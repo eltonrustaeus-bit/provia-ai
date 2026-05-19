@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ProviaAi – Provträning med AI</title>
   <meta name="description" content="ProviaAi skapar mockprov från ditt material, rättar med feedback och modellsvar." />
+  <meta property="og:title" content="ProviaAi – Provträning med AI" />
+  <meta property="og:description" content="Klistra in studiematerial → få mockprov → rätta med AI-feedback. Gratis att starta." />
+  <meta property="og:image" content="https://provia-ai-uf.vercel.app/image/proviaai-hero.png" />
+  <meta property="og:url" content="https://provia-ai-uf.vercel.app/" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ProviaAi – Provträning med AI" />
+  <meta name="twitter:description" content="Klistra in studiematerial → få mockprov → rätta med AI-feedback. Gratis att starta." />
+  <meta name="twitter:image" content="https://provia-ai-uf.vercel.app/image/proviaai-hero.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -416,6 +425,12 @@
           </div>
         </div>
 
+        <!-- CTA + replay -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:8px">
+          <a class="btn btnP" href="app.html" style="flex:1;height:36px;font-size:13px">Prova nu →</a>
+          <button id="replayBtn" type="button" class="btn btnG" style="height:36px;padding:0 12px;font-size:12px;font-family:var(--mono)" aria-label="Kör om demo">↺ Kör om</button>
+        </div>
+
       </div>
     </div>
   </section>
@@ -496,9 +511,9 @@
       <div class="secLine"></div>
       <div class="secB">
         <ul class="list">
-          <li>Infosidan är öppen — inga konton krävs för att läsa.</li>
-          <li>Appen kräver åtkomstkod eller konto via Supabase-inloggning.</li>
-          <li>ProviaAi är studiestöd och ger ingen officiell betygssättning.</li>
+          <li><strong style="color:var(--t)">Är det gratis?</strong><br>Ja — du kan köra 2 prov i veckan helt gratis utan kortuppgifter. Basic (19 kr/mån) ger 30 prov och Premium (59 kr/mån) ger obegränsat + AI-coach.</li>
+          <li><strong style="color:var(--t)">Funkar det för mitt ämne?</strong><br>Ja. ProviaAi har inbyggda guider för Matematik, NO, Svenska, Engelska, SO, Historia och Ekonomi. Klistra in vilket material som helst så anpassas proven automatiskt.</li>
+          <li><strong style="color:var(--t)">Hur lång tid tar det att göra ett prov?</strong><br>Generering tar 5–15 sekunder. Rättningen med AI-feedback är klar direkt när du lämnar in. Hela sessionen tar oftast under 10 minuter.</li>
         </ul>
       </div>
     </div>
@@ -540,7 +555,17 @@
 </div><!-- /wrap -->
 </main>
 
-<footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
+<footer>
+  <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
+    <span>© <span id="yr"></span> ProviaAi</span>
+    <span style="color:var(--l2)">·</span>
+    <a href="pricing.html" style="color:var(--t2);transition:color .15s" onmouseover="this.style.color='var(--a)'" onmouseout="this.style.color='var(--t2)'">Priser</a>
+    <span style="color:var(--l2)">·</span>
+    <a href="app.html" style="color:var(--t2);transition:color .15s" onmouseover="this.style.color='var(--a)'" onmouseout="this.style.color='var(--t2)'">Starta appen</a>
+    <span style="color:var(--l2)">·</span>
+    <span>Studiestöd — ingen officiell betygssättning</span>
+  </div>
+</footer>
 
 <script>
 /* ── LOADER ── */
@@ -678,9 +703,29 @@ document.querySelectorAll("[data-t]").forEach(btn => {
     }
   }
 
+  function startDemo() {
+    lineIdx = 0; charIdx = 0; buf = "";
+    p = 0; pFill.style.width = "0%";
+    termTxt.textContent = "";
+    trendPath.style.strokeDashoffset = 1000;
+    demoSt.textContent = "Skapar prov…";
+    statScore.textContent = "—";
+    statSub.textContent = "Väntar på svar…";
+    statCoach.textContent = "—";
+    setTimeout(typeWithBar, 600);
+  }
+
+  /* replay button */
+  const replayBtn = document.getElementById("replayBtn");
+  if (replayBtn) replayBtn.addEventListener("click", startDemo);
+
   /* Start after a short delay so page paint is settled */
-  setTimeout(typeWithBar, 600);
+  startDemo();
 })();
+
+/* ── FOOTER YEAR ── */
+const yrEl = document.getElementById("yr");
+if (yrEl) yrEl.textContent = new Date().getFullYear();
 </script>
 </body>
 </html>
