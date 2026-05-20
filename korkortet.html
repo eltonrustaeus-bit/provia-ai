@@ -220,6 +220,9 @@ body.light .miniBarInner{background:rgba(243,248,245,.95)}
 .miniBarText{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2)}
 .miniBarText strong{color:var(--a)}
 
+/* Extra padding so miniBar never covers nextBtn */
+#examView{padding-bottom:90px}
+
 /* RESULTS */
 #resultView{display:none}
 #resultView.active{display:block}
@@ -718,20 +721,22 @@ function renderQuestion(idx){
   $("qText").textContent=q.question;
 
   // Show image if question has one
-  let imgWrap=$("qImageWrap");
-  if(!imgWrap){
-    imgWrap=document.createElement("div");
-    imgWrap.id="qImageWrap";
-    imgWrap.className="qImageWrap";
-    $("qText").after(imgWrap);
-  }
-  if(q.image_url){
-    imgWrap.innerHTML=`<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'Frågabild')}" loading="lazy">`;
-    imgWrap.style.display="flex";
-  } else {
-    imgWrap.innerHTML="";
-    imgWrap.style.display="none";
-  }
+  try {
+    let imgWrap=$("qImageWrap");
+    if(!imgWrap){
+      imgWrap=document.createElement("div");
+      imgWrap.id="qImageWrap";
+      imgWrap.className="qImageWrap";
+      $("qText").after(imgWrap);
+    }
+    if(q.image_url){
+      imgWrap.innerHTML=`<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'Frågabild')}" loading="lazy">`;
+      imgWrap.style.display="flex";
+    } else {
+      imgWrap.innerHTML="";
+      imgWrap.style.display="none";
+    }
+  } catch(e){ console.warn("Image error:", e); }
 
   $("explanationBox").classList.remove("show");
   $("nextBtn").classList.remove("show");
@@ -746,28 +751,44 @@ function renderQuestion(idx){
     grid.appendChild(btn);
   });
   updateMiniBar();
+
+  // Scroll to top of question card
+  $("questionCard").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 // ── HANDLE ANSWER ──
 function handleAnswer(chosen,q){
-  const correct=q.correct;
-  answers[currentIdx]=chosen;
+  const correct=(q.correct||"").trim().toUpperCase();
+  const chosenUp=chosen.toUpperCase();
+  answers[currentIdx]=chosenUp;
 
   document.querySelectorAll(".ansBtn").forEach((btn,i)=>{
     btn.disabled=true;
     const l=["A","B","C","D"][i];
     if(l===correct) btn.classList.add("correct");
-    if(l===chosen&&chosen!==correct) btn.classList.add("wrong");
+    if(l===chosenUp&&chosenUp!==correct) btn.classList.add("wrong");
   });
 
   showExplanation(q);
 
-  const nb=$("nextBtn"); nb.classList.add("show");
-  nb.innerHTML=currentIdx===examQuestions.length-1
-    ?'Visa resultat <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>'
-    :'Nästa fråga <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>';
+  const isLast=currentIdx===examQuestions.length-1;
+  const nb=$("nextBtn");
+  nb.classList.add("show");
+  nb.textContent="";
+  const label=document.createTextNode(isLast?"Visa resultat ":"Nästa fråga ");
+  nb.appendChild(label);
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("width","14");svg.setAttribute("height","14");svg.setAttribute("viewBox","0 0 16 16");svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");svg.setAttribute("stroke-width","2");
+  const poly=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+  poly.setAttribute("points","6 3 11 8 6 13");
+  svg.appendChild(poly);nb.appendChild(svg);
 
   updateMiniBar();
+
+  // Scroll so the explanation + next button are visible
+  setTimeout(()=>{
+    $("nextBtn").scrollIntoView({behavior:"smooth",block:"nearest"});
+  },120);
 }
 
 // ── EXPLANATION ──
@@ -797,8 +818,13 @@ function showExplanation(q){
 }
 
 $("nextBtn").addEventListener("click",()=>{
-  if(currentIdx<examQuestions.length-1){ currentIdx++; renderQuestion(currentIdx); }
-  else showResults();
+  if(currentIdx<examQuestions.length-1){
+    currentIdx++;
+    renderQuestion(currentIdx);
+    window.scrollTo({top:0,behavior:"smooth"});
+  } else {
+    showResults();
+  }
 });
 
 $("abortBtn").addEventListener("click",()=>{
@@ -806,8 +832,12 @@ $("abortBtn").addEventListener("click",()=>{
   showConfigView();
 });
 
+function isCorrect(answer,q){
+  return answer!=null && answer.toUpperCase()===(q?.correct||"").trim().toUpperCase();
+}
+
 function updateMiniBar(){
-  const correct=answers.filter((a,i)=>a!==null&&a===examQuestions[i]?.correct).length;
+  const correct=answers.filter((a,i)=>isCorrect(a,examQuestions[i])).length;
   const answered=answers.filter(a=>a!==null).length;
   const remaining=examQuestions.length-answered;
   $("miniBarText").innerHTML=`<strong>${correct} / ${answered}</strong> rätt · ${remaining} frågor kvar`;
@@ -835,7 +865,7 @@ async function showResults(){
   window.scrollTo({top:0,behavior:"smooth"});
 
   const total=examQuestions.length;
-  const numCorrect=answers.filter((a,i)=>a===examQuestions[i]?.correct).length;
+  const numCorrect=answers.filter((a,i)=>isCorrect(a,examQuestions[i])).length;
   const pct=Math.round((numCorrect/total)*100);
   const passed=total===65?numCorrect>=52:pct>=75;
 
@@ -850,7 +880,7 @@ async function showResults(){
   examQuestions.forEach((q,i)=>{
     if(!catMap[q.category]) catMap[q.category]={correct:0,total:0};
     catMap[q.category].total++;
-    if(answers[i]===q.correct) catMap[q.category].correct++;
+    if(isCorrect(answers[i],q)) catMap[q.category].correct++;
   });
   const cats=Object.keys(catMap);
   if(cats.length>1){
@@ -862,7 +892,7 @@ async function showResults(){
   } else { $("breakdownCard").style.display="none"; }
 
   // Error bank
-  const errors=examQuestions.map((q,i)=>({q,chosen:answers[i]})).filter(e=>e.chosen!==e.q.correct);
+  const errors=examQuestions.map((q,i)=>({q,chosen:answers[i]})).filter(e=>!isCorrect(e.chosen,e.q));
   if(errors.length>0){
     $("errorBankCard").style.display="";
     $("errorBank").innerHTML=errors.map(({q,chosen})=>{
@@ -891,7 +921,7 @@ async function showResults(){
 
 $("newTestBtn").addEventListener("click",()=>showConfigView());
 $("retryMistakesBtn").addEventListener("click",()=>{
-  const mistakes=examQuestions.filter((_,i)=>answers[i]!==examQuestions[i]?.correct);
+  const mistakes=examQuestions.filter((_,i)=>!isCorrect(answers[i],examQuestions[i]));
   if(mistakes.length===0){toast("Inga misstag att träna!","ok");return;}
   examQuestions=shuffle(mistakes); currentIdx=0;
   answers=new Array(examQuestions.length).fill(null);
