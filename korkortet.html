@@ -182,6 +182,8 @@ body.light .startBtn{color:#fff}
 .qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px}
 .qCatBadge{color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px;font-size:9.5px}
 .qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:18px}
+.qImage{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);margin-bottom:16px;display:block;background:var(--s2)}
+.qImageWrap{display:flex;justify-content:center;margin-bottom:16px}
 
 /* ANSWER BUTTONS */
 .ansGrid{display:grid;gap:8px}
@@ -714,6 +716,23 @@ function renderQuestion(idx){
   $("qNum").textContent=`${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
   $("qCat").textContent=q.category;
   $("qText").textContent=q.question;
+
+  // Show image if question has one
+  let imgWrap=$("qImageWrap");
+  if(!imgWrap){
+    imgWrap=document.createElement("div");
+    imgWrap.id="qImageWrap";
+    imgWrap.className="qImageWrap";
+    $("qText").after(imgWrap);
+  }
+  if(q.image_url){
+    imgWrap.innerHTML=`<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'Frågabild')}" loading="lazy">`;
+    imgWrap.style.display="flex";
+  } else {
+    imgWrap.innerHTML="";
+    imgWrap.style.display="none";
+  }
+
   $("explanationBox").classList.remove("show");
   $("nextBtn").classList.remove("show");
 

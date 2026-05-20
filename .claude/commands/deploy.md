@@ -2,7 +2,7 @@
 description: Committa och pusha alla ändringar till GitHub så Vercel deployar
 ---
 
-Committa och pusha alla lokala ändringar i ProvKlarUF-projektet till GitHub.
+Committa och pusha alla lokala ändringar i ProviaAI-projektet till GitHub.
 
 Steg:
 1. Kör `git status` för att se vad som ändrats
