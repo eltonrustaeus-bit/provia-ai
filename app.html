@@ -1489,6 +1489,8 @@ async function signUpEmail(){
   try{
     const{data,error}=await db.auth.signUp({email,password});
     if(error){setLockError(error.message);return;}
+    // Notify admin about new registration (fire and forget)
+    fetch("/api/notify-new-user",{method:"POST",headers:{"Content-Type":"application/json","x-webhook-secret":"b541cc8ba411a1530dca664ce1192f5d644160f355f3b215ac3d62e29ff98d2a"},body:JSON.stringify({record:{id:data?.user?.id,approved:true,role:"gratis",created_at:new Date().toISOString()}})}).catch(()=>{});
     if(data?.session){
       const ok=await checkApprovalAndUnlock(data.session);
       if(ok){await loadExamsFromAccountToLocal();await refreshQuotaUi();}
