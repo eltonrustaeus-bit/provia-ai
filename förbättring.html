@@ -983,6 +983,15 @@
         });
         list.appendChild(d);
       });
+      if(!window.matchMedia("(prefers-reduced-motion:reduce)").matches){
+        const cards=list.querySelectorAll(".mCard");
+        cards.forEach(function(c,i){
+          c.style.opacity="0";c.style.transform="translateY(8px)";
+          c.style.transition="opacity .22s ease,transform .22s cubic-bezier(.22,.61,.36,1)";
+          c.style.transitionDelay=(i*45)+"ms";
+          requestAnimationFrame(function(){requestAnimationFrame(function(){c.style.opacity="1";c.style.transform="none";});});
+        });
+      }
     }
 
     /* ── BUILD COURSE OPTIONS ── */
@@ -1012,6 +1021,15 @@
         d.querySelector('.viewBtn')?.addEventListener('click',()=>{$('courseFilter').value=String(x.course||'').trim();renderAll();openSection('#mistakeSection');});
         wrap.appendChild(d);
       });
+      if(!window.matchMedia("(prefers-reduced-motion:reduce)").matches){
+        const cards=wrap.querySelectorAll(".dataCard");
+        cards.forEach(function(c,i){
+          c.style.opacity="0";c.style.transform="translateY(6px)";
+          c.style.transition="opacity .2s ease,transform .2s cubic-bezier(.22,.61,.36,1)";
+          c.style.transitionDelay=(i*40)+"ms";
+          requestAnimationFrame(function(){requestAnimationFrame(function(){c.style.opacity="1";c.style.transform="none";});});
+        });
+      }
     }
 
     /* ── TEACHER REPORT STATE ── */

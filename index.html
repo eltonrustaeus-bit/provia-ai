@@ -311,6 +311,8 @@
     border-top:1px solid var(--l);padding:18px 22px;text-align:center;
     font-family:var(--mono);font-size:10.5px;color:var(--t3);letter-spacing:.04em;
   }
+  .fLink{color:var(--t2);transition:color .15s ease}
+  .fLink:hover{color:var(--a)}
 
   /* REVEAL */
   .rev{opacity:0;transform:translateY(12px);transition:opacity .26s ease,transform .26s cubic-bezier(.22,.61,.36,1)}
@@ -559,9 +561,9 @@
   <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
     <span>© <span id="yr"></span> ProviaAi</span>
     <span style="color:var(--l2)">·</span>
-    <a href="pricing.html" style="color:var(--t2);transition:color .15s" onmouseover="this.style.color='var(--a)'" onmouseout="this.style.color='var(--t2)'">Priser</a>
+    <a href="pricing.html" class="fLink">Priser</a>
     <span style="color:var(--l2)">·</span>
-    <a href="app.html" style="color:var(--t2);transition:color .15s" onmouseover="this.style.color='var(--a)'" onmouseout="this.style.color='var(--t2)'">Starta appen</a>
+    <a href="app.html" class="fLink">Starta appen</a>
     <span style="color:var(--l2)">·</span>
     <span>Studiestöd — ingen officiell betygssättning</span>
   </div>
@@ -619,7 +621,7 @@ document.querySelectorAll("[data-t]").forEach(btn => {
   const io = new IntersectionObserver(entries => {
     entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
   }, { threshold:.08, rootMargin:"0px 0px -4% 0px" });
-  els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*30,120)}ms`; io.observe(el); });
+  els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*60,240)}ms`; io.observe(el); });
 })();
 
 /* ── LIVE DEMO ── */
