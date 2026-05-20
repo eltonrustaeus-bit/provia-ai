@@ -62,12 +62,14 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
-  let body = "";
-  req.on("data", (c) => (body += c));
+  const chunks = [];
+  req.on("data", (c) => chunks.push(c));
   req.on("end", async () => {
     let p;
-    try { p = body ? JSON.parse(body) : {}; }
-    catch (e) { return json(res, 400, { ok: false, error: "Invalid JSON", details: String(e) }); }
+    try {
+      const raw = Buffer.concat(chunks).toString("utf8");
+      p = raw ? JSON.parse(raw) : {};
+    } catch (e) { return json(res, 400, { ok: false, error: "Invalid JSON", details: String(e) }); }
 
     const lang = asEnum(p.lang, ["sv", "en"], "sv");
     const course = safeString(p.course, 200) || "";

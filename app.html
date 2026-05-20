@@ -636,6 +636,27 @@ color:var(--t3);letter-spacing:.04em;
 transition:border-color .28s ease,color .28s ease;
 }
 
+@media(max-width:500px){.wStepLabel{display:none}.wStep{padding:7px 8px;min-height:44px}}
+
+/* ── SKELETON LOADING ── */
+.skelBox{padding:14px 16px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);margin-top:10px;position:relative;overflow:hidden}
+.skelBox::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,rgba(27,255,140,.06) 50%,transparent 80%);animation:skelShim 1.5s ease-in-out infinite}
+@keyframes skelShim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.skelLine{height:9px;border-radius:3px;background:var(--l2);margin-bottom:9px}
+.skelLine.s{width:38%}.skelLine.m{width:62%}.skelLine.l{width:87%}
+.skelOpts{display:grid;gap:7px;margin-top:14px}
+.skelOpt{height:40px;border-radius:var(--r);background:var(--l);position:relative;overflow:hidden}
+.skelOpt::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,rgba(27,255,140,.04) 50%,transparent 80%);animation:skelShim 1.8s .15s ease-in-out infinite}
+
+/* ── TOAST NOTIFICATIONS ── */
+#toastRoot{position:fixed;top:68px;right:16px;z-index:9500;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.toast{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--r);background:var(--s);border:1px solid var(--l2);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);box-shadow:var(--sh2);pointer-events:auto;cursor:pointer;animation:toastIn .22s cubic-bezier(.22,.61,.36,1) forwards;max-width:min(320px,calc(100vw - 32px))}
+.toast.ok{border-color:rgba(27,255,140,.38);color:var(--a)}
+.toast.bad{border-color:rgba(255,107,107,.35);color:#ff8484}
+.toast.out{animation:toastOut .18s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-6px) scale(.97)}}
+
 @media(prefers-reduced-motion:reduce){
 *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
 .reveal{opacity:1;transform:none}
@@ -1513,6 +1534,46 @@ function runTrainModeIfRequested(){
 
 async function fileToDataUrl(file){ return new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>resolve(String(fr.result||"")); fr.onerror=()=>reject(new Error("FileReader error")); fr.readAsDataURL(file); }); }
 
+/* ── TOAST ── */
+(function(){
+  const root=document.createElement("div");root.id="toastRoot";document.body.appendChild(root);
+  window.showToast=function(msg,kind,ms){
+    ms=ms||3200;
+    const el=document.createElement("div");el.className="toast"+(kind?" "+kind:"");el.textContent=msg;
+    root.appendChild(el);
+    const rm=()=>{el.classList.add("out");setTimeout(()=>el.remove(),200);};
+    const tid=setTimeout(rm,ms);
+    el.addEventListener("click",()=>{clearTimeout(tid);rm();},{once:true});
+  };
+})();
+
+/* ── SKELETON ── */
+function showSkeleton(n){
+  const eb=examBodyEl();if(!eb)return;
+  eb.innerHTML="";
+  const noMotion=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  if(noMotion)return;
+  for(let i=0;i<Math.max(1,n);i++){
+    const b=document.createElement("div");b.className="skelBox";
+    const hasMc=(i%3!==1);
+    b.innerHTML=`<div class="skelLine s" style="margin-bottom:12px"></div><div class="skelLine l"></div><div class="skelLine m"></div>`
+      +(hasMc?`<div class="skelOpts"><div class="skelOpt"></div><div class="skelOpt"></div><div class="skelOpt"></div></div>`:"<div class=\"skelLine l\" style=\"height:70px;margin-top:12px\"></div>");
+    eb.appendChild(b);
+  }
+}
+
+/* ── STAGGER HELPER ── */
+function staggerIn(els,delayMs){
+  delayMs=delayMs||50;
+  if(window.matchMedia("(prefers-reduced-motion:reduce)").matches)return;
+  els.forEach(function(el,i){
+    el.style.opacity="0";el.style.transform="translateY(8px)";
+    el.style.transition="opacity .22s ease,transform .22s cubic-bezier(.22,.61,.36,1)";
+    el.style.transitionDelay=(i*delayMs)+"ms";
+    requestAnimationFrame(function(){requestAnimationFrame(function(){el.style.opacity="1";el.style.transform="none";});});
+  });
+}
+
 function renderExam(exam){
   currentExam=exam; const qs=Array.isArray(exam.questions)?exam.questions:[]; const t=T[LANG];
   const em=examMetaEl(),eb=examBodyEl(),rm=resultMetaEl(),rb=resultBodyEl();
@@ -1542,6 +1603,7 @@ function renderExam(exam){
     box.appendChild(ans);eb?.appendChild(box);
   });
   const g=$("gradeBtn");if(g)g.disabled=qs.length===0;
+  staggerIn(Array.from(eb.querySelectorAll(".qBox")),50);
   // Visa flytande rätta-bar
   const fb=$("floatingGradeBar");if(fb&&qs.length>0)fb.classList.add("show");
 }
@@ -1556,7 +1618,7 @@ function renderResult(r){
     d.innerHTML=`<div class="qMeta">ID: ${escapeHtml(item.id)} · ${item.points}/${item.max_points}</div><div class="resultFeedback">${escapeHtml(item.feedback||"")}</div><div class="resultModelLabel">${t.fullScore}</div><div class="resultModelText">${escapeHtml(model)}</div>`;
     wrap.appendChild(d);
   });
-  if(rb){rb.innerHTML="";rb.appendChild(wrap);}
+  if(rb){rb.innerHTML="";rb.appendChild(wrap);staggerIn(Array.from(rb.querySelectorAll(".resultItem")),60);}
 
   // Visa förbättring-bannern med resultatinfo
   const banner=$("improveBanner"),sub=$("improveBannerSub");
@@ -1664,6 +1726,8 @@ try{
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return;}
     const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:Number(numQuestionsEl()?.value||12)};
+    showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
+    const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload);
     if(res.status===429&&res.data){setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();return;}
@@ -1674,7 +1738,7 @@ try{
     await refreshQuotaUi();
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-    renderExam(res.data.exam);setBusy(false);setStatus(t.genDone,"ok");setWizardStep(2);
+    renderExam(res.data.exam);setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
 
     // Uppdatera floating bar hint med antal frågor
     const fh=$("floatingGradeHint");
@@ -1719,7 +1783,7 @@ try{
     });
     while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-    setBusy(false);setStatus(t.gradeDone,"ok");setWizardStep(3);
+    setBusy(false);setStatus(t.gradeDone,"ok");showToast(t.gradeDone,"ok");setWizardStep(3);
   });
 
   onClick("clearBtn",clearAll);

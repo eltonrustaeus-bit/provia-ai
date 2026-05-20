@@ -1,9 +1,14 @@
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") return res.status(405).json({ ok: false });
 
     const { userIdToApprove } = req.body || {};
     if (!userIdToApprove) return res.status(400).json({ ok: false, error: "Missing userIdToApprove" });
+
+    const targetId = String(userIdToApprove).trim();
+    if (!UUID_RE.test(targetId)) return res.status(400).json({ ok: false, error: "Invalid userIdToApprove" });
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,7 +36,7 @@ export default async function handler(req, res) {
     if (role !== "admin") return res.status(403).json({ ok: false, error: "Not admin" });
 
     // 3) Godkänn target user
-    const upResp = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userIdToApprove}`, {
+    const upResp = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${targetId}`, {
       method: "PATCH",
       headers: {
         apikey: serviceKey,
