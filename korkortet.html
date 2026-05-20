@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProviaAi – Körkortsteorin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --a:#1bff8c;--a2:#16d475;--a-dim:rgba(27,255,140,.07);
+  --bg:#08100d;--s:#111a15;--s2:#162019;
+  --t:#e8f5ee;--t2:#a8c4b4;--t3:#6b8f7c;
+  --l:rgba(27,255,140,.10);--l2:rgba(27,255,140,.22);
+  --sh:0 8px 32px rgba(0,0,0,.50);--sh2:0 16px 48px rgba(0,0,0,.55);--sh3:0 24px 64px rgba(0,0,0,.65);
+  --r:5px;--r2:3px;--max:1080px;
+  --danger:#ff6b6b;--warn:#f4c842;--ok:#1bff8c;
+}
+body.light{
+  --a:#0d9460;--a2:#0b7a50;--a-dim:rgba(13,148,96,.07);
+  --bg:#f3f8f5;--s:#ffffff;--s2:#edf5f0;
+  --t:#0c1e15;--t2:#3a6050;--t3:#7aaa92;
+  --l:rgba(13,148,96,.11);--l2:rgba(13,148,96,.25);
+  --sh:0 4px 20px rgba(0,0,0,.08);--sh2:0 8px 32px rgba(0,0,0,.11);--sh3:0 16px 48px rgba(0,0,0,.14);
+  --danger:#c0392b;--warn:#946c00;--ok:#0d9460;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+:target{scroll-margin-top:70px}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6;min-height:100vh;transition:background .28s,color .28s}
+a{text-decoration:none;color:inherit}
+input,select,textarea,button{font-family:'DM Sans',system-ui,sans-serif}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--l2);border-radius:3px}
+
+/* LOADER */
+.pageLoader{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;background:var(--bg);transition:opacity .22s,visibility .22s}
+.pageLoader.done{opacity:0;visibility:hidden;pointer-events:none}
+.loaderOrb{width:52px;height:52px;border-radius:50%;position:relative;border:1px solid var(--l2)}
+.loaderOrb::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid transparent;border-top-color:var(--a);border-right-color:rgba(27,255,140,.3);animation:spin .9s linear infinite}
+.loaderText{margin-top:14px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.12em;text-transform:uppercase}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HEADER */
+header{height:56px;position:sticky;top:0;z-index:3000;background:rgba(8,16,13,.88);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid var(--l);display:flex;align-items:center;transition:background .28s,border-color .28s}
+body.light header{background:rgba(243,248,245,.92)}
+.hWrap{max-width:var(--max);width:100%;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:30px;width:auto;display:block}
+.brandName{font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;line-height:1;transition:color .28s}
+.brandTag{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:400;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;line-height:1;transition:color .28s}
+.hRight{display:flex;align-items:center;gap:6px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;height:34px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);cursor:pointer;white-space:nowrap;position:relative;overflow:hidden;transition:transform .16s cubic-bezier(.22,.61,.36,1),box-shadow .16s,border-color .16s,background .28s,color .28s}
+.btn::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(27,255,140,.06),transparent 55%);opacity:0;transition:opacity .16s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--sh);border-color:var(--l2)}.btn:hover::after{opacity:1}
+.btn:active{transform:translateY(0) scale(.98)}.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.btnP{background:var(--a);color:#08100d;border-color:var(--a);font-weight:700}
+body.light .btnP{color:#fff}.btnP:hover{background:var(--a2);border-color:var(--a2)}
+.btnP::after{background:linear-gradient(135deg,rgba(255,255,255,.15),transparent 55%)}
+.btnG{background:transparent;border-color:var(--l)}.btnG:hover{background:var(--a-dim);border-color:var(--l2)}
+
+/* THEME TOGGLE */
+.themeTgl{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:34px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);background:transparent;cursor:pointer;transition:color .16s,border-color .16s,background .28s}
+.themeTgl:hover{color:var(--t);border-color:var(--l2);background:var(--a-dim)}
+.tglIcon{display:inline-block;transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.themeTgl:hover .tglIcon{transform:rotate(18deg) scale(1.2)}
+
+/* MENU */
+.menuWrap{position:relative;z-index:4000}
+.menuBtn{width:34px;height:34px;padding:0;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r);background:transparent;color:var(--t2);cursor:pointer;transition:border-color .16s,background .16s,color .16s}
+.menuBtn:hover{border-color:var(--l2);background:var(--a-dim);color:var(--t)}
+.menuBtn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.barsIcon{display:grid;gap:3.5px;width:16px}.barsIcon span{display:block;height:1.5px;background:currentColor;border-radius:1px}
+.dropdown{position:absolute;right:0;top:calc(100% + 8px);min-width:230px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);padding:6px;display:none;opacity:0;transform:translateY(-6px) scale(.99);z-index:5000}
+.dropdown.is-open{display:block;opacity:1;transform:translateY(0) scale(1);transition:opacity .16s cubic-bezier(.22,.61,.36,1),transform .16s cubic-bezier(.22,.61,.36,1)}
+.dropdown.is-closing{display:block;opacity:0;transform:translateY(-4px) scale(.99);transition:opacity .12s,transform .12s}
+.ddItem{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:var(--r2);border:1px solid transparent;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;font-size:13px;color:var(--t2);text-align:left;transition:background .12s,border-color .12s,color .12s}
+.ddItem:hover{background:var(--a-dim);border-color:var(--l);color:var(--t)}
+.ddPill{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.06em;border:1px solid var(--l);border-radius:var(--r2);padding:2px 7px}
+.ddPill.new{color:var(--a);border-color:var(--l2);background:rgba(27,255,140,.08)}
+.ddSep{height:1px;background:var(--l);margin:4px 2px}
+
+/* LAYOUT */
+.wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
+
+/* HERO */
+.hero{padding:36px 0 24px}
+.eyebrow{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--a);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.eyebrow::before{content:"";display:block;width:18px;height:1.5px;background:var(--a);border-radius:1px}
+.heroTitle{font-weight:700;font-size:clamp(22px,3.8vw,38px);letter-spacing:-.035em;line-height:1.15;color:var(--t);margin-bottom:10px}
+.heroTitle em{font-style:normal;color:var(--a)}
+.heroSub{font-size:14px;color:var(--t2);font-weight:400;max-width:560px;line-height:1.65}
+.statusRow{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.sDot{width:6px;height:6px;border-radius:50%;background:var(--t3);transition:background .28s,box-shadow .28s}
+.sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:dotPulse 2s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
+.statusLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.06em}
+
+/* QUOTA BANNER */
+.quotaBanner{display:none;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--l2);border-radius:var(--r);background:rgba(27,255,140,.05);padding:10px 14px;margin-bottom:16px;flex-wrap:wrap}
+.quotaBanner.show{display:flex}
+.quotaBannerTxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.4}
+.quotaBannerTxt strong{color:var(--a)}
+.quotaBannerLink{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--a);border-bottom:1px solid rgba(27,255,140,.3);white-space:nowrap}
+.quotaBannerLink:hover{border-bottom-color:var(--a)}
+
+/* LOGIN */
+.loginOverlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+.loginCard{width:min(560px,100%);background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);overflow:hidden}
+.loginTop{display:flex;gap:14px;align-items:center;padding:20px 20px 16px;border-bottom:1px solid var(--l)}
+.loginTop img{height:34px;width:auto}
+.loginTitle{font-family:'DM Sans',sans-serif;font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em}
+.loginSub{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.loginBody{padding:20px}
+.authBlock{border:1px solid var(--l);border-radius:var(--r);padding:16px;background:var(--s2);margin-bottom:14px}
+.authBlockTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+.fieldLabel{display:block;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
+input[type="email"],input[type="password"],input[type="text"],select{width:100%;padding:10px 12px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none;transition:border-color .16s,background .28s,color .28s,box-shadow .16s}
+input[type="email"]:focus,input[type="password"]:focus,input[type="text"]:focus,select:focus{border-color:var(--l2);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
+select option{background:var(--s);color:var(--t)}
+.loginBtnRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.loginHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5}
+.loginErr{font-family:'DM Mono',monospace;font-size:11.5px;font-weight:500;color:var(--danger);margin-top:10px}
+
+/* REVEAL */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .28s,transform .28s cubic-bezier(.22,.61,.36,1)}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--l);padding:20px 24px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em;transition:border-color .28s,color .28s}
+
+/* MISC */
+.stxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5}
+.stxt.ok{color:var(--ok)}.stxt.bad{color:var(--danger)}.stxt.warn{color:var(--warn)}
+.spinner{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(27,255,140,.15);border-top-color:var(--a);animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+
+/* CARD */
+.card{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:12px;transition:border-color .28s,background .28s}
+.card:hover{border-color:var(--l2)}
+.cardTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
+
+/* CATEGORY GRID */
+.catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+@media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
+.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .16s,background .16s,transform .16s;min-height:44px;position:relative;overflow:hidden;width:100%}
+.catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-1px)}
+.catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
+.catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
+.catName{font-family:'DM Sans',sans-serif;font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:3px}
+.catCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em}
+.catCard.active .catCount{color:var(--a)}
+
+/* CONFIG */
+.configGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:480px){.configGrid{grid-template-columns:1fr}}
+.startArea{text-align:center;padding:4px 0}
+.startBtn{display:inline-flex;align-items:center;gap:8px;padding:0 28px;height:48px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .16s,background .16s,box-shadow .16s}
+.startBtn:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(27,255,140,.3)}
+.startBtn:active{transform:scale(.98)}.startBtn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+body.light .startBtn{color:#fff}
+.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:8px;letter-spacing:.04em}
+
+/* EXAM VIEW */
+#examView{display:none}
+#examView.active{display:block}
+
+/* PROGRESS */
+.progressWrap{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.progressBar{flex:1;height:4px;border-radius:999px;background:var(--s2);overflow:hidden}
+.progressFill{height:100%;background:var(--a);border-radius:999px;transition:width .35s cubic-bezier(.2,.8,.2,1)}
+.progressLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
+.timerBadge{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);border:1px solid var(--l);border-radius:var(--r2);padding:2px 8px;flex-shrink:0}
+.timerBadge.warn{color:var(--warn);border-color:rgba(244,200,66,.3)}.timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.3)}
+
+/* QUESTION */
+.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.qCatBadge{color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px;font-size:9.5px}
+.qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:18px}
+
+/* ANSWER BUTTONS */
+.ansGrid{display:grid;gap:8px}
+.ansBtn{display:flex;align-items:center;gap:12px;padding:12px 15px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .16s,background .16s,color .16s,transform .16s;min-height:44px}
+.ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
+.ansBtn:disabled{cursor:default;transform:none}
+.ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t)}
+body.light .ansBtn.correct{background:rgba(13,148,96,.12);border-color:var(--a)}
+.ansBtn.wrong{border-color:#ff6b6b;background:rgba(255,107,107,.10);color:var(--t)}
+.ansLetter{width:26px;height:26px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .16s,border-color .16s,color .16s}
+.ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
+body.light .ansBtn.correct .ansLetter{color:#fff}
+.ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:#ff6b6b;color:#ff8484}
+
+/* EXPLANATION */
+.explanationBox{display:none;margin-top:14px;border-left:2px solid var(--a);background:var(--a-dim);border-radius:0 var(--r) var(--r) 0;padding:12px 16px}
+.explanationBox.show{display:block;animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.explLabel{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.explText{font-size:13.5px;color:var(--t2);line-height:1.6}
+
+/* NEXT */
+.nextBtnWrap{display:flex;justify-content:flex-end;margin-top:14px}
+.nextBtn{display:none;align-items:center;gap:6px;padding:0 20px;height:40px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s}
+.nextBtn.show{display:inline-flex}
+body.light .nextBtn{color:#fff}
+.nextBtn:hover{transform:translateY(-1px);background:var(--a2)}
+
+/* MINIBAR */
+.miniBar{position:sticky;bottom:16px;z-index:100;display:none;margin-top:16px}
+.miniBar.show{display:block}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.92);backdrop-filter:blur(14px);border:1px solid var(--l2);border-radius:var(--r);padding:12px 16px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+body.light .miniBarInner{background:rgba(243,248,245,.95)}
+.miniBarText{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2)}
+.miniBarText strong{color:var(--a)}
+
+/* RESULTS */
+#resultView{display:none}
+#resultView.active{display:block}
+.resultBig{text-align:center;padding:32px 22px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
+.resultScore{font-family:'DM Mono',monospace;font-size:clamp(36px,7vw,64px);font-weight:500;color:var(--t);letter-spacing:-.02em;line-height:1;margin-bottom:8px}
+.resultScore span{color:var(--a)}
+.resultPercent{font-family:'DM Mono',monospace;font-size:14px;color:var(--t3);margin-bottom:16px}
+.statusBadge{display:inline-flex;align-items:center;gap:7px;padding:8px 20px;border-radius:var(--r);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;letter-spacing:.06em}
+.statusBadge.pass{background:rgba(27,255,140,.12);border:1px solid var(--a);color:var(--a)}
+.statusBadge.fail{background:rgba(255,107,107,.10);border:1px solid rgba(255,107,107,.4);color:#ff8484}
+body.light .statusBadge.fail{color:#c0392b}
+
+.breakdownGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:4px}
+.breakdownCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px;transition:border-color .16s}
+.breakdownCard:hover{border-color:var(--l2)}
+.brkLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em;margin-bottom:4px}
+.brkScore{font-size:13.5px;font-weight:600;color:var(--t)}
+.brkBar{height:3px;border-radius:999px;background:var(--l);overflow:hidden;margin-top:6px}
+.brkFill{height:100%;background:var(--a);border-radius:999px}
+
+.errorBank{display:grid;gap:8px;margin-bottom:4px}
+.errorCard{background:var(--s2);border:1px solid rgba(255,107,107,.18);border-radius:var(--r);padding:14px}
+.errorQ{font-size:13px;font-weight:600;color:var(--t);margin-bottom:6px;line-height:1.45}
+.errorCatLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em;margin-bottom:6px}
+.errorCorrect{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--a);margin-bottom:4px}
+.errorExpl{font-size:12.5px;color:var(--t2);line-height:1.55;margin-top:4px}
+
+.resultActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+
+/* HISTORY */
+.histTable{width:100%;border-collapse:collapse;font-size:13px}
+.histTable th{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--l)}
+.histTable td{padding:10px 12px;border-bottom:1px solid var(--l);color:var(--t2)}
+.histTable tr:last-child td{border-bottom:none}
+.histTable tr:hover td{background:var(--a-dim);color:var(--t)}
+.passBadge{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;padding:2px 8px;border-radius:var(--r2)}
+.passBadge.p{background:rgba(27,255,140,.12);color:var(--a);border:1px solid rgba(27,255,140,.3)}
+.passBadge.f{background:rgba(255,107,107,.10);color:#ff8484;border:1px solid rgba(255,107,107,.25)}
+
+/* TOAST */
+#toastRoot{position:fixed;top:68px;right:16px;z-index:9500;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+.toast{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--r);background:var(--s);border:1px solid var(--l2);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);box-shadow:var(--sh2);pointer-events:auto;cursor:pointer;animation:toastIn .22s cubic-bezier(.22,.61,.36,1) forwards;max-width:min(320px,calc(100vw - 32px))}
+.toast.ok{border-color:rgba(27,255,140,.38);color:var(--a)}.toast.bad{border-color:rgba(255,107,107,.35);color:#ff8484}
+.toast.out{animation:toastOut .18s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-6px) scale(.97)}}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div id="toastRoot"></div>
+
+<!-- LOADER -->
+<div id="pageLoader" class="pageLoader" aria-hidden="true">
+  <div style="display:grid;place-items:center">
+    <div class="loaderOrb"></div>
+    <div class="loaderText">ProviaAI</div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="loginOverlay" style="display:none">
+  <div class="loginCard" role="dialog" aria-modal="true" aria-label="Inloggning">
+    <div class="loginTop">
+      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <div>
+        <div class="loginTitle">ProviaAi – Körkortsteorin</div>
+        <div class="loginSub">Logga in eller skapa konto</div>
+      </div>
+    </div>
+    <div class="loginBody">
+      <div class="authBlock">
+        <div class="authBlockTitle">Logga in / Skapa konto</div>
+        <div class="grid2">
+          <div>
+            <label class="fieldLabel" for="authEmail">E-post</label>
+            <input id="authEmail" type="email" autocomplete="email" placeholder="du@skola.se" />
+          </div>
+          <div>
+            <label class="fieldLabel" for="authPass">Lösenord</label>
+            <input id="authPass" type="password" autocomplete="current-password" placeholder="Minst 8 tecken" />
+          </div>
+        </div>
+        <div class="loginBtnRow">
+          <button class="btn btnP" type="button" id="signInBtn">Logga in</button>
+          <button class="btn btnG" type="button" id="signUpBtn">Skapa konto</button>
+          <a class="btn btnG" href="index.html">Infosidan</a>
+        </div>
+        <div class="loginHint">Skapa konto för att börja — gratis, inget kort krävs.</div>
+      </div>
+      <div id="loginErr" class="loginErr" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="hWrap">
+    <a class="brand" href="index.html">
+      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <div>
+        <div class="brandName">ProviaAi</div>
+        <div class="brandTag">Körkortsteorin</div>
+      </div>
+    </a>
+    <div class="hRight">
+      <a class="btn btnG" href="app.html" style="font-family:'DM Mono',monospace;font-size:11px;height:34px;padding:0 12px">← Appen</a>
+      <button class="themeTgl" id="themeBtn" type="button" aria-label="Växla tema">
+        <span class="tglIcon" id="tglIcon">🌙</span>
+        <span id="tglLabel">Light</span>
+      </button>
+      <div class="menuWrap">
+        <button class="menuBtn" id="menuBtn" type="button" aria-label="Meny">
+          <div class="barsIcon" aria-hidden="true"><span></span><span></span><span></span></div>
+        </button>
+        <div class="dropdown" id="menu">
+          <a class="ddItem" href="app.html"><span>Mockprov</span><span class="ddPill">AI</span></a>
+          <a class="ddItem" href="förbättring.html"><span>Förbättring</span><span class="ddPill">Coach</span></a>
+          <a class="ddItem" href="korkortet.html"><span>Körkortsteorin</span><span class="ddPill new">Nytt</span></a>
+          <div class="ddSep"></div>
+          <a class="ddItem" href="pricing.html"><span>Uppgradera</span><span class="ddPill" id="rolePill">Gratis</span></a>
+          <button class="ddItem" type="button" id="logoutBtn"><span>Logga ut</span><span class="ddPill">Lås</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero reveal">
+    <div class="eyebrow">Körkortsteorin</div>
+    <h1 class="heroTitle">Klara teorin på <em>första försöket</em></h1>
+    <p class="heroSub">Träna på riktiga teorifrågor kategoriserade efter Transportstyrelsens ämnesområden. AI förklarar varje svar.</p>
+    <div class="statusRow">
+      <div class="sDot ok" id="statusDot"></div>
+      <span class="statusLabel" id="quotaLabel">LADDAR…</span>
+    </div>
+  </div>
+
+  <!-- QUOTA BANNER -->
+  <div class="quotaBanner" id="quotaBanner">
+    <div class="quotaBannerTxt" id="quotaBannerTxt"></div>
+    <a class="quotaBannerLink" href="pricing.html">Uppgradera →</a>
+  </div>
+
+  <!-- CONFIG VIEW -->
+  <div id="configView">
+
+    <div class="card reveal">
+      <div class="cardTitle">Välj kategori</div>
+      <div class="catGrid" id="catGrid">
+        <div style="grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">Laddar kategorier…</div>
+      </div>
+    </div>
+
+    <div class="card reveal">
+      <div class="cardTitle">Provkonfiguration</div>
+      <div class="configGrid">
+        <div>
+          <label class="fieldLabel" for="numQSel">Antal frågor</label>
+          <select id="numQSel">
+            <option value="10">10 frågor</option>
+            <option value="20">20 frågor</option>
+            <option value="30">30 frågor</option>
+            <option value="45">45 frågor</option>
+            <option value="65">65 frågor (riktigt prov)</option>
+          </select>
+        </div>
+        <div>
+          <label class="fieldLabel" for="diffSel">Svårighetsgrad</label>
+          <select id="diffSel">
+            <option value="">Alla</option>
+            <option value="easy">Lätt</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Svår</option>
+          </select>
+        </div>
+      </div>
+      <div class="startArea">
+        <button class="startBtn" id="startBtn" type="button" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+          Starta körkortstest
+        </button>
+        <div class="startHint" id="startHint">10 frågor · 8 rätt rekommenderas</div>
+      </div>
+    </div>
+
+    <div class="card reveal" id="historySection" style="display:none">
+      <div class="cardTitle">Senaste resultat</div>
+      <div id="historyBody"></div>
+    </div>
+
+  </div>
+
+  <!-- EXAM VIEW -->
+  <div id="examView">
+    <div class="progressWrap">
+      <div class="progressBar"><div class="progressFill" id="progressFill" style="width:0%"></div></div>
+      <span class="progressLabel" id="progressLabel">Fråga 1 av 10</span>
+      <span class="timerBadge" id="timerBadge" style="display:none">--:--</span>
+    </div>
+
+    <div class="questionCard" id="questionCard">
+      <div class="qMeta">
+        <span id="qNum" style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)">01/10</span>
+        <span class="qCatBadge" id="qCat"></span>
+      </div>
+      <div class="qText" id="qText"></div>
+      <div class="ansGrid" id="ansGrid"></div>
+      <div class="explanationBox" id="explanationBox">
+        <div class="explLabel">Förklaring</div>
+        <div class="explText" id="explText"></div>
+      </div>
+    </div>
+
+    <div class="nextBtnWrap">
+      <button class="nextBtn" id="nextBtn" type="button">
+        Nästa fråga <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>
+      </button>
+    </div>
+
+    <div class="miniBar show" id="miniBar">
+      <div class="miniBarInner">
+        <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt · — frågor kvar</div>
+        <button class="btn btnG" id="abortBtn" type="button" style="height:32px;font-size:12px">Avbryt prov</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT VIEW -->
+  <div id="resultView">
+    <div class="resultBig reveal">
+      <div class="resultScore" id="resultScore"><span>0</span> / 0</div>
+      <div class="resultPercent" id="resultPercent">0%</div>
+      <div id="passBadgeWrap" style="margin-top:4px"></div>
+    </div>
+
+    <div class="resultActions">
+      <button class="btn btnP" id="retryMistakesBtn" type="button">Träna mina misstag</button>
+      <button class="btn btnG" id="newTestBtn" type="button">Nytt test</button>
+    </div>
+
+    <div class="card" id="breakdownCard" style="display:none">
+      <div class="cardTitle">Resultat per kategori</div>
+      <div class="breakdownGrid" id="breakdownGrid"></div>
+    </div>
+
+    <div class="card" id="errorBankCard" style="display:none">
+      <div class="cardTitle">Felbank — dina misstag</div>
+      <div class="errorBank" id="errorBank"></div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
+const LS_THEME      = "proviaai_theme";
+const LS_ROLE       = "proviaai_role";
+const LS_EXPL_CACHE = "proviaai_driving_explanations";
+
+const ROLE_LIMITS = {
+  gratis:  { period:"week",  limit:1        },
+  basic:   { period:"month", limit:5        },
+  premium: { period:"month", limit:Infinity },
+  admin:   { period:"month", limit:Infinity },
+  user:    { period:"month", limit:Infinity },
+};
+
+const CATEGORY_LIST = [
+  "Alla kategorier","Vägmärken","Trafikregler","Korsningar",
+  "Möte & Omkörning","Hastighet","Miljö & Ekonomi","Alkohol & Droger",
+  "Säkerhet & Utrustning","Mörker & Sikt","Väglag & Bromssträcka",
+];
+
+// ── STATE ──
+let db, currentUser, currentRole = localStorage.getItem(LS_ROLE) || "gratis";
+let allQuestions = [], examQuestions = [], currentIdx = 0;
+let answers = [], selectedCategory = "Alla kategorier";
+let timerInterval = null;
+let catCounts = {};
+
+// ── HELPERS ──
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") }
+function safeJson(s,fb){ try{return JSON.parse(s)}catch{return fb} }
+
+function isoWeekKey(d=new Date()){
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));
+  const ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  const wk=Math.ceil((((t-ys)/86400000)+1)/7);
+  return `${t.getUTCFullYear()}-W${String(wk).padStart(2,"0")}`;
+}
+function monthKey(d=new Date()){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` }
+
+function quotaKey(role,uid){
+  const cfg=ROLE_LIMITS[role]||ROLE_LIMITS.gratis;
+  const p=cfg.period==="week"?isoWeekKey():monthKey();
+  return `proviaai_driving_quota_${uid}_${role}_${p}`;
+}
+
+async function getUid(){ const {data}=await db.auth.getUser(); return data?.user?.id||null }
+async function readQuota(){ const uid=(await getUid())||"guest"; return Number(localStorage.getItem(quotaKey(currentRole,uid))||0) }
+async function bumpQuota(){ const uid=(await getUid())||"guest"; const k=quotaKey(currentRole,uid); localStorage.setItem(k,String(Number(localStorage.getItem(k)||0)+1)) }
+
+async function checkQuota(){
+  const cfg=ROLE_LIMITS[currentRole]||ROLE_LIMITS.gratis;
+  if(cfg.limit===Infinity) return {allowed:true,count:0,limit:Infinity,period:cfg.period};
+  const count=await readQuota();
+  return {allowed:count<cfg.limit,count,limit:cfg.limit,period:cfg.period};
+}
+
+function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a }
+
+// ── TOAST ──
+function toast(msg,type="ok"){
+  const el=document.createElement("div");
+  el.className=`toast ${type}`;el.textContent=msg;
+  $("toastRoot").appendChild(el);
+  el.addEventListener("click",()=>dismiss(el));
+  setTimeout(()=>dismiss(el),4000);
+  function dismiss(e){e.classList.add("out");setTimeout(()=>e.remove(),200)}
+}
+
+// ── THEME ──
+function applyTheme(t){
+  document.body.classList.toggle("light",t==="light");
+  $("tglIcon").textContent=t==="light"?"☀️":"🌙";
+  $("tglLabel").textContent=t==="light"?"Dark":"Light";
+}
+$("themeBtn").addEventListener("click",()=>{
+  const next=document.body.classList.contains("light")?"dark":"light";
+  localStorage.setItem(LS_THEME,next); applyTheme(next);
+});
+applyTheme(localStorage.getItem(LS_THEME)||"dark");
+
+// ── MENU ──
+(function(){
+  const btn=$("menuBtn"),menu=$("menu"); let open=false;
+  function close(){
+    menu.classList.remove("is-open"); menu.classList.add("is-closing");
+    setTimeout(()=>{menu.classList.remove("is-closing");menu.style.display="none"},130); open=false;
+  }
+  btn.addEventListener("click",e=>{
+    e.stopPropagation();
+    if(open){close();return;}
+    menu.style.display="block"; requestAnimationFrame(()=>menu.classList.add("is-open")); open=true;
+  });
+  document.addEventListener("click",e=>{if(open&&!menu.contains(e.target))close()});
+  $("logoutBtn").addEventListener("click",async()=>{await db?.auth.signOut();location.reload()});
+})();
+
+// ── QUOTA UI ──
+async function refreshQuotaUi(){
+  const rp=$("rolePill"); const banner=$("quotaBanner"); const bannerTxt=$("quotaBannerTxt");
+  const label=$("quotaLabel"); const dot=$("statusDot");
+  const rl={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
+  if(rp) rp.textContent=rl[currentRole]||currentRole;
+
+  const cfg=ROLE_LIMITS[currentRole]||ROLE_LIMITS.gratis;
+  if(cfg.limit===Infinity){
+    if(label) label.textContent="OBEGRÄNSAT";
+    if(banner) banner.classList.remove("show");
+    dot?.classList.add("ok");
+    $("startBtn").disabled=false;
+    return true;
+  }
+  const count=await readQuota();
+  const left=Math.max(cfg.limit-count,0);
+  const period=cfg.period==="week"?"VECKA":"MÅNAD";
+  if(label) label.textContent=`TEST DENNA ${period}: ${count}/${cfg.limit} · KVAR: ${left}`;
+  dot?.classList.toggle("ok",left>0);
+
+  if(banner&&bannerTxt){
+    if(left===0){
+      const msg=cfg.period==="week"?"Du har använt ditt gratistest denna vecka.":"Du har nått månadsgränsen.";
+      bannerTxt.innerHTML=`<strong>Gränsen nådd.</strong> ${msg}`;
+      banner.classList.add("show");
+      $("startBtn").disabled=true;
+    } else if(left===1){
+      bannerTxt.innerHTML=`<strong>1 test kvar</strong> denna ${cfg.period==="week"?"vecka":"månad"}.`;
+      banner.classList.add("show");
+      $("startBtn").disabled=false;
+    } else {
+      banner.classList.remove("show");
+      $("startBtn").disabled=false;
+    }
+  }
+  return left>0;
+}
+
+// ── LOAD DATA ──
+async function loadAllQuestions(){
+  const {data,error}=await db.from("driving_questions").select("*");
+  if(!error&&data) allQuestions=data;
+}
+
+async function loadCategories(){
+  const grid=$("catGrid"); grid.innerHTML="";
+  const {data,error}=await db.from("driving_questions").select("category");
+  if(error||!data){
+    grid.innerHTML=`<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Tabellen driving_questions saknas. Lägg till frågor i Supabase först.</div>`;
+    return;
+  }
+  data.forEach(r=>{catCounts[r.category]=(catCounts[r.category]||0)+1});
+  const total=data.length;
+
+  CATEGORY_LIST.forEach(cat=>{
+    const count=cat==="Alla kategorier"?total:(catCounts[cat]||0);
+    const card=document.createElement("button");
+    card.className="catCard"+(cat===selectedCategory?" active":"");
+    card.type="button";
+    card.innerHTML=`<div class="catName">${esc(cat)}</div><div class="catCount">${count} frågor</div>`;
+    card.addEventListener("click",()=>{
+      document.querySelectorAll(".catCard").forEach(c=>c.classList.remove("active"));
+      card.classList.add("active"); selectedCategory=cat; updateStartHint();
+    });
+    grid.appendChild(card);
+  });
+  $("startBtn").disabled=false;
+  updateStartHint();
+}
+
+function updateStartHint(){
+  const n=parseInt($("numQSel").value);
+  $("startHint").textContent=n===65?"65 frågor · 52 rätt krävs för godkänt":`${n} frågor · ${Math.ceil(n*0.8)} rätt rekommenderas`;
+}
+$("numQSel").addEventListener("change",updateStartHint);
+
+// ── START EXAM ──
+$("startBtn").addEventListener("click",async()=>{
+  const quota=await checkQuota();
+  if(!quota.allowed){toast("Gränsen nådd. Uppgradera för fler test.","bad");return;}
+
+  const numQ=parseInt($("numQSel").value);
+  const diff=$("diffSel").value;
+
+  let pool=allQuestions;
+  if(selectedCategory!=="Alla kategorier") pool=pool.filter(q=>q.category===selectedCategory);
+  if(diff) pool=pool.filter(q=>q.difficulty===diff);
+
+  if(pool.length===0){toast("Inga frågor hittades för dessa filter.","bad");return;}
+
+  examQuestions=shuffle(pool).slice(0,Math.min(numQ,pool.length));
+  currentIdx=0;
+  answers=new Array(examQuestions.length).fill(null);
+
+  await bumpQuota();
+  await refreshQuotaUi();
+
+  showExamView();
+  renderQuestion(0);
+});
+
+// ── VIEWS ──
+function showExamView(){
+  $("configView").style.display="none";
+  $("resultView").classList.remove("active");
+  $("examView").classList.add("active");
+  $("miniBar").classList.add("show");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function showConfigView(){
+  $("examView").classList.remove("active");
+  $("resultView").classList.remove("active");
+  $("configView").style.display="";
+  $("miniBar").classList.remove("show");
+  stopTimer();
+  refreshQuotaUi();
+  loadHistory();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ── RENDER QUESTION ──
+function renderQuestion(idx){
+  const q=examQuestions[idx]; const total=examQuestions.length;
+  $("progressFill").style.width=((idx/total)*100)+"%";
+  $("progressLabel").textContent=`Fråga ${idx+1} av ${total}`;
+  $("qNum").textContent=`${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
+  $("qCat").textContent=q.category;
+  $("qText").textContent=q.question;
+  $("explanationBox").classList.remove("show");
+  $("nextBtn").classList.remove("show");
+
+  const grid=$("ansGrid"); grid.innerHTML="";
+  const opts=[{l:"A",t:q.option_a},{l:"B",t:q.option_b},{l:"C",t:q.option_c},{l:"D",t:q.option_d}].filter(o=>o.t);
+  opts.forEach(opt=>{
+    const btn=document.createElement("button");
+    btn.className="ansBtn"; btn.type="button";
+    btn.innerHTML=`<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
+    btn.addEventListener("click",()=>handleAnswer(opt.l,q));
+    grid.appendChild(btn);
+  });
+  updateMiniBar();
+}
+
+// ── HANDLE ANSWER ──
+function handleAnswer(chosen,q){
+  const correct=q.correct;
+  answers[currentIdx]=chosen;
+
+  document.querySelectorAll(".ansBtn").forEach((btn,i)=>{
+    btn.disabled=true;
+    const l=["A","B","C","D"][i];
+    if(l===correct) btn.classList.add("correct");
+    if(l===chosen&&chosen!==correct) btn.classList.add("wrong");
+  });
+
+  showExplanation(q);
+
+  const nb=$("nextBtn"); nb.classList.add("show");
+  nb.innerHTML=currentIdx===examQuestions.length-1
+    ?'Visa resultat <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>'
+    :'Nästa fråga <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>';
+
+  updateMiniBar();
+}
+
+// ── EXPLANATION ──
+function showExplanation(q){
+  const box=$("explanationBox"); const txt=$("explText");
+  const cache=safeJson(localStorage.getItem(LS_EXPL_CACHE),{});
+  if(cache[q.id]){ txt.textContent=cache[q.id]; box.classList.add("show"); return; }
+  if(q.explanation?.trim()){ txt.textContent=q.explanation; box.classList.add("show"); return; }
+
+  box.classList.add("show");
+  txt.innerHTML='<span class="spinner"></span> Hämtar AI-förklaring…';
+  fetch("/api/explain",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({question:q.question,correct:q.correct,option_a:q.option_a,option_b:q.option_b,option_c:q.option_c,option_d:q.option_d})
+  })
+  .then(r=>r.ok?r.json():null)
+  .then(data=>{
+    if(data?.explanation){
+      txt.textContent=data.explanation;
+      const upd=safeJson(localStorage.getItem(LS_EXPL_CACHE),{});
+      upd[q.id]=data.explanation;
+      localStorage.setItem(LS_EXPL_CACHE,JSON.stringify(upd));
+    } else { txt.textContent=`Rätt svar: ${q.correct}.` }
+  })
+  .catch(()=>{ txt.textContent=`Rätt svar: ${q.correct}.` });
+}
+
+$("nextBtn").addEventListener("click",()=>{
+  if(currentIdx<examQuestions.length-1){ currentIdx++; renderQuestion(currentIdx); }
+  else showResults();
+});
+
+$("abortBtn").addEventListener("click",()=>{
+  if(!confirm("Avbryt provet? Ditt resultat sparas inte.")) return;
+  showConfigView();
+});
+
+function updateMiniBar(){
+  const correct=answers.filter((a,i)=>a!==null&&a===examQuestions[i]?.correct).length;
+  const answered=answers.filter(a=>a!==null).length;
+  const remaining=examQuestions.length-answered;
+  $("miniBarText").innerHTML=`<strong>${correct} / ${answered}</strong> rätt · ${remaining} frågor kvar`;
+}
+
+// ── TIMER ──
+function startTimer(seconds){
+  let s=seconds; const badge=$("timerBadge"); badge.style.display="";
+  timerInterval=setInterval(()=>{
+    s--; const m=Math.floor(s/60); const sec=s%60;
+    badge.textContent=`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+    badge.className="timerBadge"+(s<60?" bad":s<180?" warn":"");
+    if(s<=0){clearInterval(timerInterval);showResults();}
+  },1000);
+}
+function stopTimer(){ clearInterval(timerInterval); $("timerBadge").style.display="none"; }
+
+// ── RESULTS ──
+async function showResults(){
+  stopTimer();
+  $("examView").classList.remove("active");
+  $("miniBar").classList.remove("show");
+  $("configView").style.display="none";
+  $("resultView").classList.add("active");
+  window.scrollTo({top:0,behavior:"smooth"});
+
+  const total=examQuestions.length;
+  const numCorrect=answers.filter((a,i)=>a===examQuestions[i]?.correct).length;
+  const pct=Math.round((numCorrect/total)*100);
+  const passed=total===65?numCorrect>=52:pct>=75;
+
+  $("resultScore").innerHTML=`<span>${numCorrect}</span> / ${total}`;
+  $("resultPercent").textContent=`${pct}%`;
+  $("passBadgeWrap").innerHTML=passed
+    ?`<span class="statusBadge pass">✓ GODKÄNT</span>`
+    :`<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
+
+  // Category breakdown
+  const catMap={};
+  examQuestions.forEach((q,i)=>{
+    if(!catMap[q.category]) catMap[q.category]={correct:0,total:0};
+    catMap[q.category].total++;
+    if(answers[i]===q.correct) catMap[q.category].correct++;
+  });
+  const cats=Object.keys(catMap);
+  if(cats.length>1){
+    $("breakdownCard").style.display="";
+    $("breakdownGrid").innerHTML=cats.map(cat=>{
+      const {correct,total}=catMap[cat]; const p=Math.round((correct/total)*100);
+      return `<div class="breakdownCard"><div class="brkLabel">${esc(cat)}</div><div class="brkScore">${correct} / ${total} (${p}%)</div><div class="brkBar"><div class="brkFill" style="width:${p}%"></div></div></div>`;
+    }).join("");
+  } else { $("breakdownCard").style.display="none"; }
+
+  // Error bank
+  const errors=examQuestions.map((q,i)=>({q,chosen:answers[i]})).filter(e=>e.chosen!==e.q.correct);
+  if(errors.length>0){
+    $("errorBankCard").style.display="";
+    $("errorBank").innerHTML=errors.map(({q,chosen})=>{
+      const opts={A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d};
+      const correctText=opts[q.correct]||q.correct;
+      return `<div class="errorCard">
+        <div class="errorCatLabel">${esc(q.category)}</div>
+        <div class="errorQ">${esc(q.question)}</div>
+        <div class="errorCorrect">✓ Rätt: ${q.correct}. ${esc(correctText)}</div>
+        ${q.explanation?`<div class="errorExpl">${esc(q.explanation)}</div>`:""}
+      </div>`;
+    }).join("");
+  } else { $("errorBankCard").style.display="none"; }
+
+  // Save result
+  try {
+    const uid=await getUid();
+    if(uid){
+      await db.from("driving_results").insert({
+        user_id:uid, category:selectedCategory,
+        num_questions:total, num_correct:numCorrect, percent:pct, passed
+      });
+    }
+  } catch(e){console.warn("Kunde inte spara resultat:",e)}
+}
+
+$("newTestBtn").addEventListener("click",()=>showConfigView());
+$("retryMistakesBtn").addEventListener("click",()=>{
+  const mistakes=examQuestions.filter((_,i)=>answers[i]!==examQuestions[i]?.correct);
+  if(mistakes.length===0){toast("Inga misstag att träna!","ok");return;}
+  examQuestions=shuffle(mistakes); currentIdx=0;
+  answers=new Array(examQuestions.length).fill(null);
+  showExamView(); renderQuestion(0);
+});
+
+// ── HISTORY ──
+async function loadHistory(){
+  const uid=await getUid(); if(!uid) return;
+  const {data}=await db.from("driving_results")
+    .select("*").eq("user_id",uid)
+    .order("created_at",{ascending:false}).limit(10);
+  if(!data||data.length===0){$("historySection").style.display="none";return;}
+  $("historySection").style.display="";
+  $("historyBody").innerHTML=`<table class="histTable">
+    <thead><tr><th>Datum</th><th>Kategori</th><th>Resultat</th><th>Status</th></tr></thead>
+    <tbody>${data.map(r=>{
+      const date=new Date(r.created_at).toLocaleDateString("sv-SE",{month:"short",day:"numeric"});
+      return `<tr>
+        <td>${date}</td>
+        <td>${esc(r.category||"—")}</td>
+        <td>${r.num_correct}/${r.num_questions} (${r.percent}%)</td>
+        <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+
+// ── AUTH & INIT ──
+async function init(){
+  db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){ showLoginScreen(); return; }
+  currentUser=session.user;
+  await loadRole();
+  await onAuthenticated();
+}
+
+async function loadRole(){
+  if(!currentUser) return;
+  const {data}=await db.from("profiles").select("role").eq("id",currentUser.id).single();
+  if(data?.role){ currentRole=data.role; localStorage.setItem(LS_ROLE,currentRole); }
+}
+
+async function onAuthenticated(){
+  $("loginScreen").style.display="none";
+  await Promise.all([loadAllQuestions(),loadCategories()]);
+  await refreshQuotaUi();
+  await loadHistory();
+  $("pageLoader").classList.add("done");
+
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");obs.unobserve(e.target)}})
+  },{threshold:.08});
+  document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+}
+
+function showLoginScreen(){
+  $("loginScreen").style.display="flex";
+  $("pageLoader").classList.add("done");
+
+  const doSignIn=async()=>{
+    const email=$("authEmail").value.trim();
+    const pass=$("authPass").value;
+    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+    const {error}=await db.auth.signInWithPassword({email,password:pass});
+    if(error){$("loginErr").textContent=error.message;return;}
+    location.reload();
+  };
+
+  const doSignUp=async()=>{
+    const email=$("authEmail").value.trim();
+    const pass=$("authPass").value;
+    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+    const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
+    const body=await res.json();
+    if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
+    if(body.session){
+      await db.auth.setSession({access_token:body.session.access_token,refresh_token:body.session.refresh_token});
+      location.reload();
+    }
+  };
+
+  $("signInBtn").onclick=doSignIn;
+  $("signUpBtn").onclick=doSignUp;
+  $("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")doSignIn()});
+}
+
+init();
+</script>
+</body>
+</html>
