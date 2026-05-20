@@ -178,7 +178,7 @@ body.light .startBtn{color:#fff}
 .timerBadge.warn{color:var(--warn);border-color:rgba(244,200,66,.3)}.timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.3)}
 
 /* QUESTION */
-.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:16px;position:relative}
 .qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px}
 .qCatBadge{color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px;font-size:9.5px}
 .qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:18px}
@@ -197,6 +197,26 @@ body.light .ansBtn.correct{background:rgba(13,148,96,.12);border-color:var(--a)}
 .ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
 body.light .ansBtn.correct .ansLetter{color:#fff}
 .ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:#ff6b6b;color:#ff8484}
+
+/* CORRECT ANSWER PULSE */
+@keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
+.ansBtn.correct{animation:correctPulse .6s ease}
+
+/* DIFFICULTY DOT */
+.diffDot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;vertical-align:middle}
+.diffDot.easy{background:var(--ok)}.diffDot.normal{background:var(--warn)}.diffDot.hard{background:var(--danger)}
+
+/* STREAK */
+.streakWrap{display:none;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#f4c842;padding-left:4px;border-left:1px solid var(--l2)}
+.streakWrap.show{display:flex;animation:fadeIn .22s ease}
+
+/* BOOKMARK */
+.bookmarkBtn{position:absolute;top:14px;right:14px;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .16s,border-color .16s,background .16s;padding:0;z-index:2}
+.bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4);background:rgba(244,200,66,.07)}
+
+/* KEYBOARD HINT */
+.kbHint{display:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;letter-spacing:.04em;padding-top:10px}
+@media(hover:hover){.kbHint{display:block}}
 
 /* EXPLANATION */
 .explanationBox{display:none;margin-top:14px;border-left:2px solid var(--a);background:var(--a-dim);border-radius:0 var(--r) var(--r) 0;padding:12px 16px}
@@ -444,7 +464,10 @@ body.light .statusBadge.fail{color:#c0392b}
 
     <div class="miniBar show" id="miniBar">
       <div class="miniBarInner">
-        <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt · — frågor kvar</div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden">
+          <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt · — kvar</div>
+          <div class="streakWrap" id="streakWrap"></div>
+        </div>
         <div class="miniBarActions">
           <button class="nextBtn" id="nextBtn" type="button">
             Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
@@ -453,6 +476,7 @@ body.light .statusBadge.fail{color:#c0392b}
         </div>
       </div>
     </div>
+    <div class="kbHint" id="kbHint">Tangentbord: A B C D eller 1 2 3 4 för svar &nbsp;·&nbsp; Enter för nästa</div>
   </div>
 
   <!-- RESULT VIEW -->
@@ -506,12 +530,35 @@ const CATEGORY_LIST = [
   "Säkerhet & Utrustning","Mörker & Sikt","Väglag & Bromssträcka",
 ];
 
+const CAT_ICONS = {
+  "Alla kategorier":"📚","Vägmärken":"🚦","Trafikregler":"📋",
+  "Korsningar":"✖","Möte & Omkörning":"↔","Hastighet":"⚡",
+  "Miljö & Ekonomi":"🌿","Alkohol & Droger":"🚫",
+  "Säkerhet & Utrustning":"🦺","Mörker & Sikt":"🌙",
+  "Väglag & Bromssträcka":"❄",
+};
+
+const DIFF_LABEL = {easy:"Lätt",normal:"Normal",hard:"Svår"};
+const LS_BOOKMARKS = "proviaai_bookmarks";
+
 // ── STATE ──
 let db, currentUser, currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 let allQuestions = [], examQuestions = [], currentIdx = 0;
 let answers = [], selectedCategory = "Alla kategorier";
 let timerInterval = null;
 let catCounts = {};
+let streak = 0;
+
+// ── BOOKMARKS ──
+function getBookmarks(){ return safeJson(localStorage.getItem(LS_BOOKMARKS),[]); }
+function toggleBookmark(id){
+  let bm=getBookmarks();
+  const idx=bm.indexOf(id);
+  if(idx>=0) bm.splice(idx,1); else bm.push(id);
+  localStorage.setItem(LS_BOOKMARKS,JSON.stringify(bm));
+  return idx<0;
+}
+function isBookmarked(id){ return getBookmarks().includes(id); }
 
 // ── HELPERS ──
 const $ = id => document.getElementById(id);
@@ -633,18 +680,29 @@ async function loadCategories(){
   const grid=$("catGrid"); grid.innerHTML="";
   const {data,error}=await db.from("driving_questions").select("category");
   if(error||!data){
-    grid.innerHTML=`<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Tabellen driving_questions saknas. Lägg till frågor i Supabase först.</div>`;
+    grid.innerHTML=`<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Tabellen driving_questions saknas.</div>`;
     return;
   }
   data.forEach(r=>{catCounts[r.category]=(catCounts[r.category]||0)+1});
   const total=data.length;
 
-  CATEGORY_LIST.forEach(cat=>{
-    const count=cat==="Alla kategorier"?total:(catCounts[cat]||0);
+  // Bokmärkta frågor som eget val
+  const bmIds=getBookmarks();
+  const bmCount=allQuestions.filter(q=>bmIds.includes(q.id)).length;
+  const allCats=["Alla kategorier",...CATEGORY_LIST.slice(1)];
+  if(bmCount>0) allCats.push("⭐ Bokmärkta");
+
+  allCats.forEach(cat=>{
+    let count;
+    if(cat==="Alla kategorier") count=total;
+    else if(cat==="⭐ Bokmärkta") count=bmCount;
+    else count=catCounts[cat]||0;
+
     const card=document.createElement("button");
+    const icon=CAT_ICONS[cat]||"";
     card.className="catCard"+(cat===selectedCategory?" active":"");
     card.type="button";
-    card.innerHTML=`<div class="catName">${esc(cat)}</div><div class="catCount">${count} frågor</div>`;
+    card.innerHTML=`<div class="catName">${icon?icon+" ":""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${count} frågor</div>`;
     card.addEventListener("click",()=>{
       document.querySelectorAll(".catCard").forEach(c=>c.classList.remove("active"));
       card.classList.add("active"); selectedCategory=cat; updateStartHint();
@@ -657,7 +715,7 @@ async function loadCategories(){
 
 function updateStartHint(){
   const n=parseInt($("numQSel").value);
-  $("startHint").textContent=n===65?"65 frågor · 52 rätt krävs för godkänt":`${n} frågor · ${Math.ceil(n*0.8)} rätt rekommenderas`;
+  $("startHint").textContent=n===65?"65 frågor · 52 rätt krävs · 50 min tidsgräns (som riktigt prov)":`${n} frågor · ${Math.ceil(n*0.8)} rätt rekommenderas`;
 }
 $("numQSel").addEventListener("change",updateStartHint);
 
@@ -670,7 +728,12 @@ $("startBtn").addEventListener("click",async()=>{
   const diff=$("diffSel").value;
 
   let pool=allQuestions;
-  if(selectedCategory!=="Alla kategorier") pool=pool.filter(q=>q.category===selectedCategory);
+  if(selectedCategory==="⭐ Bokmärkta"){
+    const bmIds=getBookmarks();
+    pool=pool.filter(q=>bmIds.includes(q.id));
+  } else if(selectedCategory!=="Alla kategorier"){
+    pool=pool.filter(q=>q.category===selectedCategory);
+  }
   if(diff) pool=pool.filter(q=>q.difficulty===diff);
 
   if(pool.length===0){toast("Inga frågor hittades för dessa filter.","bad");return;}
@@ -678,11 +741,14 @@ $("startBtn").addEventListener("click",async()=>{
   examQuestions=shuffle(pool).slice(0,Math.min(numQ,pool.length));
   currentIdx=0;
   answers=new Array(examQuestions.length).fill(null);
+  streak=0;
+  updateStreak();
 
   await bumpQuota();
   await refreshQuotaUi();
 
   showExamView();
+  if(numQ===65) startTimer(50*60);
   renderQuestion(0);
 });
 
@@ -711,25 +777,56 @@ function renderQuestion(idx){
   const q=examQuestions[idx]; const total=examQuestions.length;
   $("progressFill").style.width=(((idx+1)/total)*100)+"%";
   $("progressLabel").textContent=`Fråga ${idx+1} av ${total}`;
+
+  // qMeta: num + category icon + difficulty dot
   $("qNum").textContent=`${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
-  $("qCat").textContent=q.category;
+  const icon=CAT_ICONS[q.category]||"";
+  $("qCat").textContent=`${icon} ${q.category}`;
+
+  // Difficulty dot
+  let dd=$("diffDot");
+  if(!dd){
+    dd=document.createElement("span");
+    dd.id="diffDot";
+    dd.className="diffDot";
+    $("qNum").after(dd);
+  }
+  dd.className=`diffDot ${q.difficulty||"normal"}`;
+  dd.title=DIFF_LABEL[q.difficulty]||"";
+
   $("qText").textContent=q.question;
 
-  // Show image if question has one
+  // Bookmark button
+  let bmBtn=$("bookmarkBtn");
+  if(!bmBtn){
+    bmBtn=document.createElement("button");
+    bmBtn.id="bookmarkBtn";
+    bmBtn.className="bookmarkBtn";
+    bmBtn.type="button";
+    bmBtn.title="Bokmärk frågan";
+    bmBtn.innerHTML=`<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3-5 3V2z"/></svg>`;
+    $("questionCard").appendChild(bmBtn);
+  }
+  bmBtn.classList.toggle("saved", isBookmarked(q.id));
+  bmBtn.onclick=()=>{
+    const saved=toggleBookmark(q.id);
+    bmBtn.classList.toggle("saved",saved);
+    toast(saved?"Bokmärkt ⭐":"Bokmärke borttaget","ok");
+  };
+
+  // Image
   try {
     let imgWrap=$("qImageWrap");
     if(!imgWrap){
       imgWrap=document.createElement("div");
-      imgWrap.id="qImageWrap";
-      imgWrap.className="qImageWrap";
+      imgWrap.id="qImageWrap"; imgWrap.className="qImageWrap";
       $("qText").after(imgWrap);
     }
     if(q.image_url){
       imgWrap.innerHTML=`<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'Frågabild')}" loading="lazy">`;
       imgWrap.style.display="flex";
     } else {
-      imgWrap.innerHTML="";
-      imgWrap.style.display="none";
+      imgWrap.innerHTML=""; imgWrap.style.display="none";
     }
   } catch(e){ console.warn("Image error:", e); }
 
@@ -761,6 +858,14 @@ function handleAnswer(chosen,q){
     if(l===correct) btn.classList.add("correct");
     if(l===chosenUp&&chosenUp!==correct) btn.classList.add("wrong");
   });
+
+  // Streak
+  if(isCorrect(chosenUp,q)){
+    streak++;
+  } else {
+    streak=0;
+  }
+  updateStreak();
 
   showExplanation(q);
 
@@ -822,8 +927,37 @@ function updateMiniBar(){
   const correct=answers.filter((a,i)=>isCorrect(a,examQuestions[i])).length;
   const answered=answers.filter(a=>a!==null).length;
   const remaining=examQuestions.length-answered;
-  $("miniBarText").innerHTML=`<strong>${correct} / ${answered}</strong> rätt · ${remaining} frågor kvar`;
+  $("miniBarText").innerHTML=`<strong>${correct} / ${answered}</strong> rätt · ${remaining} kvar`;
 }
+
+function updateStreak(){
+  const sw=$("streakWrap");
+  if(streak>=3){
+    sw.innerHTML=`🔥 ${streak} rätta i rad`;
+    sw.classList.add("show");
+  } else {
+    sw.classList.remove("show");
+  }
+}
+
+// ── KEYBOARD SHORTCUTS ──
+document.addEventListener("keydown",e=>{
+  if(!$("examView").classList.contains("active")) return;
+  if(e.target.matches("input,textarea,select")) return;
+
+  const keyMap={"1":"A","2":"B","3":"C","4":"D","a":"A","b":"B","c":"C","d":"D","A":"A","B":"B","C":"C","D":"D"};
+  if(keyMap[e.key]){
+    e.preventDefault();
+    const btns=document.querySelectorAll("#ansGrid .ansBtn:not(:disabled)");
+    const li={"A":0,"B":1,"C":2,"D":3};
+    const btn=btns[li[keyMap[e.key]]];
+    if(btn) btn.click();
+  }
+  if((e.key==="Enter"||e.key===" ")&&$("nextBtn").classList.contains("show")){
+    e.preventDefault();
+    $("nextBtn").click();
+  }
+});
 
 // ── TIMER ──
 function startTimer(seconds){
@@ -840,6 +974,7 @@ function stopTimer(){ clearInterval(timerInterval); $("timerBadge").style.displa
 // ── RESULTS ──
 async function showResults(){
   stopTimer();
+  streak=0; updateStreak();
   $("examView").classList.remove("active");
   $("miniBar").classList.remove("show");
   $("configView").style.display="none";
