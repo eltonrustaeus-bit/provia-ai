@@ -205,23 +205,19 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 .explLabel{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
 .explText{font-size:13.5px;color:var(--t2);line-height:1.6}
 
-/* NEXT */
-.nextBtnWrap{display:flex;justify-content:flex-end;margin-top:14px}
-.nextBtn{display:none;align-items:center;gap:6px;padding:0 20px;height:40px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s}
-.nextBtn.show{display:inline-flex}
-body.light .nextBtn{color:#fff}
-.nextBtn:hover{transform:translateY(-1px);background:var(--a2)}
-
 /* MINIBAR */
-.miniBar{position:sticky;bottom:16px;z-index:100;display:none;margin-top:16px}
+.miniBar{position:sticky;bottom:0;z-index:100;display:none;margin-top:16px}
 .miniBar.show{display:block}
-.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.92);backdrop-filter:blur(14px);border:1px solid var(--l2);border-radius:var(--r);padding:12px 16px;box-shadow:0 8px 32px rgba(0,0,0,.6)}
-body.light .miniBarInner{background:rgba(243,248,245,.95)}
-.miniBarText{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2)}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.95);backdrop-filter:blur(18px);border-top:1px solid var(--l2);padding:12px 16px;box-shadow:0 -4px 24px rgba(0,0,0,.5)}
+body.light .miniBarInner{background:rgba(243,248,245,.97)}
+.miniBarText{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);min-width:0}
 .miniBarText strong{color:var(--a)}
-
-/* Extra padding so miniBar never covers nextBtn */
-#examView{padding-bottom:90px}
+.miniBarActions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nextBtn{display:none;align-items:center;gap:6px;padding:0 18px;height:38px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
+.nextBtn.show{display:inline-flex;animation:fadeIn .18s ease}
+body.light .nextBtn{color:#fff}
+.nextBtn:hover{transform:translateY(-1px);background:var(--a2);box-shadow:0 4px 16px rgba(27,255,140,.3)}
+.nextBtn:active{transform:scale(.98)}
 
 /* RESULTS */
 #resultView{display:none}
@@ -446,16 +442,15 @@ body.light .statusBadge.fail{color:#c0392b}
       </div>
     </div>
 
-    <div class="nextBtnWrap">
-      <button class="nextBtn" id="nextBtn" type="button">
-        Nästa fråga <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 3 11 8 6 13"/></svg>
-      </button>
-    </div>
-
     <div class="miniBar show" id="miniBar">
       <div class="miniBarInner">
         <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt · — frågor kvar</div>
-        <button class="btn btnG" id="abortBtn" type="button" style="height:32px;font-size:12px">Avbryt prov</button>
+        <div class="miniBarActions">
+          <button class="nextBtn" id="nextBtn" type="button">
+            Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
+          </button>
+          <button class="btn btnG" id="abortBtn" type="button" style="height:36px;font-size:12px;padding:0 12px">Avbryt</button>
+        </div>
       </div>
     </div>
   </div>
@@ -714,7 +709,7 @@ function showConfigView(){
 // ── RENDER QUESTION ──
 function renderQuestion(idx){
   const q=examQuestions[idx]; const total=examQuestions.length;
-  $("progressFill").style.width=((idx/total)*100)+"%";
+  $("progressFill").style.width=(((idx+1)/total)*100)+"%";
   $("progressLabel").textContent=`Fråga ${idx+1} av ${total}`;
   $("qNum").textContent=`${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
   $("qCat").textContent=q.category;
@@ -751,9 +746,7 @@ function renderQuestion(idx){
     grid.appendChild(btn);
   });
   updateMiniBar();
-
-  // Scroll to top of question card
-  $("questionCard").scrollIntoView({behavior:"smooth",block:"start"});
+  window.scrollTo({top:0,behavior:"smooth"});
 }
 
 // ── HANDLE ANSWER ──
@@ -762,7 +755,7 @@ function handleAnswer(chosen,q){
   const chosenUp=chosen.toUpperCase();
   answers[currentIdx]=chosenUp;
 
-  document.querySelectorAll(".ansBtn").forEach((btn,i)=>{
+  document.querySelectorAll("#ansGrid .ansBtn").forEach((btn,i)=>{
     btn.disabled=true;
     const l=["A","B","C","D"][i];
     if(l===correct) btn.classList.add("correct");
@@ -773,22 +766,12 @@ function handleAnswer(chosen,q){
 
   const isLast=currentIdx===examQuestions.length-1;
   const nb=$("nextBtn");
+  nb.innerHTML=isLast
+    ?`Visa resultat <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`
+    :`Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
   nb.classList.add("show");
-  nb.textContent="";
-  const label=document.createTextNode(isLast?"Visa resultat ":"Nästa fråga ");
-  nb.appendChild(label);
-  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
-  svg.setAttribute("width","14");svg.setAttribute("height","14");svg.setAttribute("viewBox","0 0 16 16");svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");svg.setAttribute("stroke-width","2");
-  const poly=document.createElementNS("http://www.w3.org/2000/svg","polyline");
-  poly.setAttribute("points","6 3 11 8 6 13");
-  svg.appendChild(poly);nb.appendChild(svg);
 
   updateMiniBar();
-
-  // Scroll so the explanation + next button are visible
-  setTimeout(()=>{
-    $("nextBtn").scrollIntoView({behavior:"smooth",block:"nearest"});
-  },120);
 }
 
 // ── EXPLANATION ──
@@ -821,7 +804,6 @@ $("nextBtn").addEventListener("click",()=>{
   if(currentIdx<examQuestions.length-1){
     currentIdx++;
     renderQuestion(currentIdx);
-    window.scrollTo({top:0,behavior:"smooth"});
   } else {
     showResults();
   }
