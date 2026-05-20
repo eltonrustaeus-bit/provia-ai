@@ -22,17 +22,16 @@ export default async function handler(req, res) {
     if (!uuidRe.test(uid)) return res.status(400).json({ error: "Invalid user_id (not uuid)" });
 
     const { data, error } = await supabase
-      .from("user_roles")
+      .from("profiles")
       .select("role")
-      .eq("user_id", uid)
+      .eq("id", uid)
       .maybeSingle();
 
     if (error) return res.status(500).json({ error: error.message || String(error) });
 
-    // Om raden saknas av någon anledning: pending
-    if (!data) return res.status(200).json({ role: "pending" });
+    if (!data) return res.status(200).json({ role: "gratis" });
 
-    const role = String(data.role || "pending");
+    const role = String(data.role || "gratis");
     return res.status(200).json({ role });
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) });
