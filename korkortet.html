@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>if(location.hostname.includes("vercel.app")&&!location.hostname.includes("provia-ai-uf")){location.replace("https://provia-ai-uf.vercel.app"+location.pathname+location.search)}</script>
 <title>ProviaAi – Körkortsteorin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -289,12 +290,13 @@ footer{border-top:1px solid var(--l);padding:20px;text-align:center;font-family:
 <!-- LOGIN -->
 <div id="loginScreen" class="loginOverlay" style="display:none">
   <div class="loginCard">
-    <div class="loginTop">
+    <div class="loginTop" style="position:relative">
       <img src="image/proviaai-logo.png" alt="ProviaAi">
       <div>
         <div class="loginTitle">ProviaAi – Körkortsteorin</div>
         <div class="loginSub">Logga in eller skapa konto</div>
       </div>
+      <button onclick="document.getElementById('loginScreen').style.display='none'" style="position:absolute;top:0;right:0;background:none;border:none;font-size:22px;line-height:1;color:var(--t3);cursor:pointer;padding:4px 8px" aria-label="Stäng">×</button>
     </div>
     <div class="loginBody">
       <div class="authBlock">
@@ -683,6 +685,7 @@ function showExam() {
 
 // ── START EXAM ──
 $("startBtn").onclick = async () => {
+  if(!uid) { showLoginScreen(); return; }
   const cfg = LIMITS[role]||LIMITS.gratis;
   if(cfg.cap !== Infinity && readQ() >= cfg.cap) {
     toast("Gränsen nådd — uppgradera för fler test.", "bad"); return;
@@ -985,49 +988,76 @@ async function loadHistory() {
   } catch(e){ $("historySection").style.display="none" }
 }
 
+// ── LOGIN ──
+function showLoginScreen() {
+  $("loginScreen").style.display = "flex";
+}
+
 // ── INIT ──
 async function init() {
-  // Show loader, set text
   const loader = $("pageLoader"), loaderTxt = $("loaderText");
-
-  // Redirect from old preview URL to correct domain
-  if(location.hostname.includes("vercel.app") && !location.hostname.includes("provia-ai-uf")) {
-    const path = location.pathname + location.search;
-    const newURL = "https://provia-ai-uf.vercel.app" + path;
-    loaderTxt.textContent = "Omdirigerar…";
-    location.replace(newURL);
-    return;
-  }
 
   try {
     if(typeof supabase === "undefined") throw new Error("Nätverksfel — kunde inte ladda Supabase.");
     db = supabase.createClient(SUPA_URL, SUPA_ANON);
 
-    loaderTxt.textContent = "Kontrollerar inloggning…";
-    const {data:{session}, error} = await db.auth.getSession();
-    if(error) throw error;
+    // Wire up login form handlers (db must be ready first)
+    const signIn = async () => {
+      const email=$("authEmail").value.trim(), pass=$("authPass").value;
+      if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+      $("loginErr").textContent="";
+      const {error} = await db.auth.signInWithPassword({email,password:pass});
+      if(error){$("loginErr").textContent=error.message;return;}
+      location.reload();
+    };
+    const signUp = async () => {
+      const email=$("authEmail").value.trim(), pass=$("authPass").value;
+      if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+      $("loginErr").textContent="";
+      const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
+      const body=await res.json();
+      if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
+      if(body.session){await db.auth.setSession(body.session);location.reload();}
+    };
+    $("signInBtn").onclick = signIn;
+    $("signUpBtn").onclick = signUp;
+    $("authPass").onkeydown = e => { if(e.key==="Enter") signIn() };
+    $("loginScreen").addEventListener("click", e => { if(e.target===$("loginScreen")) $("loginScreen").style.display="none"; });
 
-    if(!session) { showLoginScreen(); return; }
-    uid = session.user.id;
-
-    loaderTxt.textContent = "Hämtar data…";
-
-    // Load role
-    try {
-      const {data} = await db.from("profiles").select("role").eq("id",uid).single();
-      if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
-    } catch(e){}
-
-    // Load questions
+    // 1. Load questions — public table, no auth needed
+    loaderTxt.textContent = "Hämtar frågor…";
     const {data:qs, error:qErr} = await db.from("driving_questions").select("*");
     if(qErr) throw qErr;
     questions = qs || [];
 
-    // All done — show UI
+    // 2. Check session — optional, for role/history/quota
+    loaderTxt.textContent = "Kontrollerar inloggning…";
+    const {data: authData} = await db.auth.getSession();
+    const session = authData?.session;
+    if(session) {
+      uid = session.user.id;
+      try {
+        const {data} = await db.from("profiles").select("role").eq("id",uid).single();
+        if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
+      } catch(e){}
+    }
+
+    // 3. Show UI — categories visible regardless of login status
     loader.classList.add("hide");
     buildCats();
     refreshQuotaUI();
-    await loadHistory();
+
+    // Update menu auth button
+    const authBtn = $("logoutBtn"), authSpan = authBtn.querySelector("span");
+    if(uid) {
+      authSpan.textContent = "Logga ut";
+      authBtn.onclick = async () => { await db.auth.signOut(); location.reload(); };
+    } else {
+      authSpan.textContent = "Logga in";
+      authBtn.onclick = () => showLoginScreen();
+    }
+
+    if(uid) await loadHistory();
 
   } catch(err) {
     console.error("Init-fel:", err);
@@ -1038,32 +1068,6 @@ async function init() {
       <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
     </div>`;
   }
-}
-
-function showLoginScreen() {
-  $("loginScreen").style.display = "flex";
-  $("pageLoader").classList.add("hide");
-
-  const signIn = async () => {
-    const email=$("authEmail").value.trim(), pass=$("authPass").value;
-    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
-    $("loginErr").textContent="";
-    const {error} = await db.auth.signInWithPassword({email,password:pass});
-    if(error){$("loginErr").textContent=error.message;return;}
-    location.reload();
-  };
-  const signUp = async () => {
-    const email=$("authEmail").value.trim(), pass=$("authPass").value;
-    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
-    $("loginErr").textContent="";
-    const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
-    const body=await res.json();
-    if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
-    if(body.session){await db.auth.setSession(body.session);location.reload();}
-  };
-  $("signInBtn").onclick = signIn;
-  $("signUpBtn").onclick = signUp;
-  $("authPass").onkeydown = e => { if(e.key==="Enter") signIn() };
 }
 
 init();
