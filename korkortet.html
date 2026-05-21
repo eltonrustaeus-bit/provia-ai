@@ -990,10 +990,10 @@ async function init() {
   // Show loader, set text
   const loader = $("pageLoader"), loaderTxt = $("loaderText");
 
-  // Redirect to correct domain if on old preview URL
-  if(location.hostname.includes("vercel.app") && !location.hostname.includes("provia-ai-uf")) {
+  // Redirect from old preview URL to correct domain
+  if(location.hostname.includes("provia-ai-uf")) {
     const path = location.pathname + location.search;
-    const newURL = "https://provia-ai-uf.vercel.app" + path;
+    const newURL = "https://provia-ai.vercel.app" + path;
     loaderTxt.textContent = "Omdirigerar…";
     location.replace(newURL);
     return;
