@@ -717,32 +717,28 @@ async function refreshQuotaUi(){
 }
 
 // ── LOAD DATA ──
+// Single query — derives category counts from the same data
 async function loadAllQuestions(){
   try {
     const {data, error} = await db.from("driving_questions").select("*");
-    if(!error && data) allQuestions = data;
-    else if(error) console.warn("driving_questions fel:", error.message);
-  } catch(e){ console.warn("loadAllQuestions kastade:", e) }
+    if(error){ console.warn("driving_questions fel:", error.message); return; }
+    if(data) allQuestions = data;
+  } catch(e){ console.warn("loadAllQuestions fel:", e) }
 }
 
-async function loadCategories(){
+function buildCategoryUI(){
   const grid = $("catGrid"); grid.innerHTML = "";
-  let data, error;
-  try {
-    const res = await db.from("driving_questions").select("category");
-    data = res.data; error = res.error;
-  } catch(e){
-    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Nätverksfel — kontrollera anslutningen.</div>`;
-    return;
-  }
-  if(error || !data){
-    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Kunde inte ladda frågor (${error?.message || "okänt fel"}).</div>`;
-    return;
-  }
-  data.forEach(r => { catCounts[r.category] = (catCounts[r.category] || 0) + 1 });
-  const total = data.length;
 
-  // Show stats
+  if(allQuestions.length === 0){
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Inga frågor hittades. Kontrollera anslutningen.</div>`;
+    return;
+  }
+
+  // Derive counts from already-loaded allQuestions
+  catCounts = {};
+  allQuestions.forEach(q => { catCounts[q.category] = (catCounts[q.category] || 0) + 1 });
+
+  const total = allQuestions.length;
   const uniqueCats = Object.keys(catCounts).length;
   $("totalQCount").textContent = total;
   $("totalCatCount").textContent = uniqueCats;
@@ -1199,69 +1195,72 @@ function dismissLoader(){
   $("pageLoader").classList.add("done");
 }
 
-async function init(){
-  // Safety net: dismiss loader after 12s no matter what
-  const safetyTimer = setTimeout(dismissLoader, 12000);
-  let caughtError = false;
-
-  try {
-    if(typeof supabase === "undefined"){
-      throw new Error("Supabase-biblioteket laddades inte. Kontrollera din internetanslutning.");
-    }
-    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-    const {data, error} = await db.auth.getSession();
-    if(error) throw error;
-    const session = data?.session;
-    if(!session){ clearTimeout(safetyTimer); showLoginScreen(); return; }
-    currentUser = session.user;
-    await loadRole();
-    await onAuthenticated();
-  } catch(err) {
-    caughtError = true;
-    console.error("Init-fel:", err);
-    clearTimeout(safetyTimer);
-    showInitError(err?.message || "Kunde inte ansluta. Försök ladda om sidan.");
-  } finally {
-    if(!caughtError){
-      clearTimeout(safetyTimer);
-      dismissLoader();
-    }
-  }
-}
-
 function showInitError(msg){
-  // Show error inside loader overlay (don't dismiss it — keep overlay visible)
   const loader = $("pageLoader");
   loader.innerHTML = `<div style="display:grid;place-items:center;gap:16px;padding:24px;max-width:360px;text-align:center">
     <div style="font-size:32px">⚠️</div>
-    <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;color:var(--t)">Kunde inte ladda sidan</div>
+    <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;color:var(--t)">Kunde inte ladda sidan</div>
     <div style="font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.6">${esc(msg)}</div>
     <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
   </div>`;
-  // Ensure loader stays visible (remove done class if present)
   loader.classList.remove("done");
 }
 
-async function loadRole(){
-  if(!currentUser) return;
+async function init(){
+  // If auth check takes >7s, give up and show login
+  const safetyTimer = setTimeout(() => {
+    console.warn("Auth timeout — visar login");
+    showLoginScreen();
+  }, 7000);
+
+  try {
+    if(typeof supabase === "undefined") throw new Error("Supabase laddades inte — kontrollera din internetanslutning.");
+    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    const {data, error} = await db.auth.getSession();
+    clearTimeout(safetyTimer);
+
+    if(error || !data?.session){
+      showLoginScreen();
+      return;
+    }
+
+    currentUser = data.session.user;
+
+    // Dismiss loader immediately after auth — don't wait for data
+    dismissLoader();
+    $("loginScreen").style.display = "none";
+
+    // Animate reveals right away
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add("in"); obs.unobserve(e.target) } })
+    }, {threshold:.08});
+    document.querySelectorAll(".reveal").forEach(el => obs.observe(el));
+
+    // Load role + data in background (non-blocking for the UI)
+    loadDataInBackground();
+
+  } catch(err){
+    clearTimeout(safetyTimer);
+    console.error("Init-fel:", err);
+    showInitError(err?.message || "Anslutningsfel. Försök ladda om sidan.");
+  }
+}
+
+async function loadDataInBackground(){
+  // Load role silently
   try {
     const {data} = await db.from("profiles").select("role").eq("id", currentUser.id).single();
     if(data?.role){ currentRole = data.role; localStorage.setItem(LS_ROLE, currentRole); }
-  } catch(e){ console.warn("Kunde inte hämta roll:", e) }
-}
+  } catch(e){ console.warn("Roll-fel:", e) }
 
-async function onAuthenticated(){
-  $("loginScreen").style.display = "none";
-  try {
-    await Promise.all([loadAllQuestions(), loadCategories()]);
-  } catch(e){ console.warn("Laddningsfel (frågor):", e) }
+  // Load all questions (single query — categories derived from this)
+  await loadAllQuestions();
+  buildCategoryUI();
+
+  // Quota + history
   try { await refreshQuotaUi(); } catch(e){ console.warn("Kvotfel:", e) }
   try { await loadHistory(); } catch(e){ console.warn("Historikfel:", e) }
-
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add("in"); obs.unobserve(e.target) } })
-  }, {threshold:.08});
-  document.querySelectorAll(".reveal").forEach(el => obs.observe(el));
 }
 
 function showLoginScreen(){
