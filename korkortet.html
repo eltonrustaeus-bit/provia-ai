@@ -61,6 +61,7 @@ body.light header{background:rgba(243,248,245,.92)}
 body.light .btnP{color:#fff}.btnP:hover{background:var(--a2);border-color:var(--a2)}
 .btnP::after{background:linear-gradient(135deg,rgba(255,255,255,.15),transparent 55%)}
 .btnG{background:transparent;border-color:var(--l)}.btnG:hover{background:var(--a-dim);border-color:var(--l2)}
+.btnDanger{background:transparent;border-color:rgba(255,107,107,.3);color:#ff8484}.btnDanger:hover{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.5)}
 
 /* THEME TOGGLE */
 .themeTgl{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:34px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);background:transparent;cursor:pointer;transition:color .16s,border-color .16s,background .28s}
@@ -141,13 +142,17 @@ footer{border-top:1px solid var(--l);padding:20px 24px;text-align:center;font-fa
 
 /* CARD */
 .card{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:12px;transition:border-color .28s,background .28s}
-.card:hover{border-color:var(--l2)}
 .cardTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
+
+/* STATS ROW (config) */
+.statsRow{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.statPill{display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2)}
+.statPill strong{color:var(--t);font-weight:600}
 
 /* CATEGORY GRID */
 .catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
-.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .16s,background .16s,transform .16s;min-height:44px;position:relative;overflow:hidden;width:100%}
+.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .16s,background .16s,transform .16s;min-height:48px;position:relative;overflow:hidden;width:100%}
 .catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-1px)}
 .catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
 .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
@@ -156,30 +161,33 @@ footer{border-top:1px solid var(--l);padding:20px 24px;text-align:center;font-fa
 .catCard.active .catCount{color:var(--a)}
 
 /* CONFIG */
-.configGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
-@media(max-width:480px){.configGrid{grid-template-columns:1fr}}
-.startArea{text-align:center;padding:4px 0}
-.startBtn{display:inline-flex;align-items:center;gap:8px;padding:0 28px;height:48px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .16s,background .16s,box-shadow .16s}
+.configRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:480px){.configRow{grid-template-columns:1fr}}
+.startArea{display:flex;flex-direction:column;align-items:center;gap:10px;padding:4px 0}
+.startBtn{display:inline-flex;align-items:center;gap:8px;padding:0 32px;height:52px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .16s,background .16s,box-shadow .16s;width:100%;justify-content:center;max-width:360px}
 .startBtn:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(27,255,140,.3)}
 .startBtn:active{transform:scale(.98)}.startBtn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
 body.light .startBtn{color:#fff}
-.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:8px;letter-spacing:.04em}
+.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em;text-align:center}
 
 /* EXAM VIEW */
 #examView{display:none}
-#examView.active{display:block}
+#examView.active{display:block;padding-bottom:110px}
 
 /* PROGRESS */
 .progressWrap{display:flex;align-items:center;gap:12px;margin-bottom:20px}
 .progressBar{flex:1;height:4px;border-radius:999px;background:var(--s2);overflow:hidden}
 .progressFill{height:100%;background:var(--a);border-radius:999px;transition:width .35s cubic-bezier(.2,.8,.2,1)}
-.progressLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);white-space:nowrap;letter-spacing:.04em;flex-shrink:0}
+.progressMeta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.progressLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);white-space:nowrap;letter-spacing:.04em}
+.liveScore{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);white-space:nowrap;letter-spacing:.04em}
+.liveScore.good{color:var(--ok)}.liveScore.warn{color:var(--warn)}.liveScore.bad{color:var(--danger)}
 .timerBadge{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);border:1px solid var(--l);border-radius:var(--r2);padding:2px 8px;flex-shrink:0}
 .timerBadge.warn{color:var(--warn);border-color:rgba(244,200,66,.3)}.timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.3)}
 
 /* QUESTION */
-.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:16px;position:relative}
-.qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:0;position:relative;transition:border-color .28s}
+.qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .qCatBadge{color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px;font-size:9.5px}
 .qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:18px}
 .qImage{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);margin-bottom:16px;display:block;background:var(--s2)}
@@ -187,18 +195,17 @@ body.light .startBtn{color:#fff}
 
 /* ANSWER BUTTONS */
 .ansGrid{display:grid;gap:8px}
-.ansBtn{display:flex;align-items:center;gap:12px;padding:12px 15px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .16s,background .16s,color .16s,transform .16s;min-height:44px}
+.ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .16s,background .16s,color .16s,transform .16s;min-height:52px}
 .ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
 .ansBtn:disabled{cursor:default;transform:none}
 .ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t)}
 body.light .ansBtn.correct{background:rgba(13,148,96,.12);border-color:var(--a)}
 .ansBtn.wrong{border-color:#ff6b6b;background:rgba(255,107,107,.10);color:var(--t)}
-.ansLetter{width:26px;height:26px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .16s,border-color .16s,color .16s}
+.ansLetter{width:28px;height:28px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .16s,border-color .16s,color .16s}
 .ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
 body.light .ansBtn.correct .ansLetter{color:#fff}
 .ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:#ff6b6b;color:#ff8484}
 
-/* CORRECT ANSWER PULSE */
 @keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
 .ansBtn.correct{animation:correctPulse .6s ease}
 
@@ -207,15 +214,15 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 .diffDot.easy{background:var(--ok)}.diffDot.normal{background:var(--warn)}.diffDot.hard{background:var(--danger)}
 
 /* STREAK */
-.streakWrap{display:none;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#f4c842;padding-left:4px;border-left:1px solid var(--l2)}
+.streakWrap{display:none;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#f4c842}
 .streakWrap.show{display:flex;animation:fadeIn .22s ease}
 
 /* BOOKMARK */
-.bookmarkBtn{position:absolute;top:14px;right:14px;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .16s,border-color .16s,background .16s;padding:0;z-index:2}
+.bookmarkBtn{position:absolute;top:14px;right:14px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .16s,border-color .16s,background .16s;padding:0;z-index:2}
 .bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4);background:rgba(244,200,66,.07)}
 
 /* KEYBOARD HINT */
-.kbHint{display:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;letter-spacing:.04em;padding-top:10px}
+.kbHint{display:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;letter-spacing:.04em;padding:12px 0 0}
 @media(hover:hover){.kbHint{display:block}}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -230,23 +237,24 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 .explanationBox.wrong .explLabel{color:#ff8484}
 .explText{font-size:13.5px;color:var(--t2);line-height:1.65}
 
-/* INLINE NEXT BUTTON */
-.inlineNextWrap{display:none;margin-top:14px}
-.inlineNextWrap.show{display:block;animation:fadeIn .25s ease}
-.inlineNextBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;letter-spacing:-.01em}
+/* INLINE NEXT BUTTON — primary CTA after answering */
+.inlineNextWrap{display:none;margin-top:16px}
+.inlineNextWrap.show{display:block;animation:fadeIn .3s cubic-bezier(.22,.61,.36,1)}
+.inlineNextBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;letter-spacing:-.01em}
 body.light .inlineNextBtn{color:#fff}
-.inlineNextBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 6px 20px rgba(27,255,140,.3)}
+.inlineNextBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
 .inlineNextBtn:active{transform:scale(.98)}
 
 /* MINIBAR */
-.miniBar{position:sticky;bottom:0;z-index:100;display:none;margin-top:16px}
+.miniBar{position:fixed;bottom:0;left:0;right:0;z-index:200;display:none}
 .miniBar.show{display:block}
-.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.95);backdrop-filter:blur(18px);border-top:1px solid var(--l2);padding:12px 16px;box-shadow:0 -4px 24px rgba(0,0,0,.5)}
-body.light .miniBarInner{background:rgba(243,248,245,.97)}
-.miniBarText{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);min-width:0}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 24px;max-width:100%;box-shadow:0 -4px 32px rgba(0,0,0,.6)}
+body.light .miniBarInner{background:rgba(243,248,245,.98)}
+.miniBarLeft{display:flex;align-items:center;gap:12px;min-width:0;overflow:hidden;flex:1}
+.miniBarText{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);white-space:nowrap}
 .miniBarText strong{color:var(--a)}
 .miniBarActions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.nextBtn{display:none;align-items:center;gap:6px;padding:0 18px;height:38px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
+.nextBtn{display:none;align-items:center;gap:6px;padding:0 20px;height:40px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
 .nextBtn.show{display:inline-flex;animation:fadeIn .18s ease}
 body.light .nextBtn{color:#fff}
 .nextBtn:hover{transform:translateY(-1px);background:var(--a2);box-shadow:0 4px 16px rgba(27,255,140,.3)}
@@ -255,14 +263,17 @@ body.light .nextBtn{color:#fff}
 /* RESULTS */
 #resultView{display:none}
 #resultView.active{display:block}
-.resultBig{text-align:center;padding:32px 22px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
-.resultScore{font-family:'DM Mono',monospace;font-size:clamp(36px,7vw,64px);font-weight:500;color:var(--t);letter-spacing:-.02em;line-height:1;margin-bottom:8px}
+.resultHero{text-align:center;padding:36px 22px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
+.resultScore{font-family:'DM Mono',monospace;font-size:clamp(40px,8vw,72px);font-weight:500;color:var(--t);letter-spacing:-.02em;line-height:1;margin-bottom:6px}
 .resultScore span{color:var(--a)}
-.resultPercent{font-family:'DM Mono',monospace;font-size:14px;color:var(--t3);margin-bottom:16px}
-.statusBadge{display:inline-flex;align-items:center;gap:7px;padding:8px 20px;border-radius:var(--r);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;letter-spacing:.06em}
+.resultPercent{font-family:'DM Mono',monospace;font-size:15px;color:var(--t3);margin-bottom:20px}
+.statusBadge{display:inline-flex;align-items:center;gap:7px;padding:10px 24px;border-radius:var(--r);font-family:'DM Mono',monospace;font-size:14px;font-weight:500;letter-spacing:.06em}
 .statusBadge.pass{background:rgba(27,255,140,.12);border:1px solid var(--a);color:var(--a)}
 .statusBadge.fail{background:rgba(255,107,107,.10);border:1px solid rgba(255,107,107,.4);color:#ff8484}
 body.light .statusBadge.fail{color:#c0392b}
+
+.resultActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.resultActions .btn{height:42px;font-size:14px}
 
 .breakdownGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:4px}
 .breakdownCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px;transition:border-color .16s}
@@ -279,8 +290,6 @@ body.light .statusBadge.fail{color:#c0392b}
 .errorCorrect{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--a);margin-bottom:4px}
 .errorExpl{font-size:12.5px;color:var(--t2);line-height:1.55;margin-top:4px}
 
-.resultActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-
 /* HISTORY */
 .histTable{width:100%;border-collapse:collapse;font-size:13px}
 .histTable th{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--l)}
@@ -290,6 +299,9 @@ body.light .statusBadge.fail{color:#c0392b}
 .passBadge{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;padding:2px 8px;border-radius:var(--r2)}
 .passBadge.p{background:rgba(27,255,140,.12);color:var(--a);border:1px solid rgba(27,255,140,.3)}
 .passBadge.f{background:rgba(255,107,107,.10);color:#ff8484;border:1px solid rgba(255,107,107,.25)}
+
+/* EMPTY STATE */
+.emptyState{padding:32px 16px;text-align:center;font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t3);line-height:1.7}
 
 /* TOAST */
 #toastRoot{position:fixed;top:68px;right:16px;z-index:9500;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
@@ -345,7 +357,7 @@ body.light .statusBadge.fail{color:#c0392b}
           <button class="btn btnG" type="button" id="signUpBtn">Skapa konto</button>
           <a class="btn btnG" href="index.html">Infosidan</a>
         </div>
-        <div class="loginHint">Skapa konto för att börja — gratis, inget kort krävs.</div>
+        <div class="loginHint">Gratis konto — inget kort krävs.</div>
       </div>
       <div id="loginErr" class="loginErr" aria-live="polite"></div>
     </div>
@@ -363,7 +375,7 @@ body.light .statusBadge.fail{color:#c0392b}
       </div>
     </a>
     <div class="hRight">
-      <a class="btn btnG" href="app.html" style="font-family:'DM Mono',monospace;font-size:11px;height:34px;padding:0 12px">← Appen</a>
+      <button class="btn btnDanger" id="abortBtn" type="button" style="display:none;font-size:12px;height:34px;padding:0 12px">Avbryt prov</button>
       <button class="themeTgl" id="themeBtn" type="button" aria-label="Växla tema">
         <span class="tglIcon" id="tglIcon">🌙</span>
         <span id="tglLabel">Light</span>
@@ -410,6 +422,10 @@ body.light .statusBadge.fail{color:#c0392b}
 
     <div class="card reveal">
       <div class="cardTitle">Välj kategori</div>
+      <div class="statsRow" id="statsRow" style="display:none">
+        <div class="statPill"><strong id="totalQCount">0</strong>&nbsp;frågor totalt</div>
+        <div class="statPill"><strong id="totalCatCount">0</strong>&nbsp;kategorier</div>
+      </div>
       <div class="catGrid" id="catGrid">
         <div style="grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">Laddar kategorier…</div>
       </div>
@@ -417,7 +433,7 @@ body.light .statusBadge.fail{color:#c0392b}
 
     <div class="card reveal">
       <div class="cardTitle">Provkonfiguration</div>
-      <div class="configGrid">
+      <div class="configRow">
         <div>
           <label class="fieldLabel" for="numQSel">Antal frågor</label>
           <select id="numQSel">
@@ -431,7 +447,7 @@ body.light .statusBadge.fail{color:#c0392b}
         <div>
           <label class="fieldLabel" for="diffSel">Svårighetsgrad</label>
           <select id="diffSel">
-            <option value="">Alla</option>
+            <option value="">Alla nivåer</option>
             <option value="easy">Lätt</option>
             <option value="normal">Normal</option>
             <option value="hard">Svår</option>
@@ -458,7 +474,10 @@ body.light .statusBadge.fail{color:#c0392b}
   <div id="examView">
     <div class="progressWrap">
       <div class="progressBar"><div class="progressFill" id="progressFill" style="width:0%"></div></div>
-      <span class="progressLabel" id="progressLabel">Fråga 1 av 10</span>
+      <div class="progressMeta">
+        <span class="progressLabel" id="progressLabel">Fråga 1 av 10</span>
+        <span class="liveScore" id="liveScore" style="display:none"></span>
+      </div>
       <span class="timerBadge" id="timerBadge" style="display:none">--:--</span>
     </div>
 
@@ -470,6 +489,7 @@ body.light .statusBadge.fail{color:#c0392b}
         <span id="qNum" style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)">01/10</span>
         <span class="diffDot" id="diffDot" style="display:none"></span>
         <span class="qCatBadge" id="qCat"></span>
+        <div class="streakWrap" id="streakWrap"></div>
       </div>
       <div class="qText" id="qText"></div>
       <div id="qImageWrap" class="qImageWrap" style="display:none"></div>
@@ -481,31 +501,17 @@ body.light .statusBadge.fail{color:#c0392b}
       <div class="inlineNextWrap" id="inlineNextWrap">
         <button class="inlineNextBtn" id="inlineNextBtn" type="button">
           Gå vidare
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
         </button>
       </div>
     </div>
 
-    <div class="miniBar show" id="miniBar">
-      <div class="miniBarInner">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden">
-          <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt · — kvar</div>
-          <div class="streakWrap" id="streakWrap"></div>
-        </div>
-        <div class="miniBarActions">
-          <button class="nextBtn" id="nextBtn" type="button">
-            Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
-          </button>
-          <button class="btn btnG" id="abortBtn" type="button" style="height:36px;font-size:12px;padding:0 12px">Avbryt</button>
-        </div>
-      </div>
-    </div>
     <div class="kbHint" id="kbHint">Tangentbord: A B C D eller 1 2 3 4 för svar &nbsp;·&nbsp; Enter för nästa</div>
   </div>
 
   <!-- RESULT VIEW -->
   <div id="resultView">
-    <div class="resultBig reveal">
+    <div class="resultHero reveal">
       <div class="resultScore" id="resultScore"><span>0</span> / 0</div>
       <div class="resultPercent" id="resultPercent">0%</div>
       <div id="passBadgeWrap" style="margin-top:4px"></div>
@@ -514,6 +520,7 @@ body.light .statusBadge.fail{color:#c0392b}
     <div class="resultActions">
       <button class="btn btnP" id="retryMistakesBtn" type="button">Träna mina misstag</button>
       <button class="btn btnG" id="newTestBtn" type="button">Nytt test</button>
+      <button class="btn btnG" id="sameConfigBtn" type="button">Samma inställningar</button>
     </div>
 
     <div class="card" id="breakdownCard" style="display:none">
@@ -530,6 +537,20 @@ body.light .statusBadge.fail{color:#c0392b}
 </div>
 </main>
 
+<!-- MINIBAR — fixed bottom, only shown during exam -->
+<div class="miniBar" id="miniBar">
+  <div class="miniBarInner">
+    <div class="miniBarLeft">
+      <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt</div>
+    </div>
+    <div class="miniBarActions">
+      <button class="nextBtn" id="nextBtn" type="button">
+        Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
 <footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -539,6 +560,7 @@ const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const LS_THEME      = "proviaai_theme";
 const LS_ROLE       = "proviaai_role";
 const LS_EXPL_CACHE = "proviaai_driving_explanations";
+const LS_BOOKMARKS  = "proviaai_bookmarks";
 
 const ROLE_LIMITS = {
   gratis:  { period:"week",  limit:1        },
@@ -563,12 +585,12 @@ const CAT_ICONS = {
 };
 
 const DIFF_LABEL = {easy:"Lätt",normal:"Normal",hard:"Svår"};
-const LS_BOOKMARKS = "proviaai_bookmarks";
 
 // ── STATE ──
 let db, currentUser, currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 let allQuestions = [], examQuestions = [], currentIdx = 0;
 let answers = [], selectedCategory = "Alla kategorier";
+let lastNumQ = 10, lastDiff = "";
 let timerInterval = null;
 let catCounts = {};
 let streak = 0;
@@ -576,369 +598,412 @@ let streak = 0;
 // ── BOOKMARKS ──
 function getBookmarks(){ return safeJson(localStorage.getItem(LS_BOOKMARKS),[]); }
 function toggleBookmark(id){
-  let bm=getBookmarks();
-  const idx=bm.indexOf(id);
-  if(idx>=0) bm.splice(idx,1); else bm.push(id);
-  localStorage.setItem(LS_BOOKMARKS,JSON.stringify(bm));
-  return idx<0;
+  let bm = getBookmarks();
+  const idx = bm.indexOf(id);
+  if(idx >= 0) bm.splice(idx, 1); else bm.push(id);
+  localStorage.setItem(LS_BOOKMARKS, JSON.stringify(bm));
+  return idx < 0;
 }
 function isBookmarked(id){ return getBookmarks().includes(id); }
 
 // ── HELPERS ──
 const $ = id => document.getElementById(id);
-function esc(s){ return String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") }
-function safeJson(s,fb){ try{return JSON.parse(s)}catch{return fb} }
+function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") }
+function safeJson(s, fb){ try{ return JSON.parse(s) }catch{ return fb } }
 
-function isoWeekKey(d=new Date()){
-  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-  t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));
-  const ys=new Date(Date.UTC(t.getUTCFullYear(),0,1));
-  const wk=Math.ceil((((t-ys)/86400000)+1)/7);
+function isoWeekKey(d = new Date()){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const ys = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil((((t - ys) / 86400000) + 1) / 7);
   return `${t.getUTCFullYear()}-W${String(wk).padStart(2,"0")}`;
 }
-function monthKey(d=new Date()){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` }
+function monthKey(d = new Date()){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` }
 
-function quotaKey(role,uid){
-  const cfg=ROLE_LIMITS[role]||ROLE_LIMITS.gratis;
-  const p=cfg.period==="week"?isoWeekKey():monthKey();
+function quotaKey(role, uid){
+  const cfg = ROLE_LIMITS[role] || ROLE_LIMITS.gratis;
+  const p = cfg.period === "week" ? isoWeekKey() : monthKey();
   return `proviaai_driving_quota_${uid}_${role}_${p}`;
 }
 
-async function getUid(){ const {data}=await db.auth.getUser(); return data?.user?.id||null }
-async function readQuota(){ const uid=(await getUid())||"guest"; return Number(localStorage.getItem(quotaKey(currentRole,uid))||0) }
-async function bumpQuota(){ const uid=(await getUid())||"guest"; const k=quotaKey(currentRole,uid); localStorage.setItem(k,String(Number(localStorage.getItem(k)||0)+1)) }
+async function getUid(){ const {data} = await db.auth.getUser(); return data?.user?.id || null }
+async function readQuota(){ const uid = (await getUid()) || "guest"; return Number(localStorage.getItem(quotaKey(currentRole, uid)) || 0) }
+async function bumpQuota(){ const uid = (await getUid()) || "guest"; const k = quotaKey(currentRole, uid); localStorage.setItem(k, String(Number(localStorage.getItem(k) || 0) + 1)) }
 
 async function checkQuota(){
-  const cfg=ROLE_LIMITS[currentRole]||ROLE_LIMITS.gratis;
-  if(cfg.limit===Infinity) return {allowed:true,count:0,limit:Infinity,period:cfg.period};
-  const count=await readQuota();
-  return {allowed:count<cfg.limit,count,limit:cfg.limit,period:cfg.period};
+  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
+  if(cfg.limit === Infinity) return {allowed:true, count:0, limit:Infinity, period:cfg.period};
+  const count = await readQuota();
+  return {allowed:count < cfg.limit, count, limit:cfg.limit, period:cfg.period};
 }
 
-function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a }
+function shuffle(arr){ const a = [...arr]; for(let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]] } return a }
 
 // ── TOAST ──
-function toast(msg,type="ok"){
-  const el=document.createElement("div");
-  el.className=`toast ${type}`;el.textContent=msg;
+function toast(msg, type = "ok"){
+  const el = document.createElement("div");
+  el.className = `toast ${type}`; el.textContent = msg;
   $("toastRoot").appendChild(el);
-  el.addEventListener("click",()=>dismiss(el));
-  setTimeout(()=>dismiss(el),4000);
-  function dismiss(e){e.classList.add("out");setTimeout(()=>e.remove(),200)}
+  el.addEventListener("click", () => dismiss(el));
+  setTimeout(() => dismiss(el), 4000);
+  function dismiss(e){ e.classList.add("out"); setTimeout(() => e.remove(), 200) }
 }
 
 // ── THEME ──
 function applyTheme(t){
-  document.body.classList.toggle("light",t==="light");
-  $("tglIcon").textContent=t==="light"?"☀️":"🌙";
-  $("tglLabel").textContent=t==="light"?"Dark":"Light";
+  document.body.classList.toggle("light", t === "light");
+  $("tglIcon").textContent = t === "light" ? "☀️" : "🌙";
+  $("tglLabel").textContent = t === "light" ? "Dark" : "Light";
 }
-$("themeBtn").addEventListener("click",()=>{
-  const next=document.body.classList.contains("light")?"dark":"light";
-  localStorage.setItem(LS_THEME,next); applyTheme(next);
+$("themeBtn").addEventListener("click", () => {
+  const next = document.body.classList.contains("light") ? "dark" : "light";
+  localStorage.setItem(LS_THEME, next); applyTheme(next);
 });
-applyTheme(localStorage.getItem(LS_THEME)||"dark");
+applyTheme(localStorage.getItem(LS_THEME) || "dark");
 
 // ── MENU ──
 (function(){
-  const btn=$("menuBtn"),menu=$("menu"); let open=false;
+  const btn = $("menuBtn"), menu = $("menu"); let open = false;
   function close(){
     menu.classList.remove("is-open"); menu.classList.add("is-closing");
-    setTimeout(()=>{menu.classList.remove("is-closing");menu.style.display="none"},130); open=false;
+    setTimeout(() => { menu.classList.remove("is-closing"); menu.style.display = "none" }, 130); open = false;
   }
-  btn.addEventListener("click",e=>{
+  btn.addEventListener("click", e => {
     e.stopPropagation();
-    if(open){close();return;}
-    menu.style.display="block"; requestAnimationFrame(()=>menu.classList.add("is-open")); open=true;
+    if(open){ close(); return; }
+    menu.style.display = "block"; requestAnimationFrame(() => menu.classList.add("is-open")); open = true;
   });
-  document.addEventListener("click",e=>{if(open&&!menu.contains(e.target))close()});
-  $("logoutBtn").addEventListener("click",async()=>{await db?.auth.signOut();location.reload()});
+  document.addEventListener("click", e => { if(open && !menu.contains(e.target)) close() });
+  $("logoutBtn").addEventListener("click", async () => { await db?.auth.signOut(); location.reload() });
 })();
 
 // ── QUOTA UI ──
 async function refreshQuotaUi(){
-  const rp=$("rolePill"); const banner=$("quotaBanner"); const bannerTxt=$("quotaBannerTxt");
-  const label=$("quotaLabel"); const dot=$("statusDot");
-  const rl={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
-  if(rp) rp.textContent=rl[currentRole]||currentRole;
+  const rp = $("rolePill"), banner = $("quotaBanner"), bannerTxt = $("quotaBannerTxt");
+  const label = $("quotaLabel"), dot = $("statusDot");
+  const rl = {gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
+  if(rp) rp.textContent = rl[currentRole] || currentRole;
 
-  const cfg=ROLE_LIMITS[currentRole]||ROLE_LIMITS.gratis;
-  if(cfg.limit===Infinity){
-    if(label) label.textContent="OBEGRÄNSAT";
+  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
+  if(cfg.limit === Infinity){
+    if(label) label.textContent = "OBEGRÄNSAT ANTAL TEST";
     if(banner) banner.classList.remove("show");
     dot?.classList.add("ok");
-    $("startBtn").disabled=false;
+    $("startBtn").disabled = false;
     return true;
   }
-  const count=await readQuota();
-  const left=Math.max(cfg.limit-count,0);
-  const period=cfg.period==="week"?"VECKA":"MÅNAD";
-  if(label) label.textContent=`TEST DENNA ${period}: ${count}/${cfg.limit} · KVAR: ${left}`;
-  dot?.classList.toggle("ok",left>0);
+  const count = await readQuota();
+  const left = Math.max(cfg.limit - count, 0);
+  const period = cfg.period === "week" ? "VECKA" : "MÅNAD";
+  if(label) label.textContent = `TEST DENNA ${period}: ${count}/${cfg.limit} · ${left} KVAR`;
+  dot?.classList.toggle("ok", left > 0);
 
-  if(banner&&bannerTxt){
-    if(left===0){
-      const msg=cfg.period==="week"?"Du har använt ditt gratistest denna vecka.":"Du har nått månadsgränsen.";
-      bannerTxt.innerHTML=`<strong>Gränsen nådd.</strong> ${msg}`;
+  if(banner && bannerTxt){
+    if(left === 0){
+      const msg = cfg.period === "week" ? "Du har använt ditt gratistest denna vecka." : "Du har nått månadsgränsen.";
+      bannerTxt.innerHTML = `<strong>Gränsen nådd.</strong> ${msg}`;
       banner.classList.add("show");
-      $("startBtn").disabled=true;
-    } else if(left===1){
-      bannerTxt.innerHTML=`<strong>1 test kvar</strong> denna ${cfg.period==="week"?"vecka":"månad"}.`;
+      $("startBtn").disabled = true;
+    } else if(left === 1){
+      bannerTxt.innerHTML = `<strong>1 test kvar</strong> denna ${cfg.period === "week" ? "vecka" : "månad"}.`;
       banner.classList.add("show");
-      $("startBtn").disabled=false;
+      $("startBtn").disabled = false;
     } else {
       banner.classList.remove("show");
-      $("startBtn").disabled=false;
+      $("startBtn").disabled = false;
     }
   }
-  return left>0;
+  return left > 0;
 }
 
 // ── LOAD DATA ──
 async function loadAllQuestions(){
-  const {data,error}=await db.from("driving_questions").select("*");
-  if(!error&&data) allQuestions=data;
+  try {
+    const {data, error} = await db.from("driving_questions").select("*");
+    if(!error && data) allQuestions = data;
+    else if(error) console.warn("driving_questions fel:", error.message);
+  } catch(e){ console.warn("loadAllQuestions kastade:", e) }
 }
 
 async function loadCategories(){
-  const grid=$("catGrid"); grid.innerHTML="";
-  const {data,error}=await db.from("driving_questions").select("category");
-  if(error||!data){
-    grid.innerHTML=`<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Tabellen driving_questions saknas.</div>`;
+  const grid = $("catGrid"); grid.innerHTML = "";
+  let data, error;
+  try {
+    const res = await db.from("driving_questions").select("category");
+    data = res.data; error = res.error;
+  } catch(e){
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Nätverksfel — kontrollera anslutningen.</div>`;
     return;
   }
-  data.forEach(r=>{catCounts[r.category]=(catCounts[r.category]||0)+1});
-  const total=data.length;
+  if(error || !data){
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Kunde inte ladda frågor (${error?.message || "okänt fel"}).</div>`;
+    return;
+  }
+  data.forEach(r => { catCounts[r.category] = (catCounts[r.category] || 0) + 1 });
+  const total = data.length;
 
-  // Bokmärkta frågor som eget val
-  const bmIds=getBookmarks();
-  const bmCount=allQuestions.filter(q=>bmIds.includes(q.id)).length;
-  const allCats=["Alla kategorier",...CATEGORY_LIST.slice(1)];
-  if(bmCount>0) allCats.push("⭐ Bokmärkta");
+  // Show stats
+  const uniqueCats = Object.keys(catCounts).length;
+  $("totalQCount").textContent = total;
+  $("totalCatCount").textContent = uniqueCats;
+  $("statsRow").style.display = "flex";
 
-  allCats.forEach(cat=>{
+  const bmIds = getBookmarks();
+  const bmCount = allQuestions.filter(q => bmIds.includes(q.id)).length;
+  const allCats = ["Alla kategorier", ...CATEGORY_LIST.slice(1)];
+  if(bmCount > 0) allCats.push("⭐ Bokmärkta");
+
+  allCats.forEach(cat => {
     let count;
-    if(cat==="Alla kategorier") count=total;
-    else if(cat==="⭐ Bokmärkta") count=bmCount;
-    else count=catCounts[cat]||0;
+    if(cat === "Alla kategorier") count = total;
+    else if(cat === "⭐ Bokmärkta") count = bmCount;
+    else count = catCounts[cat] || 0;
 
-    const card=document.createElement("button");
-    const icon=CAT_ICONS[cat]||"";
-    card.className="catCard"+(cat===selectedCategory?" active":"");
-    card.type="button";
-    card.innerHTML=`<div class="catName">${icon?icon+" ":""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${count} frågor</div>`;
-    card.addEventListener("click",()=>{
-      document.querySelectorAll(".catCard").forEach(c=>c.classList.remove("active"));
-      card.classList.add("active"); selectedCategory=cat; updateStartHint();
+    const card = document.createElement("button");
+    const icon = CAT_ICONS[cat] || "";
+    card.className = "catCard" + (cat === selectedCategory ? " active" : "");
+    card.type = "button";
+    card.innerHTML = `<div class="catName">${icon ? icon + " " : ""}${esc(cat.replace("⭐ ", ""))}</div><div class="catCount">${count} frågor</div>`;
+    card.addEventListener("click", () => {
+      document.querySelectorAll(".catCard").forEach(c => c.classList.remove("active"));
+      card.classList.add("active"); selectedCategory = cat; updateStartHint();
     });
     grid.appendChild(card);
   });
-  $("startBtn").disabled=false;
+
+  $("startBtn").disabled = false;
   updateStartHint();
 }
 
 function updateStartHint(){
-  const n=parseInt($("numQSel").value);
-  $("startHint").textContent=n===65?"65 frågor · 52 rätt krävs · 50 min tidsgräns (som riktigt prov)":`${n} frågor · ${Math.ceil(n*0.8)} rätt rekommenderas`;
+  const n = parseInt($("numQSel").value);
+  $("startHint").textContent = n === 65
+    ? "65 frågor · 52 rätt krävs · 50 min tidsgräns (som riktigt prov)"
+    : `${n} frågor · ${Math.ceil(n * 0.8)} rätt rekommenderas`;
 }
-$("numQSel").addEventListener("change",updateStartHint);
+$("numQSel").addEventListener("change", updateStartHint);
 
 // ── START EXAM ──
-$("startBtn").addEventListener("click",async()=>{
-  const quota=await checkQuota();
-  if(!quota.allowed){toast("Gränsen nådd. Uppgradera för fler test.","bad");return;}
+$("startBtn").addEventListener("click", async () => {
+  const quota = await checkQuota();
+  if(!quota.allowed){ toast("Gränsen nådd — uppgradera för fler test.", "bad"); return; }
 
-  const numQ=parseInt($("numQSel").value);
-  const diff=$("diffSel").value;
+  lastNumQ = parseInt($("numQSel").value);
+  lastDiff = $("diffSel").value;
+  startExam(selectedCategory, lastNumQ, lastDiff);
+});
 
-  let pool=allQuestions;
-  if(selectedCategory==="⭐ Bokmärkta"){
-    const bmIds=getBookmarks();
-    pool=pool.filter(q=>bmIds.includes(q.id));
-  } else if(selectedCategory!=="Alla kategorier"){
-    pool=pool.filter(q=>q.category===selectedCategory);
+async function startExam(category, numQ, diff){
+  let pool = allQuestions;
+  if(category === "⭐ Bokmärkta"){
+    const bmIds = getBookmarks();
+    pool = pool.filter(q => bmIds.includes(q.id));
+  } else if(category !== "Alla kategorier"){
+    pool = pool.filter(q => q.category === category);
   }
-  if(diff) pool=pool.filter(q=>q.difficulty===diff);
+  if(diff) pool = pool.filter(q => q.difficulty === diff);
 
-  if(pool.length===0){toast("Inga frågor hittades för dessa filter.","bad");return;}
+  if(pool.length === 0){ toast("Inga frågor hittades för dessa filter.", "bad"); return; }
 
-  examQuestions=shuffle(pool).slice(0,Math.min(numQ,pool.length));
-  currentIdx=0;
-  answers=new Array(examQuestions.length).fill(null);
-  streak=0;
+  examQuestions = shuffle(pool).slice(0, Math.min(numQ, pool.length));
+  currentIdx = 0;
+  answers = new Array(examQuestions.length).fill(null);
+  streak = 0;
   updateStreak();
 
   await bumpQuota();
   await refreshQuotaUi();
 
   showExamView();
-  if(numQ===65) startTimer(50*60);
+  if(numQ === 65) startTimer(50 * 60);
   renderQuestion(0);
-});
+}
 
 // ── VIEWS ──
 function showExamView(){
-  $("configView").style.display="none";
+  $("configView").style.display = "none";
   $("resultView").classList.remove("active");
   $("examView").classList.add("active");
   $("miniBar").classList.add("show");
-  window.scrollTo({top:0,behavior:"smooth"});
+  $("abortBtn").style.display = "";
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
 function showConfigView(){
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
-  $("configView").style.display="";
+  $("configView").style.display = "";
   $("miniBar").classList.remove("show");
+  $("abortBtn").style.display = "none";
   stopTimer();
   refreshQuotaUi();
   loadHistory();
-  window.scrollTo({top:0,behavior:"smooth"});
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
 // ── RENDER QUESTION ──
 function renderQuestion(idx){
-  const q=examQuestions[idx]; const total=examQuestions.length;
+  const q = examQuestions[idx];
+  const total = examQuestions.length;
 
   // Progress
-  $("progressFill").style.width=(((idx+1)/total)*100)+"%";
-  $("progressLabel").textContent=`Fråga ${idx+1} av ${total}`;
+  const pct = ((idx + 1) / total) * 100;
+  $("progressFill").style.width = pct + "%";
+  $("progressLabel").textContent = `Fråga ${idx + 1} av ${total}`;
 
-  // Meta (all static elements in HTML)
-  $("qNum").textContent=`${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
-  $("qCat").textContent=`${CAT_ICONS[q.category]||""} ${q.category}`;
-  $("diffDot").className=`diffDot ${q.difficulty||"normal"}`;
-  $("diffDot").title=DIFF_LABEL[q.difficulty]||"Normal";
-  $("diffDot").style.display="inline-block";
+  // Live score (show after first answer)
+  const answered = answers.filter(a => a !== null).length;
+  if(answered > 0){
+    const correct = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
+    const scorePct = Math.round((correct / answered) * 100);
+    const ls = $("liveScore");
+    ls.textContent = `${correct}/${answered} rätt (${scorePct}%)`;
+    ls.className = "liveScore" + (scorePct >= 75 ? " good" : scorePct >= 50 ? " warn" : " bad");
+    ls.style.display = "";
+  } else {
+    $("liveScore").style.display = "none";
+  }
+
+  // Meta
+  $("qNum").textContent = `${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
+  $("qCat").textContent = `${CAT_ICONS[q.category] || ""} ${q.category}`;
+  $("diffDot").className = `diffDot ${q.difficulty || "normal"}`;
+  $("diffDot").title = DIFF_LABEL[q.difficulty] || "Normal";
+  $("diffDot").style.display = q.difficulty ? "inline-block" : "none";
 
   // Question text
-  $("qText").textContent=q.question;
+  $("qText").textContent = q.question;
 
-  // Bookmark (static in HTML)
-  $("bookmarkBtn").style.display="grid";
+  // Bookmark
+  $("bookmarkBtn").style.display = "grid";
   $("bookmarkBtn").classList.toggle("saved", isBookmarked(q.id));
-  $("bookmarkBtn").onclick=()=>{
-    const saved=toggleBookmark(q.id);
-    $("bookmarkBtn").classList.toggle("saved",saved);
-    toast(saved?"Bokmärkt ⭐":"Bokmärke borttaget","ok");
+  $("bookmarkBtn").onclick = () => {
+    const saved = toggleBookmark(q.id);
+    $("bookmarkBtn").classList.toggle("saved", saved);
+    toast(saved ? "Bokmärkt ⭐" : "Bokmärke borttaget", "ok");
   };
 
-  // Image (static wrapper in HTML)
-  const imgWrap=$("qImageWrap");
+  // Image
+  const imgWrap = $("qImageWrap");
   if(q.image_url){
-    imgWrap.innerHTML=`<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'Frågabild')}" loading="lazy">`;
-    imgWrap.style.display="flex";
+    imgWrap.innerHTML = `<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt || 'Frågabild')}" loading="lazy">`;
+    imgWrap.style.display = "flex";
   } else {
-    imgWrap.innerHTML="";
-    imgWrap.style.display="none";
+    imgWrap.innerHTML = "";
+    imgWrap.style.display = "none";
   }
 
   // Reset feedback state
-  $("explanationBox").className="explanationBox";
+  $("explanationBox").className = "explanationBox";
   $("inlineNextWrap").classList.remove("show");
   $("nextBtn").classList.remove("show");
 
   // Build answer buttons
-  const grid=$("ansGrid");
-  grid.innerHTML="";
-  const opts=[
-    {l:"A",t:q.option_a},
-    {l:"B",t:q.option_b},
-    {l:"C",t:q.option_c},
-    {l:"D",t:q.option_d}
-  ].filter(o=>o.t);
+  const grid = $("ansGrid");
+  grid.innerHTML = "";
+  const opts = [
+    {l:"A", t:q.option_a},
+    {l:"B", t:q.option_b},
+    {l:"C", t:q.option_c},
+    {l:"D", t:q.option_d},
+  ].filter(o => o.t);
 
-  opts.forEach(opt=>{
-    const btn=document.createElement("button");
-    btn.className="ansBtn";
-    btn.type="button";
-    btn.innerHTML=`<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
-    btn.addEventListener("click",()=>handleAnswer(opt.l,q));
+  opts.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.className = "ansBtn";
+    btn.type = "button";
+    btn.innerHTML = `<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
+    btn.addEventListener("click", () => handleAnswer(opt.l, q));
     grid.appendChild(btn);
   });
 
   updateMiniBar();
-  window.scrollTo({top:0,behavior:"smooth"});
+  window.scrollTo({top:0, behavior:"smooth"});
 }
 
 // ── HANDLE ANSWER ──
-function handleAnswer(chosen,q){
-  const correct=(q.correct||"").trim().toUpperCase();
-  const chosenUp=chosen.toUpperCase();
-  const wasCorrect=chosenUp===correct;
-  answers[currentIdx]=chosenUp;
+function handleAnswer(chosen, q){
+  const correct = (q.correct || "").trim().toUpperCase();
+  const chosenUp = chosen.toUpperCase();
+  const wasCorrect = chosenUp === correct;
+  answers[currentIdx] = chosenUp;
 
   // Color the buttons
-  document.querySelectorAll("#ansGrid .ansBtn").forEach((btn,i)=>{
-    btn.disabled=true;
-    const l=["A","B","C","D"][i];
-    if(l===correct) btn.classList.add("correct");
-    if(l===chosenUp&&!wasCorrect) btn.classList.add("wrong");
+  document.querySelectorAll("#ansGrid .ansBtn").forEach((btn, i) => {
+    btn.disabled = true;
+    const l = ["A","B","C","D"][i];
+    if(l === correct) btn.classList.add("correct");
+    if(l === chosenUp && !wasCorrect) btn.classList.add("wrong");
   });
 
   // Streak
-  streak = wasCorrect ? streak+1 : 0;
+  streak = wasCorrect ? streak + 1 : 0;
   updateStreak();
 
-  // Explanation with correct/wrong color
-  const box=$("explanationBox");
-  const label=$("explLabel");
+  // Explanation
+  const box = $("explanationBox");
+  const label = $("explLabel");
   box.classList.remove("correct","wrong");
-  label.classList.remove("correct","wrong");
   if(wasCorrect){
     box.classList.add("correct");
-    label.innerHTML=`<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2 8 6 12 14 4"/></svg> Rätt svar! Förklaring`;
+    label.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2 8 6 12 14 4"/></svg> Rätt svar! Förklaring`;
   } else {
-    const opts={A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d};
+    const opts = {A:q.option_a, B:q.option_b, C:q.option_c, D:q.option_d};
     box.classList.add("wrong");
-    label.innerHTML=`<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Fel — rätt svar var ${correct}: ${esc(opts[correct]||"")}`;
+    label.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Fel — rätt svar: ${correct}. ${esc(opts[correct] || "")}`;
   }
   showExplanation(q);
 
-  // Show inline "Gå vidare" button + miniBar button
-  const isLast=currentIdx===examQuestions.length-1;
-  const inlineBtn=$("inlineNextBtn");
-  inlineBtn.innerHTML=isLast
-    ?`Visa resultat <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`
-    :`Gå vidare <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
+  // Show "Gå vidare" button
+  const isLast = currentIdx === examQuestions.length - 1;
+  const nextLabel = isLast ? "Visa resultat" : "Gå vidare";
+  const nextIcon = `<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
+
+  $("inlineNextBtn").innerHTML = `${nextLabel} ${nextIcon}`;
   $("inlineNextWrap").classList.add("show");
 
-  const nb=$("nextBtn");
-  nb.textContent=isLast?"Visa resultat":"Nästa fråga";
-  nb.classList.add("show");
+  $("nextBtn").innerHTML = `${nextLabel} ${nextIcon}`;
+  $("nextBtn").classList.add("show");
 
   updateMiniBar();
+
+  // Scroll the "Gå vidare" button into view so user can see it
+  setTimeout(() => {
+    $("inlineNextWrap").scrollIntoView({behavior:"smooth", block:"nearest"});
+  }, 120);
 }
 
 // ── EXPLANATION ──
 function showExplanation(q){
-  const box=$("explanationBox"); const txt=$("explText");
-  const cache=safeJson(localStorage.getItem(LS_EXPL_CACHE),{});
-  if(cache[q.id]){ txt.textContent=cache[q.id]; box.classList.add("show"); return; }
-  if(q.explanation?.trim()){ txt.textContent=q.explanation; box.classList.add("show"); return; }
-  // No stored explanation — still show box (it's already styled correct/wrong)
+  const box = $("explanationBox"), txt = $("explText");
+  const cache = safeJson(localStorage.getItem(LS_EXPL_CACHE), {});
+  if(cache[q.id]){ txt.textContent = cache[q.id]; box.classList.add("show"); return; }
+  if(q.explanation?.trim()){ txt.textContent = q.explanation; box.classList.add("show"); return; }
 
   box.classList.add("show");
-  txt.innerHTML='<span class="spinner"></span> Hämtar AI-förklaring…';
-  fetch("/api/explain",{
+  txt.innerHTML = '<span class="spinner"></span> Hämtar AI-förklaring…';
+  fetch("/api/explain", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({question:q.question,correct:q.correct,option_a:q.option_a,option_b:q.option_b,option_c:q.option_c,option_d:q.option_d})
+    body:JSON.stringify({question:q.question, correct:q.correct, option_a:q.option_a, option_b:q.option_b, option_c:q.option_c, option_d:q.option_d})
   })
-  .then(r=>r.ok?r.json():null)
-  .then(data=>{
+  .then(r => r.ok ? r.json() : null)
+  .then(data => {
     if(data?.explanation){
-      txt.textContent=data.explanation;
-      const upd=safeJson(localStorage.getItem(LS_EXPL_CACHE),{});
-      upd[q.id]=data.explanation;
-      localStorage.setItem(LS_EXPL_CACHE,JSON.stringify(upd));
-    } else { txt.textContent=`Rätt svar: ${q.correct}.` }
+      txt.textContent = data.explanation;
+      const upd = safeJson(localStorage.getItem(LS_EXPL_CACHE), {});
+      upd[q.id] = data.explanation;
+      localStorage.setItem(LS_EXPL_CACHE, JSON.stringify(upd));
+    } else {
+      txt.textContent = `Rätt svar: ${q.correct}.`;
+    }
   })
-  .catch(()=>{ txt.textContent=`Rätt svar: ${q.correct}.` });
+  .catch(() => { txt.textContent = `Rätt svar: ${q.correct}.` });
 }
 
+// ── NAVIGATION ──
 function goNext(){
-  if(currentIdx<examQuestions.length-1){
+  if(currentIdx < examQuestions.length - 1){
     currentIdx++;
     renderQuestion(currentIdx);
   } else {
@@ -949,26 +1014,27 @@ function goNext(){
 $("nextBtn").addEventListener("click", goNext);
 $("inlineNextBtn").addEventListener("click", goNext);
 
-$("abortBtn").addEventListener("click",()=>{
+$("abortBtn").addEventListener("click", () => {
   if(!confirm("Avbryt provet? Ditt resultat sparas inte.")) return;
   showConfigView();
 });
 
-function isCorrect(answer,q){
-  return answer!=null && answer.toUpperCase()===(q?.correct||"").trim().toUpperCase();
+// ── HELPERS ──
+function isCorrect(answer, q){
+  return answer != null && answer.toUpperCase() === (q?.correct || "").trim().toUpperCase();
 }
 
 function updateMiniBar(){
-  const correct=answers.filter((a,i)=>isCorrect(a,examQuestions[i])).length;
-  const answered=answers.filter(a=>a!==null).length;
-  const remaining=examQuestions.length-answered;
-  $("miniBarText").innerHTML=`<strong>${correct} / ${answered}</strong> rätt · ${remaining} kvar`;
+  const correct = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
+  const answered = answers.filter(a => a !== null).length;
+  const remaining = examQuestions.length - answered;
+  $("miniBarText").innerHTML = `<strong>${correct} / ${answered}</strong> rätt · ${remaining} kvar`;
 }
 
 function updateStreak(){
-  const sw=$("streakWrap");
-  if(streak>=3){
-    sw.innerHTML=`🔥 ${streak} rätta i rad`;
+  const sw = $("streakWrap");
+  if(streak >= 3){
+    sw.innerHTML = `🔥 ${streak} rätta i rad`;
     sw.classList.add("show");
   } else {
     sw.classList.remove("show");
@@ -976,190 +1042,257 @@ function updateStreak(){
 }
 
 // ── KEYBOARD SHORTCUTS ──
-document.addEventListener("keydown",e=>{
+document.addEventListener("keydown", e => {
   if(!$("examView").classList.contains("active")) return;
   if(e.target.matches("input,textarea,select")) return;
 
-  const keyMap={"1":"A","2":"B","3":"C","4":"D","a":"A","b":"B","c":"C","d":"D","A":"A","B":"B","C":"C","D":"D"};
+  const keyMap = {"1":"A","2":"B","3":"C","4":"D","a":"A","b":"B","c":"C","d":"D","A":"A","B":"B","C":"C","D":"D"};
   if(keyMap[e.key]){
     e.preventDefault();
-    const btns=document.querySelectorAll("#ansGrid .ansBtn:not(:disabled)");
-    const li={"A":0,"B":1,"C":2,"D":3};
-    const btn=btns[li[keyMap[e.key]]];
+    const btns = document.querySelectorAll("#ansGrid .ansBtn:not(:disabled)");
+    const li = {"A":0,"B":1,"C":2,"D":3};
+    const btn = btns[li[keyMap[e.key]]];
     if(btn) btn.click();
   }
-  if((e.key==="Enter"||e.key===" ")&&$("nextBtn").classList.contains("show")){
+  if((e.key === "Enter" || e.key === " ") && $("nextBtn").classList.contains("show")){
     e.preventDefault();
-    $("nextBtn").click();
+    goNext();
   }
 });
 
 // ── TIMER ──
 function startTimer(seconds){
-  let s=seconds; const badge=$("timerBadge"); badge.style.display="";
-  timerInterval=setInterval(()=>{
-    s--; const m=Math.floor(s/60); const sec=s%60;
-    badge.textContent=`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-    badge.className="timerBadge"+(s<60?" bad":s<180?" warn":"");
-    if(s<=0){clearInterval(timerInterval);showResults();}
-  },1000);
+  let s = seconds;
+  const badge = $("timerBadge"); badge.style.display = "";
+  timerInterval = setInterval(() => {
+    s--;
+    const m = Math.floor(s / 60), sec = s % 60;
+    badge.textContent = `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+    badge.className = "timerBadge" + (s < 60 ? " bad" : s < 180 ? " warn" : "");
+    if(s <= 0){ clearInterval(timerInterval); toast("Tiden är slut!", "bad"); showResults(); }
+  }, 1000);
 }
-function stopTimer(){ clearInterval(timerInterval); $("timerBadge").style.display="none"; }
+function stopTimer(){ clearInterval(timerInterval); $("timerBadge").style.display = "none"; }
 
 // ── RESULTS ──
 async function showResults(){
   stopTimer();
-  streak=0; updateStreak();
+  streak = 0; updateStreak();
   $("examView").classList.remove("active");
   $("miniBar").classList.remove("show");
-  $("configView").style.display="none";
+  $("abortBtn").style.display = "none";
+  $("configView").style.display = "none";
   $("resultView").classList.add("active");
-  window.scrollTo({top:0,behavior:"smooth"});
+  window.scrollTo({top:0, behavior:"smooth"});
 
-  const total=examQuestions.length;
-  const numCorrect=answers.filter((a,i)=>isCorrect(a,examQuestions[i])).length;
-  const pct=Math.round((numCorrect/total)*100);
-  const passed=total===65?numCorrect>=52:pct>=75;
+  const total = examQuestions.length;
+  const numCorrect = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
+  const pct = Math.round((numCorrect / total) * 100);
+  const passed = total === 65 ? numCorrect >= 52 : pct >= 75;
 
-  $("resultScore").innerHTML=`<span>${numCorrect}</span> / ${total}`;
-  $("resultPercent").textContent=`${pct}%`;
-  $("passBadgeWrap").innerHTML=passed
-    ?`<span class="statusBadge pass">✓ GODKÄNT</span>`
-    :`<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
+  $("resultScore").innerHTML = `<span>${numCorrect}</span> / ${total}`;
+  $("resultPercent").textContent = `${pct}% rätt`;
+  $("passBadgeWrap").innerHTML = passed
+    ? `<span class="statusBadge pass">✓ GODKÄNT</span>`
+    : `<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
 
   // Category breakdown
-  const catMap={};
-  examQuestions.forEach((q,i)=>{
-    if(!catMap[q.category]) catMap[q.category]={correct:0,total:0};
+  const catMap = {};
+  examQuestions.forEach((q, i) => {
+    if(!catMap[q.category]) catMap[q.category] = {correct:0, total:0};
     catMap[q.category].total++;
-    if(isCorrect(answers[i],q)) catMap[q.category].correct++;
+    if(isCorrect(answers[i], q)) catMap[q.category].correct++;
   });
-  const cats=Object.keys(catMap);
-  if(cats.length>1){
-    $("breakdownCard").style.display="";
-    $("breakdownGrid").innerHTML=cats.map(cat=>{
-      const {correct,total}=catMap[cat]; const p=Math.round((correct/total)*100);
-      return `<div class="breakdownCard"><div class="brkLabel">${esc(cat)}</div><div class="brkScore">${correct} / ${total} (${p}%)</div><div class="brkBar"><div class="brkFill" style="width:${p}%"></div></div></div>`;
+  const cats = Object.keys(catMap);
+  if(cats.length > 1){
+    $("breakdownCard").style.display = "";
+    $("breakdownGrid").innerHTML = cats.map(cat => {
+      const {correct, total} = catMap[cat];
+      const p = Math.round((correct / total) * 100);
+      const color = p >= 75 ? "var(--ok)" : p >= 50 ? "var(--warn)" : "var(--danger)";
+      return `<div class="breakdownCard">
+        <div class="brkLabel">${esc(cat)}</div>
+        <div class="brkScore">${correct} / ${total} (${p}%)</div>
+        <div class="brkBar"><div class="brkFill" style="width:${p}%;background:${color}"></div></div>
+      </div>`;
     }).join("");
-  } else { $("breakdownCard").style.display="none"; }
+  } else {
+    $("breakdownCard").style.display = "none";
+  }
 
   // Error bank
-  const errors=examQuestions.map((q,i)=>({q,chosen:answers[i]})).filter(e=>!isCorrect(e.chosen,e.q));
-  if(errors.length>0){
-    $("errorBankCard").style.display="";
-    $("errorBank").innerHTML=errors.map(({q,chosen})=>{
-      const opts={A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d};
-      const correctText=opts[q.correct]||q.correct;
+  const errors = examQuestions.map((q, i) => ({q, chosen:answers[i]})).filter(e => !isCorrect(e.chosen, e.q));
+  if(errors.length > 0){
+    $("errorBankCard").style.display = "";
+    $("errorBank").innerHTML = errors.map(({q, chosen}) => {
+      const opts = {A:q.option_a, B:q.option_b, C:q.option_c, D:q.option_d};
+      const correctText = opts[q.correct] || q.correct;
       return `<div class="errorCard">
         <div class="errorCatLabel">${esc(q.category)}</div>
         <div class="errorQ">${esc(q.question)}</div>
         <div class="errorCorrect">✓ Rätt: ${q.correct}. ${esc(correctText)}</div>
-        ${q.explanation?`<div class="errorExpl">${esc(q.explanation)}</div>`:""}
+        ${q.explanation ? `<div class="errorExpl">${esc(q.explanation)}</div>` : ""}
       </div>`;
     }).join("");
-  } else { $("errorBankCard").style.display="none"; }
+  } else {
+    $("errorBankCard").style.display = "none";
+  }
 
   // Save result
   try {
-    const uid=await getUid();
+    const uid = await getUid();
     if(uid){
       await db.from("driving_results").insert({
         user_id:uid, category:selectedCategory,
         num_questions:total, num_correct:numCorrect, percent:pct, passed
       });
     }
-  } catch(e){console.warn("Kunde inte spara resultat:",e)}
+  } catch(e){ console.warn("Kunde inte spara resultat:", e) }
+
+  // Re-enable mistakes button
+  $("retryMistakesBtn").disabled = errors.length === 0;
 }
 
-$("newTestBtn").addEventListener("click",()=>showConfigView());
-$("retryMistakesBtn").addEventListener("click",()=>{
-  const mistakes=examQuestions.filter((_,i)=>!isCorrect(answers[i],examQuestions[i]));
-  if(mistakes.length===0){toast("Inga misstag att träna!","ok");return;}
-  examQuestions=shuffle(mistakes); currentIdx=0;
-  answers=new Array(examQuestions.length).fill(null);
-  showExamView(); renderQuestion(0);
+$("newTestBtn").addEventListener("click", () => showConfigView());
+
+$("sameConfigBtn").addEventListener("click", async () => {
+  const quota = await checkQuota();
+  if(!quota.allowed){ toast("Gränsen nådd — uppgradera för fler test.", "bad"); return; }
+  startExam(selectedCategory, lastNumQ, lastDiff);
+});
+
+$("retryMistakesBtn").addEventListener("click", () => {
+  const mistakes = examQuestions.filter((_, i) => !isCorrect(answers[i], examQuestions[i]));
+  if(mistakes.length === 0){ toast("Inga misstag att träna!", "ok"); return; }
+  examQuestions = shuffle(mistakes);
+  currentIdx = 0;
+  answers = new Array(examQuestions.length).fill(null);
+  streak = 0; updateStreak();
+  showExamView();
+  renderQuestion(0);
 });
 
 // ── HISTORY ──
 async function loadHistory(){
-  const uid=await getUid(); if(!uid) return;
-  const {data}=await db.from("driving_results")
-    .select("*").eq("user_id",uid)
-    .order("created_at",{ascending:false}).limit(10);
-  if(!data||data.length===0){$("historySection").style.display="none";return;}
-  $("historySection").style.display="";
-  $("historyBody").innerHTML=`<table class="histTable">
+  const uid = await getUid(); if(!uid) return;
+  const {data} = await db.from("driving_results")
+    .select("*").eq("user_id", uid)
+    .order("created_at", {ascending:false}).limit(10);
+  if(!data || data.length === 0){ $("historySection").style.display = "none"; return; }
+  $("historySection").style.display = "";
+  $("historyBody").innerHTML = `<table class="histTable">
     <thead><tr><th>Datum</th><th>Kategori</th><th>Resultat</th><th>Status</th></tr></thead>
-    <tbody>${data.map(r=>{
-      const date=new Date(r.created_at).toLocaleDateString("sv-SE",{month:"short",day:"numeric"});
+    <tbody>${data.map(r => {
+      const date = new Date(r.created_at).toLocaleDateString("sv-SE", {month:"short", day:"numeric"});
       return `<tr>
         <td>${date}</td>
-        <td>${esc(r.category||"—")}</td>
+        <td>${esc(r.category || "—")}</td>
         <td>${r.num_correct}/${r.num_questions} (${r.percent}%)</td>
-        <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
+        <td><span class="passBadge ${r.passed ? "p" : "f"}">${r.passed ? "GODKÄNT" : "UNDERKÄNT"}</span></td>
       </tr>`;
     }).join("")}</tbody>
   </table>`;
 }
 
 // ── AUTH & INIT ──
+function dismissLoader(){
+  $("pageLoader").classList.add("done");
+}
+
 async function init(){
-  db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-  const {data:{session}}=await db.auth.getSession();
-  if(!session){ showLoginScreen(); return; }
-  currentUser=session.user;
-  await loadRole();
-  await onAuthenticated();
+  // Safety net: dismiss loader after 12s no matter what
+  const safetyTimer = setTimeout(dismissLoader, 12000);
+  let caughtError = false;
+
+  try {
+    if(typeof supabase === "undefined"){
+      throw new Error("Supabase-biblioteket laddades inte. Kontrollera din internetanslutning.");
+    }
+    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    const {data, error} = await db.auth.getSession();
+    if(error) throw error;
+    const session = data?.session;
+    if(!session){ clearTimeout(safetyTimer); showLoginScreen(); return; }
+    currentUser = session.user;
+    await loadRole();
+    await onAuthenticated();
+  } catch(err) {
+    caughtError = true;
+    console.error("Init-fel:", err);
+    clearTimeout(safetyTimer);
+    showInitError(err?.message || "Kunde inte ansluta. Försök ladda om sidan.");
+  } finally {
+    if(!caughtError){
+      clearTimeout(safetyTimer);
+      dismissLoader();
+    }
+  }
+}
+
+function showInitError(msg){
+  // Show error inside loader overlay (don't dismiss it — keep overlay visible)
+  const loader = $("pageLoader");
+  loader.innerHTML = `<div style="display:grid;place-items:center;gap:16px;padding:24px;max-width:360px;text-align:center">
+    <div style="font-size:32px">⚠️</div>
+    <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:14px;color:var(--t)">Kunde inte ladda sidan</div>
+    <div style="font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.6">${esc(msg)}</div>
+    <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
+  </div>`;
+  // Ensure loader stays visible (remove done class if present)
+  loader.classList.remove("done");
 }
 
 async function loadRole(){
   if(!currentUser) return;
-  const {data}=await db.from("profiles").select("role").eq("id",currentUser.id).single();
-  if(data?.role){ currentRole=data.role; localStorage.setItem(LS_ROLE,currentRole); }
+  try {
+    const {data} = await db.from("profiles").select("role").eq("id", currentUser.id).single();
+    if(data?.role){ currentRole = data.role; localStorage.setItem(LS_ROLE, currentRole); }
+  } catch(e){ console.warn("Kunde inte hämta roll:", e) }
 }
 
 async function onAuthenticated(){
-  $("loginScreen").style.display="none";
-  await Promise.all([loadAllQuestions(),loadCategories()]);
-  await refreshQuotaUi();
-  await loadHistory();
-  $("pageLoader").classList.add("done");
+  $("loginScreen").style.display = "none";
+  try {
+    await Promise.all([loadAllQuestions(), loadCategories()]);
+  } catch(e){ console.warn("Laddningsfel (frågor):", e) }
+  try { await refreshQuotaUi(); } catch(e){ console.warn("Kvotfel:", e) }
+  try { await loadHistory(); } catch(e){ console.warn("Historikfel:", e) }
 
-  const obs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");obs.unobserve(e.target)}})
-  },{threshold:.08});
-  document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add("in"); obs.unobserve(e.target) } })
+  }, {threshold:.08});
+  document.querySelectorAll(".reveal").forEach(el => obs.observe(el));
 }
 
 function showLoginScreen(){
-  $("loginScreen").style.display="flex";
+  $("loginScreen").style.display = "flex";
   $("pageLoader").classList.add("done");
 
-  const doSignIn=async()=>{
-    const email=$("authEmail").value.trim();
-    const pass=$("authPass").value;
-    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
-    const {error}=await db.auth.signInWithPassword({email,password:pass});
-    if(error){$("loginErr").textContent=error.message;return;}
+  const doSignIn = async () => {
+    const email = $("authEmail").value.trim();
+    const pass = $("authPass").value;
+    if(!email || !pass){ $("loginErr").textContent = "Fyll i e-post och lösenord."; return; }
+    const {error} = await db.auth.signInWithPassword({email, password:pass});
+    if(error){ $("loginErr").textContent = error.message; return; }
     location.reload();
   };
 
-  const doSignUp=async()=>{
-    const email=$("authEmail").value.trim();
-    const pass=$("authPass").value;
-    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
-    const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
-    const body=await res.json();
-    if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
+  const doSignUp = async () => {
+    const email = $("authEmail").value.trim();
+    const pass = $("authPass").value;
+    if(!email || !pass){ $("loginErr").textContent = "Fyll i e-post och lösenord."; return; }
+    const res = await fetch("/api/signup", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email, password:pass})});
+    const body = await res.json();
+    if(!res.ok){ $("loginErr").textContent = body.error || "Fel vid registrering."; return; }
     if(body.session){
-      await db.auth.setSession({access_token:body.session.access_token,refresh_token:body.session.refresh_token});
+      await db.auth.setSession({access_token:body.session.access_token, refresh_token:body.session.refresh_token});
       location.reload();
     }
   };
 
-  $("signInBtn").onclick=doSignIn;
-  $("signUpBtn").onclick=doSignUp;
-  $("authPass").addEventListener("keydown",e=>{if(e.key==="Enter")doSignIn()});
+  $("signInBtn").onclick = doSignIn;
+  $("signUpBtn").onclick = doSignUp;
+  $("authPass").addEventListener("keydown", e => { if(e.key === "Enter") doSignIn() });
 }
 
 init();
