@@ -27,293 +27,250 @@ body.light{
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-:target{scroll-margin-top:70px}
 body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6;min-height:100vh;transition:background .28s,color .28s}
 a{text-decoration:none;color:inherit}
 input,select,textarea,button{font-family:'DM Sans',system-ui,sans-serif}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--l2);border-radius:3px}
 
 /* LOADER */
-.pageLoader{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;background:var(--bg);transition:opacity .22s,visibility .22s}
-.pageLoader.done{opacity:0;visibility:hidden;pointer-events:none}
+.pageLoader{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;background:var(--bg);transition:opacity .3s,visibility .3s}
+.pageLoader.hide{opacity:0;visibility:hidden;pointer-events:none}
 .loaderOrb{width:52px;height:52px;border-radius:50%;position:relative;border:1px solid var(--l2)}
 .loaderOrb::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid transparent;border-top-color:var(--a);border-right-color:rgba(27,255,140,.3);animation:spin .9s linear infinite}
-.loaderText{margin-top:14px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.12em;text-transform:uppercase}
+.loaderText{margin-top:14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;text-align:center}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* HEADER */
-header{height:56px;position:sticky;top:0;z-index:3000;background:rgba(8,16,13,.88);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid var(--l);display:flex;align-items:center;transition:background .28s,border-color .28s}
-body.light header{background:rgba(243,248,245,.92)}
-.hWrap{max-width:var(--max);width:100%;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header{height:56px;position:sticky;top:0;z-index:3000;background:rgba(8,16,13,.9);backdrop-filter:blur(18px);border-bottom:1px solid var(--l);display:flex;align-items:center}
+body.light header{background:rgba(243,248,245,.94)}
+.hWrap{max-width:var(--max);width:100%;margin:0 auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .brand{display:flex;align-items:center;gap:10px}
-.brand img{height:30px;width:auto;display:block}
-.brandName{font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;line-height:1;transition:color .28s}
-.brandTag{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:400;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;line-height:1;transition:color .28s}
+.brand img{height:30px;width:auto}
+.brandName{font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;line-height:1}
+.brandTag{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;line-height:1}
 .hRight{display:flex;align-items:center;gap:6px}
 
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;height:34px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);cursor:pointer;white-space:nowrap;position:relative;overflow:hidden;transition:transform .16s cubic-bezier(.22,.61,.36,1),box-shadow .16s,border-color .16s,background .28s,color .28s}
-.btn::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(27,255,140,.06),transparent 55%);opacity:0;transition:opacity .16s}
-.btn:hover{transform:translateY(-1px);box-shadow:var(--sh);border-color:var(--l2)}.btn:hover::after{opacity:1}
-.btn:active{transform:translateY(0) scale(.98)}.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;height:34px;font-weight:600;font-size:13px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);cursor:pointer;white-space:nowrap;transition:transform .15s,box-shadow .15s,border-color .15s,background .28s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--sh);border-color:var(--l2)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 .btn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 .btnP{background:var(--a);color:#08100d;border-color:var(--a);font-weight:700}
-body.light .btnP{color:#fff}.btnP:hover{background:var(--a2);border-color:var(--a2)}
-.btnP::after{background:linear-gradient(135deg,rgba(255,255,255,.15),transparent 55%)}
-.btnG{background:transparent;border-color:var(--l)}.btnG:hover{background:var(--a-dim);border-color:var(--l2)}
-.btnDanger{background:transparent;border-color:rgba(255,107,107,.3);color:#ff8484}.btnDanger:hover{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.5)}
+body.light .btnP{color:#fff}
+.btnP:hover{background:var(--a2);border-color:var(--a2)}
+.btnG{background:transparent;border-color:var(--l)}
+.btnG:hover{background:var(--a-dim);border-color:var(--l2)}
+.btnDanger{background:transparent;border-color:rgba(255,107,107,.3);color:#ff8484}
+.btnDanger:hover{background:rgba(255,107,107,.08)}
 
-/* THEME TOGGLE */
-.themeTgl{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:34px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);background:transparent;cursor:pointer;transition:color .16s,border-color .16s,background .28s}
+/* THEME */
+.themeTgl{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:34px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);background:transparent;cursor:pointer;transition:color .15s,border-color .15s,background .28s}
 .themeTgl:hover{color:var(--t);border-color:var(--l2);background:var(--a-dim)}
-.tglIcon{display:inline-block;transition:transform .28s cubic-bezier(.22,.61,.36,1)}
-.themeTgl:hover .tglIcon{transform:rotate(18deg) scale(1.2)}
 
 /* MENU */
 .menuWrap{position:relative;z-index:4000}
-.menuBtn{width:34px;height:34px;padding:0;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r);background:transparent;color:var(--t2);cursor:pointer;transition:border-color .16s,background .16s,color .16s}
-.menuBtn:hover{border-color:var(--l2);background:var(--a-dim);color:var(--t)}
-.menuBtn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
-.barsIcon{display:grid;gap:3.5px;width:16px}.barsIcon span{display:block;height:1.5px;background:currentColor;border-radius:1px}
-.dropdown{position:absolute;right:0;top:calc(100% + 8px);min-width:230px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);padding:6px;display:none;opacity:0;transform:translateY(-6px) scale(.99);z-index:5000}
-.dropdown.is-open{display:block;opacity:1;transform:translateY(0) scale(1);transition:opacity .16s cubic-bezier(.22,.61,.36,1),transform .16s cubic-bezier(.22,.61,.36,1)}
-.dropdown.is-closing{display:block;opacity:0;transform:translateY(-4px) scale(.99);transition:opacity .12s,transform .12s}
-.ddItem{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:var(--r2);border:1px solid transparent;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;font-size:13px;color:var(--t2);text-align:left;transition:background .12s,border-color .12s,color .12s}
+.menuBtn{width:34px;height:34px;padding:0;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r);background:transparent;color:var(--t2);cursor:pointer;transition:border-color .15s,background .15s}
+.menuBtn:hover{border-color:var(--l2);background:var(--a-dim)}
+.barsIcon{display:grid;gap:3.5px;width:16px}
+.barsIcon span{display:block;height:1.5px;background:currentColor;border-radius:1px}
+.dropdown{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);padding:6px;display:none;z-index:5000}
+.dropdown.open{display:block;animation:fadeIn .15s ease}
+.ddItem{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:var(--r2);border:1px solid transparent;background:transparent;cursor:pointer;font-weight:500;font-size:13px;color:var(--t2);text-align:left;transition:background .1s,border-color .1s,color .1s}
 .ddItem:hover{background:var(--a-dim);border-color:var(--l);color:var(--t)}
-.ddPill{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.06em;border:1px solid var(--l);border-radius:var(--r2);padding:2px 7px}
-.ddPill.new{color:var(--a);border-color:var(--l2);background:rgba(27,255,140,.08)}
+.ddPill{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.06em;border:1px solid var(--l);border-radius:var(--r2);padding:2px 7px}
+.ddPill.hi{color:var(--a);border-color:var(--l2);background:rgba(27,255,140,.08)}
 .ddSep{height:1px;background:var(--l);margin:4px 2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
 /* LAYOUT */
-.wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
+.wrap{max-width:var(--max);margin:0 auto;padding:28px 20px}
 
 /* HERO */
-.hero{padding:36px 0 24px}
-.eyebrow{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--a);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
-.eyebrow::before{content:"";display:block;width:18px;height:1.5px;background:var(--a);border-radius:1px}
-.heroTitle{font-weight:700;font-size:clamp(22px,3.8vw,38px);letter-spacing:-.035em;line-height:1.15;color:var(--t);margin-bottom:10px}
+.hero{padding:32px 0 20px}
+.eyebrow{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--a);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.eyebrow::before{content:"";width:18px;height:1.5px;background:var(--a);border-radius:1px}
+.heroTitle{font-weight:700;font-size:clamp(22px,4vw,38px);letter-spacing:-.03em;line-height:1.15;margin-bottom:8px}
 .heroTitle em{font-style:normal;color:var(--a)}
-.heroSub{font-size:14px;color:var(--t2);font-weight:400;max-width:560px;line-height:1.65}
-.statusRow{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
-.sDot{width:6px;height:6px;border-radius:50%;background:var(--t3);transition:background .28s,box-shadow .28s}
-.sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:dotPulse 2s ease-in-out infinite}
-@keyframes dotPulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
-.statusLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.06em}
+.heroSub{font-size:14px;color:var(--t2);max-width:540px;line-height:1.65}
+.statusRow{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.sDot{width:6px;height:6px;border-radius:50%;background:var(--t3)}
+.sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
+.statusLabel{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.06em}
 
 /* QUOTA BANNER */
-.quotaBanner{display:none;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--l2);border-radius:var(--r);background:rgba(27,255,140,.05);padding:10px 14px;margin-bottom:16px;flex-wrap:wrap}
+.quotaBanner{display:none;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--l2);border-radius:var(--r);background:rgba(27,255,140,.05);padding:10px 14px;margin-bottom:14px;flex-wrap:wrap}
 .quotaBanner.show{display:flex}
 .quotaBannerTxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.4}
 .quotaBannerTxt strong{color:var(--a)}
-.quotaBannerLink{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--a);border-bottom:1px solid rgba(27,255,140,.3);white-space:nowrap}
-.quotaBannerLink:hover{border-bottom-color:var(--a)}
 
 /* LOGIN */
 .loginOverlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
-.loginCard{width:min(560px,100%);background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);overflow:hidden}
-.loginTop{display:flex;gap:14px;align-items:center;padding:20px 20px 16px;border-bottom:1px solid var(--l)}
-.loginTop img{height:34px;width:auto}
-.loginTitle{font-family:'DM Sans',sans-serif;font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em}
+.loginCard{width:min(540px,100%);background:var(--s);border:1px solid var(--l);border-radius:var(--r);box-shadow:var(--sh3);overflow:hidden}
+.loginTop{display:flex;gap:14px;align-items:center;padding:20px;border-bottom:1px solid var(--l)}
+.loginTop img{height:34px}
+.loginTitle{font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em}
 .loginSub{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
 .loginBody{padding:20px}
-.authBlock{border:1px solid var(--l);border-radius:var(--r);padding:16px;background:var(--s2);margin-bottom:14px}
-.authBlockTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.authBlock{border:1px solid var(--l);border-radius:var(--r);padding:16px;background:var(--s2);margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:480px){.grid2{grid-template-columns:1fr}}
-.fieldLabel{display:block;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
-input[type="email"],input[type="password"],input[type="text"],select{width:100%;padding:10px 12px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none;transition:border-color .16s,background .28s,color .28s,box-shadow .16s}
-input[type="email"]:focus,input[type="password"]:focus,input[type="text"]:focus,select:focus{border-color:var(--l2);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
-select option{background:var(--s);color:var(--t)}
-.loginBtnRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.loginHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5}
-.loginErr{font-family:'DM Mono',monospace;font-size:11.5px;font-weight:500;color:var(--danger);margin-top:10px}
-
-/* REVEAL */
-.reveal{opacity:0;transform:translateY(14px);transition:opacity .28s,transform .28s cubic-bezier(.22,.61,.36,1)}
-.reveal.in{opacity:1;transform:translateY(0)}
-
-/* FOOTER */
-footer{border-top:1px solid var(--l);padding:20px 24px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em;transition:border-color .28s,color .28s}
-
-/* MISC */
-.stxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.5}
-.stxt.ok{color:var(--ok)}.stxt.bad{color:var(--danger)}.stxt.warn{color:var(--warn)}
-.spinner{width:14px;height:14px;border-radius:50%;border:1.5px solid rgba(27,255,140,.15);border-top-color:var(--a);animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+.fieldLabel{display:block;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+input[type="email"],input[type="password"],select{width:100%;padding:10px 12px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);color:var(--t);font-size:13.5px;outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{border-color:var(--l2);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
+select option{background:var(--s)}
+.loginBtnRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.loginHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5}
+.loginErr{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--danger);margin-top:8px}
 
 /* CARD */
-.card{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:12px;transition:border-color .28s,background .28s}
-.cardTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}
-
-/* STATS ROW (config) */
-.statsRow{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.statPill{display:flex;align-items:center;gap:7px;padding:8px 14px;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2)}
-.statPill strong{color:var(--t);font-weight:600}
+.card{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;margin-bottom:12px}
+.cardTitle{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
 
 /* CATEGORY GRID */
-.catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
-.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .16s,background .16s,transform .16s;min-height:48px;position:relative;overflow:hidden;width:100%}
+.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
 .catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-1px)}
 .catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
 .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
-.catName{font-family:'DM Sans',sans-serif;font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:3px}
-.catCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em}
+.catName{font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:2px}
+.catCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
 .catCard.active .catCount{color:var(--a)}
+.loadingCat{grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);padding:8px 0}
 
 /* CONFIG */
-.configRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.configRow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
 @media(max-width:480px){.configRow{grid-template-columns:1fr}}
-.startArea{display:flex;flex-direction:column;align-items:center;gap:10px;padding:4px 0}
-.startBtn{display:inline-flex;align-items:center;gap:8px;padding:0 32px;height:52px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .16s,background .16s,box-shadow .16s;width:100%;justify-content:center;max-width:360px}
+.startArea{text-align:center}
+.startBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 32px;height:52px;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;width:100%;max-width:340px}
 .startBtn:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(27,255,140,.3)}
-.startBtn:active{transform:scale(.98)}.startBtn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.startBtn:active{transform:scale(.97)}
+.startBtn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 body.light .startBtn{color:#fff}
-.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em;text-align:center}
+.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:8px;letter-spacing:.04em}
 
-/* EXAM VIEW */
+/* EXAM */
 #examView{display:none}
-#examView.active{display:block;padding-bottom:110px}
+#examView.active{display:block;padding-bottom:100px}
 
 /* PROGRESS */
-.progressWrap{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.progressRow{display:flex;align-items:center;gap:12px;margin-bottom:18px}
 .progressBar{flex:1;height:4px;border-radius:999px;background:var(--s2);overflow:hidden}
-.progressFill{height:100%;background:var(--a);border-radius:999px;transition:width .35s cubic-bezier(.2,.8,.2,1)}
-.progressMeta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
-.progressLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--t3);white-space:nowrap;letter-spacing:.04em}
-.liveScore{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);white-space:nowrap;letter-spacing:.04em}
-.liveScore.good{color:var(--ok)}.liveScore.warn{color:var(--warn)}.liveScore.bad{color:var(--danger)}
-.timerBadge{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);border:1px solid var(--l);border-radius:var(--r2);padding:2px 8px;flex-shrink:0}
-.timerBadge.warn{color:var(--warn);border-color:rgba(244,200,66,.3)}.timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.3)}
+.progressFill{height:100%;background:var(--a);border-radius:999px;transition:width .3s ease}
+.progressInfo{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0}
+.progressLabel{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);white-space:nowrap}
+.liveScore{font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap}
+.liveScore.g{color:var(--ok)}.liveScore.w{color:var(--warn)}.liveScore.b{color:var(--danger)}
+.timerBadge{font-family:'DM Mono',monospace;font-size:12px;color:var(--t2);border:1px solid var(--l);border-radius:var(--r2);padding:2px 8px;display:none}
+.timerBadge.warn{color:var(--warn)}.timerBadge.bad{color:var(--danger)}
 
-/* QUESTION */
-.questionCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:0;position:relative;transition:border-color .28s}
-.qMeta{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--t3);letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.qCatBadge{color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px;font-size:9.5px}
-.qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:18px}
-.qImage{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);margin-bottom:16px;display:block;background:var(--s2)}
-.qImageWrap{display:flex;justify-content:center;margin-bottom:16px}
+/* QUESTION CARD */
+.qCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;position:relative}
+.qMeta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.qNum{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)}
+.diffDot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.diffDot.easy{background:var(--ok)}.diffDot.normal{background:var(--warn)}.diffDot.hard{background:var(--danger)}
+.qCat{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px}
+.streakBadge{display:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:#f4c842}
+.streakBadge.show{display:inline}
+.bookmarkBtn{position:absolute;top:14px;right:14px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .15s,border-color .15s;padding:0}
+.bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4)}
+.qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:16px}
+.qImg{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);display:block;margin:0 auto 14px}
 
 /* ANSWER BUTTONS */
 .ansGrid{display:grid;gap:8px}
-.ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .16s,background .16s,color .16s,transform .16s;min-height:52px}
+.ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .15s,background .15s,color .15s,transform .15s;min-height:52px}
 .ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
 .ansBtn:disabled{cursor:default;transform:none}
-.ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t)}
-body.light .ansBtn.correct{background:rgba(13,148,96,.12);border-color:var(--a)}
-.ansBtn.wrong{border-color:#ff6b6b;background:rgba(255,107,107,.10);color:var(--t)}
-.ansLetter{width:28px;height:28px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .16s,border-color .16s,color .16s}
+.ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t);animation:correctPulse .55s ease}
+.ansBtn.wrong{border-color:var(--danger);background:rgba(255,107,107,.10);color:var(--t)}
+.ansLetter{width:28px;height:28px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .15s,border-color .15s,color .15s}
 .ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
 body.light .ansBtn.correct .ansLetter{color:#fff}
-.ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:#ff6b6b;color:#ff8484}
-
+.ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:var(--danger);color:#ff8484}
 @keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
-.ansBtn.correct{animation:correctPulse .6s ease}
-
-/* DIFFICULTY DOT */
-.diffDot{display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;vertical-align:middle}
-.diffDot.easy{background:var(--ok)}.diffDot.normal{background:var(--warn)}.diffDot.hard{background:var(--danger)}
-
-/* STREAK */
-.streakWrap{display:none;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:#f4c842}
-.streakWrap.show{display:flex;animation:fadeIn .22s ease}
-
-/* BOOKMARK */
-.bookmarkBtn{position:absolute;top:14px;right:14px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .16s,border-color .16s,background .16s;padding:0;z-index:2}
-.bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4);background:rgba(244,200,66,.07)}
-
-/* KEYBOARD HINT */
-.kbHint{display:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;letter-spacing:.04em;padding:12px 0 0}
-@media(hover:hover){.kbHint{display:block}}
-
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* EXPLANATION */
-.explanationBox{display:none;margin-top:16px;border-radius:var(--r);padding:14px 16px;border:1px solid var(--l)}
-.explanationBox.show{display:block;animation:fadeIn .25s ease}
-.explanationBox.correct{border-color:rgba(27,255,140,.35);background:rgba(27,255,140,.07)}
-.explanationBox.wrong{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.07)}
-.explLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.explanationBox.correct .explLabel{color:var(--a)}
-.explanationBox.wrong .explLabel{color:#ff8484}
+.explBox{display:none;margin-top:14px;border-radius:var(--r);padding:13px 15px;border:1px solid var(--l)}
+.explBox.show{display:block;animation:fadeIn .2s ease}
+.explBox.correct{border-color:rgba(27,255,140,.35);background:rgba(27,255,140,.07)}
+.explBox.wrong{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.07)}
+.explLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.05em;margin-bottom:7px;display:flex;align-items:center;gap:5px}
+.explBox.correct .explLabel{color:var(--a)}
+.explBox.wrong .explLabel{color:#ff8484}
 .explText{font-size:13.5px;color:var(--t2);line-height:1.65}
+.spinner{width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(27,255,140,.15);border-top-color:var(--a);animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
 
-/* INLINE NEXT BUTTON — primary CTA after answering */
-.inlineNextWrap{display:none;margin-top:16px}
-.inlineNextWrap.show{display:block;animation:fadeIn .3s cubic-bezier(.22,.61,.36,1)}
-.inlineNextBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;letter-spacing:-.01em}
-body.light .inlineNextBtn{color:#fff}
-.inlineNextBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
-.inlineNextBtn:active{transform:scale(.98)}
+/* GO NEXT */
+.nextWrap{display:none;margin-top:14px}
+.nextWrap.show{display:block;animation:fadeIn .25s ease}
+.nextBigBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s}
+body.light .nextBigBtn{color:#fff}
+.nextBigBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
+.nextBigBtn:active{transform:scale(.97)}
 
 /* MINIBAR */
 .miniBar{position:fixed;bottom:0;left:0;right:0;z-index:200;display:none}
 .miniBar.show{display:block}
-.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 24px;max-width:100%;box-shadow:0 -4px 32px rgba(0,0,0,.6)}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 20px;box-shadow:0 -4px 24px rgba(0,0,0,.5)}
 body.light .miniBarInner{background:rgba(243,248,245,.98)}
-.miniBarLeft{display:flex;align-items:center;gap:12px;min-width:0;overflow:hidden;flex:1}
-.miniBarText{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);white-space:nowrap}
-.miniBarText strong{color:var(--a)}
+.miniBarTxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2)}
+.miniBarTxt strong{color:var(--a)}
 .miniBarActions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.nextBtn{display:none;align-items:center;gap:6px;padding:0 20px;height:40px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;white-space:nowrap}
-.nextBtn.show{display:inline-flex;animation:fadeIn .18s ease}
-body.light .nextBtn{color:#fff}
-.nextBtn:hover{transform:translateY(-1px);background:var(--a2);box-shadow:0 4px 16px rgba(27,255,140,.3)}
-.nextBtn:active{transform:scale(.98)}
+.kbHint{display:none;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;padding-top:10px;letter-spacing:.03em}
+@media(hover:hover){.kbHint{display:block}}
 
 /* RESULTS */
 #resultView{display:none}
 #resultView.active{display:block}
-.resultHero{text-align:center;padding:36px 22px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
-.resultScore{font-family:'DM Mono',monospace;font-size:clamp(40px,8vw,72px);font-weight:500;color:var(--t);letter-spacing:-.02em;line-height:1;margin-bottom:6px}
+.resultHero{text-align:center;padding:32px 20px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
+.resultScore{font-family:'DM Mono',monospace;font-size:clamp(40px,8vw,72px);color:var(--t);line-height:1;margin-bottom:6px}
 .resultScore span{color:var(--a)}
-.resultPercent{font-family:'DM Mono',monospace;font-size:15px;color:var(--t3);margin-bottom:20px}
-.statusBadge{display:inline-flex;align-items:center;gap:7px;padding:10px 24px;border-radius:var(--r);font-family:'DM Mono',monospace;font-size:14px;font-weight:500;letter-spacing:.06em}
+.resultPct{font-family:'DM Mono',monospace;font-size:14px;color:var(--t3);margin-bottom:18px}
+.statusBadge{display:inline-flex;align-items:center;gap:7px;padding:9px 22px;border-radius:var(--r);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;letter-spacing:.06em}
 .statusBadge.pass{background:rgba(27,255,140,.12);border:1px solid var(--a);color:var(--a)}
 .statusBadge.fail{background:rgba(255,107,107,.10);border:1px solid rgba(255,107,107,.4);color:#ff8484}
-body.light .statusBadge.fail{color:#c0392b}
-
 .resultActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .resultActions .btn{height:42px;font-size:14px}
-
-.breakdownGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:4px}
-.breakdownCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px;transition:border-color .16s}
-.breakdownCard:hover{border-color:var(--l2)}
-.brkLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em;margin-bottom:4px}
-.brkScore{font-size:13.5px;font-weight:600;color:var(--t)}
-.brkBar{height:3px;border-radius:999px;background:var(--l);overflow:hidden;margin-top:6px}
-.brkFill{height:100%;background:var(--a);border-radius:999px}
-
-.errorBank{display:grid;gap:8px;margin-bottom:4px}
-.errorCard{background:var(--s2);border:1px solid rgba(255,107,107,.18);border-radius:var(--r);padding:14px}
-.errorQ{font-size:13px;font-weight:600;color:var(--t);margin-bottom:6px;line-height:1.45}
-.errorCatLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.04em;margin-bottom:6px}
-.errorCorrect{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--a);margin-bottom:4px}
-.errorExpl{font-size:12.5px;color:var(--t2);line-height:1.55;margin-top:4px}
+.brkGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.brkCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px}
+.brkLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:4px}
+.brkScore{font-size:13px;font-weight:600;color:var(--t)}
+.brkBar{height:3px;border-radius:999px;background:var(--l);overflow:hidden;margin-top:5px}
+.brkFill{height:100%;border-radius:999px}
+.errBank{display:grid;gap:8px}
+.errCard{background:var(--s2);border:1px solid rgba(255,107,107,.18);border-radius:var(--r);padding:14px}
+.errQ{font-size:13px;font-weight:600;color:var(--t);margin-bottom:5px;line-height:1.45}
+.errCat{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:5px}
+.errRight{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--a);margin-bottom:4px}
+.errExpl{font-size:12.5px;color:var(--t2);line-height:1.55;margin-top:4px}
 
 /* HISTORY */
 .histTable{width:100%;border-collapse:collapse;font-size:13px}
-.histTable th{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:8px 12px;text-align:left;border-bottom:1px solid var(--l)}
-.histTable td{padding:10px 12px;border-bottom:1px solid var(--l);color:var(--t2)}
+.histTable th{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:7px 10px;text-align:left;border-bottom:1px solid var(--l)}
+.histTable td{padding:9px 10px;border-bottom:1px solid var(--l);color:var(--t2)}
 .histTable tr:last-child td{border-bottom:none}
-.histTable tr:hover td{background:var(--a-dim);color:var(--t)}
-.passBadge{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;padding:2px 8px;border-radius:var(--r2)}
+.histTable tr:hover td{background:var(--a-dim)}
+.passBadge{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:var(--r2)}
 .passBadge.p{background:rgba(27,255,140,.12);color:var(--a);border:1px solid rgba(27,255,140,.3)}
 .passBadge.f{background:rgba(255,107,107,.10);color:#ff8484;border:1px solid rgba(255,107,107,.25)}
 
-/* EMPTY STATE */
-.emptyState{padding:32px 16px;text-align:center;font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t3);line-height:1.7}
-
 /* TOAST */
 #toastRoot{position:fixed;top:68px;right:16px;z-index:9500;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
-.toast{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--r);background:var(--s);border:1px solid var(--l2);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--t2);box-shadow:var(--sh2);pointer-events:auto;cursor:pointer;animation:toastIn .22s cubic-bezier(.22,.61,.36,1) forwards;max-width:min(320px,calc(100vw - 32px))}
-.toast.ok{border-color:rgba(27,255,140,.38);color:var(--a)}.toast.bad{border-color:rgba(255,107,107,.35);color:#ff8484}
-.toast.out{animation:toastOut .18s ease forwards}
-@keyframes toastIn{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
-@keyframes toastOut{to{opacity:0;transform:translateY(-6px) scale(.97)}}
+.toast{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--r);background:var(--s);border:1px solid var(--l2);font-family:'DM Mono',monospace;font-size:12px;color:var(--t2);box-shadow:var(--sh2);pointer-events:auto;cursor:pointer;animation:slideIn .2s ease;max-width:min(300px,90vw)}
+.toast.ok{border-color:rgba(27,255,140,.4);color:var(--a)}
+.toast.bad{border-color:rgba(255,107,107,.35);color:#ff8484}
+.toast.out{animation:slideOut .15s ease forwards}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes slideOut{to{opacity:0;transform:translateY(-6px)}}
+
+footer{border-top:1px solid var(--l);padding:20px;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em}
 
 @media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-  .reveal{opacity:1;transform:none}
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
 </style>
 </head>
@@ -322,18 +279,18 @@ body.light .statusBadge.fail{color:#c0392b}
 <div id="toastRoot"></div>
 
 <!-- LOADER -->
-<div id="pageLoader" class="pageLoader" aria-hidden="true">
-  <div style="display:grid;place-items:center">
+<div id="pageLoader" class="pageLoader">
+  <div style="text-align:center">
     <div class="loaderOrb"></div>
-    <div class="loaderText">ProviaAI</div>
+    <div class="loaderText" id="loaderText">Laddar…</div>
   </div>
 </div>
 
 <!-- LOGIN -->
 <div id="loginScreen" class="loginOverlay" style="display:none">
-  <div class="loginCard" role="dialog" aria-modal="true" aria-label="Inloggning">
+  <div class="loginCard">
     <div class="loginTop">
-      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <img src="image/proviaai-logo.png" alt="ProviaAi">
       <div>
         <div class="loginTitle">ProviaAi – Körkortsteorin</div>
         <div class="loginSub">Logga in eller skapa konto</div>
@@ -341,21 +298,20 @@ body.light .statusBadge.fail{color:#c0392b}
     </div>
     <div class="loginBody">
       <div class="authBlock">
-        <div class="authBlockTitle">Logga in / Skapa konto</div>
         <div class="grid2">
           <div>
             <label class="fieldLabel" for="authEmail">E-post</label>
-            <input id="authEmail" type="email" autocomplete="email" placeholder="du@skola.se" />
+            <input id="authEmail" type="email" autocomplete="email" placeholder="du@skola.se">
           </div>
           <div>
             <label class="fieldLabel" for="authPass">Lösenord</label>
-            <input id="authPass" type="password" autocomplete="current-password" placeholder="Minst 8 tecken" />
+            <input id="authPass" type="password" autocomplete="current-password" placeholder="Minst 8 tecken">
           </div>
         </div>
         <div class="loginBtnRow">
-          <button class="btn btnP" type="button" id="signInBtn">Logga in</button>
-          <button class="btn btnG" type="button" id="signUpBtn">Skapa konto</button>
-          <a class="btn btnG" href="index.html">Infosidan</a>
+          <button class="btn btnP" id="signInBtn">Logga in</button>
+          <button class="btn btnG" id="signUpBtn">Skapa konto</button>
+          <a class="btn btnG" href="index.html">← Startsidan</a>
         </div>
         <div class="loginHint">Gratis konto — inget kort krävs.</div>
       </div>
@@ -368,29 +324,29 @@ body.light .statusBadge.fail{color:#c0392b}
 <header>
   <div class="hWrap">
     <a class="brand" href="index.html">
-      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <img src="image/proviaai-logo.png" alt="ProviaAi">
       <div>
         <div class="brandName">ProviaAi</div>
         <div class="brandTag">Körkortsteorin</div>
       </div>
     </a>
     <div class="hRight">
-      <button class="btn btnDanger" id="abortBtn" type="button" style="display:none;font-size:12px;height:34px;padding:0 12px">Avbryt prov</button>
-      <button class="themeTgl" id="themeBtn" type="button" aria-label="Växla tema">
-        <span class="tglIcon" id="tglIcon">🌙</span>
+      <button class="btn btnDanger" id="abortBtn" style="display:none;font-size:12px;height:34px;padding:0 12px">Avbryt prov</button>
+      <button class="themeTgl" id="themeBtn" aria-label="Växla tema">
+        <span id="tglIcon">🌙</span>
         <span id="tglLabel">Light</span>
       </button>
       <div class="menuWrap">
-        <button class="menuBtn" id="menuBtn" type="button" aria-label="Meny">
-          <div class="barsIcon" aria-hidden="true"><span></span><span></span><span></span></div>
+        <button class="menuBtn" id="menuBtn" aria-label="Meny">
+          <div class="barsIcon"><span></span><span></span><span></span></div>
         </button>
         <div class="dropdown" id="menu">
           <a class="ddItem" href="app.html"><span>Mockprov</span><span class="ddPill">AI</span></a>
           <a class="ddItem" href="förbättring.html"><span>Förbättring</span><span class="ddPill">Coach</span></a>
-          <a class="ddItem" href="korkortet.html"><span>Körkortsteorin</span><span class="ddPill new">Nytt</span></a>
+          <a class="ddItem" href="korkortet.html"><span>Körkortsteorin</span><span class="ddPill hi">Nytt</span></a>
           <div class="ddSep"></div>
           <a class="ddItem" href="pricing.html"><span>Uppgradera</span><span class="ddPill" id="rolePill">Gratis</span></a>
-          <button class="ddItem" type="button" id="logoutBtn"><span>Logga ut</span><span class="ddPill">Lås</span></button>
+          <button class="ddItem" id="logoutBtn"><span>Logga ut</span></button>
         </div>
       </div>
     </div>
@@ -401,37 +357,32 @@ body.light .statusBadge.fail{color:#c0392b}
 <div class="wrap">
 
   <!-- HERO -->
-  <div class="hero reveal">
+  <div class="hero">
     <div class="eyebrow">Körkortsteorin</div>
     <h1 class="heroTitle">Klara teorin på <em>första försöket</em></h1>
     <p class="heroSub">Träna på riktiga teorifrågor kategoriserade efter Transportstyrelsens ämnesområden. AI förklarar varje svar.</p>
     <div class="statusRow">
-      <div class="sDot ok" id="statusDot"></div>
+      <div class="sDot" id="statusDot"></div>
       <span class="statusLabel" id="quotaLabel">LADDAR…</span>
     </div>
   </div>
 
-  <!-- QUOTA BANNER -->
   <div class="quotaBanner" id="quotaBanner">
     <div class="quotaBannerTxt" id="quotaBannerTxt"></div>
-    <a class="quotaBannerLink" href="pricing.html">Uppgradera →</a>
+    <a class="btn btnP" href="pricing.html" style="height:30px;font-size:12px;padding:0 12px">Uppgradera →</a>
   </div>
 
-  <!-- CONFIG VIEW -->
+  <!-- ① CONFIG VIEW -->
   <div id="configView">
 
-    <div class="card reveal">
+    <div class="card">
       <div class="cardTitle">Välj kategori</div>
-      <div class="statsRow" id="statsRow" style="display:none">
-        <div class="statPill"><strong id="totalQCount">0</strong>&nbsp;frågor totalt</div>
-        <div class="statPill"><strong id="totalCatCount">0</strong>&nbsp;kategorier</div>
-      </div>
       <div class="catGrid" id="catGrid">
-        <div style="grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3)">Laddar kategorier…</div>
+        <div class="loadingCat">Laddar kategorier…</div>
       </div>
     </div>
 
-    <div class="card reveal">
+    <div class="card">
       <div class="cardTitle">Provkonfiguration</div>
       <div class="configRow">
         <div>
@@ -455,97 +406,97 @@ body.light .statusBadge.fail{color:#c0392b}
         </div>
       </div>
       <div class="startArea">
-        <button class="startBtn" id="startBtn" type="button" disabled>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+        <button class="startBtn" id="startBtn" disabled>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
           Starta körkortstest
         </button>
         <div class="startHint" id="startHint">10 frågor · 8 rätt rekommenderas</div>
       </div>
     </div>
 
-    <div class="card reveal" id="historySection" style="display:none">
+    <div class="card" id="historySection" style="display:none">
       <div class="cardTitle">Senaste resultat</div>
       <div id="historyBody"></div>
     </div>
 
   </div>
 
-  <!-- EXAM VIEW -->
+  <!-- ② EXAM VIEW -->
   <div id="examView">
-    <div class="progressWrap">
+
+    <div class="progressRow">
       <div class="progressBar"><div class="progressFill" id="progressFill" style="width:0%"></div></div>
-      <div class="progressMeta">
+      <div class="progressInfo">
         <span class="progressLabel" id="progressLabel">Fråga 1 av 10</span>
         <span class="liveScore" id="liveScore" style="display:none"></span>
       </div>
-      <span class="timerBadge" id="timerBadge" style="display:none">--:--</span>
+      <span class="timerBadge" id="timerBadge">--:--</span>
     </div>
 
-    <div class="questionCard" id="questionCard">
-      <button class="bookmarkBtn" id="bookmarkBtn" type="button" title="Bokmärk frågan" style="display:none">
+    <div class="qCard" id="qCard">
+      <button class="bookmarkBtn" id="bookmarkBtn" style="display:none" title="Bokmärk">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3-5 3V2z"/></svg>
       </button>
       <div class="qMeta">
-        <span id="qNum" style="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)">01/10</span>
+        <span class="qNum" id="qNum">01/10</span>
         <span class="diffDot" id="diffDot" style="display:none"></span>
-        <span class="qCatBadge" id="qCat"></span>
-        <div class="streakWrap" id="streakWrap"></div>
+        <span class="qCat" id="qCat"></span>
+        <span class="streakBadge" id="streakBadge"></span>
       </div>
-      <div class="qText" id="qText"></div>
-      <div id="qImageWrap" class="qImageWrap" style="display:none"></div>
+      <p class="qText" id="qText"></p>
+      <div id="qImgWrap" style="display:none"></div>
       <div class="ansGrid" id="ansGrid"></div>
-      <div class="explanationBox" id="explanationBox">
+      <div class="explBox" id="explBox">
         <div class="explLabel" id="explLabel">Förklaring</div>
         <div class="explText" id="explText"></div>
       </div>
-      <div class="inlineNextWrap" id="inlineNextWrap">
-        <button class="inlineNextBtn" id="inlineNextBtn" type="button">
+      <div class="nextWrap" id="nextWrap">
+        <button class="nextBigBtn" id="nextBigBtn">
           Gå vidare
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
         </button>
       </div>
     </div>
 
-    <div class="kbHint" id="kbHint">Tangentbord: A B C D eller 1 2 3 4 för svar &nbsp;·&nbsp; Enter för nästa</div>
+    <div class="kbHint">A B C D eller 1 2 3 4 för svar &nbsp;·&nbsp; Enter för nästa</div>
+
   </div>
 
-  <!-- RESULT VIEW -->
+  <!-- ③ RESULT VIEW -->
   <div id="resultView">
-    <div class="resultHero reveal">
+    <div class="resultHero">
       <div class="resultScore" id="resultScore"><span>0</span> / 0</div>
-      <div class="resultPercent" id="resultPercent">0%</div>
-      <div id="passBadgeWrap" style="margin-top:4px"></div>
+      <div class="resultPct" id="resultPct">0%</div>
+      <div id="passBadgeWrap"></div>
     </div>
 
     <div class="resultActions">
-      <button class="btn btnP" id="retryMistakesBtn" type="button">Träna mina misstag</button>
-      <button class="btn btnG" id="newTestBtn" type="button">Nytt test</button>
-      <button class="btn btnG" id="sameConfigBtn" type="button">Samma inställningar</button>
+      <button class="btn btnP" id="retryBtn">Träna mina misstag</button>
+      <button class="btn btnG" id="sameBtn">Samma inställningar</button>
+      <button class="btn btnG" id="newBtn">Nytt test</button>
     </div>
 
-    <div class="card" id="breakdownCard" style="display:none">
+    <div class="card" id="brkCard" style="display:none">
       <div class="cardTitle">Resultat per kategori</div>
-      <div class="breakdownGrid" id="breakdownGrid"></div>
+      <div class="brkGrid" id="brkGrid"></div>
     </div>
 
-    <div class="card" id="errorBankCard" style="display:none">
+    <div class="card" id="errCard" style="display:none">
       <div class="cardTitle">Felbank — dina misstag</div>
-      <div class="errorBank" id="errorBank"></div>
+      <div class="errBank" id="errBank"></div>
     </div>
   </div>
 
 </div>
 </main>
 
-<!-- MINIBAR — fixed bottom, only shown during exam -->
+<!-- MINIBAR (fixed bottom, only during exam) -->
 <div class="miniBar" id="miniBar">
   <div class="miniBarInner">
-    <div class="miniBarLeft">
-      <div class="miniBarText" id="miniBarText"><strong>0 / 0</strong> rätt</div>
-    </div>
+    <div class="miniBarTxt" id="miniBarTxt"><strong>0/0</strong> rätt</div>
     <div class="miniBarActions">
-      <button class="nextBtn" id="nextBtn" type="button">
-        Nästa fråga <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
+      <button class="btn btnP" id="miniNextBtn" style="display:none;height:38px;font-size:13px;padding:0 16px">
+        Nästa <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
       </button>
     </div>
   </div>
@@ -555,743 +506,564 @@ body.light .statusBadge.fail{color:#c0392b}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
-const LS_THEME      = "proviaai_theme";
-const LS_ROLE       = "proviaai_role";
-const LS_EXPL_CACHE = "proviaai_driving_explanations";
-const LS_BOOKMARKS  = "proviaai_bookmarks";
+"use strict";
 
-const ROLE_LIMITS = {
-  gratis:  { period:"week",  limit:1        },
-  basic:   { period:"month", limit:5        },
-  premium: { period:"month", limit:Infinity },
-  admin:   { period:"month", limit:Infinity },
-  user:    { period:"month", limit:Infinity },
+const SUPA_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
+const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
+
+const LS_THEME  = "proviaai_theme";
+const LS_ROLE   = "proviaai_role";
+const LS_EXPL   = "proviaai_expl_cache";
+const LS_BM     = "proviaai_bookmarks";
+
+const LIMITS = {
+  gratis:  {period:"week",  cap:1},
+  basic:   {period:"month", cap:5},
+  premium: {period:"month", cap:Infinity},
+  admin:   {period:"month", cap:Infinity},
+  user:    {period:"month", cap:Infinity},
 };
-
-const CATEGORY_LIST = [
-  "Alla kategorier","Vägmärken","Trafikregler","Korsningar",
-  "Möte & Omkörning","Hastighet","Miljö & Ekonomi","Alkohol & Droger",
-  "Säkerhet & Utrustning","Mörker & Sikt","Väglag & Bromssträcka",
-];
 
 const CAT_ICONS = {
-  "Alla kategorier":"📚","Vägmärken":"🚦","Trafikregler":"📋",
-  "Korsningar":"✖","Möte & Omkörning":"↔","Hastighet":"⚡",
-  "Miljö & Ekonomi":"🌿","Alkohol & Droger":"🚫",
-  "Säkerhet & Utrustning":"🦺","Mörker & Sikt":"🌙",
-  "Väglag & Bromssträcka":"❄",
+  "Alla kategorier":"📚","Vägmärken":"🚦","Trafikregler":"📋","Korsningar":"✖",
+  "Möte & Omkörning":"↔","Hastighet":"⚡","Miljö & Ekonomi":"🌿","Alkohol & Droger":"🚫",
+  "Säkerhet & Utrustning":"🦺","Mörker & Sikt":"🌙","Väglag & Bromssträcka":"❄",
 };
 
-const DIFF_LABEL = {easy:"Lätt",normal:"Normal",hard:"Svår"};
-
 // ── STATE ──
-let db, currentUser, currentRole = localStorage.getItem(LS_ROLE) || "gratis";
-let allQuestions = [], examQuestions = [], currentIdx = 0;
-let answers = [], selectedCategory = "Alla kategorier";
-let lastNumQ = 10, lastDiff = "";
-let timerInterval = null;
-let catCounts = {};
-let streak = 0;
+let db, uid, role = localStorage.getItem(LS_ROLE) || "gratis";
+let questions = [], exam = [], idx = 0, ans = [];
+let selCat = "Alla kategorier", lastN = 10, lastDiff = "";
+let streak = 0, timer = null;
+
+// ── SHORTCUTS ──
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const safeJSON = (s, fb) => { try { return JSON.parse(s) } catch { return fb } };
+const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
 
 // ── BOOKMARKS ──
-function getBookmarks(){ return safeJson(localStorage.getItem(LS_BOOKMARKS),[]); }
-function toggleBookmark(id){
-  let bm = getBookmarks();
-  const idx = bm.indexOf(id);
-  if(idx >= 0) bm.splice(idx, 1); else bm.push(id);
-  localStorage.setItem(LS_BOOKMARKS, JSON.stringify(bm));
-  return idx < 0;
+const getBM = () => safeJSON(localStorage.getItem(LS_BM), []);
+function toggleBM(id) {
+  const bm = getBM(); const i = bm.indexOf(id);
+  if(i >= 0) bm.splice(i, 1); else bm.push(id);
+  localStorage.setItem(LS_BM, JSON.stringify(bm));
+  return i < 0;
 }
-function isBookmarked(id){ return getBookmarks().includes(id); }
 
-// ── HELPERS ──
-const $ = id => document.getElementById(id);
-function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") }
-function safeJson(s, fb){ try{ return JSON.parse(s) }catch{ return fb } }
-
-function isoWeekKey(d = new Date()){
-  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+// ── QUOTA KEYS ──
+function weekKey() {
+  const d = new Date(), t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
-  const ys = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  const wk = Math.ceil((((t - ys) / 86400000) + 1) / 7);
-  return `${t.getUTCFullYear()}-W${String(wk).padStart(2,"0")}`;
+  const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return `${t.getUTCFullYear()}-W${String(Math.ceil((((t-y)/86400000)+1)/7)).padStart(2,"0")}`;
 }
-function monthKey(d = new Date()){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` }
-
-function quotaKey(role, uid){
-  const cfg = ROLE_LIMITS[role] || ROLE_LIMITS.gratis;
-  const p = cfg.period === "week" ? isoWeekKey() : monthKey();
-  return `proviaai_driving_quota_${uid}_${role}_${p}`;
+function monthKey() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` }
+function qKey() {
+  const cfg = LIMITS[role] || LIMITS.gratis;
+  const p = cfg.period === "week" ? weekKey() : monthKey();
+  return `proviaai_dq_${uid||"g"}_${role}_${p}`;
 }
-
-async function getUid(){ const {data} = await db.auth.getUser(); return data?.user?.id || null }
-async function readQuota(){ const uid = (await getUid()) || "guest"; return Number(localStorage.getItem(quotaKey(currentRole, uid)) || 0) }
-async function bumpQuota(){ const uid = (await getUid()) || "guest"; const k = quotaKey(currentRole, uid); localStorage.setItem(k, String(Number(localStorage.getItem(k) || 0) + 1)) }
-
-async function checkQuota(){
-  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
-  if(cfg.limit === Infinity) return {allowed:true, count:0, limit:Infinity, period:cfg.period};
-  const count = await readQuota();
-  return {allowed:count < cfg.limit, count, limit:cfg.limit, period:cfg.period};
-}
-
-function shuffle(arr){ const a = [...arr]; for(let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]] } return a }
+function readQ() { return Number(localStorage.getItem(qKey()) || 0) }
+function bumpQ() { localStorage.setItem(qKey(), String(readQ() + 1)) }
 
 // ── TOAST ──
-function toast(msg, type = "ok"){
+function toast(msg, type="ok") {
   const el = document.createElement("div");
   el.className = `toast ${type}`; el.textContent = msg;
   $("toastRoot").appendChild(el);
-  el.addEventListener("click", () => dismiss(el));
-  setTimeout(() => dismiss(el), 4000);
-  function dismiss(e){ e.classList.add("out"); setTimeout(() => e.remove(), 200) }
+  const rm = () => { el.classList.add("out"); setTimeout(() => el.remove(), 180) };
+  el.onclick = rm; setTimeout(rm, 4000);
 }
 
 // ── THEME ──
-function applyTheme(t){
+function applyTheme(t) {
   document.body.classList.toggle("light", t === "light");
   $("tglIcon").textContent = t === "light" ? "☀️" : "🌙";
   $("tglLabel").textContent = t === "light" ? "Dark" : "Light";
 }
-$("themeBtn").addEventListener("click", () => {
-  const next = document.body.classList.contains("light") ? "dark" : "light";
-  localStorage.setItem(LS_THEME, next); applyTheme(next);
-});
+$("themeBtn").onclick = () => {
+  const n = document.body.classList.contains("light") ? "dark" : "light";
+  localStorage.setItem(LS_THEME, n); applyTheme(n);
+};
 applyTheme(localStorage.getItem(LS_THEME) || "dark");
 
 // ── MENU ──
-(function(){
+(function() {
   const btn = $("menuBtn"), menu = $("menu"); let open = false;
-  function close(){
-    menu.classList.remove("is-open"); menu.classList.add("is-closing");
-    setTimeout(() => { menu.classList.remove("is-closing"); menu.style.display = "none" }, 130); open = false;
-  }
-  btn.addEventListener("click", e => {
-    e.stopPropagation();
-    if(open){ close(); return; }
-    menu.style.display = "block"; requestAnimationFrame(() => menu.classList.add("is-open")); open = true;
-  });
+  function close() { menu.classList.remove("open"); open = false; }
+  btn.onclick = e => { e.stopPropagation(); open ? close() : (menu.classList.add("open"), open=true); };
   document.addEventListener("click", e => { if(open && !menu.contains(e.target)) close() });
-  $("logoutBtn").addEventListener("click", async () => { await db?.auth.signOut(); location.reload() });
+  $("logoutBtn").onclick = async () => { await db?.auth.signOut(); location.reload() };
 })();
 
 // ── QUOTA UI ──
-async function refreshQuotaUi(){
-  const rp = $("rolePill"), banner = $("quotaBanner"), bannerTxt = $("quotaBannerTxt");
-  const label = $("quotaLabel"), dot = $("statusDot");
+function refreshQuotaUI() {
+  const cfg = LIMITS[role] || LIMITS.gratis;
   const rl = {gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
-  if(rp) rp.textContent = rl[currentRole] || currentRole;
+  const rp = $("rolePill"); if(rp) rp.textContent = rl[role] || role;
 
-  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
-  if(cfg.limit === Infinity){
-    if(label) label.textContent = "OBEGRÄNSAT ANTAL TEST";
-    if(banner) banner.classList.remove("show");
-    dot?.classList.add("ok");
-    $("startBtn").disabled = false;
-    return true;
-  }
-  const count = await readQuota();
-  const left = Math.max(cfg.limit - count, 0);
-  const period = cfg.period === "week" ? "VECKA" : "MÅNAD";
-  if(label) label.textContent = `TEST DENNA ${period}: ${count}/${cfg.limit} · ${left} KVAR`;
-  dot?.classList.toggle("ok", left > 0);
-
-  if(banner && bannerTxt){
-    if(left === 0){
-      const msg = cfg.period === "week" ? "Du har använt ditt gratistest denna vecka." : "Du har nått månadsgränsen.";
-      bannerTxt.innerHTML = `<strong>Gränsen nådd.</strong> ${msg}`;
-      banner.classList.add("show");
-      $("startBtn").disabled = true;
-    } else if(left === 1){
-      bannerTxt.innerHTML = `<strong>1 test kvar</strong> denna ${cfg.period === "week" ? "vecka" : "månad"}.`;
-      banner.classList.add("show");
-      $("startBtn").disabled = false;
-    } else {
-      banner.classList.remove("show");
-      $("startBtn").disabled = false;
-    }
-  }
-  return left > 0;
-}
-
-// ── LOAD DATA ──
-// Single query — derives category counts from the same data
-async function loadAllQuestions(){
-  try {
-    const {data, error} = await db.from("driving_questions").select("*");
-    if(error){ console.warn("driving_questions fel:", error.message); return; }
-    if(data) allQuestions = data;
-  } catch(e){ console.warn("loadAllQuestions fel:", e) }
-}
-
-function buildCategoryUI(){
-  const grid = $("catGrid"); grid.innerHTML = "";
-
-  if(allQuestions.length === 0){
-    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--danger);font-family:'DM Mono',monospace;font-size:11px">Inga frågor hittades. Kontrollera anslutningen.</div>`;
+  if(cfg.cap === Infinity) {
+    $("quotaLabel").textContent = "OBEGRÄNSAT ANTAL TEST";
+    $("statusDot").classList.add("ok");
+    $("quotaBanner").classList.remove("show");
     return;
   }
-
-  // Derive counts from already-loaded allQuestions
-  catCounts = {};
-  allQuestions.forEach(q => { catCounts[q.category] = (catCounts[q.category] || 0) + 1 });
-
-  const total = allQuestions.length;
-  const uniqueCats = Object.keys(catCounts).length;
-  $("totalQCount").textContent = total;
-  $("totalCatCount").textContent = uniqueCats;
-  $("statsRow").style.display = "flex";
-
-  const bmIds = getBookmarks();
-  const bmCount = allQuestions.filter(q => bmIds.includes(q.id)).length;
-  const allCats = ["Alla kategorier", ...CATEGORY_LIST.slice(1)];
-  if(bmCount > 0) allCats.push("⭐ Bokmärkta");
-
-  allCats.forEach(cat => {
-    let count;
-    if(cat === "Alla kategorier") count = total;
-    else if(cat === "⭐ Bokmärkta") count = bmCount;
-    else count = catCounts[cat] || 0;
-
-    const card = document.createElement("button");
-    const icon = CAT_ICONS[cat] || "";
-    card.className = "catCard" + (cat === selectedCategory ? " active" : "");
-    card.type = "button";
-    card.innerHTML = `<div class="catName">${icon ? icon + " " : ""}${esc(cat.replace("⭐ ", ""))}</div><div class="catCount">${count} frågor</div>`;
-    card.addEventListener("click", () => {
-      document.querySelectorAll(".catCard").forEach(c => c.classList.remove("active"));
-      card.classList.add("active"); selectedCategory = cat; updateStartHint();
-    });
-    grid.appendChild(card);
-  });
-
-  $("startBtn").disabled = false;
-  updateStartHint();
-}
-
-function updateStartHint(){
-  const n = parseInt($("numQSel").value);
-  $("startHint").textContent = n === 65
-    ? "65 frågor · 52 rätt krävs · 50 min tidsgräns (som riktigt prov)"
-    : `${n} frågor · ${Math.ceil(n * 0.8)} rätt rekommenderas`;
-}
-$("numQSel").addEventListener("change", updateStartHint);
-
-// ── START EXAM ──
-$("startBtn").addEventListener("click", async () => {
-  const quota = await checkQuota();
-  if(!quota.allowed){ toast("Gränsen nådd — uppgradera för fler test.", "bad"); return; }
-
-  lastNumQ = parseInt($("numQSel").value);
-  lastDiff = $("diffSel").value;
-  startExam(selectedCategory, lastNumQ, lastDiff);
-});
-
-async function startExam(category, numQ, diff){
-  let pool = allQuestions;
-  if(category === "⭐ Bokmärkta"){
-    const bmIds = getBookmarks();
-    pool = pool.filter(q => bmIds.includes(q.id));
-  } else if(category !== "Alla kategorier"){
-    pool = pool.filter(q => q.category === category);
+  const used = readQ(), left = Math.max(cfg.cap - used, 0);
+  const per = cfg.period === "week" ? "VECKA" : "MÅNAD";
+  $("quotaLabel").textContent = `DENNA ${per}: ${used}/${cfg.cap} · ${left} KVAR`;
+  $("statusDot").classList.toggle("ok", left > 0);
+  const banner = $("quotaBanner"), txt = $("quotaBannerTxt");
+  if(left === 0) {
+    txt.innerHTML = `<strong>Gränsen nådd.</strong> ${cfg.period==="week"?"Nytt gratistest nästa vecka.":"Uppgradera för fler test."}`;
+    banner.classList.add("show");
+    $("startBtn").disabled = true;
+  } else {
+    banner.classList.remove("show");
+    $("startBtn").disabled = false;
   }
-  if(diff) pool = pool.filter(q => q.difficulty === diff);
-
-  if(pool.length === 0){ toast("Inga frågor hittades för dessa filter.", "bad"); return; }
-
-  examQuestions = shuffle(pool).slice(0, Math.min(numQ, pool.length));
-  currentIdx = 0;
-  answers = new Array(examQuestions.length).fill(null);
-  streak = 0;
-  updateStreak();
-
-  await bumpQuota();
-  await refreshQuotaUi();
-
-  showExamView();
-  if(numQ === 65) startTimer(50 * 60);
-  renderQuestion(0);
 }
+
+// ── BUILD CATEGORIES ──
+function buildCats() {
+  const grid = $("catGrid"); grid.innerHTML = "";
+  if(questions.length === 0) {
+    grid.innerHTML = `<div class="loadingCat" style="color:var(--danger)">Inga frågor hittades — kontrollera anslutningen.</div>`;
+    return;
+  }
+  const counts = {};
+  questions.forEach(q => { counts[q.category] = (counts[q.category]||0) + 1 });
+  const bm = getBM().filter(id => questions.some(q => q.id === id));
+  const cats = ["Alla kategorier", ...Object.keys(counts).sort()];
+  if(bm.length > 0) cats.push("⭐ Bokmärkta");
+  cats.forEach(cat => {
+    const n = cat==="Alla kategorier" ? questions.length : cat==="⭐ Bokmärkta" ? bm.length : counts[cat]||0;
+    const icon = CAT_ICONS[cat] || "";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "catCard" + (cat===selCat?" active":"");
+    btn.innerHTML = `<div class="catName">${icon ? icon+" " : ""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${n} frågor</div>`;
+    btn.onclick = () => {
+      grid.querySelectorAll(".catCard").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active"); selCat = cat; updateHint();
+    };
+    grid.appendChild(btn);
+  });
+  $("startBtn").disabled = false;
+  updateHint();
+}
+
+function updateHint() {
+  const n = parseInt($("numQSel").value);
+  $("startHint").textContent = n===65
+    ? "65 frågor · 52 rätt krävs · 50 min (som riktigt prov)"
+    : `${n} frågor · ${Math.ceil(n*.8)} rätt rekommenderas`;
+}
+$("numQSel").onchange = updateHint;
 
 // ── VIEWS ──
-function showExamView(){
-  $("configView").style.display = "none";
-  $("resultView").classList.remove("active");
-  $("examView").classList.add("active");
-  $("miniBar").classList.add("show");
-  $("abortBtn").style.display = "";
-  window.scrollTo({top:0, behavior:"smooth"});
-}
-
-function showConfigView(){
+function showConfig() {
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
   $("configView").style.display = "";
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
-  stopTimer();
-  refreshQuotaUi();
+  if(timer) { clearInterval(timer); timer = null; $("timerBadge").style.display="none"; }
+  refreshQuotaUI();
   loadHistory();
-  window.scrollTo({top:0, behavior:"smooth"});
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function showExam() {
+  $("configView").style.display = "none";
+  $("resultView").classList.remove("active");
+  $("examView").classList.add("active");
+  $("miniBar").classList.add("show");
+  $("abortBtn").style.display = "";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// ── START EXAM ──
+$("startBtn").onclick = async () => {
+  const cfg = LIMITS[role]||LIMITS.gratis;
+  if(cfg.cap !== Infinity && readQ() >= cfg.cap) {
+    toast("Gränsen nådd — uppgradera för fler test.", "bad"); return;
+  }
+  lastN = parseInt($("numQSel").value);
+  lastDiff = $("diffSel").value;
+  runExam(selCat, lastN, lastDiff);
+};
+
+function runExam(cat, n, diff) {
+  let pool = [...questions];
+  if(cat === "⭐ Bokmärkta") {
+    const bm = getBM(); pool = pool.filter(q => bm.includes(q.id));
+  } else if(cat !== "Alla kategorier") {
+    pool = pool.filter(q => q.category === cat);
+  }
+  if(diff) pool = pool.filter(q => q.difficulty === diff);
+  if(pool.length === 0) { toast("Inga frågor hittades för dessa filter.", "bad"); return; }
+
+  exam = shuffle(pool).slice(0, Math.min(n, pool.length));
+  idx = 0; ans = new Array(exam.length).fill(null);
+  streak = 0; updateStreak();
+  bumpQ(); refreshQuotaUI();
+  showExam();
+  if(n === 65) startTimer(50*60);
+  renderQ(0);
 }
 
 // ── RENDER QUESTION ──
-function renderQuestion(idx){
-  const q = examQuestions[idx];
-  const total = examQuestions.length;
+function renderQ(i) {
+  const q = exam[i], total = exam.length;
 
   // Progress
-  const pct = ((idx + 1) / total) * 100;
-  $("progressFill").style.width = pct + "%";
-  $("progressLabel").textContent = `Fråga ${idx + 1} av ${total}`;
+  $("progressFill").style.width = ((i+1)/total*100)+"%";
+  $("progressLabel").textContent = `Fråga ${i+1} av ${total}`;
 
-  // Live score (show after first answer)
-  const answered = answers.filter(a => a !== null).length;
-  if(answered > 0){
-    const correct = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
-    const scorePct = Math.round((correct / answered) * 100);
+  // Live score (only after first answer)
+  const answered = ans.filter(a => a !== null).length;
+  if(answered > 0) {
+    const correct = ans.filter((a,j) => hit(a, exam[j])).length;
+    const pct = Math.round(correct/answered*100);
     const ls = $("liveScore");
-    ls.textContent = `${correct}/${answered} rätt (${scorePct}%)`;
-    ls.className = "liveScore" + (scorePct >= 75 ? " good" : scorePct >= 50 ? " warn" : " bad");
+    ls.textContent = `${correct}/${answered} rätt (${pct}%)`;
+    ls.className = "liveScore " + (pct>=75?"g":pct>=50?"w":"b");
     ls.style.display = "";
   } else {
     $("liveScore").style.display = "none";
   }
 
   // Meta
-  $("qNum").textContent = `${String(idx+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
-  $("qCat").textContent = `${CAT_ICONS[q.category] || ""} ${q.category}`;
-  $("diffDot").className = `diffDot ${q.difficulty || "normal"}`;
-  $("diffDot").title = DIFF_LABEL[q.difficulty] || "Normal";
-  $("diffDot").style.display = q.difficulty ? "inline-block" : "none";
+  $("qNum").textContent = `${String(i+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
+  $("qCat").textContent = `${CAT_ICONS[q.category]||""} ${q.category}`;
+  const dd = $("diffDot");
+  if(q.difficulty) { dd.className=`diffDot ${q.difficulty}`; dd.title=q.difficulty; dd.style.display="inline-block"; }
+  else dd.style.display = "none";
 
-  // Question text
+  // Text
   $("qText").textContent = q.question;
 
-  // Bookmark
-  $("bookmarkBtn").style.display = "grid";
-  $("bookmarkBtn").classList.toggle("saved", isBookmarked(q.id));
-  $("bookmarkBtn").onclick = () => {
-    const saved = toggleBookmark(q.id);
-    $("bookmarkBtn").classList.toggle("saved", saved);
-    toast(saved ? "Bokmärkt ⭐" : "Bokmärke borttaget", "ok");
-  };
-
   // Image
-  const imgWrap = $("qImageWrap");
-  if(q.image_url){
-    imgWrap.innerHTML = `<img class="qImage" src="${esc(q.image_url)}" alt="${esc(q.image_alt || 'Frågabild')}" loading="lazy">`;
-    imgWrap.style.display = "flex";
+  const imgWrap = $("qImgWrap");
+  if(q.image_url) {
+    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'')}" loading="lazy">`;
+    imgWrap.style.display = "";
   } else {
-    imgWrap.innerHTML = "";
-    imgWrap.style.display = "none";
+    imgWrap.innerHTML = ""; imgWrap.style.display = "none";
   }
 
-  // Reset feedback state
-  $("explanationBox").className = "explanationBox";
-  $("inlineNextWrap").classList.remove("show");
-  $("nextBtn").classList.remove("show");
+  // Bookmark
+  const bm = $("bookmarkBtn");
+  bm.style.display = "grid";
+  bm.classList.toggle("saved", getBM().includes(q.id));
+  bm.onclick = () => { const s = toggleBM(q.id); bm.classList.toggle("saved", s); toast(s?"Bokmärkt ⭐":"Borttaget","ok") };
+
+  // Reset feedback
+  $("explBox").className = "explBox";
+  $("nextWrap").classList.remove("show");
+  $("miniNextBtn").style.display = "none";
 
   // Build answer buttons
-  const grid = $("ansGrid");
-  grid.innerHTML = "";
-  const opts = [
+  const grid = $("ansGrid"); grid.innerHTML = "";
+  [
     {l:"A", t:q.option_a},
     {l:"B", t:q.option_b},
     {l:"C", t:q.option_c},
     {l:"D", t:q.option_d},
-  ].filter(o => o.t);
-
-  opts.forEach(opt => {
-    const btn = document.createElement("button");
-    btn.className = "ansBtn";
-    btn.type = "button";
-    btn.innerHTML = `<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
-    btn.addEventListener("click", () => handleAnswer(opt.l, q));
-    grid.appendChild(btn);
+  ].filter(o => o.t).forEach(opt => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "ansBtn";
+    b.innerHTML = `<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
+    b.onclick = () => handleAns(opt.l, q);
+    grid.appendChild(b);
   });
 
-  updateMiniBar();
-  window.scrollTo({top:0, behavior:"smooth"});
+  updateBar();
+  window.scrollTo({top:0,behavior:"smooth"});
 }
 
 // ── HANDLE ANSWER ──
-function handleAnswer(chosen, q){
-  const correct = (q.correct || "").trim().toUpperCase();
-  const chosenUp = chosen.toUpperCase();
-  const wasCorrect = chosenUp === correct;
-  answers[currentIdx] = chosenUp;
+function handleAns(chosen, q) {
+  const correct = (q.correct||"").trim().toUpperCase();
+  const ch = chosen.toUpperCase();
+  const ok = ch === correct;
+  ans[idx] = ch;
 
-  // Color the buttons
-  document.querySelectorAll("#ansGrid .ansBtn").forEach((btn, i) => {
-    btn.disabled = true;
+  document.querySelectorAll("#ansGrid .ansBtn").forEach((b, i) => {
+    b.disabled = true;
     const l = ["A","B","C","D"][i];
-    if(l === correct) btn.classList.add("correct");
-    if(l === chosenUp && !wasCorrect) btn.classList.add("wrong");
+    if(l === correct) b.classList.add("correct");
+    if(l === ch && !ok) b.classList.add("wrong");
   });
 
-  // Streak
-  streak = wasCorrect ? streak + 1 : 0;
+  streak = ok ? streak+1 : 0;
   updateStreak();
+  updateBar();
 
   // Explanation
-  const box = $("explanationBox");
-  const label = $("explLabel");
+  const box = $("explBox"), label = $("explLabel"), txt = $("explText");
   box.classList.remove("correct","wrong");
-  if(wasCorrect){
+  if(ok) {
     box.classList.add("correct");
-    label.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2 8 6 12 14 4"/></svg> Rätt svar! Förklaring`;
+    label.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="2 8 6 12 14 4"/></svg> Rätt svar!`;
   } else {
-    const opts = {A:q.option_a, B:q.option_b, C:q.option_c, D:q.option_d};
+    const opts = {A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d};
     box.classList.add("wrong");
-    label.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Fel — rätt svar: ${correct}. ${esc(opts[correct] || "")}`;
+    label.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg> Fel — rätt: ${correct}. ${esc(opts[correct]||"")}`;
   }
-  showExplanation(q);
+  loadExpl(q);
 
-  // Show "Gå vidare" button
-  const isLast = currentIdx === examQuestions.length - 1;
-  const nextLabel = isLast ? "Visa resultat" : "Gå vidare";
-  const nextIcon = `<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
+  const isLast = idx === exam.length-1;
+  const lbl = isLast ? "Visa resultat" : "Gå vidare";
+  const icon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
+  $("nextBigBtn").innerHTML = `${lbl} ${icon}`;
+  $("nextWrap").classList.add("show");
+  $("miniNextBtn").innerHTML = `${lbl} ${icon}`;
+  $("miniNextBtn").style.display = "";
 
-  $("inlineNextBtn").innerHTML = `${nextLabel} ${nextIcon}`;
-  $("inlineNextWrap").classList.add("show");
-
-  $("nextBtn").innerHTML = `${nextLabel} ${nextIcon}`;
-  $("nextBtn").classList.add("show");
-
-  updateMiniBar();
-
-  // Scroll the "Gå vidare" button into view so user can see it
-  setTimeout(() => {
-    $("inlineNextWrap").scrollIntoView({behavior:"smooth", block:"nearest"});
-  }, 120);
+  // Scroll "Gå vidare" into view
+  setTimeout(() => $("nextWrap").scrollIntoView({behavior:"smooth",block:"nearest"}), 100);
 }
 
-// ── EXPLANATION ──
-function showExplanation(q){
-  const box = $("explanationBox"), txt = $("explText");
-  const cache = safeJson(localStorage.getItem(LS_EXPL_CACHE), {});
-  if(cache[q.id]){ txt.textContent = cache[q.id]; box.classList.add("show"); return; }
-  if(q.explanation?.trim()){ txt.textContent = q.explanation; box.classList.add("show"); return; }
-
+// ── LOAD EXPLANATION ──
+function loadExpl(q) {
+  const box = $("explBox"), txt = $("explText");
+  const cache = safeJSON(localStorage.getItem(LS_EXPL), {});
+  if(cache[q.id]) { txt.textContent = cache[q.id]; box.classList.add("show"); return; }
+  if(q.explanation?.trim()) { txt.textContent = q.explanation; box.classList.add("show"); return; }
   box.classList.add("show");
-  txt.innerHTML = '<span class="spinner"></span> Hämtar AI-förklaring…';
-  fetch("/api/explain", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({question:q.question, correct:q.correct, option_a:q.option_a, option_b:q.option_b, option_c:q.option_c, option_d:q.option_d})
-  })
+  txt.innerHTML = `<span class="spinner"></span> Hämtar förklaring…`;
+  fetch("/api/explain",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({question:q.question,correct:q.correct,option_a:q.option_a,option_b:q.option_b,option_c:q.option_c,option_d:q.option_d})})
   .then(r => r.ok ? r.json() : null)
-  .then(data => {
-    if(data?.explanation){
-      txt.textContent = data.explanation;
-      const upd = safeJson(localStorage.getItem(LS_EXPL_CACHE), {});
-      upd[q.id] = data.explanation;
-      localStorage.setItem(LS_EXPL_CACHE, JSON.stringify(upd));
-    } else {
-      txt.textContent = `Rätt svar: ${q.correct}.`;
-    }
+  .then(d => {
+    txt.textContent = d?.explanation || `Rätt svar: ${q.correct}.`;
+    if(d?.explanation) { const upd=safeJSON(localStorage.getItem(LS_EXPL),{}); upd[q.id]=d.explanation; localStorage.setItem(LS_EXPL,JSON.stringify(upd)); }
   })
   .catch(() => { txt.textContent = `Rätt svar: ${q.correct}.` });
 }
 
 // ── NAVIGATION ──
-function goNext(){
-  if(currentIdx < examQuestions.length - 1){
-    currentIdx++;
-    renderQuestion(currentIdx);
-  } else {
-    showResults();
-  }
+function goNext() {
+  if(idx < exam.length-1) { idx++; renderQ(idx); }
+  else showResults();
 }
 
-$("nextBtn").addEventListener("click", goNext);
-$("inlineNextBtn").addEventListener("click", goNext);
+$("nextBigBtn").onclick = goNext;
+$("miniNextBtn").onclick = goNext;
+$("abortBtn").onclick = () => { if(confirm("Avbryt provet? Resultatet sparas inte.")) showConfig() };
 
-$("abortBtn").addEventListener("click", () => {
-  if(!confirm("Avbryt provet? Ditt resultat sparas inte.")) return;
-  showConfigView();
+document.addEventListener("keydown", e => {
+  if(!$("examView").classList.contains("active") || e.target.matches("input,select,textarea")) return;
+  const map={"1":"A","2":"B","3":"C","4":"D",a:"A",b:"B",c:"C",d:"D",A:"A",B:"B",C:"C",D:"D"};
+  if(map[e.key]) {
+    e.preventDefault();
+    const btns = [...document.querySelectorAll("#ansGrid .ansBtn:not(:disabled)")];
+    const i = {A:0,B:1,C:2,D:3}[map[e.key]];
+    if(btns[i]) btns[i].click();
+  }
+  if((e.key==="Enter"||e.key===" ") && $("miniNextBtn").style.display !== "none") {
+    e.preventDefault(); goNext();
+  }
 });
 
 // ── HELPERS ──
-function isCorrect(answer, q){
-  return answer != null && answer.toUpperCase() === (q?.correct || "").trim().toUpperCase();
+const hit = (a, q) => a != null && a.toUpperCase() === (q?.correct||"").trim().toUpperCase();
+
+function updateBar() {
+  const correct = ans.filter((a,i) => hit(a,exam[i])).length;
+  const answered = ans.filter(a => a!==null).length;
+  $("miniBarTxt").innerHTML = `<strong>${correct}/${answered}</strong> rätt · ${exam.length-answered} kvar`;
 }
 
-function updateMiniBar(){
-  const correct = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
-  const answered = answers.filter(a => a !== null).length;
-  const remaining = examQuestions.length - answered;
-  $("miniBarText").innerHTML = `<strong>${correct} / ${answered}</strong> rätt · ${remaining} kvar`;
+function updateStreak() {
+  const sb = $("streakBadge");
+  if(streak >= 3) { sb.textContent = `🔥 ${streak} rätt i rad`; sb.classList.add("show"); }
+  else sb.classList.remove("show");
 }
-
-function updateStreak(){
-  const sw = $("streakWrap");
-  if(streak >= 3){
-    sw.innerHTML = `🔥 ${streak} rätta i rad`;
-    sw.classList.add("show");
-  } else {
-    sw.classList.remove("show");
-  }
-}
-
-// ── KEYBOARD SHORTCUTS ──
-document.addEventListener("keydown", e => {
-  if(!$("examView").classList.contains("active")) return;
-  if(e.target.matches("input,textarea,select")) return;
-
-  const keyMap = {"1":"A","2":"B","3":"C","4":"D","a":"A","b":"B","c":"C","d":"D","A":"A","B":"B","C":"C","D":"D"};
-  if(keyMap[e.key]){
-    e.preventDefault();
-    const btns = document.querySelectorAll("#ansGrid .ansBtn:not(:disabled)");
-    const li = {"A":0,"B":1,"C":2,"D":3};
-    const btn = btns[li[keyMap[e.key]]];
-    if(btn) btn.click();
-  }
-  if((e.key === "Enter" || e.key === " ") && $("nextBtn").classList.contains("show")){
-    e.preventDefault();
-    goNext();
-  }
-});
 
 // ── TIMER ──
-function startTimer(seconds){
-  let s = seconds;
+function startTimer(secs) {
   const badge = $("timerBadge"); badge.style.display = "";
-  timerInterval = setInterval(() => {
-    s--;
-    const m = Math.floor(s / 60), sec = s % 60;
-    badge.textContent = `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-    badge.className = "timerBadge" + (s < 60 ? " bad" : s < 180 ? " warn" : "");
-    if(s <= 0){ clearInterval(timerInterval); toast("Tiden är slut!", "bad"); showResults(); }
-  }, 1000);
+  timer = setInterval(() => {
+    secs--;
+    badge.textContent = `${String(Math.floor(secs/60)).padStart(2,"0")}:${String(secs%60).padStart(2,"0")}`;
+    badge.className = "timerBadge"+(secs<60?" bad":secs<180?" warn":"");
+    if(secs<=0) { clearInterval(timer); timer=null; toast("Tiden är slut!","bad"); showResults(); }
+  },1000);
 }
-function stopTimer(){ clearInterval(timerInterval); $("timerBadge").style.display = "none"; }
 
 // ── RESULTS ──
-async function showResults(){
-  stopTimer();
+async function showResults() {
+  if(timer) { clearInterval(timer); timer=null; }
   streak = 0; updateStreak();
   $("examView").classList.remove("active");
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
   $("configView").style.display = "none";
   $("resultView").classList.add("active");
-  window.scrollTo({top:0, behavior:"smooth"});
+  window.scrollTo({top:0,behavior:"smooth"});
 
-  const total = examQuestions.length;
-  const numCorrect = answers.filter((a, i) => isCorrect(a, examQuestions[i])).length;
-  const pct = Math.round((numCorrect / total) * 100);
-  const passed = total === 65 ? numCorrect >= 52 : pct >= 75;
+  const total = exam.length;
+  const right = ans.filter((a,i) => hit(a,exam[i])).length;
+  const pct = Math.round(right/total*100);
+  const passed = total===65 ? right>=52 : pct>=75;
 
-  $("resultScore").innerHTML = `<span>${numCorrect}</span> / ${total}`;
-  $("resultPercent").textContent = `${pct}% rätt`;
+  $("resultScore").innerHTML = `<span>${right}</span> / ${total}`;
+  $("resultPct").textContent = `${pct}% rätt`;
   $("passBadgeWrap").innerHTML = passed
     ? `<span class="statusBadge pass">✓ GODKÄNT</span>`
     : `<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
 
-  // Category breakdown
+  // Breakdown
   const catMap = {};
-  examQuestions.forEach((q, i) => {
-    if(!catMap[q.category]) catMap[q.category] = {correct:0, total:0};
-    catMap[q.category].total++;
-    if(isCorrect(answers[i], q)) catMap[q.category].correct++;
+  exam.forEach((q,i) => {
+    if(!catMap[q.category]) catMap[q.category]={r:0,t:0};
+    catMap[q.category].t++;
+    if(hit(ans[i],q)) catMap[q.category].r++;
   });
   const cats = Object.keys(catMap);
-  if(cats.length > 1){
-    $("breakdownCard").style.display = "";
-    $("breakdownGrid").innerHTML = cats.map(cat => {
-      const {correct, total} = catMap[cat];
-      const p = Math.round((correct / total) * 100);
-      const color = p >= 75 ? "var(--ok)" : p >= 50 ? "var(--warn)" : "var(--danger)";
-      return `<div class="breakdownCard">
-        <div class="brkLabel">${esc(cat)}</div>
-        <div class="brkScore">${correct} / ${total} (${p}%)</div>
-        <div class="brkBar"><div class="brkFill" style="width:${p}%;background:${color}"></div></div>
-      </div>`;
+  if(cats.length > 1) {
+    $("brkCard").style.display = "";
+    $("brkGrid").innerHTML = cats.map(c => {
+      const {r,t} = catMap[c]; const p = Math.round(r/t*100);
+      const col = p>=75?"var(--ok)":p>=50?"var(--warn)":"var(--danger)";
+      return `<div class="brkCard"><div class="brkLabel">${esc(c)}</div><div class="brkScore">${r}/${t} (${p}%)</div><div class="brkBar"><div class="brkFill" style="width:${p}%;background:${col}"></div></div></div>`;
     }).join("");
-  } else {
-    $("breakdownCard").style.display = "none";
-  }
+  } else $("brkCard").style.display = "none";
 
   // Error bank
-  const errors = examQuestions.map((q, i) => ({q, chosen:answers[i]})).filter(e => !isCorrect(e.chosen, e.q));
-  if(errors.length > 0){
-    $("errorBankCard").style.display = "";
-    $("errorBank").innerHTML = errors.map(({q, chosen}) => {
-      const opts = {A:q.option_a, B:q.option_b, C:q.option_c, D:q.option_d};
-      const correctText = opts[q.correct] || q.correct;
-      return `<div class="errorCard">
-        <div class="errorCatLabel">${esc(q.category)}</div>
-        <div class="errorQ">${esc(q.question)}</div>
-        <div class="errorCorrect">✓ Rätt: ${q.correct}. ${esc(correctText)}</div>
-        ${q.explanation ? `<div class="errorExpl">${esc(q.explanation)}</div>` : ""}
+  const errors = exam.map((q,i)=>({q,ch:ans[i]})).filter(e=>!hit(e.ch,e.q));
+  if(errors.length > 0) {
+    $("errCard").style.display = "";
+    $("errBank").innerHTML = errors.map(({q,ch}) => {
+      const opts={A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d};
+      return `<div class="errCard">
+        <div class="errCat">${esc(q.category)}</div>
+        <div class="errQ">${esc(q.question)}</div>
+        <div class="errRight">✓ ${q.correct}: ${esc(opts[q.correct]||q.correct)}</div>
+        ${q.explanation?`<div class="errExpl">${esc(q.explanation)}</div>`:""}
       </div>`;
     }).join("");
-  } else {
-    $("errorBankCard").style.display = "none";
-  }
+  } else $("errCard").style.display = "none";
 
-  // Save result
+  $("retryBtn").disabled = errors.length === 0;
+
+  // Save
   try {
-    const uid = await getUid();
-    if(uid){
-      await db.from("driving_results").insert({
-        user_id:uid, category:selectedCategory,
-        num_questions:total, num_correct:numCorrect, percent:pct, passed
-      });
-    }
-  } catch(e){ console.warn("Kunde inte spara resultat:", e) }
-
-  // Re-enable mistakes button
-  $("retryMistakesBtn").disabled = errors.length === 0;
+    if(uid) await db.from("driving_results").insert({user_id:uid,category:selCat,num_questions:total,num_correct:right,percent:pct,passed});
+  } catch(e) { console.warn("Sparfel:",e) }
 }
 
-$("newTestBtn").addEventListener("click", () => showConfigView());
-
-$("sameConfigBtn").addEventListener("click", async () => {
-  const quota = await checkQuota();
-  if(!quota.allowed){ toast("Gränsen nådd — uppgradera för fler test.", "bad"); return; }
-  startExam(selectedCategory, lastNumQ, lastDiff);
-});
-
-$("retryMistakesBtn").addEventListener("click", () => {
-  const mistakes = examQuestions.filter((_, i) => !isCorrect(answers[i], examQuestions[i]));
-  if(mistakes.length === 0){ toast("Inga misstag att träna!", "ok"); return; }
-  examQuestions = shuffle(mistakes);
-  currentIdx = 0;
-  answers = new Array(examQuestions.length).fill(null);
-  streak = 0; updateStreak();
-  showExamView();
-  renderQuestion(0);
-});
+$("newBtn").onclick = () => showConfig();
+$("sameBtn").onclick = () => {
+  const cfg=LIMITS[role]||LIMITS.gratis;
+  if(cfg.cap!==Infinity && readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;}
+  runExam(selCat,lastN,lastDiff);
+};
+$("retryBtn").onclick = () => {
+  const mistakes = exam.filter((_,i)=>!hit(ans[i],exam[i]));
+  if(!mistakes.length){toast("Inga misstag att träna!","ok");return;}
+  exam=shuffle(mistakes); idx=0; ans=new Array(exam.length).fill(null);
+  streak=0; updateStreak(); showExam(); renderQ(0);
+};
 
 // ── HISTORY ──
-async function loadHistory(){
-  const uid = await getUid(); if(!uid) return;
-  const {data} = await db.from("driving_results")
-    .select("*").eq("user_id", uid)
-    .order("created_at", {ascending:false}).limit(10);
-  if(!data || data.length === 0){ $("historySection").style.display = "none"; return; }
-  $("historySection").style.display = "";
-  $("historyBody").innerHTML = `<table class="histTable">
-    <thead><tr><th>Datum</th><th>Kategori</th><th>Resultat</th><th>Status</th></tr></thead>
-    <tbody>${data.map(r => {
-      const date = new Date(r.created_at).toLocaleDateString("sv-SE", {month:"short", day:"numeric"});
-      return `<tr>
-        <td>${date}</td>
-        <td>${esc(r.category || "—")}</td>
+async function loadHistory() {
+  if(!uid) return;
+  try {
+    const {data} = await db.from("driving_results").select("*").eq("user_id",uid).order("created_at",{ascending:false}).limit(10);
+    if(!data||!data.length){$("historySection").style.display="none";return;}
+    $("historySection").style.display = "";
+    $("historyBody").innerHTML = `<table class="histTable">
+      <thead><tr><th>Datum</th><th>Kategori</th><th>Resultat</th><th>Status</th></tr></thead>
+      <tbody>${data.map(r=>`<tr>
+        <td>${new Date(r.created_at).toLocaleDateString("sv-SE",{month:"short",day:"numeric"})}</td>
+        <td>${esc(r.category||"—")}</td>
         <td>${r.num_correct}/${r.num_questions} (${r.percent}%)</td>
-        <td><span class="passBadge ${r.passed ? "p" : "f"}">${r.passed ? "GODKÄNT" : "UNDERKÄNT"}</span></td>
-      </tr>`;
-    }).join("")}</tbody>
-  </table>`;
+        <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
+      </tr>`).join("")}</tbody></table>`;
+  } catch(e){ $("historySection").style.display="none" }
 }
 
-// ── AUTH & INIT ──
-function dismissLoader(){
-  $("pageLoader").classList.add("done");
-}
+// ── INIT ──
+async function init() {
+  // Show loader, set text
+  const loader = $("pageLoader"), loaderTxt = $("loaderText");
 
-function showInitError(msg){
-  const loader = $("pageLoader");
-  loader.innerHTML = `<div style="display:grid;place-items:center;gap:16px;padding:24px;max-width:360px;text-align:center">
-    <div style="font-size:32px">⚠️</div>
-    <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;color:var(--t)">Kunde inte ladda sidan</div>
-    <div style="font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.6">${esc(msg)}</div>
-    <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
-  </div>`;
-  loader.classList.remove("done");
-}
-
-async function init(){
-  // If auth check takes >7s, give up and show login
-  const safetyTimer = setTimeout(() => {
-    console.warn("Auth timeout — visar login");
-    showLoginScreen();
-  }, 7000);
+  // Redirect to correct domain if on old preview URL
+  if(location.hostname.includes("vercel.app") && !location.hostname.includes("provia-ai-uf")) {
+    const path = location.pathname + location.search;
+    const newURL = "https://provia-ai-uf.vercel.app" + path;
+    loaderTxt.textContent = "Omdirigerar…";
+    location.replace(newURL);
+    return;
+  }
 
   try {
-    if(typeof supabase === "undefined") throw new Error("Supabase laddades inte — kontrollera din internetanslutning.");
-    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    if(typeof supabase === "undefined") throw new Error("Nätverksfel — kunde inte ladda Supabase.");
+    db = supabase.createClient(SUPA_URL, SUPA_ANON);
 
-    const {data, error} = await db.auth.getSession();
-    clearTimeout(safetyTimer);
+    loaderTxt.textContent = "Kontrollerar inloggning…";
+    const {data:{session}, error} = await db.auth.getSession();
+    if(error) throw error;
 
-    if(error || !data?.session){
-      showLoginScreen();
-      return;
-    }
+    if(!session) { showLoginScreen(); return; }
+    uid = session.user.id;
 
-    currentUser = data.session.user;
+    loaderTxt.textContent = "Hämtar data…";
 
-    // Dismiss loader immediately after auth — don't wait for data
-    dismissLoader();
-    $("loginScreen").style.display = "none";
+    // Load role
+    try {
+      const {data} = await db.from("profiles").select("role").eq("id",uid).single();
+      if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
+    } catch(e){}
 
-    // Animate reveals right away
-    const obs = new IntersectionObserver(entries => {
-      entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add("in"); obs.unobserve(e.target) } })
-    }, {threshold:.08});
-    document.querySelectorAll(".reveal").forEach(el => obs.observe(el));
+    // Load questions
+    const {data:qs, error:qErr} = await db.from("driving_questions").select("*");
+    if(qErr) throw qErr;
+    questions = qs || [];
 
-    // Load role + data in background (non-blocking for the UI)
-    loadDataInBackground();
+    // All done — show UI
+    loader.classList.add("hide");
+    buildCats();
+    refreshQuotaUI();
+    await loadHistory();
 
-  } catch(err){
-    clearTimeout(safetyTimer);
+  } catch(err) {
     console.error("Init-fel:", err);
-    showInitError(err?.message || "Anslutningsfel. Försök ladda om sidan.");
+    loader.innerHTML = `<div style="text-align:center;padding:24px;max-width:340px">
+      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+      <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;color:var(--t);margin-bottom:8px">Kunde inte ladda sidan</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:16px">${esc(err?.message||"Okänt fel — försök igen.")}</div>
+      <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
+    </div>`;
   }
 }
 
-async function loadDataInBackground(){
-  // Load role silently
-  try {
-    const {data} = await db.from("profiles").select("role").eq("id", currentUser.id).single();
-    if(data?.role){ currentRole = data.role; localStorage.setItem(LS_ROLE, currentRole); }
-  } catch(e){ console.warn("Roll-fel:", e) }
-
-  // Load all questions (single query — categories derived from this)
-  await loadAllQuestions();
-  buildCategoryUI();
-
-  // Quota + history
-  try { await refreshQuotaUi(); } catch(e){ console.warn("Kvotfel:", e) }
-  try { await loadHistory(); } catch(e){ console.warn("Historikfel:", e) }
-}
-
-function showLoginScreen(){
+function showLoginScreen() {
   $("loginScreen").style.display = "flex";
-  $("pageLoader").classList.add("done");
+  $("pageLoader").classList.add("hide");
 
-  const doSignIn = async () => {
-    const email = $("authEmail").value.trim();
-    const pass = $("authPass").value;
-    if(!email || !pass){ $("loginErr").textContent = "Fyll i e-post och lösenord."; return; }
-    const {error} = await db.auth.signInWithPassword({email, password:pass});
-    if(error){ $("loginErr").textContent = error.message; return; }
+  const signIn = async () => {
+    const email=$("authEmail").value.trim(), pass=$("authPass").value;
+    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+    $("loginErr").textContent="";
+    const {error} = await db.auth.signInWithPassword({email,password:pass});
+    if(error){$("loginErr").textContent=error.message;return;}
     location.reload();
   };
-
-  const doSignUp = async () => {
-    const email = $("authEmail").value.trim();
-    const pass = $("authPass").value;
-    if(!email || !pass){ $("loginErr").textContent = "Fyll i e-post och lösenord."; return; }
-    const res = await fetch("/api/signup", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email, password:pass})});
-    const body = await res.json();
-    if(!res.ok){ $("loginErr").textContent = body.error || "Fel vid registrering."; return; }
-    if(body.session){
-      await db.auth.setSession({access_token:body.session.access_token, refresh_token:body.session.refresh_token});
-      location.reload();
-    }
+  const signUp = async () => {
+    const email=$("authEmail").value.trim(), pass=$("authPass").value;
+    if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
+    $("loginErr").textContent="";
+    const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
+    const body=await res.json();
+    if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
+    if(body.session){await db.auth.setSession(body.session);location.reload();}
   };
-
-  $("signInBtn").onclick = doSignIn;
-  $("signUpBtn").onclick = doSignUp;
-  $("authPass").addEventListener("keydown", e => { if(e.key === "Enter") doSignIn() });
+  $("signInBtn").onclick = signIn;
+  $("signUpBtn").onclick = signUp;
+  $("authPass").onkeydown = e => { if(e.key==="Enter") signIn() };
 }
 
 init();
