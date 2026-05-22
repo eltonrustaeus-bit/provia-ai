@@ -994,14 +994,30 @@ function showLoginScreen() {
 }
 
 // ── INIT ──
+function raceTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout efter ${ms/1000}s (${label})`)), ms))
+  ]);
+}
+
 async function init() {
   const loader = $("pageLoader"), loaderTxt = $("loaderText");
+  const step = t => { loaderTxt.textContent = t; };
 
   try {
-    if(typeof supabase === "undefined") throw new Error("Nätverksfel — kunde inte ladda Supabase.");
+    step("Startar…");
+
+    // Wire up login form (always, before db is needed)
+    $("loginScreen").addEventListener("click", e => {
+      if(e.target === $("loginScreen")) $("loginScreen").style.display = "none";
+    });
+
+    if(typeof supabase === "undefined") {
+      throw new Error("Supabase-biblioteket laddades inte. Kontrollera din anslutning.");
+    }
     db = supabase.createClient(SUPA_URL, SUPA_ANON);
 
-    // Wire up login form handlers (db must be ready first)
     const signIn = async () => {
       const email=$("authEmail").value.trim(), pass=$("authPass").value;
       if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
@@ -1021,33 +1037,57 @@ async function init() {
     };
     $("signInBtn").onclick = signIn;
     $("signUpBtn").onclick = signUp;
-    $("authPass").onkeydown = e => { if(e.key==="Enter") signIn() };
-    $("loginScreen").addEventListener("click", e => { if(e.target===$("loginScreen")) $("loginScreen").style.display="none"; });
+    $("authPass").onkeydown = e => { if(e.key==="Enter") signIn(); };
 
-    // 1. Load questions — public table, no auth needed
-    loaderTxt.textContent = "Hämtar frågor…";
-    const {data:qs, error:qErr} = await db.from("driving_questions").select("*");
-    if(qErr) throw qErr;
-    questions = qs || [];
-
-    // 2. Check session — optional, for role/history/quota
-    loaderTxt.textContent = "Kontrollerar inloggning…";
-    const {data: authData} = await db.auth.getSession();
-    const session = authData?.session;
-    if(session) {
-      uid = session.user.id;
-      try {
-        const {data} = await db.from("profiles").select("role").eq("id",uid).single();
-        if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
-      } catch(e){}
+    // 1. Load questions — try Supabase client, fall back to raw fetch
+    step("Hämtar frågor…");
+    let questions_raw = null;
+    try {
+      const {data, error} = await raceTimeout(
+        db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_alt"),
+        12000, "frågeinladdning"
+      );
+      if(error) throw new Error(error.message);
+      questions_raw = data;
+    } catch(clientErr) {
+      // Fallback: raw fetch directly to PostgREST
+      step("Försöker direktanslutning…");
+      const resp = await raceTimeout(
+        fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_alt`, {
+          headers: { apikey: SUPA_ANON, Authorization: `Bearer ${SUPA_ANON}` }
+        }),
+        12000, "direktfetch"
+      );
+      if(!resp.ok) throw new Error(`Databasfel ${resp.status}: ${await resp.text()}`);
+      questions_raw = await resp.json();
     }
 
-    // 3. Show UI — categories visible regardless of login status
+    if(!Array.isArray(questions_raw) || questions_raw.length === 0) {
+      throw new Error("Inga frågor returnerades från databasen.");
+    }
+    questions = questions_raw;
+
+    // 2. Check session — optional, never blocks UI
+    step("Kontrollerar inloggning…");
+    try {
+      const {data: authData} = await raceTimeout(db.auth.getSession(), 6000, "session");
+      const session = authData?.session;
+      if(session) {
+        uid = session.user.id;
+        try {
+          const {data} = await db.from("profiles").select("role").eq("id",uid).single();
+          if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
+        } catch(_){}
+      }
+    } catch(_) {
+      // Session check timed out or failed — continue without login
+    }
+
+    // 3. Show UI
     loader.classList.add("hide");
     buildCats();
     refreshQuotaUI();
 
-    // Update menu auth button
     const authBtn = $("logoutBtn"), authSpan = authBtn.querySelector("span");
     if(uid) {
       authSpan.textContent = "Logga ut";
@@ -1060,12 +1100,12 @@ async function init() {
     if(uid) await loadHistory();
 
   } catch(err) {
-    console.error("Init-fel:", err);
-    loader.innerHTML = `<div style="text-align:center;padding:24px;max-width:340px">
-      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
-      <div style="font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;color:var(--t);margin-bottom:8px">Kunde inte ladda sidan</div>
-      <div style="font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:16px">${esc(err?.message||"Okänt fel — försök igen.")}</div>
-      <button onclick="location.reload()" style="padding:10px 24px;background:var(--a);color:#08100d;border:none;border-radius:5px;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
+    console.error("[korkortet] init-fel:", err);
+    loader.innerHTML = `<div style="text-align:center;padding:28px 24px;max-width:380px">
+      <div style="font-size:40px;margin-bottom:14px">⚠️</div>
+      <div style="font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;color:#e8f5ee;margin-bottom:8px">Kunde inte ladda sidan</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:#6b8f7c;line-height:1.7;margin-bottom:20px">${esc(err?.message||"Okänt fel")}</div>
+      <button onclick="location.reload()" style="padding:11px 28px;background:#1bff8c;color:#08100d;border:none;border-radius:5px;font-weight:700;font-size:13px;cursor:pointer">Ladda om</button>
     </div>`;
   }
 }
