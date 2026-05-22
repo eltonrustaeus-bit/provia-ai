@@ -1083,10 +1083,14 @@ async function init() {
       // Session check timed out or failed — continue without login
     }
 
-    // 3. Show UI
+    // 3. Show UI — always hide loader first, then build UI pieces individually
     loader.classList.add("hide");
-    buildCats();
-    refreshQuotaUI();
+
+    try { buildCats(); } catch(e) {
+      console.error("[korkortet] buildCats:", e);
+      $("catGrid").innerHTML = `<div class="loadingCat" style="color:var(--danger)">⚠️ ${esc(e?.message||"Fel vid kategorier")} &nbsp;<button onclick="location.reload()" style="background:none;border:none;color:var(--a);cursor:pointer;font:inherit;text-decoration:underline">Ladda om</button></div>`;
+    }
+    try { refreshQuotaUI(); } catch(_) {}
 
     const authBtn = $("logoutBtn"), authSpan = authBtn.querySelector("span");
     if(uid) {
@@ -1101,6 +1105,7 @@ async function init() {
 
   } catch(err) {
     console.error("[korkortet] init-fel:", err);
+    loader.classList.remove("hide");
     loader.innerHTML = `<div style="text-align:center;padding:28px 24px;max-width:380px">
       <div style="font-size:40px;margin-bottom:14px">⚠️</div>
       <div style="font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;color:#e8f5ee;margin-bottom:8px">Kunde inte ladda sidan</div>
@@ -1109,6 +1114,10 @@ async function init() {
     </div>`;
   }
 }
+
+window.addEventListener("unhandledrejection", e => {
+  console.error("[korkortet] Ohanterat promise-fel:", e.reason);
+});
 
 init();
 </script>
