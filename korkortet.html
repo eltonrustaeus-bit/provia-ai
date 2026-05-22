@@ -748,7 +748,7 @@ function renderQ(i) {
   // Image
   const imgWrap = $("qImgWrap");
   if(q.image_url) {
-    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_alt||'')}" loading="lazy">`;
+    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_description||'')}" loading="lazy">`;
     imgWrap.style.display = "";
   } else {
     imgWrap.innerHTML = ""; imgWrap.style.display = "none";
@@ -1044,7 +1044,7 @@ async function init() {
     let questions_raw = null;
     try {
       const {data, error} = await raceTimeout(
-        db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_alt"),
+        db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description"),
         12000, "frågeinladdning"
       );
       if(error) throw new Error(error.message);
@@ -1053,7 +1053,7 @@ async function init() {
       // Fallback: raw fetch directly to PostgREST
       step("Försöker direktanslutning…");
       const resp = await raceTimeout(
-        fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_alt`, {
+        fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description`, {
           headers: { apikey: SUPA_ANON, Authorization: `Bearer ${SUPA_ANON}` }
         }),
         12000, "direktfetch"
