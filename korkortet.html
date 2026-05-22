@@ -541,7 +541,7 @@ let streak = 0, timer = null;
 // ── SHORTCUTS ──
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-const safeJSON = (s, fb) => { try { return JSON.parse(s) } catch { return fb } };
+const safeJSON = (s, fb) => { try { return JSON.parse(s) ?? fb } catch { return fb } };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
 
 // ── BOOKMARKS ──
