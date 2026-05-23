@@ -1,0 +1,457 @@
+/* ProviaAI — Shared Design System v1.0 */
+
+/* ── TOKENS ── */
+:root {
+  --a: #1bff8c;
+  --a2: #16d475;
+  --a-dim: rgba(27,255,140,.07);
+  --a-glow: rgba(27,255,140,.18);
+  --bg: #08100d;
+  --s: #111a15;
+  --s2: #162019;
+  --s3: #1a2820;
+  --t: #e8f5ee;
+  --t2: #a8c4b4;
+  --t3: #6b8f7c;
+  --l: rgba(27,255,140,.10);
+  --l2: rgba(27,255,140,.22);
+  --l3: rgba(27,255,140,.32);
+  --sh: 0 8px 32px rgba(0,0,0,.50);
+  --sh2: 0 16px 48px rgba(0,0,0,.55);
+  --sh3: 0 24px 64px rgba(0,0,0,.65);
+  --r: 5px;
+  --r2: 3px;
+  --max: 1080px;
+  --font: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+  --danger: #ff6b6b;
+  --warn: #f4c842;
+  --ok: #1bff8c;
+}
+
+body.light {
+  --a: #0d9460;
+  --a2: #0b7a50;
+  --a-dim: rgba(13,148,96,.07);
+  --bg: #f3f8f5;
+  --s: #ffffff;
+  --s2: #edf5f0;
+  --t: #0c1e15;
+  --t2: #3a6050;
+  --t3: #7aaa92;
+  --l: rgba(13,148,96,.11);
+  --l2: rgba(13,148,96,.25);
+  --sh: 0 4px 20px rgba(0,0,0,.08);
+  --sh2: 0 8px 32px rgba(0,0,0,.11);
+  --sh3: 0 16px 48px rgba(0,0,0,.14);
+  --danger: #c0392b;
+  --warn: #946c00;
+  --ok: #0d9460;
+}
+
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+:target { scroll-margin-top: 70px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--t);
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background .28s ease, color .28s ease;
+}
+a { text-decoration: none; color: inherit; }
+input, select, textarea, button { font-family: var(--font); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--l2); border-radius: 3px; }
+
+/* ── LOADER ── */
+/* supports: .loader (index/pricing) and .pageLoader (app/korkortet) */
+.loader, .pageLoader {
+  position: fixed; inset: 0; z-index: 12000;
+  display: grid; place-items: center;
+  background: var(--bg);
+  transition: opacity .3s ease, visibility .3s ease;
+}
+.loader.out,
+.pageLoader.done,
+.pageLoader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* supports: .lOrb (index/pricing) and .loaderOrb (app/korkortet) */
+.lOrb, .loaderOrb {
+  width: 52px; height: 52px; border-radius: 50%;
+  position: relative; border: 1px solid var(--l2);
+}
+.lOrb::before, .loaderOrb::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--a);
+  border-right-color: rgba(27,255,140,.3);
+  animation: spin .9s linear infinite;
+}
+.lTxt, .loaderText {
+  margin-top: 14px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--t3); letter-spacing: .12em; text-transform: uppercase;
+  text-align: center;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(27,255,140,.4); }
+  50%       { box-shadow: 0 0 0 7px rgba(27,255,140,0); }
+}
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(27,255,140,0); }
+  50%       { box-shadow: 0 0 0 5px rgba(27,255,140,.1); }
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── HEADER ── */
+header {
+  height: 56px; position: sticky; top: 0; z-index: 3000;
+  background: rgba(8,16,13,.88);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid var(--l);
+  display: flex; align-items: center;
+  transition: background .28s ease, border-color .28s ease;
+}
+body.light header { background: rgba(243,248,245,.92); }
+
+.hWrap {
+  max-width: var(--max); width: 100%; margin: 0 auto;
+  padding: 0 22px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { height: 30px; width: auto; display: block; }
+
+/* supports: .bName/.bTag (index/pricing) and .brandName/.brandTag (app/korkortet) */
+.bName, .brandName {
+  font-weight: 700; font-size: 15px; color: var(--t);
+  letter-spacing: -.02em; line-height: 1;
+  transition: color .28s ease;
+}
+.bTag, .brandTag {
+  font-family: var(--mono); font-size: 9.5px; color: var(--t3);
+  letter-spacing: .1em; text-transform: uppercase;
+  margin-top: 2px; line-height: 1;
+  transition: color .28s ease;
+}
+/* supports: .hR (index/pricing) and .hRight (app/korkortet) */
+.hR, .hRight { display: flex; align-items: center; gap: 6px; }
+
+/* ── AI STATUS ── */
+/* .aiDot = the container pill (index/pricing); .aiStatus = the container (pricing alt) */
+.aiDot {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 10px; height: 30px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--t3);
+  border: 1px solid var(--l); border-radius: var(--r); background: transparent;
+}
+/* the pulsing dot inside the pill */
+.dot, .aiStatus .aiDot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--a);
+  box-shadow: 0 0 0 0 rgba(27,255,140,.4);
+  animation: pulse 2s ease infinite;
+}
+/* pricing uses .aiStatus as the pill and .aiDot as the inner dot */
+.aiStatus {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 10px; height: 30px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--t3);
+  border: 1px solid var(--l); border-radius: var(--r); background: transparent;
+}
+.aiStatus .aiDot {
+  display: block; padding: 0; height: auto; border: none;
+  width: 5px; border-radius: 50%; background: var(--a);
+  animation: pulse 2s ease infinite;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 0 15px; height: 36px;
+  font-family: var(--font); font-weight: 600; font-size: 13px;
+  border: 1px solid var(--l); border-radius: var(--r);
+  background: var(--s2); color: var(--t);
+  cursor: pointer; white-space: nowrap;
+  position: relative; overflow: hidden;
+  transition: transform .15s cubic-bezier(.22,.61,.36,1), box-shadow .15s ease,
+              border-color .15s ease, background .28s ease, color .28s ease;
+}
+.btn::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(27,255,140,.07), transparent 60%);
+  opacity: 0; transition: opacity .15s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--sh); border-color: var(--l2); }
+.btn:hover::after { opacity: 1; }
+.btn:active { transform: translateY(0) scale(.98); }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+.btnP { background: var(--a); color: #08100d; border-color: var(--a); font-weight: 700; }
+body.light .btnP { color: #fff; }
+.btnP:hover { background: var(--a2); border-color: var(--a2); }
+.btnP::after { background: linear-gradient(135deg, rgba(255,255,255,.15), transparent 55%); }
+.btnG { background: transparent; border-color: var(--l); }
+.btnG:hover { background: var(--a-dim); border-color: var(--l2); }
+
+/* Bigger touch targets on mobile */
+@media (max-width: 768px) {
+  .btn { min-height: 44px; }
+}
+
+/* ── THEME TOGGLE ── */
+.themeTgl {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 12px; height: 36px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--t3); border: 1px solid var(--l); border-radius: var(--r);
+  background: transparent; cursor: pointer;
+  transition: color .16s ease, border-color .16s ease, background .28s ease;
+}
+.themeTgl:hover { color: var(--t); border-color: var(--l2); background: var(--a-dim); }
+.tglIcon { display: inline-block; transition: transform .28s cubic-bezier(.22,.61,.36,1); }
+.themeTgl:hover .tglIcon { transform: rotate(18deg) scale(1.2); }
+@media (max-width: 768px) { .themeTgl { min-height: 44px; } }
+
+/* ── MENU ── */
+/* supports: .mWrap (index/pricing) and .menuWrap (app/korkortet) */
+.mWrap, .menuWrap { position: relative; z-index: 4000; }
+/* supports: .mBtn (index/pricing) and .menuBtn (app/korkortet) */
+.mBtn, .menuBtn {
+  width: 44px; height: 44px; padding: 0;
+  display: grid; place-items: center;
+  border: 1px solid var(--l); border-radius: var(--r);
+  background: transparent; color: var(--t2); cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.mBtn:hover, .menuBtn:hover { border-color: var(--l2); background: var(--a-dim); color: var(--t); }
+.mBtn:focus-visible, .menuBtn:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+/* supports: .bars (index/pricing) and .barsIcon (app/korkortet) */
+.bars, .barsIcon { display: grid; gap: 3.5px; width: 16px; }
+.bars span, .barsIcon span { display: block; height: 1.5px; background: currentColor; border-radius: 1px; }
+/* supports: .drop (index/pricing) and .dropdown (app/korkortet) */
+.drop, .dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 224px;
+  background: var(--s); border: 1px solid var(--l); border-radius: var(--r);
+  box-shadow: var(--sh3); padding: 6px;
+  display: none; opacity: 0; transform: translateY(-5px) scale(.99); z-index: 5000;
+}
+.drop.on, .dropdown.is-open {
+  display: block; opacity: 1; transform: none;
+  transition: opacity .15s cubic-bezier(.22,.61,.36,1), transform .15s cubic-bezier(.22,.61,.36,1);
+}
+.drop.off, .dropdown.is-closing {
+  display: block; opacity: 0; transform: translateY(-4px);
+  transition: opacity .11s, transform .11s;
+}
+.dropdown.open { display: block; animation: fadeIn .15s ease; }
+/* supports: .ddi (index/pricing) and .ddItem (app/korkortet) */
+.ddi, .ddItem {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r2); border: 1px solid transparent;
+  background: transparent; cursor: pointer;
+  font-family: var(--font); font-weight: 500; font-size: 13px;
+  color: var(--t2); text-align: left;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.ddi:hover, .ddItem:hover { background: var(--a-dim); border-color: var(--l); color: var(--t); }
+.ddi:focus-visible, .ddItem:focus-visible { outline: 2px solid var(--a); outline-offset: 1px; }
+/* supports: .dpill (index/pricing) and .ddPill (app/korkortet) */
+.dpill, .ddPill {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--t3); letter-spacing: .06em;
+  border: 1px solid var(--l); border-radius: var(--r2); padding: 2px 7px;
+}
+.ddPill.hi { color: var(--a); border-color: var(--l2); background: rgba(27,255,140,.08); }
+.ddSep { height: 1px; background: var(--l); margin: 4px 2px; }
+
+/* ── LAYOUT ── */
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 22px; }
+main.wrap { padding-top: 32px; padding-bottom: 32px; }
+
+/* ── EYEBROW ── */
+.eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--a); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px;
+}
+.eyebrow::before {
+  content: ""; width: 18px; height: 1.5px;
+  background: var(--a); border-radius: 1px; flex-shrink: 0;
+}
+
+/* ── PAGE TITLE ── */
+.heroTitle, .pageTitle {
+  font-weight: 700; font-size: clamp(22px, 3.5vw, 38px);
+  letter-spacing: -.035em; line-height: 1.1; color: var(--t); margin-bottom: 10px;
+}
+.heroTitle em, .pageTitle em { font-style: normal; color: var(--a); }
+
+/* ── BADGE ── */
+.badge {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  color: var(--t3); letter-spacing: .05em;
+  border: 1px solid var(--l); border-radius: var(--r2); padding: 3px 8px;
+  background: var(--s2);
+}
+
+/* ── FORM ELEMENTS ── */
+.fieldLabel {
+  display: block;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--t3); letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 7px;
+}
+select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--l); border-radius: var(--r);
+  background: var(--s2); color: var(--t);
+  font-family: var(--font); font-size: 13.5px;
+  outline: none;
+  transition: border-color .16s ease, background .28s ease, color .28s ease, box-shadow .16s ease;
+}
+select:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus { border-color: var(--l2); box-shadow: 0 0 0 3px rgba(27,255,140,.08); }
+textarea { min-height: 160px; resize: vertical; line-height: 1.6; }
+select option { background: var(--s); color: var(--t); }
+
+/* ── GRID ── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 540px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* ── STATUS TEXT ── */
+.stxt {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 400;
+  color: var(--t3); margin-top: 8px; line-height: 1.5; word-break: break-word;
+}
+.stxt.ok { color: var(--ok); }
+.stxt.bad { color: var(--danger); }
+.stxt.warn { color: var(--warn); }
+
+/* ── SPINNER ── */
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid rgba(27,255,140,.15); border-top-color: var(--a);
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+body.light .spinner { border-color: rgba(13,148,96,.15); border-top-color: var(--a); }
+
+/* ── LOGIN ── */
+.loginOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.loginCard {
+  width: min(560px, 100%);
+  background: var(--s); border: 1px solid var(--l); border-radius: var(--r);
+  box-shadow: var(--sh3); overflow: hidden;
+}
+.loginTop {
+  display: flex; gap: 14px; align-items: center;
+  padding: 20px 20px 16px; border-bottom: 1px solid var(--l);
+}
+.loginTop img { height: 34px; width: auto; }
+.loginTitle {
+  font-family: var(--font); font-weight: 700; font-size: 16px;
+  color: var(--t); letter-spacing: -.02em;
+}
+.loginSub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--t3); letter-spacing: .06em; text-transform: uppercase; margin-top: 3px;
+}
+.loginBody { padding: 20px; }
+.authBlock {
+  border: 1px solid var(--l); border-radius: var(--r);
+  padding: 16px; background: var(--s2); margin-bottom: 14px;
+}
+.authBlockTitle {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500;
+  color: var(--t3); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px;
+}
+.loginBtnRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.loginHint { font-family: var(--mono); font-size: 11px; color: var(--t3); margin-top: 10px; line-height: 1.5; }
+.loginErr { font-family: var(--mono); font-size: 11.5px; font-weight: 500; color: var(--danger); margin-top: 10px; }
+
+/* ── QUOTA BANNER ── */
+.quotaBanner {
+  display: none;
+  align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--l2); border-radius: var(--r);
+  background: rgba(27,255,140,.05);
+  padding: 10px 14px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.quotaBanner.show { display: flex; }
+.quotaBannerTxt { font-family: var(--mono); font-size: 11.5px; color: var(--t2); line-height: 1.4; }
+.quotaBannerTxt strong { color: var(--a); }
+.quotaBannerLink {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--a); border-bottom: 1px solid rgba(27,255,140,.3); white-space: nowrap;
+}
+.quotaBannerLink:hover { border-bottom-color: var(--a); }
+
+/* ── TOAST ── */
+#toastRoot {
+  position: fixed; top: 70px; right: 16px; z-index: 9500;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none;
+}
+.toast {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-radius: var(--r);
+  background: var(--s); border: 1px solid var(--l2);
+  font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--t2);
+  box-shadow: var(--sh2); pointer-events: auto; cursor: pointer;
+  animation: toastIn .22s cubic-bezier(.22,.61,.36,1) forwards;
+  max-width: min(320px, calc(100vw - 32px));
+}
+.toast.ok  { border-color: rgba(27,255,140,.38); color: var(--a); }
+.toast.bad { border-color: rgba(255,107,107,.35); color: #ff8484; }
+.toast.out { animation: toastOut .18s ease forwards; }
+@keyframes toastIn  { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { to   { opacity: 0; transform: translateY(-6px)  scale(.97); } }
+
+/* ── SCROLL REVEAL ── */
+/* supports: .rev/.rev.in (index/pricing) and .reveal/.reveal.in (app/korkortet) */
+.rev, .reveal {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .26s ease, transform .26s cubic-bezier(.22,.61,.36,1);
+}
+.rev.in, .reveal.in { opacity: 1; transform: none; }
+.rev.d1, .reveal.d1 { transition-delay: .07s; }
+.rev.d2, .reveal.d2 { transition-delay: .14s; }
+.rev.d3, .reveal.d3 { transition-delay: .21s; }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--l); padding: 20px 22px; text-align: center;
+  font-family: var(--mono); font-size: 11px; color: var(--t3); letter-spacing: .04em;
+  transition: border-color .28s ease, color .28s ease;
+}
+.fLink { color: var(--t2); transition: color .15s ease; }
+.fLink:hover { color: var(--a); }
+
+/* ── REDUCED MOTION ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .rev, .reveal { opacity: 1; transform: none; }
+}
