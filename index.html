@@ -120,13 +120,13 @@
   .sec{
     background:var(--s);border:1px solid var(--l);
     border-radius:var(--r);overflow:hidden;
-    transition:border-color .15s;
+    transition:border-color .2s cubic-bezier(.22,.61,.36,1);
   }
   .sec:hover{border-color:var(--l2)}
   .secH{
     display:flex;align-items:center;gap:14px;
     padding:14px 18px;cursor:pointer;user-select:none;
-    transition:background .14s;
+    transition:background .2s cubic-bezier(.22,.61,.36,1);
   }
   .secH:hover{background:var(--a-dim)}
   .secN{font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.06em;flex-shrink:0}
@@ -201,6 +201,83 @@
   .pricingBtn{height:38px;padding:0 20px;font-size:13.5px}
   .pricingNote{font-family:var(--mono);font-size:9.5px;color:var(--t3);letter-spacing:.04em}
 
+  /* ── CUSTOM CURSOR ── */
+  @media (pointer: fine) {
+    * { cursor: none !important }
+    #cursorDot {
+      position:fixed;top:0;left:0;z-index:99999;
+      width:6px;height:6px;border-radius:50%;background:#1bff8c;
+      pointer-events:none;opacity:0;
+      transition:transform .08s ease,opacity .15s;
+      will-change:transform;
+    }
+    #cursorRing {
+      position:fixed;top:0;left:0;z-index:99998;
+      width:28px;height:28px;pointer-events:none;opacity:0;
+      transition:opacity .15s;will-change:transform;
+    }
+    #cursorRing > div {
+      width:100%;height:100%;border-radius:50%;
+      border:1.5px solid rgba(27,255,140,.5);
+      transform-origin:center center;
+      transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s ease;
+    }
+    #cursorRing.rHov > div { transform:scale(1.57);opacity:.3 }
+    #cursorRing.rDown > div { transform:scale(.64);opacity:.8 }
+    #cursorLabel {
+      position:fixed;z-index:99997;pointer-events:none;
+      font-family:var(--mono);font-size:10px;color:var(--t2);
+      background:rgba(8,16,13,.85);border:1px solid var(--l);
+      border-radius:4px;padding:3px 7px;
+      opacity:0;transition:opacity .15s ease;white-space:nowrap;
+    }
+  }
+
+  /* ── DEMO Q ELEMENTS ── */
+  .demoQ { animation:fadeSlideIn .2s ease both }
+  @keyframes fadeSlideIn {
+    from { opacity:0;transform:translateY(6px) }
+    to   { opacity:1;transform:translateY(0) }
+  }
+  .demoQMeta {
+    font-family:var(--mono);font-size:9.5px;color:var(--t3);
+    letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;
+  }
+  .demoQText {
+    font-size:12.5px;font-weight:600;color:var(--t);line-height:1.5;margin-bottom:10px;
+  }
+  .demoOpts { display:grid;gap:5px }
+  .demoOpt {
+    font-family:var(--mono);font-size:11px;color:var(--t2);
+    padding:6px 10px;border:1px solid var(--l);border-radius:var(--r2);
+    background:var(--s2);transition:all .12s ease;
+  }
+  .demoOptSel { border-color:var(--a);background:rgba(27,255,140,.08);color:var(--t) }
+  .demoAns {
+    font-family:var(--mono);font-size:11px;color:var(--t2);line-height:1.6;
+    padding:8px 10px;border:1px solid var(--l);border-radius:var(--r2);
+    background:var(--s2);min-height:38px;
+  }
+
+  /* ── ANIMATION POLISH ── */
+  .btn { will-change:transform }
+  header { will-change:transform }
+  .rev {
+    transition:opacity .32s cubic-bezier(.22,.61,.36,1),
+               transform .32s cubic-bezier(.22,.61,.36,1) !important;
+  }
+  /* pricingCta entrance starts slightly lower */
+  .pricingCta.rev:not(.in) { transform:translateY(8px) }
+
+  /* ── REDUCED MOTION ── */
+  @media (prefers-reduced-motion: reduce) {
+    * { cursor:auto !important }
+    #cursorDot,#cursorRing,#cursorLabel { display:none !important }
+    .rev { transition:none !important }
+    @keyframes fadeSlideIn { from { opacity:1;transform:none } }
+    @keyframes shim { from,to { transform:translateX(0) } }
+  }
+
   </style>
 </head>
 <body>
@@ -274,36 +351,28 @@
       <div class="demoCard">
 
         <div class="demoHead">
-          <span class="demoHeadTitle">ProviaAI — live-demonstration</span>
-          <span class="demoBadge">Alla funktioner</span>
+          <span class="demoHeadTitle">ProviaAI — live demo</span>
+          <span class="demoBadge" id="demoState">Skapar prov…</span>
         </div>
 
-        <div style="display:grid;gap:7px;margin-bottom:14px">
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
-            <span style="font:500 11px var(--mono);color:var(--a)">01</span>
-            <span style="font:400 12px var(--font);color:var(--t2)">Klistra in studiematerial — AI läser av</span>
+        <div class="pBar"><div class="pFill" id="pFill"></div></div>
+
+        <!-- terminal (steg 1 + steg 4) -->
+        <div class="terminal" id="demoTerminal">
+          <div class="termBar">
+            <div class="termDot" style="background:#ff5f57"></div>
+            <div class="termDot" style="background:#febc2e"></div>
+            <div class="termDot" style="background:#28c840"></div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
-            <span style="font:500 11px var(--mono);color:var(--a)">02</span>
-            <span style="font:400 12px var(--font);color:var(--t2)">Mockprov genereras på sekunder</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
-            <span style="font:500 11px var(--mono);color:var(--a)">03</span>
-            <span style="font:400 12px var(--font);color:var(--t2)">AI rättar med feedback och modellsvar</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
-            <span style="font:500 11px var(--mono);color:var(--a)">04</span>
-            <span style="font:400 12px var(--font);color:var(--t2)">Coach analyserar och bygger träningsplan</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
-            <span style="font:500 11px var(--mono);color:var(--a)">05</span>
-            <span style="font:400 12px var(--font);color:var(--t2)">Felbank, historik och lärarrapport</span>
-          </div>
+          <div class="termTxt" id="termTxt"><span class="termCursor"></span></div>
         </div>
 
-        <div style="display:flex;gap:8px">
-          <a class="btn btnP" href="live-demo.html" style="flex:1;height:36px;font-size:13px">▶&nbsp; Visa ProviaAI</a>
-          <a class="btn" href="app.html" style="height:36px;font-size:13px">Testa på riktigt →</a>
+        <!-- fråge-container (steg 2 + steg 3) -->
+        <div id="demoQWrap" style="display:none;min-height:148px"></div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <a class="btn btnP" href="app.html" style="flex:1;height:36px;font-size:13px">Prova nu →</a>
+          <a class="btn" href="live-demo.html" style="height:36px;padding:0 12px;font-size:13px">▶ Full demo</a>
         </div>
 
       </div>
@@ -494,12 +563,243 @@ document.querySelectorAll("[data-t]").forEach(btn => {
   const io = new IntersectionObserver(entries => {
     entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
   }, { threshold:.08, rootMargin:"0px 0px -4% 0px" });
-  els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*60,240)}ms`; io.observe(el); });
+  els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*40,200)}ms`; io.observe(el); });
 })();
 
 /* ── FOOTER YEAR ── */
 const yrEl = document.getElementById("yr");
 if (yrEl) yrEl.textContent = new Date().getFullYear();
+
+/* ── LIVE DEMO LOOP ── */
+(function(){
+  const pFill    = document.getElementById("pFill");
+  const termTxt  = document.getElementById("termTxt");
+  const demoSt   = document.getElementById("demoState");
+  const terminal = document.getElementById("demoTerminal");
+  const qWrap    = document.getElementById("demoQWrap");
+  if (!pFill || !termTxt || !terminal || !qWrap) return;
+
+  /* reduced motion: static end state */
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    demoSt.textContent = "Rättning klar ✓";
+    demoSt.style.color = "var(--a)";
+    pFill.style.width = "100%";
+    termTxt.textContent = "$ resultat: 4/5p (80%) — sparat";
+    return;
+  }
+
+  const cur = document.createElement("span");
+  cur.className = "termCursor";
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  function setBar(pct, dur = 350) {
+    pFill.style.transition = `width ${dur}ms cubic-bezier(.2,.8,.2,1)`;
+    pFill.style.width = pct + "%";
+  }
+
+  async function typeLines(lines, dpc) {
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li];
+      const prefix = lines.slice(0, li).join("\n") + (li > 0 ? "\n" : "");
+      for (let ci = 0; ci <= line.length; ci++) {
+        termTxt.textContent = prefix + line.slice(0, ci);
+        termTxt.appendChild(cur);
+        await sleep(dpc);
+      }
+      if (li < lines.length - 1) await sleep(160);
+    }
+  }
+
+  function showTerm(yes) {
+    terminal.style.display = yes ? "block" : "none";
+    qWrap.style.display    = yes ? "none"  : "block";
+  }
+
+  async function runOnce() {
+    /* reset */
+    demoSt.textContent = "Skapar prov…";
+    demoSt.style.color = "";
+    pFill.style.transition = "none";
+    pFill.style.width = "0%";
+    termTxt.textContent = "";
+    qWrap.innerHTML = "";
+    showTerm(true);
+    await sleep(20);
+
+    /* STEG 1 — terminal */
+    setBar(40, 1200);
+    await typeLines([
+      "$ material: Biologi — Cellens delar",
+      "$ nivå: C  |  2 frågor  |  mix",
+      "$ genererar…  ██████ 100%"
+    ], 12);
+    await sleep(200);
+
+    /* STEG 2 — flervalsfråga */
+    showTerm(false);
+    qWrap.innerHTML = `
+      <div class="demoQ">
+        <div class="demoQMeta">Fråga 1 / 2 · Flerval · 2p</div>
+        <div class="demoQText">Vad kallas den del av cellen som styr cellens aktiviteter och innehåller DNA?</div>
+        <div class="demoOpts">
+          <div class="demoOpt">A&nbsp; Cellmembran</div>
+          <div class="demoOpt">B&nbsp; Mitokondrie</div>
+          <div class="demoOpt" id="dOptC">C&nbsp; Cellkärna</div>
+          <div class="demoOpt">D&nbsp; Ribosom</div>
+        </div>
+      </div>`;
+    await sleep(800);
+    setBar(60, 300);
+
+    const optC = document.getElementById("dOptC");
+    if (optC) {
+      optC.style.transition = "transform .06s ease, border-color .12s, background .12s";
+      optC.style.transform = "scale(.98)";
+      await sleep(80);
+      optC.style.transform = "scale(1)";
+      await sleep(60);
+      optC.classList.add("demoOptSel");
+    }
+    await sleep(1000);
+
+    /* STEG 3 — kortsvar */
+    qWrap.innerHTML = `
+      <div class="demoQ">
+        <div class="demoQMeta">Fråga 2 / 2 · Kortsvar · 3p</div>
+        <div class="demoQText">Förklara mitokondriernas funktion i cellen.</div>
+        <div class="demoAns" id="dAnsF"></div>
+      </div>`;
+
+    const ansF = document.getElementById("dAnsF");
+    const ansText = "Mitokondrierna producerar energi (ATP) genom cellandning.";
+    const ansCur = document.createElement("span");
+    ansCur.className = "termCursor";
+    ansCur.style.cssText = "background:var(--t2);width:1px;height:11px";
+    for (let i = 0; i <= ansText.length; i++) {
+      ansF.textContent = ansText.slice(0, i);
+      ansF.appendChild(ansCur);
+      await sleep(14);
+    }
+    ansCur.remove();
+    setBar(80, 300);
+    await sleep(400);
+
+    /* STEG 4 — rättning */
+    showTerm(true);
+    termTxt.textContent = "";
+    setBar(100, 800);
+    await typeLines([
+      "$ rättar svar 1…  ✓ 2/2p — korrekt",
+      "$ rättar svar 2…  ◐ 2/3p — nästan rätt",
+      "$ feedback: Nämn även ATP-syntesen",
+      "$ resultat: 4/5p (80%) — sparat"
+    ], 11);
+
+    demoSt.textContent = "Rättning klar ✓";
+    demoSt.style.color = "var(--a)";
+    await sleep(2000);
+
+    /* fade reset */
+    terminal.style.transition = "opacity .15s ease";
+    terminal.style.opacity = "0";
+    await sleep(160);
+    terminal.style.opacity = "1";
+    terminal.style.transition = "";
+  }
+
+  async function loop() { while (true) { await runOnce(); } }
+  setTimeout(loop, 600);
+})();
+</script>
+
+<!-- CUSTOM CURSOR -->
+<div id="cursorDot" aria-hidden="true"></div>
+<div id="cursorRing" aria-hidden="true"><div></div></div>
+<div id="cursorLabel" aria-hidden="true"></div>
+
+<script>
+/* ── CUSTOM CURSOR ── */
+(function(){
+  /* touch / coarse pointer — skip */
+  if (window.matchMedia("(pointer: coarse)").matches || ("ontouchstart" in window)) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const dot  = document.getElementById("cursorDot");
+  const ring = document.getElementById("cursorRing");
+  const lbl  = document.getElementById("cursorLabel");
+  if (!dot || !ring) return;
+
+  let mx = -200, my = -200;
+  let rx = -200, ry = -200;
+  let visible = false;
+
+  /* lerp ring via rAF */
+  (function raf() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    ring.style.transform = `translate(${rx - 14}px,${ry - 14}px)`;
+    requestAnimationFrame(raf);
+  })();
+
+  const HOVER = "a,button,[data-t],input,select,label,.btn";
+  let lastEl = null;
+
+  function applyHover(el) {
+    if (el === lastEl) return;
+    lastEl = el;
+    if (el) {
+      ring.classList.add("rHov");
+      dot.style.transform = `translate(${mx - 3}px,${my - 3}px) scale(.5)`;
+      if (lbl) {
+        const isBtnP = el.matches(".btnP");
+        const isPricing = el.matches('[href="pricing.html"]') || el.closest('[href="pricing.html"]');
+        const isSec = el.matches("[data-t]") || el.closest("[data-t]");
+        const txt = isBtnP ? "Starta →" : isPricing ? "Se priser" : isSec ? "Öppna" : "";
+        lbl.textContent = txt;
+        lbl.style.opacity = txt ? "1" : "0";
+      }
+    } else {
+      ring.classList.remove("rHov");
+      dot.style.transform = `translate(${mx - 3}px,${my - 3}px)`;
+      if (lbl) lbl.style.opacity = "0";
+    }
+  }
+
+  document.addEventListener("mousemove", e => {
+    mx = e.clientX; my = e.clientY;
+    if (!visible) {
+      visible = true;
+      dot.style.opacity = "1";
+      ring.style.opacity = "1";
+    }
+    dot.style.transform = `translate(${mx - 3}px,${my - 3}px)${lastEl ? " scale(.5)" : ""}`;
+    if (lbl) { lbl.style.left = (mx + 14) + "px"; lbl.style.top = (my + 8) + "px"; }
+    applyHover(e.target?.closest ? e.target.closest(HOVER) : null);
+  });
+
+  document.addEventListener("mousedown", () => {
+    ring.classList.remove("rHov");
+    ring.classList.add("rDown");
+    dot.style.transform = `translate(${mx - 3}px,${my - 3}px) scale(1.5)`;
+    if (lbl) lbl.style.opacity = "0";
+  });
+
+  document.addEventListener("mouseup", () => {
+    ring.classList.remove("rDown");
+    applyHover(lastEl); /* restore hover state */
+  });
+
+  document.addEventListener("mouseleave", () => {
+    dot.style.opacity = "0"; ring.style.opacity = "0";
+    if (lbl) lbl.style.opacity = "0";
+    visible = false;
+  });
+
+  document.addEventListener("mouseenter", () => {
+    if (visible) { dot.style.opacity = "1"; ring.style.opacity = "1"; }
+  });
+})();
 </script>
 </body>
 </html>
