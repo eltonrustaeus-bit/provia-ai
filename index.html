@@ -49,68 +49,49 @@
   .hActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
   .hBadges{display:flex;gap:6px;flex-wrap:wrap}
 
-  /* RIGHT — LIVE DEMO CARD */
-  .demoCard{
+  /* RIGHT — DEMO CTA */
+  .demoCta{
     background:var(--s);border:1px solid var(--l2);
-    border-radius:8px;padding:16px;
+    border-radius:12px;padding:32px 28px;
     box-shadow:var(--sh2);
     position:relative;overflow:hidden;
+    display:flex;flex-direction:column;align-items:flex-start;gap:14px;
   }
-  .demoCard::before{
-    content:"";position:absolute;top:-50px;right:-50px;
-    width:160px;height:160px;border-radius:50%;
-    background:radial-gradient(circle,rgba(27,255,140,.10),transparent 65%);
-    pointer-events:none;
+  .demoCtaGlow{
+    position:absolute;top:-60px;right:-60px;
+    width:200px;height:200px;border-radius:50%;
+    background:radial-gradient(circle,rgba(27,255,140,.13),transparent 65%);
+    pointer-events:none;animation:pulse 3s ease-in-out infinite;
   }
-  .demoCard::after{
-    content:"";position:absolute;inset:0 auto 0 -50%;width:40%;
-    background:linear-gradient(100deg,transparent,rgba(27,255,140,.04),transparent);
-    animation:shim 5s ease-in-out infinite;pointer-events:none;
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.15);opacity:1}}
+  .demoCtaTag{
+    font-family:var(--mono);font-size:10px;font-weight:500;
+    color:var(--a);letter-spacing:.1em;text-transform:uppercase;
+    border:1px solid rgba(27,255,140,.3);border-radius:20px;
+    padding:4px 11px;background:rgba(27,255,140,.07);
   }
-  @keyframes shim{0%,65%,100%{transform:translateX(0)}35%{transform:translateX(580%)}}
-
-  .demoHead{
-    display:flex;align-items:center;justify-content:space-between;
-    margin-bottom:10px;
+  .demoCtaTitle{
+    font-weight:700;font-size:clamp(20px,2.4vw,26px);color:var(--t);
+    letter-spacing:-.03em;line-height:1.15;
   }
-  .demoHeadTitle{font-weight:600;font-size:12.5px;color:var(--t)}
-  .demoBadge{
-    font-family:var(--mono);font-size:9px;font-weight:500;
-    color:var(--a);letter-spacing:.07em;
-    border:1px solid var(--l2);border-radius:var(--r2);padding:2px 7px;
-    animation:glow 2s ease-in-out infinite;
+  .demoCtaSub{
+    font-size:13.5px;color:var(--t2);line-height:1.65;max-width:38ch;
   }
-  @keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(27,255,140,0)}50%{box-shadow:0 0 0 5px rgba(27,255,140,.1)}}
-
-  .pBar{height:2px;border-radius:999px;background:var(--s3);overflow:hidden;margin-bottom:12px}
-  .pFill{height:100%;width:0%;background:var(--a);transition:width .35s cubic-bezier(.2,.8,.2,1)}
-
-  .terminal{
-    background:var(--bg);border:1px solid var(--l);border-radius:var(--r2);
-    padding:10px 12px;margin-bottom:12px;
+  .demoCtaBtn{
+    height:44px;padding:0 28px;font-size:14.5px;font-weight:600;
+    letter-spacing:-.01em;
+    box-shadow:0 0 0 0 rgba(27,255,140,.4);
+    transition:box-shadow .25s ease,transform .15s ease;
   }
-  .termBar{display:flex;gap:4px;align-items:center;margin-bottom:8px}
-  .termDot{width:6px;height:6px;border-radius:50%}
-  .termTxt{
-    font-family:var(--mono);font-size:10.5px;line-height:1.55;
-    color:var(--t2);white-space:pre-wrap;min-height:48px;
+  .demoCtaBtn:hover{
+    box-shadow:0 0 22px 4px rgba(27,255,140,.22);
+    transform:translateY(-1px);
   }
-  .termCursor{
-    display:inline-block;width:1px;height:11px;background:var(--a);
-    margin-left:1px;vertical-align:middle;
-    animation:blink .9s step-end infinite;
+  .demoCtaSteps{
+    display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+    font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:4px;
   }
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-
-  .statGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .statBox{
-    background:var(--s2);border:1px solid var(--l);
-    border-radius:var(--r2);padding:9px 10px;
-  }
-  .statLabel{font-family:var(--mono);font-size:9px;font-weight:500;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
-  .statVal{font-weight:600;font-size:13px;color:var(--t);line-height:1.2}
-  .statSub{font-family:var(--mono);font-size:9.5px;color:var(--t2);margin-top:2px}
-  .miniGraph{width:100%;height:30px;display:block;margin-top:4px}
+  .demoCtaArrow{color:var(--a);opacity:.6}
 
   /* ═══════════════════════════
      BELOW HERO — sections
@@ -233,31 +214,6 @@
     }
   }
 
-  /* ── DEMO Q ELEMENTS ── */
-  .demoQ { animation:fadeSlideIn .2s ease both }
-  @keyframes fadeSlideIn {
-    from { opacity:0;transform:translateY(6px) }
-    to   { opacity:1;transform:translateY(0) }
-  }
-  .demoQMeta {
-    font-family:var(--mono);font-size:9.5px;color:var(--t3);
-    letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;
-  }
-  .demoQText {
-    font-size:12.5px;font-weight:600;color:var(--t);line-height:1.5;margin-bottom:10px;
-  }
-  .demoOpts { display:grid;gap:5px }
-  .demoOpt {
-    font-family:var(--mono);font-size:11px;color:var(--t2);
-    padding:6px 10px;border:1px solid var(--l);border-radius:var(--r2);
-    background:var(--s2);transition:all .12s ease;
-  }
-  .demoOptSel { border-color:var(--a);background:rgba(27,255,140,.08);color:var(--t) }
-  .demoAns {
-    font-family:var(--mono);font-size:11px;color:var(--t2);line-height:1.6;
-    padding:8px 10px;border:1px solid var(--l);border-radius:var(--r2);
-    background:var(--s2);min-height:38px;
-  }
 
   /* ── ANIMATION POLISH ── */
   .btn { will-change:transform }
@@ -346,35 +302,23 @@
       </div>
     </div>
 
-    <!-- RIGHT: demo preview -->
+    <!-- RIGHT: demo CTA -->
     <div class="heroRight rev" style="transition-delay:.1s">
-      <div class="demoCard">
-
-        <div class="demoHead">
-          <span class="demoHeadTitle">ProviaAI — live demo</span>
-          <span class="demoBadge" id="demoState">Skapar prov…</span>
+      <div class="demoCta">
+        <div class="demoCtaGlow"></div>
+        <div class="demoCtaTag">Live-simulation</div>
+        <div class="demoCtaTitle">Se ProviaAI i aktion</div>
+        <div class="demoCtaSub">Följ Vilgot R genom ett helt provpass — material, mockprov, rättning och AI-coach.</div>
+        <a class="btn btnP demoCtaBtn" href="live-demo.html">Visa ProviaAI</a>
+        <div class="demoCtaSteps">
+          <span>📄 Material</span>
+          <span class="demoCtaArrow">→</span>
+          <span>📝 Prov</span>
+          <span class="demoCtaArrow">→</span>
+          <span>✓ Rättning</span>
+          <span class="demoCtaArrow">→</span>
+          <span>🤖 Coach</span>
         </div>
-
-        <div class="pBar"><div class="pFill" id="pFill"></div></div>
-
-        <!-- terminal (steg 1 + steg 4) -->
-        <div class="terminal" id="demoTerminal">
-          <div class="termBar">
-            <div class="termDot" style="background:#ff5f57"></div>
-            <div class="termDot" style="background:#febc2e"></div>
-            <div class="termDot" style="background:#28c840"></div>
-          </div>
-          <div class="termTxt" id="termTxt"><span class="termCursor"></span></div>
-        </div>
-
-        <!-- fråge-container (steg 2 + steg 3) -->
-        <div id="demoQWrap" style="display:none;min-height:148px"></div>
-
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <a class="btn btnP" href="app.html" style="flex:1;height:36px;font-size:13px">Prova nu →</a>
-          <a class="btn" href="live-demo.html" style="height:36px;padding:0 12px;font-size:13px">▶ Full demo</a>
-        </div>
-
       </div>
     </div>
   </section>
@@ -570,147 +514,6 @@ document.querySelectorAll("[data-t]").forEach(btn => {
 const yrEl = document.getElementById("yr");
 if (yrEl) yrEl.textContent = new Date().getFullYear();
 
-/* ── LIVE DEMO LOOP ── */
-(function(){
-  const pFill    = document.getElementById("pFill");
-  const termTxt  = document.getElementById("termTxt");
-  const demoSt   = document.getElementById("demoState");
-  const terminal = document.getElementById("demoTerminal");
-  const qWrap    = document.getElementById("demoQWrap");
-  if (!pFill || !termTxt || !terminal || !qWrap) return;
-
-  /* reduced motion: static end state */
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    demoSt.textContent = "Rättning klar ✓";
-    demoSt.style.color = "var(--a)";
-    pFill.style.width = "100%";
-    termTxt.textContent = "$ resultat: 4/5p (80%) — sparat";
-    return;
-  }
-
-  const cur = document.createElement("span");
-  cur.className = "termCursor";
-
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-  function setBar(pct, dur = 350) {
-    pFill.style.transition = `width ${dur}ms cubic-bezier(.2,.8,.2,1)`;
-    pFill.style.width = pct + "%";
-  }
-
-  async function typeLines(lines, dpc) {
-    for (let li = 0; li < lines.length; li++) {
-      const line = lines[li];
-      const prefix = lines.slice(0, li).join("\n") + (li > 0 ? "\n" : "");
-      for (let ci = 0; ci <= line.length; ci++) {
-        termTxt.textContent = prefix + line.slice(0, ci);
-        termTxt.appendChild(cur);
-        await sleep(dpc);
-      }
-      if (li < lines.length - 1) await sleep(160);
-    }
-  }
-
-  function showTerm(yes) {
-    terminal.style.display = yes ? "block" : "none";
-    qWrap.style.display    = yes ? "none"  : "block";
-  }
-
-  async function runOnce() {
-    /* reset */
-    demoSt.textContent = "Skapar prov…";
-    demoSt.style.color = "";
-    pFill.style.transition = "none";
-    pFill.style.width = "0%";
-    termTxt.textContent = "";
-    qWrap.innerHTML = "";
-    showTerm(true);
-    await sleep(20);
-
-    /* STEG 1 — terminal */
-    setBar(40, 1200);
-    await typeLines([
-      "$ material: Biologi — Cellens delar",
-      "$ nivå: C  |  2 frågor  |  mix",
-      "$ genererar…  ██████ 100%"
-    ], 12);
-    await sleep(200);
-
-    /* STEG 2 — flervalsfråga */
-    showTerm(false);
-    qWrap.innerHTML = `
-      <div class="demoQ">
-        <div class="demoQMeta">Fråga 1 / 2 · Flerval · 2p</div>
-        <div class="demoQText">Vad kallas den del av cellen som styr cellens aktiviteter och innehåller DNA?</div>
-        <div class="demoOpts">
-          <div class="demoOpt">A&nbsp; Cellmembran</div>
-          <div class="demoOpt">B&nbsp; Mitokondrie</div>
-          <div class="demoOpt" id="dOptC">C&nbsp; Cellkärna</div>
-          <div class="demoOpt">D&nbsp; Ribosom</div>
-        </div>
-      </div>`;
-    await sleep(800);
-    setBar(60, 300);
-
-    const optC = document.getElementById("dOptC");
-    if (optC) {
-      optC.style.transition = "transform .06s ease, border-color .12s, background .12s";
-      optC.style.transform = "scale(.98)";
-      await sleep(80);
-      optC.style.transform = "scale(1)";
-      await sleep(60);
-      optC.classList.add("demoOptSel");
-    }
-    await sleep(1000);
-
-    /* STEG 3 — kortsvar */
-    qWrap.innerHTML = `
-      <div class="demoQ">
-        <div class="demoQMeta">Fråga 2 / 2 · Kortsvar · 3p</div>
-        <div class="demoQText">Förklara mitokondriernas funktion i cellen.</div>
-        <div class="demoAns" id="dAnsF"></div>
-      </div>`;
-
-    const ansF = document.getElementById("dAnsF");
-    const ansText = "Mitokondrierna producerar energi (ATP) genom cellandning.";
-    const ansCur = document.createElement("span");
-    ansCur.className = "termCursor";
-    ansCur.style.cssText = "background:var(--t2);width:1px;height:11px";
-    for (let i = 0; i <= ansText.length; i++) {
-      ansF.textContent = ansText.slice(0, i);
-      ansF.appendChild(ansCur);
-      await sleep(14);
-    }
-    ansCur.remove();
-    setBar(80, 300);
-    await sleep(400);
-
-    /* STEG 4 — rättning */
-    showTerm(true);
-    termTxt.textContent = "";
-    setBar(100, 800);
-    await typeLines([
-      "$ rättar svar 1…  ✓ 2/2p — korrekt",
-      "$ rättar svar 2…  ◐ 2/3p — nästan rätt",
-      "$ feedback: Nämn även ATP-syntesen",
-      "$ resultat: 4/5p (80%) — sparat"
-    ], 11);
-
-    demoSt.textContent = "Rättning klar ✓";
-    demoSt.style.color = "var(--a)";
-    await sleep(2000);
-
-    /* fade reset */
-    terminal.style.transition = "opacity .15s ease";
-    terminal.style.opacity = "0";
-    await sleep(160);
-    terminal.style.opacity = "1";
-    terminal.style.transition = "";
-  }
-
-  async function loop() { while (true) { await runOnce(); } }
-  setTimeout(loop, 600);
-})();
 </script>
 
 <!-- CUSTOM CURSOR -->

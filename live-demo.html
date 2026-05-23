@@ -85,6 +85,13 @@
     .aBtn.ok{border-color:#1bff8c;background:rgba(27,255,140,.09);color:#1bff8c}
     .aBtn.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b}
 
+    /* ── WRITTEN ANSWER FIELD ── */
+    .aTextField{min-height:46px;border:1px solid var(--l);border-radius:var(--r);padding:10px 14px;font:500 14px/1.5 var(--mono);color:var(--t2);background:var(--bg);display:flex;align-items:center;transition:border-color .2s}
+    .aTextField.active{border-color:var(--a)}
+    .aTextField.bad{border-color:#ff6b6b;background:rgba(255,107,107,.06);color:#ff6b6b}
+    .aFieldCursor{display:inline-block;width:2px;height:16px;background:var(--a);margin-left:2px;animation:blink 1s step-end infinite}
+    .aTextField.bad .aFieldCursor{display:none}
+
     /* ── GRADING ── */
     .gradOv{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:16px}
     .gradSpin{width:44px;height:44px;border:3px solid var(--l);border-top-color:var(--a);border-radius:50%;animation:spin .75s linear infinite;margin:0 auto 14px}
@@ -218,31 +225,22 @@
     #gcBody{transition:transform .15s}
 
     /* ════════════════════════════════════════
-       DEMO TIP (speaker bubble)
+       DEMO TIP (bottom strip)
     ════════════════════════════════════════ */
     #demoTip{
-      position:fixed;z-index:9998;
-      pointer-events:none;
-      opacity:0;
-      transition:opacity .3s;
-      max-width:260px;
+      position:fixed;bottom:0;left:0;right:0;
+      z-index:9998;pointer-events:none;
+      padding:13px 32px;
+      background:rgba(17,26,21,.97);
+      border-top:1px solid var(--l2);
+      font:400 13px/1.5 var(--font);color:var(--t2);
+      transform:translateY(100%);
+      transition:transform .35s cubic-bezier(.4,0,.2,1);
+      display:flex;align-items:center;gap:10px;
     }
-    #demoTip.vis{opacity:1}
-    .tipBubble{
-      background:var(--s);border:1px solid var(--l2);
-      border-radius:10px;padding:10px 14px;
-      box-shadow:var(--sh2);
-      font:400 12px/1.5 var(--font);color:var(--t2);
-    }
-    .tipBubble strong{color:var(--a);font-weight:600}
-    /* small arrow pointing left toward cursor */
-    .tipArrow{
-      width:0;height:0;
-      border-top:6px solid transparent;
-      border-bottom:6px solid transparent;
-      border-right:8px solid var(--l2);
-      position:absolute;left:-8px;top:14px;
-    }
+    #demoTip.vis{transform:translateY(0)}
+    #demoTip strong{color:var(--a);font-weight:600}
+    #tipIcon{font-size:15px;flex-shrink:0;opacity:.7}
 
     /* ════════════════════════════════════════
        HIGHLIGHT RING (on target elements)
@@ -442,12 +440,12 @@
     <div class="gradOv" id="gradOv" style="display:none">
       <div class="gradSpin"></div>
       <div class="gradLbl">Rättar prov…</div>
-      <div class="gradSt" id="gradSt">Analyserar svar 1 av 5…</div>
+      <div class="gradSt" id="gradSt">Analyserar svar 1 av 2…</div>
     </div>
 
     <div class="scoreBox" id="scoreBox" style="display:none">
-      <div class="scoreBig">4/5</div>
-      <div class="scoreLbl">80% rätt · Betyg C · Matematik C</div>
+      <div class="scoreBig">75%</div>
+      <div class="scoreLbl">1.5 / 2 p · Betyg C · Matematik C</div>
       <div class="scoreBar"><div class="scoreBarF" id="scoreF"></div></div>
       <div class="btnRow">
         <button class="btn btnP" onclick="document.getElementById('feedWrap').scrollIntoView({behavior:'smooth'})">Visa detaljerad feedback →</button>
@@ -489,7 +487,7 @@
           <tbody>
             <tr><td>2026-05-10</td><td>Matematik C</td><td style="text-align:right">3/5 · 60%</td></tr>
             <tr><td>2026-05-17</td><td>Matematik C</td><td style="text-align:right">4/5 · 70%</td></tr>
-            <tr><td>2026-05-23</td><td>Matematik C</td><td style="text-align:right" class="acc">4/5 · 80% ← idag</td></tr>
+            <tr><td>2026-05-23</td><td>Matematik C</td><td style="text-align:right" class="acc">1.5/2 · 75% ← idag</td></tr>
           </tbody>
         </table>
         <div class="chartWrap2">
@@ -515,7 +513,7 @@
           <div class="coachTxt" id="coachTxt"></div>
         </div>
         <div class="statRow">
-          <div class="statBox"><div class="statLbl">Senaste</div><div class="statVal" style="color:var(--a)">80%</div></div>
+          <div class="statBox"><div class="statLbl">Senaste</div><div class="statVal" style="color:var(--a)">75%</div></div>
           <div class="statBox"><div class="statLbl">Trend</div><div class="statVal" style="color:var(--a)">+20 p.p.</div></div>
           <div class="statBox"><div class="statLbl">Fokus</div><div class="statVal" style="font-size:16px">Faktorer</div></div>
         </div>
@@ -631,12 +629,10 @@
   </div>
 </div>
 
-<!-- DEMO TIP -->
+<!-- DEMO TIP (bottom strip) -->
 <div id="demoTip">
-  <div class="tipBubble">
-    <div class="tipArrow"></div>
-    <span id="tipText"></span>
-  </div>
+  <span id="tipIcon">💡</span>
+  <span id="tipText"></span>
 </div>
 
 <!-- PAUSE OVERLAY -->
@@ -652,57 +648,27 @@
 /* ═══════════════════════════════════════════════
    DEMO DATA
 ═══════════════════════════════════════════════ */
-const MAT = `Andragradsekvationer — Matematik C
+const MAT = `ax² + bx + c = 0
 
-En andragradsekvation har formen ax² + bx + c = 0 (a ≠ 0).
+Faktorisering:
+  x² − 5x + 6 = (x−2)(x−3)
+  → x = 2 eller x = 3
 
-FAKTORISERING
-Om ekvationen kan skrivas som (x − r₁)(x − r₂) = 0
-ger nollproduktregeln: x = r₁ eller x = r₂.
-
-Exempel: x² − 5x + 6 = 0
-  Sök tal vars produkt är 6 och summa är −5 → −2 och −3
-  (x − 2)(x − 3) = 0  →  x = 2 eller x = 3 ✓
-
-PQ-FORMELN
-x² + px + q = 0  →  x = −p/2 ± √((p/2)² − q)
-
-Diskriminant D = (p/2)² − q:
-  D > 0 → två reella rötter
-  D = 0 → en dubbelrot
-  D < 0 → inga reella lösningar
-
-KVADRATKOMPLETTERING
-x² + bx + c = 0
-  (x + b/2)² = (b/2)² − c
-  x = −b/2 ± √((b/2)² − c)
-
-VIKTIGT: Ange alltid ALLA lösningar. Kontrollräkna.`;
+pq-formeln: x = −p/2 ± √((p/2)²−q)`;
 
 const QS = [
   { t:'Vilken är standardformen för en andragradsekvation?',
     opts:['ax² + bx + c = 0','ax + b = 0','ax³ + bx² = 0','a/x + b = 0'], ok:0, demo:0 },
-  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.', math:true,
-    opts:['x = 2 och x = 3','x = 2','x = −2 och x = −3','x = 5'], ok:0, demo:1 },
-  { t:'Hur många reella rötter har ekvationen x² + 4 = 0?',
-    opts:['Inga reella rötter','En dubbelrot','Två distinkta rötter','Oändligt många'], ok:0, demo:0 },
-  { t:'Korrekt tillämpning av pq-formeln för x² − 6x + 8 = 0?',
-    opts:['x = 3 ± √1, alltså x = 2 och x = 4','x = 6 ± √28','x = −3 ± 1','x = 0 eller x = 6'], ok:0, demo:0 },
-  { t:'Diskriminanten D för x² − 4x + 3 = 0 är:',
-    opts:['D = 1','D = −1','D = 4','D = 7'], ok:0, demo:0 },
+  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.',
+    math:true, mathTex:'x² − 5x + 6 = 0',
+    type:'written', answer:'x = 2 och x = 3', demoAnswer:'x = 2' },
 ];
 
 const FEED = [
   { q:'Standardform för andragradsekvation?', ico:'✓', ok:true,  r:'Rätt — 1/1 p',
     m:'ax² + bx + c = 0 är korrekt standardform.' },
-  { q:'Lös x² − 5x + 6 = 0',               ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
-    m:'x = 2 stämmer, men x = 3 saknas. Faktorisering: (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
-  { q:'Hur många rötter har x² + 4 = 0?',   ico:'✓', ok:true,  r:'Rätt — 1/1 p',
-    m:'D = −4 < 0, alltså inga reella rötter.' },
-  { q:'pq-formeln för x² − 6x + 8 = 0',    ico:'✓', ok:true,  r:'Rätt — 1/1 p',
-    m:'x = 3 ± √(9−8) = 3 ± 1, alltså x = 2 och x = 4.' },
-  { q:'Diskriminanten för x² − 4x + 3 = 0', ico:'✓', ok:true,  r:'Rätt — 1/1 p',
-    m:'D = (4/2)² − 3 = 4 − 3 = 1. Korrekt.' },
+  { q:'Lös x² − 5x + 6 = 0 — ange alla lösningar', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
+    m:'x = 2 stämmer, men x = 3 saknas. (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
 ];
 
 const COACH = `Hej Vilgot!
@@ -871,28 +837,27 @@ const cursor = {
 let tipTimer = null;
 
 async function showTip(html, durationMs = 4500){
-  const tip = $('demoTip');
-  const txt = $('tipText');
+  const tip = $('demoTip'), txt = $('tipText');
   if(!tip || !txt) return;
-
-  // Position tip to the right of cursor (avoid right edge)
-  const margin = 30;
-  const tipW = 270;
-  let tx = cursor.cx + margin;
-  let ty = cursor.cy - 20;
-  if(tx + tipW > window.innerWidth - 16) tx = cursor.cx - tipW - margin;
-  if(ty < 60) ty = 60;
-
   txt.innerHTML = html;
-  tip.style.left = tx + 'px';
-  tip.style.top  = ty + 'px';
   tip.classList.add('vis');
-
   clearTimeout(tipTimer);
   tipTimer = setTimeout(() => tip.classList.remove('vis'), durationMs);
 }
 
 function hideTip(){ $('demoTip')?.classList.remove('vis'); }
+
+async function typeIntoField(fieldId, text, speed = 48){
+  const field = $(fieldId);
+  if(!field) return;
+  field.classList.add('active');
+  let typed = '';
+  for(const ch of text){
+    typed += ch;
+    field.innerHTML = `<span>${typed}</span><span class="aFieldCursor"></span>`;
+    await wait(speed);
+  }
+}
 
 /* ═══════════════════════════════════════════════
    ACT TRIGGERS
@@ -920,8 +885,8 @@ async function triggerA2(){
   await wait(300);
   const sets = [
     {id:'scn',vid:'svn',v:'C'},
-    {id:'sct',vid:'svt',v:'Flerval'},
-    {id:'sca',vid:'sva',v:'5 frågor'},
+    {id:'sct',vid:'svt',v:'Mix'},
+    {id:'sca',vid:'sva',v:'2 frågor'},
   ];
   for(const s of sets){
     await wait(600);
@@ -947,11 +912,17 @@ async function triggerA3(){
   QS.forEach((q,i)=>{
     const card=document.createElement('div');
     card.className='qCard'; card.id='qc'+i;
-    const mathLine=q.math?`<div class="qMath">x² − 5x + 6 = 0</div>`:'';
-    const opts=q.opts.map((o,j)=>
-      `<button class="aBtn" id="ab${i}_${j}" onclick="selAns(${i},${j})">${'ABCD'[j]}. ${o}</button>`
-    ).join('');
-    card.innerHTML=`<div class="qN">Fråga ${i+1} / ${QS.length}</div><div class="qT">${q.t}</div>${mathLine}<div class="aGrid">${opts}</div>`;
+    const mathLine=q.math?`<div class="qMath">${q.mathTex||''}</div>`:'';
+    let ansHtml;
+    if(q.type==='written'){
+      ansHtml=`<div class="aTextField" id="ansField${i}"><span class="aFieldCursor"></span></div>`;
+    } else {
+      const opts=q.opts.map((o,j)=>
+        `<button class="aBtn" id="ab${i}_${j}" onclick="selAns(${i},${j})">${'ABCD'[j]}. ${o}</button>`
+      ).join('');
+      ansHtml=`<div class="aGrid">${opts}</div>`;
+    }
+    card.innerHTML=`<div class="qN">Fråga ${i+1} / ${QS.length}</div><div class="qT">${q.t}</div>${mathLine}${ansHtml}`;
     ql.appendChild(card);
   });
   skel.style.display='none';
@@ -969,12 +940,17 @@ function selAns(qi,oi){
 
 function markAnswers(){
   QS.forEach((q,i)=>{
-    for(let j=0;j<q.opts.length;j++){
-      const b=$(`ab${i}_${j}`);
-      if(!b) continue;
-      b.classList.remove('sel');
-      if(j===q.ok) b.classList.add('ok');
-      if(j===q.demo&&j!==q.ok) b.classList.add('bad');
+    if(q.type==='written'){
+      const field=$('ansField'+i);
+      if(field) field.classList.add('bad');
+    } else {
+      for(let j=0;j<q.opts.length;j++){
+        const b=$(`ab${i}_${j}`);
+        if(!b) continue;
+        b.classList.remove('sel');
+        if(j===q.ok) b.classList.add('ok');
+        if(j===q.demo&&j!==q.ok) b.classList.add('bad');
+      }
     }
   });
 }
@@ -984,13 +960,13 @@ async function triggerAct4(){
   wDone(3); wOn(4);
   const ov=$('gradOv'),st=$('gradSt');
   if(ov) ov.style.display='block';
-  const steps=['Analyserar svar 1 av 5…','Analyserar svar 2 av 5…','Analyserar svar 3 av 5…',
-    'Analyserar svar 4 av 5…','Analyserar svar 5 av 5…','Beräknar totalpoäng…','Genererar feedback…'];
+  const steps=['Analyserar svar 1 av 2…','Analyserar svar 2 av 2…',
+    'Beräknar totalpoäng…','Genererar feedback…'];
   for(const s of steps){if(st) st.textContent=s; await wait(700);}
   if(ov) ov.style.display='none';
   const sb=$('scoreBox'); if(sb) sb.style.display='block';
   await wait(300);
-  const sf=$('scoreF'); if(sf) sf.style.width='80%';
+  const sf=$('scoreF'); if(sf) sf.style.width='75%';
   markAnswers();
   await wait(900);
   const fg=$('feedGrid');
@@ -1068,14 +1044,14 @@ async function startAuto(){
   await showTip('Välj frågetyp — flerval, kortsvar eller blandning', 4000);
   await cursor.highlight($('sct'));
   await cursor.click($('sct'));
-  $('svt').textContent='Flerval';
+  $('svt').textContent='Mix';
   $('sct').classList.add('flash'); await wait(400); $('sct').classList.remove('flash');
   await wait(1200);
 
   await showTip('Antal frågor — du väljer själv hur långt provet ska vara', 4000);
   await cursor.highlight($('sca'));
   await cursor.click($('sca'));
-  $('sva').textContent='5 frågor';
+  $('sva').textContent='2 frågor';
   $('sca').classList.add('flash'); await wait(400); $('sca').classList.remove('flash');
   await wait(1400);
 
@@ -1102,20 +1078,27 @@ async function startAuto(){
   await showTip('Eleven besvarar frågorna direkt i appen', 4000);
 
   for(let i=0;i<QS.length;i++){
-    const btnEl=$(`ab${i}_${QS[i].demo}`);
-    if(!btnEl) continue;
-
-    if(i===1){
-      await showTip('<strong>Observera:</strong> eleven svarar bara "x = 2" — missar den andra roten. AI:n fångar upp det.', 6000);
+    const q=QS[i];
+    if(q.type==='written'){
+      await showTip('<strong>Observera:</strong> eleven skriver bara "x = 2" — missar den andra roten. AI:n fångar upp det.', 6000);
+      const field=$('ansField'+i);
+      if(field){
+        await cursor.moveTo(field, 0, 0);
+        await wait(400);
+        await cursor.highlight(field);
+        await typeIntoField('ansField'+i, q.demoAnswer);
+      }
+      await wait(1500);
     } else {
+      const btnEl=$(`ab${i}_${q.demo}`);
+      if(!btnEl) continue;
       await wait(400);
+      await cursor.moveTo(btnEl, -8, 0);
+      await wait(400);
+      await cursor.click(btnEl);
+      selAns(i, q.demo);
+      await wait(1200);
     }
-
-    await cursor.moveTo(btnEl, -8, 0);
-    await wait(400);
-    await cursor.click(btnEl);
-    selAns(i, QS[i].demo);
-    await wait(i===1 ? 2000 : 1200);
   }
 
   await wait(800);
