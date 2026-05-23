@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProviaAI — Live Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── CHAPTER NAV ── */
+    .dNav{position:sticky;top:0;z-index:200;background:rgba(8,16,13,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--l);padding:10px 0}
+    .dNavI{max-width:var(--max);margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .chap{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1px solid var(--l);background:transparent;color:var(--t2);font:500 12px var(--font);cursor:pointer;transition:all .2s}
+    .chap:hover{border-color:var(--l2);color:var(--t)}
+    .chap.on{background:var(--a-dim);border-color:var(--a);color:var(--a)}
+    .chapN{font:500 11px var(--mono);opacity:.65}
+    .dCtrl{margin-left:auto;display:flex;align-items:center;gap:8px}
+    .sPill{font:500 11px var(--mono);color:var(--t3)}
+
+    /* ── ACTS ── */
+    .act{padding:72px 0 56px;border-bottom:1px solid var(--l);scroll-margin-top:54px}
+    .act:last-of-type{border-bottom:none}
+    .aI{max-width:var(--max);margin:0 auto;padding:0 20px}
+    .aTag{display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:20px;border:1px solid var(--l2);background:var(--a-dim);color:var(--a);font:600 11px var(--mono);letter-spacing:.06em;margin-bottom:22px}
+    .aTitle{font:700 26px/1.2 var(--font);color:var(--t);margin-bottom:8px}
+    .aSub{font:400 15px/1.55 var(--font);color:var(--t2);margin-bottom:28px;max-width:600px}
+
+    /* ── HERO ── */
+    .dHero{padding:80px 0 56px;text-align:center}
+    .dHI{max-width:560px;margin:0 auto;padding:0 20px}
+    .dEye{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--l2);background:var(--a-dim);font:600 11px var(--mono);color:var(--a);letter-spacing:.07em;margin-bottom:20px}
+    .dHT{font:700 40px/1.15 var(--font);color:var(--t);margin-bottom:14px}
+    .dHS{font:400 16px/1.6 var(--font);color:var(--t2);margin-bottom:28px}
+    .btnRow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+
+    /* ── WIZARD ── */
+    .wRail{display:flex;align-items:center;gap:0;margin-bottom:32px;overflow-x:auto;padding-bottom:2px}
+    .wSt{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:var(--r);border:1px solid transparent;color:var(--t3);font:500 13px var(--font);white-space:nowrap;transition:all .3s}
+    .wSt.on{border-color:var(--l2);background:var(--a-dim);color:var(--a)}
+    .wSt.dn{color:var(--t2)}
+    .wDot{width:20px;height:20px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font:500 10px var(--mono);flex-shrink:0;transition:all .3s}
+    .wSt.on .wDot{border-color:var(--a);background:var(--a);color:#000}
+    .wSt.dn .wDot{border-color:var(--a);background:var(--a);color:#000}
+    .wC{width:22px;height:2px;background:var(--l);flex-shrink:0;transition:background .4s}
+    .wC.dn{background:var(--a)}
+
+    /* ── MATERIAL ── */
+    .matArea{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:16px;min-height:200px;font:400 13px/1.8 var(--mono);color:var(--t);white-space:pre-wrap;word-break:break-word;position:relative}
+    .matArea::after{content:'|';color:var(--a);animation:blink 1s step-end infinite}
+    .matArea.dn::after{display:none}
+    @keyframes blink{50%{opacity:0}}
+    .matCnt{margin-top:6px;font:400 12px var(--mono);color:var(--t3);text-align:right}
+    .courseTag{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;background:var(--s);border:1px solid var(--l2);border-radius:var(--r);font:500 14px var(--font);color:var(--a);margin-bottom:14px}
+
+    /* ── SETTINGS ── */
+    .setGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+    .sCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;transition:all .25s}
+    .sCard.flash{border-color:var(--a);background:var(--a-dim)}
+    .sLbl{font:500 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+    .sVal{font:600 20px var(--font);color:var(--t)}
+    .sCard.flash .sVal{color:var(--a)}
+
+    /* ── SKELETON ── */
+    .skelL{display:flex;flex-direction:column;gap:14px}
+    .skelC{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px}
+    .sLine{height:11px;border-radius:5px;background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);background-size:200% 100%;animation:shim 1.4s infinite;margin-bottom:9px}
+    .sLine.w80{width:80%}.sLine.w60{width:60%}.sLine.w40{width:40%}
+    @keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* ── QUESTIONS ── */
+    .qList{display:flex;flex-direction:column;gap:14px}
+    .qCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:18px;opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s}
+    .qCard.vis{opacity:1;transform:translateY(0)}
+    .qN{font:600 11px var(--mono);color:var(--t3);margin-bottom:7px}
+    .qT{font:500 15px/1.5 var(--font);color:var(--t);margin-bottom:14px}
+    .qMath{font:400 14px var(--mono);background:var(--s2);padding:7px 11px;border-radius:var(--r2);color:var(--a);display:inline-block;margin-bottom:10px}
+    .aGrid{display:flex;flex-direction:column;gap:7px}
+    .aBtn{background:transparent;border:1px solid var(--l);border-radius:var(--r);padding:9px 13px;font:400 14px var(--font);color:var(--t2);text-align:left;cursor:default;transition:all .22s;width:100%}
+    .aBtn.sel{border-color:var(--a);background:var(--a-dim);color:var(--a)}
+    .aBtn.ok{border-color:#1bff8c;background:rgba(27,255,140,.09);color:#1bff8c}
+    .aBtn.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b}
+
+    /* ── GRADING ── */
+    .gradOv{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:16px}
+    .gradSpin{width:44px;height:44px;border:3px solid var(--l);border-top-color:var(--a);border-radius:50%;animation:spin .75s linear infinite;margin:0 auto 14px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .gradLbl{font:500 14px var(--font);color:var(--t2)}
+    .gradSt{font:400 12px var(--mono);color:var(--t3);margin-top:7px}
+
+    /* ── SCORE ── */
+    .scoreBox{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:20px}
+    .scoreBig{font:700 60px/1 var(--font);color:var(--a);margin-bottom:4px}
+    .scoreLbl{font:400 14px var(--font);color:var(--t2);margin-bottom:20px}
+    .scoreBar{height:7px;background:var(--s2);border-radius:4px;max-width:280px;margin:0 auto 22px;overflow:hidden}
+    .scoreBarF{height:100%;background:var(--a);border-radius:4px;width:0;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+
+    /* ── FEEDBACK ── */
+    .feedGrid{display:flex;flex-direction:column;gap:11px}
+    .feedCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:15px;display:flex;gap:11px;opacity:0;transform:translateY(7px);transition:opacity .35s,transform .35s}
+    .feedCard.vis{opacity:1;transform:translateY(0)}
+    .feedIco{font-size:17px;flex-shrink:0;margin-top:1px}
+    .feedBody{flex:1;min-width:0}
+    .feedQ{font:500 13px/1.4 var(--font);color:var(--t2);margin-bottom:3px}
+    .feedMod{font:400 13px/1.5 var(--font);color:var(--t3)}
+    .feedMod strong{color:var(--a);font-weight:600}
+    .feedPts{font:600 12px var(--mono);margin-top:5px}
+    .feedPts.ok{color:var(--ok)}.feedPts.bad{color:var(--danger)}
+
+    /* ── COACH BANNER ── */
+    .coachBanner{background:var(--a-dim);border:1px solid var(--a);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:22px;opacity:0;transition:opacity .5s}
+    .coachBanner.vis{opacity:1}
+    .cBTitle{font:600 14px var(--font);color:var(--a);margin-bottom:3px}
+    .cBSub{font:400 13px var(--font);color:var(--t2)}
+
+    /* ── IMPROVE SECTIONS ── */
+    .iSec{background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:11px;overflow:hidden}
+    .iHead{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;user-select:none}
+    .iHL{display:flex;align-items:center;gap:11px}
+    .iNum{font:600 13px var(--mono);color:var(--a);opacity:.8}
+    .iTitle{font:600 14px var(--font);color:var(--t)}
+    .iSub{font:400 12px var(--font);color:var(--t3)}
+    .iBody{padding:0 18px 18px}
+
+    /* ── STATS ── */
+    .statRow{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
+    .statBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:14px}
+    .statLbl{font:500 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+    .statVal{font:600 22px var(--font);color:var(--t)}
+
+    /* ── COACH TEXT ── */
+    .coachBox2{background:var(--s2);border:1px solid var(--l2);border-radius:var(--r);padding:18px;margin-bottom:14px}
+    .coachLbl{font:600 11px var(--mono);color:var(--a);text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
+    .coachTxt{font:400 13px/1.75 var(--font);color:var(--t);white-space:pre-wrap}
+
+    /* ── CHART ── */
+    .chartWrap2{background:var(--s2);border-radius:var(--r);padding:14px;margin-top:14px}
+    .chartLbl{font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+    .chartBars{display:flex;align-items:flex-end;gap:8px;height:90px}
+    .cBar{flex:1;border-radius:3px 3px 0 0;background:var(--a);opacity:.55;min-height:4px}
+    .cBar:last-child{opacity:1}
+    .cBarLbl{font:400 10px var(--mono);color:var(--t3);text-align:center;margin-top:5px}
+    .cBarWrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end}
+
+    /* ── MISTAKE CARDS ── */
+    .mGrid{display:flex;flex-direction:column;gap:11px}
+    .mCard{background:var(--s2);border:1px solid var(--l);border-left:3px solid var(--danger);border-radius:var(--r);padding:15px}
+    .mHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+    .mMeta{font:500 11px var(--mono);color:var(--t3)}
+    .mScore{font:600 12px var(--mono);color:var(--danger)}
+    .mQ{font:500 14px/1.4 var(--font);color:var(--t);margin-bottom:9px}
+    .mDiv{height:1px;background:var(--l);margin:9px 0}
+    .mFL{font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;margin-bottom:3px}
+    .mFV{font:400 13px/1.4 var(--font);color:var(--a)}
+    .mFV.bad{color:var(--danger)}
+    .mActs{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+    .tinyBtn{padding:5px 11px;font:500 12px var(--font)}
+
+    /* ── REPORT ── */
+    .repBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:16px;font:400 13px/1.7 var(--font);color:var(--t2);white-space:pre-wrap;min-height:60px}
+
+    /* ── TRAIN SECTION ── */
+    .trainRow2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+    .selPill2{display:inline-flex;align-items:center;padding:4px 10px;background:var(--a-dim);border:1px solid var(--a);border-radius:20px;font:500 12px var(--mono);color:var(--a)}
+    .trainCard{background:var(--a-dim);border:1px solid var(--a);border-radius:var(--r);padding:15px}
+    .trainCardT{font:500 13px var(--font);color:var(--a);margin-bottom:5px}
+    .trainCardS{font:400 12px var(--font);color:var(--t2)}
+
+    /* ── HIST TABLE ── */
+    .histTable{width:100%;border-collapse:collapse;font:400 13px var(--font)}
+    .histTable th{text-align:left;padding:8px 0;font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--l)}
+    .histTable td{padding:10px 0;color:var(--t2);border-bottom:1px solid var(--l)}
+    .histTable tr:last-child td{border-bottom:none}
+    .histTable .acc{color:var(--a);font-weight:600}
+
+    /* ── CTA ── */
+    .ctaBox{text-align:center;padding:56px 20px;background:var(--s);border:1px solid var(--l2);border-radius:var(--r)}
+    .ctaT{font:700 28px/1.2 var(--font);color:var(--t);margin-bottom:11px}
+    .ctaS{font:400 15px/1.55 var(--font);color:var(--t2);margin-bottom:26px;max-width:440px;margin-left:auto;margin-right:auto}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:600px){
+      .dHT{font-size:26px}
+      .aTitle{font-size:21px}
+      .scoreBig{font-size:44px}
+      .statRow{grid-template-columns:1fr}
+      .setGrid{grid-template-columns:1fr 1fr}
+      .dCtrl{width:100%;justify-content:flex-end}
+      .ctaT{font-size:22px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div class="pageLoader" id="pgLoader"><div class="loaderOrb"></div></div>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hWrap">
+    <a href="index.html" class="brand">
+      <span class="brandName">ProviaAI</span>
+      <span class="brandTag">LIVE DEMO</span>
+    </a>
+    <div class="hRight">
+      <a href="app.html" class="btn btnP" style="font-size:13px">Testa på riktigt →</a>
+      <a href="index.html" class="btn" style="font-size:13px">Tillbaka</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="dHero">
+  <div class="dHI">
+    <div class="dEye">▶&nbsp; Live-demonstration</div>
+    <h1 class="dHT">Se ProviaAI i verkligheten</h1>
+    <p class="dHS">En komplett genomgång — från studiematerial till AI-coachning. Alla riktiga funktioner, inget konto krävs.</p>
+    <div class="btnRow">
+      <button class="btn btnP" id="autoBtn" onclick="startAuto()">▶&nbsp; Spela upp allt</button>
+      <button class="btn" onclick="resetDemo()">⟳&nbsp; Starta om</button>
+      <a href="app.html" class="btn">Testa på riktigt →</a>
+    </div>
+  </div>
+</section>
+
+<!-- CHAPTER NAV -->
+<nav class="dNav" id="dNav">
+  <div class="dNavI">
+    <button class="chap on" id="c1" onclick="go('act1',1)"><span class="chapN">01</span>Material</button>
+    <button class="chap" id="c2" onclick="go('act2',2)"><span class="chapN">02</span>Prov</button>
+    <button class="chap" id="c3" onclick="go('act3',3)"><span class="chapN">03</span>Rättning</button>
+    <button class="chap" id="c4" onclick="go('act4',4)"><span class="chapN">04</span>Coach</button>
+    <div class="dCtrl"><span class="sPill" id="sPill"></span></div>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════
+     AKT 1 – MATERIAL
+════════════════════════════════════════════ -->
+<section class="act" id="act1">
+  <div class="aI">
+    <div class="aTag">AKT 01 — MATERIAL</div>
+    <h2 class="aTitle">Ladda upp ditt studiematerial</h2>
+    <p class="aSub">Klistra in kompendium, anteckningar eller kapitel. AI:n läser av och bygger ett prov anpassat till din kurs och betygsnivå.</p>
+
+    <!-- Wizard -->
+    <div class="wRail" id="wRail">
+      <div class="wSt on" id="ws1"><div class="wDot" id="wd1">1</div>Material</div>
+      <div class="wC" id="wc1"></div>
+      <div class="wSt" id="ws2"><div class="wDot" id="wd2">2</div>Inställningar</div>
+      <div class="wC" id="wc2"></div>
+      <div class="wSt" id="ws3"><div class="wDot" id="wd3">3</div>Mockprov</div>
+      <div class="wC" id="wc3"></div>
+      <div class="wSt" id="ws4"><div class="wDot" id="wd4">4</div>Rättning</div>
+    </div>
+
+    <div class="courseTag">Matematik C — Andragradsekvationer</div>
+    <div class="matArea" id="matArea"></div>
+    <div class="matCnt" id="matCnt">0 tecken</div>
+
+    <div style="margin-top:18px">
+      <button class="btn btnP" id="nextBtn" style="opacity:0;transition:opacity .5s;pointer-events:none" onclick="go('act2',2)">
+        Fortsätt till inställningar →
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 2 – INSTÄLLNINGAR
+════════════════════════════════════════════ -->
+<section class="act" id="act2">
+  <div class="aI">
+    <div class="aTag">AKT 02 — INSTÄLLNINGAR</div>
+    <h2 class="aTitle">Välj provtyp och svårighetsgrad</h2>
+    <p class="aSub">Anpassa efter kurs, betygsnivå och frågetyp. AI:n genererar ett prov exakt anpassat till din nivå och ditt material.</p>
+
+    <div class="setGrid">
+      <div class="sCard" id="sck">
+        <div class="sLbl">Kurs</div>
+        <div class="sVal">Matematik C</div>
+      </div>
+      <div class="sCard" id="scn">
+        <div class="sLbl">Betygsnivå</div>
+        <div class="sVal" id="svn">—</div>
+      </div>
+      <div class="sCard" id="sct">
+        <div class="sLbl">Frågetyp</div>
+        <div class="sVal" id="svt">—</div>
+      </div>
+      <div class="sCard" id="sca">
+        <div class="sLbl">Antal frågor</div>
+        <div class="sVal" id="sva">—</div>
+      </div>
+    </div>
+
+    <button class="btn btnP" id="genBtn" disabled style="opacity:.4;cursor:default">
+      <span id="genLbl">Väljer inställningar…</span>
+    </button>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 3 – MOCKPROV
+════════════════════════════════════════════ -->
+<section class="act" id="act3">
+  <div class="aI">
+    <div class="aTag">AKT 03 — MOCKPROV</div>
+    <h2 class="aTitle">AI-genererat prov</h2>
+    <p class="aSub">Frågorna är baserade på ditt material och din nivå. AI:n svarar automatiskt i demon — ett svar är medvetet ofullständigt.</p>
+
+    <div class="skelL" id="skelL">
+      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
+      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
+      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
+    </div>
+
+    <div class="qList" id="qList" style="display:none"></div>
+
+    <div style="margin-top:18px">
+      <button class="btn btnP" id="gradeBtn" disabled style="opacity:0;transition:opacity .5s;pointer-events:none"
+        onclick="go('act3b',3);triggerAct4()">
+        Rätta prov →
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 4 – RÄTTNING
+════════════════════════════════════════════ -->
+<section class="act" id="act3b" style="scroll-margin-top:54px">
+  <div class="aI">
+    <div class="aTag">AKT 04 — AI-RÄTTNING</div>
+    <h2 class="aTitle">Omedelbar feedback på varje svar</h2>
+    <p class="aSub">AI:n analyserar svaren, jämför med modellsvaret och ger pedagogisk feedback med förklaringar och förbättringstips.</p>
+
+    <div class="gradOv" id="gradOv" style="display:none">
+      <div class="gradSpin"></div>
+      <div class="gradLbl">Rättar prov…</div>
+      <div class="gradSt" id="gradSt">Analyserar svar 1 av 5…</div>
+    </div>
+
+    <div class="scoreBox" id="scoreBox" style="display:none">
+      <div class="scoreBig">4/5</div>
+      <div class="scoreLbl">80% rätt · Betyg C · Matematik C</div>
+      <div class="scoreBar"><div class="scoreBarF" id="scoreF"></div></div>
+      <div class="btnRow">
+        <button class="btn btnP" onclick="document.getElementById('feedWrap').scrollIntoView({behavior:'smooth'})">Visa detaljerad feedback →</button>
+      </div>
+    </div>
+
+    <div id="feedWrap" style="margin-top:20px;scroll-margin-top:70px">
+      <div class="feedGrid" id="feedGrid"></div>
+    </div>
+
+    <div class="coachBanner" id="coachBanner">
+      <div>
+        <div class="cBTitle">Klar för djupare analys?</div>
+        <div class="cBSub">Din AI-coach har identifierat mönster och har en konkret plan.</div>
+      </div>
+      <button class="btn btnP" onclick="go('act4',4);triggerAct5()">Öppna coach →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 5 – FÖRBÄTTRING / COACH
+════════════════════════════════════════════ -->
+<section class="act" id="act4">
+  <div class="aI">
+    <div class="aTag">AKT 05 — AI-COACH &amp; FÖRBÄTTRING</div>
+    <h2 class="aTitle">Din personliga studiecoach</h2>
+    <p class="aSub">AI:n analyserar mönster i dina misstag och sätter ihop en konkret träningsplan — baserad på just din historik.</p>
+
+    <!-- 01 – Historik -->
+    <div class="iSec">
+      <div class="iHead" onclick="toggleSec(this)">
+        <div class="iHL">
+          <span class="iNum">01</span>
+          <div><div class="iTitle">Provhistorik</div><div class="iSub">3 genomförda prov · Matematik C</div></div>
+        </div>
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="iBody">
+        <table class="histTable">
+          <thead><tr><th>Datum</th><th>Kurs</th><th style="text-align:right">Resultat</th></tr></thead>
+          <tbody>
+            <tr><td>2026-05-10</td><td>Matematik C</td><td style="text-align:right">3/5 · 60%</td></tr>
+            <tr><td>2026-05-17</td><td>Matematik C</td><td style="text-align:right">4/5 · 70%</td></tr>
+            <tr><td>2026-05-23</td><td>Matematik C</td><td style="text-align:right" class="acc">4/5 · 80% ← idag</td></tr>
+          </tbody>
+        </table>
+        <div class="chartWrap2">
+          <div class="chartLbl">Resultatutveckling</div>
+          <div class="chartBars" id="chartBars">
+            <div class="cBarWrap"><div class="cBar" style="height:60%"></div><div class="cBarLbl">maj 10</div></div>
+            <div class="cBarWrap"><div class="cBar" style="height:70%"></div><div class="cBarLbl">maj 17</div></div>
+            <div class="cBarWrap"><div class="cBar" style="height:80%"></div><div class="cBarLbl">maj 23</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 – Coach -->
+    <div class="iSec">
+      <div class="iHead" onclick="toggleSec(this)">
+        <div class="iHL">
+          <span class="iNum">02</span>
+          <div><div class="iTitle">AI-Coach</div><div class="iSub">Personlig analys baserad på din historik och felbank</div></div>
+        </div>
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="iBody">
+        <div class="coachBox2">
+          <div class="coachLbl">Rekommendation</div>
+          <div class="coachTxt" id="coachTxt"></div>
+        </div>
+        <div class="statRow">
+          <div class="statBox"><div class="statLbl">Senaste</div><div class="statVal" style="color:var(--a)">80%</div></div>
+          <div class="statBox"><div class="statLbl">Trend</div><div class="statVal" style="color:var(--a)">+20 p.p.</div></div>
+          <div class="statBox"><div class="statLbl">Fokus</div><div class="statVal" style="font-size:16px">Faktorer</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 – Rapport -->
+    <div class="iSec">
+      <div class="iHead" onclick="toggleSec(this)">
+        <div class="iHL">
+          <span class="iNum">03</span>
+          <div><div class="iTitle">Lärarrapport</div><div class="iSub">Exportera en sammanfattning för din lärare</div></div>
+        </div>
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="iBody">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn btnP" onclick="genReport()">Skapa rapport</button>
+          <button class="btn" disabled id="copyRepBtn">Kopiera</button>
+        </div>
+        <div class="repBox" id="repBox">Klicka "Skapa rapport" för att generera en sammanfattning för din lärare.</div>
+      </div>
+    </div>
+
+    <!-- 04 – Träna -->
+    <div class="iSec">
+      <div class="iHead" onclick="toggleSec(this)">
+        <div class="iHL">
+          <span class="iNum">04</span>
+          <div><div class="iTitle">Träna misstag</div><div class="iSub">Markera i felbanken, träna exakt det du behöver</div></div>
+        </div>
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="iBody">
+        <div class="trainRow2">
+          <button class="btn btnP" onclick="doTrain()">Träna markerade</button>
+          <button class="btn" onclick="clearSel()">Rensa val</button>
+          <span class="selPill2" id="selPill">1 vald</span>
+        </div>
+        <div class="trainCard">
+          <div class="trainCardT">Träna nu: Faktorisering av andragradsekvationer</div>
+          <div class="trainCardS">3 liknande frågor genereras baserat på ditt markerade misstag.</div>
+          <button class="btn btnP" style="margin-top:12px;font-size:12px" onclick="doTrain()">Starta träning →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 – Felbank -->
+    <div class="iSec">
+      <div class="iHead" onclick="toggleSec(this)">
+        <div class="iHL">
+          <span class="iNum">05</span>
+          <div><div class="iTitle">Felbank</div><div class="iSub">Frågor du tappat poäng på · med modellsvar</div></div>
+        </div>
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="iBody">
+        <div class="mGrid">
+
+          <div class="mCard" id="mc1">
+            <div class="mHead">
+              <div class="mMeta">Matematik C · 2026-05-23</div>
+              <div class="mScore">1/2 p</div>
+            </div>
+            <div class="mQ">Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.</div>
+            <div class="mDiv"></div>
+            <div class="mFL">Ditt svar</div>
+            <div class="mFV bad">x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständigt — en rot saknas)</span></div>
+            <div class="mFL" style="margin-top:10px">Modellsvar</div>
+            <div class="mFV">x = 2 och x = 3 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(x²−5x+6 = (x−2)(x−3) = 0)</span></div>
+            <div class="mActs">
+              <button class="btn tinyBtn" id="markBtn1" onclick="toggleMark('markBtn1','selPill')">Markera för träning</button>
+              <button class="btn tinyBtn" style="color:var(--danger);border-color:rgba(255,107,107,.3)" onclick="removeCard('mc1','selPill')">Ta bort</button>
+            </div>
+          </div>
+
+          <div class="mCard" id="mc2">
+            <div class="mHead">
+              <div class="mMeta">Matematik C · 2026-05-17</div>
+              <div class="mScore">0/2 p</div>
+            </div>
+            <div class="mQ">Visa med pq-formeln att x² − 4x + 3 = 0 har lösningarna x = 1 och x = 3.</div>
+            <div class="mDiv"></div>
+            <div class="mFL">Ditt svar</div>
+            <div class="mFV bad">x = 1</div>
+            <div class="mFL" style="margin-top:10px">Modellsvar</div>
+            <div class="mFV">p = −4, q = 3. &nbsp;x = 4/2 ± √((4/2)² − 3) = 2 ± 1. &nbsp;Alltså x = 1 och x = 3.</div>
+            <div class="mActs">
+              <button class="btn tinyBtn" id="markBtn2" onclick="toggleMark('markBtn2','selPill')">Markera för träning</button>
+              <button class="btn tinyBtn" style="color:var(--danger);border-color:rgba(255,107,107,.3)" onclick="removeCard('mc2','selPill')">Ta bort</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="act">
+  <div class="aI">
+    <div class="ctaBox">
+      <div class="dEye" style="margin:0 auto 18px">Redo att börja?</div>
+      <div class="ctaT">Prova ProviaAI på riktigt</div>
+      <p class="ctaS">Allt du såg är riktiga funktioner. Skapa ett konto och testa direkt — inga kreditkort, ingen bindningstid.</p>
+      <div class="btnRow">
+        <a href="app.html" class="btn btnP">Kom igång gratis →</a>
+        <a href="pricing.html" class="btn">Se priser</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="text-align:center;padding:24px 20px;font:400 13px var(--font);color:var(--t3)">
+  ProviaAI är studiestöd och ger ingen officiell betygssättning.
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DEMO DATA
+═══════════════════════════════════════════════ */
+
+const MAT = `Andragradsekvationer — Matematik C
+
+En andragradsekvation har formen ax² + bx + c = 0 (a ≠ 0).
+
+FAKTORISERING
+Om ekvationen kan skrivas som (x − r₁)(x − r₂) = 0
+ger nollproduktregeln: x = r₁ eller x = r₂.
+
+Exempel: x² − 5x + 6 = 0
+  Sök tal vars produkt är 6 och summa är −5 → −2 och −3
+  (x − 2)(x − 3) = 0  →  x = 2 eller x = 3 ✓
+
+PQ-FORMELN
+x² + px + q = 0  →  x = −p/2 ± √((p/2)² − q)
+
+Diskriminant D = (p/2)² − q:
+  D > 0 → två reella rötter
+  D = 0 → en dubbelrot
+  D < 0 → inga reella lösningar
+
+KVADRATKOMPLETTERING
+x² + bx + c = 0
+  (x + b/2)² = (b/2)² − c
+  x = −b/2 ± √((b/2)² − c)
+
+VIKTIGT: Ange alltid ALLA lösningar. Kontrollräkna.`;
+
+const QS = [
+  { t:'Vilken är standardformen för en andragradsekvation?', opts:['ax² + bx + c = 0','ax + b = 0','ax³ + bx² = 0','a/x + b = 0'], ok:0, demo:0 },
+  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.', math:true, opts:['x = 2 och x = 3','x = 2','x = −2 och x = −3','x = 5'], ok:0, demo:1 },
+  { t:'Hur många reella rötter har ekvationen x² + 4 = 0?', opts:['Inga reella rötter','En dubbelrot','Två distinkta rötter','Oändligt många'], ok:0, demo:0 },
+  { t:'Korrekt tillämpning av pq-formeln för x² − 6x + 8 = 0?', opts:['x = 3 ± √1, alltså x = 2 och x = 4','x = 6 ± √28','x = −3 ± 1','x = 0 eller x = 6'], ok:0, demo:0 },
+  { t:'Diskriminanten D för x² − 4x + 3 = 0 är:', opts:['D = 1','D = −1','D = 4','D = 7'], ok:0, demo:0 },
+];
+
+const FEED = [
+  { q:'Standardform för andragradsekvation?', ico:'✓', ok:true,  r:'Rätt — 1/1 p',  m:'ax² + bx + c = 0 är korrekt standardform.' },
+  { q:'Lös x² − 5x + 6 = 0',               ico:'△', ok:false, r:'Delvis rätt — 1/2 p', m:'x = 2 stämmer, men x = 3 saknas. Faktorisering: (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
+  { q:'Hur många rötter har x² + 4 = 0?',   ico:'✓', ok:true,  r:'Rätt — 1/1 p',  m:'D = −4 < 0, alltså inga reella rötter.' },
+  { q:'pq-formeln för x² − 6x + 8 = 0',    ico:'✓', ok:true,  r:'Rätt — 1/1 p',  m:'x = 3 ± √(9−8) = 3 ± 1, alltså x = 2 och x = 4.' },
+  { q:'Diskriminanten för x² − 4x + 3 = 0', ico:'✓', ok:true,  r:'Rätt — 1/1 p',  m:'D = (4/2)² − 3 = 4 − 3 = 1. Korrekt.' },
+];
+
+const COACH = `Hej!
+
+Data: 3 prov · Snitt (5 senaste): 70% · Misstag (30d): 3
+Trend: +20 p.p. — tydlig förbättring 📈
+
+Prioritet:
+• Matematik C — faktorisering (2 misstag, samma mönster)
+
+Metoder:
+• Skriv alltid full metod: varje steg på egen rad.
+• Ange ALLA rötter — kontrollräkna mot ursprungsekvationen.
+• Markera slutsvar tydligt ("Svar: x = 2 och x = 3").
+
+Tips & tricks:
+• Återskapa lösningen utan facit — jämför sedan.
+• Träna 3 liknande andragradsekvationer i rad (samma typ).
+• Skriv en "miniregel" efter varje misstag (1 mening).
+
+Nästa pass (15–20 min):
+• Markera de 2 felbanksuppgifterna nedan.
+• Träna markerade misstag.
+• Skriv om modellsvaret för x² − 5x + 6 = 0 med egna ord.
+
+Senaste prov: 80% — bra jobbat, fortsätt!`;
+
+const REPORT = `LÄRARRAPPORT — ProviaAI
+Elev: Demo-användare  ·  Kurs: Matematik C
+Datum: 2026-05-23  ·  Baserad på: 3 prov
+
+SAMMANFATTNING
+Eleven visar tydlig positiv trend (+20 p.p.) med snitt 70%
+de tre senaste proven: 60% → 70% → 80%.
+
+STYRKOR
+• God grundläggande förståelse för andragradsekvationer
+• Korrekt diskriminantanalys (fråga 3 och 5)
+• Stabil förbättring mellan prov
+
+FÖRBÄTTRINGSOMRÅDEN
+• Faktorisering: hittar en rot men missar den andra
+• Behöver öva att alltid ange ALLA lösningar
+• Steg-för-steg-metodik med pq-formeln
+
+REKOMMENDATION
+Ge eleven strukturerade övningar med explicit krav på att
+ange alla lösningar. Fokus: faktoriseringsuppgifter där
+båda rötter är positiva och distinkta.`;
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+const S = { a1:false, a2:false, a3:false, a4:false, a5:false, auto:false };
+
+/* ═══════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════ */
+const ms = n => new Promise(r => setTimeout(r, n));
+const $ = id => document.getElementById(id);
+
+function setSt(t){ const el=$('sPill'); if(el) el.textContent = t; }
+
+function setChap(n){
+  [1,2,3,4].forEach(i => $('c'+i)?.classList.toggle('on', i===n));
+}
+
+function go(id, ch){
+  $('act4')?.removeAttribute('style'); // ensure coach section visible
+  const el = $(id);
+  if(el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  if(ch) setChap(ch);
+  if(id==='act2' && !S.a2) triggerA2();
+  if(id==='act3' && !S.a3) triggerA3();
+  if((id==='act3b') && !S.a4) triggerAct4();
+  if(id==='act4' && !S.a5) triggerAct5();
+}
+
+/* Wizard step helpers */
+function wDone(n){
+  $('ws'+n)?.classList.replace('on','dn') || $('ws'+n)?.classList.add('dn');
+  $('ws'+n)?.classList.remove('on');
+  $('ws'+n)?.classList.add('dn');
+  const d = $('wd'+n); if(d) d.textContent = '✓';
+  $('wc'+n)?.classList.add('dn');
+}
+function wOn(n){
+  $('ws'+n)?.classList.add('on');
+  $('ws'+n)?.classList.remove('dn');
+}
+
+/* ═══════════════════════════════════════════════
+   ACT 1 – TYPEWRITER
+═══════════════════════════════════════════════ */
+async function runTypewriter(fast){
+  const area = $('matArea'), cnt = $('matCnt'), btn = $('nextBtn');
+  if(!area) return;
+  area.textContent = '';
+  area.classList.remove('dn');
+  const d = fast ? 9 : 20;
+  for(let i=0; i<=MAT.length; i++){
+    area.textContent = MAT.slice(0,i);
+    if(cnt) cnt.textContent = i + ' tecken';
+    await ms(d);
+  }
+  area.classList.add('dn');
+  S.a1 = true;
+  if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
+  setSt('Material klart ✓');
+}
+
+/* ═══════════════════════════════════════════════
+   ACT 2 – SETTINGS
+═══════════════════════════════════════════════ */
+async function triggerA2(){
+  if(S.a2) return;
+  S.a2 = true;
+  wDone(1); wOn(2);
+  await ms(350);
+  const sets = [
+    { id:'scn', vid:'svn', v:'C', d:0 },
+    { id:'sct', vid:'svt', v:'Flerval', d:320 },
+    { id:'sca', vid:'sva', v:'5 frågor', d:640 },
+  ];
+  for(const s of sets){
+    await ms(s.d === 0 ? 0 : 320);
+    const c = $(s.id), ve = $(s.vid);
+    if(ve) ve.textContent = s.v;
+    if(c){ c.classList.add('flash'); await ms(220); c.classList.remove('flash'); }
+  }
+  await ms(500);
+  const gb = $('genBtn'), gl = $('genLbl');
+  if(gl) gl.textContent = 'Skapa prov';
+  if(gb){ gb.removeAttribute('disabled'); gb.style.opacity='1'; gb.style.cursor='pointer';
+    gb.onclick = () => { go('act3',2); triggerA3(); }; }
+  setSt('Inställningar klara ✓');
+}
+
+/* ═══════════════════════════════════════════════
+   ACT 3 – EXAM GENERATION + AUTO-ANSWER
+═══════════════════════════════════════════════ */
+async function triggerA3(){
+  if(S.a3) return;
+  S.a3 = true;
+  wDone(2); wOn(3);
+
+  const skel = $('skelL'), ql = $('qList');
+  if(!skel||!ql) return;
+  skel.style.display = 'flex';
+  ql.style.display = 'none';
+  await ms(1800);
+
+  // Build questions
+  ql.innerHTML = '';
+  QS.forEach((q,i) => {
+    const card = document.createElement('div');
+    card.className = 'qCard';
+    card.id = 'qc'+i;
+    const mathLine = q.math ? `<div class="qMath">x² − 5x + 6 = 0</div>` : '';
+    const opts = q.opts.map((o,j) =>
+      `<button class="aBtn" id="ab${i}_${j}" onclick="selAns(${i},${j})">${'ABCD'[j]}. ${o}</button>`
+    ).join('');
+    card.innerHTML = `<div class="qN">Fråga ${i+1} / ${QS.length}</div>
+      <div class="qT">${q.t}</div>${mathLine}
+      <div class="aGrid">${opts}</div>`;
+    ql.appendChild(card);
+  });
+
+  skel.style.display = 'none';
+  ql.style.display = 'flex';
+
+  for(let i=0;i<QS.length;i++){
+    await ms(i===0 ? 80 : 180);
+    $('qc'+i)?.classList.add('vis');
+  }
+  setSt('Prov genererat ✓');
+
+  // Auto-answer
+  await ms(700);
+  for(let i=0;i<QS.length;i++){
+    await ms(650);
+    selAns(i, QS[i].demo);
+  }
+  await ms(500);
+  const gb = $('gradeBtn');
+  if(gb){ gb.style.opacity='1'; gb.style.pointerEvents='auto'; gb.removeAttribute('disabled'); }
+}
+
+function selAns(qi, oi){
+  QS[qi]._chosen = oi;
+  for(let j=0;j<QS[qi].opts.length;j++){
+    const b = $(`ab${qi}_${j}`);
+    if(b){ b.classList.remove('sel','ok','bad'); if(j===oi) b.classList.add('sel'); }
+  }
+}
+
+function markAnswers(){
+  QS.forEach((q,i) => {
+    for(let j=0;j<q.opts.length;j++){
+      const b = $(`ab${i}_${j}`);
+      if(!b) continue;
+      b.classList.remove('sel');
+      if(j===q.ok) b.classList.add('ok');
+      if(j===q.demo && j!==q.ok) b.classList.add('bad');
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   ACT 4 – GRADING
+═══════════════════════════════════════════════ */
+async function triggerAct4(){
+  if(S.a4) return;
+  S.a4 = true;
+  wDone(3); wOn(4);
+
+  const ov = $('gradOv'), st = $('gradSt');
+  if(ov) ov.style.display = 'block';
+
+  const steps = ['Analyserar svar 1 av 5…','Analyserar svar 2 av 5…','Analyserar svar 3 av 5…',
+    'Analyserar svar 4 av 5…','Analyserar svar 5 av 5…','Beräknar totalpoäng…','Genererar feedback…'];
+  for(const s of steps){
+    if(st) st.textContent = s;
+    await ms(540);
+  }
+
+  if(ov) ov.style.display = 'none';
+  const sb = $('scoreBox');
+  if(sb) sb.style.display = 'block';
+  await ms(200);
+  const sf = $('scoreF'); if(sf) sf.style.width = '80%';
+
+  markAnswers();
+  await ms(700);
+
+  // Feedback cards
+  const fg = $('feedGrid');
+  if(fg){
+    fg.innerHTML = '';
+    FEED.forEach((f,i) => {
+      const c = document.createElement('div');
+      c.className = 'feedCard';
+      c.innerHTML = `<div class="feedIco">${f.ico}</div>
+        <div class="feedBody">
+          <div class="feedQ">${f.q}</div>
+          <div class="feedMod">Modellsvar: <strong>${f.m}</strong></div>
+          <div class="feedPts ${f.ok?'ok':'bad'}">${f.r}</div>
+        </div>`;
+      fg.appendChild(c);
+    });
+    const cards = fg.querySelectorAll('.feedCard');
+    for(let i=0;i<cards.length;i++){
+      await ms(200);
+      cards[i].classList.add('vis');
+    }
+  }
+
+  wDone(4);
+  await ms(400);
+  const cb = $('coachBanner');
+  if(cb){ cb.classList.add('vis'); }
+  setSt('Rättning klar ✓');
+  S.a4 = true;
+}
+
+/* ═══════════════════════════════════════════════
+   ACT 5 – COACH
+═══════════════════════════════════════════════ */
+async function triggerAct5(){
+  if(S.a5) return;
+  S.a5 = true;
+  const el = $('coachTxt');
+  if(el){
+    el.textContent = '';
+    for(let i=0;i<=COACH.length;i++){
+      el.textContent = COACH.slice(0,i);
+      await ms(7);
+    }
+  }
+  setSt('Coach analyserat ✓');
+}
+
+/* ═══════════════════════════════════════════════
+   AUTO PLAY
+═══════════════════════════════════════════════ */
+async function startAuto(){
+  if(S.auto) return;
+  S.auto = true;
+  const btn = $('autoBtn');
+  if(btn) btn.textContent = '⏸ Spelas upp…';
+
+  $('act1')?.scrollIntoView({ behavior:'smooth' });
+  setChap(1);
+  await ms(700);
+
+  await runTypewriter(true);
+  await ms(500);
+
+  $('act2')?.scrollIntoView({ behavior:'smooth' });
+  setChap(2);
+  await ms(400);
+  await triggerA2();
+  await ms(600);
+
+  $('act3')?.scrollIntoView({ behavior:'smooth' });
+  await ms(400);
+  await triggerA3();
+  // wait for auto-answer (5 * 650ms + 500ms + card animations)
+  await ms(QS.length * 650 + 1200);
+
+  $('act3b')?.scrollIntoView({ behavior:'smooth' });
+  setChap(3);
+  await ms(500);
+  await triggerAct4();
+  await ms(900);
+
+  $('act4')?.scrollIntoView({ behavior:'smooth' });
+  setChap(4);
+  await ms(500);
+  await triggerAct5();
+
+  if(btn) btn.textContent = '✓ Demo klar';
+  S.auto = false;
+  setSt('Hela demon genomförd ✓');
+}
+
+/* ═══════════════════════════════════════════════
+   INTERACTIVE
+═══════════════════════════════════════════════ */
+function resetDemo(){ location.reload(); }
+
+function toggleSec(head){
+  const body = head.nextElementSibling;
+  if(!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+}
+
+function genReport(){
+  const box = $('repBox'), btn = $('copyRepBtn');
+  if(!box) return;
+  const steps = ['Analyserar historik…','Identifierar mönster…','Skriver rapport…'];
+  let i = 0;
+  box.textContent = steps[0];
+  const t = setInterval(() => {
+    i++;
+    if(i < steps.length){ box.textContent = steps[i]; }
+    else{
+      clearInterval(t);
+      box.textContent = REPORT;
+      if(btn) btn.removeAttribute('disabled');
+    }
+  }, 900);
+}
+
+let selCount = 1;
+function toggleMark(btnId, pillId){
+  const btn = $(btnId);
+  const marked = btn?.textContent === 'Markerad ✓';
+  if(btn){
+    btn.textContent = marked ? 'Markera för träning' : 'Markerad ✓';
+    btn.style.borderColor = marked ? '' : 'var(--a)';
+    btn.style.color = marked ? '' : 'var(--a)';
+  }
+  selCount += marked ? -1 : 1;
+  const pill = $(pillId);
+  if(pill) pill.textContent = selCount + ' vald' + (selCount===1?'':'a');
+}
+
+function removeCard(cardId, pillId){
+  const card = $(cardId);
+  if(!card) return;
+  card.style.opacity = '0';
+  card.style.transition = 'opacity .3s';
+  setTimeout(() => card.remove(), 300);
+}
+
+function clearSel(){
+  $('selPill').textContent = '0 valda';
+}
+
+function doTrain(){
+  const msg = document.createElement('div');
+  msg.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s);border:1px solid var(--a);color:var(--a);font:500 13px var(--font);padding:12px 20px;border-radius:var(--r);z-index:9999;box-shadow:var(--sh)';
+  msg.textContent = 'Demo: I appen startar ett träningsprov med 3 liknande andragradsekvationer.';
+  document.body.appendChild(msg);
+  setTimeout(() => { msg.style.opacity='0'; msg.style.transition='opacity .4s'; setTimeout(()=>msg.remove(),400); }, 3000);
+}
+
+/* ═══════════════════════════════════════════════
+   SCROLL SPY
+═══════════════════════════════════════════════ */
+function setupObs(){
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(!e.isIntersecting) return;
+      const id = e.target.id;
+      if(id==='act1') setChap(1);
+      if(id==='act2'){ setChap(2); if(!S.a2) triggerA2(); }
+      if(id==='act3'){ setChap(2); if(!S.a3) triggerA3(); }
+      if(id==='act3b'){ setChap(3); }
+      if(id==='act4'){ setChap(4); if(!S.a5) triggerAct5(); }
+    });
+  }, { threshold: 0.18 });
+  ['act1','act2','act3','act3b','act4'].forEach(id => {
+    const el = $(id); if(el) obs.observe(el);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+window.addEventListener('load', async () => {
+  await ms(500);
+  const ldr = $('pgLoader');
+  if(ldr){ ldr.style.opacity='0'; ldr.style.transition='opacity .4s'; setTimeout(()=>ldr.remove(),400); }
+  setupObs();
+  await ms(200);
+  runTypewriter(false);
+});
+</script>
+</body>
+</html>

@@ -269,48 +269,41 @@
       </div>
     </div>
 
-    <!-- RIGHT: live demo -->
+    <!-- RIGHT: demo preview -->
     <div class="heroRight rev" style="transition-delay:.1s">
       <div class="demoCard">
 
         <div class="demoHead">
-          <span class="demoHeadTitle">Live-demo</span>
-          <span class="demoBadge" id="demoState">Skapar prov…</span>
+          <span class="demoHeadTitle">ProviaAI — live-demonstration</span>
+          <span class="demoBadge">Alla funktioner</span>
         </div>
 
-        <div class="pBar"><div class="pFill" id="pFill"></div></div>
-
-        <!-- terminal -->
-        <div class="terminal">
-          <div class="termBar">
-            <div class="termDot" style="background:#ff5f57"></div>
-            <div class="termDot" style="background:#febc2e"></div>
-            <div class="termDot" style="background:#28c840"></div>
+        <div style="display:grid;gap:7px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
+            <span style="font:500 11px var(--mono);color:var(--a)">01</span>
+            <span style="font:400 12px var(--font);color:var(--t2)">Klistra in studiematerial — AI läser av</span>
           </div>
-          <div class="termTxt" id="termTxt"><span class="termCursor"></span></div>
-        </div>
-
-        <!-- stats -->
-        <div class="statGrid">
-          <div class="statBox">
-            <div class="statLabel">Resultat</div>
-            <div class="statVal" id="statScore">—</div>
-            <div class="statSub" id="statSub">Väntar på svar…</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
+            <span style="font:500 11px var(--mono);color:var(--a)">02</span>
+            <span style="font:400 12px var(--font);color:var(--t2)">Mockprov genereras på sekunder</span>
           </div>
-          <div class="statBox">
-            <div class="statLabel">Trend</div>
-            <svg class="miniGraph" viewBox="0 0 180 36" role="img" aria-label="Trend">
-              <path d="M6 30 C 40 28,55 22,80 17 S 130 10,174 4" fill="none" stroke="rgba(27,255,140,.15)" stroke-width="2" stroke-linecap="round"/>
-              <path id="trendPath" d="M6 30 C 40 28,55 22,80 17 S 130 10,174 4" fill="none" stroke="#1bff8c" stroke-width="2" stroke-linecap="round" stroke-dasharray="1000" stroke-dashoffset="1000"/>
-            </svg>
-            <div class="statSub" id="statCoach">—</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
+            <span style="font:500 11px var(--mono);color:var(--a)">03</span>
+            <span style="font:400 12px var(--font);color:var(--t2)">AI rättar med feedback och modellsvar</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
+            <span style="font:500 11px var(--mono);color:var(--a)">04</span>
+            <span style="font:400 12px var(--font);color:var(--t2)">Coach analyserar och bygger träningsplan</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--l);border-radius:var(--r2)">
+            <span style="font:500 11px var(--mono);color:var(--a)">05</span>
+            <span style="font:400 12px var(--font);color:var(--t2)">Felbank, historik och lärarrapport</span>
           </div>
         </div>
 
-        <!-- CTA + replay -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:8px">
-          <a class="btn btnP" href="app.html" style="flex:1;height:36px;font-size:13px">Prova nu →</a>
-          <button id="replayBtn" type="button" class="btn btnG" style="height:36px;padding:0 12px;font-size:12px;font-family:var(--mono)" aria-label="Kör om demo">↺ Kör om</button>
+        <div style="display:flex;gap:8px">
+          <a class="btn btnP" href="live-demo.html" style="flex:1;height:36px;font-size:13px">▶&nbsp; Visa ProviaAI</a>
+          <a class="btn" href="app.html" style="height:36px;font-size:13px">Testa på riktigt →</a>
         </div>
 
       </div>
@@ -502,107 +495,6 @@ document.querySelectorAll("[data-t]").forEach(btn => {
     entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
   }, { threshold:.08, rootMargin:"0px 0px -4% 0px" });
   els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*60,240)}ms`; io.observe(el); });
-})();
-
-/* ── LIVE DEMO ── */
-(function(){
-  const pFill    = document.getElementById("pFill");
-  const termTxt  = document.getElementById("termTxt");
-  const demoSt   = document.getElementById("demoState");
-  const statScore= document.getElementById("statScore");
-  const statSub  = document.getElementById("statSub");
-  const statCoach= document.getElementById("statCoach");
-  const trendPath= document.getElementById("trendPath");
-  if (!pFill || !termTxt) return;
-
-  const lines = [
-    "$ material: Cellens delar + funktioner",
-    "$ nivå: C  |  frågor: 12  |  typ: mix",
-    "$ genererar prov…  ████████████ 100%",
-    "$ prov klart. startar rättning…",
-    "$ rättning klar — resultat sparas."
-  ];
-
-  /* cursor blink span */
-  const cursor = document.createElement("span");
-  cursor.className = "termCursor";
-
-  let lineIdx = 0, charIdx = 0, buf = "";
-
-  function typeNext(){
-    if (lineIdx >= lines.length) {
-      /* all done */
-      demoSt.textContent = "Rättning klar";
-      statScore.textContent = "45% → 92%";
-      statSub.textContent = "3 provsessioner";
-      statCoach.textContent = "5 misstag kvar att träna";
-      /* draw trend */
-      const len = trendPath.getTotalLength();
-      trendPath.style.strokeDasharray  = len;
-      trendPath.style.strokeDashoffset = len;
-      let o = len;
-      const drawI = setInterval(() => {
-        o = Math.max(0, o - len/22);
-        trendPath.style.strokeDashoffset = o;
-        if (o <= 0) clearInterval(drawI);
-      }, 90);
-      return;
-    }
-    const line = lines[lineIdx];
-    if (charIdx <= line.length) {
-      buf = lines.slice(0, lineIdx).join("\n") + (lineIdx > 0 ? "\n" : "") + line.slice(0, charIdx);
-      termTxt.textContent = buf;
-      termTxt.appendChild(cursor);
-      charIdx++;
-      setTimeout(typeNext, 28);
-    } else {
-      lineIdx++; charIdx = 0;
-      setTimeout(typeNext, 200);
-    }
-  }
-
-  /* progress bar */
-  let p = 0;
-  const totalSteps = lines.length;
-  function bumpBar(){
-    p = Math.min(100, p + 100/totalSteps);
-    pFill.style.width = p + "%";
-  }
-  const origType = typeNext;
-  function typeWithBar(){
-    if (charIdx === 0 && lineIdx < lines.length) bumpBar();
-    if (lineIdx >= lines.length) { typeNext(); return; }
-    const line = lines[lineIdx];
-    if (charIdx <= line.length) {
-      buf = lines.slice(0, lineIdx).join("\n") + (lineIdx > 0 ? "\n" : "") + line.slice(0, charIdx);
-      termTxt.textContent = buf;
-      termTxt.appendChild(cursor);
-      charIdx++;
-      setTimeout(typeWithBar, 28);
-    } else {
-      lineIdx++; charIdx = 0;
-      setTimeout(typeWithBar, 200);
-    }
-  }
-
-  function startDemo() {
-    lineIdx = 0; charIdx = 0; buf = "";
-    p = 0; pFill.style.width = "0%";
-    termTxt.textContent = "";
-    trendPath.style.strokeDashoffset = 1000;
-    demoSt.textContent = "Skapar prov…";
-    statScore.textContent = "—";
-    statSub.textContent = "Väntar på svar…";
-    statCoach.textContent = "—";
-    setTimeout(typeWithBar, 600);
-  }
-
-  /* replay button */
-  const replayBtn = document.getElementById("replayBtn");
-  if (replayBtn) replayBtn.addEventListener("click", startDemo);
-
-  /* Start after a short delay so page paint is settled */
-  startDemo();
 })();
 
 /* ── FOOTER YEAR ── */
