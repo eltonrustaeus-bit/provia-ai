@@ -152,7 +152,7 @@ module.exports = async function handler(req, res) {
   const level = asEnum(parsed.level, ["E", "C", "A"], "C");
   const qType = asEnum(parsed.qType, ["mix", "mc", "short"], "mix");
   const course = safeString(parsed.course, 200);
-  const pastedText = safeString(parsed.pastedText, 200000);
+  const pastedText = safeString(parsed.pastedText, 40000);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 12);
   const numQuestions = Math.min(20, Math.max(3, numQuestionsRaw));
@@ -254,7 +254,8 @@ module.exports = async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(45_000)
     });
 
     const raw = await r.text();
@@ -262,7 +263,7 @@ module.exports = async function handler(req, res) {
     try {
       data = JSON.parse(raw);
     } catch {
-      return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status, raw });
+      return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
     }
     if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data });
 
