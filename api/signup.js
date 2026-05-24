@@ -38,7 +38,7 @@ function buildWelcomeHtml(email) {
             </tr>
           </table>
           <!-- CTA -->
-          <a href="https://proviaai.vercel.app/app.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Börja träna nu</a>
+          <a href="https://proviaai.se/app.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Börja träna nu</a>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(27,255,140,.08)">
