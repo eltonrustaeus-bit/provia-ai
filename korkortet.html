@@ -20,7 +20,7 @@
 .heroSub{font-size:14px;color:var(--t2);max-width:540px;line-height:1.65}
 .statusRow{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
 .sDot{width:6px;height:6px;border-radius:50%;background:var(--t3)}
-.sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:pulse 2s ease-in-out infinite}
+.sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:kk-pulse 2s ease-in-out infinite}
 @keyframes kk-pulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
 .statusLabel{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.06em}
 
@@ -35,7 +35,7 @@
 .catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
 .catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
-.catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-1px)}
+.catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-2px)}
 .catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
 .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
 .catName{font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:2px}
