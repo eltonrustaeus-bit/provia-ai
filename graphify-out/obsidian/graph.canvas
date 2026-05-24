@@ -1,0 +1,3474 @@
+{
+  "nodes": [
+    {
+      "id": "g0",
+      "type": "group",
+      "label": "Grading Logic Internals",
+      "x": 0,
+      "y": 0,
+      "width": 1540,
+      "height": 1420,
+      "color": "1"
+    },
+    {
+      "id": "n_api_grade_answermap",
+      "type": "file",
+      "file": "answerMap.md",
+      "x": 20,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_asenum",
+      "type": "file",
+      "file": "asEnum()_1.md",
+      "x": 220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_buildnonmcgradeschema",
+      "type": "file",
+      "file": "buildNonMcGradeSchema().md",
+      "x": 420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_byid",
+      "type": "file",
+      "file": "byId.md",
+      "x": 20,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_chosenindex",
+      "type": "file",
+      "file": "chosenIndex.md",
+      "x": 220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_chosenletter",
+      "type": "file",
+      "file": "chosenLetter.md",
+      "x": 420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_chunks",
+      "type": "file",
+      "file": "chunks.md",
+      "x": 20,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_clamp",
+      "type": "file",
+      "file": "clamp().md",
+      "x": 220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_errortags",
+      "type": "file",
+      "file": "errorTags.md",
+      "x": 420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_extractoutputtext",
+      "type": "file",
+      "file": "extractOutputText().md",
+      "x": 20,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_got",
+      "type": "file",
+      "file": "got.md",
+      "x": 220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_js",
+      "type": "file",
+      "file": "grade.js.md",
+      "x": 420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_history",
+      "type": "file",
+      "file": "history.md",
+      "x": 20,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_id",
+      "type": "file",
+      "file": "id.md",
+      "x": 220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_json",
+      "type": "file",
+      "file": "json()_1.md",
+      "x": 420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_lang",
+      "type": "file",
+      "file": "lang_1.md",
+      "x": 20,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_lettertoindex",
+      "type": "file",
+      "file": "letterToIndex().md",
+      "x": 220,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_mistakesctx",
+      "type": "file",
+      "file": "mistakesCtx.md",
+      "x": 420,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_model",
+      "type": "file",
+      "file": "model_1.md",
+      "x": 20,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_mp",
+      "type": "file",
+      "file": "mp.md",
+      "x": 220,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_nonmcpack",
+      "type": "file",
+      "file": "nonMcPack.md",
+      "x": 420,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_normalizechoice",
+      "type": "file",
+      "file": "normalizeChoice().md",
+      "x": 20,
+      "y": 640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_outputtext",
+      "type": "file",
+      "file": "outputText.md",
+      "x": 220,
+      "y": 640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_pastedtext",
+      "type": "file",
+      "file": "pastedText_1.md",
+      "x": 420,
+      "y": 640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_payload",
+      "type": "file",
+      "file": "payload_1.md",
+      "x": 20,
+      "y": 720,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_per",
+      "type": "file",
+      "file": "per.md",
+      "x": 220,
+      "y": 720,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_perbyid",
+      "type": "file",
+      "file": "perById.md",
+      "x": 420,
+      "y": 720,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_pickmodel",
+      "type": "file",
+      "file": "pickModel()_1.md",
+      "x": 20,
+      "y": 800,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_pts",
+      "type": "file",
+      "file": "pts.md",
+      "x": 220,
+      "y": 800,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_raw",
+      "type": "file",
+      "file": "raw.md",
+      "x": 420,
+      "y": 800,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_responseformat",
+      "type": "file",
+      "file": "responseFormat_1.md",
+      "x": 20,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_safearraystrings",
+      "type": "file",
+      "file": "safeArrayStrings().md",
+      "x": 220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_safestring",
+      "type": "file",
+      "file": "safeString()_1.md",
+      "x": 420,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_sanitizehistory",
+      "type": "file",
+      "file": "sanitizeHistory().md",
+      "x": 20,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_sanitizemistakes",
+      "type": "file",
+      "file": "sanitizeMistakes().md",
+      "x": 220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_type",
+      "type": "file",
+      "file": "type.md",
+      "x": 420,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade_userpayload",
+      "type": "file",
+      "file": "userPayload.md",
+      "x": 20,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g1",
+      "type": "group",
+      "label": "Exam Generation Logic",
+      "x": 1620,
+      "y": 0,
+      "width": 1100,
+      "height": 920,
+      "color": "2"
+    },
+    {
+      "id": "n_api_generate_exam_asenum",
+      "type": "file",
+      "file": "asEnum().md",
+      "x": 1640,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_buildmockexamschema",
+      "type": "file",
+      "file": "buildMockExamSchema().md",
+      "x": 1840,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_course",
+      "type": "file",
+      "file": "course.md",
+      "x": 2040,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_js",
+      "type": "file",
+      "file": "generate-exam.js.md",
+      "x": 1640,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_ismath",
+      "type": "file",
+      "file": "isMath.md",
+      "x": 1840,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_json",
+      "type": "file",
+      "file": "json().md",
+      "x": 2040,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_lang",
+      "type": "file",
+      "file": "lang.md",
+      "x": 1640,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_level",
+      "type": "file",
+      "file": "level.md",
+      "x": 1840,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_lookslikemath",
+      "type": "file",
+      "file": "looksLikeMath().md",
+      "x": 2040,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_model",
+      "type": "file",
+      "file": "model.md",
+      "x": 1640,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_numquestions",
+      "type": "file",
+      "file": "numQuestions.md",
+      "x": 1840,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_numquestionsraw",
+      "type": "file",
+      "file": "numQuestionsRaw.md",
+      "x": 2040,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_pastedtext",
+      "type": "file",
+      "file": "pastedText.md",
+      "x": 1640,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_payload",
+      "type": "file",
+      "file": "payload.md",
+      "x": 1840,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_pickmodel",
+      "type": "file",
+      "file": "pickModel().md",
+      "x": 2040,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_qtype",
+      "type": "file",
+      "file": "qType.md",
+      "x": 1640,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_readjsonbody",
+      "type": "file",
+      "file": "readJsonBody().md",
+      "x": 1840,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_responseformat",
+      "type": "file",
+      "file": "responseFormat.md",
+      "x": 2040,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_safestring",
+      "type": "file",
+      "file": "safeString().md",
+      "x": 1640,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_toint",
+      "type": "file",
+      "file": "toInt().md",
+      "x": 1840,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_useren",
+      "type": "file",
+      "file": "userEn.md",
+      "x": 2040,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generate_exam_usersv",
+      "type": "file",
+      "file": "userSv.md",
+      "x": 1640,
+      "y": 640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g2",
+      "type": "group",
+      "label": "API Endpoints",
+      "x": 2800,
+      "y": 0,
+      "width": 1100,
+      "height": 820,
+      "color": "3"
+    },
+    {
+      "id": "n_api_deleteexams",
+      "type": "file",
+      "file": "Delete Exams Handler.md",
+      "x": 2820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_concept_mcgrading",
+      "type": "file",
+      "file": "Deterministic MC Grading.md",
+      "x": 3020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_explain",
+      "type": "file",
+      "file": "Explain Handler.md",
+      "x": 3220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_generateexam",
+      "type": "file",
+      "file": "Generate Exam Handler.md",
+      "x": 2820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_grade",
+      "type": "file",
+      "file": "Grade Handler.md",
+      "x": 3020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_concept_mathdetection",
+      "type": "file",
+      "file": "Math Detection Logic.md",
+      "x": 3220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr",
+      "type": "file",
+      "file": "OCR Handler.md",
+      "x": 2820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_ext_openai_responses",
+      "type": "file",
+      "file": "OpenAI v1responses Endpoint.md",
+      "x": 3020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_projectdoc",
+      "type": "file",
+      "file": "Project Architecture Doc.md",
+      "x": 3220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_smarttips",
+      "type": "file",
+      "file": "Smart Tips Handler.md",
+      "x": 2820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_db_userexams",
+      "type": "file",
+      "file": "Supabase Table user_exams.md",
+      "x": 3020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_teacherreport",
+      "type": "file",
+      "file": "Teacher Report Handler.md",
+      "x": 3220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_trainmaterial",
+      "type": "file",
+      "file": "Train Material Handler.md",
+      "x": 2820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_concept_trainmaterial",
+      "type": "file",
+      "file": "Train Material from Mistakes.md",
+      "x": 3020,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_verceljson_config",
+      "type": "file",
+      "file": "Vercel Serverless Config.md",
+      "x": 3220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_fn_buildmockexamschema",
+      "type": "file",
+      "file": "buildMockExamSchema() Function.md",
+      "x": 2820,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_fn_buildnonmcgradeschema",
+      "type": "file",
+      "file": "buildNonMcGradeSchema() Function.md",
+      "x": 3020,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_fn_looksmlikemath",
+      "type": "file",
+      "file": "looksLikeMath() Function.md",
+      "x": 3220,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_fn_pickcoursequide",
+      "type": "file",
+      "file": "pickCourseGuide() Function.md",
+      "x": 2820,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g3",
+      "type": "group",
+      "label": "Train Material API",
+      "x": 3980,
+      "y": 0,
+      "width": 880,
+      "height": 620,
+      "color": "4"
+    },
+    {
+      "id": "n_api_train_material_asenum",
+      "type": "file",
+      "file": "asEnum()_2.md",
+      "x": 4000,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_buildschema",
+      "type": "file",
+      "file": "buildSchema().md",
+      "x": 4200,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_chunks",
+      "type": "file",
+      "file": "chunks_2.md",
+      "x": 4400,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_json",
+      "type": "file",
+      "file": "json()_3.md",
+      "x": 4000,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_lang",
+      "type": "file",
+      "file": "lang_2.md",
+      "x": 4200,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_last",
+      "type": "file",
+      "file": "last.md",
+      "x": 4400,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_model",
+      "type": "file",
+      "file": "model_3.md",
+      "x": 4000,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_payload",
+      "type": "file",
+      "file": "payload_3.md",
+      "x": 4200,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_pickmodel",
+      "type": "file",
+      "file": "pickModel()_3.md",
+      "x": 4400,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_raw",
+      "type": "file",
+      "file": "raw_2.md",
+      "x": 4000,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_responseformat",
+      "type": "file",
+      "file": "responseFormat_2.md",
+      "x": 4200,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_safestring",
+      "type": "file",
+      "file": "safeString()_3.md",
+      "x": 4400,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_js",
+      "type": "file",
+      "file": "train-material.js.md",
+      "x": 4000,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_train_material_userpayload",
+      "type": "file",
+      "file": "userPayload_1.md",
+      "x": 4200,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g4",
+      "type": "group",
+      "label": "Vercel Serverless Config",
+      "x": 4940,
+      "y": 0,
+      "width": 880,
+      "height": 620,
+      "color": "5"
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_explain_js",
+      "type": "file",
+      "file": "apiexplain.js.md",
+      "x": 4960,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_grade_js",
+      "type": "file",
+      "file": "apigrade.js.md",
+      "x": 5160,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_ocr_js",
+      "type": "file",
+      "file": "apiocr.js.md",
+      "x": 5360,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_smart_tips_js",
+      "type": "file",
+      "file": "apismart-tips.js.md",
+      "x": 4960,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_teacher_report_js",
+      "type": "file",
+      "file": "apiteacher-report.js.md",
+      "x": 5160,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions_api_train_material_js",
+      "type": "file",
+      "file": "apitrain-material.js.md",
+      "x": 5360,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_functions",
+      "type": "file",
+      "file": "functions.md",
+      "x": 4960,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_explain_js_maxduration",
+      "type": "file",
+      "file": "maxDuration_5.md",
+      "x": 5160,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_grade_js_maxduration",
+      "type": "file",
+      "file": "maxDuration.md",
+      "x": 5360,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_ocr_js_maxduration",
+      "type": "file",
+      "file": "maxDuration_4.md",
+      "x": 4960,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_smart_tips_js_maxduration",
+      "type": "file",
+      "file": "maxDuration_1.md",
+      "x": 5160,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_teacher_report_js_maxduration",
+      "type": "file",
+      "file": "maxDuration_2.md",
+      "x": 5360,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_vercel_api_train_material_js_maxduration",
+      "type": "file",
+      "file": "maxDuration_3.md",
+      "x": 4960,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_vercel_json",
+      "type": "file",
+      "file": "vercel.json.md",
+      "x": 5160,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g5",
+      "type": "group",
+      "label": "Auth & Admin Handlers",
+      "x": 5900,
+      "y": 0,
+      "width": 880,
+      "height": 620,
+      "color": "6"
+    },
+    {
+      "id": "n_scripts_addquestionsbatch2",
+      "type": "file",
+      "file": "Add Questions Batch2 Script.md",
+      "x": 5920,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_adminapprove",
+      "type": "file",
+      "file": "Admin Approve Handler.md",
+      "x": 6120,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adminhtml_page",
+      "type": "file",
+      "file": "Admin HTML Page.md",
+      "x": 6320,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_checkrole",
+      "type": "file",
+      "file": "Check Role Handler.md",
+      "x": 5920,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_scripts_insertquestions",
+      "type": "file",
+      "file": "Insert Questions Script.md",
+      "x": 6120,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_notifynewuser",
+      "type": "file",
+      "file": "Notify New User Handler.md",
+      "x": 6320,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_packagejson_proviaai",
+      "type": "file",
+      "file": "ProviaAI Package.md",
+      "x": 5920,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_scripts_questionsjson",
+      "type": "file",
+      "file": "Questions JSON Data.md",
+      "x": 6120,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_ext_resend",
+      "type": "file",
+      "file": "Resend Email API.md",
+      "x": 6320,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_signup",
+      "type": "file",
+      "file": "Signup Handler.md",
+      "x": 5920,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_ext_supabase",
+      "type": "file",
+      "file": "Supabase Backend.md",
+      "x": 6120,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_db_drivingquestions",
+      "type": "file",
+      "file": "Supabase Table driving_questions.md",
+      "x": 6320,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_db_profiles",
+      "type": "file",
+      "file": "Supabase Table profiles.md",
+      "x": 5920,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_concept_role",
+      "type": "file",
+      "file": "User Role System (gratisbasicpremiumadmin).md",
+      "x": 6120,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g6",
+      "type": "group",
+      "label": "Product Context & Commands",
+      "x": 0,
+      "y": 1500,
+      "width": 880,
+      "height": 520,
+      "color": "1"
+    },
+    {
+      "id": "n_korkortet_350_questions",
+      "type": "file",
+      "file": "350 Curated Korkortet Questions.md",
+      "x": 20,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_page_admin",
+      "type": "file",
+      "file": "Admin Panel (admin.html).md",
+      "x": 220,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claude_md_dataflow",
+      "type": "file",
+      "file": "App Data Flow (app.html to APIs).md",
+      "x": 420,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_page_app",
+      "type": "file",
+      "file": "Core App Page (app.html).md",
+      "x": 20,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_page_korkortet",
+      "type": "file",
+      "file": "Driver License Quiz Page (korkortet.html).md",
+      "x": 220,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_page_forbattring",
+      "type": "file",
+      "file": "FeedbackImprovement Page (forbattring.html).md",
+      "x": 420,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_cmd_grant",
+      "type": "file",
+      "file": "Grant Role Command.md",
+      "x": 20,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_page_pricing",
+      "type": "file",
+      "file": "Pricing Page (pricing.html).md",
+      "x": 220,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_pricing_gratis_basic_premium",
+      "type": "file",
+      "file": "Pricing Plans (gratisbasicpremium).md",
+      "x": 420,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_product_md_proviaai",
+      "type": "file",
+      "file": "ProviaAI Product Context.md",
+      "x": 20,
+      "y": 1820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_cmd_users",
+      "type": "file",
+      "file": "Users Command.md",
+      "x": 220,
+      "y": 1820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g7",
+      "type": "group",
+      "label": "AI Grading & Exam Pipeline",
+      "x": 1620,
+      "y": 1500,
+      "width": 880,
+      "height": 520,
+      "color": "2"
+    },
+    {
+      "id": "n_smart_tips_courseguide",
+      "type": "file",
+      "file": "Course Specific Guide Selector.md",
+      "x": 1640,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_generate_exam_handler",
+      "type": "file",
+      "file": "Generate Exam Handler_1.md",
+      "x": 1840,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_grade_handler",
+      "type": "file",
+      "file": "Grade Handler_1.md",
+      "x": 2040,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_grade_mc_deterministic",
+      "type": "file",
+      "file": "MC Deterministic Grading.md",
+      "x": 1640,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_generate_exam_lookslikemath",
+      "type": "file",
+      "file": "Math Detection looksLikeMath.md",
+      "x": 1840,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_generate_exam_buildschema",
+      "type": "file",
+      "file": "Mock Exam JSON Schema Builder.md",
+      "x": 2040,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_grade_nonmc_ai",
+      "type": "file",
+      "file": "Non-MC AI Grading.md",
+      "x": 1640,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_openai_responses_endpoint",
+      "type": "file",
+      "file": "OpenAI v1 responses API.md",
+      "x": 1840,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_smart_tips_handler",
+      "type": "file",
+      "file": "Smart Tips Handler_1.md",
+      "x": 2040,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_teacher_report_handler",
+      "type": "file",
+      "file": "Teacher Report Handler_1.md",
+      "x": 1640,
+      "y": 1820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_vercel_serverless",
+      "type": "file",
+      "file": "Vercel Serverless Functions.md",
+      "x": 1840,
+      "y": 1820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g8",
+      "type": "group",
+      "label": "OCR Image Processing",
+      "x": 2800,
+      "y": 1500,
+      "width": 660,
+      "height": 420,
+      "color": "3"
+    },
+    {
+      "id": "n_api_ocr_chunks",
+      "type": "file",
+      "file": "chunks_1.md",
+      "x": 2820,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_imagedataurl",
+      "type": "file",
+      "file": "imageDataUrl.md",
+      "x": 3020,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_json",
+      "type": "file",
+      "file": "json()_2.md",
+      "x": 3220,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_model",
+      "type": "file",
+      "file": "model_2.md",
+      "x": 2820,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_js",
+      "type": "file",
+      "file": "ocr.js.md",
+      "x": 3020,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_payload",
+      "type": "file",
+      "file": "payload_2.md",
+      "x": 3220,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_pickmodel",
+      "type": "file",
+      "file": "pickModel()_2.md",
+      "x": 2820,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_ocr_raw",
+      "type": "file",
+      "file": "raw_1.md",
+      "x": 3020,
+      "y": 1740,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g9",
+      "type": "group",
+      "label": "Role & Auth System",
+      "x": 3980,
+      "y": 1500,
+      "width": 660,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_admin_approve_handler",
+      "type": "file",
+      "file": "Admin Approve Handler_1.md",
+      "x": 4000,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_check_role_handler",
+      "type": "file",
+      "file": "Check Role Handler_1.md",
+      "x": 4200,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_signup_resend",
+      "type": "file",
+      "file": "Resend Email Notification.md",
+      "x": 4400,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_role_system",
+      "type": "file",
+      "file": "Role System gratis basic premium admin.md",
+      "x": 4000,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_signup_handler",
+      "type": "file",
+      "file": "Signup Handler_1.md",
+      "x": 4200,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_supabase_profiles_table",
+      "type": "file",
+      "file": "Supabase Profiles Table.md",
+      "x": 4400,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g10",
+      "type": "group",
+      "label": "NPM Dependencies",
+      "x": 4940,
+      "y": 1500,
+      "width": 660,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_provklaruf_package_dependencies_supabase_supabase_js",
+      "type": "file",
+      "file": "@supabasesupabase-js.md",
+      "x": 4960,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_package_dependencies",
+      "type": "file",
+      "file": "dependencies.md",
+      "x": 5160,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_package_name",
+      "type": "file",
+      "file": "name.md",
+      "x": 5360,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_package_json",
+      "type": "file",
+      "file": "package.json.md",
+      "x": 4960,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_package_private",
+      "type": "file",
+      "file": "private.md",
+      "x": 5160,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_provklaruf_package_version",
+      "type": "file",
+      "file": "version.md",
+      "x": 5360,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g11",
+      "type": "group",
+      "label": "Smart Tips API",
+      "x": 5900,
+      "y": 1500,
+      "width": 660,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_api_smart_tips_handler",
+      "type": "file",
+      "file": "handler()_6.md",
+      "x": 5920,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_smart_tips_normalizecourse",
+      "type": "file",
+      "file": "normalizeCourse().md",
+      "x": 6120,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_smart_tips_pickcourseguide",
+      "type": "file",
+      "file": "pickCourseGuide().md",
+      "x": 6320,
+      "y": 1580,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_smart_tips_safestring",
+      "type": "file",
+      "file": "safeString()_2.md",
+      "x": 5920,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_smart_tips_js",
+      "type": "file",
+      "file": "smart-tips.js.md",
+      "x": 6120,
+      "y": 1660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g12",
+      "type": "group",
+      "label": "Brand & Visual Identity",
+      "x": 0,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_brand_identity",
+      "type": "file",
+      "file": "Brand Identity (ProviaAI  ProvKlar).md",
+      "x": 20,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_image_provklar_logo",
+      "type": "file",
+      "file": "ProvKlar Logo.md",
+      "x": 220,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_image_proviaai_hero",
+      "type": "file",
+      "file": "ProviaAI Hero Image.md",
+      "x": 420,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_image_proviaai_logo",
+      "type": "file",
+      "file": "ProviaAI Logo.md",
+      "x": 20,
+      "y": 2260,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g13",
+      "type": "group",
+      "label": "Check Role API",
+      "x": 1620,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_api_check_role_js",
+      "type": "file",
+      "file": "check-role.js.md",
+      "x": 1640,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_check_role_handler",
+      "type": "file",
+      "file": "handler()_1.md",
+      "x": 1840,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_check_role_supabase",
+      "type": "file",
+      "file": "supabase.md",
+      "x": 2040,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g14",
+      "type": "group",
+      "label": "Delete Exams API",
+      "x": 2800,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_api_delete_exams_js",
+      "type": "file",
+      "file": "delete-exams.js.md",
+      "x": 2820,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_delete_exams_handler",
+      "type": "file",
+      "file": "handler()_2.md",
+      "x": 3020,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_delete_exams_supabase",
+      "type": "file",
+      "file": "supabase_1.md",
+      "x": 3220,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g15",
+      "type": "group",
+      "label": "Explain API",
+      "x": 3980,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_api_explain_client",
+      "type": "file",
+      "file": "client.md",
+      "x": 4000,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_explain_js",
+      "type": "file",
+      "file": "explain.js.md",
+      "x": 4200,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_explain_handler",
+      "type": "file",
+      "file": "handler()_3.md",
+      "x": 4400,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g16",
+      "type": "group",
+      "label": "Notify New User API",
+      "x": 4940,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_api_notify_new_user_handler",
+      "type": "file",
+      "file": "handler()_4.md",
+      "x": 4960,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_notify_new_user_js",
+      "type": "file",
+      "file": "notify-new-user.js.md",
+      "x": 5160,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_notify_new_user_supabase",
+      "type": "file",
+      "file": "supabase_2.md",
+      "x": 5360,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g17",
+      "type": "group",
+      "label": "Signup API",
+      "x": 5900,
+      "y": 2100,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_api_signup_handler",
+      "type": "file",
+      "file": "handler()_5.md",
+      "x": 5920,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_signup_js",
+      "type": "file",
+      "file": "signup.js.md",
+      "x": 6120,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_signup_supabase",
+      "type": "file",
+      "file": "supabase_3.md",
+      "x": 6320,
+      "y": 2180,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g18",
+      "type": "group",
+      "label": "Teacher Report API",
+      "x": 0,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_api_teacher_report_handler",
+      "type": "file",
+      "file": "handler()_7.md",
+      "x": 20,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_teacher_report_safe",
+      "type": "file",
+      "file": "safe().md",
+      "x": 220,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_teacher_report_js",
+      "type": "file",
+      "file": "teacher-report.js.md",
+      "x": 420,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g19",
+      "type": "group",
+      "label": "Vercel & Supabase Infrastructure",
+      "x": 1620,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_cmd_deploy",
+      "type": "file",
+      "file": "Deploy Command.md",
+      "x": 1640,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claude_md_supabase",
+      "type": "file",
+      "file": "Supabase Schema (profiles, user_exams).md",
+      "x": 1840,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claude_md_arch",
+      "type": "file",
+      "file": "Vercel Serverless Architecture.md",
+      "x": 2040,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g20",
+      "type": "group",
+      "label": "Cleanup Command",
+      "x": 2800,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_product_md_brand",
+      "type": "file",
+      "file": "Brand Tone (Sharp, Focused, Swedish).md",
+      "x": 2820,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_md_tokens",
+      "type": "file",
+      "file": "Design Tokens (color, typography).md",
+      "x": 3020,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_md_accent",
+      "type": "file",
+      "file": "Green Accent 1bff8c.md",
+      "x": 3220,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g21",
+      "type": "group",
+      "label": "Pricing & Plans",
+      "x": 3980,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_api_admin_approve_js",
+      "type": "file",
+      "file": "admin-approve.js.md",
+      "x": 4000,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_api_admin_approve_handler",
+      "type": "file",
+      "file": "handler().md",
+      "x": 4200,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g22",
+      "type": "group",
+      "label": "Frontend Pages",
+      "x": 4940,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_scripts_insert_questions_insert_batch",
+      "type": "file",
+      "file": "insert_batch().md",
+      "x": 4960,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_scripts_insert_questions_py",
+      "type": "file",
+      "file": "insert_questions.py.md",
+      "x": 5160,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g23",
+      "type": "group",
+      "label": "Design System",
+      "x": 5900,
+      "y": 2580,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_scripts_add_questions_batch2_py",
+      "type": "file",
+      "file": "add_questions_batch2.py.md",
+      "x": 5920,
+      "y": 2660,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g24",
+      "type": "group",
+      "label": "Korkortet Quiz Module",
+      "x": 0,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_scripts_questions_json",
+      "type": "file",
+      "file": "questions.json.md",
+      "x": 20,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g25",
+      "type": "group",
+      "label": "Grade Handler Core",
+      "x": 1620,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_ext_openai_chat",
+      "type": "file",
+      "file": "OpenAI v1chatcompletions Endpoint.md",
+      "x": 1640,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g26",
+      "type": "group",
+      "label": "Generate Exam Core",
+      "x": 2800,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_db_userprofiles",
+      "type": "file",
+      "file": "Supabase Table user_profiles.md",
+      "x": 2820,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g27",
+      "type": "group",
+      "label": "Community 27",
+      "x": 3980,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_delete_exams_handler",
+      "type": "file",
+      "file": "Delete Exams Handler_1.md",
+      "x": 4000,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g28",
+      "type": "group",
+      "label": "Community 28",
+      "x": 4940,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_train_material_handler",
+      "type": "file",
+      "file": "Train Material Handler_1.md",
+      "x": 4960,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g29",
+      "type": "group",
+      "label": "Community 29",
+      "x": 5900,
+      "y": 3060,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_ocr_handler",
+      "type": "file",
+      "file": "OCR Handler_1.md",
+      "x": 5920,
+      "y": 3140,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g30",
+      "type": "group",
+      "label": "Community 30",
+      "x": 0,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_explain_handler",
+      "type": "file",
+      "file": "Explain Handler_1.md",
+      "x": 20,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g31",
+      "type": "group",
+      "label": "Community 31",
+      "x": 1620,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_product_md_users",
+      "type": "file",
+      "file": "Target Users (Students 16-25, Korkortet).md",
+      "x": 1640,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g32",
+      "type": "group",
+      "label": "Community 32",
+      "x": 2800,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_design_md_components",
+      "type": "file",
+      "file": "UI Components (btnP, btnG, Cards, Badges).md",
+      "x": 2820,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g33",
+      "type": "group",
+      "label": "Community 33",
+      "x": 3980,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_page_index",
+      "type": "file",
+      "file": "Landing Page (index.html).md",
+      "x": 4000,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g34",
+      "type": "group",
+      "label": "Community 34",
+      "x": 4940,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_page_live_demo",
+      "type": "file",
+      "file": "Live Demo Page (live-demo.html).md",
+      "x": 4960,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g35",
+      "type": "group",
+      "label": "Community 35",
+      "x": 5900,
+      "y": 3540,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_cmd_cleanup",
+      "type": "file",
+      "file": "Cleanup Command.md",
+      "x": 5920,
+      "y": 3620,
+      "width": 180,
+      "height": 60
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_package_json_provklaruf_package_name",
+      "fromNode": "n_package_json",
+      "toNode": "n_provklaruf_package_name",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_package_json_provklaruf_package_version",
+      "fromNode": "n_package_json",
+      "toNode": "n_provklaruf_package_version",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_package_json_provklaruf_package_private",
+      "fromNode": "n_package_json",
+      "toNode": "n_provklaruf_package_private",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_package_json_provklaruf_package_dependencies",
+      "fromNode": "n_package_json",
+      "toNode": "n_provklaruf_package_dependencies",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_package_dependencies_provklaruf_package_dependencies_supabase_supabase_js",
+      "fromNode": "n_provklaruf_package_dependencies",
+      "toNode": "n_provklaruf_package_dependencies_supabase_supabase_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_vercel_json_provklaruf_vercel_functions",
+      "fromNode": "n_vercel_json",
+      "toNode": "n_provklaruf_vercel_functions",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_grade_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_grade_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_smart_tips_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_smart_tips_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_teacher_report_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_teacher_report_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_train_material_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_train_material_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_ocr_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_ocr_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_provklaruf_vercel_functions_api_explain_js",
+      "fromNode": "n_provklaruf_vercel_functions",
+      "toNode": "n_provklaruf_vercel_functions_api_explain_js",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_grade_js_provklaruf_vercel_api_grade_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_grade_js",
+      "toNode": "n_provklaruf_vercel_api_grade_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_smart_tips_js_provklaruf_vercel_api_smart_tips_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_smart_tips_js",
+      "toNode": "n_provklaruf_vercel_api_smart_tips_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_teacher_report_js_provklaruf_vercel_api_teacher_report_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_teacher_report_js",
+      "toNode": "n_provklaruf_vercel_api_teacher_report_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_train_material_js_provklaruf_vercel_api_train_material_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_train_material_js",
+      "toNode": "n_provklaruf_vercel_api_train_material_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_ocr_js_provklaruf_vercel_api_ocr_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_ocr_js",
+      "toNode": "n_provklaruf_vercel_api_ocr_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_provklaruf_vercel_functions_api_explain_js_provklaruf_vercel_api_explain_js_maxduration",
+      "fromNode": "n_provklaruf_vercel_functions_api_explain_js",
+      "toNode": "n_provklaruf_vercel_api_explain_js_maxduration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_admin_approve_js_api_admin_approve_handler",
+      "fromNode": "n_api_admin_approve_js",
+      "toNode": "n_api_admin_approve_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_check_role_js_api_check_role_supabase",
+      "fromNode": "n_api_check_role_js",
+      "toNode": "n_api_check_role_supabase",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_check_role_js_api_check_role_handler",
+      "fromNode": "n_api_check_role_js",
+      "toNode": "n_api_check_role_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_delete_exams_js_api_delete_exams_supabase",
+      "fromNode": "n_api_delete_exams_js",
+      "toNode": "n_api_delete_exams_supabase",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_delete_exams_js_api_delete_exams_handler",
+      "fromNode": "n_api_delete_exams_js",
+      "toNode": "n_api_delete_exams_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_explain_js_api_explain_client",
+      "fromNode": "n_api_explain_js",
+      "toNode": "n_api_explain_client",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_explain_js_api_explain_handler",
+      "fromNode": "n_api_explain_js",
+      "toNode": "n_api_explain_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_json",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_json",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_safestring",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_safestring",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_asenum",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_asenum",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_toint",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_toint",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_lookslikemath",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_lookslikemath",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_pickmodel",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_pickmodel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_buildmockexamschema",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_buildmockexamschema",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_readjsonbody",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_readjsonbody",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_lang",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_lang",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_level",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_level",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_qtype",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_qtype",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_course",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_course",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_pastedtext",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_pastedtext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_numquestionsraw",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_numquestionsraw",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_numquestions",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_numquestions",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_ismath",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_ismath",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_model",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_model",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_responseformat",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_responseformat",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_usersv",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_usersv",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_useren",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_useren",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generate_exam_js_api_generate_exam_payload",
+      "fromNode": "n_api_generate_exam_js",
+      "toNode": "n_api_generate_exam_payload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_json",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_json",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_pickmodel",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_pickmodel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_safestring",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_safestring",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_asenum",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_asenum",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_clamp",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_clamp",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_normalizechoice",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_normalizechoice",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_lettertoindex",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_lettertoindex",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_safearraystrings",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_safearraystrings",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_buildnonmcgradeschema",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_buildnonmcgradeschema",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_sanitizehistory",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_sanitizehistory",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_sanitizemistakes",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_sanitizemistakes",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_extractoutputtext",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_extractoutputtext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_chunks",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_chunks",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_raw",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_raw",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_lang",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_lang",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_pastedtext",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_pastedtext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_history",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_history",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_mistakesctx",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_mistakesctx",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_answermap",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_answermap",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_id",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_id",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_perbyid",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_perbyid",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_nonmcpack",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_nonmcpack",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_type",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_type",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_chosenletter",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_chosenletter",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_chosenindex",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_chosenindex",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_per",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_per",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_model",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_model",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_responseformat",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_responseformat",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_userpayload",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_userpayload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_payload",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_payload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_outputtext",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_outputtext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_byid",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_byid",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_got",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_got",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_mp",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_mp",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_pts",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_pts",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_js_api_grade_errortags",
+      "fromNode": "n_api_grade_js",
+      "toNode": "n_api_grade_errortags",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_notify_new_user_js_api_notify_new_user_supabase",
+      "fromNode": "n_api_notify_new_user_js",
+      "toNode": "n_api_notify_new_user_supabase",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_notify_new_user_js_api_notify_new_user_handler",
+      "fromNode": "n_api_notify_new_user_js",
+      "toNode": "n_api_notify_new_user_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_json",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_json",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_pickmodel",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_pickmodel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_chunks",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_chunks",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_raw",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_raw",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_imagedataurl",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_imagedataurl",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_model",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_model",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_js_api_ocr_payload",
+      "fromNode": "n_api_ocr_js",
+      "toNode": "n_api_ocr_payload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_signup_js_api_signup_supabase",
+      "fromNode": "n_api_signup_js",
+      "toNode": "n_api_signup_supabase",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_signup_js_api_signup_handler",
+      "fromNode": "n_api_signup_js",
+      "toNode": "n_api_signup_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_js_api_smart_tips_safestring",
+      "fromNode": "n_api_smart_tips_js",
+      "toNode": "n_api_smart_tips_safestring",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_js_api_smart_tips_normalizecourse",
+      "fromNode": "n_api_smart_tips_js",
+      "toNode": "n_api_smart_tips_normalizecourse",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_js_api_smart_tips_pickcourseguide",
+      "fromNode": "n_api_smart_tips_js",
+      "toNode": "n_api_smart_tips_pickcourseguide",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_js_api_smart_tips_handler",
+      "fromNode": "n_api_smart_tips_js",
+      "toNode": "n_api_smart_tips_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_safestring_api_smart_tips_handler",
+      "fromNode": "n_api_smart_tips_safestring",
+      "toNode": "n_api_smart_tips_handler",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_normalizecourse_api_smart_tips_pickcourseguide",
+      "fromNode": "n_api_smart_tips_normalizecourse",
+      "toNode": "n_api_smart_tips_pickcourseguide",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smart_tips_pickcourseguide_api_smart_tips_handler",
+      "fromNode": "n_api_smart_tips_pickcourseguide",
+      "toNode": "n_api_smart_tips_handler",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_teacher_report_js_api_teacher_report_safe",
+      "fromNode": "n_api_teacher_report_js",
+      "toNode": "n_api_teacher_report_safe",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_teacher_report_js_api_teacher_report_handler",
+      "fromNode": "n_api_teacher_report_js",
+      "toNode": "n_api_teacher_report_handler",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_teacher_report_safe_api_teacher_report_handler",
+      "fromNode": "n_api_teacher_report_safe",
+      "toNode": "n_api_teacher_report_handler",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_json",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_json",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_pickmodel",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_pickmodel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_safestring",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_safestring",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_asenum",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_asenum",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_buildschema",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_buildschema",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_chunks",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_chunks",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_raw",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_raw",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_lang",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_lang",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_last",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_last",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_model",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_model",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_responseformat",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_responseformat",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_userpayload",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_userpayload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_api_train_material_js_api_train_material_payload",
+      "fromNode": "n_api_train_material_js",
+      "toNode": "n_api_train_material_payload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_scripts_insert_questions_py_scripts_insert_questions_insert_batch",
+      "fromNode": "n_scripts_insert_questions_py",
+      "toNode": "n_scripts_insert_questions_insert_batch",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_packagejson_proviaai_ext_supabase",
+      "fromNode": "n_packagejson_proviaai",
+      "toNode": "n_ext_supabase",
+      "label": "depends_on [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_grade",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_grade",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_smarttips",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_smarttips",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_teacherreport",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_teacherreport",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_trainmaterial",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_trainmaterial",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_ocr",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_ocr",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_verceljson_config_api_explain",
+      "fromNode": "n_verceljson_config",
+      "toNode": "n_api_explain",
+      "label": "configures [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_api_generateexam",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_api_generateexam",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_api_grade",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_api_grade",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_api_smarttips",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_api_smarttips",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_api_trainmaterial",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_api_trainmaterial",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_api_teacherreport",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_api_teacherreport",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_db_profiles",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_db_profiles",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_db_userexams",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_db_userexams",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_projectdoc_concept_role",
+      "fromNode": "n_claudemd_projectdoc",
+      "toNode": "n_concept_role",
+      "label": "documents [EXTRACTED]"
+    },
+    {
+      "id": "e_api_adminapprove_ext_supabase",
+      "fromNode": "n_api_adminapprove",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_adminapprove_db_profiles",
+      "fromNode": "n_api_adminapprove",
+      "toNode": "n_db_profiles",
+      "label": "writes [EXTRACTED]"
+    },
+    {
+      "id": "e_api_adminapprove_concept_role",
+      "fromNode": "n_api_adminapprove",
+      "toNode": "n_concept_role",
+      "label": "enforces [EXTRACTED]"
+    },
+    {
+      "id": "e_api_adminapprove_adminhtml_page",
+      "fromNode": "n_api_adminapprove",
+      "toNode": "n_adminhtml_page",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_checkrole_ext_supabase",
+      "fromNode": "n_api_checkrole",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_checkrole_db_profiles",
+      "fromNode": "n_api_checkrole",
+      "toNode": "n_db_profiles",
+      "label": "reads [EXTRACTED]"
+    },
+    {
+      "id": "e_api_checkrole_concept_role",
+      "fromNode": "n_api_checkrole",
+      "toNode": "n_concept_role",
+      "label": "returns [EXTRACTED]"
+    },
+    {
+      "id": "e_api_deleteexams_ext_supabase",
+      "fromNode": "n_api_deleteexams",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_deleteexams_db_userexams",
+      "fromNode": "n_api_deleteexams",
+      "toNode": "n_db_userexams",
+      "label": "deletes [EXTRACTED]"
+    },
+    {
+      "id": "e_api_explain_ext_openai_responses",
+      "fromNode": "n_api_explain",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generateexam_ext_openai_responses",
+      "fromNode": "n_api_generateexam",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generateexam_fn_looksmlikemath",
+      "fromNode": "n_api_generateexam",
+      "toNode": "n_fn_looksmlikemath",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generateexam_fn_buildmockexamschema",
+      "fromNode": "n_api_generateexam",
+      "toNode": "n_fn_buildmockexamschema",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_generateexam_concept_mathdetection",
+      "fromNode": "n_api_generateexam",
+      "toNode": "n_concept_mathdetection",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_ext_openai_responses",
+      "fromNode": "n_api_grade",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_fn_buildnonmcgradeschema",
+      "fromNode": "n_api_grade",
+      "toNode": "n_fn_buildnonmcgradeschema",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_grade_concept_mcgrading",
+      "fromNode": "n_api_grade",
+      "toNode": "n_concept_mcgrading",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_api_notifynewuser_ext_supabase",
+      "fromNode": "n_api_notifynewuser",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_notifynewuser_ext_resend",
+      "fromNode": "n_api_notifynewuser",
+      "toNode": "n_ext_resend",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_ocr_ext_openai_responses",
+      "fromNode": "n_api_ocr",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_signup_ext_supabase",
+      "fromNode": "n_api_signup",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_signup_ext_resend",
+      "fromNode": "n_api_signup",
+      "toNode": "n_ext_resend",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smarttips_ext_openai_responses",
+      "fromNode": "n_api_smarttips",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_smarttips_fn_pickcoursequide",
+      "fromNode": "n_api_smarttips",
+      "toNode": "n_fn_pickcoursequide",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_teacherreport_ext_openai_responses",
+      "fromNode": "n_api_teacherreport",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_trainmaterial_ext_openai_responses",
+      "fromNode": "n_api_trainmaterial",
+      "toNode": "n_ext_openai_responses",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_api_trainmaterial_concept_trainmaterial",
+      "fromNode": "n_api_trainmaterial",
+      "toNode": "n_concept_trainmaterial",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_adminhtml_page_ext_supabase",
+      "fromNode": "n_adminhtml_page",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_scripts_insertquestions_ext_supabase",
+      "fromNode": "n_scripts_insertquestions",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_scripts_insertquestions_db_drivingquestions",
+      "fromNode": "n_scripts_insertquestions",
+      "toNode": "n_db_drivingquestions",
+      "label": "writes [EXTRACTED]"
+    },
+    {
+      "id": "e_scripts_addquestionsbatch2_ext_supabase",
+      "fromNode": "n_scripts_addquestionsbatch2",
+      "toNode": "n_ext_supabase",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_scripts_addquestionsbatch2_db_drivingquestions",
+      "fromNode": "n_scripts_addquestionsbatch2",
+      "toNode": "n_db_drivingquestions",
+      "label": "writes [EXTRACTED]"
+    },
+    {
+      "id": "e_fn_looksmlikemath_concept_mathdetection",
+      "fromNode": "n_fn_looksmlikemath",
+      "toNode": "n_concept_mathdetection",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_generate_exam_handler_generate_exam_lookslikemath",
+      "fromNode": "n_generate_exam_handler",
+      "toNode": "n_generate_exam_lookslikemath",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_generate_exam_handler_generate_exam_buildschema",
+      "fromNode": "n_generate_exam_handler",
+      "toNode": "n_generate_exam_buildschema",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_generate_exam_handler_openai_responses_endpoint",
+      "fromNode": "n_generate_exam_handler",
+      "toNode": "n_openai_responses_endpoint",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_generate_exam_handler_grade_handler",
+      "fromNode": "n_generate_exam_handler",
+      "toNode": "n_grade_handler",
+      "label": "semantically_similar_to [INFERRED]"
+    },
+    {
+      "id": "e_generate_exam_handler_vercel_serverless",
+      "fromNode": "n_generate_exam_handler",
+      "toNode": "n_vercel_serverless",
+      "label": "references [INFERRED]"
+    },
+    {
+      "id": "e_grade_handler_grade_mc_deterministic",
+      "fromNode": "n_grade_handler",
+      "toNode": "n_grade_mc_deterministic",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_grade_handler_grade_nonmc_ai",
+      "fromNode": "n_grade_handler",
+      "toNode": "n_grade_nonmc_ai",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_grade_nonmc_ai_openai_responses_endpoint",
+      "fromNode": "n_grade_nonmc_ai",
+      "toNode": "n_openai_responses_endpoint",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_smart_tips_handler_smart_tips_courseguide",
+      "fromNode": "n_smart_tips_handler",
+      "toNode": "n_smart_tips_courseguide",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_smart_tips_handler_openai_responses_endpoint",
+      "fromNode": "n_smart_tips_handler",
+      "toNode": "n_openai_responses_endpoint",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_teacher_report_handler_openai_responses_endpoint",
+      "fromNode": "n_teacher_report_handler",
+      "toNode": "n_openai_responses_endpoint",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_check_role_handler_supabase_profiles_table",
+      "fromNode": "n_check_role_handler",
+      "toNode": "n_supabase_profiles_table",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_check_role_handler_role_system",
+      "fromNode": "n_check_role_handler",
+      "toNode": "n_role_system",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_signup_handler_supabase_profiles_table",
+      "fromNode": "n_signup_handler",
+      "toNode": "n_supabase_profiles_table",
+      "label": "shares_data_with [INFERRED]"
+    },
+    {
+      "id": "e_signup_handler_signup_resend",
+      "fromNode": "n_signup_handler",
+      "toNode": "n_signup_resend",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_admin_approve_handler_supabase_profiles_table",
+      "fromNode": "n_admin_approve_handler",
+      "toNode": "n_supabase_profiles_table",
+      "label": "shares_data_with [INFERRED]"
+    },
+    {
+      "id": "e_product_md_proviaai_page_app",
+      "fromNode": "n_product_md_proviaai",
+      "toNode": "n_page_app",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_product_md_proviaai_page_korkortet",
+      "fromNode": "n_product_md_proviaai",
+      "toNode": "n_page_korkortet",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_product_md_proviaai_page_pricing",
+      "fromNode": "n_product_md_proviaai",
+      "toNode": "n_page_pricing",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_product_md_proviaai_page_forbattring",
+      "fromNode": "n_product_md_proviaai",
+      "toNode": "n_page_forbattring",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_product_md_proviaai_page_admin",
+      "fromNode": "n_product_md_proviaai",
+      "toNode": "n_page_admin",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_product_md_brand_design_md_tokens",
+      "fromNode": "n_product_md_brand",
+      "toNode": "n_design_md_tokens",
+      "label": "rationale_for [INFERRED]"
+    },
+    {
+      "id": "e_product_md_brand_design_md_accent",
+      "fromNode": "n_product_md_brand",
+      "toNode": "n_design_md_accent",
+      "label": "rationale_for [EXTRACTED]"
+    },
+    {
+      "id": "e_claude_md_arch_claude_md_supabase",
+      "fromNode": "n_claude_md_arch",
+      "toNode": "n_claude_md_supabase",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claude_md_arch_cmd_deploy",
+      "fromNode": "n_claude_md_arch",
+      "toNode": "n_cmd_deploy",
+      "label": "references [INFERRED]"
+    },
+    {
+      "id": "e_claude_md_dataflow_page_app",
+      "fromNode": "n_claude_md_dataflow",
+      "toNode": "n_page_app",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claude_md_dataflow_page_forbattring",
+      "fromNode": "n_claude_md_dataflow",
+      "toNode": "n_page_forbattring",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_page_korkortet_korkortet_350_questions",
+      "fromNode": "n_page_korkortet",
+      "toNode": "n_korkortet_350_questions",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_page_pricing_pricing_gratis_basic_premium",
+      "fromNode": "n_page_pricing",
+      "toNode": "n_pricing_gratis_basic_premium",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_page_admin_cmd_grant",
+      "fromNode": "n_page_admin",
+      "toNode": "n_cmd_grant",
+      "label": "conceptually_related_to [INFERRED]"
+    },
+    {
+      "id": "e_page_admin_cmd_users",
+      "fromNode": "n_page_admin",
+      "toNode": "n_cmd_users",
+      "label": "conceptually_related_to [INFERRED]"
+    },
+    {
+      "id": "e_cmd_grant_cmd_users",
+      "fromNode": "n_cmd_grant",
+      "toNode": "n_cmd_users",
+      "label": "semantically_similar_to [INFERRED]"
+    },
+    {
+      "id": "e_image_proviaai_hero_brand_identity",
+      "fromNode": "n_image_proviaai_hero",
+      "toNode": "n_brand_identity",
+      "label": "conceptually_related_to [INFERRED]"
+    },
+    {
+      "id": "e_image_proviaai_logo_brand_identity",
+      "fromNode": "n_image_proviaai_logo",
+      "toNode": "n_brand_identity",
+      "label": "conceptually_related_to [INFERRED]"
+    },
+    {
+      "id": "e_image_proviaai_logo_image_provklar_logo",
+      "fromNode": "n_image_proviaai_logo",
+      "toNode": "n_image_provklar_logo",
+      "label": "semantically_similar_to [INFERRED]"
+    }
+  ]
+}
