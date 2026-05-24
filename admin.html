@@ -1,11 +1,408 @@
-const { data: { session } } = await supabase.auth.getSession();
-const token = session?.access_token;
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>if(location.hostname.includes("vercel.app")&&!location.hostname.includes("provia-ai-uf")){location.replace("https://provia-ai-uf.vercel.app"+location.pathname+location.search)}</script>
+  <title>ProviaAi – Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+  .pageHero{padding:32px 0 24px;border-bottom:1px solid var(--l);margin-bottom:24px}
+  .pageSub{font-size:13px;color:var(--t2);line-height:1.7}
 
-await fetch("/api/admin-approve", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`
-  },
-  body: JSON.stringify({ userIdToApprove })
+  /* STATS ROW */
+  .statsRow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+  @media(max-width:640px){.statsRow{grid-template-columns:1fr 1fr}}
+  .statBox{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:14px}
+  .statLabel{font-family:var(--mono);font-size:9.5px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+  .statVal{font-size:22px;font-weight:700;color:var(--t);letter-spacing:-.03em}
+  .statVal.accent{color:var(--a)}
+
+  /* CONTROLS */
+  .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .searchBox{
+    flex:1;min-width:180px;max-width:320px;
+    padding:8px 12px;border-radius:var(--r);border:1px solid var(--l);
+    background:var(--s);color:var(--t);font-family:var(--font);font-size:13px;
+    outline:none;transition:border-color .15s;
+  }
+  .searchBox:focus{border-color:var(--l2)}
+  .searchBox::placeholder{color:var(--t3)}
+  .filterChip{
+    display:inline-flex;align-items:center;gap:4px;padding:6px 11px;
+    border-radius:var(--r2);border:1px solid var(--l);background:var(--s);
+    cursor:pointer;font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--t3);
+    transition:all .13s ease;user-select:none;
+  }
+  .filterChip:hover{border-color:var(--l2);color:var(--t)}
+  .filterChip.active{background:var(--a-dim);border-color:var(--l2);color:var(--a2)}
+
+  /* USER TABLE */
+  .tableWrap{overflow-x:auto;border:1px solid var(--l);border-radius:var(--r);margin-bottom:24px}
+  .userTable{width:100%;border-collapse:collapse;min-width:560px}
+  .userTable thead th{
+    font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);
+    letter-spacing:.07em;text-transform:uppercase;
+    padding:10px 14px;border-bottom:1px solid var(--l);text-align:left;
+    background:var(--s);white-space:nowrap;
+  }
+  .userTable tbody tr{transition:background .1s ease}
+  .userTable tbody tr:hover{background:var(--a-dim)}
+  .userTable td{padding:11px 14px;font-size:12.5px;color:var(--t2);border-bottom:1px solid var(--l);vertical-align:middle}
+  .userTable tbody tr:last-child td{border-bottom:none}
+  .emailCell{font-size:13px;color:var(--t);font-weight:500;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .idCell{font-family:var(--mono);font-size:10px;color:var(--t3);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  .idCell:hover{color:var(--a)}
+  .dateCell{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+
+  /* ROLE BADGE */
+  .roleBadge{
+    display:inline-flex;align-items:center;gap:4px;
+    font-family:var(--mono);font-size:9.5px;font-weight:500;
+    letter-spacing:.07em;text-transform:uppercase;
+    padding:2px 8px;border-radius:var(--r2);
+  }
+  .roleBadge.gratis{color:var(--t3);border:1px solid var(--l);background:transparent}
+  .roleBadge.basic{color:#d4a016;border:1px solid rgba(212,160,22,.25);background:rgba(212,160,22,.07)}
+  .roleBadge.premium{color:var(--a2);border:1px solid var(--l2);background:var(--a-dim)}
+  .roleBadge.admin{color:#fff;border:1px solid rgba(100,120,255,.4);background:rgba(80,100,255,.15)}
+
+  /* ROLE SELECT */
+  .roleSelect{
+    padding:5px 28px 5px 8px;border-radius:var(--r2);border:1px solid var(--l);
+    background:var(--s);color:var(--t2);font-family:var(--mono);font-size:11px;font-weight:500;
+    cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b8f7c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;
+    transition:border-color .15s;
+  }
+  .roleSelect:focus{border-color:var(--l2)}
+
+  .saveBtn{
+    padding:5px 12px;border-radius:var(--r2);border:1px solid var(--l2);
+    background:var(--a-dim);color:var(--a2);font-family:var(--mono);font-size:11px;font-weight:500;
+    cursor:pointer;transition:all .14s ease;white-space:nowrap;
+  }
+  .saveBtn:hover{background:rgba(27,255,140,.16);border-color:var(--a2);color:var(--t)}
+  .saveBtn:disabled{opacity:.4;cursor:not-allowed}
+  .saveBtn.saving{opacity:.6}
+  .saveBtn.ok{color:var(--ok);border-color:var(--ok)}
+  .saveBtn.err{color:#d44016;border-color:#d44016}
+
+  /* STATUS */
+  .statusBar{
+    display:flex;align-items:center;gap:8px;padding:10px 14px;
+    border-radius:var(--r);margin-bottom:16px;font-size:13px;
+    font-family:var(--mono);
+  }
+  .statusBar.ok{background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.18);color:var(--a2)}
+  .statusBar.err{background:rgba(212,64,22,.07);border:1px solid rgba(212,64,22,.2);color:#d44016}
+  .statusBar.warn{background:rgba(212,160,22,.07);border:1px solid rgba(212,160,22,.2);color:#d4a016}
+
+  .emptyRow td{text-align:center;padding:36px;color:var(--t3);font-family:var(--mono);font-size:12px}
+
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--l2);border-top-color:var(--a);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="ldr" class="loader" aria-hidden="true">
+  <div style="display:grid;place-items:center">
+    <div class="lOrb"></div>
+    <div class="lTxt">ProviaAi</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="hWrap">
+    <a class="brand" href="index.html">
+      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <div>
+        <div class="bName">ProviaAi</div>
+        <div class="bTag">Admin · Användare</div>
+      </div>
+    </a>
+    <div class="hR">
+      <span class="aiStatus">
+        <span class="aiDot" aria-hidden="true"></span>
+        <span id="adminLabel">Kontrollerar åtkomst…</span>
+      </span>
+      <div class="mWrap">
+        <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false">
+          <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
+        </button>
+        <div class="drop" id="drop">
+          <a class="ddi" href="index.html"><span>Startsidan</span><span class="dpill">Hem</span></a>
+          <a class="ddi" href="app.html"><span>Starta ProviaAi</span><span class="dpill">App</span></a>
+          <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">19/59</span></a>
+          <a class="ddi" href="förbättring.html"><span>Förbättring</span><span class="dpill">Coach</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <div class="pageHero">
+    <div class="eyebrow">Admin</div>
+    <h1 class="pageTitle">Användarhantering</h1>
+    <p class="pageSub">Hantera roller och åtkomst för alla ProviaAi-användare.</p>
+  </div>
+
+  <div id="statusBar" style="display:none"></div>
+
+  <!-- STATS -->
+  <div class="statsRow" id="statsRow">
+    <div class="statBox"><div class="statLabel">Totalt</div><div class="statVal" id="statTotal">—</div></div>
+    <div class="statBox"><div class="statLabel">Premium</div><div class="statVal accent" id="statPremium">—</div></div>
+    <div class="statBox"><div class="statLabel">Basic</div><div class="statVal" id="statBasic">—</div></div>
+    <div class="statBox"><div class="statLabel">Gratis</div><div class="statVal" id="statGratis">—</div></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <input class="searchBox" id="searchBox" type="text" placeholder="Sök e-post eller ID…" autocomplete="off" />
+    <button class="filterChip active" data-role="all" id="fAll">Alla</button>
+    <button class="filterChip" data-role="admin">Admin</button>
+    <button class="filterChip" data-role="premium">Premium</button>
+    <button class="filterChip" data-role="basic">Basic</button>
+    <button class="filterChip" data-role="gratis">Gratis</button>
+    <button class="btn" id="refreshBtn" style="margin-left:auto">↻ Uppdatera</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="tableWrap">
+    <table class="userTable" aria-label="Användarlista">
+      <thead>
+        <tr>
+          <th>E-post</th>
+          <th>Roll</th>
+          <th>Registrerad</th>
+          <th>ID</th>
+          <th>Ändra roll</th>
+        </tr>
+      </thead>
+      <tbody id="userTableBody">
+        <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--t3);font-family:var(--mono);font-size:12px">
+          <span class="spinner"></span>Laddar…
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</main>
+
+<footer>ProviaAi Admin — ej för obehöriga.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://mnmotdluigzeehdjbhbu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
+const db = window.supabase.createClient(SB_URL, SB_KEY);
+
+/* LOADER */
+window.addEventListener('load', () => setTimeout(() => document.getElementById('ldr').classList.add('out'), 160));
+
+/* MENU */
+const mBtn = document.getElementById('mBtn'), drop = document.getElementById('drop');
+let ct;
+function openDrop(){ clearTimeout(ct); drop.classList.remove('off'); drop.style.display='block'; requestAnimationFrame(()=>drop.classList.add('on')); mBtn.setAttribute('aria-expanded','true'); }
+function closeDrop(){ mBtn.setAttribute('aria-expanded','false'); drop.classList.remove('on'); drop.classList.add('off'); clearTimeout(ct); ct=setTimeout(()=>{drop.classList.remove('off');drop.style.display='none';},120); }
+mBtn.addEventListener('click', e=>{e.stopPropagation(); drop.classList.contains('on')?closeDrop():openDrop();});
+document.addEventListener('click', e=>{if(!drop.classList.contains('on'))return; if(!drop.contains(e.target)&&e.target!==mBtn)closeDrop();});
+document.addEventListener('keydown', e=>{if(e.key==='Escape')closeDrop();});
+
+/* STATE */
+let ALL_USERS = [];
+let filterRole = 'all';
+let searchQ = '';
+
+/* STATUS */
+function showStatus(msg, type) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'statusBar ' + type;
+  bar.textContent = msg;
+  bar.style.display = 'flex';
+  if (type === 'ok') setTimeout(() => { bar.style.display = 'none'; }, 3000);
+}
+
+/* STATS */
+function renderStats(users) {
+  const counts = { total: users.length, premium: 0, basic: 0, gratis: 0, admin: 0 };
+  users.forEach(u => { counts[u.role] = (counts[u.role] || 0) + 1; });
+  document.getElementById('statTotal').textContent = counts.total;
+  document.getElementById('statPremium').textContent = counts.premium + (counts.admin ? ` (+${counts.admin} adm)` : '');
+  document.getElementById('statBasic').textContent = counts.basic;
+  document.getElementById('statGratis').textContent = counts.gratis;
+}
+
+/* FILTER */
+function getFiltered() {
+  return ALL_USERS.filter(u => {
+    if (filterRole !== 'all' && u.role !== filterRole) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      if (!u.email.toLowerCase().includes(q) && !u.id.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+/* RENDER TABLE */
+function renderTable() {
+  const tbody = document.getElementById('userTableBody');
+  const filtered = getFiltered();
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="emptyRow"><td colspan="5">Inga användare matchar filtret.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(u => {
+    const date = new Date(u.created_at).toLocaleDateString('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const roleOpts = ['gratis','basic','premium','admin'].map(r =>
+      `<option value="${r}"${u.role===r?' selected':''}>${r}</option>`
+    ).join('');
+    return `<tr>
+      <td><div class="emailCell" title="${esc(u.email)}">${esc(u.email)}</div></td>
+      <td><span class="roleBadge ${esc(u.role)}">${esc(u.role)}</span></td>
+      <td><div class="dateCell">${date}</div></td>
+      <td><div class="idCell" title="${esc(u.id)}" onclick="copyId('${esc(u.id)}')">${u.id.slice(0,8)}…</div></td>
+      <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select class="roleSelect" data-uid="${esc(u.id)}" data-current="${esc(u.role)}">${roleOpts}</select>
+        <button class="saveBtn" data-uid="${esc(u.id)}" onclick="saveRole('${esc(u.id)}',this)">Spara</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+
+function copyId(id) {
+  navigator.clipboard?.writeText(id).then(() => showStatus('ID kopierat: ' + id, 'ok'));
+}
+
+/* SAVE ROLE */
+async function saveRole(uid, btn) {
+  const select = document.querySelector(`.roleSelect[data-uid="${uid}"]`);
+  if (!select) return;
+  const newRole = select.value;
+  btn.disabled = true;
+  btn.textContent = '…';
+  btn.className = 'saveBtn saving';
+
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Inte inloggad');
+
+    const res = await fetch('/api/set-role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ targetId: uid, role: newRole })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Misslyckades');
+
+    const u = ALL_USERS.find(x => x.id === uid);
+    if (u) u.role = newRole;
+    renderTable();
+    renderStats(ALL_USERS);
+    showStatus(`Roll uppdaterad → ${newRole}`, 'ok');
+  } catch (e) {
+    btn.textContent = 'Fel';
+    btn.className = 'saveBtn err';
+    showStatus('Fel: ' + e.message, 'err');
+    setTimeout(() => { btn.textContent = 'Spara'; btn.className = 'saveBtn'; btn.disabled = false; }, 2000);
+  }
+}
+
+/* LOAD USERS */
+async function loadUsers() {
+  const tbody = document.getElementById('userTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--t3);font-family:var(--mono);font-size:12px"><span class="spinner"></span>Laddar…</td></tr>';
+
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Inte inloggad');
+
+    const res = await fetch('/api/admin-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Kunde inte hämta användare');
+
+    ALL_USERS = data.users || [];
+    renderStats(ALL_USERS);
+    renderTable();
+  } catch (e) {
+    tbody.innerHTML = `<tr class="emptyRow"><td colspan="5">Fel: ${esc(e.message)}</td></tr>`;
+    showStatus('Kunde inte ladda användare: ' + e.message, 'err');
+  }
+}
+
+/* AUTH GATE */
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  const lbl = document.getElementById('adminLabel');
+
+  if (!session) {
+    lbl.textContent = 'Inte inloggad';
+    document.querySelector('main').style.opacity = '0.4';
+    document.querySelector('main').style.pointerEvents = 'none';
+    showStatus('Du måste vara inloggad som admin för att se den här sidan.', 'warn');
+    return;
+  }
+
+  const res = await fetch('/api/check-role', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` }
+  });
+  const data = await res.json();
+
+  if (data?.role !== 'admin') {
+    lbl.textContent = `Ingen åtkomst (${data?.role || 'okänd roll'})`;
+    document.querySelector('main').style.opacity = '0.4';
+    document.querySelector('main').style.pointerEvents = 'none';
+    showStatus('Ingen åtkomst. Kontot saknar admin-roll.', 'err');
+    return;
+  }
+
+  lbl.textContent = `Admin · ${session.user.email}`;
+  await loadUsers();
+}
+
+/* FILTER CHIPS */
+document.querySelectorAll('.filterChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filterChip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    filterRole = chip.getAttribute('data-role');
+    renderTable();
+  });
 });
+
+/* SEARCH */
+document.getElementById('searchBox').addEventListener('input', e => {
+  searchQ = e.target.value.trim();
+  renderTable();
+});
+
+/* REFRESH */
+document.getElementById('refreshBtn').addEventListener('click', () => loadUsers());
+
+init();
+</script>
+</body>
+</html>
