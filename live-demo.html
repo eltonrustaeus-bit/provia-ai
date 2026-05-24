@@ -340,6 +340,62 @@
     .pauseLbl{font:700 18px var(--font);color:var(--t);margin-bottom:6px}
     .pauseSub{font:400 13px var(--font);color:var(--t2)}
 
+    /* ── ACCORDION FIX — start collapsed ── */
+    .iBody { display: none; }
+    .iSec.open .iBody { display: block; }
+
+    /* ── CUSTOM CURSOR ── */
+    @media (pointer: fine) {
+      * { cursor: none !important }
+      #cursorDot {
+        position:fixed;top:0;left:0;z-index:99999;
+        width:6px;height:6px;border-radius:50%;background:#1bff8c;
+        pointer-events:none;opacity:0;
+        transition:transform .08s ease,opacity .15s;
+        will-change:transform;
+      }
+      #cursorRing {
+        position:fixed;top:0;left:0;z-index:99998;
+        width:28px;height:28px;pointer-events:none;opacity:0;
+        transition:opacity .15s;will-change:transform;
+      }
+      #cursorRing > div {
+        width:100%;height:100%;border-radius:50%;
+        border:1.5px solid rgba(27,255,140,.5);
+        transform-origin:center center;
+        transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s ease;
+      }
+      #cursorRing.rHov > div { transform:scale(1.57);opacity:.3 }
+      #cursorRing.rDown > div { transform:scale(.64);opacity:.8 }
+    }
+
+    /* ── GLASS EFFECTS ── */
+    .smartTipCard {
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+    }
+    .scoreBox, .gradOv {
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+    }
+    .demoCta-glass {
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+    }
+
+    /* ── WILL-CHANGE ── */
+    .btn { will-change:transform }
+    .qCard,.feedCard,.mCard { will-change:opacity,transform }
+    .scoreBarF { will-change:width }
+
+    /* ── REDUCED MOTION ── */
+    @media (prefers-reduced-motion: reduce) {
+      * { cursor:auto !important }
+      #cursorDot,#cursorRing { display:none !important }
+      .reveal { transition:none !important }
+      .qCard,.feedCard,.mCard { transition:none !important }
+    }
+
     /* ════════════════════════════════════════
        RESPONSIVE
     ════════════════════════════════════════ */
@@ -704,6 +760,96 @@ x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständ
   ProviaAI är studiestöd och ger ingen officiell betygssättning.
 </footer>
 
+<!-- GSAP + ScrollTrigger -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) {
+    document.querySelectorAll(".reveal").forEach(el=>{el.style.opacity="1";el.style.transform="none";});
+    return;
+  }
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* Hero entrance */
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      gsap.from(".dHI > *", {
+        opacity:0, y:22, duration:0.52, stagger:0.09, ease:"power3.out",
+        clearProps:"all"
+      });
+    }, 200);
+  });
+
+  /* Act section headers + subs — reveal on scroll */
+  gsap.utils.toArray(".act").forEach(act => {
+    const els = [
+      act.querySelector(".aTag"),
+      act.querySelector(".aTitle"),
+      act.querySelector(".aSub")
+    ].filter(Boolean);
+    if (!els.length) return;
+    gsap.from(els, {
+      opacity:0, y:16, duration:0.48, stagger:0.07, ease:"power2.out",
+      scrollTrigger:{ trigger:act, start:"top 86%", once:true }
+    });
+  });
+
+  /* CTA section */
+  gsap.from(".ctaBox", {
+    opacity:0, y:24, duration:0.6, ease:"power3.out",
+    scrollTrigger:{ trigger:".ctaBox", start:"top 88%", once:true }
+  });
+
+  /* Wizard rail */
+  gsap.from(".wRail", {
+    opacity:0, y:10, duration:0.4, ease:"power2.out",
+    scrollTrigger:{ trigger:".wRail", start:"top 88%", once:true }
+  });
+})();
+</script>
+
+<!-- CUSTOM CURSOR -->
+<div id="cursorDot" aria-hidden="true"></div>
+<div id="cursorRing" aria-hidden="true"><div></div></div>
+<script>
+(function(){
+  if (window.matchMedia("(pointer: coarse)").matches || ("ontouchstart" in window)) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const dot=document.getElementById("cursorDot");
+  const ring=document.getElementById("cursorRing");
+  if(!dot||!ring) return;
+  let mx=-200,my=-200,rx=-200,ry=-200,visible=false;
+  (function raf(){
+    rx+=(mx-rx)*.12; ry+=(my-ry)*.12;
+    ring.style.transform=`translate(${rx-14}px,${ry-14}px)`;
+    requestAnimationFrame(raf);
+  })();
+  const HOVER="a,button,.chap,.iHead,.aBtn,.sCard,.stFooterLink,.abn";
+  let lastEl=null;
+  function applyHover(el){
+    if(el===lastEl) return; lastEl=el;
+    ring.classList.toggle("rHov",!!el);
+    dot.style.transform=`translate(${mx-3}px,${my-3}px)${el?" scale(.5)":""}`;
+  }
+  document.addEventListener("mousemove",e=>{
+    mx=e.clientX; my=e.clientY;
+    if(!visible){visible=true;dot.style.opacity="1";ring.style.opacity="1";}
+    dot.style.transform=`translate(${mx-3}px,${my-3}px)${lastEl?" scale(.5)":""}`;
+    applyHover(e.target?.closest?e.target.closest(HOVER):null);
+  });
+  document.addEventListener("mousedown",()=>{
+    ring.classList.remove("rHov"); ring.classList.add("rDown");
+    dot.style.transform=`translate(${mx-3}px,${my-3}px) scale(1.5)`;
+  });
+  document.addEventListener("mouseup",()=>{ ring.classList.remove("rDown"); applyHover(lastEl); });
+  document.addEventListener("mouseleave",()=>{ dot.style.opacity="0"; ring.style.opacity="0"; visible=false; });
+  document.addEventListener("mouseenter",()=>{ if(visible){dot.style.opacity="1";ring.style.opacity="1";} });
+})();
+</script>
+
 <!-- ════════════════════════════════════════
      GHOST CURSOR
 ════════════════════════════════════════ -->
@@ -868,11 +1014,17 @@ function go(id, ch){
 }
 
 function toggleSec(head){
-  const body=head.nextElementSibling;
-  if(!body) return;
-  const isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : 'block';
-  head.parentElement.classList.toggle('open', !isOpen);
+  const sec=head.parentElement;
+  const wasOpen=sec.classList.contains('open');
+  sec.classList.toggle('open');
+  // Animate chart bars when opening
+  if(!wasOpen){
+    sec.querySelectorAll('.cBar').forEach(b=>{
+      if(!b.dataset.h) b.dataset.h=b.style.height||'0%';
+      b.style.height='0%';
+      requestAnimationFrame(()=>{ b.style.height=b.dataset.h; });
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════
@@ -1115,8 +1267,6 @@ async function triggerAct5(){
   if(S.a5) return; S.a5=true;
 
   // Auto-open coach section
-  const coachBody=$('coachBody');
-  if(coachBody) coachBody.style.display='block';
   const coachSec=$('coachSec');
   if(coachSec) coachSec.classList.add('open');
 
