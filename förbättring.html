@@ -482,7 +482,7 @@
             </select>
             <button class="btn tinyBtnP" id="syncBtn" type="button" style="margin-left:auto;padding:6px 12px">↻ <span id="syncBtnLabel">Synka</span></button>
           </div>
-          <div class="statusText" id="examListStatus"></div>
+          <div class="statusText" id="examListStatus" aria-live="polite"></div>
           <div class="dataGrid" id="examList"></div>
         </div>
       </div>
@@ -535,7 +535,7 @@
       <div class="sDivider"></div>
       <div class="sBody">
         <div class="sBodyInner">
-          <div class="statusText" id="reportStatus"></div>
+          <div class="statusText" id="reportStatus" aria-live="polite"></div>
           <div class="reportActions">
             <button class="btn btnP" id="genReportBtn" type="button">Skapa rapport</button>
             <button class="btn" id="copyReportBtn" type="button" disabled>Kopiera</button>
@@ -595,7 +595,7 @@
       <div class="sDivider"></div>
       <div class="sBody">
         <div class="sBodyInner">
-          <div class="statusText" id="mistakeStatus"></div>
+          <div class="statusText" id="mistakeStatus" aria-live="polite"></div>
           <div class="mistakeGrid" id="mistakeList"></div>
         </div>
       </div>
@@ -900,8 +900,8 @@
 
     /* ── LOADING OVERLAY ── */
     let _lt=null;
-    function showLoad(){const o=$('reportLoadingOverlay');if(o)o.classList.add('on');['loadStep1','loadStep2','loadStep3'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});const e0=$('loadStep1');if(e0)e0.classList.add('on');let i=0;const steps=['loadStep1','loadStep2','loadStep3'];_lt=setInterval(()=>{i++;if(i<steps.length){const e=$(steps[i]);if(e)e.classList.add('on');}},900);}
-    function hideLoad(){const o=$('reportLoadingOverlay');if(o)o.classList.remove('on');if(_lt){clearInterval(_lt);_lt=null;}['loadStep1','loadStep2','loadStep3'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});}
+    function showLoad(){const o=$('reportLoadingOverlay');if(o)o.classList.add('on');setGenEnabled(false);['loadStep1','loadStep2','loadStep3'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});const e0=$('loadStep1');if(e0)e0.classList.add('on');let i=0;const steps=['loadStep1','loadStep2','loadStep3'];_lt=setInterval(()=>{i++;if(i<steps.length){const e=$(steps[i]);if(e)e.classList.add('on');}},900);}
+    function hideLoad(){const o=$('reportLoadingOverlay');if(o)o.classList.remove('on');setGenEnabled(true);if(_lt){clearInterval(_lt);_lt=null;}['loadStep1','loadStep2','loadStep3'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});}
 
     /* ── CHART ── */
     let _chart=null;

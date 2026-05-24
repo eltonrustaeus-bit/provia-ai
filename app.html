@@ -40,7 +40,12 @@ color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;
 .wizardRail{
 display:flex;align-items:center;
 background:var(--s);border:1px solid var(--l);border-radius:var(--r);
-padding:6px;gap:2px;overflow-x:auto;
+padding:6px;gap:2px;overflow-x:auto;scrollbar-width:none;
+}
+.wizardRail::-webkit-scrollbar{display:none}
+@media(max-width:600px){
+.wizardWrap{position:relative}
+.wizardWrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:24px;background:linear-gradient(to right,transparent,var(--bg));pointer-events:none;border-radius:0 var(--r) var(--r) 0}
 }
 .wStep{
 display:flex;align-items:center;gap:7px;
@@ -696,7 +701,7 @@ white-space:nowrap;
 <button class="btn btnG" id="clearBtn" type="button">Rensa</button>
 <a class="btn btnG" href="förbättring.html" id="improveBtnInline">Förbättring</a>
 </div>
-<div class="stxt" id="status"></div>
+<div class="stxt" id="status" aria-live="polite"></div>
 <details id="debugWrap" style="display:none">
 <summary id="debugTitle">Debug</summary>
 <pre id="debug"></pre>
