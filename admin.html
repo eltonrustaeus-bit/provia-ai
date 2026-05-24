@@ -305,10 +305,10 @@ async function saveRole(uid, btn) {
     const token = session?.access_token;
     if (!token) throw new Error('Inte inloggad');
 
-    const res = await fetch('/api/set-role', {
+    const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ targetId: uid, role: newRole })
+      body: JSON.stringify({ action: 'set-role', targetId: uid, role: newRole })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Misslyckades');
@@ -336,9 +336,10 @@ async function loadUsers() {
     const token = session?.access_token;
     if (!token) throw new Error('Inte inloggad');
 
-    const res = await fetch('/api/admin-users', {
+    const res = await fetch('/api/admin', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'list-users' })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || 'Kunde inte hämta användare');
