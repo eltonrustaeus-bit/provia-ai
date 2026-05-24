@@ -8,9 +8,9 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
-  // Verify the request is from Supabase
+  // Verify the request is from Supabase — secret is required
   const secret = process.env.SUPABASE_WEBHOOK_SECRET;
-  if (secret && req.headers["x-webhook-secret"] !== secret) {
+  if (!secret || req.headers["x-webhook-secret"] !== secret) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
