@@ -11,3 +11,12 @@ screenshot.js
 supabase/.temp/
 
 .vercel
+
+# Ruflo / claude-flow runtime
+.claude/memory.db
+.claude-flow/logs/
+.claude-flow/sessions/
+.claude-flow/data/
+.swarm/
+ruvector.db
+*.rvf.lock
