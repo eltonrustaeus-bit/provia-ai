@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     const role = profArr?.[0]?.role;
     if (role !== "admin") return res.status(403).json({ ok: false, error: "Not admin" });
 
-    // 3) Godkänn target user
+    // 3) Godkänn target user och sätt role = premium
     const upResp = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${targetId}`, {
       method: "PATCH",
       headers: {
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
         Prefer: "return=representation"
       },
-      body: JSON.stringify({ approved: true })
+      body: JSON.stringify({ approved: true, role: "premium" })
     });
     const up = await upResp.json();
     if (!upResp.ok) return res.status(400).json({ ok: false, error: "Update failed", details: up });
