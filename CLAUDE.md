@@ -75,8 +75,9 @@ förbättring.html
   → POST /api/check-approved  (user_id → { approved: bool })
   → POST /api/check-role      (JWT → { role: "student"|"teacher"|"admin"|"pending" })
 
-Supabase webhook (profiles INSERT)
-  → POST /api/welcome-email   (user_id → fetch email from auth → send welcome mail via Resend)
+api/signup.js (on every new signup, server-side)
+  → Resend welcome email to new user (buildWelcomeHtml template, inline in signup.js)
+  → Resend admin notification to elton.rustaeus@gmail.com
 ```
 
 ### Supabase schema
