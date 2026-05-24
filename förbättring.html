@@ -780,9 +780,10 @@
       const{data:sd,error:se}=await db.auth.getSession();
       if(se)return{ok:false,reason:'not_logged_in'};
       const uid=sd?.session?.user?.id||'';
-      if(!uid)return{ok:false,reason:'not_logged_in'};
+      const token=sd?.session?.access_token||'';
+      if(!uid||!token)return{ok:false,reason:'not_logged_in'};
       try{
-        const r=await fetch('/api/check-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid})});
+        const r=await fetch('/api/check-role',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({user_id:uid})});
         const txt=await r.text();let j=null;try{j=JSON.parse(txt);}catch{}
         if(!r.ok)return{ok:false,reason:'api_error',detail:(j?.error)?String(j.error):'non-200'};
         const role=String(j?.role||'');
