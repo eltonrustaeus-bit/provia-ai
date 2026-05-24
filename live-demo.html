@@ -28,6 +28,11 @@
     .aTitle{font:700 26px/1.2 var(--font);color:var(--t);margin-bottom:8px}
     .aSub{font:400 15px/1.55 var(--font);color:var(--t2);margin-bottom:28px;max-width:600px}
 
+    /* ── SCROLL REVEAL ── */
+    .reveal{opacity:0;transform:translateY(18px);transition:opacity .65s cubic-bezier(.4,0,.2,1),transform .65s cubic-bezier(.4,0,.2,1)}
+    .reveal.revealed{opacity:1;transform:translateY(0)}
+    .reveal.d1{transition-delay:.1s}.reveal.d2{transition-delay:.2s}.reveal.d3{transition-delay:.3s}
+
     /* ── HERO ── */
     .dHero{padding:72px 0 48px;text-align:center}
     .dHI{max-width:580px;margin:0 auto;padding:0 20px}
@@ -86,11 +91,31 @@
     .aBtn.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b}
 
     /* ── WRITTEN ANSWER FIELD ── */
-    .aTextField{min-height:46px;border:1px solid var(--l);border-radius:var(--r);padding:10px 14px;font:500 14px/1.5 var(--mono);color:var(--t2);background:var(--bg);display:flex;align-items:center;transition:border-color .2s}
-    .aTextField.active{border-color:var(--a)}
+    .aTextField{
+      min-height:80px;
+      border:1px solid var(--l);border-radius:var(--r);
+      padding:11px 14px;
+      font:500 13px/1.8 var(--mono);color:var(--t2);
+      background:var(--bg);
+      white-space:pre-line;
+      transition:border-color .2s,box-shadow .2s;
+      word-break:break-all;
+    }
+    .aTextField.active{border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
     .aTextField.bad{border-color:#ff6b6b;background:rgba(255,107,107,.06);color:#ff6b6b}
-    .aFieldCursor{display:inline-block;width:2px;height:16px;background:var(--a);margin-left:2px;animation:blink 1s step-end infinite}
+    .aFieldCursor{display:inline-block;width:2px;height:14px;background:var(--a);margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite}
     .aTextField.bad .aFieldCursor{display:none}
+
+    /* ── SHAKE ── */
+    @keyframes shake{
+      0%,100%{transform:translateX(0)}
+      15%{transform:translateX(-7px)}
+      30%{transform:translateX(7px)}
+      45%{transform:translateX(-5px)}
+      60%{transform:translateX(5px)}
+      75%{transform:translateX(-2px)}
+    }
+    .shake{animation:shake .45s ease-out}
 
     /* ── GRADING ── */
     .gradOv{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:16px}
@@ -101,10 +126,16 @@
 
     /* ── SCORE ── */
     .scoreBox{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:20px}
-    .scoreBig{font:700 60px/1 var(--font);color:var(--a);margin-bottom:4px}
+    .scoreBig{font:700 64px/1 var(--font);color:var(--a);margin-bottom:4px;font-variant-numeric:tabular-nums;transition:color .3s}
     .scoreLbl{font:400 14px var(--font);color:var(--t2);margin-bottom:20px}
     .scoreBar{height:7px;background:var(--s2);border-radius:4px;max-width:280px;margin:0 auto 22px;overflow:hidden}
-    .scoreBarF{height:100%;background:var(--a);border-radius:4px;width:0;transition:width 1.5s cubic-bezier(.4,0,.2,1)}
+    .scoreBarF{
+      height:100%;
+      background:linear-gradient(90deg,var(--a),rgba(27,255,140,.6));
+      border-radius:4px;width:0;
+      transition:width 1.4s cubic-bezier(.4,0,.2,1);
+      box-shadow:0 0 8px rgba(27,255,140,.5);
+    }
 
     /* ── FEEDBACK ── */
     .feedGrid{display:flex;flex-direction:column;gap:11px}
@@ -117,6 +148,39 @@
     .feedMod strong{color:var(--a);font-weight:600}
     .feedPts{font:600 12px var(--mono);margin-top:5px}
     .feedPts.ok{color:var(--ok)}.feedPts.bad{color:var(--danger)}
+
+    /* ── AI SMART TIP (förbättringsförslag) ── */
+    .smartTipWrap{margin-top:18px;opacity:0;transform:translateY(10px);transition:opacity .6s,transform .6s}
+    .smartTipWrap.vis{opacity:1;transform:translateY(0)}
+    .smartTipCard{
+      background:linear-gradient(135deg,rgba(27,255,140,.06) 0%,var(--s) 70%);
+      border:1px solid var(--a);
+      border-radius:var(--r);
+      padding:20px;
+      position:relative;overflow:hidden;
+    }
+    .smartTipCard::before{
+      content:'';position:absolute;top:0;left:-100%;right:0;height:2px;
+      background:linear-gradient(90deg,transparent,var(--a),transparent);
+      animation:scanLine 2.4s linear infinite;
+    }
+    @keyframes scanLine{0%{left:-100%}100%{left:100%}}
+    .stHeader{display:flex;align-items:center;gap:8px;margin-bottom:13px;flex-wrap:wrap}
+    .stIco{color:var(--a);font-size:16px;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(1.15)}}
+    .stTitle{font:600 13px var(--font);color:var(--a)}
+    .stSub{font:400 11px var(--mono);color:var(--t3);margin-left:auto}
+    .stBadge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--a-dim);border:1px solid var(--a);border-radius:20px;font:600 10px var(--mono);color:var(--a);letter-spacing:.04em}
+    .stBody{
+      font:400 13px/1.75 var(--font);color:var(--t);
+      white-space:pre-line;
+      min-height:40px;
+    }
+    .stBody.glow{text-shadow:0 0 14px rgba(27,255,140,.18)}
+    .stFooter{margin-top:13px;padding-top:11px;border-top:1px solid var(--l);font:400 12px var(--font);color:var(--t3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .stFooter strong{color:var(--a)}
+    .stFooterLink{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border:1px solid var(--a);border-radius:20px;font:500 11px var(--font);color:var(--a);cursor:pointer;transition:background .2s}
+    .stFooterLink:hover{background:var(--a-dim)}
 
     /* ── COACH BANNER ── */
     .coachBanner{background:var(--a-dim);border:1px solid var(--a);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:22px;opacity:0;transition:opacity .6s}
@@ -133,26 +197,31 @@
     .iTitle{font:600 14px var(--font);color:var(--t)}
     .iSub{font:400 12px var(--font);color:var(--t3)}
     .iBody{padding:0 18px 18px}
+    .iSec.open .iHead{background:var(--a-dim)}
 
     /* ── STATS + CHART ── */
     .statRow{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
     .statBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:14px}
     .statLbl{font:500 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
     .statVal{font:600 22px var(--font);color:var(--t)}
-    .coachBox2{background:var(--s2);border:1px solid var(--l2);border-radius:var(--r);padding:18px;margin-bottom:14px}
+    .coachBox2{background:var(--s2);border:1px solid var(--l2);border-radius:var(--r);padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+    .coachBox2.typing{border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
+    .coachBox2.typing::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--a);animation:scanBottom 1.8s linear infinite}
+    @keyframes scanBottom{0%{transform:scaleX(0);transform-origin:left}50%{transform:scaleX(1);transform-origin:left}50.01%{transform-origin:right}100%{transform:scaleX(0);transform-origin:right}}
     .coachLbl{font:600 11px var(--mono);color:var(--a);text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
     .coachTxt{font:400 13px/1.75 var(--font);color:var(--t);white-space:pre-wrap}
     .chartWrap2{background:var(--s2);border-radius:var(--r);padding:14px;margin-top:14px}
     .chartLbl{font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
     .chartBars{display:flex;align-items:flex-end;gap:8px;height:90px}
-    .cBar{flex:1;border-radius:3px 3px 0 0;background:var(--a);opacity:.5;min-height:4px}
+    .cBar{flex:1;border-radius:3px 3px 0 0;background:var(--a);opacity:.5;min-height:4px;transition:height .8s cubic-bezier(.4,0,.2,1)}
     .cBar:last-child{opacity:1}
     .cBarLbl{font:400 10px var(--mono);color:var(--t3);text-align:center;margin-top:5px}
     .cBarWrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end}
 
     /* ── MISTAKE CARDS ── */
     .mGrid{display:flex;flex-direction:column;gap:11px}
-    .mCard{background:var(--s2);border:1px solid var(--l);border-left:3px solid var(--danger);border-radius:var(--r);padding:15px}
+    .mCard{background:var(--s2);border:1px solid var(--l);border-left:3px solid var(--danger);border-radius:var(--r);padding:15px;opacity:0;transform:translateX(-8px);transition:opacity .5s,transform .5s}
+    .mCard.vis{opacity:1;transform:translateX(0)}
     .mHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
     .mMeta{font:500 11px var(--mono);color:var(--t3)}
     .mScore{font:600 12px var(--mono);color:var(--danger)}
@@ -220,7 +289,6 @@
       0%{transform:translate(-50%,-50%) scale(0);opacity:1}
       100%{transform:translate(-50%,-50%) scale(2.5);opacity:0}
     }
-    /* Cursor body click press */
     #gcBody.pressing{transform:scale(.82);transition:transform .1s}
     #gcBody{transition:transform .15s}
 
@@ -243,7 +311,7 @@
     #tipIcon{font-size:15px;flex-shrink:0;opacity:.7}
 
     /* ════════════════════════════════════════
-       HIGHLIGHT RING (on target elements)
+       HIGHLIGHT RING
     ════════════════════════════════════════ */
     .dHL{
       box-shadow:0 0 0 3px var(--a), 0 0 0 7px rgba(27,255,140,.18) !important;
@@ -278,11 +346,13 @@
     @media(max-width:600px){
       .dHT{font-size:26px}
       .aTitle{font-size:21px}
-      .scoreBig{font-size:44px}
+      .scoreBig{font-size:46px}
       .statRow{grid-template-columns:1fr}
       .setGrid{grid-template-columns:1fr 1fr}
       .ctaT{font-size:22px}
-      #gc{display:none} /* cursor hidden on mobile */
+      /* Cursor scaled down on mobile — still visible */
+      #gc{transform-origin:top left}
+      #gcLabel{font-size:10px;padding:3px 7px}
     }
   </style>
 </head>
@@ -310,7 +380,7 @@
   <div class="dHI">
     <div class="dEye">▶&nbsp; Live-demonstration</div>
     <h1 class="dHT">Se ProviaAI i verkligheten</h1>
-    <p class="dHS">En animerad genomgång — från studiematerial till AI-coachning. Pausa när du vill för att förklara.</p>
+    <p class="dHS">En animerad genomgång — från studiematerial till AI-coachning. Pausa när du vill.</p>
     <div class="btnRow">
       <button class="btn btnP" id="autoBtn" onclick="startAuto()" style="font-size:14px;padding:0 22px;height:42px">
         ▶&nbsp; Starta demo
@@ -343,9 +413,9 @@
 ════════════════════════════════════════════ -->
 <section class="act" id="act1">
   <div class="aI">
-    <div class="aTag">AKT 01 — MATERIAL</div>
-    <h2 class="aTitle">Ladda upp ditt studiematerial</h2>
-    <p class="aSub">Klistra in kompendium, anteckningar eller kapitel. AI:n läser av och bygger ett prov anpassat till din kurs och betygsnivå.</p>
+    <div class="aTag reveal">AKT 01 — MATERIAL</div>
+    <h2 class="aTitle reveal d1">Ladda upp ditt studiematerial</h2>
+    <p class="aSub reveal d2">Klistra in kompendium, anteckningar eller kapitel. AI:n läser av och bygger ett prov anpassat till din kurs och betygsnivå.</p>
 
     <div class="wRail" id="wRail">
       <div class="wSt on" id="ws1"><div class="wDot" id="wd1">1</div>Material</div>
@@ -374,9 +444,9 @@
 ════════════════════════════════════════════ -->
 <section class="act" id="act2">
   <div class="aI">
-    <div class="aTag">AKT 02 — INSTÄLLNINGAR</div>
-    <h2 class="aTitle">Välj provtyp och svårighetsgrad</h2>
-    <p class="aSub">Anpassa efter kurs, betygsnivå och frågetyp. AI:n genererar ett prov exakt anpassat till din nivå och ditt material.</p>
+    <div class="aTag reveal">AKT 02 — INSTÄLLNINGAR</div>
+    <h2 class="aTitle reveal d1">Välj provtyp och svårighetsgrad</h2>
+    <p class="aSub reveal d2">Anpassa efter kurs, betygsnivå och frågetyp. AI:n genererar ett prov exakt anpassat till din nivå och ditt material.</p>
 
     <div class="setGrid">
       <div class="sCard" id="sck">
@@ -408,9 +478,9 @@
 ════════════════════════════════════════════ -->
 <section class="act" id="act3">
   <div class="aI">
-    <div class="aTag">AKT 03 — MOCKPROV</div>
-    <h2 class="aTitle">AI-genererat prov</h2>
-    <p class="aSub">Frågorna är baserade på ditt material och din nivå. En fråga är medvetet ofullständigt besvarad — AI:n fångar upp det.</p>
+    <div class="aTag reveal">AKT 03 — MOCKPROV</div>
+    <h2 class="aTitle reveal d1">AI-genererat prov</h2>
+    <p class="aSub reveal d2">Frågorna är baserade på ditt material och din nivå. Den skrivna frågan besvaras medvetet ofullständigt — AI:n fångar upp det.</p>
 
     <div class="skelL" id="skelL">
       <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
@@ -433,9 +503,9 @@
 ════════════════════════════════════════════ -->
 <section class="act" id="act3b">
   <div class="aI">
-    <div class="aTag">AKT 04 — AI-RÄTTNING</div>
-    <h2 class="aTitle">Omedelbar feedback på varje svar</h2>
-    <p class="aSub">AI:n analyserar varje svar mot modellsvaret och ger pedagogisk feedback — även på det du missade.</p>
+    <div class="aTag reveal">AKT 04 — AI-RÄTTNING</div>
+    <h2 class="aTitle reveal d1">Omedelbar feedback på varje svar</h2>
+    <p class="aSub reveal d2">AI:n analyserar varje svar mot modellsvaret och ger pedagogisk feedback — även på det du missade.</p>
 
     <div class="gradOv" id="gradOv" style="display:none">
       <div class="gradSpin"></div>
@@ -444,7 +514,7 @@
     </div>
 
     <div class="scoreBox" id="scoreBox" style="display:none">
-      <div class="scoreBig">75%</div>
+      <div class="scoreBig" id="scoreBig">0%</div>
       <div class="scoreLbl">1.5 / 2 p · Betyg C · Matematik C</div>
       <div class="scoreBar"><div class="scoreBarF" id="scoreF"></div></div>
       <div class="btnRow">
@@ -454,6 +524,23 @@
 
     <div id="feedWrap" style="margin-top:20px;scroll-margin-top:70px">
       <div class="feedGrid" id="feedGrid"></div>
+    </div>
+
+    <!-- AI FÖRBÄTTRINGSFÖRSLAG (visas efter rättning) -->
+    <div class="smartTipWrap" id="smartTipWrap">
+      <div class="smartTipCard">
+        <div class="stHeader">
+          <span class="stIco">✦</span>
+          <span class="stTitle">AI Förbättringsförslag</span>
+          <span class="stBadge">PREMIUM</span>
+          <span class="stSub">Genereras automatiskt av din coach</span>
+        </div>
+        <div class="stBody" id="smartTipTxt"></div>
+        <div class="stFooter">
+          <span>Fler analyser och träningsuppgifter på</span>
+          <span class="stFooterLink" onclick="go('act4',4)">Förbättringsidan →</span>
+        </div>
+      </div>
     </div>
 
     <div class="coachBanner" id="coachBanner">
@@ -471,9 +558,9 @@
 ════════════════════════════════════════════ -->
 <section class="act" id="act4">
   <div class="aI">
-    <div class="aTag">AKT 05 — AI-COACH &amp; FÖRBÄTTRING</div>
-    <h2 class="aTitle">Din personliga studiecoach</h2>
-    <p class="aSub">AI:n analyserar mönster i dina misstag och sätter ihop en konkret träningsplan — baserad på just din historik.</p>
+    <div class="aTag reveal">AKT 05 — AI-COACH &amp; FÖRBÄTTRING</div>
+    <h2 class="aTitle reveal d1">Din personliga studiecoach</h2>
+    <p class="aSub reveal d2">AI:n analyserar mönster i dina misstag och sätter ihop en konkret träningsplan — baserad på just din historik.</p>
 
     <!-- 01 – Historik -->
     <div class="iSec">
@@ -502,13 +589,13 @@
     </div>
 
     <!-- 02 – Coach -->
-    <div class="iSec">
+    <div class="iSec" id="coachSec">
       <div class="iHead" onclick="toggleSec(this)">
         <div class="iHL"><span class="iNum">02</span><div><div class="iTitle">AI-Coach</div><div class="iSub">Personlig analys baserad på din historik och felbank</div></div></div>
         <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      <div class="iBody">
-        <div class="coachBox2">
+      <div class="iBody" id="coachBody">
+        <div class="coachBox2" id="coachBox2">
           <div class="coachLbl">Rekommendation</div>
           <div class="coachTxt" id="coachTxt"></div>
         </div>
@@ -568,7 +655,9 @@
             <div class="mQ">Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.</div>
             <div class="mDiv"></div>
             <div class="mFL">Ditt svar</div>
-            <div class="mFV bad">x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständigt — en rot saknas)</span></div>
+            <div class="mFV bad" style="font:400 12px var(--mono);white-space:pre-line">x² − 5x + 6 = 0
+(x−2)(x−3) = 0
+x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständigt — en rot saknas)</span></div>
             <div class="mFL" style="margin-top:10px">Modellsvar</div>
             <div class="mFV">x = 2 och x = 3 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(x²−5x+6 = (x−2)(x−3) = 0)</span></div>
             <div class="mActs">
@@ -659,17 +748,30 @@ pq-formeln: x = −p/2 ± √((p/2)²−q)`;
 const QS = [
   { t:'Vilken är standardformen för en andragradsekvation?',
     opts:['ax² + bx + c = 0','ax + b = 0','ax³ + bx² = 0','a/x + b = 0'], ok:0, demo:0 },
-  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.',
+  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange ALLA lösningar.',
     math:true, mathTex:'x² − 5x + 6 = 0',
-    type:'written', answer:'x = 2 och x = 3', demoAnswer:'x = 2' },
+    type:'written',
+    answer:'x = 2 och x = 3',
+    demoAnswer:'x² − 5x + 6 = 0\n(x−2)(x−3) = 0\nx = 2' },
 ];
 
 const FEED = [
   { q:'Standardform för andragradsekvation?', ico:'✓', ok:true,  r:'Rätt — 1/1 p',
     m:'ax² + bx + c = 0 är korrekt standardform.' },
-  { q:'Lös x² − 5x + 6 = 0 — ange alla lösningar', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
-    m:'x = 2 stämmer, men x = 3 saknas. (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
+  { q:'Lös x² − 5x + 6 = 0 — ange ALLA lösningar', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
+    m:'x = 2 stämmer, men ekvationen har TVÅ rötter. (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
 ];
+
+const SMART_TIP = `Du hittade faktorn (x−2) korrekt och löste x = 2.
+
+Problemet: du stannade efter första roten. Andragradsekvationer har alltid lika många rötter som gradtalet — kontrollräkna alltid båda.
+
+Metod framåt:
+• Skriv ut BÅDA faktorerna: (x−a)(x−b) = 0
+• Lös x−a = 0 OCH x−b = 0 separat
+• Sätt alltid in båda svaren i originalekv.
+
+Nästa steg: träna 3 faktoriseringsuppgifter → markera nedan.`;
 
 const COACH = `Hej Vilgot!
 
@@ -694,7 +796,7 @@ Nästa pass (15–20 min):
 • Träna markerade misstag.
 • Skriv om modellsvaret med egna ord.
 
-Senaste prov: 80% — bra jobbat, fortsätt!`;
+Senaste prov: 75% — bra jobbat, fortsätt!`;
 
 const REPORT = `LÄRARRAPPORT — ProviaAI
 Elev: Vilgot R  ·  Kurs: Matematik C
@@ -702,11 +804,11 @@ Datum: 2026-05-23  ·  Baserad på: 3 prov
 
 SAMMANFATTNING
 Eleven visar tydlig positiv trend (+20 p.p.) med snitt 70%
-de tre senaste proven: 60% → 70% → 80%.
+de tre senaste proven: 60% → 70% → 75%.
 
 STYRKOR
 • God grundläggande förståelse för andragradsekvationer
-• Korrekt diskriminantanalys
+• Korrekt faktoriseringsansats
 • Stabil förbättring mellan prov
 
 FÖRBÄTTRINGSOMRÅDEN
@@ -751,7 +853,6 @@ document.addEventListener('keydown', e => {
 const $ = id => document.getElementById(id);
 function setChap(n){ [1,2,3,4].forEach(i => $('c'+i)?.classList.toggle('on', i===n)); }
 function setStep(n, total=5){ const b=$('stepBadge'); if(b){b.textContent=`Steg ${n} / ${total}`;b.className='stepBadge on';} }
-function setSt(t){ }
 
 function wDone(n){
   const s=$('ws'+n),d=$('wd'+n),c=$('wc'+n);
@@ -768,58 +869,78 @@ function go(id, ch){
 
 function toggleSec(head){
   const body=head.nextElementSibling;
-  if(body) body.style.display = body.style.display==='none'?'block':'none';
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  head.parentElement.classList.toggle('open', !isOpen);
+}
+
+/* ═══════════════════════════════════════════════
+   SCORE COUNTER ANIMATION
+═══════════════════════════════════════════════ */
+async function animateScore(from, to, durationMs=1300){
+  const el=$('scoreBig');
+  if(!el) return;
+  const start = performance.now();
+  await new Promise(resolve=>{
+    function step(now){
+      const t = Math.min(1,(now-start)/durationMs);
+      const ease = t<0.5 ? 2*t*t : (4-2*t)*t-1;
+      el.textContent = Math.round(from+(to-from)*ease)+'%';
+      if(t<1) requestAnimationFrame(step);
+      else { el.textContent = to+'%'; resolve(); }
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 /* ═══════════════════════════════════════════════
    GHOST CURSOR CONTROLLER
 ═══════════════════════════════════════════════ */
 const cursor = {
-  el: null, body: null, ripple: null,
-  cx: 0, cy: 0,
+  el:null, body:null, ripple:null, cx:0, cy:0,
+  isMobile: window.innerWidth < 600,
 
   init(){
-    this.el = $('gc');
-    this.body = $('gcBody');
-    this.ripple = $('gcRipple');
-    // start off-screen top-left
-    this.setPos(80, window.innerHeight * 0.55);
+    this.el=$('gc'); this.body=$('gcBody'); this.ripple=$('gcRipple');
+    this.isMobile = window.innerWidth < 600;
+    if(this.isMobile && this.el){
+      // Scale down cursor on mobile
+      this.el.style.transformOrigin = 'top left';
+    }
+    this.setPos(80, window.innerHeight*0.55);
   },
 
-  setPos(x, y){
-    this.cx = x; this.cy = y;
-    if(this.el) this.el.style.transform = `translate(${x}px,${y}px)`;
+  setPos(x,y){
+    this.cx=x; this.cy=y;
+    if(!this.el) return;
+    const scale = this.isMobile ? ' scale(0.7)' : '';
+    this.el.style.transform=`translate(${x}px,${y}px)${scale}`;
   },
 
   show(){ if(this.el) this.el.classList.add('vis'); },
   hide(){ if(this.el) this.el.classList.remove('vis'); },
 
   async moveTo(el, offX=0, offY=0){
-    if(!el || !this.el) return;
-
-    // Scroll element into center of viewport first
-    el.scrollIntoView({behavior:'smooth', block:'center'});
+    if(!el||!this.el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
     await wait(700);
-
-    // Get fresh rect after scroll
-    const r = el.getBoundingClientRect();
-    const tx = r.left + r.width*0.5 + offX;
-    const ty = r.top  + r.height*0.5 + offY;
-
-    this.cx = tx; this.cy = ty;
-    this.el.style.transform = `translate(${tx}px,${ty}px)`;
-    await wait(950); // match CSS transition .9s
+    const r=el.getBoundingClientRect();
+    const tx=r.left+r.width*0.5+offX;
+    const ty=r.top+r.height*0.5+offY;
+    this.cx=tx; this.cy=ty;
+    const scale = this.isMobile ? ' scale(0.7)' : '';
+    this.el.style.transform=`translate(${tx}px,${ty}px)${scale}`;
+    await wait(950);
   },
 
   async click(el){
     await this.moveTo(el);
     await wait(350);
-
-    // Press animation
-    if(this.body){ this.body.classList.add('pressing'); }
-    if(this.ripple){ this.ripple.classList.remove('pop'); void this.ripple.offsetWidth; this.ripple.classList.add('pop'); }
+    if(this.body){this.body.classList.add('pressing');}
+    if(this.ripple){this.ripple.classList.remove('pop');void this.ripple.offsetWidth;this.ripple.classList.add('pop');}
     await wait(130);
-    if(this.body){ this.body.classList.remove('pressing'); }
+    if(this.body){this.body.classList.remove('pressing');}
     await wait(200);
   },
 
@@ -834,70 +955,66 @@ const cursor = {
 /* ═══════════════════════════════════════════════
    TIP BUBBLE
 ═══════════════════════════════════════════════ */
-let tipTimer = null;
+let tipTimer=null;
 
-async function showTip(html, durationMs = 4500){
-  const tip = $('demoTip'), txt = $('tipText');
-  if(!tip || !txt) return;
-  txt.innerHTML = html;
+async function showTip(html, durationMs=4500){
+  const tip=$('demoTip'),txt=$('tipText');
+  if(!tip||!txt) return;
+  txt.innerHTML=html;
   tip.classList.add('vis');
   clearTimeout(tipTimer);
-  tipTimer = setTimeout(() => tip.classList.remove('vis'), durationMs);
+  tipTimer=setTimeout(()=>tip.classList.remove('vis'),durationMs);
 }
 
 function hideTip(){ $('demoTip')?.classList.remove('vis'); }
 
-async function typeIntoField(fieldId, text, speed = 48){
-  const field = $(fieldId);
+/* Multi-line typewriter (handles \n) */
+async function typeIntoField(fieldId, text, speed=46){
+  const field=$(fieldId);
   if(!field) return;
   field.classList.add('active');
-  let typed = '';
+  let typed='';
   for(const ch of text){
-    typed += ch;
-    field.innerHTML = `<span>${typed}</span><span class="aFieldCursor"></span>`;
+    typed+=ch;
+    // Render newlines as <br>, cursor at end
+    const html=typed.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    field.innerHTML=`${html}<span class="aFieldCursor"></span>`;
+    await wait(ch==='\n'? speed*4 : speed);
+  }
+}
+
+/* Typewriter for smart tip */
+async function typeSmartTip(text, speed=14){
+  const el=$('smartTipTxt');
+  if(!el) return;
+  el.classList.add('glow');
+  let typed='';
+  for(let i=0;i<=text.length;i++){
+    typed=text.slice(0,i);
+    el.textContent=typed;
     await wait(speed);
   }
+  el.classList.remove('glow');
 }
 
 /* ═══════════════════════════════════════════════
    ACT TRIGGERS
 ═══════════════════════════════════════════════ */
-const S = {a1:false,a2:false,a3:false,a4:false,a5:false};
+const S={a1:false,a2:false,a3:false,a4:false,a5:false};
 
 async function runTypewriter(){
-  const area=$('matArea'), cnt=$('matCnt'), btn=$('nextBtn');
+  const area=$('matArea'),cnt=$('matCnt'),btn=$('nextBtn');
   if(!area) return;
   area.textContent='';
   area.classList.remove('dn');
   for(let i=0;i<=MAT.length;i++){
     area.textContent=MAT.slice(0,i);
     if(cnt) cnt.textContent=i+' tecken';
-    await wait(30);
+    await wait(28);
   }
   area.classList.add('dn');
   S.a1=true;
-  if(btn){ btn.style.opacity='1'; btn.style.pointerEvents='auto'; }
-}
-
-async function triggerA2(){
-  if(S.a2) return; S.a2=true;
-  wDone(1); wOn(2);
-  await wait(300);
-  const sets = [
-    {id:'scn',vid:'svn',v:'C'},
-    {id:'sct',vid:'svt',v:'Mix'},
-    {id:'sca',vid:'sva',v:'2 frågor'},
-  ];
-  for(const s of sets){
-    await wait(600);
-    const c=$(s.id), ve=$(s.vid);
-    if(ve) ve.textContent=s.v;
-    if(c){c.classList.add('flash');await wait(400);c.classList.remove('flash');}
-  }
-  await wait(600);
-  const gb=$('genBtn'),gl=$('genLbl');
-  if(gl) gl.textContent='Skapa prov';
-  if(gb){gb.removeAttribute('disabled');gb.style.opacity='1';gb.style.cursor='pointer';}
+  if(btn){btn.style.opacity='1';btn.style.pointerEvents='auto';}
 }
 
 async function triggerA3(){
@@ -942,7 +1059,11 @@ function markAnswers(){
   QS.forEach((q,i)=>{
     if(q.type==='written'){
       const field=$('ansField'+i);
-      if(field) field.classList.add('bad');
+      if(field){
+        field.classList.add('bad');
+        field.classList.add('shake');
+        setTimeout(()=>field.classList.remove('shake'),500);
+      }
     } else {
       for(let j=0;j<q.opts.length;j++){
         const b=$(`ab${i}_${j}`);
@@ -966,33 +1087,49 @@ async function triggerAct4(){
   if(ov) ov.style.display='none';
   const sb=$('scoreBox'); if(sb) sb.style.display='block';
   await wait(300);
+
+  // Animate score counter + progress bar
   const sf=$('scoreF'); if(sf) sf.style.width='75%';
+  animateScore(0,75,1300); // non-awaited — runs in parallel with bar
+  await wait(1400);
+
   markAnswers();
   await wait(900);
+
   const fg=$('feedGrid');
   if(fg){
     fg.innerHTML='';
     FEED.forEach((f,i)=>{
       const c=document.createElement('div');
       c.className='feedCard';
-      c.innerHTML=`<div class="feedIco">${f.ico}</div><div class="feedBody"><div class="feedQ">${f.q}</div><div class="feedMod">Modellsvar: <strong>${f.m}</strong></div><div class="feedPts ${f.ok?'ok':'bad'}">${f.r}</div></div>`;
+      c.innerHTML=`<div class="feedIco">${f.ico}</div><div class="feedBody"><div class="feedQ">${f.q}</div><div class="feedMod">AI-feedback: <strong>${f.m}</strong></div><div class="feedPts ${f.ok?'ok':'bad'}">${f.r}</div></div>`;
       fg.appendChild(c);
     });
     const cards=fg.querySelectorAll('.feedCard');
-    for(let i=0;i<cards.length;i++){await wait(350);cards[i].classList.add('vis');}
+    for(let i=0;i<cards.length;i++){await wait(380);cards[i].classList.add('vis');}
   }
   wDone(4);
-  await wait(600);
-  const cb=$('coachBanner'); if(cb) cb.classList.add('vis');
 }
 
 async function triggerAct5(){
   if(S.a5) return; S.a5=true;
+
+  // Auto-open coach section
+  const coachBody=$('coachBody');
+  if(coachBody) coachBody.style.display='block';
+  const coachSec=$('coachSec');
+  if(coachSec) coachSec.classList.add('open');
+
+  // Glow while typing
+  const box=$('coachBox2');
+  if(box) box.classList.add('typing');
+
   const el=$('coachTxt');
   if(el){
     el.textContent='';
-    for(let i=0;i<=COACH.length;i++){el.textContent=COACH.slice(0,i);await wait(12);}
+    for(let i=0;i<=COACH.length;i++){el.textContent=COACH.slice(0,i);await wait(11);}
   }
+  if(box) box.classList.remove('typing');
 }
 
 /* ═══════════════════════════════════════════════
@@ -1002,7 +1139,7 @@ async function startAuto(){
   if(isRunning) return;
   isRunning=true;
 
-  const autoBtn=$('autoBtn'), pauseBtn=$('pauseBtn');
+  const autoBtn=$('autoBtn'),pauseBtn=$('pauseBtn');
   if(autoBtn){autoBtn.textContent='▶ Demo pågår…';autoBtn.disabled=true;}
   if(pauseBtn) pauseBtn.style.display='inline-flex';
 
@@ -1018,23 +1155,22 @@ async function startAuto(){
   await cursor.moveTo($('matArea'));
   await wait(600);
 
-  // Typewriter starts
-  showTip('AI:n läser av materialet och förstår ämnet', 4000);
-  runTypewriter(); // non-awaited — runs in parallel
-  await wait(MAT.length * 30 + 1000); // wait for typewriter
+  showTip('AI:n läser av materialet och förstår kursinnehållet direkt', 4500);
+  runTypewriter();
+  await wait(MAT.length*28+800);
 
-  await wait(1200);
+  await wait(1000);
   await showTip('<strong>Klicka Fortsätt</strong> när materialet är inläst', 3500);
   await cursor.highlight($('nextBtn'));
   await cursor.click($('nextBtn'));
-  go('act2', 2);
+  go('act2',2);
   await wait(800);
 
   // ─── STEG 2: INSTÄLLNINGAR ──────────────────
   setStep(2);
   await wait(600);
 
-  await showTip('<strong>Steg 2:</strong> Välj betygsnivå — E, C eller A. AI:n anpassar svårighetsgraden.', 5000);
+  await showTip('<strong>Steg 2:</strong> Välj betygsnivå — E, C eller A. AI:n anpassar svårighetsgraden automatiskt.', 5000);
   await cursor.highlight($('scn'));
   await cursor.click($('scn'));
   $('svn').textContent='C';
@@ -1064,7 +1200,7 @@ async function startAuto(){
   await showTip('<strong>Skapa prov</strong> — AI:n genererar frågorna direkt baserat på materialet', 5000);
   await cursor.highlight(gb);
   await cursor.click(gb);
-  go('act3', 2);
+  go('act3',2);
   await wait(600);
 
   // ─── STEG 3: MOCKPROV ───────────────────────
@@ -1072,86 +1208,98 @@ async function startAuto(){
   wDone(2); wOn(3);
 
   await showTip('<strong>Steg 3:</strong> AI:n genererar skräddarsydda frågor — det tar bara sekunder', 5000);
-  await triggerA3(); // skeleton + questions
+  await triggerA3();
   await wait(800);
 
-  await showTip('Eleven besvarar frågorna direkt i appen', 4000);
-
-  for(let i=0;i<QS.length;i++){
-    const q=QS[i];
-    if(q.type==='written'){
-      await showTip('<strong>Observera:</strong> eleven skriver bara "x = 2" — missar den andra roten. AI:n fångar upp det.', 6000);
-      const field=$('ansField'+i);
-      if(field){
-        await cursor.moveTo(field, 0, 0);
-        await wait(400);
-        await cursor.highlight(field);
-        await typeIntoField('ansField'+i, q.demoAnswer);
-      }
-      await wait(1500);
-    } else {
-      const btnEl=$(`ab${i}_${q.demo}`);
-      if(!btnEl) continue;
-      await wait(400);
-      await cursor.moveTo(btnEl, -8, 0);
-      await wait(400);
-      await cursor.click(btnEl);
-      selAns(i, q.demo);
-      await wait(1200);
-    }
+  await showTip('Fråga 1 — flervalsfråga om standardform', 4000);
+  const btnEl=$(`ab0_0`);
+  if(btnEl){
+    await cursor.moveTo(btnEl,-8,0);
+    await wait(400);
+    await cursor.click(btnEl);
+    selAns(0,0);
   }
+  await wait(1000);
 
-  await wait(800);
+  await showTip('<strong>Fråga 2:</strong> eleven skriver lösningsstegen men stannar vid x = 2 — missar den andra roten. AI:n fångar det.', 7000);
+  const field=$('ansField1');
+  if(field){
+    await cursor.moveTo(field,0,0);
+    await wait(400);
+    await cursor.highlight(field);
+    await typeIntoField('ansField1', QS[1].demoAnswer, 46);
+  }
+  await wait(1500);
+
   const gradeBtn=$('gradeBtn');
   if(gradeBtn){gradeBtn.style.opacity='1';gradeBtn.style.pointerEvents='auto';gradeBtn.removeAttribute('disabled');}
 
-  await showTip('<strong>Rätta prov</strong> — AI:n rättar alla svar mot modellsvaret', 4500);
+  await showTip('<strong>Rätta prov</strong> — AI:n analyserar varje svar mot modellsvaret', 4500);
   await cursor.highlight(gradeBtn);
   await cursor.click(gradeBtn);
-  go('act3b', 3);
+  go('act3b',3);
   await wait(800);
 
   // ─── STEG 4: RÄTTNING ───────────────────────
   setStep(4); setChap(3);
   await wait(400);
 
-  await showTip('<strong>Steg 4:</strong> AI:n analyserar varje svar och jämför med modellsvaret', 5000);
-  await triggerAct4(); // grading + feedback cards
-  await wait(1200);
+  await showTip('<strong>Steg 4:</strong> AI:n rättar — poängräknaren startar…', 4500);
+  await triggerAct4();
+  await wait(1000);
 
-  await showTip('Fråga 2 — AI:n noterar att svaret är <strong>ofullständigt</strong>: x = 3 saknas', 6000);
+  await showTip('Fråga 2 — <strong>halvt rätt (1/2 p):</strong> AI:n noterar att x = 3 saknas trots korrekt faktorisering', 7000);
   const badFeed=$('feedGrid')?.querySelectorAll('.feedCard')[1];
   if(badFeed) await cursor.moveTo(badFeed);
-  await wait(2000);
+  await wait(2500);
 
-  await showTip('Varje svar får feedback och modellsvar — studenten förstår exakt vad som gick fel', 5000);
-  await wait(3000);
+  // Show smart tip / förbättringsförslag
+  await showTip('Nu genereras ett <strong>AI förbättringsförslag</strong> — det är vad du får på Förbättringsidan', 6000);
+  const stw=$('smartTipWrap');
+  if(stw) stw.classList.add('vis');
+  await wait(600);
+  typeSmartTip(SMART_TIP, 13); // run in parallel
+  await wait(SMART_TIP.length*13+800);
+
+  const stFooter=$('smartTipWrap')?.querySelector('.stFooterLink');
+  if(stFooter) await cursor.highlight(stFooter);
+  await wait(1500);
+
+  await showTip('Varje svar får feedback och förbättringsförslag — studenten förstår exakt vad som gick fel och vad som ska tränas', 6000);
+  await wait(3500);
 
   const coachBtn=$('openCoachBtn');
-  await showTip('<strong>Öppna coach</strong> — AI:n har analyserat historiken och har en plan', 4500);
+  await showTip('<strong>Öppna coach</strong> — AI:n har analyserat historiken och har en konkret träningsplan', 4500);
+  const cb=$('coachBanner'); if(cb) cb.classList.add('vis');
+  await wait(800);
   await cursor.highlight(coachBtn);
   await cursor.click(coachBtn);
-  go('act4', 4);
+  go('act4',4);
   await wait(800);
 
   // ─── STEG 5: COACH ──────────────────────────
   setStep(5); setChap(4);
   await wait(600);
 
-  await showTip('<strong>Steg 5:</strong> Förbättringssidan — historik, AI-coach, felbank och träningsläge på ett ställe', 6000);
-  await triggerAct5(); // coach text types out
+  await showTip('<strong>Steg 5:</strong> Förbättringsidan — historik, AI-coach, felbank och träningsläge på ett ställe', 6000);
+  await triggerAct5();
   await wait(1500);
 
-  await showTip('Coachen ger en konkret träningsplan baserad på mönster i misstagen', 5000);
+  await showTip('Coachen skriver ut en konkret plan: exakt vad som ska tränas och hur', 5000);
   const coachEl=$('coachTxt');
   if(coachEl) await cursor.moveTo(coachEl);
   await wait(2500);
 
-  // Scroll to felbank
-  const mb=$('mc1');
-  await showTip('<strong>Felbank:</strong> alla frågor du tappat poäng på — med modellsvar och träningsknapp', 6000);
-  if(mb) await cursor.moveTo(mb);
-  await wait(2000);
+  // Scroll to felbank and animate cards in
+  const mb=$('mc1'),mb2=$('mc2');
+  await showTip('<strong>Felbank:</strong> alla frågor du tappat poäng på — med ditt svar, modellsvar och träningsknapp', 6000);
+  if(mb){
+    await cursor.moveTo(mb);
+    mb.classList.add('vis');
+    await wait(300);
+    if(mb2) mb2.classList.add('vis');
+  }
+  await wait(1500);
 
   const markBtn=$('markBtn1');
   await showTip('Markera misstag för träning — appen skapar ett nytt prov med liknande frågor', 5000);
@@ -1160,7 +1308,6 @@ async function startAuto(){
   if(markBtn){markBtn.textContent='Markerad ✓';markBtn.style.borderColor='var(--a)';markBtn.style.color='var(--a)';}
   await wait(2500);
 
-  // Cursor waves goodbye
   cursor.hide();
   hideTip();
 
@@ -1169,7 +1316,6 @@ async function startAuto(){
   isRunning=false;
   isPaused=false;
 
-  // Final toast
   doToast('Demo genomförd — alla funktioner visade ✓');
 }
 
@@ -1213,10 +1359,11 @@ function doTrain(){
 }
 
 /* ═══════════════════════════════════════════════
-   SCROLL SPY
+   SCROLL SPY + REVEAL
 ═══════════════════════════════════════════════ */
 function setupObs(){
-  const obs=new IntersectionObserver(entries=>{
+  // Chapter spy
+  const chapObs=new IntersectionObserver(entries=>{
     entries.forEach(e=>{
       if(!e.isIntersecting||isRunning) return;
       const id=e.target.id;
@@ -1227,7 +1374,23 @@ function setupObs(){
       if(id==='act4') setChap(4);
     });
   },{threshold:.18});
-  ['act1','act2','act3','act3b','act4'].forEach(id=>{const el=$(id);if(el)obs.observe(el);});
+  ['act1','act2','act3','act3b','act4'].forEach(id=>{const el=$(id);if(el)chapObs.observe(el);});
+
+  // Reveal animation
+  const revealObs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting) e.target.classList.add('revealed');
+    });
+  },{threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
+
+  // Felbank card reveal on scroll
+  const cardObs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting) e.target.classList.add('vis');
+    });
+  },{threshold:.2});
+  ['mc1','mc2'].forEach(id=>{const el=$(id);if(el)cardObs.observe(el);});
 }
 
 /* Coach open button wiring */
