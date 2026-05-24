@@ -1,0 +1,172 @@
+{
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\package.json": {
+    "mtime": 1779315123.0670252,
+    "ast_hash": "1937f2c860142ca12c35d3b6dfbb86cd",
+    "semantic_hash": "1937f2c860142ca12c35d3b6dfbb86cd"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\vercel.json": {
+    "mtime": 1779304689.6806076,
+    "ast_hash": "05b4fd1d746fc6df99cbeab313bb68c0",
+    "semantic_hash": "05b4fd1d746fc6df99cbeab313bb68c0"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\admin-approve.js": {
+    "mtime": 1779260797.8993194,
+    "ast_hash": "7ba6336a3101ce79c9e82bcf3cb06ec6",
+    "semantic_hash": "7ba6336a3101ce79c9e82bcf3cb06ec6"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\check-role.js": {
+    "mtime": 1779296512.8654666,
+    "ast_hash": "d5293e4afd6ba048f8788c61a7886bd1",
+    "semantic_hash": "d5293e4afd6ba048f8788c61a7886bd1"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\delete-exams.js": {
+    "mtime": 1779225222.673795,
+    "ast_hash": "b9a179d465c8f04e1787fd01974deded",
+    "semantic_hash": "b9a179d465c8f04e1787fd01974deded"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\explain.js": {
+    "mtime": 1779304613.3912709,
+    "ast_hash": "f71f071584e0810c98c03add2fd673f6",
+    "semantic_hash": "f71f071584e0810c98c03add2fd673f6"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\generate-exam.js": {
+    "mtime": 1779225222.6749334,
+    "ast_hash": "af09c7b122644721da60f496cf070f98",
+    "semantic_hash": "af09c7b122644721da60f496cf070f98"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\grade.js": {
+    "mtime": 1779260851.4181254,
+    "ast_hash": "9c9590d5b2286f2b0818d8eeb29f00e3",
+    "semantic_hash": "9c9590d5b2286f2b0818d8eeb29f00e3"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\notify-new-user.js": {
+    "mtime": 1779300523.3728747,
+    "ast_hash": "4080866ca3ef75abfbb8688eb93dc4bb",
+    "semantic_hash": "4080866ca3ef75abfbb8688eb93dc4bb"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\ocr.js": {
+    "mtime": 1779260863.9119096,
+    "ast_hash": "7464b61e468dffad531670c50f5b6eae",
+    "semantic_hash": "7464b61e468dffad531670c50f5b6eae"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\signup.js": {
+    "mtime": 1779596524.5972736,
+    "ast_hash": "74fb4e845d2dc90588aa0acce931bd5d",
+    "semantic_hash": "74fb4e845d2dc90588aa0acce931bd5d"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\smart-tips.js": {
+    "mtime": 1779260845.1480417,
+    "ast_hash": "2c3dc0eff981df11d18a07dfb0a7ec5a",
+    "semantic_hash": "2c3dc0eff981df11d18a07dfb0a7ec5a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\teacher-report.js": {
+    "mtime": 1779295522.6921687,
+    "ast_hash": "3a07cf3e7d94b28fa0633940b4ff773f",
+    "semantic_hash": "3a07cf3e7d94b28fa0633940b4ff773f"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\train-material.js": {
+    "mtime": 1779260856.670549,
+    "ast_hash": "adfbf1ffde0bcd33f06b17fd3c2d5b1b",
+    "semantic_hash": "adfbf1ffde0bcd33f06b17fd3c2d5b1b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\add_questions_batch2.py": {
+    "mtime": 1779320613.8214314,
+    "ast_hash": "c74e57d01abad3c2861a8d2d1779a4bb",
+    "semantic_hash": "c74e57d01abad3c2861a8d2d1779a4bb"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\insert_questions.py": {
+    "mtime": 1779317348.9206755,
+    "ast_hash": "376c331684c69f6508dcb47c10c6e3f0",
+    "semantic_hash": "376c331684c69f6508dcb47c10c6e3f0"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\questions.json": {
+    "mtime": 1779317752.040108,
+    "ast_hash": "c483c2c81fad8e25f2d0e9ac8834a58c",
+    "semantic_hash": "c483c2c81fad8e25f2d0e9ac8834a58c"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\admin.html": {
+    "mtime": 1779225222.6695528,
+    "ast_hash": "0116d611eb45ac47de17506c472219d4",
+    "semantic_hash": "0116d611eb45ac47de17506c472219d4"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\app.html": {
+    "mtime": 1779526351.6385312,
+    "ast_hash": "3d19d6604c15d36d47def83e2ca7d8f5",
+    "semantic_hash": "3d19d6604c15d36d47def83e2ca7d8f5"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\CLAUDE.md": {
+    "mtime": 1779225686.4752364,
+    "ast_hash": "8de1cbbf925d4b3a3b6f1d5b62ace82a",
+    "semantic_hash": "8de1cbbf925d4b3a3b6f1d5b62ace82a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\DESIGN.md": {
+    "mtime": 1779525618.7436566,
+    "ast_hash": "af816d64d609d7902e036aa2a0403333",
+    "semantic_hash": "af816d64d609d7902e036aa2a0403333"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\f\u00f6rb\u00e4ttring.html": {
+    "mtime": 1779526463.6675436,
+    "ast_hash": "e4988cf07cc22c38983eddfa43e72a07",
+    "semantic_hash": "e4988cf07cc22c38983eddfa43e72a07"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\index.html": {
+    "mtime": 1779573488.53554,
+    "ast_hash": "4c25f3225e60cd77cdc7a47906fe9ec5",
+    "semantic_hash": "4c25f3225e60cd77cdc7a47906fe9ec5"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\korkortet.html": {
+    "mtime": 1779526419.9393935,
+    "ast_hash": "bb6ef38a36a57565b7762f8eedb536fd",
+    "semantic_hash": "bb6ef38a36a57565b7762f8eedb536fd"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\live-demo.html": {
+    "mtime": 1779573524.699083,
+    "ast_hash": "c9b68d3833c3096b9fae31a73da6c02f",
+    "semantic_hash": "c9b68d3833c3096b9fae31a73da6c02f"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\pricing.html": {
+    "mtime": 1779526218.3407786,
+    "ast_hash": "6469478f5307f1c2a5d02eaf01cf7415",
+    "semantic_hash": "6469478f5307f1c2a5d02eaf01cf7415"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\PRODUCT.md": {
+    "mtime": 1779525598.7302015,
+    "ast_hash": "31e4ef48cf3c426ee39525bd4eae684c",
+    "semantic_hash": "31e4ef48cf3c426ee39525bd4eae684c"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude\\commands\\cleanup.md": {
+    "mtime": 1779303416.9027307,
+    "ast_hash": "ca302f0268a711f82b2c4d1a364b31d9",
+    "semantic_hash": "ca302f0268a711f82b2c4d1a364b31d9"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude\\commands\\deploy.md": {
+    "mtime": 1779315889.3964422,
+    "ast_hash": "658f68cf2b373cb858113e1715bd7f15",
+    "semantic_hash": "658f68cf2b373cb858113e1715bd7f15"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude\\commands\\grant.md": {
+    "mtime": 1779303410.0713446,
+    "ast_hash": "29a72deb7b88bc3853a3161540afe788",
+    "semantic_hash": "29a72deb7b88bc3853a3161540afe788"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude\\commands\\users.md": {
+    "mtime": 1779303390.582092,
+    "ast_hash": "5cbae61be583d0a6520407eb06c63037",
+    "semantic_hash": "5cbae61be583d0a6520407eb06c63037"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\proviaai-hero.png": {
+    "mtime": 1779225222.6933446,
+    "ast_hash": "c7aed6aab69d09e4ebe3cd4c2c118192",
+    "semantic_hash": "c7aed6aab69d09e4ebe3cd4c2c118192"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\proviaai-logo.png": {
+    "mtime": 1779225222.7037268,
+    "ast_hash": "6ee55cb34dc2a5ae6468113031b243e2",
+    "semantic_hash": "6ee55cb34dc2a5ae6468113031b243e2"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\provklar-logo.png": {
+    "mtime": 1779225222.7057984,
+    "ast_hash": "4dd7d48abe6d3ba0832bd2792db5299f",
+    "semantic_hash": "4dd7d48abe6d3ba0832bd2792db5299f"
+  }
+}
