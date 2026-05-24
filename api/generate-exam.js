@@ -109,11 +109,34 @@ async function readJsonBody(req) {
   return JSON.parse(raw);
 }
 
+async function requireAuth(req) {
+  const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  try {
+    const r = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY
+        },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data?.id ? data : null;
+  } catch { return null; }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
   }
+
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });

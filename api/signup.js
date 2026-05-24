@@ -1,5 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 function buildWelcomeHtml(email) {
   return `<!DOCTYPE html>
 <html lang="sv">
@@ -86,13 +95,13 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         from: "ProviaAI <onboarding@resend.dev>",
         to: "elton.rustaeus@gmail.com",
-        subject: `Ny användare på ProviaAI — ${email}`,
+        subject: `Ny användare på ProviaAI — ${escapeHtml(email)}`,
         html: `
           <div style="font-family:sans-serif;max-width:480px">
             <h2 style="color:#1bff8c;margin:0 0 16px">Ny registrering</h2>
             <table style="width:100%;border-collapse:collapse">
-              <tr><td style="padding:6px 0;color:#666">Email</td><td><b>${email}</b></td></tr>
-              <tr><td style="padding:6px 0;color:#666">Användar-ID</td><td style="font-size:12px;font-family:monospace">${userData.user.id}</td></tr>
+              <tr><td style="padding:6px 0;color:#666">Email</td><td><b>${escapeHtml(email)}</b></td></tr>
+              <tr><td style="padding:6px 0;color:#666">Användar-ID</td><td style="font-size:12px;font-family:monospace">${escapeHtml(userData.user.id)}</td></tr>
               <tr><td style="padding:6px 0;color:#666">Roll</td><td><b>gratis</b></td></tr>
               <tr><td style="padding:6px 0;color:#666">Registrerad</td><td>${new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}</td></tr>
             </table>
