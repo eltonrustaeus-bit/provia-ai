@@ -17,8 +17,10 @@ vercel dev
 OPENAI_API_KEY
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
-OPENAI_MODEL          # optional, defaults to gpt-4o-mini
-OPENAI_MODEL_MATH     # optional, defaults to OPENAI_MODEL
+OPENAI_MODEL              # optional, defaults to gpt-4o-mini
+OPENAI_MODEL_MATH         # optional, defaults to OPENAI_MODEL
+RESEND_API_KEY            # welcome email via Resend (resend.com)
+SUPABASE_WEBHOOK_SECRET   # optional but recommended — validates Supabase webhook calls
 ```
 
 **Test an API endpoint manually:**
@@ -72,6 +74,9 @@ förbättring.html
   → POST /api/teacher-report  (exam history + mistakes → formatted report)
   → POST /api/check-approved  (user_id → { approved: bool })
   → POST /api/check-role      (JWT → { role: "student"|"teacher"|"admin"|"pending" })
+
+Supabase webhook (profiles INSERT)
+  → POST /api/welcome-email   (user_id → fetch email from auth → send welcome mail via Resend)
 ```
 
 ### Supabase schema
