@@ -9,3 +9,5 @@ browser.js
 screenshot.js
 .mcp.json
 supabase/.temp/
+
+.vercel
