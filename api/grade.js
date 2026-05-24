@@ -177,7 +177,7 @@ module.exports = async function handler(req, res) {
     }
 
     const lang = asEnum(p.lang, ["sv", "en"], "sv");
-    const pastedText = safeString(p.pastedText, 200000);
+    const pastedText = safeString(p.pastedText, 40000);
     const questions = Array.isArray(p.questions) ? p.questions : [];
     const answersArr = Array.isArray(p.answers) ? p.answers : [];
 
@@ -331,7 +331,8 @@ module.exports = async function handler(req, res) {
       const r = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(45_000)
       });
 
       const raw = await r.text();
@@ -339,9 +340,9 @@ module.exports = async function handler(req, res) {
       try {
         data = JSON.parse(raw);
       } catch {
-        return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status, raw });
+        return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
       }
-      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data, raw });
+      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data });
 
       const outputText = extractOutputText(data);
       if (!outputText) {

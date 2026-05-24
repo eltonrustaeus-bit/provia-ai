@@ -1,3 +1,5 @@
+import { requireAuth } from "./_auth.js";
+
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 function safe(val, max) {
@@ -8,6 +10,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
 
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ ok: false, error: "OPENAI_API_KEY not configured" });
@@ -91,10 +96,13 @@ Skriv rapporten enligt formatet och kraven.`;
         model: MODEL,
         instructions: systemPrompt,
         input: userPrompt
-      })
+      }),
+      signal: AbortSignal.timeout(45_000)
     });
 
-    const data = await response.json();
+    const rawBody = await response.text();
+    let data;
+    try { data = JSON.parse(rawBody); } catch { data = {}; }
 
     if (!response.ok) {
       return res.status(500).json({

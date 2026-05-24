@@ -1,9 +1,13 @@
 import OpenAI from "openai";
+import { requireAuth } from "./_auth.js";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
 
   const { question, correct, option_a, option_b, option_c, option_d } = req.body || {};
   if (!question || !correct) return res.status(400).json({ error: "question and correct required" });
@@ -36,7 +40,6 @@ Svara på svenska. Fokusera på trafikregeln eller principen som gäller.`;
     if (!explanation) return res.status(502).json({ error: "No explanation generated" });
     res.json({ explanation });
   } catch (err) {
-    console.error("explain error:", err);
     res.status(500).json({ error: "AI error" });
   }
 }

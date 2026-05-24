@@ -1,5 +1,5 @@
 // api/train-material.js (CommonJS / Vercel Serverless)
-// Skapar “träningsmaterial” från användarens fel (mistakes) så appen kan generera prov på det du missade.
+// Skapar "träningsmaterial" från användarens fel (mistakes) så appen kan generera prov på det du missade.
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -8,7 +8,6 @@ function json(res, status, obj) {
 }
 
 function pickModel() {
-  // Sätt i Vercel env: OPENAI_MODEL_TRAIN (t.ex. en dyrare modell), annars faller den tillbaka.
   return process.env.OPENAI_MODEL_TRAIN || process.env.OPENAI_MODEL || "gpt-4o-mini";
 }
 
@@ -53,11 +52,34 @@ function buildSchema() {
   };
 }
 
+async function requireAuth(req) {
+  const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  try {
+    const r = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY
+        },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data?.id ? data : null;
+  } catch { return null; }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "Use POST" });
   }
+
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
@@ -78,7 +100,6 @@ module.exports = async function handler(req, res) {
 
     if (!mistakes.length) return json(res, 400, { ok: false, error: "Missing mistakes" });
 
-    // Ta senaste (max) 40 misstag för att hålla prompten stabil/snabb.
     const last = mistakes.slice(-40).map((m) => ({
       id: String(m?.id ?? ""),
       qType: String(m?.qType ?? ""),
@@ -136,15 +157,16 @@ module.exports = async function handler(req, res) {
       const r = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(45_000)
       });
 
-      const raw = await r.text();
+      const rawBody = await r.text();
       let data;
-      try { data = JSON.parse(raw); } catch {
-        return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status, raw });
+      try { data = JSON.parse(rawBody); } catch {
+        return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
       }
-      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data, raw });
+      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data });
 
       const outputText =
         (Array.isArray(data.output) &&

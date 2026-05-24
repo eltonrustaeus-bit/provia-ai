@@ -1,3 +1,5 @@
+import { requireAuth } from "./_auth.js";
+
 function safeString(x, maxLen) {
   const s = typeof x === "string" ? x : "";
   return s.length > maxLen ? s.slice(0, maxLen) : s;
@@ -61,6 +63,9 @@ function pickCourseGuide(courseName) {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(500).json({ ok: false, error: "Missing OPENAI_API_KEY" });
 
@@ -115,11 +120,14 @@ Max 200 ord.`;
           { role: "user", content: userContent }
         ]
       }),
+      signal: AbortSignal.timeout(45_000)
     });
 
-    const data = await r.json();
+    const rawBody = await r.text();
+    let data;
+    try { data = JSON.parse(rawBody); } catch { data = {}; }
 
-    if (!r.ok) return res.status(500).json({ ok: false, error: "OpenAI error", status: r.status, details: data });
+    if (!r.ok) return res.status(500).json({ ok: false, error: "OpenAI error", status: r.status });
 
     const text =
       (Array.isArray(data?.output) &&
