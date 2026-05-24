@@ -362,10 +362,22 @@
       *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
       .reveal{opacity:1;transform:none}
     }
+    /* CUSTOM CURSOR */
+    @media(pointer:fine){
+      *{cursor:none!important}
+      #cursorDot{position:fixed;top:0;left:0;z-index:99999;width:6px;height:6px;border-radius:50%;background:var(--a);pointer-events:none;opacity:0;transition:transform .08s ease,opacity .15s;will-change:transform}
+      #cursorRing{position:fixed;top:0;left:0;z-index:99998;width:28px;height:28px;pointer-events:none;opacity:0;transition:opacity .15s;will-change:transform}
+      #cursorRing>div{width:100%;height:100%;border-radius:50%;border:1.5px solid rgba(27,255,140,.5);transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s ease}
+      #cursorRing.rHov>div{transform:scale(1.57);opacity:.3}
+      #cursorRing.rDown>div{transform:scale(.64);opacity:.8}
+    }
+    .coachBox{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
   </style>
 </head>
 
 <body>
+<div id="cursorDot" aria-hidden="true"></div>
+<div id="cursorRing" aria-hidden="true"><div></div></div>
 
   <!-- HEADER -->
   <header>
@@ -607,6 +619,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
   <script>
     /* ── STORAGE KEYS ── */
     const LS_HISTORY='proviaai_history',LS_MISTAKES='proviaai_mistakes',LS_LAST='proviaai_last_result',
@@ -1209,6 +1223,36 @@
         if(db){const uid=await getUserId();if(uid)await syncFromAccount();}
         renderAll();
       })();
+    })();
+
+    /* ── GSAP + CURSOR ── */
+    (function(){
+      const rm=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if(!rm&&window.gsap){
+        gsap.registerPlugin(ScrollTrigger);
+        const hero=document.querySelector('.hero');
+        if(hero){
+          hero.classList.add('in');
+          gsap.from('.hero > *',{y:18,opacity:0,duration:.55,ease:'power2.out',stagger:.1,delay:.1});
+        }
+      }
+      const dot=document.getElementById('cursorDot'),ring=document.getElementById('cursorRing');
+      if(!dot||!ring||rm||!window.matchMedia('(pointer:fine)').matches)return;
+      let mx=0,my=0,rx=0,ry=0,vis=false;
+      const lerp=(a,b,t)=>a+(b-a)*t;
+      (function raf(){rx=lerp(rx,mx,.12);ry=lerp(ry,my,.12);ring.style.transform=`translate(${rx-14}px,${ry-14}px)`;requestAnimationFrame(raf);})();
+      document.addEventListener('mousemove',e=>{
+        mx=e.clientX;my=e.clientY;
+        dot.style.transform=`translate(${mx-3}px,${my-3}px)`;
+        if(!vis){vis=true;dot.style.opacity='1';ring.style.opacity='1';}
+      });
+      document.addEventListener('mouseleave',()=>{dot.style.opacity='0';ring.style.opacity='0';vis=false;});
+      document.querySelectorAll('a,button,[role="button"]').forEach(el=>{
+        el.addEventListener('mouseenter',()=>ring.classList.add('rHov'));
+        el.addEventListener('mouseleave',()=>ring.classList.remove('rHov'));
+      });
+      document.addEventListener('mousedown',()=>ring.classList.add('rDown'));
+      document.addEventListener('mouseup',()=>ring.classList.remove('rDown'));
     })();
   </script>
 </body>
