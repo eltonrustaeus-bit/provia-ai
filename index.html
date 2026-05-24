@@ -234,6 +234,23 @@
     @keyframes shim { from,to { transform:translateX(0) } }
   }
 
+  /* ── GSAP TAKES OVER .rev — kill CSS transitions ── */
+  .rev { transition: none !important }
+
+  /* ── GLASS UPGRADE — demoCta & pricingCta ── */
+  .demoCta {
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    background: rgba(17,26,21,.78) !important;
+  }
+  .pricingCta {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* ── HERO GLOW PARALLAX ── */
+  .demoCtaGlow { will-change: transform }
+
   </style>
 </head>
 <body>
@@ -500,20 +517,75 @@ document.querySelectorAll("[data-t]").forEach(btn => {
   btn.addEventListener("click", () => sec && sec.classList.toggle("col"));
 });
 
-/* ── SCROLL REVEAL ── */
-(function(){
-  const els = [...document.querySelectorAll(".rev")];
-  if (!("IntersectionObserver" in window)) { els.forEach(e => e.classList.add("in")); return; }
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
-  }, { threshold:.08, rootMargin:"0px 0px -4% 0px" });
-  els.forEach((el, i) => { el.style.transitionDelay = `${Math.min(i*40,200)}ms`; io.observe(el); });
-})();
+/* ── SCROLL REVEAL — placeholder; GSAP block below handles this ── */
 
 /* ── FOOTER YEAR ── */
 const yrEl = document.getElementById("yr");
 if (yrEl) yrEl.textContent = new Date().getFullYear();
 
+</script>
+
+<!-- GSAP + ScrollTrigger -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+/* ── GSAP SCROLL & HERO ANIMATIONS ── */
+(function(){
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (reduced) {
+    document.querySelectorAll(".rev").forEach(el => { el.style.opacity = "1"; el.style.transform = "none"; });
+    return;
+  }
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* initial states */
+  gsap.set(".heroLeft, .heroRight", { opacity: 1, y: 0 });
+  gsap.set(".heroLeft > *", { opacity: 0, y: 22 });
+  gsap.set(".heroRight .demoCta", { opacity: 0, y: 18, x: 12 });
+  gsap.utils.toArray(".sec, .pricingCta").forEach(el => gsap.set(el, { opacity: 0, y: 28 }));
+
+  /* hero entrance — small buffer so loader starts fading (loader hides at load+160ms) */
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      gsap.timeline({ defaults: { ease: "power3.out" } })
+        .to(".heroLeft > *", { opacity: 1, y: 0, duration: 0.5, stagger: 0.08 })
+        .to(".heroRight .demoCta", { opacity: 1, y: 0, x: 0, duration: 0.55 }, "-=0.3");
+    }, 80);
+  });
+
+  /* section reveals */
+  gsap.utils.toArray(".sec").forEach(el => {
+    gsap.to(el, {
+      scrollTrigger: { trigger: el, start: "top 87%", once: true },
+      opacity: 1, y: 0, duration: 0.52, ease: "power2.out"
+    });
+  });
+
+  /* pricing CTA */
+  gsap.to(".pricingCta", {
+    scrollTrigger: { trigger: ".pricingCta", start: "top 88%", once: true },
+    opacity: 1, y: 0, duration: 0.6, ease: "power3.out"
+  });
+
+  /* hero glow parallax */
+  gsap.to(".demoCtaGlow", {
+    y: 50,
+    ease: "none",
+    scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1.5 }
+  });
+
+  /* list item stagger on open sections */
+  document.querySelectorAll(".secH[data-t]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sec = document.getElementById(btn.dataset.t);
+      if (!sec || sec.classList.contains("col")) return;
+      const items = sec.querySelectorAll(".list li, .olist li");
+      gsap.from(items, { opacity: 0, x: -12, duration: 0.35, stagger: 0.06, ease: "power2.out", delay: 0.05 });
+    });
+  });
+})();
 </script>
 
 <!-- CUSTOM CURSOR -->
