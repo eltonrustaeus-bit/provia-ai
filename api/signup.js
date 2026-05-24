@@ -115,7 +115,7 @@ export default async function handler(req, res) {
       })
     });
   } catch (e) {
-    console.error("Email send failed:", e?.message, "RESEND_API_KEY set:", !!process.env.RESEND_API_KEY);
+    return res.status(200).json({ session: signInData.session, user: signInData.user, _emailError: e?.message, _keySet: !!process.env.RESEND_API_KEY });
   }
 
   return res.status(200).json({ session: signInData.session, user: signInData.user });
