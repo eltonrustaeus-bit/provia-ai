@@ -1461,6 +1461,20 @@ try{
   await refreshQuotaUi();
   setStatus("");
 
+  // Handle return from Stripe Checkout
+  (function(){
+    const p = new URLSearchParams(location.search);
+    if(p.get("upgrade") === "success") {
+      const plan = p.get("plan") || "";
+      const msg = plan === "premium"
+        ? (LANG === "sv" ? "Välkommen till Premium! Din plan är nu aktiv." : "Welcome to Premium! Your plan is now active.")
+        : (LANG === "sv" ? "Välkommen till Basic! Din plan är nu aktiv." : "Welcome to Basic! Your plan is now active.");
+      setStatus(msg, "ok");
+      history.replaceState({}, "", location.pathname);
+      setTimeout(async () => { await refreshQuotaUi(); }, 2000);
+    }
+  })();
+
   onClick("menuBtn",(e)=>{e.preventDefault();e.stopPropagation();const m=$("menu");if(!m)return;if(m.classList.contains("is-open"))closeMenuAnimated();else openMenuAnimated();});
   document.addEventListener("click",(e)=>{const m=$("menu"),mb=$("menuBtn");if(!m||!mb)return;if(!m.classList.contains("is-open"))return;if(m.contains(e.target)||mb.contains(e.target))return;closeMenuAnimated();});
   const menuEl=$("menu");
