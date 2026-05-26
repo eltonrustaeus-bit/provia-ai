@@ -6,7 +6,6 @@
     "api/generate-exam.js": { "maxDuration": 60 },
     "api/smart-tips.js": { "maxDuration": 60 },
     "api/teacher-report.js": { "maxDuration": 60 },
-    "api/train-material.js": { "maxDuration": 60 },
     "api/ocr.js": { "maxDuration": 60 },
     "api/explain.js": { "maxDuration": 30 }
   }
