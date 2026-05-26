@@ -1,5 +1,7 @@
 {
   "functions": {
+    "api/stripe-webhook.js": { "maxDuration": 10 },
+    "api/create-checkout-session.js": { "maxDuration": 15 },
     "api/grade.js": { "maxDuration": 60 },
     "api/generate-exam.js": { "maxDuration": 60 },
     "api/smart-tips.js": { "maxDuration": 60 },

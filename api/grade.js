@@ -102,7 +102,7 @@ function buildNonMcGradeSchema() {
 
 function sanitizeHistory(x) {
   if (!Array.isArray(x)) return [];
-  return x.slice(-10).map((a) => ({
+  return x.slice(-3).map((a) => ({
     ts: Number(a?.ts || 0) || 0,
     course: typeof a?.course === "string" ? a.course.slice(0, 80) : "",
     level: typeof a?.level === "string" ? a.level.slice(0, 10) : "",
@@ -113,7 +113,7 @@ function sanitizeHistory(x) {
 
 function sanitizeMistakes(x) {
   if (!Array.isArray(x)) return [];
-  return x.slice(-20).map((m) => ({
+  return x.slice(-10).map((m) => ({
     ts: Number(m?.ts || 0) || 0,
     id: typeof m?.id === "string" ? m.id.slice(0, 40) : "",
     qType: typeof m?.qType === "string" ? m.qType.slice(0, 20) : "",
@@ -184,7 +184,6 @@ module.exports = async function handler(req, res) {
     const history = sanitizeHistory(p.history);
     const mistakesCtx = sanitizeMistakes(p.mistakes);
 
-    if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText" });
     if (!questions.length) return json(res, 400, { ok: false, error: "Missing questions" });
 
     const answerMap = new Map();
@@ -269,6 +268,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText for open questions" });
+
     const model = pickModel();
     const responseFormat = buildNonMcGradeSchema();
 
@@ -313,7 +314,7 @@ module.exports = async function handler(req, res) {
       "8) Style: Professional. No fluff.\n";
 
     const userPayload = {
-      material: pastedText,
+      material: pastedText.slice(0, 12000),
       student_context: { history, mistakes: mistakesCtx },
       items: nonMcPack
     };

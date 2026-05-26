@@ -249,7 +249,7 @@
       </ul>
 
       <div class="planNote2">Basic är för dig som vill ha en snabb och tydlig provrutin utan avancerade AI-funktioner.</div>
-      <a class="planCta outline" href="app.html">Kom igång med Basic</a>
+      <button class="planCta outline" id="btn-basic" onclick="startCheckout('basic')">Kom igång med Basic</button>
     </div>
 
     <!-- PREMIUM -->
@@ -279,7 +279,7 @@
       </ul>
 
       <div class="planNote2">Premium är för dig som vill förbättras snabbare — mindre gissning, mer riktad träning.</div>
-      <a class="planCta" href="app.html">Kom igång med Premium</a>
+      <button class="planCta" id="btn-premium" onclick="startCheckout('premium')">Kom igång med Premium</button>
     </div>
 
   </div>
@@ -401,6 +401,58 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
     });
   },{threshold:.6});
   document.querySelectorAll(".planAmt").forEach(el=>io.observe(el));
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+  const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
+  const sb = window.supabase && window.supabase.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  window.startCheckout = async function(plan) {
+    const btn = document.getElementById("btn-" + plan);
+    const origText = btn.textContent;
+
+    if (!sb) {
+      window.location.href = "app.html";
+      return;
+    }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.href = "app.html";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Laddar...";
+
+    try {
+      const r = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + session.access_token,
+        },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await r.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Något gick fel. Försök igen.");
+        btn.disabled = false;
+        btn.textContent = origText;
+      }
+    } catch {
+      alert("Nätverksfel. Försök igen.");
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  };
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
