@@ -38,8 +38,8 @@
     "correct": "A",
     "explanation": "Andreaskors placeras direkt vid obevakad järnvägskorsning och varnar för tåg från båda riktningarna.",
     "difficulty": "normal",
-    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Sweden_road_sign_A36.svg/330px-Sweden_road_sign_A36.svg.png",
-    "image_alt": "Jarnvag med bom A36"
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Sweden_road_sign_A37.svg/330px-Sweden_road_sign_A37.svg.png",
+    "image_alt": "Andreaskors A37 — obevakad järnvägskorsning"
   },
   {
     "id": 4,
@@ -372,7 +372,7 @@
     "option_c": "Halvt körfält",
     "option_d": "Bara om cykelfält finns",
     "correct": "B",
-    "explanation": "Hall minst 1,5 meters sidoavstand vid omkoring av cyklist - de kan vingla ovantat. Transportstyrelsen rekommenderar 1,5 m; lagen kraver betryggande avstand.",
+    "explanation": "Håll minst 1,5 meters sidoavstånd vid omkörning av cyklist — de kan vingla oväntat. Transportstyrelsen rekommenderar 1,5 m; lagen kräver betryggande avstånd.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
@@ -436,13 +436,13 @@
   {
     "id": 32,
     "category": "Hastighet",
-    "question": "Ungefär hur lång bromssträcka vid 90 km/h på torr asfalt?",
+    "question": "Ungefär hur lång stoppsträcka (reaktion + broms) vid 90 km/h på torr asfalt?",
     "option_a": "55 meter",
     "option_b": "70 meter",
     "option_c": "90 meter",
     "option_d": "105 meter",
     "correct": "C",
-    "explanation": "Bromssträckan vid 90 km/h är ca 90 meter på torr asfalt.",
+    "explanation": "Total stoppsträcka vid 90 km/h är ca 90 meter (reaktionssträcka ~25 m + bromssträcka ~55–65 m). Ren bromssträcka är ca 50–60 m.",
     "difficulty": "hard",
     "image_url": null,
     "image_alt": null
@@ -500,20 +500,6 @@
     "correct": "B",
     "explanation": "Luftmotståndet ökar med kvadraten på hastigheten. Skillnaden är normalt 20-30%.",
     "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 37,
-    "category": "Miljö & Ekonomi",
-    "question": "Vad innebär ecokörning?",
-    "option_a": "Framförhållning, rulla fritt, undvika onödiga stopp",
-    "option_b": "Köra fort för att minska restid",
-    "option_c": "Alltid lägsta möjliga växel",
-    "option_d": "Alltid köra el",
-    "correct": "A",
-    "explanation": "Ecokörning handlar om framförhållning: planera bromsningar, rulla fritt och accelerera mjukt.",
-    "difficulty": "easy",
     "image_url": null,
     "image_alt": null
   },
@@ -896,20 +882,6 @@
     "image_alt": "Vajningsplikt mot motande B4"
   },
   {
-    "id": 75,
-    "category": "Vägmärken",
-    "question": "Vad innebär ett blått runt märke med en vit pil rakt upp?",
-    "option_a": "Obligatorisk körriktning rakt fram",
-    "option_b": "Parkering tillåten",
-    "option_c": "Upphörande av förbud",
-    "option_d": "Cykelbana",
-    "correct": "A",
-    "explanation": "Blå runda märken med vita pilar är påbudsmärken. Pil rakt upp innebär att du måste köra rakt fram.",
-    "difficulty": "normal",
-    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-    "image_alt": "Pabudmarke rakt fram D1-3"
-  },
-  {
     "id": 76,
     "category": "Vägmärken",
     "question": "Vad gäller vid märket Förbud mot fordonstrafik i båda riktningarna?",
@@ -1010,7 +982,7 @@
   {
     "id": 83,
     "category": "Vägmärken",
-    "question": "Vad varnar ett rödrandat trekantigt märke med en rak linje för?",
+    "question": "Vad varnar märket A13 — en röd triangel med bild av en studsande bil — för?",
     "option_a": "Stigning",
     "option_b": "Brant utförsbacke",
     "option_c": "Ojämn väg",
@@ -1114,7 +1086,7 @@
     "option_c": "Cyklister ska stiga av och leda cykeln",
     "option_d": "Cyklister har samma rätt som fotgängare",
     "correct": "C",
-    "explanation": "Vid ett overgangstalle har cyklister inte automatisk fortur. De ska stiga av och leda cykeln for att ha samma skydd som fotgangare. Vid en cykeloverart (bla markeringar) har cyklisten daremot fortur.",
+    "explanation": "Vid ett övergångställe har cyklister inte automatisk företräde. De ska stiga av och leda cykeln för att ha samma skydd som fotgängare. Vid en cykelöverfart (blå markeringar) har cyklisten däremot företräde.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
@@ -1242,20 +1214,6 @@
     "correct": "C",
     "explanation": "Blinkande gult ljus innebär att du ska köra försiktigt och observera trafiken.",
     "difficulty": "hard",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 101,
-    "category": "Korsningar",
-    "question": "Du ska köra in i en rondell. Vem har företräde?",
-    "option_a": "Du som kör in",
-    "option_b": "Det beror på hastighetsgränsen",
-    "option_c": "Fordon från höger i rondellen",
-    "option_d": "Trafiken som redan är i rondellen",
-    "correct": "D",
-    "explanation": "I en rondell har trafiken som redan kör i rondellen företräde.",
-    "difficulty": "normal",
     "image_url": null,
     "image_alt": null
   },
@@ -1414,20 +1372,6 @@
     "image_alt": null
   },
   {
-    "id": 115,
-    "category": "Miljö & Ekonomi",
-    "question": "Hur påverkar lågt däcktryck bränsleförbrukningen?",
-    "option_a": "Det spelar ingen roll",
-    "option_b": "Lägre tryck ger lägre förbrukning",
-    "option_c": "För lågt tryck ökar rullmotstånd och förbrukning",
-    "option_d": "Lägre tryck ger bättre grepp",
-    "correct": "C",
-    "explanation": "För lågt däcktryck ökar rullmotståndet och bränsleförbrukningen.",
-    "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
     "id": 116,
     "category": "Miljö & Ekonomi",
     "question": "Vad gör du om du stannar mer än 1 minut med motorn igång?",
@@ -1470,20 +1414,6 @@
     "image_alt": null
   },
   {
-    "id": 119,
-    "category": "Alkohol & Droger",
-    "question": "Vad är promillegränsen för rattfylleri i Sverige?",
-    "option_a": "0,5 promille",
-    "option_b": "1,0 promille",
-    "option_c": "0,8 promille",
-    "option_d": "0,2 promille",
-    "correct": "D",
-    "explanation": "I Sverige är gränsen för rattfylleri 0,2 promille.",
-    "difficulty": "easy",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
     "id": 120,
     "category": "Alkohol & Droger",
     "question": "Hur snabbt bryts alkohol ned i kroppen?",
@@ -1493,20 +1423,6 @@
     "option_d": "0,1-0,15 promille per timme",
     "correct": "D",
     "explanation": "Alkohol bryts ned med ca 0,1-0,15 promille per timme.",
-    "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 121,
-    "category": "Alkohol & Droger",
-    "question": "Vad är straffet för grovt rattfylleri?",
-    "option_a": "Böter",
-    "option_b": "Fängelse upp till 6 månader",
-    "option_c": "Fängelse upp till 2 år",
-    "option_d": "Körkortsindragning i 1 år",
-    "correct": "C",
-    "explanation": "Grovt rattfylleri kan ge fängelse i upp till 2 år.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
@@ -1577,20 +1493,6 @@
     "option_d": "Minst 150 meter",
     "correct": "C",
     "explanation": "På landsväg ska varningstriangeln placeras minst 100 meter bakom fordonet.",
-    "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 127,
-    "category": "Säkerhet & Utrustning",
-    "question": "Vad gäller för barn under 135 cm i en bil?",
-    "option_a": "Bälteskudde räcker alltid",
-    "option_b": "De ska alltid sitta bakåtvänd",
-    "option_c": "De får inte sitta i framsätet",
-    "option_d": "Godkänd bilbarnstol anpassad för deras storlek",
-    "correct": "D",
-    "explanation": "Barn under 135 cm ska använda ett godkänt fordonsbarnsskydd anpassat för deras storlek.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
@@ -1808,13 +1710,13 @@
   {
     "id": 144,
     "category": "Vägmärken",
-    "question": "Vad innebär ett vitt märke med röd kant och ett rött snedstreck?",
+    "question": "Vad innebär ett runt rött märke med en vit horisontell bård?",
     "option_a": "Förbud mot infart",
     "option_b": "Stopplikt",
     "option_c": "Väjningsplikt",
     "option_d": "Parkering förbjuden",
     "correct": "A",
-    "explanation": "Market Forbud mot infart (C2) har vit bakgrund med rod kant och rott snedstreck. Ingen trafik far kora in pa den vagen.",
+    "explanation": "Märket Förbud mot infart (C2) är ett runt rött märke med vit horisontell bård. Ingen trafik får köra in på den vägen.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
@@ -1940,7 +1842,7 @@
     "option_c": "Stannande förbjudet",
     "option_d": "Väjningsplikt",
     "correct": "A",
-    "explanation": "Det runda märket med vit horisontell linje (B1) är 'Förbud mot infart'. Ingen trafik i den riktningen.",
+    "explanation": "Det runda röda märket med vit horisontell bård (C2) är 'Förbud mot infart'. Ingen trafik får köra i den riktningen.",
     "difficulty": "easy",
     "image_url": null,
     "image_alt": null
@@ -1951,7 +1853,7 @@
     "question": "Vad innebär ett märke med en röd triangel och en svart gående person?",
     "option_a": "Varning för skola",
     "option_b": "Varning för gångtrafikanter",
-    "option_c": "Övergångställe ahead",
+    "option_c": "Övergångställe framåt",
     "option_d": "Gångfartsområde",
     "correct": "B",
     "explanation": "Det gula triangelmärket med en gående person varnar förare om att gångtrafikanter kan korsa eller röra sig längs vägen.",
@@ -1998,20 +1900,6 @@
     "correct": "A",
     "explanation": "Dubbla heldragna gula mittlinjer innebär absolut körförbud för båda riktningarna. De finns vid platser med extremt dålig sikt.",
     "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 160,
-    "category": "Trafikregler",
-    "question": "Är det tillåtet att använda handhållen mobiltelefon under körning?",
-    "option_a": "Ja, om det inte stör körningen",
-    "option_b": "Ja, vid kortare samtal",
-    "option_c": "Nej, det är förbjudet",
-    "option_d": "Ja, om hastigheten är under 30 km/h",
-    "correct": "C",
-    "explanation": "Det är förbjudet att hålla i och använda mobiltelefon under körning. Böter utdelas. Handsfree är tillåtet.",
-    "difficulty": "easy",
     "image_url": null,
     "image_alt": null
   },
@@ -2244,11 +2132,11 @@
     "category": "Korsningar",
     "question": "Det finns inga märken i korsningen och du möter en spårvagn. Vem har företräde?",
     "option_a": "Du har alltid företräde gentemot spårvagnar",
-    "option_b": "Spårvagnen har alltid företräde",
-    "option_c": "Högerregeln gäller",
+    "option_b": "Spårvagnen har alltid juridisk företräde",
+    "option_c": "Högerregeln gäller — spårvagnen kan inte styra undan",
     "option_d": "Den som kör sakta ger företräde",
-    "correct": "B",
-    "explanation": "Spårvagnar har alltid företräde framför andra fordon om inte märken eller trafikljus anger annat.",
+    "correct": "C",
+    "explanation": "Högerregeln gäller i korsning utan märken. Spårvagnar kan inte styra undan, vilket i praktiken innebär att du ska väja — men det finns ingen generell lagstadgad prioritet för spårvagnar utan vägmärken.",
     "difficulty": "hard",
     "image_url": null,
     "image_alt": null
@@ -2457,8 +2345,8 @@
     "option_b": "100 km/h",
     "option_c": "110 km/h",
     "option_d": "120 km/h",
-    "correct": "C",
-    "explanation": "Maxhastigheten på svenska motorvägar är 110 km/h om inget annat anges.",
+    "correct": "D",
+    "explanation": "Grundregeln på svenska motorvägar är 120 km/h (TF 3 kap 17§). Lägre hastighetsgräns kan vara skyltad.",
     "difficulty": "easy",
     "image_url": null,
     "image_alt": null
@@ -2739,20 +2627,6 @@
     "option_d": "Lika med vinterdäck",
     "correct": "C",
     "explanation": "Bromssträckan på is kan vara 5-10 gånger längre än på torr asfalt. Vinterdäck förbättrar bromsen men eliminerar inte risken.",
-    "difficulty": "normal",
-    "image_url": null,
-    "image_alt": null
-  },
-  {
-    "id": 216,
-    "category": "Väglag & Bromssträcka",
-    "question": "Vad är aquaplaning och hur undviker du det?",
-    "option_a": "Däcken lyfter på vattenfilm – sänk hastigheten",
-    "option_b": "Bilen glider på is – undvik med vinterdäck",
-    "option_c": "Bilen suger sig fast i vått underlag",
-    "option_d": "Kylsystemet överhettas",
-    "correct": "A",
-    "explanation": "Aquaplaning uppstår när ett vattenfilmsskikt bildas under däcken och de förlorar greppet. Sänk hastigheten vid vattenpölar och ha däck med bra mönsterdjup.",
     "difficulty": "normal",
     "image_url": null,
     "image_alt": null
