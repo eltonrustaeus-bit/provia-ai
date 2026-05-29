@@ -93,7 +93,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "ProviaAI <onboarding@resend.dev>",
+        from: "ProviaAI <noreply@proviaai.se>",
         to: "elton.rustaeus@gmail.com",
         subject: `Ny användare på ProviaAI — ${escapeHtml(email)}`,
         html: `
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "ProviaAI <onboarding@resend.dev>",
+        from: "ProviaAI <noreply@proviaai.se>",
         to: email,
         subject: `Välkommen till ProviaAI!`,
         html: buildWelcomeHtml(email)
