@@ -555,6 +555,11 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 <script>
 "use strict";
 
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const safeJSON = (s, fb) => { try { return JSON.parse(s) ?? fb } catch { return fb } };
+const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
+
 const SUPA_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
 const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
 
@@ -819,12 +824,6 @@ async function loadTeoriHist() {
       </tr>`).join("")}</tbody></table>`;
   } catch(_){}
 }
-
-// ── SHORTCUTS ──
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-const safeJSON = (s, fb) => { try { return JSON.parse(s) ?? fb } catch { return fb } };
-const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
 
 // ── BOOKMARKS ──
 const getBM = () => safeJSON(localStorage.getItem(LS_BM), []);
