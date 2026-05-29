@@ -23,35 +23,35 @@ function buildWelcomeHtml(email) {
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:32px">
-          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Välkommen till ProviaAI!</h1>
-          <p style="margin:0 0 24px;font-size:15px;color:#a8c4b4;line-height:1.6">Hej! Ditt konto är nu klart. Här är hur du kommer igång:</p>
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Ta körkort i sommar — börja träna idag</h1>
+          <p style="margin:0 0 24px;font-size:15px;color:#a8c4b4;line-height:1.6">Ditt konto är klart. ProviaAI hjälper dig klara kunskapsprovet på första försöket med AI-anpassade teoriprov.</p>
           <!-- Steps -->
           <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px">
             <tr>
               <td style="padding:12px 0;border-bottom:1px solid rgba(27,255,140,.08)">
                 <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">1</span>
-                <span style="color:#e8f5ee;font-size:14px">Klistra in ditt kursmaterial</span>
+                <span style="color:#e8f5ee;font-size:14px">Träna på körkortsteorin — vägmärken, trafikregler, säkerhet</span>
               </td>
             </tr>
             <tr>
               <td style="padding:12px 0;border-bottom:1px solid rgba(27,255,140,.08)">
                 <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">2</span>
-                <span style="color:#e8f5ee;font-size:14px">Generera ett provs anpassat för dig</span>
+                <span style="color:#e8f5ee;font-size:14px">Gör AI-anpassade provprov som matchar Trafikverkets prov</span>
               </td>
             </tr>
             <tr>
               <td style="padding:12px 0">
                 <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">3</span>
-                <span style="color:#e8f5ee;font-size:14px">Få AI-rättning och personlig feedback</span>
+                <span style="color:#e8f5ee;font-size:14px">Se exakt vad du missar och förbättra dig inför riktiga provet</span>
               </td>
             </tr>
           </table>
           <!-- CTA -->
-          <a href="https://proviaai.se/app.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Börja träna nu</a>
+          <a href="https://proviaai.se/korkortet.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Börja träna teorin nu</a>
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:20px 32px;border-top:1px solid rgba(27,255,140,.08)">
-          <p style="margin:0;font-size:12px;color:#6b8f7c;line-height:1.5">Du är registrerad med <b style="color:#a8c4b4">${email}</b>. Gratis-kontot ger dig 2 prov per vecka — uppgradera när du är redo.</p>
+          <p style="margin:0;font-size:12px;color:#6b8f7c;line-height:1.5">Du är registrerad med <b style="color:#a8c4b4">${email}</b>. Gratis-kontot ger dig 2 teoriprov per vecka — uppgradera för obegränsad träning.</p>
         </td></tr>
       </table>
     </td></tr>
