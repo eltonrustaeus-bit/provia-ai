@@ -83,6 +83,34 @@ export default async function handler(req, res) {
     }
   }
 
+  // Cancel Stripe subscription
+  if (action === "cancel_sub") {
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("stripe_subscription_id, role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!prof?.stripe_subscription_id) {
+        return res.status(400).json({ error: "No active subscription found" });
+      }
+
+      const stripeKey = (process.env.STRIPE_SECRET_KEY || "").replace(/^﻿/, "").trim();
+      const r = await fetch(`https://api.stripe.com/v1/subscriptions/${prof.stripe_subscription_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${stripeKey}` },
+      });
+      const result = await r.json();
+      if (!r.ok) return res.status(500).json({ error: "Stripe cancellation failed", details: result });
+
+      await supabase.from("profiles").update({ role: "gratis", stripe_subscription_id: null }).eq("id", user.id);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   try {
     const { data, error } = await supabase
       .from("profiles")
