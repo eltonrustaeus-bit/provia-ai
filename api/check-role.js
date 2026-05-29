@@ -24,6 +24,39 @@ export default async function handler(req, res) {
   const user = await requireAuth(req, res);
   if (!user) return;
 
+  const action = req.body?.action;
+
+  // Server-side korkortet quota check + bump
+  if (action === "bump_kk") {
+    const KK_LIMITS = { gratis: 2, basic: Infinity, premium: Infinity, admin: Infinity, user: Infinity };
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role, kk_quota_count, kk_quota_week")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) return res.status(500).json({ error: "DB error" });
+
+      const role = String(data?.role || "gratis");
+      const limit = KK_LIMITS[role] ?? 2;
+
+      if (limit === Infinity) return res.status(200).json({ ok: true, count: 0, limit });
+
+      const now = new Date();
+      const weekKey = `${now.getUTCFullYear()}-W${String(Math.ceil((((now - new Date(Date.UTC(now.getUTCFullYear(),0,1)))/86400000)+1)/7)).padStart(2,"0")}`;
+      const storedWeek = data?.kk_quota_week || "";
+      const count = storedWeek === weekKey ? (data?.kk_quota_count || 0) : 0;
+
+      if (count >= limit) return res.status(429).json({ error: "Quota exceeded", count, limit });
+
+      await supabase.from("profiles").update({ kk_quota_count: count + 1, kk_quota_week: weekKey }).eq("id", user.id);
+      return res.status(200).json({ ok: true, count: count + 1, limit });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   try {
     const { data, error } = await supabase
       .from("profiles")

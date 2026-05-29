@@ -1735,10 +1735,28 @@ function startCourseQuiz(stage) {
   $("courseStageView").style.display = "none";
   $("modeTabs").style.display = "none";
   if(isTest) {
-    // Count quota only for test (full quiz), not mini-quiz
     const cfg=LIMITS[role]||LIMITS.gratis;
-    if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
-    bumpQ(); refreshQuotaUI();
+    if(cfg.cap!==Infinity) {
+      // Server-side quota check for authenticated users
+      if(db && uid) {
+        try {
+          const tok = (await db.auth.getSession()).data.session?.access_token;
+          if(tok) {
+            const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
+            if(r.status===429){toast("Gränsen nådd — uppgradera för mer.","bad");window.location.href="pricing.html";return;}
+            if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
+          } else {
+            // Not logged in — fallback localStorage
+            if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+            bumpQ();
+          }
+        } catch { if(readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;} bumpQ(); }
+      } else {
+        if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+        bumpQ();
+      }
+      refreshQuotaUI();
+    }
   }
   // Build exam pool
   let pool = questions.filter(q=>q.category===cat);
