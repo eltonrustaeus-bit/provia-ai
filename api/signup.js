@@ -118,8 +118,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         from: "ProviaAI <onboarding@resend.dev>",
-        to: "elton.rustaeus@gmail.com", // TODO: ändra till `email` efter domänverifiering i Resend
-        subject: `[TEST] Välkommen till ProviaAI — ${email}`,
+        to: email,
+        subject: `Välkommen till ProviaAI!`,
         html: buildWelcomeHtml(email)
       })
     });
