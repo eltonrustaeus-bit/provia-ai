@@ -1701,7 +1701,7 @@ async function askTeacher(presetQ) {
   const btn = $("aiSendBtn"); if(btn) btn.disabled = true;
   try {
     const token = (await db?.auth?.getSession())?.data?.session?.access_token || "";
-    const res = await fetch("/api/teach", {
+    const res = await fetch("/api/explain", {
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
       body: JSON.stringify({ topic: activeCourse, userQuestion: q })
