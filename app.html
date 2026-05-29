@@ -774,7 +774,6 @@ Rätta prov
 const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co".trim();
 const SUPABASE_ANON_KEY_RAW = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
 const SUPABASE_ANON_KEY = (SUPABASE_ANON_KEY_RAW || "").trim();
-const ACCESS_CODE = "provia123";
 const ACCESS_FLAG_KEY = "proviaai_app_access";
 const LS_HISTORY = "proviaai_history";
 const LS_MISTAKES = "proviaai_mistakes";
@@ -1230,7 +1229,15 @@ function isUnlocked(){ return localStorage.getItem(ACCESS_FLAG_KEY)==="true"; }
 function showLock(){ const s=$("loginScreen");if(!s)return;s.style.display="flex";s.setAttribute("aria-hidden","false");document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden"; }
 function hideLock(){ const s=$("loginScreen");if(!s)return;s.style.display="none";s.setAttribute("aria-hidden","true");document.documentElement.style.overflow="";document.body.style.overflow=""; }
 function setLockError(msg){ const em=$("errorMsg");if(em)em.textContent=msg||""; }
-function unlockByCode(){ const v=($("accessCode")?.value||"").trim();if(v===ACCESS_CODE){localStorage.setItem(ACCESS_FLAG_KEY,"true");setLockError("");hideLock();runTrainModeIfRequested();}else setLockError(T[LANG].wrongCode); }
+async function unlockByCode(){
+  const v=($("accessCode")?.value||"").trim();
+  if(!v){setLockError(T[LANG].wrongCode);return;}
+  try{
+    const r=await fetch("/api/verify-access-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:v})});
+    if(r.ok){localStorage.setItem(ACCESS_FLAG_KEY,"true");setLockError("");hideLock();runTrainModeIfRequested();}
+    else setLockError(T[LANG].wrongCode);
+  }catch{setLockError(T[LANG].wrongCode);}
+}
 async function logout(){
   localStorage.removeItem(ACCESS_FLAG_KEY);
   localStorage.removeItem(LS_ROLE);
