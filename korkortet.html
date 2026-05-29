@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 <script src="shared.js" defer></script>
+<script src="korkortet-srs.js" defer></script>
 <style>
 /* ── KORKORTET-SPECIFIC ── */
 
@@ -240,6 +241,114 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .focusPct{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
 .focusGo{font-family:'DM Mono',monospace;font-size:10px;color:var(--a);flex-shrink:0}
 
+/* ── XP BAR ── */
+.xpBar{display:flex;align-items:center;gap:10px;padding:10px 0 16px;flex-wrap:wrap}
+.xpLevel{font-family:'DM Mono',monospace;font-size:11px;color:var(--a);display:flex;align-items:center;gap:5px;flex-shrink:0}
+.xpTrack{flex:1;height:4px;background:var(--s2);border-radius:999px;overflow:hidden;min-width:60px}
+.xpFill{height:100%;background:var(--a);border-radius:999px;transition:width .6s ease}
+.xpCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);flex-shrink:0}
+.dailyGoal{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:var(--r2);border:1px solid var(--l);color:var(--t3)}
+.dailyGoal.done{border-color:rgba(27,255,140,.3);color:var(--a)}
+
+/* ── DUE BADGE ── */
+.dueBadge{display:none;background:var(--a);color:#08100d;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;margin-left:3px}
+body.light .dueBadge{color:#fff}
+.dueBadge.show{display:inline}
+
+/* ── COURSE STAGE FLOW ── */
+.stageWrap{padding-bottom:100px}
+.stageNav{display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.stageBack{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);cursor:pointer;background:none;border:none;padding:0;transition:color .15s}
+.stageBack:hover{color:var(--a)}
+.stageProgress{display:flex;gap:4px;align-items:center;flex:1;justify-content:flex-end}
+.stageDot{width:8px;height:8px;border-radius:50%;background:var(--s2);border:1px solid var(--l);transition:all .2s}
+.stageDot.done{background:var(--a);border-color:var(--a)}
+.stageDot.active{background:var(--a);border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.2)}
+.stageLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.05em}
+
+/* INTRO STAGE */
+.introCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:28px;margin-bottom:16px}
+.introIcon{font-size:40px;margin-bottom:14px;line-height:1}
+.introTitle{font-weight:700;font-size:22px;color:var(--t);letter-spacing:-.025em;margin-bottom:6px}
+.introBadge{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:18px}
+.introBlock{margin-bottom:16px}
+.introBlockTitle{font-family:'DM Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.introBlockTitle.why{color:var(--a)}
+.introBlockTitle.exam{color:#64b5f6}
+.introBlockTitle.trap{color:#ff8484}
+.introBlockBody{font-size:13.5px;color:var(--t2);line-height:1.7}
+.introTrapList{list-style:none;display:grid;gap:5px;margin:0;padding:0}
+.introTrapList li{display:flex;gap:8px;font-size:13px;color:var(--t2);line-height:1.5;align-items:flex-start}
+.introTrapList li::before{content:"⚠";font-size:11px;color:#ff8484;flex-shrink:0;margin-top:2px}
+.introTime{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);margin-top:20px;padding-top:14px;border-top:1px solid var(--l)}
+
+/* STUDY STAGE */
+.studyCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:12px}
+.studySecTitle{font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.studyList{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.studyList li{display:flex;gap:10px;font-size:14px;color:var(--t2);line-height:1.65;align-items:flex-start}
+.studyList li::before{content:"→";color:var(--a);font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:3px}
+
+/* AI TEACHER */
+.aiTeacherWrap{background:var(--s2);border:1px solid var(--l2);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.aiTeacherHeader{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--l)}
+.aiAvatar{width:28px;height:28px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;font-size:14px;flex-shrink:0}
+.aiName{font-weight:600;font-size:12.5px;color:var(--t)}
+.aiRole{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3)}
+.aiMessages{padding:12px 14px;display:grid;gap:10px;max-height:320px;overflow-y:auto}
+.aiMsg{font-size:13.5px;color:var(--t2);line-height:1.7;padding:10px 13px;border-radius:var(--r);max-width:92%}
+.aiMsg.teacher{background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.15);border-radius:var(--r) var(--r) var(--r) 4px}
+.aiMsg.user{background:var(--s);border:1px solid var(--l);border-radius:var(--r) var(--r) 4px var(--r);margin-left:auto;color:var(--t)}
+.aiMsg.typing{color:var(--t3);font-style:italic}
+.aiInputRow{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--l)}
+.aiInput{flex:1;background:var(--s);border:1px solid var(--l);border-radius:var(--r2);padding:8px 12px;font-size:13px;color:var(--t);font-family:inherit;outline:none;transition:border-color .15s}
+.aiInput:focus{border-color:var(--l2)}
+.aiSendBtn{background:var(--a);color:#08100d;border:none;border-radius:var(--r2);padding:0 14px;font-weight:700;font-size:12px;cursor:pointer;transition:background .15s;white-space:nowrap}
+body.light .aiSendBtn{color:#fff}
+.aiSendBtn:hover{background:var(--a2)}
+.aiSendBtn:disabled{opacity:.4;cursor:not-allowed}
+.aiQuickBtns{display:flex;gap:6px;padding:0 12px 10px;flex-wrap:wrap}
+.aiQuickBtn{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r2);padding:3px 9px;background:none;cursor:pointer;transition:all .13s}
+.aiQuickBtn:hover{border-color:var(--a);color:var(--a)}
+
+/* UNDERSTANDING CHECK */
+.understandCheck{background:rgba(244,200,66,.06);border:1px solid rgba(244,200,66,.25);border-radius:var(--r);padding:14px;margin-top:12px}
+.understandCheckTitle{font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:#f4c842;letter-spacing:.07em;margin-bottom:8px}
+.understandCheckQ{font-size:13.5px;color:var(--t2);line-height:1.65;margin-bottom:10px}
+.understandCheckBtns{display:flex;gap:6px;flex-wrap:wrap}
+.ucBtn{font-size:12.5px;color:var(--t2);border:1px solid var(--l);border-radius:var(--r2);padding:6px 12px;background:none;cursor:pointer;transition:all .13s;text-align:left}
+.ucBtn:hover{border-color:var(--l2);background:var(--a-dim)}
+.ucBtn.correct{border-color:var(--a);background:rgba(27,255,140,.08);color:var(--t)}
+.ucBtn.wrong{border-color:var(--danger);background:rgba(255,107,107,.08);color:#ff8484}
+
+/* MINI QUIZ MODE */
+.mqProgress{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.mqTag{font-size:10px;padding:2px 8px;border-radius:var(--r2);background:rgba(27,255,140,.08);border:1px solid rgba(27,255,140,.18);color:var(--a)}
+.mqNote{font-size:12px;color:var(--t3);font-style:italic;margin-bottom:14px}
+
+/* STAGE COMPLETION */
+.doneCard{background:var(--s);border:1px solid rgba(27,255,140,.3);border-radius:var(--r);padding:32px;text-align:center;margin-bottom:16px;position:relative;overflow:hidden}
+.doneCard::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(27,255,140,.08),transparent 60%)}
+.doneIcon{font-size:44px;margin-bottom:12px;line-height:1}
+.doneTitle{font-weight:700;font-size:21px;color:var(--t);letter-spacing:-.025em;margin-bottom:6px}
+.doneSub{font-size:13.5px;color:var(--t2);max-width:32ch;margin:0 auto 20px;line-height:1.65}
+.xpGained{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--a);background:rgba(27,255,140,.08);border:1px solid rgba(27,255,140,.2);border-radius:var(--r2);padding:6px 14px;margin-bottom:16px}
+.nextCourse{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px}
+.nextCourse:hover{border-color:var(--l2);transform:translateY(-2px);box-shadow:var(--sh)}
+.nextCourseLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:3px}
+.nextCourseName{font-weight:600;font-size:14px;color:var(--t)}
+
+/* REPETITION VIEW */
+.repHeader{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.repHeaderTitle{font-weight:700;font-size:18px;color:var(--t);margin-bottom:4px}
+.repHeaderSub{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px}
+.repStats{display:flex;gap:16px;flex-wrap:wrap}
+.repStat{display:flex;flex-direction:column;gap:2px}
+.repStatVal{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--t)}
+.repStatLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.06em}
+.repEmpty{text-align:center;padding:40px 20px;color:var(--t3);font-family:'DM Mono',monospace;font-size:12px}
+.repEmptyIcon{font-size:36px;margin-bottom:10px}
+
 /* ── PROGRESS DASHBOARD ── */
 .dashCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px 20px;margin-bottom:16px}
 .dashTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
@@ -361,6 +470,14 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
     <a class="btn btnP" href="pricing.html" style="height:30px;font-size:12px;padding:0 12px">Uppgradera →</a>
   </div>
 
+  <!-- XP BAR -->
+  <div class="xpBar" id="xpBar" style="display:none">
+    <div class="xpLevel" id="xpLevelLabel">🚗 Nybörjare</div>
+    <div class="xpTrack"><div class="xpFill" id="xpFill" style="width:0%"></div></div>
+    <div class="xpCount" id="xpCount">0 XP</div>
+    <div class="dailyGoal" id="dailyGoalBadge">Mål: 0/20</div>
+  </div>
+
   <!-- MODE TABS -->
   <div class="modeTabs" id="modeTabs">
     <button class="modeTab active" id="tab-ovning" onclick="setMode('ovning')" type="button">
@@ -374,6 +491,10 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
     <button class="modeTab" id="tab-teoriprov" onclick="setMode('teoriprov')" type="button">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2 9 6 13 14 3"/></svg>
       Teoriprov
+    </button>
+    <button class="modeTab" id="tab-repetition" onclick="setMode('repetition')" type="button">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2 8 5 2 8 8 11 5 14 8"/></svg>
+      Repetition<span class="dueBadge" id="dueBadge"></span>
     </button>
   </div>
 
@@ -440,6 +561,43 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
         <div id="teoriHistBody"></div>
       </div>
     </div>
+  </div>
+
+  <!-- REPETITION VIEW -->
+  <div id="repetitionView" style="display:none">
+    <div class="repHeader">
+      <div class="repHeaderTitle">Spaced Repetition</div>
+      <div class="repHeaderSub">Vetenskapligt baserad repetition — systemet väljer exakt vilka frågor du behöver öva på idag för att komma ihåg dem länge.</div>
+      <div class="repStats">
+        <div class="repStat"><div class="repStatVal" id="repDueCount">0</div><div class="repStatLabel">ATT REPETERA</div></div>
+        <div class="repStat"><div class="repStatVal" id="repSeenToday">0</div><div class="repStatLabel">GJORT IDAG</div></div>
+        <div class="repStat"><div class="repStatVal" id="repGoalCount">20</div><div class="repStatLabel">DAGSMÅL</div></div>
+      </div>
+    </div>
+    <div id="repEmptyBox" class="repEmpty" style="display:none">
+      <div class="repEmptyIcon">✅</div>
+      <div>Inga frågor att repetera idag!</div>
+      <div style="margin-top:6px;font-size:11px;color:var(--t3)">Fortsätt öva i Kurser eller Övning.</div>
+    </div>
+    <div class="startArea" id="repStartArea" style="display:none">
+      <button class="startBtn" id="repStartBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+        Starta repetition
+      </button>
+      <div class="startHint">Frågor valda av systemet baserat på vad du behöver öva</div>
+    </div>
+  </div>
+
+  <!-- COURSE STAGE VIEW -->
+  <div id="courseStageView" style="display:none">
+    <div class="stageNav">
+      <button class="stageBack" id="stageBackBtn" type="button">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="10 3 5 8 10 13"/></svg>
+        Tillbaka till kurser
+      </button>
+      <div class="stageProgress" id="stageProgress"></div>
+    </div>
+    <div id="stageContent"></div>
   </div>
 
   <!-- ① CONFIG VIEW (Övning mode) -->
@@ -627,8 +785,11 @@ let db, uid, role = localStorage.getItem(LS_ROLE) || "gratis";
 let questions = [], exam = [], idx = 0, ans = [];
 let selCat = "Alla kategorier", lastN = 10, lastDiff = "";
 let streak = 0, timer = null;
-let currentMode = "ovning"; // "ovning" | "kurser" | "teoriprov"
-let activeCourse = null; // category name when in kurser mode
+let currentMode = "ovning"; // "ovning" | "kurser" | "teoriprov" | "repetition"
+let activeCourse = null;
+let courseStage = "intro"; // "intro"|"study"|"quiz"|"test"|"done"
+let miniQuizMode = false;  // true = quiz within course (no quota bump, always show expl)
+let answerStartTime = 0;   // for SRS quality scoring
 
 // ── COURSE PROGRESS ──
 const getCatProg = () => safeJSON(localStorage.getItem(LS_CAT_PROG), {});
@@ -1256,18 +1417,47 @@ const THEORY = {
   }
 };
 
+// ── XP BAR ──
+function updateXpBar() {
+  if(typeof XP === "undefined") return;
+  const xp = XP.get();
+  const lv = XP.level(xp);
+  const dp = XP.dailyProgress();
+  const bar = $("xpBar"); if(bar) bar.style.display = "";
+  const ll = $("xpLevelLabel"); if(ll) ll.textContent = `${lv.icon} ${lv.label}`;
+  const xf = $("xpFill"); if(xf) xf.style.width = lv.progress + "%";
+  const xc = $("xpCount"); if(xc) xc.textContent = `${xp} XP`;
+  const dg = $("dailyGoalBadge");
+  if(dg) {
+    dg.textContent = `Mål: ${dp.done}/${dp.goal}`;
+    dg.className = "dailyGoal" + (dp.done >= dp.goal ? " done" : "");
+  }
+  // Due badge
+  if(typeof SRS !== "undefined" && questions.length > 0) {
+    const due = SRS.dueCount(questions);
+    const badge = $("dueBadge");
+    if(badge) { badge.textContent = due > 0 ? String(due) : ""; badge.classList.toggle("show", due > 0); }
+  }
+}
+
 // ── MODE MANAGEMENT ──
 function setMode(mode) {
   currentMode = mode;
-  const views = { ovning:"configView", kurser:"kurserView", teoriprov:"teoriView" };
+  const views = {
+    ovning:"configView", kurser:"kurserView", teoriprov:"teoriView",
+    repetition:"repetitionView"
+  };
   Object.entries(views).forEach(([m, id]) => {
-    const tab=$(("tab-"+m)), view=$(id);
+    const tab=$("tab-"+m), view=$(id);
     if(tab) tab.classList.toggle("active", m===mode);
     if(view) view.style.display = m===mode ? "" : "none";
   });
-  const tv=$("theoryView"); if(tv) tv.style.display="none";
+  const hide = ["theoryView","courseStageView"];
+  hide.forEach(id => { const el=$(id); if(el) el.style.display="none"; });
   if(mode==="kurser") buildCourseGrid();
   if(mode==="teoriprov") loadTeoriHist();
+  if(mode==="repetition") buildRepetitionView();
+  updateXpBar();
 }
 
 // ── PROGRESS DASHBOARD ──
@@ -1320,7 +1510,7 @@ function buildCourseGrid() {
     const n = questions.filter(q => q.category===cat).length;
     const icon = CAT_ICONS[cat]||"📖";
     const hasWrong = wrongIds.some(id => questions.find(q=>q.id===id&&q.category===cat));
-    return `<div class="courseCard ${p.done?"cc-done":""}" onclick="showTheory('${esc(cat)}')">
+    return `<div class="courseCard ${p.done?"cc-done":""}" onclick="showCourse('${esc(cat)}')">
       <div class="ccCheck">✓</div>
       <div class="ccIcon">${icon}</div>
       <div class="ccName">${esc(cat)}</div>
@@ -1331,60 +1521,276 @@ function buildCourseGrid() {
   grid.innerHTML = rows;
 }
 
-// ── THEORY VIEW ──
-function showTheory(cat) {
+// ── COURSE STAGE FLOW ──
+const STAGE_LABELS = ["Intro","Lär dig","Quiz","Prov","Klart"];
+const STAGE_KEYS   = ["intro","study","quiz","test","done"];
+
+function showCourse(cat) {
   activeCourse = cat;
-  const prog = getCatProg()[cat] || {best:0, attempts:0, done:false};
-  const n = questions.filter(q=>q.category===cat).length;
-  const theory = THEORY[cat];
-
-  $("theoryBigIcon").textContent = CAT_ICONS[cat]||"📖";
-  $("theoryTitle").textContent = cat;
-  $("theoryBadge").textContent = `${n} frågor · Bäst: ${prog.best||0}%`;
-
-  let html = "";
-  if(theory) {
-    if(theory.intro) html += `<div class="theoryIntro">${esc(theory.intro)}</div>`;
-    html += theory.sections.map(s=>
-      `<div class="theorySection">
-        <div class="theorySecTitle">${esc(s.t)}</div>
-        <ul class="theoryList">${s.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
-      </div>`
-    ).join("");
-    if(theory.mistakes?.length) {
-      html += `<div class="mistakeBox"><div class="mistakeBoxTitle">Vanliga misstag</div>
-        <ul class="mistakeList">${theory.mistakes.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>
-      </div>`;
-    }
-    if(theory.tips?.length) {
-      html += `<div class="tipBox"><div class="tipBoxTitle">Kom ihåg</div>
-        <ul class="tipList">${theory.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
-      </div>`;
-    }
-  } else {
-    html = `<p style="color:var(--t2);font-size:14px">Övning med ${n} frågor inom ${esc(cat)}.</p>`;
-  }
-  $("theoryBody").innerHTML = html;
-
+  courseStage = "intro";
   $("kurserView").style.display = "none";
-  $("theoryView").style.display = "";
+  $("theoryView").style.display = "none";
+  $("courseStageView").style.display = "";
+  $("stageBackBtn").onclick = () => {
+    $("courseStageView").style.display = "none";
+    $("kurserView").style.display = "";
+    activeCourse = null;
+    $("modeTabs").style.display = "";
+  };
+  renderStage("intro");
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
-$("theoryBackBtn").onclick = () => {
+function renderStageProgress(active) {
+  const p = $("stageProgress"); if(!p) return;
+  p.innerHTML = STAGE_KEYS.map((k,i) => {
+    const cls = k === active ? "stageDot active" : STAGE_KEYS.indexOf(active) > i ? "stageDot done" : "stageDot";
+    return `<span class="${cls}" title="${STAGE_LABELS[i]}"></span>`;
+  }).join("");
+}
+
+function renderStage(stage) {
+  courseStage = stage;
+  renderStageProgress(stage);
+  const cat = activeCourse;
+  const theory = THEORY[cat];
+  const prog = getCatProg()[cat] || {best:0, attempts:0, done:false};
+  const n = questions.filter(q=>q.category===cat).length;
+  const content = $("stageContent"); if(!content) return;
+
+  if(stage === "intro") {
+    const examNote = {
+      "Vägmärken":"Upp till 12 av 65 frågor på provet handlar om vägmärken — den tyngsta kategorin.",
+      "Korsningar":"Korsningsfrågor är svårast — ca 7 frågor på provet. Hälften av alla olyckor sker här.",
+      "Trafikregler":"Ca 9 frågor om trafikregler. Högerregeln och parkering är vanligast.",
+      "Väglag & Bromssträcka":"7 frågor — bromssträcka på is är klassisk fälla.",
+      "Hastighet":"4 frågor — grundgränser och anpassning är nyckelbegreppen.",
+      "Mörker & Sikt":"5 frågor — ljusregler är vanliga fällor.",
+      "Möte & Omkörning":"5 frågor — när omkörning är förbjuden testas ofta.",
+      "Miljö & Ekonomi":"4 frågor om ekokörning och bränslebesparing.",
+      "Alkohol & Droger":"4 frågor — gränsvärden måste kunnas utantill.",
+      "Säkerhet & Utrustning":"4 frågor — barnstol och bälte är vanligast.",
+    };
+    content.innerHTML = `
+      <div class="introCard">
+        <div class="introIcon">${CAT_ICONS[cat]||"📖"}</div>
+        <div class="introTitle">${esc(cat)}</div>
+        <div class="introBadge">${n} frågor i databasen · Bäst hittills: ${prog.best||0}%</div>
+        ${theory?.intro ? `
+        <div class="introBlock">
+          <div class="introBlockTitle why">Varför är detta viktigt?</div>
+          <div class="introBlockBody">${esc(theory.intro)}</div>
+        </div>` : ""}
+        ${examNote[cat] ? `
+        <div class="introBlock">
+          <div class="introBlockTitle exam">På teoriprovet</div>
+          <div class="introBlockBody">${esc(examNote[cat])}</div>
+        </div>` : ""}
+        ${theory?.mistakes?.length ? `
+        <div class="introBlock">
+          <div class="introBlockTitle trap">Vanliga fällor att undvika</div>
+          <ul class="introTrapList">${theory.mistakes.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>
+        </div>` : ""}
+        <div class="introTime">⏱ Beräknad tid: ~15 minuter · 5 steg till godkänt</div>
+      </div>
+      <div class="startArea">
+        <button class="startBtn" id="introStartBtn" type="button">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+          Börja lära →
+        </button>
+      </div>`;
+    $("introStartBtn").onclick = () => renderStage("study");
+
+  } else if(stage === "study") {
+    let studyHtml = "";
+    if(theory) {
+      studyHtml = theory.sections.map(s =>
+        `<div class="studyCard">
+          <div class="studySecTitle">${esc(s.t)}</div>
+          <ul class="studyList">${s.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+        </div>`
+      ).join("");
+      if(theory.tips?.length) {
+        studyHtml += `<div class="studyCard">
+          <div class="studySecTitle">Kom ihåg</div>
+          <ul class="studyList">${theory.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+        </div>`;
+      }
+    }
+    const quickQs = [
+      "Ge mig ett konkret exempel",
+      "Varför är detta viktigt för provet?",
+      "Vad är den vanligaste fällan?",
+      "Ge mig en minnesregel"
+    ];
+    content.innerHTML = `
+      <div style="margin-bottom:16px">${studyHtml}</div>
+      <div class="aiTeacherWrap" id="aiTeacherWrap">
+        <div class="aiTeacherHeader">
+          <div class="aiAvatar">👩‍🏫</div>
+          <div><div class="aiName">Maria — din trafiklärare</div><div class="aiRole">Fråga mig vad som helst om ${esc(cat)}</div></div>
+        </div>
+        <div class="aiMessages" id="aiMessages">
+          <div class="aiMsg teacher">Hej! Jag är Maria, din trafiklärare. Jag har just visat dig teorin om <strong>${esc(cat)}</strong>. Har du frågor? Klicka på en snabbfråga eller skriv din egen!</div>
+        </div>
+        <div class="aiQuickBtns" id="aiQuickBtns">
+          ${quickQs.map(q=>`<button class="aiQuickBtn" onclick="askTeacher('${esc(q)}')">${esc(q)}</button>`).join("")}
+        </div>
+        <div class="aiInputRow">
+          <input class="aiInput" id="aiInput" type="text" placeholder="Skriv din fråga…" />
+          <button class="aiSendBtn" id="aiSendBtn" onclick="askTeacher()">Skicka</button>
+        </div>
+      </div>
+      <div class="startArea" style="margin-top:16px">
+        <button class="startBtn" id="studyNextBtn" type="button">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+          Jag förstår — starta mini-quiz →
+        </button>
+        <div class="startHint">5–7 frågor · Inga poäng — fokus på förståelse</div>
+      </div>`;
+    const aiIn = $("aiInput");
+    if(aiIn) aiIn.onkeydown = e => { if(e.key==="Enter") askTeacher(); };
+    $("studyNextBtn").onclick = () => startCourseQuiz("quiz");
+
+  } else if(stage === "quiz" || stage === "test") {
+    // Handled by runExam — just a placeholder
+    content.innerHTML = "";
+    startCourseQuiz(stage);
+
+  } else if(stage === "done") {
+    const doneXp = prog.done ? 25 : 50; // more XP first completion
+    if(typeof XP !== "undefined") XP.add(doneXp);
+    updateXpBar();
+    // Recommend next incomplete course
+    const allCats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
+    const catProgAll = getCatProg();
+    const nextCat = allCats.find(c => c !== cat && !(catProgAll[c]?.done));
+    content.innerHTML = `
+      <div class="doneCard">
+        <div class="doneIcon">🎉</div>
+        <div class="doneTitle">Kurs klar!</div>
+        <div class="doneSub">Du har nu genomfört <strong>${esc(cat)}</strong>. Fortsätt träna för att befästa kunskapen.</div>
+        <div class="xpGained">+${doneXp} XP</div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-width:320px;margin:0 auto">
+          <button class="startBtn" onclick="startCourseQuiz('test')" type="button" style="max-width:100%">Öva igen</button>
+          ${nextCat ? `
+          <div class="nextCourse" onclick="showCourse('${esc(nextCat)}')">
+            <div style="font-size:22px">${CAT_ICONS[nextCat]||"📖"}</div>
+            <div><div class="nextCourseLabel">NÄSTA REKOMMENDERADE KURS</div><div class="nextCourseName">${esc(nextCat)}</div></div>
+          </div>` : ""}
+          <button class="btn btnG" onclick="$('courseStageView').style.display='none';$('kurserView').style.display='';activeCourse=null;buildCourseGrid();" type="button" style="width:100%;height:44px">← Tillbaka till kurser</button>
+        </div>
+      </div>`;
+  }
+}
+
+// ── AI TEACHER ──
+async function askTeacher(presetQ) {
+  const input = $("aiInput");
+  const q = presetQ || (input ? input.value.trim() : "");
+  if(!q) return;
+  if(input) input.value = "";
+  const msgs = $("aiMessages"); if(!msgs) return;
+  // Add user message
+  const userEl = document.createElement("div");
+  userEl.className = "aiMsg user"; userEl.textContent = q; msgs.appendChild(userEl);
+  // Typing indicator
+  const typingEl = document.createElement("div");
+  typingEl.className = "aiMsg teacher typing"; typingEl.textContent = "Maria skriver…"; msgs.appendChild(typingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+  const btn = $("aiSendBtn"); if(btn) btn.disabled = true;
+  try {
+    const token = (await db?.auth?.getSession())?.data?.session?.access_token || "";
+    const res = await fetch("/api/teach", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+      body: JSON.stringify({ topic: activeCourse, userQuestion: q })
+    });
+    const data = await res.json();
+    typingEl.className = "aiMsg teacher";
+    typingEl.innerHTML = esc(data.answer || "Kunde inte hämta svar just nu.");
+  } catch(_) {
+    typingEl.className = "aiMsg teacher";
+    typingEl.textContent = "Kunde inte ansluta till läraren just nu. Kontrollera din anslutning.";
+  }
+  if(btn) btn.disabled = false;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── COURSE QUIZ STARTER ──
+function startCourseQuiz(stage) {
+  courseStage = stage;
+  if(!uid) { showLoginScreen(); return; }
+  const cat = activeCourse;
+  const isTest = stage === "test";
+  const n = isTest ? Math.min(10, questions.filter(q=>q.category===cat).length) : Math.min(7, questions.filter(q=>q.category===cat).length);
+  miniQuizMode = !isTest;
+  // Hide stage view, show exam
+  $("courseStageView").style.display = "none";
+  $("modeTabs").style.display = "none";
+  if(isTest) {
+    // Count quota only for test (full quiz), not mini-quiz
+    const cfg=LIMITS[role]||LIMITS.gratis;
+    if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+    bumpQ(); refreshQuotaUI();
+  }
+  // Build exam pool
+  let pool = questions.filter(q=>q.category===cat);
+  if(!isTest) {
+    // Mini quiz: prefer easy questions first
+    const easy = pool.filter(q=>q.difficulty==="easy"||!q.difficulty);
+    const other = pool.filter(q=>q.difficulty&&q.difficulty!=="easy");
+    pool = [...shuffle(easy), ...shuffle(other)];
+  } else {
+    // Adaptive for test: boost wrong answers
+    const wrongIds = getWrongIds();
+    const weak = shuffle(pool.filter(q=>wrongIds.includes(q.id)));
+    const strong = shuffle(pool.filter(q=>!wrongIds.includes(q.id)));
+    const weakTarget = Math.min(weak.length, Math.floor(n*0.4));
+    pool = shuffle([...weak.slice(0,weakTarget), ...strong.slice(0, n-weakTarget)]);
+  }
+  exam = pool.slice(0, n);
+  idx = 0; ans = new Array(exam.length).fill(null);
+  streak = 0; updateStreak();
+  showExam(); renderQ(0);
+}
+
+// ── REPETITION VIEW ──
+function buildRepetitionView() {
+  if(typeof SRS === "undefined" || questions.length === 0) return;
+  const due = SRS.due(questions);
+  const seenCount = SRS.seenToday().length;
+  const repDue = $("repDueCount"); if(repDue) repDue.textContent = due.length;
+  const repSeen = $("repSeenToday"); if(repSeen) repSeen.textContent = seenCount;
+  const empty = $("repEmptyBox"), startArea = $("repStartArea");
+  if(due.length === 0) {
+    if(empty) empty.style.display = "";
+    if(startArea) startArea.style.display = "none";
+  } else {
+    if(empty) empty.style.display = "none";
+    if(startArea) startArea.style.display = "";
+    const startBtn = $("repStartBtn");
+    if(startBtn) startBtn.onclick = () => {
+      miniQuizMode = true;
+      activeCourse = null;
+      exam = shuffle(due).slice(0, 20);
+      idx = 0; ans = new Array(exam.length).fill(null);
+      streak = 0; updateStreak();
+      $("repetitionView").style.display = "none";
+      $("modeTabs").style.display = "none";
+      showExam(); renderQ(0);
+    };
+  }
+}
+
+// ── THEORY VIEW (legacy - now redirects to showCourse) ──
+function showTheory(cat) { showCourse(cat); }
+$("theoryBackBtn") && ($("theoryBackBtn").onclick = () => {
   $("theoryView").style.display = "none";
   $("kurserView").style.display = "";
   activeCourse = null;
-};
-
-$("courseStartBtn").onclick = () => {
-  if(!uid){showLoginScreen();return;}
-  const cfg=LIMITS[role]||LIMITS.gratis;
-  if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera för fler test.","bad");return;}
-  $("theoryView").style.display="none";
-  $("modeTabs").style.display="none";
-  runExam(activeCourse, Math.min(10, questions.filter(q=>q.category===activeCourse).length), "");
-};
+});
+$("courseStartBtn") && ($("courseStartBtn").onclick = () => {});
 
 // ── TEORIPROV ──
 $("teoriStartBtn").onclick = () => {
@@ -1572,10 +1978,12 @@ $("numQSel").onchange = updateHint;
 
 // ── VIEWS ──
 function showConfig() {
+  miniQuizMode = false;
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
   $("modeTabs").style.display = "";
   $("theoryView").style.display = "none";
+  $("courseStageView").style.display = "none";
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
   if(timer) { clearInterval(timer); timer = null; $("timerBadge").style.display="none"; }
@@ -1583,6 +1991,7 @@ function showConfig() {
   refreshQuotaUI();
   loadHistory();
   buildFocusRecs();
+  updateXpBar();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function showExam() {
@@ -1705,6 +2114,20 @@ function renderQ(i) {
   $("nextWrap").classList.remove("show");
   $("miniNextBtn").style.display = "none";
 
+  // Record time for SRS scoring
+  answerStartTime = Date.now();
+
+  // Mini-quiz label
+  const mqNote = document.getElementById("mqNote");
+  if(miniQuizMode) {
+    if(!mqNote) {
+      const note = document.createElement("div");
+      note.id = "mqNote"; note.className = "mqNote";
+      note.textContent = "Mini-quiz — fokus på lärande, inte poäng. Förklaring visas alltid.";
+      $("qCard").insertBefore(note, $("qCard").firstChild);
+    }
+  } else if(mqNote) mqNote.remove();
+
   // Build answer buttons
   const grid = $("ansGrid"); grid.innerHTML = "";
   [
@@ -1742,6 +2165,23 @@ function handleAns(chosen, q) {
   updateStreak();
   updateBar();
 
+  // SRS + XP integration
+  if(typeof SRS !== "undefined") {
+    const elapsed = Date.now() - answerStartTime;
+    const quality = SRS.quality(ok, elapsed);
+    SRS.review(q.id, quality);
+    SRS.markSeen(q.id);
+    // XP: +3 correct, +1 wrong (still learning), bonus for fast correct
+    if(typeof XP !== "undefined") {
+      const xpGain = ok ? (elapsed < 3000 ? 4 : 3) : 1;
+      XP.add(xpGain);
+    }
+    // Memorization detection: show understanding check after fast correct streak
+    if(ok && streak >= 3 && elapsed < 2500 && SRS.detectMemorization(q.id, elapsed)) {
+      setTimeout(() => showUnderstandCheck(q), 300);
+    }
+  }
+
   // Explanation
   const box = $("explBox"), label = $("explLabel"), txt = $("explText");
   box.classList.remove("correct","wrong");
@@ -1765,6 +2205,26 @@ function handleAns(chosen, q) {
 
   // Scroll "Gå vidare" into view
   setTimeout(() => $("nextWrap").scrollIntoView({behavior:"smooth",block:"nearest"}), 100);
+}
+
+// ── UNDERSTANDING CHECK ──
+function showUnderstandCheck(q) {
+  const box = $("explBox"); if(!box || !box.classList.contains("show")) return;
+  // Inject a "why" question after the explanation
+  const checks = [
+    { q:`Vilken regel avgör denna situation?`, opts: null },
+    { q:`Vad hade hänt om du svarat fel här på ett riktigt prov?`, opts: null },
+  ];
+  const check = checks[Math.floor(Math.random() * checks.length)];
+  // Check if already added
+  if(box.querySelector(".understandCheck")) return;
+  const div = document.createElement("div");
+  div.className = "understandCheck";
+  div.innerHTML = `
+    <div class="understandCheckTitle">🧠 Förståelsekontroll</div>
+    <div class="understandCheckQ">${esc(check.q)}</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:6px">Tänk igenom svaret — förståelse är bättre än memorering.</div>`;
+  box.appendChild(div);
 }
 
 // ── LOAD EXPLANATION ──
@@ -1793,7 +2253,21 @@ function goNext() {
 
 $("nextBigBtn").onclick = goNext;
 $("miniNextBtn").onclick = goNext;
-$("abortBtn").onclick = () => { if(confirm("Avbryt provet? Resultatet sparas inte.")) showConfig() };
+$("abortBtn").onclick = () => {
+  if(!confirm("Avbryt provet? Resultatet sparas inte.")) return;
+  miniQuizMode = false;
+  if(activeCourse && currentMode === "kurser") {
+    if(timer){clearInterval(timer);timer=null;}
+    $("examView").classList.remove("active");
+    $("miniBar").classList.remove("show");
+    $("abortBtn").style.display = "none";
+    $("modeTabs").style.display = "";
+    $("courseStageView").style.display = "";
+    renderStage("study"); // go back to study stage
+  } else {
+    showConfig();
+  }
+};
 
 document.addEventListener("keydown", e => {
   if(!$("examView").classList.contains("active") || e.target.matches("input,select,textarea")) return;
@@ -1891,10 +2365,45 @@ async function showResults() {
 
   $("retryBtn").disabled = errors.length === 0;
 
+  // Course flow: adjust buttons based on stage
+  if(activeCourse && currentMode === "kurser") {
+    const newBtn = $("newBtn"), sameBtn = $("sameBtn");
+    if(miniQuizMode) {
+      // Mini-quiz complete → advance to full area test
+      newBtn.textContent = "Fortsätt till områdesprov →";
+      newBtn.onclick = () => {
+        $("resultView").classList.remove("active");
+        $("modeTabs").style.display = "";
+        $("courseStageView").style.display = "";
+        renderStage("test");
+      };
+      if(sameBtn) sameBtn.style.display = "none";
+    } else {
+      // Area test complete
+      const isCoursePass = pct >= 75;
+      newBtn.textContent = isCoursePass ? "Kursen klar! Visa sammanfattning →" : "Försök igen";
+      newBtn.onclick = () => {
+        $("resultView").classList.remove("active");
+        $("modeTabs").style.display = "";
+        $("courseStageView").style.display = "";
+        renderStage(isCoursePass ? "done" : "test");
+      };
+      if(sameBtn) sameBtn.style.display = "none";
+    }
+  } else {
+    // Reset buttons for non-course mode
+    $("newBtn").textContent = "Nytt test";
+    $("newBtn").onclick = () => { activeCourse=null; miniQuizMode=false; showConfig(); };
+    const sameBtn = $("sameBtn"); if(sameBtn) sameBtn.style.display = "";
+  }
+
   // Save course progress if in course mode
-  if(activeCourse && currentMode==="kurser") {
+  if(activeCourse && (currentMode==="kurser" || miniQuizMode)) {
     saveCatProg(activeCourse, pct);
   }
+
+  // Update XP bar after results
+  updateXpBar();
   // Track wrong/right IDs for repetition
   const wrongIds = errors.map(e=>e.q.id);
   const rightIds = exam.filter((_,i)=>hit(ans[i],exam[i])).map(q=>q.id);
@@ -1922,7 +2431,21 @@ async function showResults() {
   } catch(e) { console.warn("Sparfel:",e) }
 }
 
-$("newBtn").onclick = () => { activeCourse=null; showConfig(); };
+$("newBtn").onclick = () => {
+  miniQuizMode = false;
+  // If in course mode, go back to course flow
+  if(activeCourse && currentMode === "kurser") {
+    // Return to course stage flow at 'done' stage or stage nav
+    $("resultView").classList.remove("active");
+    $("modeTabs").style.display = "";
+    $("courseStageView").style.display = "";
+    // If they passed the test, go to done; otherwise let them try again
+    renderStage("done");
+  } else {
+    activeCourse = null;
+    showConfig();
+  }
+};
 $("sameBtn").onclick = () => {
   const cfg=LIMITS[role]||LIMITS.gratis;
   if(cfg.cap!==Infinity && readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;}
@@ -2079,6 +2602,7 @@ async function init() {
     }
 
     if(uid) await loadHistory();
+    updateXpBar();
 
   } catch(err) {
     console.error("[korkortet] init-fel:", err);
