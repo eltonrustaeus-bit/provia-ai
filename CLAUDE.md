@@ -31,6 +31,16 @@ Vercel serverless exam platform for Swedish students. No framework, no build ste
 - State bug + fix. Stop. No suggestions beyond scope.
 - No guessing about bugs — read the code first.
 
+## körkortsteorin — driving_questions table (2026-05-29)
+- 416 questions, 16 categories (all normalized — no more "och" vs "&" variants)
+- Categories: Vägmärken(81), Säkerhet&Utrustning(41), Alkohol&Droger(41), Miljö&Ekonomi(39),
+  Väglag&Bromssträcka(37), Mörker&Sikt(35), Trafikregler(33), Korsningar(24),
+  Möte&Omkörning(19), Trafikmiljö&Planering(15), Hastighet(15), Nödsituationer(9),
+  Vägtunnlar(8), Fordon&Besiktning(7), Bogsering&Lastsäkring(7), Körning med Släp(5)
+- Fields: id, category, question, option_a-d, correct, explanation, difficulty, image_url, image_description
+- TEORI_DIST: category weights for 65-question teoriprov (matches Trafikverket distribution)
+- Adaptive learning: wrong-answer questions boosted up to 40% of exam pool
+
 ## Graphify First
 Before reading any source file, query the graphify graph:
 `C:\Users\elton\Desktop\ProvKlarUF\graphify-out\graph.json`
