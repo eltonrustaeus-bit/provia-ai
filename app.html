@@ -1596,7 +1596,38 @@ try{
     setBusy(false);setStatus(t.gradeDone,"ok");showToast(t.gradeDone,"ok");setWizardStep(3);
   });
 
-  onClick("clearBtn",clearAll);
+  onClick("clearBtn", async () => {
+    if (!confirm(LANG === "sv"
+      ? "Rensa ALL provhistorik och misstag?\n\nDetta tar bort dina prov och felbank lokalt och från ditt konto. Kan inte ångras."
+      : "Clear ALL exam history and mistakes?\n\nThis removes your exams and mistake bank locally and from your account. Cannot be undone.")) return;
+
+    const btn = $("clearBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+
+    // 1. Delete from Supabase account
+    if (db) {
+      try {
+        const token = await getAccessToken();
+        if (token) {
+          await fetch("/api/delete-exams", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+          });
+        }
+      } catch (_) {}
+    }
+
+    // 2. Clear all local history, mistakes, and cached data
+    [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
+
+    // 3. Reset current session UI
+    clearAll();
+
+    if (btn) { btn.disabled = false; btn.textContent = T[LANG]?.clear || "Rensa"; }
+    showToast(LANG === "sv" ? "Allt rensat — lokalt + konto." : "All data cleared — local + account.", "ok");
+  });
 
   // Floating grade-knapp kör samma som gradeBtn
   onClick("floatingGradeBtn",()=>{const g=$("gradeBtn");if(g&&!g.disabled)g.click();});
