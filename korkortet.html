@@ -1700,18 +1700,24 @@ async function askTeacher(presetQ) {
   msgs.scrollTop = msgs.scrollHeight;
   const btn = $("aiSendBtn"); if(btn) btn.disabled = true;
   try {
-    const token = (await db?.auth?.getSession())?.data?.session?.access_token || "";
+    const sess = await db?.auth?.getSession();
+    const token = sess?.data?.session?.access_token || "";
     const res = await fetch("/api/explain", {
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
       body: JSON.stringify({ topic: activeCourse, userQuestion: q })
     });
-    const data = await res.json();
+    let data = {};
+    try { data = await res.json(); } catch(_) {}
     typingEl.className = "aiMsg teacher";
-    typingEl.innerHTML = esc(data.answer || "Kunde inte hämta svar just nu.");
-  } catch(_) {
+    if(!res.ok) {
+      typingEl.textContent = data.error || `Fel ${res.status} — försök igen.`;
+    } else {
+      typingEl.innerHTML = esc(data.answer || "Inget svar genererades.");
+    }
+  } catch(err) {
     typingEl.className = "aiMsg teacher";
-    typingEl.textContent = "Kunde inte ansluta till läraren just nu. Kontrollera din anslutning.";
+    typingEl.textContent = "Nätverksfel — kontrollera anslutningen och försök igen.";
   }
   if(btn) btn.disabled = false;
   msgs.scrollTop = msgs.scrollHeight;

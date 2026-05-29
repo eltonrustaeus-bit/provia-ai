@@ -4,9 +4,7 @@ import { requireAuth } from "./_auth.js";
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function callAI(prompt, system, maxTokens) {
-  const input = system
-    ? [{ role: "system", content: system }, { role: "user", content: prompt }]
-    : prompt;
+  const input = system ? `${system}\n\n${prompt}` : prompt;
   const response = await client.responses.create({
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     input,
