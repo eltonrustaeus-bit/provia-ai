@@ -1482,7 +1482,14 @@ try{
         : (LANG === "sv" ? "Välkommen till Basic! Din plan är nu aktiv." : "Welcome to Basic! Your plan is now active.");
       setStatus(msg, "ok");
       history.replaceState({}, "", location.pathname);
-      setTimeout(async () => { await refreshQuotaUi(); }, 2000);
+      // Force-fetch role from Supabase after purchase
+      setTimeout(async () => {
+        try {
+          const { data: { session } } = await db.auth.getSession();
+          if (session) await checkApprovalAndUnlock(session);
+        } catch (_) {}
+        await refreshQuotaUi();
+      }, 2500);
     }
   })();
 
