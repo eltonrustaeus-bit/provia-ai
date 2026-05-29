@@ -814,6 +814,67 @@ function removeRight(ids) {
 }
 const getWrongIds = () => safeJSON(localStorage.getItem(LS_WRONG), []);
 
+// ── SUPABASE PROGRESS SYNC ──
+async function getAuthToken() {
+  try { return (await db?.auth?.getSession())?.data?.session?.access_token || null; } catch { return null; }
+}
+
+async function loadProgressFromSupabase() {
+  const tok = await getAuthToken();
+  if (!tok) return;
+  try {
+    const r = await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_load" }) });
+    if (!r.ok) return;
+    const { data } = await r.json();
+    if (!data) return;
+
+    // Merge SRS: union by question key, take latest nextReview
+    const localSrs = getSrs();
+    const remoteSrs = data.srs_data || {};
+    const mergedSrs = { ...localSrs };
+    for (const [k, v] of Object.entries(remoteSrs)) {
+      if (!mergedSrs[k] || (v.nextReview || 0) > (mergedSrs[k].nextReview || 0)) mergedSrs[k] = v;
+    }
+    setSrs(mergedSrs);
+
+    // XP: take max
+    const remoteXp = data.xp || 0;
+    const localXp = getXP();
+    if (remoteXp > localXp) localStorage.setItem(XP_KEY, String(remoteXp));
+
+    // Wrong IDs: union capped at 150
+    const localW = getWrongIds();
+    const remoteW = data.wrong_ids || [];
+    const merged = [...new Set([...localW, ...remoteW])].slice(-150);
+    localStorage.setItem(LS_WRONG, JSON.stringify(merged));
+
+    // Cat progress: merge best
+    const localCp = safeJSON(localStorage.getItem(LS_CAT_PROG), {});
+    const remoteCp = data.cat_prog || {};
+    const mergedCp = { ...localCp };
+    for (const [cat, v] of Object.entries(remoteCp)) {
+      if (!mergedCp[cat]) { mergedCp[cat] = v; continue; }
+      mergedCp[cat].best = Math.max(mergedCp[cat].best || 0, v.best || 0);
+      mergedCp[cat].attempts = (mergedCp[cat].attempts || 0) + (v.attempts || 0);
+      mergedCp[cat].done = mergedCp[cat].done || v.done;
+    }
+    localStorage.setItem(LS_CAT_PROG, JSON.stringify(mergedCp));
+
+    // Bookmarks: union
+    const localBm = safeJSON(localStorage.getItem(LS_BM), []);
+    const remoteBm = data.bookmarks || [];
+    localStorage.setItem(LS_BM, JSON.stringify([...new Set([...localBm, ...remoteBm])]));
+  } catch (_) {}
+}
+
+async function saveProgressToSupabase() {
+  const tok = await getAuthToken();
+  if (!tok) return;
+  try {
+    await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_save", srs_data: getSrs(), xp: getXP(), wrong_ids: getWrongIds(), cat_prog: safeJSON(localStorage.getItem(LS_CAT_PROG), {}), bookmarks: safeJSON(localStorage.getItem(LS_BM), []) }) });
+  } catch (_) {}
+}
+
 // ── THEORY CONTENT ──
 const THEORY = {
   "Vägmärken": {
@@ -2626,7 +2687,8 @@ async function init() {
     }
 
     if(uid) await loadHistory();
-    updateXpBar();
+    if(uid) { await loadProgressFromSupabase(); updateXpBar(); setInterval(saveProgressToSupabase, 60000); }
+    else updateXpBar();
 
   } catch(err) {
     console.error("[korkortet] init-fel:", err);
@@ -2643,6 +2705,9 @@ async function init() {
 window.addEventListener("unhandledrejection", e => {
   console.error("[korkortet] Ohanterat promise-fel:", e.reason);
 });
+
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && uid) saveProgressToSupabase(); });
+window.addEventListener("pagehide", () => { if (uid) saveProgressToSupabase(); });
 
 init();
 </script>
