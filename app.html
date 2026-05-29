@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<script src="shared.js" defer></script>
 <style>
 /* ── APP-SPECIFIC ── */
 
@@ -1257,6 +1258,9 @@ async function checkApprovalAndUnlock(session){
   localStorage.setItem(LS_ROLE, currentRole);
   setLockError("");
   hideLock();
+  /* Show welcome animation */
+  const _wEmail = session?.user?.email || '';
+  if (window.showWelcome) setTimeout(() => window.showWelcome(_wEmail), 60);
   return true;
 }
 

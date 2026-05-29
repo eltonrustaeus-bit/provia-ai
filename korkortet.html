@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<script src="shared.js" defer></script>
 <style>
 /* ── KORKORTET-SPECIFIC ── */
 
@@ -178,13 +179,12 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 <!-- LOGIN -->
 <div id="loginScreen" class="loginOverlay" style="display:none">
   <div class="loginCard">
-    <div class="loginTop" style="position:relative">
+    <div class="loginTop">
       <img src="image/proviaai-logo.png" alt="ProviaAi">
       <div>
         <div class="loginTitle">ProviaAi – Körkortsteorin</div>
         <div class="loginSub">Logga in eller skapa konto</div>
       </div>
-      <button onclick="document.getElementById('loginScreen').style.display='none'" style="position:absolute;top:0;right:0;background:none;border:none;font-size:22px;line-height:1;color:var(--t3);cursor:pointer;padding:4px 8px" aria-label="Stäng">×</button>
     </div>
     <div class="loginBody">
       <div class="authBlock">
@@ -896,36 +896,62 @@ async function init() {
   try {
     step("Startar…");
 
-    // Wire up login form (always, before db is needed)
-    $("loginScreen").addEventListener("click", e => {
-      if(e.target === $("loginScreen")) $("loginScreen").style.display = "none";
-    });
-
     if(typeof supabase === "undefined") {
       throw new Error("Supabase-biblioteket laddades inte. Kontrollera din anslutning.");
     }
     db = supabase.createClient(SUPA_URL, SUPA_ANON);
 
+    // Wire up login form
     const signIn = async () => {
       const email=$("authEmail").value.trim(), pass=$("authPass").value;
       if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
       $("loginErr").textContent="";
+      $("signInBtn").disabled=true;
       const {error} = await db.auth.signInWithPassword({email,password:pass});
+      $("signInBtn").disabled=false;
       if(error){$("loginErr").textContent=error.message;return;}
+      window.triggerWelcome && window.triggerWelcome(email);
       location.reload();
     };
     const signUp = async () => {
       const email=$("authEmail").value.trim(), pass=$("authPass").value;
       if(!email||!pass){$("loginErr").textContent="Fyll i e-post och lösenord.";return;}
       $("loginErr").textContent="";
+      $("signUpBtn").disabled=true;
       const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:pass})});
       const body=await res.json();
+      $("signUpBtn").disabled=false;
       if(!res.ok){$("loginErr").textContent=body.error||"Fel vid registrering.";return;}
-      if(body.session){await db.auth.setSession(body.session);location.reload();}
+      if(body.session){
+        await db.auth.setSession(body.session);
+        window.triggerWelcome && window.triggerWelcome(email);
+        location.reload();
+      }
     };
     $("signInBtn").onclick = signIn;
     $("signUpBtn").onclick = signUp;
     $("authPass").onkeydown = e => { if(e.key==="Enter") signIn(); };
+
+    // 0. Check session FIRST — access requires login
+    step("Kontrollerar inloggning…");
+    let _session = null;
+    try {
+      const {data: _authData} = await raceTimeout(db.auth.getSession(), 6000, "session-check");
+      _session = _authData?.session || null;
+    } catch(_) {}
+
+    if (!_session) {
+      loader.classList.add("hide");
+      $("loginScreen").style.display = "flex";
+      return;
+    }
+
+    // Logged in — load role
+    uid = _session.user.id;
+    try {
+      const {data: _prof} = await db.from("profiles").select("role").eq("id",uid).single();
+      if(_prof?.role){ role=_prof.role; localStorage.setItem(LS_ROLE,role); }
+    } catch(_) {}
 
     // 1. Load questions — try Supabase client, fall back to raw fetch
     step("Hämtar frågor…");
@@ -955,23 +981,7 @@ async function init() {
     }
     questions = questions_raw;
 
-    // 2. Check session — optional, never blocks UI
-    step("Kontrollerar inloggning…");
-    try {
-      const {data: authData} = await raceTimeout(db.auth.getSession(), 6000, "session");
-      const session = authData?.session;
-      if(session) {
-        uid = session.user.id;
-        try {
-          const {data} = await db.from("profiles").select("role").eq("id",uid).single();
-          if(data?.role){ role=data.role; localStorage.setItem(LS_ROLE,role); }
-        } catch(_){}
-      }
-    } catch(_) {
-      // Session check timed out or failed — continue without login
-    }
-
-    // 3. Show UI — always hide loader first, then build UI pieces individually
+    // 2. Show UI — always hide loader first, then build UI pieces individually
     loader.classList.add("hide");
 
     try { buildCats(); } catch(e) {
