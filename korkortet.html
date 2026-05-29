@@ -162,6 +162,82 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .passBadge.p{background:rgba(27,255,140,.12);color:var(--a);border:1px solid rgba(27,255,140,.3)}
 .passBadge.f{background:rgba(255,107,107,.10);color:#ff8484;border:1px solid rgba(255,107,107,.25)}
 
+/* ── MODE TABS ── */
+.modeTabs{display:flex;gap:3px;padding:3px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:20px}
+.modeTab{flex:1;padding:9px 8px;border-radius:var(--r2);border:1px solid transparent;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:12.5px;color:var(--t3);text-align:center;transition:all .15s ease;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:5px}
+.modeTab:hover{background:var(--a-dim);color:var(--t);border-color:var(--l)}
+.modeTab.active{background:var(--a-dim);border-color:var(--l2);color:var(--t)}
+.modeTab svg{flex-shrink:0}
+@media(max-width:480px){.modeTab{font-size:11px;padding:9px 4px;gap:3px}}
+
+/* ── COURSE GRID ── */
+.courseGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+@media(max-width:480px){.courseGrid{grid-template-columns:1fr}}
+.courseCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;cursor:pointer;transition:all .15s ease;position:relative;min-height:100px}
+.courseCard:hover{border-color:var(--l2);transform:translateY(-2px);box-shadow:var(--sh)}
+.courseCard.cc-done{border-color:rgba(27,255,140,.3)}
+.ccCheck{position:absolute;top:10px;right:12px;width:20px;height:20px;border-radius:50%;background:rgba(27,255,140,.15);border:1px solid rgba(27,255,140,.3);display:none;place-items:center;font-size:11px;color:var(--a)}
+.courseCard.cc-done .ccCheck{display:grid}
+.ccIcon{font-size:22px;margin-bottom:8px;line-height:1}
+.ccName{font-weight:700;font-size:13.5px;color:var(--t);margin-bottom:3px;line-height:1.3}
+.ccMeta{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);margin-bottom:8px;line-height:1.4}
+.ccBar{height:4px;background:var(--s2);border-radius:999px;overflow:hidden}
+.ccBarFill{height:100%;border-radius:999px;background:var(--a);transition:width .4s ease}
+
+/* ── THEORY VIEW ── */
+.theoryBack{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);cursor:pointer;margin-bottom:16px;background:none;border:none;padding:0;transition:color .15s;touch-action:manipulation}
+.theoryBack:hover{color:var(--a)}
+.theoryCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.theoryHeadRow{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.theoryBigIcon{font-size:32px;flex-shrink:0}
+.theoryTitle{font-weight:700;font-size:19px;color:var(--t);letter-spacing:-.025em;margin-bottom:3px}
+.theoryBadge{font-family:'DM Mono',monospace;font-size:10px;color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:2px 8px;display:inline-block}
+.theorySection{margin-bottom:16px}
+.theorySecTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.theoryList{list-style:none;display:grid;gap:6px}
+.theoryList li{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--t2);line-height:1.55}
+.theoryList li::before{content:"→";color:var(--a);font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:3px}
+
+/* ── TEORIPROV VIEW ── */
+.teoriCard{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:28px;text-align:center;position:relative;overflow:hidden;margin-bottom:16px}
+.teoriCard::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(27,255,140,.07),transparent 65%);pointer-events:none}
+.teoriCardTitle{font-size:21px;font-weight:700;color:var(--t);margin-bottom:8px;letter-spacing:-.025em}
+.teoriCardSub{font-size:13.5px;color:var(--t2);margin-bottom:20px;line-height:1.65;max-width:38ch;margin-left:auto;margin-right:auto}
+.teoriStats{display:flex;gap:0;justify-content:center;margin-bottom:24px}
+.teoriStat{display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 20px;border-right:1px solid var(--l)}
+.teoriStat:last-child{border-right:none}
+.teoriStatVal{font-weight:700;font-size:24px;color:var(--t);letter-spacing:-.03em}
+.teoriStatLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.06em}
+
+/* ── WEAK AREAS ── */
+.weakCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;margin-bottom:16px}
+.weakTitle{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+.weakRow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--l)}
+.weakRow:last-child{border-bottom:none}
+.weakCat{flex:1;font-size:13px;color:var(--t2)}
+.weakScore{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--danger)}
+
+/* ── PROGRESS DASHBOARD ── */
+.dashCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px 20px;margin-bottom:16px}
+.dashTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.dashLabel{font-family:'DM Mono',monospace;font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.08em;text-transform:uppercase}
+.dashBadge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 10px;border-radius:var(--r2);border:1px solid var(--l);color:var(--t3);white-space:nowrap}
+.dashBadge.rdy{border-color:rgba(27,255,140,.3);background:rgba(27,255,140,.06);color:var(--a)}
+.dashProgressRow{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.dashTrack{flex:1;height:5px;background:var(--s2);border-radius:999px;overflow:hidden}
+.dashFill{height:100%;background:var(--a);border-radius:999px;transition:width .5s ease}
+.dashCount{font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);white-space:nowrap;flex-shrink:0}
+.dashCount strong{color:var(--t)}
+.dashAreas{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dashAreaItem{display:flex;align-items:center;gap:5px}
+.dashAreaDot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dashAreaDot.g{background:var(--ok)}
+.dashAreaDot.r{background:var(--danger)}
+.dashAreaName{color:var(--t3)}
+.dashAreaPct{font-weight:600}
+.dashAreaPct.g{color:var(--ok)}
+.dashAreaPct.r{color:var(--danger)}
+
 </style>
 </head>
 <body>
@@ -262,7 +338,88 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
     <a class="btn btnP" href="pricing.html" style="height:30px;font-size:12px;padding:0 12px">Uppgradera →</a>
   </div>
 
-  <!-- ① CONFIG VIEW -->
+  <!-- MODE TABS -->
+  <div class="modeTabs" id="modeTabs">
+    <button class="modeTab active" id="tab-ovning" onclick="setMode('ovning')" type="button">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/></svg>
+      Övning
+    </button>
+    <button class="modeTab" id="tab-kurser" onclick="setMode('kurser')" type="button">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="12" height="10" rx="1"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="8" y2="10"/></svg>
+      Kurser
+    </button>
+    <button class="modeTab" id="tab-teoriprov" onclick="setMode('teoriprov')" type="button">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2 9 6 13 14 3"/></svg>
+      Teoriprov
+    </button>
+  </div>
+
+  <!-- KURSER VIEW -->
+  <div id="kurserView" style="display:none">
+    <div class="dashCard" id="dashCard" style="display:none">
+      <div class="dashTop">
+        <div class="dashLabel">Din framsteg</div>
+        <div class="dashBadge" id="dashBadge"></div>
+      </div>
+      <div class="dashProgressRow">
+        <div class="dashTrack"><div class="dashFill" id="dashFill" style="width:0%"></div></div>
+        <div class="dashCount"><strong id="dashDone">0</strong> / 10 kurser</div>
+      </div>
+      <div class="dashAreas" id="dashAreas"></div>
+    </div>
+    <div class="courseGrid" id="courseGrid"></div>
+  </div>
+
+  <!-- THEORY VIEW (sub-view of kurser) -->
+  <div id="theoryView" style="display:none">
+    <button class="theoryBack" id="theoryBackBtn" type="button">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="10 3 5 8 10 13"/></svg>
+      Tillbaka till kurser
+    </button>
+    <div class="theoryCard">
+      <div class="theoryHeadRow">
+        <div class="theoryBigIcon" id="theoryBigIcon"></div>
+        <div>
+          <div class="theoryTitle" id="theoryTitle"></div>
+          <span class="theoryBadge" id="theoryBadge"></span>
+        </div>
+      </div>
+      <div id="theoryBody"></div>
+    </div>
+    <div class="startArea">
+      <button class="startBtn" id="courseStartBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+        Starta mini-quiz (10 frågor)
+      </button>
+      <div class="startHint">Minst 75% rätt = kursen godkänd</div>
+    </div>
+  </div>
+
+  <!-- TEORIPROV VIEW -->
+  <div id="teoriView" style="display:none">
+    <div class="teoriCard">
+      <div class="teoriCardTitle">Officiellt teoriprov</div>
+      <div class="teoriCardSub">65 slumpade frågor från alla kategorier. Klara 52 av 65 — precis som det riktiga provet.</div>
+      <div class="teoriStats">
+        <div class="teoriStat"><div class="teoriStatVal">65</div><div class="teoriStatLabel">FRÅGOR</div></div>
+        <div class="teoriStat"><div class="teoriStatVal">52</div><div class="teoriStatLabel">RÄTT KRÄVS</div></div>
+        <div class="teoriStat"><div class="teoriStatVal">50</div><div class="teoriStatLabel">MINUTER</div></div>
+      </div>
+      <button class="startBtn" id="teoriStartBtn" type="button" style="max-width:280px">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
+        Starta teoriprov
+      </button>
+      <div class="startHint" style="margin-top:10px">Alla kategorier blandade — exakt som Transportstyrelsens prov</div>
+    </div>
+    <div id="teoriHistSection" style="display:none">
+      <div class="card">
+        <div class="cardTitle">Dina teoriprov</div>
+        <div id="teoriHistBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ① CONFIG VIEW (Övning mode) -->
   <div id="configView">
 
     <div class="card">
@@ -401,10 +558,12 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 const SUPA_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
 const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
 
-const LS_THEME  = "proviaai_theme";
-const LS_ROLE   = "proviaai_role";
-const LS_EXPL   = "proviaai_expl_cache";
-const LS_BM     = "proviaai_bookmarks";
+const LS_THEME    = "proviaai_theme";
+const LS_ROLE     = "proviaai_role";
+const LS_EXPL     = "proviaai_expl_cache";
+const LS_BM       = "proviaai_bookmarks";
+const LS_CAT_PROG = "proviaai_kk_cat_progress";
+const LS_WRONG    = "proviaai_kk_wrong_ids";
 
 const LIMITS = {
   gratis:  {period:"week",  cap:2},
@@ -425,6 +584,241 @@ let db, uid, role = localStorage.getItem(LS_ROLE) || "gratis";
 let questions = [], exam = [], idx = 0, ans = [];
 let selCat = "Alla kategorier", lastN = 10, lastDiff = "";
 let streak = 0, timer = null;
+let currentMode = "ovning"; // "ovning" | "kurser" | "teoriprov"
+let activeCourse = null; // category name when in kurser mode
+
+// ── COURSE PROGRESS ──
+const getCatProg = () => safeJSON(localStorage.getItem(LS_CAT_PROG), {});
+function saveCatProg(cat, pct) {
+  const p = getCatProg();
+  if(!p[cat]) p[cat] = { best: 0, attempts: 0, done: false };
+  p[cat].attempts++;
+  p[cat].best = Math.max(p[cat].best, pct);
+  p[cat].done = p[cat].done || pct >= 75;
+  localStorage.setItem(LS_CAT_PROG, JSON.stringify(p));
+}
+function addWrong(ids) {
+  let w = safeJSON(localStorage.getItem(LS_WRONG), []);
+  ids.forEach(id => { if(!w.includes(id)) w.push(id); });
+  while(w.length > 150) w.shift();
+  localStorage.setItem(LS_WRONG, JSON.stringify(w));
+}
+function removeRight(ids) {
+  let w = safeJSON(localStorage.getItem(LS_WRONG), []);
+  w = w.filter(id => !ids.includes(id));
+  localStorage.setItem(LS_WRONG, JSON.stringify(w));
+}
+const getWrongIds = () => safeJSON(localStorage.getItem(LS_WRONG), []);
+
+// ── THEORY CONTENT ──
+const THEORY = {
+  "Vägmärken": {
+    sections:[
+      {t:"Fyra typer av märken",items:["Röd triangel (A) = Varning — fara framåt","Röd cirkel (C) = Förbud — något är förbjudet","Blå cirkel (D) = Påbud — du måste göra något","Blå/grön rektangel (E) = Information och anvisning"]},
+      {t:"Viktiga enskilda märken",items:["STOP (åttakantigt, rött) = stanna helt, lämna företräde","Röd-vit triangel med spets nedåt = väjningsplikt","Röd cirkel med vit horisontell bård = förbud mot infart","Gul romb = Huvudled — du har företräde","Genomstruken gul romb = lämnar huvudled"]}
+    ]
+  },
+  "Trafikregler": {
+    sections:[
+      {t:"Högerregeln",items:["Ge företräde åt fordon från höger om inget annat anges","Gäller INTE på huvudled, vid trafikljus eller stopplikt","Cyklister har inte automatisk förkörsrätt i korsning"]},
+      {t:"Omkörning",items:["Förbjudet vid backkrön, skymd sikt och järnvägskorsning","Du ansvarar för att det är säkert att köra om","Håll till vänster, passera snabbt, återgå i god tid"]},
+      {t:"Företräde",items:["Spårfordon (tåg, spårvagn) — alltid förkörsrätt","Utryckningsfordon med blåljus/siren — ge plats omedelbart","Gångtrafikanter på övergångsställe — bilister väjer"]}
+    ]
+  },
+  "Korsningar": {
+    sections:[
+      {t:"Grundregler",items:["Utan skyltar: ge företräde åt fordon från höger","Fordon som svänger in i din väg har väjningsplikt","Vänstersväng: ge företräde åt mötande rakt körande"]},
+      {t:"Cirkulationsplatser",items:["Fordon INNE i rondellen har alltid förkörsrätt","Blinkers vänster inne, höger när du ska ta din avfart","Aldrig stanna inne i rondellen"]},
+      {t:"Trafikljus",items:["Rött + gult = förbered dig, men stanna fortfarande","Grön pil = du får köra i pilens riktning","Blinkar gult = var försiktig, ingen har förkörsrätt"]}
+    ]
+  },
+  "Möte & Omkörning": {
+    sections:[
+      {t:"Möte på smal väg",items:["Den med närmaste mötesplats backar eller väjer","B4-märke: du har väjningsplikt mot mötande trafik","B5-märke: mötande trafik har väjningsplikt mot dig","Visa hänsyn mot tung trafik — det är svårare att backa"]},
+      {t:"Omkörningsförbud",items:["Heldragna linjer = absolut förbud att korsa","C35: förbud att köra om motorfordon med fler än 2 hjul","Förbudet gäller tills upphörandemärke eller ny korsning"]}
+    ]
+  },
+  "Hastighet": {
+    sections:[
+      {t:"Grundhastig heter",items:["Inom tättbebyggt område: 50 km/h om inget annat anges","Utanför tättbebyggt: 70 km/h om inget annat anges","Motorväg: max 120 km/h","Motortrafikled: max 100 km/h","Gångfartsområde: gångfart (fotgängarnas hastighet)"]},
+      {t:"Anpassad hastighet",items:["Alltid anpassa efter sikt, väglag, väder och trafik","Tillfälliga skyltar (gul/orange) gäller framför fasta","Skymd sikt, halt väglag = sänk hastigheten omedelbart"]}
+    ]
+  },
+  "Miljö & Ekonomi": {
+    sections:[
+      {t:"Ekokörning",items:["Kör i hög växel vid lågt varvtal — sparar bränsle","Förutseende körning: bromsa mjukt och tidigt","Rätt lufttryck — lågt tryck ökar förbrukningen märkbart","Stäng av AC när möjligt — ökar förbrukning 5-15%"]},
+      {t:"Miljöpåverkan",items:["Katalysator renar avgaser — fungerar bäst när den är varm","Tomgångskörning >1 min = onödig förbrukning (och förbjudet)","Ladda elbilen på natten när elnätet är minst belastat"]}
+    ]
+  },
+  "Alkohol & Droger": {
+    sections:[
+      {t:"Gränsvärden",items:["Rattfylleri: 0,2‰ blodalkohol (0,10 mg/l utandning)","Grovt rattfylleri: 1,0‰ eller mer","Narkotikaklassade ämnen: nolltolerans","Läkemedel med varningsetikett = kör inte"]},
+      {t:"Effekter",items:["Alkohol försämrar reaktionstid, syn, riskbedömning och koordination","Trötthet förstärks kraftigt med alkohol — farlig kombination","Effekten kvarstår — du kan vara onykter dagen efter"]}
+    ]
+  },
+  "Säkerhet & Utrustning": {
+    sections:[
+      {t:"Bälte och skydd",items:["Bälte är obligatoriskt för alla passagerare","Föraren ansvarar för att passagerare under 15 år sitter säkert","Barnstol: fram- eller bakåtvänd beroende på vikt/ålder","Airbag + bakåtvänd barnstol i framsäte = livsfarligt"]},
+      {t:"Fordonsutrustning",items:["Varningstriangel och reflexväst ska finnas i bilen","Mönsterdjup: min 1,6 mm (vinterdäck: min 3 mm rekommenderas)","Vinterdäck obligatoriskt vid vinterväglag 1 dec–31 mars","Bromsarna ska ge lika kraft på alla hjul"]}
+    ]
+  },
+  "Mörker & Sikt": {
+    sections:[
+      {t:"Ljusregler",items:["Halvljus alltid när det inte är fullt dagsljus","Helljus: byt till halvljus 150-200m innan mötande fordon","Dimljus bak: sikt sämre än 100m — stäng av vid bättre sikt","Parkeringsljus: parkerat på belyst väg i mörker"]},
+      {t:"Körning i mörker",items:["Sänk hastigheten — se bara så långt som ljuset räcker","Extra uppmärksam på oskyddade trafikanter","Vilt syns sent — älgar kan dyka upp plötsligt","Undvik att titta direkt in i mötandes strålkastare"]}
+    ]
+  },
+  "Väglag & Bromssträcka": {
+    sections:[
+      {t:"Bromssträckor",items:["50 km/h torrt: ~14m · halt underlag: 3-4× längre","90 km/h torrt: ~45m · is och snö: upp till 200m","Bromssträcka ökar med kvadraten på hastigheten","ABS förhindrar låsning men förkortar inte alltid sträckan"]},
+      {t:"Halt väglag",items:["Is och packad snö: mjuka starter, bromsningar och styrningar","Broar fryser snabbare — luftkylning underifrån och uppifrån","Aquaplaning: lyft lätt av gassen, håll ratten rakt, bromsa inte","Sämst sikt: dimma, snöstorm — sänk hastigheten drastiskt"]}
+    ]
+  }
+};
+
+// ── MODE MANAGEMENT ──
+function setMode(mode) {
+  currentMode = mode;
+  const views = { ovning:"configView", kurser:"kurserView", teoriprov:"teoriView" };
+  Object.entries(views).forEach(([m, id]) => {
+    const tab=$(("tab-"+m)), view=$(id);
+    if(tab) tab.classList.toggle("active", m===mode);
+    if(view) view.style.display = m===mode ? "" : "none";
+  });
+  const tv=$("theoryView"); if(tv) tv.style.display="none";
+  if(mode==="kurser") buildCourseGrid();
+  if(mode==="teoriprov") loadTeoriHist();
+}
+
+// ── PROGRESS DASHBOARD ──
+function buildDashboard() {
+  const prog = getCatProg();
+  const cats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
+  const total = cats.length;
+  const done = cats.filter(c => prog[c]?.done).length;
+  const attempted = cats.filter(c => prog[c]?.attempts > 0);
+
+  const card = $("dashCard");
+  if (attempted.length === 0) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  $("dashFill").style.width = (done / total * 100) + "%";
+  $("dashDone").textContent = done;
+
+  const badge = $("dashBadge");
+  if (done >= Math.ceil(total * 0.8)) {
+    badge.textContent = "✓ Redo att ta provet";
+    badge.className = "dashBadge rdy";
+  } else {
+    const left = total - done;
+    badge.textContent = left + (left === 1 ? " kurs kvar" : " kurser kvar");
+    badge.className = "dashBadge";
+  }
+
+  const ranked = attempted.map(c => [c, prog[c]?.best || 0]).sort((a, b) => b[1] - a[1]);
+  const parts = [];
+  if (ranked.length > 0) {
+    const [sc, sv] = ranked[0];
+    parts.push(`<span class="dashAreaItem"><span class="dashAreaDot g"></span><span class="dashAreaName">Starkast:&nbsp;</span><span class="dashAreaPct g">${esc(sc)} ${sv}%</span></span>`);
+  }
+  if (ranked.length > 1) {
+    const [wc, wv] = ranked[ranked.length - 1];
+    parts.push(`<span class="dashAreaItem"><span class="dashAreaDot r"></span><span class="dashAreaName">Svagast:&nbsp;</span><span class="dashAreaPct r">${esc(wc)} ${wv}%</span></span>`);
+  }
+  $("dashAreas").innerHTML = parts.join('<span style="color:var(--l);margin:0 3px">·</span>');
+}
+
+// ── COURSE GRID ──
+function buildCourseGrid() {
+  buildDashboard();
+  const prog = getCatProg();
+  const wrongIds = getWrongIds();
+  const cats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
+  const grid = $("courseGrid"); if(!grid) return;
+  const rows = cats.map(cat => {
+    const p = prog[cat] || {best:0, attempts:0, done:false};
+    const n = questions.filter(q => q.category===cat).length;
+    const icon = CAT_ICONS[cat]||"📖";
+    const hasWrong = wrongIds.some(id => questions.find(q=>q.id===id&&q.category===cat));
+    return `<div class="courseCard ${p.done?"cc-done":""}" onclick="showTheory('${esc(cat)}')">
+      <div class="ccCheck">✓</div>
+      <div class="ccIcon">${icon}</div>
+      <div class="ccName">${esc(cat)}</div>
+      <div class="ccMeta">${n} frågor${p.attempts?` · ${p.attempts} försök · Bäst: ${p.best}%`:""}${hasWrong?" · ⚠ misstag":""}</div>
+      <div class="ccBar"><div class="ccBarFill" style="width:${p.best}%"></div></div>
+    </div>`;
+  }).join("");
+  grid.innerHTML = rows;
+}
+
+// ── THEORY VIEW ──
+function showTheory(cat) {
+  activeCourse = cat;
+  const prog = getCatProg()[cat] || {best:0, attempts:0, done:false};
+  const n = questions.filter(q=>q.category===cat).length;
+  const theory = THEORY[cat];
+
+  $("theoryBigIcon").textContent = CAT_ICONS[cat]||"📖";
+  $("theoryTitle").textContent = cat;
+  $("theoryBadge").textContent = `${n} frågor · Bäst: ${prog.best||0}%`;
+
+  if(theory) {
+    $("theoryBody").innerHTML = theory.sections.map(s=>
+      `<div class="theorySection">
+        <div class="theorySecTitle">${esc(s.t)}</div>
+        <ul class="theoryList">${s.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+      </div>`
+    ).join("");
+  } else {
+    $("theoryBody").innerHTML = `<p style="color:var(--t2);font-size:14px">Övning med ${n} frågor inom ${esc(cat)}.</p>`;
+  }
+
+  $("kurserView").style.display = "none";
+  $("theoryView").style.display = "";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+$("theoryBackBtn").onclick = () => {
+  $("theoryView").style.display = "none";
+  $("kurserView").style.display = "";
+  activeCourse = null;
+};
+
+$("courseStartBtn").onclick = () => {
+  if(!uid){showLoginScreen();return;}
+  const cfg=LIMITS[role]||LIMITS.gratis;
+  if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera för fler test.","bad");return;}
+  $("theoryView").style.display="none";
+  $("modeTabs").style.display="none";
+  runExam(activeCourse, Math.min(10, questions.filter(q=>q.category===activeCourse).length), "");
+};
+
+// ── TEORIPROV ──
+$("teoriStartBtn").onclick = () => {
+  if(!uid){showLoginScreen();return;}
+  const cfg=LIMITS[role]||LIMITS.gratis;
+  if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera för fler test.","bad");return;}
+  $("modeTabs").style.display="none";
+  runExam("Alla kategorier",65,"");
+};
+
+async function loadTeoriHist() {
+  if(!uid||!db) return;
+  try {
+    const {data} = await db.from("driving_results").select("*")
+      .eq("user_id",uid).eq("num_questions",65)
+      .order("created_at",{ascending:false}).limit(5);
+    if(!data||!data.length){$("teoriHistSection").style.display="none";return;}
+    $("teoriHistSection").style.display="";
+    $("teoriHistBody").innerHTML=`<table class="histTable">
+      <thead><tr><th>Datum</th><th>Resultat</th><th>Status</th></tr></thead>
+      <tbody>${data.map(r=>`<tr>
+        <td>${new Date(r.created_at).toLocaleDateString("sv-SE",{month:"short",day:"numeric"})}</td>
+        <td>${r.num_correct}/65 (${r.percent}%)</td>
+        <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
+      </tr>`).join("")}</tbody></table>`;
+  } catch(_){}
+}
 
 // ── SHORTCUTS ──
 const $ = id => document.getElementById(id);
@@ -554,10 +948,12 @@ $("numQSel").onchange = updateHint;
 function showConfig() {
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
-  $("configView").style.display = "";
+  $("modeTabs").style.display = "";
+  $("theoryView").style.display = "none";
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
   if(timer) { clearInterval(timer); timer = null; $("timerBadge").style.display="none"; }
+  setMode(currentMode);
   refreshQuotaUI();
   loadHistory();
   window.scrollTo({top:0,behavior:"smooth"});
@@ -839,13 +1235,38 @@ async function showResults() {
 
   $("retryBtn").disabled = errors.length === 0;
 
+  // Save course progress if in course mode
+  if(activeCourse && currentMode==="kurser") {
+    saveCatProg(activeCourse, pct);
+  }
+  // Track wrong/right IDs for repetition
+  const wrongIds = errors.map(e=>e.q.id);
+  const rightIds = exam.filter((_,i)=>hit(ans[i],exam[i])).map(q=>q.id);
+  addWrong(wrongIds);
+  removeRight(rightIds);
+
+  // Show weak areas if multiple categories tested
+  const weakCats = Object.entries(catMap)
+    .filter(([,{r,t}])=>Math.round(r/t*100)<75&&t>=2)
+    .sort((a,b)=>Math.round(a[1].r/a[1].t*100)-Math.round(b[1].r/b[1].t*100))
+    .slice(0,4);
+  const weakSection = document.getElementById("weakSection");
+  if(weakSection) weakSection.remove();
+  if(weakCats.length>0) {
+    const wDiv=document.createElement("div");
+    wDiv.id="weakSection"; wDiv.className="weakCard";
+    wDiv.innerHTML=`<div class="weakTitle">Svaga områden — träna extra</div>`
+      +weakCats.map(([c,{r,t}])=>`<div class="weakRow"><span class="weakCat">${esc(c)}</span><span class="weakScore">${Math.round(r/t*100)}%</span></div>`).join("");
+    $("resultView").insertBefore(wDiv, $("retryBtn").closest("div"));
+  }
+
   // Save
   try {
     if(uid) await db.from("driving_results").insert({user_id:uid,category:selCat,num_questions:total,num_correct:right,percent:pct,passed});
   } catch(e) { console.warn("Sparfel:",e) }
 }
 
-$("newBtn").onclick = () => showConfig();
+$("newBtn").onclick = () => { activeCourse=null; showConfig(); };
 $("sameBtn").onclick = () => {
   const cfg=LIMITS[role]||LIMITS.gratis;
   if(cfg.cap!==Infinity && readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;}
@@ -854,6 +1275,8 @@ $("sameBtn").onclick = () => {
 $("retryBtn").onclick = () => {
   const mistakes = exam.filter((_,i)=>!hit(ans[i],exam[i]));
   if(!mistakes.length){toast("Inga misstag att träna!","ok");return;}
+  const cfg=LIMITS[role]||LIMITS.gratis;
+  if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
   exam=shuffle(mistakes); idx=0; ans=new Array(exam.length).fill(null);
   streak=0; updateStreak(); showExam(); renderQ(0);
 };
