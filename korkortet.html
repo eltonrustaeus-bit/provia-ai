@@ -217,6 +217,29 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .weakCat{flex:1;font-size:13px;color:var(--t2)}
 .weakScore{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--danger)}
 
+/* ── THEORY EXPANDED ── */
+.theoryIntro{font-size:13.5px;color:var(--t2);line-height:1.75;margin-bottom:18px;padding:12px 15px;background:var(--s2);border-radius:var(--r);border-left:3px solid var(--a)}
+.mistakeBox{background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.22);border-radius:var(--r);padding:14px;margin-top:16px}
+.mistakeBoxTitle{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;color:#ff8484;letter-spacing:.08em;text-transform:uppercase;margin-bottom:9px}
+.mistakeList{list-style:none;display:grid;gap:6px}
+.mistakeList li{font-size:13px;color:var(--t2);line-height:1.55;display:flex;gap:8px;align-items:flex-start}
+.mistakeList li::before{content:"✗";color:#ff8484;font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:2px}
+.tipBox{background:rgba(27,255,140,.06);border:1px solid rgba(27,255,140,.18);border-radius:var(--r);padding:14px;margin-top:10px}
+.tipBoxTitle{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:9px}
+.tipList{list-style:none;display:grid;gap:6px}
+.tipList li{font-size:13px;color:var(--t2);line-height:1.55;display:flex;gap:8px;align-items:flex-start}
+.tipList li::before{content:"→";color:var(--a);font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:2px}
+
+/* ── FOCUS RECOMMENDATIONS ── */
+.focusRow{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--l);cursor:pointer;transition:background .13s;margin:0 -20px;padding:9px 20px}
+.focusRow:last-child{border-bottom:none}
+.focusRow:hover{background:var(--a-dim)}
+.focusCat{flex:1;font-size:13px;font-weight:600;color:var(--t)}
+.focusStats{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.focusBad{font-family:'DM Mono',monospace;font-size:10px;color:#ff8484;background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.18);border-radius:var(--r2);padding:1px 6px}
+.focusPct{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
+.focusGo{font-family:'DM Mono',monospace;font-size:10px;color:var(--a);flex-shrink:0}
+
 /* ── PROGRESS DASHBOARD ── */
 .dashCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px 20px;margin-bottom:16px}
 .dashTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
@@ -399,7 +422,7 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
   <div id="teoriView" style="display:none">
     <div class="teoriCard">
       <div class="teoriCardTitle">Officiellt teoriprov</div>
-      <div class="teoriCardSub">65 slumpade frågor från alla kategorier. Klara 52 av 65 — precis som det riktiga provet.</div>
+      <div class="teoriCardSub">65 frågor fördelade på alla kategorier precis som Transportstyrelsens prov. Klara 52 av 65 på 50 minuter — godkänt.</div>
       <div class="teoriStats">
         <div class="teoriStat"><div class="teoriStatVal">65</div><div class="teoriStatLabel">FRÅGOR</div></div>
         <div class="teoriStat"><div class="teoriStatVal">52</div><div class="teoriStatLabel">RÄTT KRÄVS</div></div>
@@ -421,6 +444,11 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 
   <!-- ① CONFIG VIEW (Övning mode) -->
   <div id="configView">
+
+    <div class="card" id="focusCard" style="display:none;border-color:rgba(244,200,66,.18)">
+      <div class="cardTitle" style="color:var(--warn)">Rekommenderat fokus</div>
+      <div id="focusBody"></div>
+    </div>
 
     <div class="card">
       <div class="cardTitle">Välj kategori</div>
@@ -582,6 +610,16 @@ const CAT_ICONS = {
   "Alla kategorier":"📚","Vägmärken":"🚦","Trafikregler":"📋","Korsningar":"✖",
   "Möte & Omkörning":"↔","Hastighet":"⚡","Miljö & Ekonomi":"🌿","Alkohol & Droger":"🚫",
   "Säkerhet & Utrustning":"🦺","Mörker & Sikt":"🌙","Väglag & Bromssträcka":"❄",
+  "Nödsituationer":"🆘","Vägtunnlar":"🚇","Trafikmiljö & Planering":"🗺",
+  "Fordon & Besiktning":"🔧","Bogsering & Lastsäkring":"⛓","Körning med Släp":"🚗",
+};
+
+// Kategoridistribution för officiellt teoriprov (65 frågor)
+const TEORI_DIST = {
+  "Vägmärken":12,"Trafikregler":9,"Korsningar":7,"Möte & Omkörning":5,
+  "Hastighet":4,"Väglag & Bromssträcka":7,"Mörker & Sikt":5,
+  "Miljö & Ekonomi":4,"Alkohol & Droger":4,"Säkerhet & Utrustning":4,
+  "Nödsituationer":2,"Vägtunnlar":2,
 };
 
 // ── STATE ──
@@ -618,65 +656,602 @@ const getWrongIds = () => safeJSON(localStorage.getItem(LS_WRONG), []);
 // ── THEORY CONTENT ──
 const THEORY = {
   "Vägmärken": {
+    intro:"Vägmärken styr trafiken och kommunicerar regler via form och färg. Att känna de fyra huvudgrupperna är grunden till allt annat.",
     sections:[
-      {t:"Fyra typer av märken",items:["Röd triangel (A) = Varning — fara framåt","Röd cirkel (C) = Förbud — något är förbjudet","Blå cirkel (D) = Påbud — du måste göra något","Blå/grön rektangel (E) = Information och anvisning"]},
-      {t:"Viktiga enskilda märken",items:["STOP (åttakantigt, rött) = stanna helt, lämna företräde","Röd-vit triangel med spets nedåt = väjningsplikt","Röd cirkel med vit horisontell bård = förbud mot infart","Gul romb = Huvudled — du har företräde","Genomstruken gul romb = lämnar huvudled"]}
+      {t:"De fyra typerna",items:[
+        "A-märken (röd triangel, spets upp) = Varning — fara framåt",
+        "B-märken (röd/vit form) = Prioritet och väjningsplikt",
+        "C-märken (röd cirkel) = Förbud — du får inte göra detta",
+        "D-märken (blå cirkel) = Påbud — du måste göra detta",
+        "E-märken (rektangel, blå/grön) = Information och vägvisning"
+      ]},
+      {t:"Kritiska enskilda märken",items:[
+        "STOP (åttakantigt, rött) = stanna helt, lämna sedan företräde",
+        "Röd triangel med spets nedåt = Väjningsplikt",
+        "Röd cirkel med vit horisontell bård = Infartförbud (enkelriktat)",
+        "Gul romb med vit kant = Huvudled — du har företräde",
+        "Genomstruken gul romb = Du lämnar huvudled",
+        "Blå rektangel med M = Motorväg börjar"
+      ]},
+      {t:"Hastighetsmärken",items:[
+        "Röd cirkel med siffra = Maxhastighet — bindande",
+        "Blå rektangel med siffra = Rekommenderad hastighet — inte bindande",
+        "Genomstruken siffra i röd cirkel = Hastighetsgräns upphör",
+        "Gula/orange tillfälliga skyltar gäller FRAMFÖR fasta skyltar"
+      ]},
+      {t:"Tilläggstavlor",items:[
+        "Hänger under märket och modifierar dess giltighet",
+        "Exempel: 'Gäller 7–19' eller 'Max 30 min' under parkeringsmärke",
+        "Pilsymbol anger exakt riktning märket gäller — läs alltid hela kombinationen"
+      ]}
+    ],
+    mistakes:[
+      "Förväxlar C-märken (förbud, röd cirkel) med D-märken (påbud, blå cirkel) — form och färg är nyckeln",
+      "Missar tilläggstavlan under skylten — den ändrar vad skylten gäller för",
+      "Tror att gul/orange tillfällig skylt är rekommendation — den är bindande och gäller framför fast skylt"
+    ],
+    tips:[
+      "RÖDA märken = stoppa eller förbjudet. BLÅ cirklar = du MÅSTE. GUL romb = du har företräde",
+      "STOP är det enda åttakantiga märket i Sverige — unikt för snabb igenkänning",
+      "Tilläggstavla ändrar skyltens budskap — läs alltid hela kombinationen"
     ]
   },
   "Trafikregler": {
+    intro:"Trafikreglerna skapar ordning i trafiken. De flesta olyckor sker när regler bryts i korsningar och vid omkörning.",
     sections:[
-      {t:"Högerregeln",items:["Ge företräde åt fordon från höger om inget annat anges","Gäller INTE på huvudled, vid trafikljus eller stopplikt","Cyklister har inte automatisk förkörsrätt i korsning"]},
-      {t:"Omkörning",items:["Förbjudet vid backkrön, skymd sikt och järnvägskorsning","Du ansvarar för att det är säkert att köra om","Håll till vänster, passera snabbt, återgå i god tid"]},
-      {t:"Företräde",items:["Spårfordon (tåg, spårvagn) — alltid förkörsrätt","Utryckningsfordon med blåljus/siren — ge plats omedelbart","Gångtrafikanter på övergångsställe — bilister väjer"]}
+      {t:"Högerregeln",items:[
+        "I korsning utan skylt eller signal: ge företräde åt fordon från HÖGER",
+        "Högerregeln gäller INTE om: det finns vägmärken, trafikljus eller du är på huvudled",
+        "Cyklist på cykelbana har INTE automatisk förkörsrätt — högerregeln gäller",
+        "Spårfordon (tåg, spårvagn) har ALLTID förkörsrätt oavsett riktning"
+      ]},
+      {t:"Parkering och stopp",items:[
+        "Parkering förbjuden inom 10 m från korsning, övergångställe eller hållplats",
+        "Stoppförbud (helgul linje): varken parkering eller tillfälligt stopp tillåtet",
+        "Parkeringsförbud (streckat gul linje): stopp tillåtet för av- och påstigning",
+        "Aldrig parkera på huvudled, motorväg eller motortrafikled"
+      ]},
+      {t:"Utryckningsfordon",items:[
+        "Blåljus och siren: ge utrymme OMEDELBART — kör till sidan",
+        "Stanna aldrig mitt i korsning — det blockerar utryckningsfordonet",
+        "Föraren av utryckningsfordon ansvarar för sin körning, du ansvarar för att ge plats"
+      ]},
+      {t:"Körfält och placering",items:[
+        "Kör i körfältets mitt och håll till höger",
+        "Motorväg: kör i höger körfält, vänster bara vid omkörning",
+        "Vänstersväng: anmäl tidigt, vänta på säker lucka, ge företräde åt mötande"
+      ]}
+    ],
+    mistakes:[
+      "Tror att högerregeln alltid gäller — den gäller BARA utan skylt eller signal",
+      "Parkerar inom 10 m från korsning — det är förbjudet och hindrar sikten",
+      "Ger inte utryckningsfordon fri väg omedelbart — det är lagkrav och livsviktigt"
+    ],
+    tips:[
+      "Höger = rätt om inget märke eller signal säger annat",
+      "10 meter = en busslängd — håll det avstånd från korsningar",
+      "Blåljus = kör undan direkt, ingen diskussion"
     ]
   },
   "Korsningar": {
+    intro:"Hälften av alla dödsolyckor sker i korsningar. Lär dig reglerna utantill — det räddar liv.",
     sections:[
-      {t:"Grundregler",items:["Utan skyltar: ge företräde åt fordon från höger","Fordon som svänger in i din väg har väjningsplikt","Vänstersväng: ge företräde åt mötande rakt körande"]},
-      {t:"Cirkulationsplatser",items:["Fordon INNE i rondellen har alltid förkörsrätt","Blinkers vänster inne, höger när du ska ta din avfart","Aldrig stanna inne i rondellen"]},
-      {t:"Trafikljus",items:["Rött + gult = förbered dig, men stanna fortfarande","Grön pil = du får köra i pilens riktning","Blinkar gult = var försiktig, ingen har förkörsrätt"]}
+      {t:"Utan märken eller signaler",items:[
+        "Högerregeln gäller: ge företräde åt fordon från höger",
+        "Fordon som svänger in i din väg har alltid väjningsplikt",
+        "Vänstersväng: ge företräde åt mötande rakt körande fordon",
+        "Cyklist på cykelbana: högerregeln gäller — inte automatisk förkörsrätt"
+      ]},
+      {t:"Rondeller",items:[
+        "Fordon INNE i rondellen har ALLTID förkörsrätt — du som kör in väjer",
+        "Blinkers VÄNSTER medan du kör runt, HÖGER strax INNAN din avfart",
+        "Aldrig stanna inne i rondellen — kör runt igen om du missar avfarten",
+        "Kontrollera alltid cyklister och fotgängare vid avfarten"
+      ]},
+      {t:"Trafikljus",items:[
+        "Rött + gult = förbered start, men stanna fortfarande",
+        "Grön pil = fri körning i pilens riktning — akta ändå fotgängare",
+        "Gult blinkar = var extra försiktig, ingen har formell förkörsrätt",
+        "Grönt ljus = du ska ändå lämna företräde åt fotgängare och cyklister i körbanan"
+      ]},
+      {t:"Cykelöverfarter",items:[
+        "Blå rektangulärskylt = cykelöverfart — cyklister och mopedister har företräde",
+        "Vitmarkerad övergångsmålning = övergångställe — fotgängare har företräde",
+        "Vid sväng i korsning: kontrollera cykelfältet INNAN du svänger"
+      ]}
+    ],
+    mistakes:[
+      "I rondell tror man att fordon till höger har företräde — det är fordon INNE i rondellen",
+      "Vid grönt ljus ger man inte fotgängare och cyklister företräde vid sväng",
+      "Missar att cykelöverfart (blå skylt) ger cyklisterna företräde"
+    ],
+    tips:[
+      "Rondell: Du som KÖR IN väjer — alltid, utan undantag",
+      "Grönt ljus är inte fri passage — fotgängare och cyklister kan ha företräde",
+      "Blinkers i rondell: vänster inne, höger ut"
     ]
   },
   "Möte & Omkörning": {
+    intro:"Omkörning är en av de vanligaste orsakerna till dödsolyckor — du ansvarar ALLTID själv för att det är säkert.",
     sections:[
-      {t:"Möte på smal väg",items:["Den med närmaste mötesplats backar eller väjer","B4-märke: du har väjningsplikt mot mötande trafik","B5-märke: mötande trafik har väjningsplikt mot dig","Visa hänsyn mot tung trafik — det är svårare att backa"]},
-      {t:"Omkörningsförbud",items:["Heldragna linjer = absolut förbud att korsa","C35: förbud att köra om motorfordon med fler än 2 hjul","Förbudet gäller tills upphörandemärke eller ny korsning"]}
+      {t:"När omkörning är förbjuden",items:[
+        "Vid backkrön, kurva med skymd sikt, obevakad järnvägskorsning",
+        "C35-märke = förbud att köra om motordrivet fordon med fler än 2 hjul",
+        "Heldragen vit eller gul mittlinje = absolut förbud att korsa",
+        "Förbudet gäller tills upphörandemärke, ny korsning eller ny mittlinjemålning"
+      ]},
+      {t:"Säker omkörning",items:[
+        "Kontrollera: fritt framåt, tillräcklig fri sträcka, fordon bakom",
+        "Blinkers vänster, öka farten, passera snabbt",
+        "Återgå till höger EFTER att du ser hela fordonet i innerspegeln",
+        "Blinkers höger och återgå mjukt"
+      ]},
+      {t:"Möte på smal väg",items:[
+        "B4-märke = DU har väjningsplikt mot mötande",
+        "B5-märke = mötande har väjningsplikt mot DIG",
+        "Utan märke: den med närmaste mötesplats backar eller väjer",
+        "Visa hänsyn mot lastbilar — svårare för dem att backa"
+      ]},
+      {t:"Cyklister och svaga trafikanter",items:[
+        "Håll minst 1,5 meter sidoavstånd vid passerning av cyklist om möjligt",
+        "Sänk hastigheten vid passerning av cyklister och mopedister",
+        "Kontrollera cykelfältet INNAN du svänger höger"
+      ]}
+    ],
+    mistakes:[
+      "Kör om vid backkrön — du ser inte mötande fordon tills det är för sent",
+      "Lägger om till höger för tidigt — fordonet du kört om syns inte i spegeln ännu",
+      "500 meter fri sträcka krävs för säker omkörning vid 90 km/h — glöms ofta"
+    ],
+    tips:[
+      "Ser du hela fordonet i INNERSPEGELN = säkert att lägga om till höger",
+      "Vid backkrön: inga omkörningar, punkt — du ser aldrig mötande i tid",
+      "B4 = Backa undan. B5 = de Backar/väjer"
     ]
   },
   "Hastighet": {
+    intro:"Vid dubbel hastighet är kinetiska energin fyra gånger större — konsekvenserna av olyckor ökar dramatiskt med farten.",
     sections:[
-      {t:"Grundhastig heter",items:["Inom tättbebyggt område: 50 km/h om inget annat anges","Utanför tättbebyggt: 70 km/h om inget annat anges","Motorväg: max 120 km/h","Motortrafikled: max 100 km/h","Gångfartsområde: gångfart (fotgängarnas hastighet)"]},
-      {t:"Anpassad hastighet",items:["Alltid anpassa efter sikt, väglag, väder och trafik","Tillfälliga skyltar (gul/orange) gäller framför fasta","Skymd sikt, halt väglag = sänk hastigheten omedelbart"]}
-    ]
-  },
-  "Miljö & Ekonomi": {
-    sections:[
-      {t:"Ekokörning",items:["Kör i hög växel vid lågt varvtal — sparar bränsle","Förutseende körning: bromsa mjukt och tidigt","Rätt lufttryck — lågt tryck ökar förbrukningen märkbart","Stäng av AC när möjligt — ökar förbrukning 5-15%"]},
-      {t:"Miljöpåverkan",items:["Katalysator renar avgaser — fungerar bäst när den är varm","Tomgångskörning >1 min = onödig förbrukning (och förbjudet)","Ladda elbilen på natten när elnätet är minst belastat"]}
-    ]
-  },
-  "Alkohol & Droger": {
-    sections:[
-      {t:"Gränsvärden",items:["Rattfylleri: 0,2‰ blodalkohol (0,10 mg/l utandning)","Grovt rattfylleri: 1,0‰ eller mer","Narkotikaklassade ämnen: nolltolerans","Läkemedel med varningsetikett = kör inte"]},
-      {t:"Effekter",items:["Alkohol försämrar reaktionstid, syn, riskbedömning och koordination","Trötthet förstärks kraftigt med alkohol — farlig kombination","Effekten kvarstår — du kan vara onykter dagen efter"]}
-    ]
-  },
-  "Säkerhet & Utrustning": {
-    sections:[
-      {t:"Bälte och skydd",items:["Bälte är obligatoriskt för alla passagerare","Föraren ansvarar för att passagerare under 15 år sitter säkert","Barnstol: fram- eller bakåtvänd beroende på vikt/ålder","Airbag + bakåtvänd barnstol i framsäte = livsfarligt"]},
-      {t:"Fordonsutrustning",items:["Varningstriangel och reflexväst ska finnas i bilen","Mönsterdjup: min 1,6 mm (vinterdäck: min 3 mm rekommenderas)","Vinterdäck obligatoriskt vid vinterväglag 1 dec–31 mars","Bromsarna ska ge lika kraft på alla hjul"]}
-    ]
-  },
-  "Mörker & Sikt": {
-    sections:[
-      {t:"Ljusregler",items:["Halvljus alltid när det inte är fullt dagsljus","Helljus: byt till halvljus 150-200m innan mötande fordon","Dimljus bak: sikt sämre än 100m — stäng av vid bättre sikt","Parkeringsljus: parkerat på belyst väg i mörker"]},
-      {t:"Körning i mörker",items:["Sänk hastigheten — se bara så långt som ljuset räcker","Extra uppmärksam på oskyddade trafikanter","Vilt syns sent — älgar kan dyka upp plötsligt","Undvik att titta direkt in i mötandes strålkastare"]}
+      {t:"Grundgränser",items:[
+        "Tätort (skyltat eller utpekat): 50 km/h",
+        "Utanför tätort (ingen skylt): 90 km/h",
+        "Motorväg: 120 km/h (eller lägre om skylt finns)",
+        "Motortrafikled: 100 km/h",
+        "Gångfartsområde: gångfart — fotgängarnas hastighet (ca 7 km/h)"
+      ]},
+      {t:"Anpassa hastigheten",items:[
+        "Du MÅSTE anpassa efter: sikt, väglag, väder, trafik och fordonets skick",
+        "Grundregeln: aldrig köra fortare än att du kan stanna säkert inom synhåll",
+        "Tillfälliga skyltar (gula/orange) gäller FRAMFÖR fasta skyltar",
+        "Skolzonsskyltar gäller alltid — även på lovdagar och helger"
+      ]},
+      {t:"Konsekvenser av hög hastighet",items:[
+        "50 km/h mot fotgängare: ca 15% dödlig utgång",
+        "70 km/h mot fotgängare: ca 85% dödlig utgång",
+        "Bromssträckan ökar med kvadraten på hastigheten",
+        "Fördubblad hastighet = fyra gånger längre bromssträcka"
+      ]}
+    ],
+    mistakes:[
+      "Tror att 70 gäller utanför tätort — det är 90 om ingen skylt finns",
+      "Kör maxhastigheten vid dålig sikt eller halt väglag — anpassa ALLTID",
+      "Ignorerar gula/orange tillfälliga skyltar — de är bindande och gäller framför fasta"
+    ],
+    tips:[
+      "Motorväg 120 · Motortrafikled 100 · Landsväg 90 · Tätort 50 · Gångfart ca 7",
+      "Tänk: 'Kan jag stanna inom det jag ser?' — om nej, sakta ner",
+      "Hastighetsskylten gäller tills ny skylt eller korsning — inte bara vid skylten"
     ]
   },
   "Väglag & Bromssträcka": {
+    intro:"Bromssträckan ökar med kvadraten på hastigheten — dubbel fart ger fyra gånger längre sträcka. På is kan sträckan bli 3–4 gånger längre än torrt.",
     sections:[
-      {t:"Bromssträckor",items:["50 km/h torrt: ~14m · halt underlag: 3-4× längre","90 km/h torrt: ~45m · is och snö: upp till 200m","Bromssträcka ökar med kvadraten på hastigheten","ABS förhindrar låsning men förkortar inte alltid sträckan"]},
-      {t:"Halt väglag",items:["Is och packad snö: mjuka starter, bromsningar och styrningar","Broar fryser snabbare — luftkylning underifrån och uppifrån","Aquaplaning: lyft lätt av gassen, håll ratten rakt, bromsa inte","Sämst sikt: dimma, snöstorm — sänk hastigheten drastiskt"]}
+      {t:"Reaktions- och bromssträcka",items:[
+        "Total stoppsträcka = reaktionssträcka + bromssträcka",
+        "Reaktionstid: ca 1 sekund (vid 90 km/h = 25 m rullad sträcka under reaktionen)",
+        "50 km/h torrt: total ca 28 m · halt: 60–100 m",
+        "90 km/h torrt: total ca 90 m · is: upp till 300 m",
+        "ABS förhindrar hjullåsning men förkortar INTE alltid sträckan på lös snö"
+      ]},
+      {t:"Halt väglag",items:[
+        "Broar fryser snabbare — luftkyla under och ovan",
+        "Skuggsidor och norrsidor håller is längre",
+        "Packad snö och is: mjuka starter och tidiga bromsningar",
+        "Nollgradet är värst — vätskfilm gör isen extra hal"
+      ]},
+      {t:"Aquaplaning och regn",items:[
+        "Aquaplaning: hjulen svävar på vattenhinna — lyft foten från gas, styr rakt, bromsa EJ",
+        "Risk ökar med hastighet, slitna däck och grunt mönster",
+        "Vid aquaplaning: vänta tills greppet återkommer, bromsa sedan försiktigt",
+        "Sprut från framförvarandes hjul = tecken på risk för aquaplaning"
+      ]},
+      {t:"Vinterdäck och utrustning",items:[
+        "Vinterdäck obligatoriskt vid vinterförhållanden 1 dec–31 mars",
+        "Rekommenderat mönsterdjup vinterdäck: minst 3 mm (lagkrav 1,6 mm)",
+        "Dubbdäck ger bäst grepp på is — men kontrollera tillåtna perioder",
+        "ESP/ESC = elektronisk stabilitetskontroll, förhindrar sladd"
+      ]}
+    ],
+    mistakes:[
+      "Underskattar bromssträcka vid halt väglag — på is upp till 300 m vid 90 km/h",
+      "Bromsar hårt vid aquaplaning — ska lyfta foten och styra rakt",
+      "Tror att ABS alltid ger kortare bromssträcka — på lös snö kan det bli längre"
+    ],
+    tips:[
+      "90 km/h torrt = ca 90 m stoppsträcka. På is: multiplicera med 3–4",
+      "Aquaplaning: gas av, ratt rakt, vänta — bromsa inte, sväng inte",
+      "Bro = risk för is även när vägen bredvid är torr"
+    ]
+  },
+  "Mörker & Sikt": {
+    intro:"Risken att dö i trafiken är tre gånger högre i mörker. Rätt ljusanvändning och anpassad hastighet är nyckeln.",
+    sections:[
+      {t:"Grundregler för ljus",items:[
+        "Halvljus: ALLTID när det inte är fullt dagsljus — hela dygnet vid sämre sikt",
+        "Helljus: byt till halvljus senast 150–200 m innan mötande fordon",
+        "Parkeringsljus: parkering på olyst väg i mörker — aldrig vid körning",
+        "Dagsljuslykta (DRL): räcker INTE vid mörker eller sämre sikt — halvljus krävs"
+      ]},
+      {t:"Dimljus",items:[
+        "Bakre dimljus: sikt sämre än 100 m — stäng av direkt när sikten förbättras",
+        "Främre dimljus: komplettera halvljus vid dimma, snöstorm eller kraftigt regn",
+        "Förbjudet att använda dimljus när sikten är god — bländar mötande trafik"
+      ]},
+      {t:"Körning i mörker",items:[
+        "Kör aldrig fortare än att du kan stanna inom det belysta området",
+        "Extra uppmärksam på fotgängare utan reflexer och cyklister utan lyktor",
+        "Titta FÖRBI mötandes strålkastare mot vägkanten — undvik bländning",
+        "Djur syns sent i mörker — sänk hastigheten vid varningsskyltar och skogskanter"
+      ]},
+      {t:"Sikt och väder",items:[
+        "Dimma: sänk hastigheten kraftigt, håll stort avstånd",
+        "Snöstorm: halvljus plus dimljus fram — helljus reflekterar mot snön",
+        "Regn: minska farten, öka följeavståndet, bromssträckan ökar"
+      ]}
+    ],
+    mistakes:[
+      "Kör med dagsljuslykta (DRL) i mörker — det räcker inte, halvljus krävs",
+      "Glömmer att stänga av bakre dimljus när sikten förbättras — bländar bakomvarande",
+      "Tittar in i mötandes strålkastare — titta alltid mot vägkanten istället"
+    ],
+    tips:[
+      "Halvljus = standard när det inte är full dag. Alltid, ingen diskussion",
+      "Bakre dimljus: under 100 m sikt. Stäng av direkt när det klarnar",
+      "Djur i mörker: sänk farten vid varningsskyltar och skogskanter"
+    ]
+  },
+  "Miljö & Ekonomi": {
+    intro:"Ekokörning kan minska bränsleförbrukning med 15–20% utan att restiden ökar nämnvärt.",
+    sections:[
+      {t:"Framförhållning och flöde",items:[
+        "Förutseende körning: kolla trafikbilden långt framåt och anpassa tidigt",
+        "Rulla fritt istället för gas och sedan bromsa — sparar bränsle och bromsar",
+        "Håll jämn hastighet — hastighetsändringar ökar förbrukningen markant",
+        "Utnyttja motorbromsning: lyft foten tidigt, lägg inte i friläge"
+      ]},
+      {t:"Växelval och varvtal",items:[
+        "Hög växel vid lågt varvtal = sparsamt (men inte under 1 200 rpm)",
+        "Byt upp tidigt — bensin: runt 2 000 rpm, diesel: runt 1 500 rpm",
+        "Undvik onödig nedväxling i uppförsbackar — kör igenom om möjligt"
+      ]},
+      {t:"Fordonets skick",items:[
+        "Däcktryck: 0,5 bar för lågt ökar förbrukning med 3–5%",
+        "Luftkonditionering ökar förbrukning med 5–15% — stäng av när möjligt",
+        "Takbox och skidräcke ökar luftmotstånd och förbrukning markant",
+        "Tomgångskörning mer än 60 sek = onödig förbrukning och miljöpåverkan"
+      ]},
+      {t:"Miljöpåverkan",items:[
+        "Katalysatorn fungerar bäst varm — korta resor i kallt väder är extra smutsiga",
+        "Ladda elbil på natten när elnätet har lägre belastning",
+        "Rätt lufttryck sparar bränsle, förbättrar bromsning och minskar slitage"
+      ]}
+    ],
+    mistakes:[
+      "Tror att låg växel sparar bränsle — hög växel vid lågt varvtal är sparsamt",
+      "Håller lågt däcktryck — ökar förbrukning, bromssträcka och slitage",
+      "Kör med AC på hela tiden — stäng av när du inte behöver det"
+    ],
+    tips:[
+      "Hög växel + lågt varvtal = sparsamt. Rulla ut framåt istället för att bromsa",
+      "Rätt däcktryck sparar bränsle och förbättrar bromsningen",
+      "Stäng av motorn vid stopp mer än 60 sek — starten kostar bara ca 3 sekunders bränsle"
+    ]
+  },
+  "Alkohol & Droger": {
+    intro:"Alkohol finns med i var fjärde dödsolycka trots att det är förbjudet. Effekterna börjar redan vid det lagliga gränsvärdet.",
+    sections:[
+      {t:"Gränsvärden",items:[
+        "Rattfylleri: 0,2 promille i blod (0,10 mg/l i utandning)",
+        "Grovt rattfylleri: 1,0 promille eller mer i blod",
+        "Narkotika: nolltolerans — minsta spår i blodet räcker",
+        "Läkemedel med varningsetikett (triangel): körförbud gäller"
+      ]},
+      {t:"Effekter på körförmågan",items:[
+        "Redan vid 0,2 promille: försämrad riskbedömning och reaktionstid",
+        "Vid 0,5 promille: synfältet smalnar, koordination försämras",
+        "Vid 1,0 promille: kraftigt nedsatt omdöme och motorik",
+        "Trötthet kombinerat med alkohol är extremt farligt",
+        "Alkoholen kvarstår — du kan vara påverkad morgonen efter"
+      ]},
+      {t:"Konsekvenser",items:[
+        "Rattfylleri: böter och körkortsåterkallelse (minst 12 månader)",
+        "Grovt rattfylleri: fängelse upp till 2 år plus återkallelse",
+        "Försäkringen kan avvisas vid rattfylleri — personligt skadeståndsansvar",
+        "Alkolås kan krävas för att återfå körkortet"
+      ]},
+      {t:"Droger och läkemedel",items:[
+        "Salivprov (DrugWipe) används av polis vid misstanke",
+        "Positivt salivprov = blodprov tas",
+        "Antihistaminer, sömnmedel och lugnande medel: ofta körförbud",
+        "Läs alltid bipacksedeln och fråga apoteket om du är osäker"
+      ]}
+    ],
+    mistakes:[
+      "Tror att en öl inte märks — redan 0,2 promille ger körförbud och straffansvar",
+      "Kör morgonen efter och tror att alkoholen gått ur — kroppen bryter ner ca 0,1 promille per timme",
+      "Glömmer att receptfria läkemedel kan ge körförbud — kolla alltid bipacksedeln"
+    ],
+    tips:[
+      "0,2 promille = ca 1 öl (50 cl) för en 70 kg person. Kör ALDRIG om du druckit",
+      "Kroppen bryter ner ca 0,1 promille per timme — du kan fortfarande vara påverkad på morgonen",
+      "Nolltolerans för narkotika — minsta spår räcker för åtal"
+    ]
+  },
+  "Säkerhet & Utrustning": {
+    intro:"Bälte är det viktigaste skyddet och minskar dödrisken vid krock med 50%. Det är obligatoriskt för alla passagerare.",
+    sections:[
+      {t:"Bilbälte",items:[
+        "Obligatoriskt för ALLA passagerare — föraren ansvarar för barn under 15 år",
+        "Axelrem mot axel och bröst, höftrem mot höfterna — inte mot magen",
+        "Gravida: bältet under magen, inte snett över buken",
+        "Airbag skyddar BARA effektivt om bältet sitter rätt"
+      ]},
+      {t:"Barnstolar",items:[
+        "Bakåtvänd barnstol ger bäst skydd — rekommenderas upp till minst 4 år",
+        "ALDRIG bakåtvänd barnstol i framsäte med aktiv airbag — livsfarligt",
+        "Framåtvänd från ca 9 kg, bälteskudde från ca 15 kg och 125 cm",
+        "Föraren ansvarar för att barnstolen är rätt monterad"
+      ]},
+      {t:"Däck",items:[
+        "Sommardäck: min 1,6 mm mönsterdjup (rekommenderat 3 mm)",
+        "Vinterdäck: obligatoriskt vid vinterförhållanden 1 dec–31 mars",
+        "Kontrollera lufttryck minst en gång i månaden",
+        "Skadade eller spruckna däck = farligt och kan ge körförbud"
+      ]},
+      {t:"Obligatorisk utrustning",items:[
+        "Varningstriangel: placeras 30–50 m bakom fordonet vid haveri",
+        "Reflexväst: ska finnas i bilen och användas vid vägkanten",
+        "Dagsljuslykta (DRL) ersätter inte halvljus vid mörker eller sämre sikt",
+        "Brandsläckare: ej lagkrav för privatbil men starkt rekommenderat"
+      ]}
+    ],
+    mistakes:[
+      "Bakåtvänd barnstol i framsäte med aktiv airbag — airbagen kan döda barnet",
+      "Kör med mönsterdjup under 1,6 mm — ger böter och kraftigt försämrad bromsning",
+      "Tror att airbagen ersätter bältet — airbagen är ett KOMPLEMENT, aldrig en ersättning"
+    ],
+    tips:[
+      "Bälte alltid, alla, varje gång — det tar 2 sekunder att sätta på",
+      "Barnstol: bakåtvänd så länge möjligt. Aldrig i framsäte med aktiv airbag",
+      "Mönsterdjup: sätt ett 1-kronorsmynt i spåret — räcker det inte djupt är det dags att byta"
+    ]
+  },
+  "Nödsituationer": {
+    intro:"I en nödsituation gäller det att agera snabbt och rätt. Grundprincipen: Skydda — Larma — Hjälp.",
+    sections:[
+      {t:"Prioriteringsordningen",items:[
+        "1. SKYDDA olycksplatsen: varningsblinkers på, varningstriangel 50 m bakom",
+        "2. LARMA: ring 112, tala om plats, antal skadade och typ av skada",
+        "3. HJÄLP: livsräddande åtgärder — stoppa blödning, stabilt sidoläge, HLR",
+        "Lämna inte skadad person ensam om det går att undvika"
+      ]},
+      {t:"Olycksplats",items:[
+        "Stäng av tändning på olycksfordon om möjligt — minskar brandrisk",
+        "Flytta INTE skadad person om du inte MÅSTE (livsfarlig brand eller drunkning)",
+        "Stabilt sidoläge för medvetslös person som andas normalt",
+        "HLR om personen inte andas: 30 bröstkompressioner + 2 inblåsningar"
+      ]},
+      {t:"Brand och elektriska fordon",items:[
+        "Bilbrand: rädda ut passagerare, ring 112 — försök inte släcka",
+        "Elbil: batteriet kan återantändas timmar senare — kontakta räddningstjänst",
+        "Elsystemet ger ström länge efter krock — undvik att röra kablar"
+      ]},
+      {t:"SOS Alarm 112",items:[
+        "Säg: VEM du är, VAR olyckan är, VAD som hänt, SKADADE",
+        "Lägg INTE på förrän operatören säger det",
+        "Mobilens GPS kan ge din position automatiskt",
+        "E-Call: nya bilar larmar automatiskt vid krock"
+      ]}
+    ],
+    mistakes:[
+      "Lyfter och flyttar skadad person — kan förvärra rygg- och nackskador dramatiskt",
+      "Glömmer att säkra olycksplatsen INNAN hjälp ges — du riskerar att bli påkörd",
+      "Lägger på efter 112-samtal — håll linjen öppen tills operatören säger att du kan lägga på"
+    ],
+    tips:[
+      "Skydda → Larma → Hjälp — i den ordningen, alltid",
+      "112: plats, antal skadade, typ av skada — håll linjen öppen",
+      "Flytta inte skadad om det inte är absolut nödvändigt"
+    ]
+  },
+  "Vägtunnlar": {
+    intro:"Tunnlar kräver extra uppmärksamhet — begränsad sikt, inga flyktmöjligheter och brand är de största riskerna.",
+    sections:[
+      {t:"Regler i tunnel",items:[
+        "Halvljus är obligatoriskt i alla tunnlar",
+        "Håll extra avstånd — hård inbromsning i tunnel är farlig",
+        "Förbud mot U-sväng och backning inne i tunnel",
+        "Stanna aldrig inne i tunneln om det inte är absolut nödvändigt"
+      ]},
+      {t:"Brand i tunnel",items:[
+        "Försök ALLTID att köra ut ur tunneln — stanna inte om motorn orkar",
+        "Om du måste stanna: parkera till sidan, stäng av motor, ta med nyckeln",
+        "Gå inte mot rök — sök SOS-nisch eller nödutgång bakom dig",
+        "Täck näsa och mun, håll dig lågt under rökgränsen"
+      ]},
+      {t:"Nödutrustning i tunnel",items:[
+        "SOS-telefoner finns var 150–250 m — ring eller tryck på knappen",
+        "Brandsläckare i orange nischer längs tunnelväggarna",
+        "Nödutgångar markerade med gröna skyltar",
+        "Lyssna på högtalarsystemet och följ anvisningarna"
+      ]},
+      {t:"Korrekt beteende",items:[
+        "Håll till höger, håll avstånd och håll rätt fart",
+        "Fordon med farligt gods: kontrollera tillåtelse före inresa i tunnel",
+        "Ventilationen hjälper vid brand — håll fönster stängda vid rök"
+      ]}
+    ],
+    mistakes:[
+      "Stannar inne i tunnel vid litet problem — ska köra ut om möjligt",
+      "Kör mot rök — rök i tunnel är giftig och dödlig, gå alltid bort från röken",
+      "Glömmer att halvljus är obligatoriskt i alla tunnlar"
+    ],
+    tips:[
+      "Brand: kör UT om möjligt. Stannar: motor av, nyckel kvar, gå BORT från röken",
+      "Rök: gå ALDRIG mot rök. SOS-nisch eller nödutgång finns bakom dig",
+      "Halvljus i tunnel = obligatoriskt, alltid"
+    ]
+  },
+  "Trafikmiljö & Planering": {
+    intro:"Trafikmiljön är planerad för att separera och skydda olika trafikanter — förstå systemet och du förutser riskerna.",
+    sections:[
+      {t:"Väghållare och vägtyper",items:[
+        "Trafikverket: statliga vägar (riksvägar, europavägar, motorvägar)",
+        "Kommunen: kommunala gator och vägar i tätort",
+        "Enskild väg: privat ägd, men allmänt tillgänglig — lägre standard och underhåll",
+        "Motorväg: separerade körfält, inga korsningar, minst 2 körfält per riktning"
+      ]},
+      {t:"Hastighetszoner",items:[
+        "30-zoner: bostadsområden och platser med hög fotgängartäthet",
+        "Gångfartsområde: fotgängare i hela gatan — bilister har väjningsplikt",
+        "Skolzoner: extra uppmärksam — gäller även helg och lov",
+        "Tillfällig skylt (gul/orange): gäller framför fast skylt"
+      ]},
+      {t:"Separerad trafik",items:[
+        "Cykelfält (i körfältsnivå) vs cykelbana (upphöjd) — cyklisten har olika prioritet",
+        "Shared space: alla trafikanter i samma yta, inga markeringar, lägre fart",
+        "Bussfil: bara bussar, taxi och ofta cyklar — böter vid intrång med bil",
+        "Spårfordon (spårvagn, tåg): alltid förkörsrätt"
+      ]},
+      {t:"Planering och framförhållning",items:[
+        "Planera rutten i förväg — använd aldrig mobilen vid ratten",
+        "Tidmarginaler minskar onödiga hastighetöverträdelser",
+        "Undvik rusningstid om möjligt — sänker stress och olycksrisk"
+      ]}
+    ],
+    mistakes:[
+      "Kör i bussfil — förbjudet för privatbil och ger böter",
+      "Tror att gångfartsområde = 10 km/h — egentligen fotgängarnas gånghastighet (ca 7 km/h)",
+      "Feltolkar cykelfält (i körfältsnivå) och cykelbana (upphöjd) och ger fel prioritet"
+    ],
+    tips:[
+      "Gångfartsområde = fotgängarens gånghastighet + deras rätt att röra sig var som helst",
+      "Skolzon-skylt: gäller alltid, även lördag och lov",
+      "Cykelöverfart (blå skylt): cyklisten har företräde. Cykelbana: högerregeln gäller"
+    ]
+  },
+  "Fordon & Besiktning": {
+    intro:"Alla fordon på allmän väg måste vara trafiksäkra och besiktade — du som förare ansvarar.",
+    sections:[
+      {t:"Obligatorisk besiktning",items:[
+        "Personbil: första besiktning senast 3 år efter registrering",
+        "Därefter vartannat år (vid 3, 5, 7, 9 år) — sedan varje år",
+        "Körförbud: fordon med allvarliga brister får inte köras",
+        "Anmärkning: boka ny besiktning inom 2–4 veckor"
+      ]},
+      {t:"Vad besiktas",items:[
+        "Bromsar, styrning, belysning, däck, avgaser och synlighet",
+        "ABS, airbag och säkerhetssystem kontrolleras",
+        "Rost i bärande delar = körförbud",
+        "Emissionskontroll: mäter avgaser, underkänt kräver reparation"
+      ]},
+      {t:"Trafikförsäkring och skatt",items:[
+        "Trafikförsäkring (ansvar) är obligatorisk — alltid",
+        "Fordon utan trafikförsäkring: trafikförsäkringsavgift och personligt ansvar vid skada",
+        "Fordonsskatt baseras på koldioxidutsläpp (CO2)",
+        "Avställning: fordonet används inte, ingen skatt — men inte heller trafikförsäkring"
+      ]},
+      {t:"Vikt och mått",items:[
+        "Lastvikt: max bruttovikt minus fordonets tjänstevikt",
+        "Överlast: ger böter och ökat slitage på väg och fordon",
+        "Maxhöjd i Sverige: 4,5 m — kontrollera vid tunnlar och broar"
+      ]}
+    ],
+    mistakes:[
+      "Kör med körförbud 'bara en liten bit' — det är straffbart oavsett sträcka",
+      "Glömmer besiktningsdatum — kan leda till körförbud och böter",
+      "Kör utan trafikförsäkring — personligt ansvar vid skada, kan bli enorma kostnader"
+    ],
+    tips:[
+      "Besiktning: 3, 5, 7, 9 år — sedan varje år. Glömmer du = körförbud",
+      "Trafikförsäkring är lagkrav — kontrollera att den är aktiv",
+      "Körförbud = stå stilla. Inga undantag, inte ens till verkstaden"
+    ]
+  },
+  "Bogsering & Lastsäkring": {
+    intro:"Otillräcklig lastsäkring kan förvandla föremål till livsfarliga projektiler vid inbromsning.",
+    sections:[
+      {t:"Lastsäkring",items:[
+        "Lasten ska tåla 0,8G framåtbromsning — använd spännen, nät och stöttor",
+        "Lätta föremål kan bli livsfarliga vid krock — säkra ALLT i bagageutrymmet",
+        "Lasten får inte hindra sikten åt något håll",
+        "Sticker lasten ut mer än 1 m bakom = röd varningsflagga obligatorisk"
+      ]},
+      {t:"Bogsering",items:[
+        "Max bogserhastighet utan bromsar på det bogserade fordonet: 30 km/h",
+        "Max bogserhastighet med bromsar på det bogserade: normalt 80 km/h",
+        "Bogserlina: max 5 m lång, varningsflagga i mitten",
+        "Bogsering ska ske på kortaste lämpliga vägen till verkstad"
+      ]},
+      {t:"Ansvar och kontroll",items:[
+        "Föraren ansvarar alltid för att lasten är rätt säkrad",
+        "Faller last och skadar annan: skadeståndsansvar och böter",
+        "Kontrollera lasten efter körning på grov väg eller vid stopp",
+        "Presenning måste vara fastsatt — lösa täcken kan lossna och orsaka olycka"
+      ]}
+    ],
+    mistakes:[
+      "Tror att tung last ligger kvar av sig själv — vid 0,8G inbromsning rör sig allt",
+      "Bogserar för fort utan att kontrollera om det bogserade fordonet har bromsar",
+      "Låter last sticka ut mer än 1 m utan flagga — straffbart och farligt"
+    ],
+    tips:[
+      "Last sticker ut mer än 1 m bakåt = röd flagga. Inga undantag",
+      "Bogsering utan bromsar på det bogserade: max 30 km/h",
+      "Säkra ALLT i bilen — en vattenflaska kan döda vid krock"
+    ]
+  },
+  "Körning med Släp": {
+    intro:"Släpet påverkar hela fordonets beteende — längre bromssträcka, slingringsrisk och snävare svängar kräver anpassad körning.",
+    sections:[
+      {t:"Hastighet med släp",items:[
+        "Personbil med lätt släp (max 750 kg): normalt max 80 km/h",
+        "Kontrollera registreringsbevis för bil och släp — angiven maxhastighet gäller",
+        "Motorväg med lätt släp: max 80 km/h även om skyltat 120",
+        "Tung bil med tungt släp kan vara begränsad ytterligare"
+      ]},
+      {t:"Slingrande",items:[
+        "Slingrande: ta bort foten från gasen, styr RAKT — bromsa INTE hårt",
+        "Orsak: för hög hastighet, ojämn lastfördelning eller löst kopplat släp",
+        "Lasten ska vara tyngst vid kopplingen — inte i bakänden av släpet",
+        "Greppet återkommer — bromsa sedan försiktigt"
+      ]},
+      {t:"Manövrering",items:[
+        "Sväng EXTRA brett i korsningar — bakhjulen skär inåt",
+        "Backa med släp: händerna nedtill på ratten, styr åt MOTSATT håll",
+        "Kontrollera släpets bromsljus och blinkers INNAN körning",
+        "Längre reaktionssträcka och bromssträcka — öka följeavståndet"
+      ]}
+    ],
+    mistakes:[
+      "Kör i 90 km/h med lätt släp på landsväg — max är normalt 80",
+      "Bromsar hårt vid slingrande — förvärrar slingrandet, ta gas av och styr rakt",
+      "Glömmer att bakhjulen skär inåt vid sväng — tar svängen för snävt"
+    ],
+    tips:[
+      "Slingrande: gas av, rakt, vänta — INTE bromsa",
+      "Max 80 km/h med de flesta lätta släp — även på motorväg",
+      "Backa med släp: händer nedtill på ratten, sväng MOT önskad riktning"
     ]
   }
 };
@@ -767,16 +1342,29 @@ function showTheory(cat) {
   $("theoryTitle").textContent = cat;
   $("theoryBadge").textContent = `${n} frågor · Bäst: ${prog.best||0}%`;
 
+  let html = "";
   if(theory) {
-    $("theoryBody").innerHTML = theory.sections.map(s=>
+    if(theory.intro) html += `<div class="theoryIntro">${esc(theory.intro)}</div>`;
+    html += theory.sections.map(s=>
       `<div class="theorySection">
         <div class="theorySecTitle">${esc(s.t)}</div>
         <ul class="theoryList">${s.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
       </div>`
     ).join("");
+    if(theory.mistakes?.length) {
+      html += `<div class="mistakeBox"><div class="mistakeBoxTitle">Vanliga misstag</div>
+        <ul class="mistakeList">${theory.mistakes.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>
+      </div>`;
+    }
+    if(theory.tips?.length) {
+      html += `<div class="tipBox"><div class="tipBoxTitle">Kom ihåg</div>
+        <ul class="tipList">${theory.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+      </div>`;
+    }
   } else {
-    $("theoryBody").innerHTML = `<p style="color:var(--t2);font-size:14px">Övning med ${n} frågor inom ${esc(cat)}.</p>`;
+    html = `<p style="color:var(--t2);font-size:14px">Övning med ${n} frågor inom ${esc(cat)}.</p>`;
   }
+  $("theoryBody").innerHTML = html;
 
   $("kurserView").style.display = "none";
   $("theoryView").style.display = "";
@@ -907,6 +1495,44 @@ function refreshQuotaUI() {
   }
 }
 
+// ── FOCUS RECOMMENDATIONS ──
+function buildFocusRecs() {
+  const wrap = $("focusCard");
+  if(!wrap || questions.length === 0) return;
+  const prog = getCatProg();
+  const wrongIds = getWrongIds();
+  const cats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
+
+  const recs = cats.map(cat => {
+    const p = prog[cat] || {};
+    const wrongInCat = wrongIds.filter(id => questions.find(q => q.id===id && q.category===cat)).length;
+    const score = (p.attempts>0 ? 100 - (p.best||0) : 0) + wrongInCat * 5;
+    return { cat, score, best:p.best||0, wrongInCat };
+  }).filter(r => r.score > 5).sort((a,b) => b.score - a.score).slice(0,3);
+
+  if(!recs.length) { wrap.style.display="none"; return; }
+  wrap.style.display="";
+  $("focusBody").innerHTML = recs.map(r =>
+    `<div class="focusRow" onclick="setFocusCat('${esc(r.cat)}')">
+      <span class="focusCat">${esc(r.cat)}</span>
+      <span class="focusStats">
+        ${r.wrongInCat>0?`<span class="focusBad">${r.wrongInCat} fel</span>`:""}
+        ${r.best>0?`<span class="focusPct">Bäst: ${r.best}%</span>`:""}
+      </span>
+      <span class="focusGo">Öva →</span>
+    </div>`
+  ).join("");
+}
+
+function setFocusCat(cat) {
+  selCat = cat;
+  document.querySelectorAll("#catGrid .catCard").forEach(c => {
+    c.classList.toggle("active", c.querySelector(".catName")?.textContent.includes(cat.replace("⭐ ","")));
+  });
+  updateHint();
+  $("catGrid").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
 // ── BUILD CATEGORIES ──
 function buildCats() {
   const grid = $("catGrid"); grid.innerHTML = "";
@@ -933,6 +1559,7 @@ function buildCats() {
   });
   $("startBtn").disabled = false;
   updateHint();
+  buildFocusRecs();
 }
 
 function updateHint() {
@@ -955,6 +1582,7 @@ function showConfig() {
   setMode(currentMode);
   refreshQuotaUI();
   loadHistory();
+  buildFocusRecs();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function showExam() {
@@ -978,7 +1606,31 @@ $("startBtn").onclick = async () => {
   runExam(selCat, lastN, lastDiff);
 };
 
+function buildTeoriExam() {
+  let result = [];
+  for(const [cat, target] of Object.entries(TEORI_DIST)) {
+    const pool = shuffle(questions.filter(q => q.category === cat));
+    result = result.concat(pool.slice(0, Math.min(target, pool.length)));
+  }
+  if(result.length < 65) {
+    const ids = new Set(result.map(q=>q.id));
+    const extra = shuffle(questions.filter(q => !ids.has(q.id)));
+    result = result.concat(extra.slice(0, 65 - result.length));
+  }
+  return shuffle(result).slice(0, 65);
+}
+
 function runExam(cat, n, diff) {
+  // Teoriprov: category-distributed 65-question exam
+  if(cat === "Alla kategorier" && n === 65) {
+    exam = buildTeoriExam();
+    idx = 0; ans = new Array(exam.length).fill(null);
+    streak = 0; updateStreak();
+    bumpQ(); refreshQuotaUI();
+    showExam(); startTimer(50*60); renderQ(0);
+    return;
+  }
+
   let pool = [...questions];
   if(cat === "⭐ Bokmärkta") {
     const bm = getBM(); pool = pool.filter(q => bm.includes(q.id));
@@ -988,13 +1640,18 @@ function runExam(cat, n, diff) {
   if(diff) pool = pool.filter(q => q.difficulty === diff);
   if(pool.length === 0) { toast("Inga frågor hittades för dessa filter.", "bad"); return; }
 
-  exam = shuffle(pool).slice(0, Math.min(n, pool.length));
+  // Adaptive: boost wrong-answer questions (up to 40% of exam)
+  const wrongIds = getWrongIds();
+  const weak = shuffle(pool.filter(q => wrongIds.includes(q.id)));
+  const strong = shuffle(pool.filter(q => !wrongIds.includes(q.id)));
+  const weakTarget = Math.min(weak.length, Math.floor(n * 0.4));
+  const strongTarget = Math.min(strong.length, n - weakTarget);
+  exam = shuffle([...weak.slice(0, weakTarget), ...strong.slice(0, strongTarget)]);
+
   idx = 0; ans = new Array(exam.length).fill(null);
   streak = 0; updateStreak();
   bumpQ(); refreshQuotaUI();
-  showExam();
-  if(n === 65) startTimer(50*60);
-  renderQ(0);
+  showExam(); renderQ(0);
 }
 
 // ── RENDER QUESTION ──
