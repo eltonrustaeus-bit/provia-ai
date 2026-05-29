@@ -254,7 +254,7 @@ body.light .btnP { color: #fff; }
   display: block; opacity: 0; transform: translateY(-4px);
   transition: opacity .11s, transform .11s;
 }
-.dropdown.open { display: block; animation: fadeIn .15s ease; }
+.dropdown.open { display: block; opacity: 1; transform: none; animation: fadeIn .15s ease; }
 /* supports: .ddi (index/pricing) and .ddItem (app/korkortet) */
 .ddi, .ddItem {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
