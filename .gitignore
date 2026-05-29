@@ -20,3 +20,5 @@ supabase/.temp/
 .swarm/
 ruvector.db
 *.rvf.lock
+
+.env*
