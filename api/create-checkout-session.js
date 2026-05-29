@@ -94,7 +94,10 @@ export default async function handler(req, res) {
       "subscription_data[metadata][plan]": plan,
     }, stripeKey);
 
-    if (!ok) return res.status(500).json({ error: "Session creation failed", details: session });
+    if (!ok) {
+      console.error("Stripe session error:", JSON.stringify(session));
+      return res.status(500).json({ error: "Session creation failed", details: session });
+    }
 
     return res.status(200).json({ url: session.url });
 
