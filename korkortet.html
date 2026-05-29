@@ -1785,7 +1785,7 @@ async function askTeacher(presetQ) {
 }
 
 // ── COURSE QUIZ STARTER ──
-function startCourseQuiz(stage) {
+async function startCourseQuiz(stage) {
   courseStage = stage;
   if(!uid) { showLoginScreen(); return; }
   const cat = activeCourse;
