@@ -54,80 +54,12 @@
     }
     a{text-decoration:none;color:inherit}
 
-    /* ── HEADER ── */
-    header{
-      position:sticky;top:0;z-index:900;height:56px;
-      background:var(--glass);backdrop-filter:blur(18px) saturate(160%);
-      -webkit-backdrop-filter:blur(18px) saturate(160%);
-      border-bottom:1px solid var(--l);
-      transition:background .28s ease,border-color .28s ease;
-    }
-    .wrap{max-width:var(--max);margin:0 auto;padding:0 clamp(16px,4vw,36px);position:relative;z-index:1}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px}
-    .brand{display:flex;align-items:center;gap:12px}
-    .brand img{height:34px;width:auto;display:block}
-    .brandText .bname{font-size:14px;font-weight:700;color:var(--t);letter-spacing:-.02em;line-height:1;transition:color .28s ease}
-    .brandText .btag{font-family:var(--mono);font-size:9.5px;color:var(--t3);margin-top:3px;letter-spacing:.05em;transition:color .28s ease}
-    .hActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    /* ── HEADER OVERRIDE ── */
+    header{ z-index:3000; }
 
-    /* ── BUTTONS ── */
-    .btn{
-      display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
-      border-radius:var(--r);font-family:var(--font);font-weight:600;font-size:13px;
-      border:1px solid var(--l);background:var(--s2);color:var(--t2);
-      cursor:pointer;white-space:nowrap;user-select:none;
-      transition:all .16s cubic-bezier(.22,.61,.36,1);position:relative;overflow:hidden;
-    }
-    .btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.055),transparent 55%);opacity:0;transition:opacity .16s;pointer-events:none}
-    .btn:hover{border-color:var(--l2);color:var(--t);box-shadow:var(--sh);transform:translateY(-1px)}
-    .btn:hover::after{opacity:1}
-    .btn:active{transform:scale(.98)}
-    .btn:disabled{opacity:.42;cursor:not-allowed;transform:none}
-    .btn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
-    .btnP{background:var(--a);color:#03120a;border-color:transparent;font-weight:700}
-    .btnP:hover{background:var(--a2);color:#03120a;box-shadow:0 4px 20px rgba(27,255,140,.22)}
-    body.light .btnP{color:#fff} body.light .btnP:hover{color:#fff}
+    /* ── DANGER BUTTON (not in style.css) ── */
     .btnD{background:transparent;color:var(--danger);border-color:rgba(212,64,22,.2)}
     .btnD:hover{background:rgba(212,64,22,.07);border-color:rgba(212,64,22,.38)}
-    .btnG{background:transparent;border-color:transparent;color:var(--t3);padding:7px 10px}
-    .btnG:hover{background:var(--s2);border-color:var(--l);color:var(--t)}
-
-    /* Theme toggle */
-    .themeTgl{
-      display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:var(--r);
-      border:1px solid var(--l);background:var(--s2);cursor:pointer;
-      font-family:var(--font);font-weight:600;font-size:12px;color:var(--t3);
-      transition:all .16s ease;user-select:none;
-    }
-    .themeTgl:hover{border-color:var(--l2);color:var(--t);box-shadow:var(--sh)}
-    .tIcon{font-size:13px;transition:transform .32s cubic-bezier(.34,1.56,.64,1)}
-    .themeTgl:hover .tIcon{transform:rotate(18deg) scale(1.2)}
-
-    /* Pill */
-    .pill{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);border:1px solid var(--l);border-radius:var(--r2);padding:2px 6px;background:var(--s2);transition:all .28s ease}
-
-    /* ── MENU ── */
-    .menuWrap{position:relative;z-index:800}
-    .iconBtn{width:36px;height:36px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;display:grid;place-items:center;transition:all .16s ease}
-    .iconBtn:hover{border-color:var(--l2);box-shadow:var(--sh)}
-    .bars{display:flex;flex-direction:column;gap:4px;width:15px}
-    .bars span{display:block;height:1.5px;background:var(--t2);border-radius:1px;transition:all .18s ease}
-    .bars span:nth-child(2){width:65%}
-    .dropdown{
-      position:absolute;right:0;top:calc(100% + 8px);min-width:230px;
-      background:var(--s);border:1px solid var(--l);border-radius:var(--r);
-      box-shadow:var(--sh3);padding:5px;
-      display:none;opacity:0;transform:translateY(-5px) scale(.99);transform-origin:top right;z-index:900;
-    }
-    .dropdown.is-open{display:block;opacity:1;transform:none;transition:opacity .18s ease,transform .18s cubic-bezier(.22,.61,.36,1)}
-    .dropdown.is-closing{display:block;opacity:0;transform:translateY(-4px);transition:opacity .14s ease,transform .14s ease}
-    .dropdown a,.dropdown button{
-      width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
-      padding:8px 11px;border-radius:var(--r2);border:none;background:transparent;
-      cursor:pointer;font-family:var(--font);font-weight:500;color:var(--t2);font-size:13px;text-align:left;
-      transition:background .1s ease,color .1s ease;
-    }
-    .dropdown a:hover,.dropdown button:hover{background:var(--a-dim);color:var(--t)}
 
     /* ── MAIN ── */
     main.wrap{padding-top:40px;padding-bottom:80px}
@@ -430,38 +362,32 @@
 
   <!-- HEADER -->
   <header>
-    <div class="wrap">
-      <div class="topbar">
-        <a class="brand" href="index.html">
-          <img src="image/proviaai-logo.png" alt="ProviaAi">
-          <div class="brandText">
-            <div class="bname">ProviaAi</div>
-            <div class="btag" id="tagLine">FÖRBÄTTRING · COACH · HISTORIK</div>
-          </div>
-        </a>
-        <div class="hActions">
-          <a class="btn" href="app.html" id="toAppBtn">Till appen</a>
-          <button class="themeTgl" id="themeToggle" type="button">
-            <span class="tIcon" id="themeIcon">🌙</span>
-            <span id="themeLabel">Light</span>
+    <div class="hWrap">
+      <a class="brand" href="index.html">
+        <img src="image/proviaai-logo.png" alt="ProviaAi">
+        <div>
+          <div class="bName">ProviaAi</div>
+          <div class="bTag" id="tagLine">Förbättring</div>
+        </div>
+      </a>
+      <div class="hRight">
+        <button class="themeTgl" id="themeToggle" type="button" aria-label="Växla tema">
+          <span class="tglIcon" id="themeIcon">🌙</span>
+          <span id="themeLabel">Light</span>
+        </button>
+        <div class="menuWrap">
+          <button class="mBtn" id="menuBtn" type="button" aria-label="Meny" aria-expanded="false">
+            <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
           </button>
-          <button class="btn btnG" id="langBtn" type="button">
-            <span id="langLabel">English</span>
-            <span class="pill" id="langPill">SV</span>
-          </button>
-          <button class="btn btnD" id="resetBtn" type="button">Rensa</button>
-          <div class="menuWrap">
-            <button class="iconBtn" id="menuBtn" type="button" aria-label="Meny" aria-expanded="false">
-              <div class="bars"><span></span><span></span><span></span></div>
-            </button>
-            <div class="dropdown" id="menu">
-              <a href="index.html#how"><span>Hur det funkar</span><span class="pill">Steg</span></a>
-              <a href="index.html#feat"><span>Funktioner</span><span class="pill">AI</span></a>
-              <a href="index.html#coach"><span>AI-coach</span><span class="pill">Coach</span></a>
-              <a href="index.html#faq"><span>FAQ</span><span class="pill">Svar</span></a>
-              <a href="korkortet.html"><span>Körkortsteorin</span><span class="pill" style="color:var(--a);border-color:var(--a-border)">Nytt</span></a>
-              <a href="pricing.html"><span>Priser</span><span class="pill">19/59</span></a>
-            </div>
+          <div class="drop" id="menu">
+            <a class="ddi" href="app.html" id="toAppBtn"><span>Till appen</span><span class="dpill">App</span></a>
+            <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a);border-color:var(--l2)">Nytt</span></a>
+            <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">19/59</span></a>
+            <div class="ddSep"></div>
+            <button class="ddi" id="langBtn" type="button"><span id="langLabel">English</span><span class="dpill" id="langPill">SV</span></button>
+            <button class="ddi" id="resetBtn" type="button"><span>Rensa all data</span><span class="dpill" style="color:var(--danger)">!</span></button>
+            <div class="ddSep"></div>
+            <button class="ddi" id="logoutBtn" type="button"><span>Logga ut</span><span class="dpill">Lås</span></button>
           </div>
         </div>
       </div>
@@ -964,7 +890,9 @@
     /* ── APPLY LANG ── */
     function applyLang(){
       const t=T[LANG];
-      $('tagLine').textContent=t.tag;$('toAppBtn').textContent=t.toApp;$('resetBtn').textContent=t.reset;
+      $('tagLine').textContent=t.tag;
+      const _ta=$('toAppBtn');if(_ta){const _s=_ta.querySelector('span:first-child');if(_s)_s.textContent=t.toApp;else _ta.textContent=t.toApp;}
+      const _rb=$('resetBtn');if(_rb){const _s=_rb.querySelector('span:first-child');if(_s)_s.textContent=t.reset;else _rb.textContent=t.reset;}
       const h=$('howToText');if(h)h.innerHTML=t.howTo;
       $('coachTitle').textContent=t.coachTitle;$('coachSub').textContent=t.coachSub;$('coachHeader').textContent=t.coachHeader;
       $('lastTitle').textContent=t.lastTitle;$('trendTitle').textContent=t.trendTitle;$('focusTitle').textContent=t.focusTitle;
@@ -1289,11 +1217,14 @@
     /* ── MENU ── */
     function bindMenu(){
       const menuBtn=$('menuBtn'),menu=$('menu');if(!menuBtn||!menu)return;
-      function openMenu(){menu.classList.remove('is-closing');menu.classList.add('is-open');menuBtn.setAttribute('aria-expanded','true');}
-      function closeMenu(){if(!menu.classList.contains('is-open'))return;menu.classList.remove('is-open');menu.classList.add('is-closing');menuBtn.setAttribute('aria-expanded','false');setTimeout(()=>menu.classList.remove('is-closing'),160);}
-      menuBtn.addEventListener('click',e=>{e.stopPropagation();menu.classList.contains('is-open')?closeMenu():openMenu();});
-      document.addEventListener('click',e=>{if(!menu.contains(e.target)&&!menuBtn.contains(e.target))closeMenu();});
+      let ct;
+      function openMenu(){clearTimeout(ct);menu.classList.remove('off');menu.style.display='block';requestAnimationFrame(()=>menu.classList.add('on'));menuBtn.setAttribute('aria-expanded','true');}
+      function closeMenu(){if(!menu.classList.contains('on'))return;menuBtn.setAttribute('aria-expanded','false');menu.classList.remove('on');menu.classList.add('off');clearTimeout(ct);ct=setTimeout(()=>{menu.classList.remove('off');menu.style.display='none';},120);}
+      menuBtn.addEventListener('click',e=>{e.stopPropagation();menu.classList.contains('on')?closeMenu():openMenu();});
+      document.addEventListener('click',e=>{if(!menu.classList.contains('on'))return;if(!menu.contains(e.target)&&!menuBtn.contains(e.target))closeMenu();});
       document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
+      /* Close menu when clicking any link inside it */
+      menu.addEventListener('click',e=>{if(e.target.closest('a'))setTimeout(closeMenu,80);});
     }
 
     /* ── REVEAL ── */
