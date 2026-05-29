@@ -1233,7 +1233,7 @@ async function unlockByCode(){
   const v=($("accessCode")?.value||"").trim();
   if(!v){setLockError(T[LANG].wrongCode);return;}
   try{
-    const r=await fetch("/api/verify-access-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:v})});
+    const r=await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:v})});
     if(r.ok){localStorage.setItem(ACCESS_FLAG_KEY,"true");setLockError("");hideLock();runTrainModeIfRequested();}
     else setLockError(T[LANG].wrongCode);
   }catch{setLockError(T[LANG].wrongCode);}

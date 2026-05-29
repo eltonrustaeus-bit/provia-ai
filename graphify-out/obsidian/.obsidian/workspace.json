@@ -8,7 +8,7 @@
         "type": "tabs",
         "children": [
           {
-            "id": "d3069ee4eaac9957",
+            "id": "16e0a0df20788aa7",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -49,7 +49,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "tag:#graphify/code",
+                "query": "",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -75,8 +75,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "be693dbf1825085f",
@@ -178,7 +177,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "d3069ee4eaac9957",
+  "active": "16e0a0df20788aa7",
   "lastOpenFiles": [
     "Untitled.md",
     "Resend Email Notification.md"

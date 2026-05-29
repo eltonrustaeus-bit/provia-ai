@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-24T19:42:59.402Z",
+  "projectRoot": "C:\\Users\\elton\\Desktop\\ProvKlarUF",
+  "structure": {
+    "hasPackageJson": true,
+    "hasTsConfig": false,
+    "hasClaudeConfig": true,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1779651779403
+}

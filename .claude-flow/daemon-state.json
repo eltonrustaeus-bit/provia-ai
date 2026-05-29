@@ -1,0 +1,140 @@
+{
+  "running": true,
+  "startedAt": "2026-05-24T19:12:59.371Z",
+  "workers": {
+    "map": {
+      "runCount": 3,
+      "successCount": 3,
+      "failureCount": 0,
+      "averageDurationMs": 10.666666666666666,
+      "isRunning": false,
+      "nextRun": "2026-05-24T19:57:59.413Z",
+      "lastStartedAt": "2026-05-24T19:42:59.395Z",
+      "lastRun": "2026-05-24T19:42:59.405Z"
+    },
+    "audit": {
+      "runCount": 5,
+      "successCount": 5,
+      "failureCount": 0,
+      "averageDurationMs": 109.8,
+      "isRunning": false,
+      "nextRun": "2026-05-24T19:54:59.811Z",
+      "lastStartedAt": "2026-05-24T19:54:59.804Z",
+      "lastRun": "2026-05-24T19:54:59.912Z"
+    },
+    "optimize": {
+      "runCount": 3,
+      "successCount": 3,
+      "failureCount": 0,
+      "averageDurationMs": 26,
+      "isRunning": false,
+      "nextRun": "2026-05-24T20:01:59.452Z",
+      "lastStartedAt": "2026-05-24T19:46:59.407Z",
+      "lastRun": "2026-05-24T19:46:59.444Z"
+    },
+    "consolidate": {
+      "runCount": 2,
+      "successCount": 2,
+      "failureCount": 0,
+      "averageDurationMs": 8,
+      "isRunning": false,
+      "nextRun": "2026-05-24T20:18:59.360Z",
+      "lastStartedAt": "2026-05-24T19:48:59.346Z",
+      "lastRun": "2026-05-24T19:48:59.354Z"
+    },
+    "testgaps": {
+      "runCount": 2,
+      "successCount": 2,
+      "failureCount": 0,
+      "averageDurationMs": 34,
+      "isRunning": false,
+      "nextRun": "2026-05-24T20:00:59.433Z",
+      "lastStartedAt": "2026-05-24T19:40:59.391Z",
+      "lastRun": "2026-05-24T19:40:59.426Z"
+    },
+    "predict": {
+      "runCount": 0,
+      "successCount": 0,
+      "failureCount": 0,
+      "averageDurationMs": 0,
+      "isRunning": false
+    },
+    "document": {
+      "runCount": 0,
+      "successCount": 0,
+      "failureCount": 0,
+      "averageDurationMs": 0,
+      "isRunning": false
+    }
+  },
+  "config": {
+    "autoStart": false,
+    "logDir": "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude-flow\\logs",
+    "stateFile": "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude-flow\\daemon-state.json",
+    "maxConcurrent": 2,
+    "workerTimeoutMs": 960000,
+    "resourceThresholds": {
+      "maxCpuLoad": 9.600000000000001,
+      "minFreeMemoryPercent": 10
+    },
+    "workers": [
+      {
+        "type": "map",
+        "intervalMs": 900000,
+        "offsetMs": 0,
+        "priority": "normal",
+        "description": "Codebase mapping",
+        "enabled": true
+      },
+      {
+        "type": "audit",
+        "intervalMs": 600000,
+        "offsetMs": 120000,
+        "priority": "critical",
+        "description": "Security analysis",
+        "enabled": true
+      },
+      {
+        "type": "optimize",
+        "intervalMs": 900000,
+        "offsetMs": 240000,
+        "priority": "high",
+        "description": "Performance optimization",
+        "enabled": true
+      },
+      {
+        "type": "consolidate",
+        "intervalMs": 1800000,
+        "offsetMs": 360000,
+        "priority": "low",
+        "description": "Memory consolidation",
+        "enabled": true
+      },
+      {
+        "type": "testgaps",
+        "intervalMs": 1200000,
+        "offsetMs": 480000,
+        "priority": "normal",
+        "description": "Test coverage analysis",
+        "enabled": true
+      },
+      {
+        "type": "predict",
+        "intervalMs": 600000,
+        "offsetMs": 0,
+        "priority": "low",
+        "description": "Predictive preloading",
+        "enabled": false
+      },
+      {
+        "type": "document",
+        "intervalMs": 3600000,
+        "offsetMs": 0,
+        "priority": "low",
+        "description": "Auto-documentation",
+        "enabled": false
+      }
+    ]
+  },
+  "savedAt": "2026-05-24T19:54:59.913Z"
+}

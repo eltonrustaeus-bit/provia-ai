@@ -13,6 +13,14 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  // Access code verification (no auth required)
+  if (req.body && req.body.code !== undefined) {
+    const secret = process.env.ACCESS_CODE;
+    if (!secret) return res.status(500).json({ error: "Server misconfigured" });
+    const ok = (req.body.code || "").trim() === secret;
+    return ok ? res.status(200).json({ ok: true }) : res.status(401).json({ error: "Invalid code" });
+  }
+
   const user = await requireAuth(req, res);
   if (!user) return;
 
