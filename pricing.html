@@ -448,7 +448,7 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert("Fel: " + (data.message || data.error || JSON.stringify(data)));
+        alert("Fel: " + (data.message || data.error || "") + "\n" + JSON.stringify(data.details || {}));
         btn.disabled = false;
         btn.textContent = origText;
       }
