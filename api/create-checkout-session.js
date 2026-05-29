@@ -39,8 +39,18 @@ export default async function handler(req, res) {
     .maybeSingle();
 
   if (profile?.stripe_customer_id) {
-    stripeCustomerId = profile.stripe_customer_id;
-  } else {
+    // Verify customer still valid in current mode (test vs live)
+    const checkRes = await fetch(`https://api.stripe.com/v1/customers/${profile.stripe_customer_id}`, {
+      headers: { Authorization: `Bearer ${stripeKey}` },
+    });
+    if (checkRes.ok) {
+      stripeCustomerId = profile.stripe_customer_id;
+    } else {
+      // Stale customer (e.g. test ID in live mode) — clear and recreate
+      await supabase.from("profiles").update({ stripe_customer_id: null }).eq("id", user.id);
+    }
+  }
+  if (!stripeCustomerId) {
     const custRes = await fetch("https://api.stripe.com/v1/customers", {
       method: "POST",
       headers: {
