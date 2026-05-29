@@ -26,6 +26,32 @@ export default async function handler(req, res) {
 
   const action = req.body?.action;
 
+  // Save korkortet progress
+  if (action === "kk_save") {
+    const { srs_data, xp, wrong_ids, cat_prog, bookmarks } = req.body;
+    try {
+      const { error } = await supabase.from("driving_progress").upsert(
+        { user_id: user.id, srs_data: srs_data ?? {}, xp: xp ?? 0, wrong_ids: wrong_ids ?? [], cat_prog: cat_prog ?? {}, bookmarks: bookmarks ?? [], updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+      if (error) return res.status(500).json({ error: "Save failed" });
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  // Load korkortet progress
+  if (action === "kk_load") {
+    try {
+      const { data, error } = await supabase.from("driving_progress").select("srs_data,xp,wrong_ids,cat_prog,bookmarks,updated_at").eq("user_id", user.id).maybeSingle();
+      if (error) return res.status(500).json({ error: "Load failed" });
+      return res.status(200).json({ data: data || null });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   // Server-side korkortet quota check + bump
   if (action === "bump_kk") {
     const KK_LIMITS = { gratis: 2, basic: Infinity, premium: Infinity, admin: Infinity, user: Infinity };
