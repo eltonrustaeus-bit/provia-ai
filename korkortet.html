@@ -483,7 +483,7 @@ applyTheme(localStorage.getItem(LS_THEME) || "dark");
   const btn = $("menuBtn"), menu = $("menu"); let open = false;
   function close() { menu.classList.remove("open"); open = false; }
   btn.onclick = e => { e.stopPropagation(); open ? close() : (menu.classList.add("open"), open=true); };
-  document.addEventListener("click", e => { if(open && !menu.contains(e.target)) close() });
+  document.addEventListener("click", e => { if(open && !menu.contains(e.target) && !btn.contains(e.target)) close() });
   $("logoutBtn").onclick = async () => { await db?.auth.signOut(); location.reload() };
 })();
 

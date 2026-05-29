@@ -494,7 +494,7 @@ function closeDrop(){
   ct = setTimeout(() => { drop.classList.remove("off"); drop.style.display="none"; }, 120);
 }
 mBtn.addEventListener("click", e => { e.stopPropagation(); drop.classList.contains("on") ? closeDrop() : openDrop(); });
-document.addEventListener("click", e => { if (!drop.classList.contains("on")) return; if (!drop.contains(e.target) && e.target !== mBtn) closeDrop(); });
+document.addEventListener("click", e => { if (!drop.classList.contains("on")) return; if (!drop.contains(e.target) && !mBtn.contains(e.target)) closeDrop(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrop(); });
 drop.addEventListener("click", e => {
   const a = e.target.closest("[data-s]");
