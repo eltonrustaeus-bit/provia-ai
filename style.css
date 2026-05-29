@@ -231,6 +231,7 @@ body.light .btnP { color: #fff; }
   display: grid; place-items: center;
   border: 1px solid var(--l); border-radius: var(--r);
   background: transparent; color: var(--t2); cursor: pointer;
+  touch-action: manipulation; user-select: none;
   transition: border-color .15s ease, background .15s ease, color .15s ease;
 }
 .mBtn:hover, .menuBtn:hover { border-color: var(--l2); background: var(--a-dim); color: var(--t); }
