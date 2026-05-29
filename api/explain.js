@@ -28,10 +28,10 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  // ── TEACH MODE: Maria AI teacher ──
+  // ── TEACH MODE: P.E.R AI teacher ──
   if (body.topic) {
     const { topic, userQuestion, context } = body;
-    const system = `Du är Maria, en erfaren och tålmodig svensk trafiklärare med 20 års erfarenhet. Du undervisar körkortselever pedagogiskt och engagerande. Fokusera på förståelse, inte memorering. Max 80 ord. Svara alltid på svenska. Aktuellt ämne: ${topic}`;
+    const system = `Du är P.E.R, en erfaren och tålmodig svensk trafiklärare med 20 års erfarenhet. Du undervisar körkortselever pedagogiskt och engagerande. Fokusera på förståelse, inte memorering. Max 80 ord. Svara alltid på svenska. Aktuellt ämne: ${topic}`;
     const userMsg = userQuestion
       ? `Eleven frågar: "${userQuestion}"`
       : context
