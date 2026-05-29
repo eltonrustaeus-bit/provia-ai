@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     const priceId = PRICE_IDS[plan];
     if (!priceId) return res.status(500).json({ error: "Price not configured" });
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    const stripeKey = (process.env.STRIPE_SECRET_KEY || "").replace(/^﻿/, "").trim();
     if (!stripeKey) return res.status(500).json({ error: "Stripe key missing" });
 
     // Get or create Stripe customer
