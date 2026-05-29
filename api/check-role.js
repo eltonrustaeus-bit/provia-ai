@@ -54,7 +54,7 @@ export default async function handler(req, res) {
 
   // Server-side korkortet quota check + bump
   if (action === "bump_kk") {
-    const KK_LIMITS = { gratis: 2, basic: Infinity, premium: Infinity, admin: Infinity, user: Infinity };
+    const KK_LIMITS = { gratis: 2, basic: 30, premium: Infinity, admin: Infinity, user: Infinity };
     try {
       const { data, error } = await supabase
         .from("profiles")
