@@ -6,9 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const clean = s => (s || "").replace(/^﻿/, "").trim();
 const PRICE_IDS = {
-  basic: process.env.STRIPE_BASIC_PRICE_ID,
-  premium: process.env.STRIPE_PREMIUM_PRICE_ID,
+  basic: clean(process.env.STRIPE_BASIC_PRICE_ID),
+  premium: clean(process.env.STRIPE_PREMIUM_PRICE_ID),
 };
 
 function stripeBody(params) {
