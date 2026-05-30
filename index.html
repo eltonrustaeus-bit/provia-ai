@@ -297,6 +297,13 @@
   </div>
 </header>
 
+<div id="betaBanner" style="background:#0d1a10;border-bottom:1px solid rgba(27,255,140,.15);padding:9px 48px 9px 16px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;color:#a8c4b4;position:relative;flex-wrap:wrap">
+  <span>⚡ ProviaAi är i tidig fas — småfel kan förekomma. Vi vill gärna höra vad du tycker och vad du saknar!</span>
+  <a href="mailto:hej@proviaai.se?subject=Feedback ProviaAi" style="color:#1bff8c;text-decoration:none;white-space:nowrap">Skicka feedback →</a>
+  <button onclick="document.getElementById('betaBanner').style.display='none';sessionStorage.setItem('betaDismissed','1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#a8c4b4;cursor:pointer;font-size:16px;line-height:1;padding:4px 6px" aria-label="Stäng">✕</button>
+</div>
+<script>if(sessionStorage.getItem('betaDismissed')==='1'){var _b=document.getElementById('betaBanner');if(_b)_b.style.display='none'}</script>
+
 <main>
 <div class="wrap">
 
