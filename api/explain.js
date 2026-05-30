@@ -8,9 +8,9 @@ const supabase = createClient(
 );
 
 const PER_LIMITS = {
-  gratis:  { cap: 2,  period: "week"  },
-  basic:   { cap: 40, period: "month" },
-  premium: { cap: 20, period: "day"   },
+  gratis:  { cap: 5,  period: "week"  },
+  basic:   { cap: 5,  period: "day"   },
+  // premium: no cap — unlimited
 };
 
 function currentPeriodKey(period) {
