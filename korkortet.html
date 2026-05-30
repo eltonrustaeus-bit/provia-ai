@@ -814,6 +814,16 @@ function removeRight(ids) {
 }
 const getWrongIds = () => safeJSON(localStorage.getItem(LS_WRONG), []);
 
+// ── COURSE MASTERY ──
+const LS_CAT_MASTERED = "proviaai_kk_cat_mastered";
+const getMastered = () => safeJSON(localStorage.getItem(LS_CAT_MASTERED), {});
+function markMastered(cat, id) {
+  const m = getMastered();
+  if (!m[cat]) m[cat] = [];
+  if (!m[cat].includes(id)) { m[cat].push(id); localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(m)); }
+}
+const masteredFor = (cat) => getMastered()[cat] || [];
+
 // ── SUPABASE PROGRESS SYNC ──
 async function getAuthToken() {
   try { return (await db?.auth?.getSession())?.data?.session?.access_token || null; } catch { return null; }
@@ -852,13 +862,21 @@ async function loadProgressFromSupabase() {
     const localCp = safeJSON(localStorage.getItem(LS_CAT_PROG), {});
     const remoteCp = data.cat_prog || {};
     const mergedCp = { ...localCp };
+    const localMastered = getMastered();
     for (const [cat, v] of Object.entries(remoteCp)) {
-      if (!mergedCp[cat]) { mergedCp[cat] = v; continue; }
-      mergedCp[cat].best = Math.max(mergedCp[cat].best || 0, v.best || 0);
-      mergedCp[cat].attempts = (mergedCp[cat].attempts || 0) + (v.attempts || 0);
-      mergedCp[cat].done = mergedCp[cat].done || v.done;
+      if (!mergedCp[cat]) { mergedCp[cat] = { best: v.best||0, attempts: v.attempts||0, done: v.done||false }; }
+      else {
+        mergedCp[cat].best = Math.max(mergedCp[cat].best || 0, v.best || 0);
+        mergedCp[cat].attempts = (mergedCp[cat].attempts || 0) + (v.attempts || 0);
+        mergedCp[cat].done = mergedCp[cat].done || v.done;
+      }
+      // Union mastered IDs from server (stored inside cat_prog)
+      if (Array.isArray(v.mastered)) {
+        localMastered[cat] = [...new Set([...(localMastered[cat]||[]), ...v.mastered])];
+      }
     }
     localStorage.setItem(LS_CAT_PROG, JSON.stringify(mergedCp));
+    localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(localMastered));
 
     // Bookmarks: union
     const localBm = safeJSON(localStorage.getItem(LS_BM), []);
@@ -871,7 +889,13 @@ async function saveProgressToSupabase() {
   const tok = await getAuthToken();
   if (!tok) return;
   try {
-    await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_save", srs_data: getSrs(), xp: getXP(), wrong_ids: getWrongIds(), cat_prog: safeJSON(localStorage.getItem(LS_CAT_PROG), {}), bookmarks: safeJSON(localStorage.getItem(LS_BM), []) }) });
+    const cpToSave = safeJSON(localStorage.getItem(LS_CAT_PROG), {});
+    const masteredToSave = getMastered();
+    for (const cat of Object.keys(masteredToSave)) {
+      if (!cpToSave[cat]) cpToSave[cat] = { best:0, attempts:0, done:false };
+      cpToSave[cat].mastered = masteredToSave[cat];
+    }
+    await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_save", srs_data: getSrs(), xp: getXP(), wrong_ids: getWrongIds(), cat_prog: cpToSave, bookmarks: safeJSON(localStorage.getItem(LS_BM), []) }) });
   } catch (_) {}
 }
 
@@ -1566,17 +1590,20 @@ function buildCourseGrid() {
   const wrongIds = getWrongIds();
   const cats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
   const grid = $("courseGrid"); if(!grid) return;
+  const allMastered = getMastered();
   const rows = cats.map(cat => {
     const p = prog[cat] || {best:0, attempts:0, done:false};
     const n = questions.filter(q => q.category===cat).length;
     const icon = CAT_ICONS[cat]||"📖";
     const hasWrong = wrongIds.some(id => questions.find(q=>q.id===id&&q.category===cat));
-    return `<div class="courseCard ${p.done?"cc-done":""}" onclick="showCourse('${esc(cat)}')">
+    const masteredCount = (allMastered[cat]||[]).length;
+    const allDone = n > 0 && masteredCount >= n;
+    return `<div class="courseCard ${allDone?"cc-done":""}" onclick="showCourse('${esc(cat)}')">
       <div class="ccCheck">✓</div>
       <div class="ccIcon">${icon}</div>
       <div class="ccName">${esc(cat)}</div>
-      <div class="ccMeta">${n} frågor${p.attempts?` · ${p.attempts} försök · Bäst: ${p.best}%`:""}${hasWrong?" · ⚠ misstag":""}</div>
-      <div class="ccBar"><div class="ccBarFill" style="width:${p.best}%"></div></div>
+      <div class="ccMeta">${masteredCount} / ${n} frågor klarade${p.best?` · Bäst: ${p.best}%`:""}${hasWrong?" · ⚠ misstag":""}</div>
+      <div class="ccBar"><div class="ccBarFill" style="width:${n?Math.round(masteredCount/n*100):0}%"></div></div>
     </div>`;
   }).join("");
   grid.innerHTML = rows;
@@ -1608,6 +1635,25 @@ function renderStageProgress(active) {
     const cls = k === active ? "stageDot active" : STAGE_KEYS.indexOf(active) > i ? "stageDot done" : "stageDot";
     return `<span class="${cls}" title="${STAGE_LABELS[i]}"></span>`;
   }).join("");
+}
+
+function renderCourseMastered(cat) {
+  const total = questions.filter(q=>q.category===cat).length;
+  renderStageProgress("done");
+  const content = $("stageContent"); if(!content) return;
+  content.innerHTML = `
+    <div class="doneCard">
+      <div class="doneIcon">✅</div>
+      <div class="doneTitle">Alla frågor klarade!</div>
+      <div class="doneSub">Du har bemästrat alla <strong>${total}</strong> frågor i <strong>${esc(cat)}</strong>.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-width:320px;margin:20px auto 0">
+        <button class="startBtn" type="button" onclick="startCourseQuiz('test')" style="max-width:100%">Gör områdesprovet →</button>
+        <button class="startBtn" style="background:transparent;border:1px solid var(--l);color:var(--t2);max-width:100%" type="button"
+          onclick="const m=getMastered();m['${esc(cat)}']=[];localStorage.setItem(LS_CAT_MASTERED,JSON.stringify(m));startCourseQuiz('quiz')">
+          Öva igen från början
+        </button>
+      </div>
+    </div>`;
 }
 
 function renderStage(stage) {
@@ -1822,9 +1868,19 @@ async function startCourseQuiz(stage) {
   // Build exam pool
   let pool = questions.filter(q=>q.category===cat);
   if(!isTest) {
-    // Mini quiz: prefer easy questions first
-    const easy = pool.filter(q=>q.difficulty==="easy"||!q.difficulty);
-    const other = pool.filter(q=>q.difficulty&&q.difficulty!=="easy");
+    // Exclude already mastered questions
+    const masteredIds = masteredFor(cat);
+    const remaining = pool.filter(q => !masteredIds.includes(q.id));
+    if (remaining.length === 0) {
+      // All questions mastered — show completion state
+      miniQuizMode = false;
+      $("modeTabs").style.display = "";
+      $("courseStageView").style.display = "";
+      renderCourseMastered(cat);
+      return;
+    }
+    const easy = remaining.filter(q=>q.difficulty==="easy"||!q.difficulty);
+    const other = remaining.filter(q=>q.difficulty&&q.difficulty!=="easy");
     pool = [...shuffle(easy), ...shuffle(other)];
   } else {
     // Adaptive for test: boost wrong answers
@@ -2238,6 +2294,7 @@ function handleAns(chosen, q) {
   const ch = chosen.toUpperCase();
   const ok = ch === correct;
   ans[idx] = ch;
+  if (ok && miniQuizMode && activeCourse) markMastered(activeCourse, q.id);
 
   document.querySelectorAll("#ansGrid .ansBtn").forEach((b, i) => {
     b.disabled = true;
