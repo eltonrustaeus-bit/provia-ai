@@ -40,6 +40,25 @@ module.exports = async function handler(req, res) {
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
 
+  // OCR requires Basic or higher
+  try {
+    const profRes = await fetch(
+      process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + user.id,
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    const profData = await profRes.json();
+    const role = String(profData?.[0]?.role || "gratis");
+    if (!["basic", "premium", "admin", "user"].includes(role)) {
+      return json(res, 403, { ok: false, error: "OCR requires Basic or Premium" });
+    }
+  } catch { return json(res, 500, { ok: false, error: "Role check failed" }); }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
