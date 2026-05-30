@@ -680,7 +680,7 @@
         course:'Kurs',show:'Visa',allCourses:'Alla kurser',selected:'valda',doneBtn:'Klar ✓',pick:'Välj',
         showingAll:(n,c)=>`${n} misstag${c?' · '+c:''}`,showingExams:(n,c)=>`${n} prov${c?' · '+c:''}`,
         removedOne:'Borttagen från felbanken.',open:'Öppna',close:'Stäng',
-        smartTips:'Tips',smartTipsLoading:'Hämtar tips…',smartTipsError:'Kunde inte hämta tips.',smartTipsCached:'cache',
+        smartTips:'P.E.R-tips',smartTipsLoading:'P.E.R analyserar…',smartTipsError:'Kunde inte hämta tips — försök igen.',smartTipsCached:'cache',
         reportNav:'Rapport',reportTitle:'Lärarrapport',reportSub:'Kräver minst 3 genomförda prov',
         reportNeed3:n=>`Minst 3 prov krävs. Du har ${n}.`,reportReady:n=>`Redo – ${n} prov`,
         reportGenerating:'Skapar rapport…',reportError:'Kunde inte skapa rapport.',
@@ -705,7 +705,7 @@
         course:'Course',show:'Show',allCourses:'All courses',selected:'selected',doneBtn:'Done ✓',pick:'Pick',
         showingAll:(n,c)=>`${n} mistakes${c?' · '+c:''}`,showingExams:(n,c)=>`${n} exams${c?' · '+c:''}`,
         removedOne:'Removed from library.',open:'Open',close:'Close',
-        smartTips:'Tips',smartTipsLoading:'Fetching tips…',smartTipsError:'Could not fetch tips.',smartTipsCached:'cache',
+        smartTips:'P.E.R tips',smartTipsLoading:'P.E.R analysing…',smartTipsError:'Could not fetch tips — try again.',smartTipsCached:'cache',
         reportNav:'Report',reportTitle:'Teacher report',reportSub:'Requires at least 3 completed exams',
         reportNeed3:n=>`At least 3 exams required. You have ${n}.`,reportReady:n=>`Ready – ${n} exams`,
         reportGenerating:'Generating…',reportError:'Could not generate report.',
@@ -990,7 +990,9 @@
     function getTipsCache(){const o=lsObj(LS_SMART_TIPS_CACHE);return(o&&typeof o==='object')?o:{};}
     function setTipsCache(c){lsSet(LS_SMART_TIPS_CACHE,c);}
     async function fetchTips(m){
-      const res=await fetch('/api/smart-tips',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:m.question,feedback:m.feedback,model_answer:m.model_answer,course:m.course})});
+      const{data:sd}=await db.auth.getSession();
+      const token=sd?.session?.access_token||'';
+      const res=await fetch('/api/smart-tips',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({question:m.question,feedback:m.feedback,model_answer:m.model_answer,course:m.course})});
       const data=await res.json();if(!res.ok)throw new Error(data?.error||'failed');return String(data?.tips||'');
     }
 
