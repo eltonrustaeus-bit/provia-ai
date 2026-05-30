@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
+import { callAI, buildPERSystemPrompt } from "./_per-core.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -24,24 +25,28 @@ function sanitize(str, maxLen) {
   return typeof str === "string" ? str.slice(0, maxLen) : "";
 }
 
-async function callAI(messages, maxTokens) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, input: messages }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || `OpenAI ${r.status}`);
-  return (
-    Array.isArray(data?.output) &&
-    data.output
-      .flatMap((o) => (Array.isArray(o?.content) ? o.content : []))
-      .find((c) => c?.type === "output_text")?.text?.trim()
-  ) || null;
+function sanitizePageContext(pc) {
+  if (!pc || typeof pc !== 'object') return null;
+  const out = {};
+  if (typeof pc.page === 'string') out.page = pc.page.slice(0, 50);
+  if (pc.currentQuestion && typeof pc.currentQuestion === 'object') {
+    out.currentQuestion = {
+      text: sanitize(pc.currentQuestion.text, 500),
+      options: Array.isArray(pc.currentQuestion.options)
+        ? pc.currentQuestion.options.slice(0, 6).map(o => sanitize(String(o), 100))
+        : undefined,
+    };
+  }
+  if (typeof pc.userScore === 'number' && Number.isFinite(pc.userScore)) {
+    out.userScore = Math.max(0, Math.min(1, pc.userScore));
+  }
+  if (pc.examState && typeof pc.examState === 'object') {
+    out.examState = {
+      answered: typeof pc.examState.answered === 'number' ? pc.examState.answered : undefined,
+      remaining: typeof pc.examState.remaining === 'number' ? pc.examState.remaining : undefined,
+    };
+  }
+  return out;
 }
 
 export default async function handler(req, res) {
@@ -52,9 +57,8 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  // ── TEACH MODE: P.E.R AI assistant (multi-turn with history) ──
+  // ── TEACH MODE: P.E.R multi-turn chat ──
   if (body.topic || (Array.isArray(body.history) && body.history.length > 0)) {
-    // Fetch role server-side — never trust client body
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("role, per_quota_count, per_quota_period")
@@ -65,7 +69,6 @@ export default async function handler(req, res) {
 
     const role = String(prof?.role || "gratis");
 
-    // Quota check + bump (admin has no limit)
     const cfg = PER_LIMITS[role];
     if (cfg) {
       const key = currentPeriodKey(cfg.period);
@@ -82,50 +85,32 @@ export default async function handler(req, res) {
         .eq("id", user.id);
     }
 
-    // Sanitize user inputs before injecting into prompt
-    const topic      = sanitize(body.topic, 150);
+    const topic        = sanitize(body.topic, 150);
     const userQuestion = sanitize(body.userQuestion, 500);
-    const context    = sanitize(body.context, 300);
-    const rawAreas   = Array.isArray(body.weakAreas) ? body.weakAreas : [];
-    const weakAreas  = rawAreas.slice(0, 10).map((a) => sanitize(a, 80));
+    const context      = sanitize(body.context, 400);
+    const rawAreas     = Array.isArray(body.weakAreas) ? body.weakAreas : [];
+    const weakAreas    = rawAreas.slice(0, 10).map(a => sanitize(String(a), 80));
+    const helpLevel    = (typeof body.helpLevel === 'number' && Number.isFinite(body.helpLevel))
+      ? Math.min(3, Math.max(0, Math.floor(body.helpLevel))) : 0;
+    const pageContext  = sanitizePageContext(body.pageContext);
 
-    // Validate history — reject any role other than user/assistant, cap content length
     const rawHist = Array.isArray(body.history) ? body.history : [];
     const history = rawHist
-      .filter((m) => m && (m.role === "user" || m.role === "assistant"))
-      .map((m) => ({ role: m.role, content: sanitize(m.content, 500) }))
+      .filter(m => m && (m.role === "user" || m.role === "assistant"))
+      .map(m => ({ role: m.role, content: sanitize(String(m.content), 500) }))
       .slice(-8);
 
-    const ctxLines = [];
-    if (topic)          ctxLines.push(`Aktuellt ämne: ${topic}`);
-    if (weakAreas.length) ctxLines.push(`Elevens svaga ämnen: ${weakAreas.join(", ")}`);
-    if (role === "premium") ctxLines.push("Premium-elev: ge detaljerade förklaringar.");
+    const ctxParts = [];
+    if (topic) ctxParts.push(`Aktuellt ämne: ${topic}`);
+    if (context) ctxParts.push(context);
 
-    const systemContent = `Du är P.E.R — Provias egna AI-resurs.
-${ctxLines.length ? "\n" + ctxLines.join("\n") : ""}
-
-## MÅL BAKOM FRÅGAN
-Användaren frågar sällan efter information. De försöker uppnå något.
-"Hur många prov får jag?" → "Vilken plan passar mig?"
-"Jag fick 67 %." → "Är jag på rätt väg?"
-"Hur fungerar detta?" → "Vad gör jag härnäst?"
-Identifiera alltid målet. Hjälp användaren nå det — inte bara svara på frågan.
-
-## SVARSMÖNSTER
-1. Besvara frågan
-2. Ge relevant kontext om det behövs
-3. Peka ut nästa steg
-
-Kort när det räcker. Utförlig när det behövs.
-
-## FELSKYDD
-Hitta aldrig på funktioner, priser, statistik eller regler.
-Saknas information — säg det. Gissa aldrig.
-
-## FORMAT
-- Max 120 ord
-- Svenska alltid
-- Konkreta exempel framför abstrakt förklaring`;
+    const systemContent = buildPERSystemPrompt({
+      context: ctxParts.join('\n'),
+      weakAreas,
+      role,
+      helpLevel,
+      pageContext,
+    });
 
     const userMsg = userQuestion
       ? userQuestion
@@ -140,7 +125,7 @@ Saknas information — säg det. Gissa aldrig.
     ];
 
     try {
-      const answer = await callAI(msgs, 250);
+      const answer = await callAI(msgs, { timeout: 30_000 });
       if (!answer) return res.status(502).json({ error: "No response generated" });
       const newHistory = [
         ...history,
@@ -159,7 +144,7 @@ Saknas information — säg det. Gissa aldrig.
 
   const opts = { A: option_a, B: option_b, C: option_c, D: option_d };
   const correctText = opts[correct] || correct;
-  const prompt = `Du är en svensk körkortsexpert. Förklara kortfattat (max 60 ord) varför svaret på följande teorifråga är ${correct}: ${correctText}.
+  const prompt = `Du är P.E.R — Provias intelligenta studiepartner. Förklara kortfattat (max 60 ord) varför svaret på följande teorifråga är ${correct}: ${correctText}.
 
 Fråga: ${question}
 A: ${option_a || "—"}
@@ -170,7 +155,7 @@ D: ${option_d || "—"}
 Svara på svenska. Fokusera på trafikregeln eller principen som gäller.`;
 
   try {
-    const explanation = await callAI([{ role: "user", content: prompt }], 150);
+    const explanation = await callAI([{ role: "user", content: prompt }], { timeout: 30_000 });
     if (!explanation) return res.status(502).json({ error: "No explanation generated" });
     res.json({ explanation });
   } catch (err) {

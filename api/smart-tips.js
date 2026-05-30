@@ -1,4 +1,5 @@
 import { requireAuth } from "./_auth.js";
+import { callAI } from "./_per-core.js";
 
 function safeString(x, maxLen) {
   const s = typeof x === "string" ? x : "";
@@ -79,11 +80,10 @@ export default async function handler(req, res) {
   if (!q.trim()) return res.status(400).json({ ok: false, error: "Missing question" });
   if (!fb.trim()) return res.status(400).json({ ok: false, error: "Missing feedback" });
 
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const courseGuide = pickCourseGuide(c);
 
-  const systemPrompt = `Du är en professionell lärare.
-Du ska ge korta tips för en fråga eleven fått fel på.
+  const systemPrompt = `Du är P.E.R — Provias intelligenta studiepartner.
+Du ska ge korta, konkreta tips för en fråga eleven fått fel på.
 Tipsen måste anpassas efter kursen.
 
 ${courseGuide}
@@ -107,37 +107,16 @@ Max 200 ord.`;
   const userContent = `Kurs:\n${c}\n\nFråga:\n${q}\n\nFeedback:\n${fb}\n\nModellsvar:\n${ma}`;
 
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent }
-        ]
-      }),
-      signal: AbortSignal.timeout(45_000)
-    });
+    const tips = await callAI(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent }
+      ],
+      { timeout: 45_000 }
+    );
 
-    const rawBody = await r.text();
-    let data;
-    try { data = JSON.parse(rawBody); } catch { data = {}; }
-
-    if (!r.ok) return res.status(500).json({ ok: false, error: "OpenAI error", status: r.status });
-
-    const text =
-      (Array.isArray(data?.output) &&
-        data.output
-          .flatMap(o => Array.isArray(o?.content) ? o.content : [])
-          .find(c => c?.type === "output_text")?.text) ||
-      data?.output_text ||
-      (data?.error ? `OpenAI error: ${data.error.message || JSON.stringify(data.error)}` : "No response");
-
-    return res.status(200).json({ ok: true, tips: text, course_used: c });
+    if (!tips) return res.status(500).json({ ok: false, error: "No response" });
+    return res.status(200).json({ ok: true, tips, course_used: c });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }

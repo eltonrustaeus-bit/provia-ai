@@ -1,4 +1,5 @@
 import { requireAuth } from "./_auth.js";
+import { callAI } from "./_per-core.js";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
@@ -56,7 +57,8 @@ export default async function handler(req, res) {
       max_points: Number(m.max_points || 0)
     }));
 
-    const systemPrompt = `Du är en professionell lärare som skriver en kort, tydlig och professionell lärarrapport.
+    const systemPrompt = `Du är P.E.R — Provias intelligenta studiepartner och professionell lärare.
+Skriv en kort, tydlig och professionell lärarrapport baserad på elevens provhistorik.
 
 KRAV:
 - Rapporten måste baseras på minst 3 prov.
@@ -86,34 +88,13 @@ ${JSON.stringify(last50Mistakes, null, 2)}
 
 Skriv rapporten enligt formatet och kraven.`;
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        instructions: systemPrompt,
-        input: userPrompt
-      }),
-      signal: AbortSignal.timeout(45_000)
-    });
-
-    const rawBody = await response.text();
-    let data;
-    try { data = JSON.parse(rawBody); } catch { data = {}; }
-
-    if (!response.ok) {
-      return res.status(500).json({
-        ok: false,
-        error: data?.error?.message || "OpenAI request failed"
-      });
-    }
-
-    const text = String(
-      data.output?.flatMap(o => o.content ?? []).find(c => c.type === "output_text")?.text || ""
-    ).trim();
+    const text = await callAI(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      { model: MODEL, timeout: 45_000 }
+    );
 
     if (!text) {
       return res.status(500).json({ ok: false, error: "Empty report" });

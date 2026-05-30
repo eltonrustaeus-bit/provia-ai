@@ -80,6 +80,44 @@
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_MAX_HIST = 30;
 
+  function getPageContext() {
+    try {
+      var path = window.location.pathname.toLowerCase();
+      var page = 'app';
+      if (path.includes('korkortet')) page = 'körkortsteorin';
+      else if (path.includes('rb') || path.includes('rbattring') || path.includes('forbattring') || path.includes('förbättring')) page = 'förbättring';
+      else if (path.includes('pricing')) page = 'prisplan';
+      else if (path === '/' || path.includes('index')) page = 'startsida';
+
+      var ctx = { page: page };
+
+      /* Optional rich context set by individual pages */
+      if (window._perPageContext && typeof window._perPageContext === 'object') {
+        var pc = window._perPageContext;
+        if (pc.currentQuestion) ctx.currentQuestion = pc.currentQuestion;
+        if (pc.examState) ctx.examState = pc.examState;
+      }
+
+      /* User score from localStorage history */
+      try {
+        var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+        if (Array.isArray(hist) && hist.length) {
+          var last5 = hist.slice(-5);
+          var avg = last5.reduce(function(s, x) { return s + (Number(x.percent) || 0); }, 0) / last5.length;
+          ctx.userScore = avg / 100;
+        }
+      } catch (_) {}
+
+      return ctx;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /* Pages call this to inject richer context into the P.E.R widget */
+  window.setPerContext = function(ctx) { window._perPageContext = ctx || null; };
+  window.clearPerContext = function() { window._perPageContext = null; };
+
   function perGetHist() {
     try { return JSON.parse(localStorage.getItem(PER_HIST_KEY) || '[]'); } catch (_) { return []; }
   }
@@ -132,10 +170,11 @@
       var token = await getToken();
 
       try {
+        var pageCtx = getPageContext();
         var r = await fetch('/api/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ userQuestion: q, history: hist, topic: 'Körkortsteorin' })
+          body: JSON.stringify({ userQuestion: q, history: hist, topic: 'Körkortsteorin', pageContext: pageCtx })
         });
         var data = {};
         try { data = await r.json(); } catch (_) {}
@@ -209,7 +248,7 @@
       widget.innerHTML =
         '<div id="perPanel">' +
           '<div class="per-hdr">' +
-            '<div class="per-av">👩‍🏫</div>' +
+            '<div class="per-av">👨‍🏫</div>' +
             '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIA AI-LÄRARE</div></div>' +
             '<button class="per-clr" id="perClearBtn">Rensa</button>' +
           '</div>' +
@@ -221,7 +260,7 @@
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
-        '<button id="perBubble" title="Chatta med P.E.R">👩‍🏫</button>';
+        '<button id="perBubble" title="Chatta med P.E.R">👨‍🏫</button>';
       document.body.appendChild(widget);
 
       document.getElementById('perBubble').onclick = toggle;

@@ -491,8 +491,11 @@
       <div class="sBody">
         <div class="sBodyInner">
           <div class="coachBox">
-            <div class="coachLabel" id="coachHeader">Rekommendation</div>
+            <div class="coachLabel" id="coachHeader">P.E.R · Rekommendation</div>
             <div class="coachText" id="coachText">—</div>
+            <div style="margin-top:12px">
+              <button class="btn tinyBtnP" id="perCoachBtn" type="button" style="display:none">Hämta P.E.R-analys</button>
+            </div>
           </div>
           <div class="statsRow">
             <div class="statBox"><div class="statLabel" id="lastTitle">Senaste</div><div class="statValue" id="lastText">—</div></div>
@@ -603,6 +606,7 @@
       LS_TRAIN_PICK='proviaai_train_pick',LS_UI_OPEN='proviaai_ui_open_improve',
       LS_USER_NAME_A='proviaai_user_name',LS_USER_NAME_B='proviaai_name',
       LS_SMART_TIPS_CACHE='proviaai_smart_tips_cache',LS_TEACHER_REPORT_CACHE='proviaai_teacher_report_cache',
+      LS_PER_COACH_CACHE='proviaai_per_coach_cache',
       LS_THEME='proviaai_theme';
 
     /* ── THEME ── */
@@ -919,6 +923,68 @@
     function updateSelPill(){const p=getPick();const n=Array.isArray(p.ids)?p.ids.length:0;$('selCountPill').textContent=`${n} ${T[LANG].selected}`;}
     function removeMistake(m){const all=lsArr(LS_MISTAKES),k=mKey(m);lsSet(LS_MISTAKES,all.filter(x=>mKey(x)!==k));const p=getPick(),ids=(Array.isArray(p.ids)?p.ids:[]).map(String),sid=String(m.id);if(ids.includes(sid)){p.ids=ids.filter(x=>x!==sid);setPick(p);}}
 
+    /* ── PER COACH ── */
+    const PER_COACH_TTL = 24 * 60 * 60 * 1000;
+    function getCoachCache(){const o=lsObj(LS_PER_COACH_CACHE);return(o&&typeof o==='object')?o:null;}
+    function setCoachCache(data){lsSet(LS_PER_COACH_CACHE,data);}
+    function isCoachCacheFresh(c){return c&&c.text&&(Date.now()-(c.ts||0))<PER_COACH_TTL;}
+
+    async function fetchPERCoach(h,m){
+      if(!db) return null;
+      const{data:sd}=await db.auth.getSession();
+      const token=sd?.session?.access_token||'';
+      if(!token) return null;
+
+      const avg5=h.slice(-5).reduce((s,x)=>s+(Number(x.percent)||0),0)/Math.max(1,Math.min(5,h.length));
+      const courseFreq={};
+      m.slice(-30).forEach(x=>{const c=String(x.course||'').trim();if(c)courseFreq[c]=(courseFreq[c]||0)+1;});
+      const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
+      const weakAreas=Object.keys(courseFreq).sort((a,b)=>courseFreq[b]-courseFreq[a]).slice(0,5);
+      const recentQ=m.slice(-5).map(x=>String(x.question||'').slice(0,80)).filter(Boolean).join(' | ');
+
+      const context=[
+        `${h.length} prov gjorda.`,
+        `Snitt senaste 5: ${Math.round(avg5)}%.`,
+        topCourses?`Mest misstag i: ${topCourses}.`:'',
+        recentQ?`Senaste misstag: ${recentQ}.`:''
+      ].filter(Boolean).join(' ');
+
+      const r=await fetch('/api/explain',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({
+          topic:'studiecoach',
+          context,
+          weakAreas,
+          userQuestion:LANG==='sv'
+            ?'Analysera min provhistorik och ge mig en personlig rekommendation för att förbättra mina resultat.'
+            :'Analyse my exam history and give me a personal recommendation to improve my results.'
+        })
+      });
+      const data=await r.json();
+      if(!r.ok)throw new Error(data?.error||'failed');
+      return data?.answer||null;
+    }
+
+    function renderCoachSection(h,m,last){
+      const t=T[LANG],btn=$('perCoachBtn');
+      if(!h.length){
+        $('coachText').textContent=t.noData;
+        if(btn)btn.style.display='none';
+        return;
+      }
+      const cache=getCoachCache();
+      if(isCoachCacheFresh(cache)){
+        $('coachText').textContent=cache.text;
+        if(btn)btn.style.display='none';
+        return;
+      }
+      $('coachText').textContent=LANG==='sv'
+        ?'P.E.R är redo att analysera din progress. Klicka för att hämta personlig coaching.'
+        :'P.E.R is ready to analyse your progress. Click to get personal coaching.';
+      if(btn)btn.style.display='inline-flex';
+    }
+
     /* ── SMART TIPS ── */
     function tipsCKey(m){return`${String(m.course||'').trim()}::${String(m.id||'').trim()}`;}
     function getTipsCache(){const o=lsObj(LS_SMART_TIPS_CACHE);return(o&&typeof o==='object')?o:{};}
@@ -1124,12 +1190,14 @@
       const course=String($('courseFilter')?.value||'').trim();
       if(!h.length){
         setTopStatus(t.noData,'warn');
-        $('coachText').textContent=t.noData;$('lastText').textContent='—';$('trendText').textContent='—';$('focusText').textContent='—';
+        $('coachText').textContent=t.noData;
+        const _btn=$('perCoachBtn');if(_btn)_btn.style.display='none';
+        $('lastText').textContent='—';$('trendText').textContent='—';$('focusText').textContent='—';
         renderMistakes([],course);renderExamList([],course);renderChart([]);updateSelPill();renderReportState([]);return;
       }
       setTopStatus(LANG==='sv'?`${h.length} prov synkade`:`${h.length} exams synced`,'ok');
       const lastA=(last&&last.attempt)?last.attempt:h[h.length-1],trend=computeTrend(h);
-      $('coachText').textContent=buildCoachText(h,m,lastA);
+      renderCoachSection(h,m,lastA);
       const lastP=Number(lastA?.percent||0),lastC=(lastA?.course||'').trim();
       $('lastText').textContent=LANG==='sv'?`${lastP}% · ${lastA?.level||'—'} · ${lastC||'Ingen kurs'}`:`${lastP}% · ${lastA?.level||'—'} · ${lastC||'No course'}`;
       if(trend){const sign=trend.delta>=0?'+':'',delta=Math.round(trend.delta);$('trendText').textContent=`${sign}${delta} ${LANG==='sv'?'p.p.':'p.p.'}`;}else $('trendText').textContent='—';
@@ -1177,6 +1245,23 @@
     }
 
     /* ── EVENTS ── */
+    $('perCoachBtn')?.addEventListener('click',async()=>{
+      const btn=$('perCoachBtn');
+      if(btn){btn.disabled=true;btn.textContent=LANG==='sv'?'P.E.R analyserar…':'P.E.R analysing…';}
+      const h=lsArr(LS_HISTORY),m=lsArr(LS_MISTAKES);
+      try{
+        const text=await fetchPERCoach(h,m);
+        if(text){
+          $('coachText').textContent=text;
+          setCoachCache({ts:Date.now(),text});
+          if(btn)btn.style.display='none';
+        }else{
+          if(btn){btn.disabled=false;btn.textContent='Hämta P.E.R-analys';}
+        }
+      }catch{
+        if(btn){btn.disabled=false;btn.textContent='Hämta P.E.R-analys';}
+      }
+    });
     $('courseFilter').addEventListener('change',()=>renderAll());
     $('showMode').addEventListener('change',()=>{openSection($('showMode').value==='all'?'#examSection':'#mistakeSection');});
     $('syncBtn').addEventListener('click',async()=>{await syncFromAccount();openSection('#examSection');});
@@ -1197,7 +1282,7 @@
       }
 
       // 2. Rensa localStorage (UTAN att sätta LS_CLEAR_TS)
-      [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,LS_TEACHER_REPORT_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
+      [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
 
       renderAll();
       setTopStatus(LANG==='sv'?'Historik rensad (lokalt + konto).':'History cleared (local + account).','ok');
