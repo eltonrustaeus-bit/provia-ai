@@ -115,8 +115,31 @@
   }
 
   /* Pages call this to inject richer context into the P.E.R widget */
-  window.setPerContext = function(ctx) { window._perPageContext = ctx || null; };
+  window.setPerContext = function(ctx) {
+    window._perPageContext = ctx || null;
+    if (ctx && window.PER && window.PER._resetNudge) window.PER._resetNudge();
+  };
   window.clearPerContext = function() { window._perPageContext = null; };
+
+  function getContextGreeting() {
+    try {
+      var path = window.location.pathname.toLowerCase();
+      var pc = window._perPageContext;
+      if (path.includes('korkortet')) {
+        if (pc && pc.currentQuestion && pc.currentQuestion.text) {
+          return 'Jag ser att du övar körkortsteorin. Fastnat på den här frågan? Fråga mig!';
+        }
+        return 'Hej! Jag ser att du tränar körkortsteorin. Fråga mig om trafikregler, skyltar eller vad som helst!';
+      }
+      if (path.includes('förbättring') || path.includes('forbattring') || path.includes('rbattring')) {
+        return 'Hej! Ser du dina resultat? Vill du att jag förklarar ett specifikt misstag eller ger dig studietips?';
+      }
+      if (path.includes('app')) {
+        return 'Hej! Vad vill du ha hjälp med i ditt prov? Fråga mig om uppgifter, begrepp eller hur du ska tänka.';
+      }
+    } catch (_) {}
+    return 'Hej! Jag är P.E.R — Provias intelligenta studiepartner. Vad kan jag hjälpa dig med?';
+  }
 
   function perGetHist() {
     try { return JSON.parse(localStorage.getItem(PER_HIST_KEY) || '[]'); } catch (_) { return []; }
@@ -128,6 +151,56 @@
   window.PER = (function () {
     var _getToken = null;
     var _open = false;
+    var _nudgeTimer = null;
+    var _nudgeShownKey = null;
+
+    function getNudgeKey() {
+      try {
+        var pc = window._perPageContext;
+        if (pc && pc.currentQuestion && pc.currentQuestion.text) return pc.currentQuestion.text.slice(0, 80);
+      } catch (_) {}
+      return null;
+    }
+
+    function hideNudge() {
+      var nudge = document.getElementById('perNudge');
+      if (!nudge) return;
+      nudge.classList.add('per-hide');
+      setTimeout(function() { if (nudge.parentNode) nudge.parentNode.removeChild(nudge); }, 320);
+    }
+
+    function showNudge() {
+      if (_open) return;
+      var path = window.location.pathname.toLowerCase();
+      var onExamPage = path.includes('korkortet') || path.includes('app');
+      if (!onExamPage) return;
+      var key = getNudgeKey() || path;
+      if (key === _nudgeShownKey) return;
+      _nudgeShownKey = key;
+
+      var bubble = document.getElementById('perBubble');
+      if (bubble) { bubble.classList.add('per-nudge'); setTimeout(function() { bubble.classList.remove('per-nudge'); }, 2400); }
+
+      var existing = document.getElementById('perNudge');
+      if (existing) existing.remove();
+      var nudge = document.createElement('div');
+      nudge.id = 'perNudge';
+      nudge.textContent = 'Fastnat? Fråga mig! 💬';
+      nudge.onclick = function() { hideNudge(); toggle(); };
+      var widget = document.getElementById('perWidget');
+      if (widget) widget.appendChild(nudge);
+      setTimeout(hideNudge, 4000);
+    }
+
+    function startNudgeTimer() {
+      clearTimeout(_nudgeTimer);
+      _nudgeTimer = setTimeout(showNudge, 30000);
+    }
+
+    function resetNudge() {
+      _nudgeShownKey = null;
+      startNudgeTimer();
+    }
 
     function register(fn) { _getToken = fn; }
 
@@ -205,6 +278,17 @@
       if (panel) panel.classList.toggle('per-open', _open);
       if (bubble) bubble.classList.toggle('per-open', _open);
       if (_open) {
+        hideNudge();
+        /* Update greeting if no real user messages yet */
+        var hist = perGetHist();
+        var hasConversation = hist.some(function(m) { return m.role === 'user'; });
+        if (!hasConversation) {
+          var msgs = document.getElementById('perMessages');
+          if (msgs) {
+            var first = msgs.querySelector('.per-msg.teacher');
+            if (first) first.textContent = getContextGreeting();
+          }
+        }
         var inp = document.getElementById('perInput');
         if (inp) setTimeout(function () { inp.focus(); }, 50);
       }
@@ -239,6 +323,11 @@
         '#perSendBtn{background:var(--a,#1bff8c);color:#08100d;border:none;border-radius:6px;padding:0 12px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap}',
         '#perSendBtn:hover{background:var(--a2,#00e67a)}',
         '#perSendBtn:disabled{opacity:.4;cursor:not-allowed}',
+        '@keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.4)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 7px rgba(27,255,140,.12)}}',
+        '#perBubble.per-nudge{animation:perPulse 1.1s ease-in-out 2}',
+        '#perNudge{position:absolute;bottom:64px;right:0;background:var(--s,#111a15);border:1px solid rgba(27,255,140,.3);border-radius:10px;padding:9px 14px;font-size:12.5px;font-family:"DM Sans",sans-serif;color:var(--t,#e8f5ee);white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.55);cursor:pointer;animation:perUp .22s ease;z-index:1;user-select:none}',
+        '#perNudge:hover{border-color:rgba(27,255,140,.55);background:var(--s2,#162019)}',
+        '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
         '@media(max-width:400px){#perPanel{width:90vw;right:-10px}}'
       ].join('');
       document.head.appendChild(style);
@@ -295,6 +384,12 @@
           msgs.scrollTop = msgs.scrollHeight;
         }
       }
+
+      /* Start nudge timer for exam pages */
+      var initPath = window.location.pathname.toLowerCase();
+      if (initPath.includes('korkortet') || initPath.includes('app')) {
+        startNudgeTimer();
+      }
     }
 
     if (document.readyState === 'loading') {
@@ -303,7 +398,7 @@
       initWidget();
     }
 
-    return { register: register, send: send };
+    return { register: register, send: send, _resetNudge: resetNudge };
   })();
 
 })();
