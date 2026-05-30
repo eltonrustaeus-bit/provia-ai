@@ -956,6 +956,10 @@ async function refreshQuotaUi() {
     rp.textContent = roleLabel[currentRole] || currentRole;
   }
 
+  // Dölj OCR för gratis
+  const ocrBox = document.querySelector(".uploadBox");
+  if (ocrBox) ocrBox.style.display = currentRole === "gratis" ? "none" : "";
+
   const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
 
   if (cfg.limit === Infinity) {
@@ -1556,6 +1560,7 @@ try{
   });
 
   onClick("ocrBtn",async()=>{
+    if(currentRole==="gratis"){window.location.href="pricing.html";return;}
     hideDebug();const t=T[LANG];const inp=imageInputEl();const file=inp?.files&&inp.files[0];
     if(!file){setOcrStatus(t.ocrNoFile,"bad");return;}
     setBusy(true,t.ocrWorking);setOcrStatus(t.ocrWorking,"warn");
