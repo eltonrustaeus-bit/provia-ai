@@ -1276,6 +1276,7 @@ async function checkApprovalAndUnlock(session){
   localStorage.setItem(LS_ROLE, currentRole);
   setLockError("");
   hideLock();
+  if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
   /* Show welcome animation */
   const _wEmail = session?.user?.email || '';
   if (window.showWelcome) setTimeout(() => window.showWelcome(_wEmail), 60);

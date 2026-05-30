@@ -1744,14 +1744,10 @@ function renderStage(stage) {
           <div><div class="aiName">P.E.R — din trafiklärare</div><div class="aiRole">Fråga mig vad som helst om ${esc(cat)}</div></div>
         </div>
         <div class="aiMessages" id="aiMessages">
-          <div class="aiMsg teacher">Hej! Jag är P.E.R, din trafiklärare. Jag har just visat dig teorin om <strong>${esc(cat)}</strong>. Har du frågor? Klicka på en snabbfråga eller skriv din egen!</div>
+          <div class="aiMsg teacher">Hej! Jag är P.E.R, din trafiklärare. Jag har just visat dig teorin om <strong>${esc(cat)}</strong>. Klicka på en snabbfråga nedan!</div>
         </div>
         <div class="aiQuickBtns" id="aiQuickBtns">
           ${quickQs.map(q=>`<button class="aiQuickBtn" onclick="askTeacher('${esc(q)}')">${esc(q)}</button>`).join("")}
-        </div>
-        <div class="aiInputRow">
-          <input class="aiInput" id="aiInput" type="text" placeholder="Skriv din fråga…" />
-          <button class="aiSendBtn" id="aiSendBtn" onclick="askTeacher()">Skicka</button>
         </div>
       </div>
       <div class="startArea" style="margin-top:16px">
@@ -1761,8 +1757,6 @@ function renderStage(stage) {
         </button>
         <div class="startHint">5–7 frågor · Inga poäng — fokus på förståelse</div>
       </div>`;
-    const aiIn = $("aiInput");
-    if(aiIn) aiIn.onkeydown = e => { if(e.key==="Enter") askTeacher(); };
     $("studyNextBtn").onclick = () => startCourseQuiz("quiz");
 
   } else if(stage === "quiz" || stage === "test") {
@@ -1798,27 +1792,26 @@ function renderStage(stage) {
 }
 
 // ── AI TEACHER ──
-async function askTeacher(presetQ) {
-  const input = $("aiInput");
-  const q = presetQ || (input ? input.value.trim() : "");
+const PER_HIST_KEY_PREFIX = "proviaai_per_hist_";
+function getPerHist(cat) { try { return JSON.parse(localStorage.getItem(PER_HIST_KEY_PREFIX + cat) || "[]"); } catch { return []; } }
+function savePerHist(cat, h) { try { localStorage.setItem(PER_HIST_KEY_PREFIX + cat, JSON.stringify(h.slice(-20))); } catch(_) {} }
+
+async function askTeacher(q) {
   if(!q) return;
-  if(input) input.value = "";
   const msgs = $("aiMessages"); if(!msgs) return;
-  // Add user message
   const userEl = document.createElement("div");
   userEl.className = "aiMsg user"; userEl.textContent = q; msgs.appendChild(userEl);
-  // Typing indicator
   const typingEl = document.createElement("div");
   typingEl.className = "aiMsg teacher typing"; typingEl.textContent = "P.E.R skriver…"; msgs.appendChild(typingEl);
   msgs.scrollTop = msgs.scrollHeight;
-  const btn = $("aiSendBtn"); if(btn) btn.disabled = true;
   try {
     const sess = await db?.auth?.getSession();
     const token = sess?.data?.session?.access_token || "";
+    const hist = getPerHist(activeCourse);
     const res = await fetch("/api/explain", {
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-      body: JSON.stringify({ topic: activeCourse, userQuestion: q })
+      body: JSON.stringify({ topic: activeCourse, userQuestion: q, history: hist, userRole: role })
     });
     let data = {};
     try { data = await res.json(); } catch(_) {}
@@ -1826,13 +1819,13 @@ async function askTeacher(presetQ) {
     if(!res.ok) {
       typingEl.textContent = data.error || `Fel ${res.status} — försök igen.`;
     } else {
-      typingEl.innerHTML = esc(data.answer || "Inget svar genererades.");
+      typingEl.textContent = data.answer || "Inget svar genererades.";
+      if(data.history) savePerHist(activeCourse, data.history);
     }
   } catch(err) {
     typingEl.className = "aiMsg teacher";
     typingEl.textContent = "Nätverksfel — kontrollera anslutningen och försök igen.";
   }
-  if(btn) btn.disabled = false;
   msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -2698,6 +2691,7 @@ async function init() {
 
     // Logged in — load role
     uid = _session.user.id;
+    if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
     try {
       const {data: _prof} = await db.from("profiles").select("role").eq("id",uid).single();
       if(_prof?.role){ role=_prof.role; localStorage.setItem(LS_ROLE,role); }
