@@ -426,6 +426,19 @@
     .korExpl{margin-top:14px;padding:13px;border-left:2px solid var(--a);background:rgba(27,255,140,.05);border-radius:0 var(--r) var(--r) 0;font:400 13px/1.6 var(--font);color:var(--t2);opacity:0;transition:opacity .4s ease}
     .korExpl.vis{opacity:1}
 
+    /* ── P.E.R MINI BAR (alltid synlig efter act-per) ── */
+    #perMiniBar{
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      display:none;align-items:center;gap:8px;
+      background:var(--s);border:1px solid rgba(27,255,140,.3);
+      border-radius:20px;padding:7px 16px;
+      font:600 12px var(--font);color:var(--a);
+      z-index:998;box-shadow:0 4px 16px rgba(0,0,0,.5);
+      white-space:nowrap;animation:perUp .3s ease;
+    }
+    #perMiniBar.on{display:flex}
+    #perMiniBar .pDot{width:7px;height:7px;border-radius:50%;background:var(--a);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+
     /* ── REDUCED MOTION ── */
     @media (prefers-reduced-motion: reduce) {
       * { cursor:auto !important }
@@ -523,7 +536,7 @@
       <div class="wSt" id="ws4"><div class="wDot" id="wd4">4</div>Rättning</div>
     </div>
 
-    <div class="courseTag">Matematik C — Andragradsekvationer</div>
+    <div class="courseTag">Matematik 1b — Procenträkning</div>
     <div class="matArea" id="matArea"></div>
     <div class="matCnt" id="matCnt">0 tecken</div>
 
@@ -967,6 +980,12 @@ x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständ
   <span id="tipText"></span>
 </div>
 
+<!-- P.E.R MINI BAR -->
+<div id="perMiniBar">
+  <div class="pDot"></div>
+  👨‍🏫 P.E.R är aktiv
+</div>
+
 <!-- PAUSE OVERLAY -->
 <div id="pauseOv">
   <div class="pauseCard">
@@ -980,91 +999,87 @@ x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständ
 /* ═══════════════════════════════════════════════
    DEMO DATA
 ═══════════════════════════════════════════════ */
-const MAT = `ax² + bx + c = 0
+const MAT = `Procenträkning — Matte 1b
 
-Faktorisering:
-  x² − 5x + 6 = (x−2)(x−3)
-  → x = 2 eller x = 3
+Del = Procent × Helhet
+  40% av 350 = 0,4 × 350 = 140
 
-pq-formeln: x = −p/2 ± √((p/2)²−q)`;
+Rabatt baklänges:
+  480 kr = 80% av originalet
+  → 480 ÷ 0,8 = 600 kr`;
 
 const QS = [
-  { t:'Vilken är standardformen för en andragradsekvation?',
-    opts:['ax² + bx + c = 0','ax + b = 0','ax³ + bx² = 0','a/x + b = 0'], ok:0, demo:0 },
-  { t:'Lös ekvationen x² − 5x + 6 = 0 och ange ALLA lösningar.',
-    math:true, mathTex:'x² − 5x + 6 = 0',
+  { t:'Vad är 40% av 350?',
+    opts:['100', '140', '160', '175'], ok:1, demo:1 },
+  { t:'En vara kostar 480 kr efter 20% rabatt. Vad var originalpriset?',
+    math:true, mathTex:'480 kr = 80% av originalet',
     type:'written',
-    answer:'x = 2 och x = 3',
-    demoAnswer:'x² − 5x + 6 = 0\n(x−2)(x−3) = 0\nx = 2' },
+    answer:'600 kr',
+    demoAnswer:'80% = 480 kr\n480 ÷ 0,8 = 600' },
 ];
 
 const FEED = [
-  { q:'Standardform för andragradsekvation?', ico:'✓', ok:true,  r:'Rätt — 1/1 p',
-    m:'ax² + bx + c = 0 är korrekt standardform.' },
-  { q:'Lös x² − 5x + 6 = 0 — ange ALLA lösningar', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
-    m:'x = 2 stämmer, men ekvationen har TVÅ rötter. (x−2)(x−3) = 0 → x = 2 OCH x = 3.' },
+  { q:'Vad är 40% av 350?', ico:'✓', ok:true, r:'Rätt — 1/1 p',
+    m:'0,4 × 350 = 140. Kom ihåg: procent × helhet = del.' },
+  { q:'Originalpriset — 20% rabatt → 480 kr', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
+    m:'Rätt metod (÷ 0,8 = 600) men enheten kr saknades i slutsvaret. Skriv alltid enhet.' },
 ];
 
-const SMART_TIP = `Du hittade faktorn (x−2) korrekt och löste x = 2.
+const SMART_TIP = `Du hittade rätt metod (480 ÷ 0,8 = 600) — bra!
 
-Problemet: du stannade efter första roten. Andragradsekvationer har alltid lika många rötter som gradtalet — kontrollräkna alltid båda.
+Problemet: slutsvaret saknade enheten "kr". Alltid ange enhet.
 
-Metod framåt:
-• Skriv ut BÅDA faktorerna: (x−a)(x−b) = 0
-• Lös x−a = 0 OCH x−b = 0 separat
-• Sätt alltid in båda svaren i originalekv.
+Metod:
+• Skriv: 480 ÷ 0,8 = 600 kr
+• Kontrollräkna: 600 × 0,8 = 480 ✓
+• Tydligt slutsvar: "Svar: 600 kr"
 
-Nästa steg: träna 3 faktoriseringsuppgifter → markera nedan.`;
+Nästa steg: träna rabatt/påslag-uppgifter → markera nedan.`;
 
 const COACH = `Hej Vilgot!
 
-Data: 3 prov · Snitt (5 senaste): 70% · Misstag (30d): 3
-Trend: +20 p.p. — tydlig förbättring! 📈
+Data: 3 prov · Snitt: 72% · Misstag (30d): 2
+Trend: +18 p.p. — tydlig förbättring! 📈
 
 Prioritet:
-• Matematik C — faktorisering (2 misstag, samma mönster)
+• Matte 1b — procenträkning (2 misstag, liknande mönster)
 
-Metoder:
-• Skriv alltid full metod: varje steg på egen rad.
-• Ange ALLA rötter — kontrollräkna mot ursprungsekvationen.
-• Markera slutsvar tydligt ("Svar: x = 2 och x = 3").
+Metod att öva:
+• Rabatt baklänges: del ÷ (1 − procent) = helhet
+• Ange alltid enhet i slutsvar (kr, %, m...)
+• Kontrollräkna: helhet × procent = del ✓
 
-Tips & tricks:
-• Återskapa lösningen utan facit — jämför sedan.
-• Träna 3 liknande andragradsekvationer i rad.
-• Skriv en "miniregel" efter varje misstag (1 mening).
-
-Nästa pass (15–20 min):
-• Markera de 2 felbanksuppgifterna nedan.
+Nästa pass (15 min):
+• Markera 2 felbanksuppgifter om rabatt.
 • Träna markerade misstag.
-• Skriv om modellsvaret med egna ord.
+• Skriv modellsvaret med egna ord.
 
 Senaste prov: 75% — bra jobbat, fortsätt!`;
 
 const REPORT = `LÄRARRAPPORT — ProviaAI
-Elev: Vilgot R  ·  Kurs: Matematik C
+Elev: Vilgot R  ·  Kurs: Matematik 1b
 Datum: 2026-05-23  ·  Baserad på: 3 prov
 
 SAMMANFATTNING
-Eleven visar tydlig positiv trend (+20 p.p.) med snitt 70%
-de tre senaste proven: 60% → 70% → 75%.
+Eleven visar positiv trend (+18 p.p.) med snitt 72%
+de senaste proven: 58% → 70% → 75%.
 
 STYRKOR
-• God grundläggande förståelse för andragradsekvationer
-• Korrekt faktoriseringsansats
+• God förståelse för grundläggande procenträkning
+• Rätt metod vid rabatt baklänges (÷ 0,8)
 • Stabil förbättring mellan prov
 
 FÖRBÄTTRINGSOMRÅDEN
-• Faktorisering: hittar en rot men missar den andra
-• Behöver öva att alltid ange ALLA lösningar
+• Saknar enheter i slutsvar (kr, %)
+• Behöver öva rabatt och påslag baklänges
 
 REKOMMENDATION
 Ge eleven strukturerade övningar med explicit krav på att
 ange alla lösningar. Fokus: faktoriseringsuppgifter.`;
 
-const PER_GREETING = 'Hej! Jag ser att du precis rättat ditt matematikprov. Vad vill du veta?';
-const PER_USER     = 'Hjälp mig förstå fråga 2 — varför fick jag bara 1/2 p?';
-const PER_RESPONSE = 'Du hittade x = 2 korrekt!\n\nProblemet: ekvationen x² − 5x + 6 = 0 har TVÅ rötter.\nFaktorisering → (x−2)(x−3) = 0\n→ x = 2 OCH x = 3\n\nKomihåg: kontrollräkna alltid mot originalekv. Vill du träna ett liknande exempel?';
+const PER_GREETING = 'Hej! Jag ser att du precis rättat ditt Matte 1b-prov. Vad undrar du?';
+const PER_USER     = 'Hjälp mig med fråga 2 — varför inte full poäng?';
+const PER_RESPONSE = 'Du hittade rätt metod: 480 ÷ 0,8 = 600 ✓\n\nProblemet: "kr" saknades i slutsvaret. Skriv alltid enhet.\n\nSvar: 600 kr\nKontroll: 600 × 0,8 = 480 ✓\n\nVill du träna liknande rabatt-uppgifter?';
 
 /* ═══════════════════════════════════════════════
    PAUSE SYSTEM
@@ -1344,7 +1359,7 @@ async function runTypewriter(){
   for(let i=0;i<=MAT.length;i++){
     area.textContent=MAT.slice(0,i);
     if(cnt) cnt.textContent=i+' tecken';
-    await wait(28);
+    await wait(12);
   }
   area.classList.add('dn');
   S.a1=true;
@@ -1358,7 +1373,7 @@ async function triggerA3(){
   if(!skel||!ql) return;
   skel.style.display='flex';
   ql.style.display='none';
-  await wait(2200);
+  await wait(700);
   ql.innerHTML='';
   QS.forEach((q,i)=>{
     const card=document.createElement('div');
@@ -1481,192 +1496,190 @@ async function startAuto(){
   // ─── STEG 1: MATERIAL ───────────────────────
   setStep(1); setChap(1);
   $('act1')?.scrollIntoView({behavior:'smooth'});
-  await wait(1200);
-
-  await showTip('<strong>Steg 1:</strong> Eleven klistrar in sitt studiematerial — kompendium, anteckningar, vad som helst.', 5000);
-  await cursor.moveTo($('matArea'));
   await wait(600);
 
-  showTip('AI:n läser av materialet och förstår kursinnehållet direkt', 4500);
-  runTypewriter();
-  await wait(MAT.length*28+800);
+  await showTip('<strong>Steg 1:</strong> Eleven klistrar in studiematerial — anteckningar, kompendium, vad som helst.', 4000);
+  await cursor.moveTo($('matArea'));
+  await wait(400);
 
-  await wait(1000);
-  await showTip('<strong>Klicka Fortsätt</strong> när materialet är inläst', 3500);
+  showTip('AI:n läser materialet och förstår kursinnehållet direkt', 3500);
+  runTypewriter();
+  await wait(MAT.length*12+300);
+
+  await wait(500);
+  await showTip('<strong>Fortsätt</strong> — materialet är inläst', 2500);
   await cursor.highlight($('nextBtn'));
   await cursor.click($('nextBtn'));
   go('act2',2);
-  await wait(800);
+  await wait(500);
 
   // ─── STEG 2: INSTÄLLNINGAR ──────────────────
   setStep(2);
-  await wait(600);
+  await wait(400);
 
-  await showTip('<strong>Steg 2:</strong> Välj betygsnivå — E, C eller A. AI:n anpassar svårighetsgraden automatiskt.', 5000);
+  await showTip('<strong>Steg 2:</strong> Välj betygsnivå E, C eller A — AI:n anpassar svårigheten.', 4000);
   await cursor.highlight($('scn'));
   await cursor.click($('scn'));
   $('svn').textContent='C';
   $('scn').classList.add('flash'); await wait(400); $('scn').classList.remove('flash');
-  await wait(1200);
+  await wait(600);
 
-  await showTip('Välj frågetyp — flerval, kortsvar eller blandning', 4000);
   await cursor.highlight($('sct'));
   await cursor.click($('sct'));
   $('svt').textContent='Mix';
   $('sct').classList.add('flash'); await wait(400); $('sct').classList.remove('flash');
-  await wait(1200);
+  await wait(600);
 
-  await showTip('Antal frågor — du väljer själv hur långt provet ska vara', 4000);
   await cursor.highlight($('sca'));
   await cursor.click($('sca'));
   $('sva').textContent='2 frågor';
   $('sca').classList.add('flash'); await wait(400); $('sca').classList.remove('flash');
-  await wait(1400);
+  await wait(700);
 
   S.a2=true; wDone(1); wOn(2);
   const gb=$('genBtn'),gl=$('genLbl');
   if(gl) gl.textContent='Skapa prov';
   if(gb){gb.removeAttribute('disabled');gb.style.opacity='1';gb.style.cursor='pointer';}
-  await wait(500);
+  await wait(400);
 
-  await showTip('<strong>Skapa prov</strong> — AI:n genererar frågorna direkt baserat på materialet', 5000);
+  await showTip('<strong>Skapa prov</strong> — AI:n genererar frågor baserat på materialet', 4000);
   await cursor.highlight(gb);
   await cursor.click(gb);
   go('act3',2);
-  await wait(600);
+  await wait(400);
 
   // ─── STEG 3: MOCKPROV ───────────────────────
   setStep(3);
   wDone(2); wOn(3);
 
-  await showTip('<strong>Steg 3:</strong> AI:n genererar skräddarsydda frågor — det tar bara sekunder', 5000);
+  await showTip('<strong>Steg 3:</strong> AI:n genererar skräddarsydda frågor på sekunder', 4000);
   await triggerA3();
-  await wait(800);
+  await wait(600);
 
-  await showTip('Fråga 1 — flervalsfråga om standardform', 4000);
-  const btnEl=$(`ab0_0`);
+  await showTip('Fråga 1 — flervalsfråga om procenträkning', 3000);
+  const btnEl=$(`ab0_1`);
   if(btnEl){
     await cursor.moveTo(btnEl,-8,0);
-    await wait(400);
+    await wait(300);
     await cursor.click(btnEl);
-    selAns(0,0);
+    selAns(0,1);
   }
-  await wait(1000);
+  await wait(600);
 
-  await showTip('<strong>Fråga 2:</strong> eleven skriver lösningsstegen men stannar vid x = 2 — missar den andra roten. AI:n fångar det.', 7000);
+  await showTip('<strong>Fråga 2:</strong> eleven hittar rätt metod men glömmer enheten kr — AI:n fångar det.', 5000);
   const field=$('ansField1');
   if(field){
     await cursor.moveTo(field,0,0);
-    await wait(400);
+    await wait(300);
     await cursor.highlight(field);
-    await typeIntoField('ansField1', QS[1].demoAnswer, 46);
+    await typeIntoField('ansField1', QS[1].demoAnswer, 30);
   }
-  await wait(1500);
+  await wait(800);
 
   const gradeBtn=$('gradeBtn');
   if(gradeBtn){gradeBtn.style.opacity='1';gradeBtn.style.pointerEvents='auto';gradeBtn.removeAttribute('disabled');}
 
-  await showTip('<strong>Rätta prov</strong> — AI:n analyserar varje svar mot modellsvaret', 4500);
+  await showTip('<strong>Rätta prov</strong> — AI:n analyserar varje svar', 3500);
   await cursor.highlight(gradeBtn);
   await cursor.click(gradeBtn);
   go('act3b',3);
-  await wait(800);
+  await wait(600);
 
   // ─── STEG 4: RÄTTNING ───────────────────────
   setStep(4); setChap(3);
-  await wait(400);
+  await wait(300);
 
-  await showTip('<strong>Steg 4:</strong> AI:n rättar — poängräknaren startar…', 4500);
+  await showTip('<strong>Steg 4:</strong> AI:n rättar — poängräknaren startar…', 3500);
   await triggerAct4();
-  await wait(1000);
+  await wait(700);
 
-  await showTip('Fråga 2 — <strong>halvt rätt (1/2 p):</strong> AI:n noterar att x = 3 saknas trots korrekt faktorisering', 7000);
+  await showTip('Fråga 2 — <strong>halvt rätt (1/2 p):</strong> rätt metod men enhet saknas — AI:n fångar det direkt', 5000);
   const badFeed=$('feedGrid')?.querySelectorAll('.feedCard')[1];
   if(badFeed) await cursor.moveTo(badFeed);
-  await wait(2500);
+  await wait(1200);
 
-  // Show smart tip / förbättringsförslag
-  await showTip('Nu genereras ett <strong>AI förbättringsförslag</strong> — det är vad du får på Förbättringsidan', 6000);
+  await showTip('AI-förbättringsförslag genereras automatiskt för varje misstag', 4500);
   const stw=$('smartTipWrap');
   if(stw) stw.classList.add('vis');
-  await wait(600);
-  typeSmartTip(SMART_TIP, 13); // run in parallel
-  await wait(SMART_TIP.length*13+800);
+  await wait(400);
+  typeSmartTip(SMART_TIP, 10);
+  await wait(SMART_TIP.length*10+300);
 
   const stFooter=$('smartTipWrap')?.querySelector('.stFooterLink');
   if(stFooter) await cursor.highlight(stFooter);
-  await wait(1500);
+  await wait(800);
 
-  await showTip('Varje svar får feedback och förbättringsförslag — studenten förstår exakt vad som gick fel och vad som ska tränas', 6000);
-  await wait(3500);
+  await showTip('Varje svar: feedback + förbättringsförslag — eleven vet exakt vad som ska tränas', 5000);
+  await wait(1500);
 
   // ─── STEG 5: P.E.R ──────────────────────────
   setStep(5); setChap(4);
   go('act-per', 4);
-  await wait(800);
+  await wait(600);
 
-  await showTip('<strong>Steg 5:</strong> P.E.R ser vad du jobbar med — fråga direkt om specifika uppgifter', 5000);
+  await showTip('<strong>Steg 5:</strong> P.E.R ser vad du jobbar med — fråga direkt om vilken uppgift som helst', 5000);
   await triggerActPer();
-  await wait(2000);
+  showPerMini();
+  await wait(1000);
 
   const perMsgEl = $('perMockMsgs')?.lastElementChild;
   if(perMsgEl) await cursor.moveTo(perMsgEl);
-  await wait(2000);
+  await wait(1000);
 
   // ─── STEG 6: KÖRKORTSTEORIN ─────────────────
   setStep(6); setChap(5);
   go('act-kor', 5);
+  await wait(600);
+
+  await showTip('<strong>Steg 6:</strong> Körkortsteorin — 368 frågor, 16 kategorier. Adaptivt lärande fokuserar svaga kategorier.', 5000);
+  await triggerActKor();
   await wait(800);
 
-  await showTip('<strong>Steg 6:</strong> Körkortsteorin — 368 frågor, 16 kategorier. Adaptivt lärande fokuserar dina svagheter', 6000);
-  await triggerActKor();
+  await showTip('Rätt svar → XP och framsteg. Fel svar → fråga P.E.R direkt', 4000);
   await wait(1500);
 
-  await showTip('Rätt svar → XP och framsteg. Fel svar → P.E.R kan förklara varför', 5000);
-  await wait(3000);
-
-  // ─── STEG 7: COACH ──────────────────────────
+  // ─── STEG 7: FÖRBÄTTRING ────────────────────
   const coachBtn=$('openCoachBtn');
-  await showTip('<strong>Öppna förbättring</strong> — AI-coach, felbank och lärarrapport på ett ställe', 4500);
+  await showTip('<strong>Steg 7:</strong> Förbättring — AI-coach, felbank och lärarrapport på ett ställe', 4500);
   const cb=$('coachBanner'); if(cb) cb.classList.add('vis');
-  await wait(800);
+  await wait(600);
   await cursor.highlight(coachBtn);
   await cursor.click(coachBtn);
   go('act4',6);
-  await wait(800);
-
-  setStep(7); setChap(6);
   await wait(600);
 
-  await showTip('<strong>Steg 5:</strong> Förbättringsidan — historik, AI-coach, felbank och träningsläge på ett ställe', 6000);
-  await triggerAct5();
-  await wait(1500);
+  setStep(7); setChap(6);
+  await wait(500);
 
-  await showTip('Coachen skriver ut en konkret plan: exakt vad som ska tränas och hur', 5000);
+  await showTip('<strong>Steg 7:</strong> Förbättringsidan — historik, AI-coach, felbank och träningsläge', 5000);
+  await triggerAct5();
+  await wait(800);
+
+  await showTip('P.E.R-coachen skriver en konkret plan: exakt vad som tränas och hur', 4000);
   const coachEl=$('coachTxt');
   if(coachEl) await cursor.moveTo(coachEl);
-  await wait(2500);
+  await wait(1200);
 
-  // Scroll to felbank and animate cards in
   const mb=$('mc1'),mb2=$('mc2');
-  await showTip('<strong>Felbank:</strong> alla frågor du tappat poäng på — med ditt svar, modellsvar och träningsknapp', 6000);
+  await showTip('<strong>Felbank:</strong> varje tappat poäng sparas med ditt svar, modellsvar och P.E.R-tips', 5000);
   if(mb){
     await cursor.moveTo(mb);
     mb.classList.add('vis');
     await wait(300);
     if(mb2) mb2.classList.add('vis');
   }
-  await wait(1500);
+  await wait(800);
 
   const markBtn=$('markBtn1');
-  await showTip('Markera misstag för träning — appen skapar ett nytt prov med liknande frågor', 5000);
+  await showTip('Markera misstag → appen skapar ett nytt prov med liknande frågor', 4000);
   await cursor.highlight(markBtn);
   await cursor.click(markBtn);
   if(markBtn){markBtn.textContent='Markerad ✓';markBtn.style.borderColor='var(--a)';markBtn.style.color='var(--a)';}
-  await wait(2500);
+  await wait(1200);
 
   cursor.hide();
   hideTip();
+  hidePerMini();
 
   if(autoBtn){autoBtn.textContent='✓ Demo klar';autoBtn.disabled=false;}
   if(pauseBtn) pauseBtn.style.display='none';
@@ -1675,6 +1688,9 @@ async function startAuto(){
 
   doToast('Demo genomförd — alla funktioner visade ✓');
 }
+
+function showPerMini(){ const b=$('perMiniBar'); if(b) b.classList.add('on'); }
+function hidePerMini(){ const b=$('perMiniBar'); if(b) b.classList.remove('on'); }
 
 function doToast(msg){
   const t=document.createElement('div');
