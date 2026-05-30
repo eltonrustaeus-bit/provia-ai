@@ -46,19 +46,28 @@ Before reading any source file, query the graphify graph:
 `C:\Users\elton\Desktop\ProvKlarUF\graphify-out\graph.json`
 212 nodes, 211 edges, 36 communities. Only fall back to raw file reads if graph lacks detail.
 
+## P.E.R Core Architecture (uppdaterad 2026-05-30)
+- `api/_per-core.js` — Delat AI-lager: `callAI()`, `buildPERSystemPrompt()`, `buildPERCoachSystemPrompt()`
+- Alla ESM-endpoints importerar från `_per-core.js` (explain, smart-tips, teacher-report)
+- grade.js/generate-exam.js är CJS — importerar EJ _per-core men har PER-branding i system prompt
+- `shared.js` — `getPageContext()` injicerar sidkontext i P.E.R-anrop; `window.setPerContext(ctx)` låter sidor sätta rik kontext
+- `förbättring.html` coach-sektion → PER API-anrop (cached 24h i `proviaai_per_coach_cache`)
+- explain.js accepterar nu `pageContext` + `helpLevel` (0=ledtråd, 1=förklara, 2=steg-för-steg, 3=full lösning)
+
 ## API Routes (security-sensitive — review carefully)
 | File | Purpose |
 |------|---------|
 | `api/_auth.js` | Auth middleware shared by all routes |
-| `api/generate-exam.js` | OpenAI call — rate-limit enforced |
-| `api/grade.js` | OpenAI call — validates user owns exam |
-| `api/explain.js` | OpenAI call — Premium only |
-| `api/smart-tips.js` | OpenAI call — Premium only |
+| `api/_per-core.js` | **PER Core Engine** — callAI + personality (ESM, importeras av explain/smart-tips/teacher-report) |
+| `api/generate-exam.js` | OpenAI call — rate-limit enforced (CJS) |
+| `api/grade.js` | OpenAI call — validates user owns exam (CJS) |
+| `api/explain.js` | P.E.R chat + körkortsförklaring — quota enforced (ESM) |
+| `api/smart-tips.js` | P.E.R tips för felbank — auth required (ESM) |
 | `api/check-role.js` | Returns user role — never trust client-side role |
 | `api/signup.js` | Creates user row — validate all inputs |
 | `api/admin.js` | Admin-only — verify role server-side |
 | `api/ocr.js` | File upload — sanitize paths |
-| `api/teacher-report.js` | Reads other users' data — auth required |
+| `api/teacher-report.js` | P.E.R lärarrapport — auth required (ESM) |
 
 Any change to `api/` triggers security review checklist:
 - [ ] Input validated before use
