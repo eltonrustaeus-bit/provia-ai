@@ -214,7 +214,7 @@
             '<button class="per-clr" id="perClearBtn">Rensa</button>' +
           '</div>' +
           '<div id="perMessages">' +
-            '<div class="per-msg teacher">Hej! Jag är P.E.R, Provias AI-lärare. Fråga mig vad som helst om körkortsteorin!</div>' +
+            '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias egna AI-resurs. Ställ din fråga specifikt så hjälper jag dig!</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
