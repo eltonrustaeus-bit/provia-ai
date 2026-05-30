@@ -388,6 +388,44 @@
     .qCard,.feedCard,.mCard { will-change:opacity,transform }
     .scoreBarF { will-change:width }
 
+    /* ── P.E.R MOCK ── */
+    .perMock{background:var(--s);border:1px solid rgba(27,255,140,.22);border-radius:12px;overflow:hidden;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.55)}
+    .perMockHdr{display:flex;align-items:center;gap:9px;padding:12px 14px;background:var(--s2);border-bottom:1px solid var(--l)}
+    .perMockAv{width:32px;height:32px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;font-size:16px;flex-shrink:0}
+    .perMockNm{font:700 13px var(--font);color:var(--t)}
+    .perMockRl{font:500 10px var(--mono);color:var(--t3);letter-spacing:.04em}
+    .perMockCtx{margin-left:auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid rgba(27,255,140,.3);border-radius:20px;font:500 10px var(--mono);color:var(--a);background:rgba(27,255,140,.06)}
+    .perMockCtx::before{content:'●';font-size:7px;animation:pulse 2s ease-in-out infinite}
+    .perMockMsgs{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:180px;max-height:280px;overflow-y:auto}
+    .perMockMsg{font:400 13px/1.65 var(--font);padding:9px 12px;border-radius:8px;max-width:88%;word-break:break-word;opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease}
+    .perMockMsg.vis{opacity:1;transform:translateY(0)}
+    .perMockMsg.teacher{background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.15);color:var(--t2);border-radius:8px 8px 8px 3px}
+    .perMockMsg.user{background:var(--s2);border:1px solid var(--l);color:var(--t);border-radius:8px 8px 3px 8px;margin-left:auto}
+    .perMockMsg.typing{color:var(--t3);font-style:italic}
+    .perMockInp{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--l);background:var(--s2)}
+    .perMockInputField{flex:1;background:var(--s);border:1px solid var(--l);border-radius:6px;padding:8px 10px;font:400 13px var(--mono);color:var(--t2);min-height:34px;white-space:pre-wrap}
+    .perMockInputField.active{border-color:rgba(27,255,140,.35)}
+    .perMockSend{background:var(--a);color:#08100d;border:none;border-radius:6px;padding:0 14px;font:700 12px var(--font);cursor:pointer}
+
+    /* ── KÖRKORTET MOCK ── */
+    .korMock{background:var(--s);border:1px solid var(--l);border-radius:var(--r);overflow:hidden;max-width:520px}
+    .korProgressBar{height:5px;background:var(--s2)}
+    .korProgressFill{height:100%;background:var(--a);transition:width 1s cubic-bezier(.4,0,.2,1);border-radius:0 3px 3px 0}
+    .korMeta{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--l);font:500 12px var(--mono);color:var(--t3)}
+    .korXP{margin-left:auto;font:700 13px var(--mono);color:var(--a);opacity:0;transform:translateY(-6px);transition:all .5s cubic-bezier(.22,.61,.36,1)}
+    .korXP.vis{opacity:1;transform:translateY(0)}
+    .korStreak{color:var(--a)}
+    .korQuestionCard{padding:22px 18px}
+    .korQ{font:500 16px/1.55 var(--font);color:var(--t);margin-bottom:18px}
+    .korOpts{display:flex;flex-direction:column;gap:8px}
+    .korOpt{background:transparent;border:1px solid var(--l);border-radius:var(--r);padding:11px 14px;font:400 14px var(--font);color:var(--t2);text-align:left;cursor:pointer;transition:all .22s ease;opacity:0;transform:translateY(5px)}
+    .korOpt.vis{opacity:1;transform:translateY(0)}
+    .korOpt.sel{border-color:rgba(27,255,140,.5);background:rgba(27,255,140,.06);color:var(--t)}
+    .korOpt.ok{border-color:#1bff8c;background:rgba(27,255,140,.09);color:#1bff8c}
+    .korOpt.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b;animation:shake .4s ease-out}
+    .korExpl{margin-top:14px;padding:13px;border-left:2px solid var(--a);background:rgba(27,255,140,.05);border-radius:0 var(--r) var(--r) 0;font:400 13px/1.6 var(--font);color:var(--t2);opacity:0;transition:opacity .4s ease}
+    .korExpl.vis{opacity:1}
+
     /* ── REDUCED MOTION ── */
     @media (prefers-reduced-motion: reduce) {
       * { cursor:auto !important }
@@ -457,9 +495,11 @@
     <button class="chap on" id="c1" onclick="go('act1',1)"><span class="chapN">01</span>Material</button>
     <button class="chap" id="c2" onclick="go('act2',2)"><span class="chapN">02</span>Prov</button>
     <button class="chap" id="c3" onclick="go('act3b',3)"><span class="chapN">03</span>Rättning</button>
-    <button class="chap" id="c4" onclick="go('act4',4)"><span class="chapN">04</span>Coach</button>
+    <button class="chap" id="c4" onclick="go('act-per',4)"><span class="chapN">04</span>P.E.R</button>
+    <button class="chap" id="c5" onclick="go('act-kor',5)"><span class="chapN">05</span>Körkortet</button>
+    <button class="chap" id="c6" onclick="go('act4',6)"><span class="chapN">06</span>Förbättring</button>
     <div class="dCtrl">
-      <span class="stepBadge" id="stepBadge">Steg 1 / 5</span>
+      <span class="stepBadge" id="stepBadge">Steg 1 / 7</span>
     </div>
   </div>
 </nav>
@@ -610,7 +650,64 @@
 </section>
 
 <!-- ════════════════════════════════════════════
-     AKT 5 – FÖRBÄTTRING / COACH
+     AKT 04 — P.E.R AI-ASSISTENT
+════════════════════════════════════════════ -->
+<section class="act" id="act-per">
+  <div class="aI">
+    <div class="aTag reveal">AKT 04 — P.E.R AI-ASSISTENT</div>
+    <h2 class="aTitle reveal d1">Din personliga AI-lärare</h2>
+    <p class="aSub reveal d2">P.E.R ser vad du jobbar med och svarar direkt. Fråga om specifika uppgifter, be om en ledtråd eller en fullständig förklaring.</p>
+
+    <div class="perMock reveal d3" id="perMock">
+      <div class="perMockHdr">
+        <div class="perMockAv">👨‍🏫</div>
+        <div><div class="perMockNm">P.E.R</div><div class="perMockRl">PROVIA AI-LÄRARE</div></div>
+        <div class="perMockCtx" id="perCtxBadge">ser din skärm</div>
+      </div>
+      <div class="perMockMsgs" id="perMockMsgs"></div>
+      <div class="perMockInp">
+        <div class="perMockInputField" id="perDemoInput"></div>
+        <button class="perMockSend">Skicka</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 05 — KÖRKORTSTEORIN
+════════════════════════════════════════════ -->
+<section class="act" id="act-kor">
+  <div class="aI">
+    <div class="aTag reveal">AKT 05 — KÖRKORTSTEORIN</div>
+    <h2 class="aTitle reveal d1">368 teorifrågor · 16 kategorier</h2>
+    <p class="aSub reveal d2">Träna körkortsteorin med adaptivt lärande — systemet fokuserar automatiskt på dina svagaste kategorier och bostar dem i nästa omgång.</p>
+
+    <div class="korMock reveal d3" id="korMock">
+      <div class="korProgressBar"><div class="korProgressFill" id="korProgressFill" style="width:35%"></div></div>
+      <div class="korMeta">
+        <span>Fråga 9 / 25</span>
+        <span>🚦 Trafikregler</span>
+        <span class="korStreak">🔥 5 rätt i rad</span>
+        <div class="korXP" id="korXP">+10 XP</div>
+      </div>
+      <div class="korQuestionCard">
+        <div class="korQ" id="korQ">Vilket märke innebär att du har väjningsplikt mot mötande trafik?</div>
+        <div class="korOpts" id="korOpts">
+          <button class="korOpt" id="ko0">A. Stoppmärke</button>
+          <button class="korOpt" id="ko1">B. Väjningsplikt</button>
+          <button class="korOpt" id="ko2">C. Parkering förbjuden</button>
+          <button class="korOpt" id="ko3">D. Huvudled upphör</button>
+        </div>
+        <div class="korExpl" id="korExpl">
+          <strong>B är rätt.</strong> Väjningspliktsmärket (inverterad triangel) innebär att du ska lämna företräde till korsande trafik. Stoppmärket kräver fullständigt stopp, vilket är skillnaden.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     AKT 06 – FÖRBÄTTRING / COACH
 ════════════════════════════════════════════ -->
 <section class="act" id="act4">
   <div class="aI">
@@ -965,6 +1062,10 @@ REKOMMENDATION
 Ge eleven strukturerade övningar med explicit krav på att
 ange alla lösningar. Fokus: faktoriseringsuppgifter.`;
 
+const PER_GREETING = 'Hej! Jag ser att du precis rättat ditt matematikprov. Vad vill du veta?';
+const PER_USER     = 'Hjälp mig förstå fråga 2 — varför fick jag bara 1/2 p?';
+const PER_RESPONSE = 'Du hittade x = 2 korrekt!\n\nProblemet: ekvationen x² − 5x + 6 = 0 har TVÅ rötter.\nFaktorisering → (x−2)(x−3) = 0\n→ x = 2 OCH x = 3\n\nKomihåg: kontrollräkna alltid mot originalekv. Vill du träna ett liknande exempel?';
+
 /* ═══════════════════════════════════════════════
    PAUSE SYSTEM
 ═══════════════════════════════════════════════ */
@@ -997,8 +1098,8 @@ document.addEventListener('keydown', e => {
    UTILS
 ═══════════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
-function setChap(n){ [1,2,3,4].forEach(i => $('c'+i)?.classList.toggle('on', i===n)); }
-function setStep(n, total=5){ const b=$('stepBadge'); if(b){b.textContent=`Steg ${n} / ${total}`;b.className='stepBadge on';} }
+function setChap(n){ [1,2,3,4,5,6].forEach(i => $('c'+i)?.classList.toggle('on', i===n)); }
+function setStep(n, total=7){ const b=$('stepBadge'); if(b){b.textContent=`Steg ${n} / ${total}`;b.className='stepBadge on';} }
 
 function wDone(n){
   const s=$('ws'+n),d=$('wd'+n),c=$('wc'+n);
@@ -1152,7 +1253,88 @@ async function typeSmartTip(text, speed=14){
 /* ═══════════════════════════════════════════════
    ACT TRIGGERS
 ═══════════════════════════════════════════════ */
-const S={a1:false,a2:false,a3:false,a4:false,a5:false};
+const S={a1:false,a2:false,a3:false,a4:false,a5:false,aper:false,akor:false};
+
+/* ═══════════════════════════════════════════════
+   P.E.R ACT
+═══════════════════════════════════════════════ */
+function addPerMsg(text, type){
+  const msgs=$('perMockMsgs'); if(!msgs) return null;
+  const d=document.createElement('div');
+  d.className='perMockMsg '+type;
+  d.textContent=text;
+  msgs.appendChild(d);
+  msgs.scrollTop=msgs.scrollHeight;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>d.classList.add('vis')));
+  return d;
+}
+
+async function typePerInput(text, speed=40){
+  const field=$('perDemoInput'); if(!field) return;
+  field.classList.add('active');
+  let typed='';
+  for(const ch of text){ typed+=ch; field.textContent=typed; await wait(speed); }
+  await wait(300);
+  field.classList.remove('active');
+  field.textContent='';
+}
+
+async function typePerMsg(el, text, speed=16){
+  if(!el) return;
+  let typed='';
+  for(const ch of text){ typed+=ch; el.textContent=typed; await wait(speed); }
+}
+
+async function triggerActPer(){
+  if(S.aper) return; S.aper=true;
+  await wait(600);
+  // Greeting
+  const g=addPerMsg(PER_GREETING,'teacher');
+  await wait(1800);
+  // User types
+  await typePerInput(PER_USER, 42);
+  const u=addPerMsg(PER_USER,'user');
+  await wait(500);
+  // Typing indicator
+  const typing=addPerMsg('P.E.R skriver…','teacher typing');
+  await wait(1600);
+  if(typing){ typing.className='perMockMsg teacher'; typing.textContent=''; await typePerMsg(typing, PER_RESPONSE, 14); }
+}
+
+/* ═══════════════════════════════════════════════
+   KÖRKORTET ACT
+═══════════════════════════════════════════════ */
+async function triggerActKor(){
+  if(S.akor) return; S.akor=true;
+  // Reveal answer options
+  for(let i=0;i<4;i++){
+    await wait(220);
+    const opt=$('ko'+i); if(opt) opt.classList.add('vis');
+  }
+  await wait(1200);
+  // Ghost selects wrong answer (A)
+  const ko0=$('ko0');
+  await cursor.moveTo(ko0);
+  await cursor.click(ko0);
+  ko0.classList.add('bad');
+  await wait(900);
+  ko0.classList.remove('bad');
+  await wait(500);
+  // Correct answer (B)
+  const ko1=$('ko1');
+  await cursor.moveTo(ko1);
+  await cursor.click(ko1);
+  ko1.classList.add('ok');
+  await wait(800);
+  // XP + progress
+  const xp=$('korXP'); if(xp) xp.classList.add('vis');
+  const pf=$('korProgressFill'); if(pf) pf.style.width='39%';
+  await wait(700);
+  // Show explanation
+  const expl=$('korExpl'); if(expl) expl.classList.add('vis');
+  await wait(1500);
+}
+
 
 async function runTypewriter(){
   const area=$('matArea'),cnt=$('matCnt'),btn=$('nextBtn');
@@ -1418,17 +1600,42 @@ async function startAuto(){
   await showTip('Varje svar får feedback och förbättringsförslag — studenten förstår exakt vad som gick fel och vad som ska tränas', 6000);
   await wait(3500);
 
+  // ─── STEG 5: P.E.R ──────────────────────────
+  setStep(5); setChap(4);
+  go('act-per', 4);
+  await wait(800);
+
+  await showTip('<strong>Steg 5:</strong> P.E.R ser vad du jobbar med — fråga direkt om specifika uppgifter', 5000);
+  await triggerActPer();
+  await wait(2000);
+
+  const perMsgEl = $('perMockMsgs')?.lastElementChild;
+  if(perMsgEl) await cursor.moveTo(perMsgEl);
+  await wait(2000);
+
+  // ─── STEG 6: KÖRKORTSTEORIN ─────────────────
+  setStep(6); setChap(5);
+  go('act-kor', 5);
+  await wait(800);
+
+  await showTip('<strong>Steg 6:</strong> Körkortsteorin — 368 frågor, 16 kategorier. Adaptivt lärande fokuserar dina svagheter', 6000);
+  await triggerActKor();
+  await wait(1500);
+
+  await showTip('Rätt svar → XP och framsteg. Fel svar → P.E.R kan förklara varför', 5000);
+  await wait(3000);
+
+  // ─── STEG 7: COACH ──────────────────────────
   const coachBtn=$('openCoachBtn');
-  await showTip('<strong>Öppna coach</strong> — AI:n har analyserat historiken och har en konkret träningsplan', 4500);
+  await showTip('<strong>Öppna förbättring</strong> — AI-coach, felbank och lärarrapport på ett ställe', 4500);
   const cb=$('coachBanner'); if(cb) cb.classList.add('vis');
   await wait(800);
   await cursor.highlight(coachBtn);
   await cursor.click(coachBtn);
-  go('act4',4);
+  go('act4',6);
   await wait(800);
 
-  // ─── STEG 5: COACH ──────────────────────────
-  setStep(5); setChap(4);
+  setStep(7); setChap(6);
   await wait(600);
 
   await showTip('<strong>Steg 5:</strong> Förbättringsidan — historik, AI-coach, felbank och träningsläge på ett ställe', 6000);
@@ -1521,10 +1728,12 @@ function setupObs(){
       if(id==='act2') setChap(2);
       if(id==='act3') setChap(2);
       if(id==='act3b') setChap(3);
-      if(id==='act4') setChap(4);
+      if(id==='act-per') setChap(4);
+      if(id==='act-kor') setChap(5);
+      if(id==='act4') setChap(6);
     });
   },{threshold:.18});
-  ['act1','act2','act3','act3b','act4'].forEach(id=>{const el=$(id);if(el)chapObs.observe(el);});
+  ['act1','act2','act3','act3b','act-per','act-kor','act4'].forEach(id=>{const el=$(id);if(el)chapObs.observe(el);});
 
   // Reveal animation
   const revealObs=new IntersectionObserver(entries=>{
@@ -1545,7 +1754,7 @@ function setupObs(){
 
 /* Coach open button wiring */
 $('openCoachBtn')?.addEventListener('click',()=>{
-  if(!isRunning){ go('act4',4); triggerAct5(); }
+  if(!isRunning){ go('act4',6); triggerAct5(); }
 });
 
 /* ═══════════════════════════════════════════════
