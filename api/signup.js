@@ -17,42 +17,125 @@ function buildWelcomeHtml(email) {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#08100d;padding:40px 16px">
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#0f1a13;border:1px solid rgba(27,255,140,.18);border-radius:8px;overflow:hidden">
+
         <!-- Header -->
         <tr><td style="background:#0a130d;padding:28px 32px;border-bottom:1px solid rgba(27,255,140,.12)">
           <span style="font-size:20px;font-weight:700;color:#1bff8c;letter-spacing:-0.3px">ProviaAI</span>
         </td></tr>
-        <!-- Body -->
-        <tr><td style="padding:32px">
-          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Ta körkort i sommar — börja träna idag</h1>
-          <p style="margin:0 0 24px;font-size:15px;color:#a8c4b4;line-height:1.6">Ditt konto är klart. ProviaAI hjälper dig klara kunskapsprovet på första försöket med AI-anpassade teoriprov.</p>
-          <!-- Steps -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px">
+
+        <!-- Hero -->
+        <tr><td style="padding:36px 32px 24px">
+          <h1 style="margin:0 0 14px;font-size:24px;font-weight:700;color:#e8f5ee;line-height:1.25">Ditt konto är redo. Nu kör vi.</h1>
+          <p style="margin:0;font-size:15px;color:#a8c4b4;line-height:1.65">ProviaAI anpassar träningen efter <em>dina</em> svagheter — inte ett generiskt prov som alla andra gör. Ju mer du tränar, desto smartare blir systemet.</p>
+        </td></tr>
+
+        <!-- Steps -->
+        <tr><td style="padding:0 32px 28px">
+          <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(27,255,140,.08)">
-                <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">1</span>
-                <span style="color:#e8f5ee;font-size:14px">Träna på körkortsteorin — vägmärken, trafikregler, säkerhet</span>
+              <td style="padding:13px 0;border-bottom:1px solid rgba(27,255,140,.08)">
+                <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">1</span>
+                <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Kör teoriprov — AI väljer frågor du behöver träna mest på</span>
               </td>
             </tr>
             <tr>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(27,255,140,.08)">
-                <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">2</span>
-                <span style="color:#e8f5ee;font-size:14px">Gör AI-anpassade provprov som matchar Trafikverkets prov</span>
+              <td style="padding:13px 0;border-bottom:1px solid rgba(27,255,140,.08)">
+                <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">2</span>
+                <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Öva körkortsteorin — vägmärken, trafikregler, alla kategorier</span>
               </td>
             </tr>
             <tr>
-              <td style="padding:12px 0">
-                <span style="display:inline-block;width:24px;height:24px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:12px">3</span>
-                <span style="color:#e8f5ee;font-size:14px">Se exakt vad du missar och förbättra dig inför riktiga provet</span>
+              <td style="padding:13px 0">
+                <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">3</span>
+                <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Se vad du missar — och lär dig varför svaret är fel</span>
               </td>
             </tr>
           </table>
-          <!-- CTA -->
-          <a href="https://proviaai.se/korkortet.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Börja träna teorin nu</a>
         </td></tr>
+
+        <!-- Primary CTA -->
+        <tr><td style="padding:0 32px 36px">
+          <a href="https://proviaai.se/app.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Starta ditt första prov →</a>
+        </td></tr>
+
+        <!-- Pricing section -->
+        <tr><td style="padding:28px 32px;background:#0a130d;border-top:1px solid rgba(27,255,140,.12)">
+          <p style="margin:0 0 18px;font-size:13px;font-weight:700;color:#6b8f7c;text-transform:uppercase;letter-spacing:0.8px">Vad ingår i ditt konto?</p>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <!-- Gratis row -->
+            <tr>
+              <td style="padding:12px 14px;background:#111a15;border-radius:5px 5px 0 0;border:1px solid rgba(27,255,140,.18);border-bottom:none">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td>
+                      <span style="font-size:13px;font-weight:700;color:#1bff8c">Gratis</span>
+                      <span style="font-size:12px;color:#6b8f7c;margin-left:8px">— du är här nu</span>
+                    </td>
+                    <td align="right">
+                      <span style="font-size:14px;font-weight:700;color:#e8f5ee">0 kr</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
+                      2 teoriprov per vecka &nbsp;·&nbsp; 2 körkortstest per vecka
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- Basic row -->
+            <tr>
+              <td style="padding:12px 14px;background:#111a15;border:1px solid rgba(27,255,140,.12);border-bottom:none">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td>
+                      <span style="font-size:13px;font-weight:700;color:#e8f5ee">Basic</span>
+                    </td>
+                    <td align="right">
+                      <span style="font-size:14px;font-weight:700;color:#e8f5ee">29 kr<span style="font-size:11px;font-weight:400;color:#6b8f7c">/mån</span></span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
+                      30 teoriprov per månad — träna ordentligt inför provet
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <!-- Premium row -->
+            <tr>
+              <td style="padding:12px 14px;background:#0e1c12;border-radius:0 0 5px 5px;border:1px solid rgba(27,255,140,.35)">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td>
+                      <span style="font-size:13px;font-weight:700;color:#1bff8c">Premium</span>
+                      <span style="display:inline-block;font-size:10px;font-weight:700;color:#08100d;background:#1bff8c;padding:2px 7px;border-radius:20px;margin-left:8px;vertical-align:middle">BÄST VÄRDE</span>
+                    </td>
+                    <td align="right">
+                      <span style="font-size:14px;font-weight:700;color:#e8f5ee">79 kr<span style="font-size:11px;font-weight:400;color:#6b8f7c">/mån</span></span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
+                      Obegränsad träning &nbsp;·&nbsp; Förbättringscoach &nbsp;·&nbsp; Full körkortstest
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+          <!-- Upgrade CTA -->
+          <div style="margin-top:18px;text-align:center">
+            <a href="https://proviaai.se/pricing.html" style="display:inline-block;border:1px solid rgba(27,255,140,.4);color:#1bff8c;font-size:14px;font-weight:600;padding:11px 24px;border-radius:5px;text-decoration:none">Se alla planer</a>
+          </div>
+        </td></tr>
+
         <!-- Footer -->
-        <tr><td style="padding:20px 32px;border-top:1px solid rgba(27,255,140,.08)">
-          <p style="margin:0;font-size:12px;color:#6b8f7c;line-height:1.5">Du är registrerad med <b style="color:#a8c4b4">${email}</b>. Gratis-kontot ger dig 2 teoriprov per vecka — uppgradera för obegränsad träning.</p>
+        <tr><td style="padding:18px 32px;border-top:1px solid rgba(27,255,140,.08)">
+          <p style="margin:0;font-size:12px;color:#6b8f7c;line-height:1.5">Registrerad med <b style="color:#a8c4b4">${email}</b>. Frågor? Svara på det här mejlet.</p>
         </td></tr>
+
       </table>
     </td></tr>
   </table>
