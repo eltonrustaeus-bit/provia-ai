@@ -64,7 +64,6 @@ export default async function handler(req, res) {
     const userId = session.metadata?.supabase_user_id;
     const plan = session.metadata?.plan;
     const customerId = session.customer;
-    const subscriptionId = session.subscription;
 
     if (!userId || !plan || !PLAN_ROLES[plan]) {
       // Log but don't fail — Stripe expects 200
@@ -72,18 +71,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true });
     }
 
-    const { error } = await supabase.from("profiles").upsert(
-      {
-        id: userId,
-        role: PLAN_ROLES[plan],
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId,
-      },
-      { onConflict: "id" }
-    );
+    if (session.mode === "subscription") {
+      const subscriptionId = session.subscription;
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          role: PLAN_ROLES[plan],
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+        },
+        { onConflict: "id" }
+      );
+      if (error) console.error("stripe-webhook: subscription update failed", error);
 
-    if (error) {
-      console.error("stripe-webhook: supabase update failed", error);
+    } else if (session.mode === "payment" && session.payment_status === "paid") {
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          role: PLAN_ROLES[plan],
+          stripe_customer_id: customerId,
+          swish_expires_at: expiresAt,
+        },
+        { onConflict: "id" }
+      );
+      if (error) console.error("stripe-webhook: swish update failed", error);
     }
   }
 

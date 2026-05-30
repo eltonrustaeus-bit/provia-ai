@@ -252,6 +252,7 @@
 
       <div class="planNote2">Basic är för dig som vill ha en snabb och tydlig provrutin utan avancerade AI-funktioner.</div>
       <button class="planCta outline" id="btn-basic" onclick="startCheckout('basic')">Kom igång med Basic</button>
+      <button class="planCta outline swish-btn" id="btn-swish-basic" onclick="startSwishCheckout('basic')" style="margin-top:8px;border-color:rgba(0,166,81,.5);color:#00a651">🟡 Betala med Swish – 30 dagar</button>
     </div>
 
     <!-- PREMIUM -->
@@ -283,6 +284,7 @@
 
       <div class="planNote2">Premium är för dig som vill klara körkortet och andra prov snabbare — mindre gissning, mer riktad träning.</div>
       <button class="planCta" id="btn-premium" onclick="startCheckout('premium')">Kom igång med Premium</button>
+      <button class="planCta swish-btn" id="btn-swish-premium" onclick="startSwishCheckout('premium')" style="margin-top:8px;background:#00a651;border-color:#00a651">🟡 Betala med Swish – 30 dagar</button>
     </div>
 
   </div>
@@ -443,6 +445,42 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
 
     try {
       const r = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + session.access_token,
+        },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await r.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Fel: " + (data.message || data.error || "") + "\n" + JSON.stringify(data.details || {}));
+        btn.disabled = false;
+        btn.textContent = origText;
+      }
+    } catch {
+      alert("Nätverksfel. Försök igen.");
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  };
+
+  window.startSwishCheckout = async function(plan) {
+    const btn = document.getElementById("btn-swish-" + plan);
+    const origText = btn.textContent;
+
+    if (!sb) { window.location.href = "app.html"; return; }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = "app.html"; return; }
+
+    btn.disabled = true;
+    btn.textContent = "Laddar...";
+
+    try {
+      const r = await fetch("/api/create-swish-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -114,7 +114,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, swish_expires_at, stripe_subscription_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -122,7 +122,19 @@ export default async function handler(req, res) {
 
     if (!data) return res.status(200).json({ role: "gratis" });
 
-    const role = String(data.role || "gratis");
+    let role = String(data.role || "gratis");
+
+    // Lazy expiry: downgrade if Swish payment expired and no active subscription
+    if (data.swish_expires_at && !data.stripe_subscription_id && role !== "gratis") {
+      if (new Date(data.swish_expires_at) < new Date()) {
+        await supabase
+          .from("profiles")
+          .update({ role: "gratis", swish_expires_at: null })
+          .eq("id", user.id);
+        role = "gratis";
+      }
+    }
+
     return res.status(200).json({ role });
   } catch (e) {
     return res.status(500).json({ error: "Internal server error" });
