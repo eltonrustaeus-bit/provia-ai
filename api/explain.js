@@ -28,22 +28,46 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  // ── TEACH MODE: P.E.R AI teacher ──
-  if (body.topic) {
-    const { topic, userQuestion, context } = body;
-    const system = `Du är P.E.R, en erfaren och tålmodig svensk trafiklärare med 20 års erfarenhet. Du undervisar körkortselever pedagogiskt och engagerande. Fokusera på förståelse, inte memorering. Max 80 ord. Svara alltid på svenska. Aktuellt ämne: ${topic}`;
+  // ── TEACH MODE: P.E.R AI teacher (multi-turn with history) ──
+  if (body.topic || (Array.isArray(body.history) && body.history.length > 0)) {
+    const { topic, userQuestion, context, history = [], userRole = "gratis", weakAreas = [] } = body;
+
+    const ctxLines = [];
+    if (topic) ctxLines.push(`Aktuellt ämne: ${topic}`);
+    if (weakAreas.length) ctxLines.push(`Elevens svaga ämnen: ${weakAreas.join(", ")}`);
+    if (userRole === "premium") ctxLines.push("Premium-elev: ge detaljerade förklaringar.");
+
+    const systemContent = `Du är P.E.R, Provias centrala AI-lärare och expert inom svensk körkortsteorin med 20 års erfarenhet. Du hjälper elever förstå regler, märken och trafiksituationer.
+${ctxLines.length ? "\n" + ctxLines.join("\n") : ""}
+
+Regler:
+- Max 120 ord per svar
+- Alltid på svenska
+- Pedagogisk, varm och tålmodig ton
+- Använd konkreta trafiksituationer som exempel
+- Är du osäker — säg det ärligt`;
+
     const userMsg = userQuestion
-      ? `Eleven frågar: "${userQuestion}"`
+      ? userQuestion
       : context
-        ? `Förklara kortfattat detta moment för en nybörjare: ${context}`
-        : `Ge en kort introduktion till ämnet ${topic} med ett praktiskt exempel.`;
+        ? `Förklara kortfattat: ${context}`
+        : `Ge en kort, engagerande introduktion till ämnet ${topic} med ett praktiskt exempel.`;
+
+    const msgs = [
+      { role: "system", content: systemContent },
+      ...history.slice(-8),
+      { role: "user", content: userMsg },
+    ];
+
     try {
-      const answer = await callAI(
-        [{ role: "system", content: system }, { role: "user", content: userMsg }],
-        200
-      );
+      const answer = await callAI(msgs, 250);
       if (!answer) return res.status(502).json({ error: "No response generated" });
-      return res.json({ answer });
+      const newHistory = [
+        ...history,
+        { role: "user", content: userMsg },
+        { role: "assistant", content: answer },
+      ].slice(-20);
+      return res.json({ answer, history: newHistory });
     } catch (err) {
       return res.status(500).json({ error: err.message || "AI error" });
     }
