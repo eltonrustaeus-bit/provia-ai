@@ -1730,24 +1730,15 @@ function renderStage(stage) {
         </div>`;
       }
     }
-    const quickQs = [
-      "Ge mig ett konkret exempel",
-      "Varför är detta viktigt för provet?",
-      "Vad är den vanligaste fällan?",
-      "Ge mig en minnesregel"
-    ];
     content.innerHTML = `
       <div style="margin-bottom:16px">${studyHtml}</div>
       <div class="aiTeacherWrap" id="aiTeacherWrap">
         <div class="aiTeacherHeader">
           <div class="aiAvatar">👩‍🏫</div>
-          <div><div class="aiName">P.E.R — din trafiklärare</div><div class="aiRole">Fråga mig vad som helst om ${esc(cat)}</div></div>
+          <div><div class="aiName">P.E.R — din trafiklärare</div><div class="aiRole">Tillgänglig via chatten nere till höger</div></div>
         </div>
         <div class="aiMessages" id="aiMessages">
-          <div class="aiMsg teacher">Hej! Jag är P.E.R, din trafiklärare. Jag har just visat dig teorin om <strong>${esc(cat)}</strong>. Klicka på en snabbfråga nedan!</div>
-        </div>
-        <div class="aiQuickBtns" id="aiQuickBtns">
-          ${quickQs.map(q=>`<button class="aiQuickBtn" onclick="askTeacher('${esc(q)}')">${esc(q)}</button>`).join("")}
+          <div class="aiMsg teacher">Hej! Jag är P.E.R. Du har just läst teorin om <strong>${esc(cat)}</strong>. Har du frågor? Använd chatbubblan 👩‍🏫 nere till höger!</div>
         </div>
       </div>
       <div class="startArea" style="margin-top:16px">
@@ -1791,43 +1782,6 @@ function renderStage(stage) {
   }
 }
 
-// ── AI TEACHER ──
-const PER_HIST_KEY_PREFIX = "proviaai_per_hist_";
-function getPerHist(cat) { try { return JSON.parse(localStorage.getItem(PER_HIST_KEY_PREFIX + cat) || "[]"); } catch { return []; } }
-function savePerHist(cat, h) { try { localStorage.setItem(PER_HIST_KEY_PREFIX + cat, JSON.stringify(h.slice(-20))); } catch(_) {} }
-
-async function askTeacher(q) {
-  if(!q) return;
-  const msgs = $("aiMessages"); if(!msgs) return;
-  const userEl = document.createElement("div");
-  userEl.className = "aiMsg user"; userEl.textContent = q; msgs.appendChild(userEl);
-  const typingEl = document.createElement("div");
-  typingEl.className = "aiMsg teacher typing"; typingEl.textContent = "P.E.R skriver…"; msgs.appendChild(typingEl);
-  msgs.scrollTop = msgs.scrollHeight;
-  try {
-    const sess = await db?.auth?.getSession();
-    const token = sess?.data?.session?.access_token || "";
-    const hist = getPerHist(activeCourse);
-    const res = await fetch("/api/explain", {
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-      body: JSON.stringify({ topic: activeCourse, userQuestion: q, history: hist, userRole: role })
-    });
-    let data = {};
-    try { data = await res.json(); } catch(_) {}
-    typingEl.className = "aiMsg teacher";
-    if(!res.ok) {
-      typingEl.textContent = data.error || `Fel ${res.status} — försök igen.`;
-    } else {
-      typingEl.textContent = data.answer || "Inget svar genererades.";
-      if(data.history) savePerHist(activeCourse, data.history);
-    }
-  } catch(err) {
-    typingEl.className = "aiMsg teacher";
-    typingEl.textContent = "Nätverksfel — kontrollera anslutningen och försök igen.";
-  }
-  msgs.scrollTop = msgs.scrollHeight;
-}
 
 // ── COURSE QUIZ STARTER ──
 async function startCourseQuiz(stage) {
