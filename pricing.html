@@ -480,13 +480,13 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
     btn.textContent = "Laddar...";
 
     try {
-      const r = await fetch("/api/create-swish-session", {
+      const r = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer " + session.access_token,
         },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, payment_type: "swish" }),
       });
       const data = await r.json();
       if (data.url) {

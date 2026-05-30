@@ -11,6 +11,11 @@ const PRICE_IDS = {
   basic: clean(process.env.STRIPE_BASIC_PRICE_ID),
   premium: clean(process.env.STRIPE_PREMIUM_PRICE_ID),
 };
+const SWISH_AMOUNTS = { basic: 2900, premium: 7900 };
+const SWISH_NAMES = {
+  basic: "ProviaAi Basic – 30 dagar",
+  premium: "ProviaAi Premium – 30 dagar",
+};
 
 function stripeBody(params) {
   return Object.entries(params)
@@ -38,13 +43,17 @@ export default async function handler(req, res) {
     const user = await requireAuth(req, res);
     if (!user) return;
 
-    const { plan } = req.body || {};
+    const { plan, payment_type } = req.body || {};
     if (!["basic", "premium"].includes(plan)) {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    const priceId = PRICE_IDS[plan];
-    if (!priceId) return res.status(500).json({ error: "Price not configured" });
+    const isSwish = payment_type === "swish";
+
+    if (!isSwish) {
+      const priceId = PRICE_IDS[plan];
+      if (!priceId) return res.status(500).json({ error: "Price not configured" });
+    }
 
     const stripeKey = (process.env.STRIPE_SECRET_KEY || "").replace(/^﻿/, "").trim();
     if (!stripeKey) return res.status(500).json({ error: "Stripe key missing" });
@@ -82,18 +91,40 @@ export default async function handler(req, res) {
     }
 
     const origin = "https://proviaai.se";
-    const { ok, json: session } = await stripePost("/v1/checkout/sessions", {
-      customer: stripeCustomerId,
-      mode: "subscription",
-      "line_items[0][price]": priceId,
-      "line_items[0][quantity]": "1",
-      success_url: `${origin}/app.html?upgrade=success&plan=${plan}`,
-      cancel_url: `${origin}/pricing.html`,
-      "metadata[supabase_user_id]": user.id,
-      "metadata[plan]": plan,
-      "subscription_data[metadata][supabase_user_id]": user.id,
-      "subscription_data[metadata][plan]": plan,
-    }, stripeKey);
+    let sessionParams;
+
+    if (isSwish) {
+      sessionParams = {
+        customer: stripeCustomerId,
+        mode: "payment",
+        "payment_method_types[0]": "swish",
+        currency: "sek",
+        "line_items[0][price_data][currency]": "sek",
+        "line_items[0][price_data][product_data][name]": SWISH_NAMES[plan],
+        "line_items[0][price_data][unit_amount]": String(SWISH_AMOUNTS[plan]),
+        "line_items[0][quantity]": "1",
+        success_url: `${origin}/app.html?upgrade=success&plan=${plan}`,
+        cancel_url: `${origin}/pricing.html`,
+        "metadata[supabase_user_id]": user.id,
+        "metadata[plan]": plan,
+        "metadata[payment_type]": "swish",
+      };
+    } else {
+      sessionParams = {
+        customer: stripeCustomerId,
+        mode: "subscription",
+        "line_items[0][price]": PRICE_IDS[plan],
+        "line_items[0][quantity]": "1",
+        success_url: `${origin}/app.html?upgrade=success&plan=${plan}`,
+        cancel_url: `${origin}/pricing.html`,
+        "metadata[supabase_user_id]": user.id,
+        "metadata[plan]": plan,
+        "subscription_data[metadata][supabase_user_id]": user.id,
+        "subscription_data[metadata][plan]": plan,
+      };
+    }
+
+    const { ok, json: session } = await stripePost("/v1/checkout/sessions", sessionParams, stripeKey);
 
     if (!ok) {
       console.error("Stripe session error:", JSON.stringify(session));
