@@ -2191,7 +2191,7 @@ function renderQ(i) {
   // Image
   const imgWrap = $("qImgWrap");
   if(q.image_url) {
-    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_description||'')}" loading="lazy">`;
+    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_description||'')}" loading="eager">`;
     imgWrap.style.display = "";
   } else {
     imgWrap.innerHTML = ""; imgWrap.style.display = "none";
