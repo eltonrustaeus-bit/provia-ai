@@ -1,4 +1,28 @@
+import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const PER_LIMITS = {
+  gratis:  { cap: 2,  period: "week"  },
+  basic:   { cap: 40, period: "month" },
+  premium: { cap: 20, period: "day"   },
+};
+
+function currentPeriodKey(period) {
+  const now = new Date();
+  if (period === "day") return now.toISOString().slice(0, 10);
+  if (period === "month") return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const dayOfYear = Math.floor((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 1))) / 86400000) + 1;
+  return `${now.getUTCFullYear()}-W${String(Math.ceil(dayOfYear / 7)).padStart(2, "0")}`;
+}
+
+function sanitize(str, maxLen) {
+  return typeof str === "string" ? str.slice(0, maxLen) : "";
+}
 
 async function callAI(messages, maxTokens) {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -28,23 +52,80 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  // ── TEACH MODE: P.E.R AI teacher (multi-turn with history) ──
+  // ── TEACH MODE: P.E.R AI assistant (multi-turn with history) ──
   if (body.topic || (Array.isArray(body.history) && body.history.length > 0)) {
-    const { topic, userQuestion, context, history = [], userRole = "gratis", weakAreas = [] } = body;
+    // Fetch role server-side — never trust client body
+    const { data: prof, error: profErr } = await supabase
+      .from("profiles")
+      .select("role, per_quota_count, per_quota_period")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profErr) return res.status(500).json({ error: "DB error" });
+
+    const role = String(prof?.role || "gratis");
+
+    // Quota check + bump (admin has no limit)
+    const cfg = PER_LIMITS[role];
+    if (cfg) {
+      const key = currentPeriodKey(cfg.period);
+      const storedKey = prof?.per_quota_period || "";
+      const count = storedKey === key ? (prof?.per_quota_count || 0) : 0;
+
+      if (count >= cfg.cap) {
+        return res.status(429).json({ error: "Quota exceeded", count, limit: cfg.cap });
+      }
+
+      await supabase
+        .from("profiles")
+        .update({ per_quota_count: count + 1, per_quota_period: key })
+        .eq("id", user.id);
+    }
+
+    // Sanitize user inputs before injecting into prompt
+    const topic      = sanitize(body.topic, 150);
+    const userQuestion = sanitize(body.userQuestion, 500);
+    const context    = sanitize(body.context, 300);
+    const rawAreas   = Array.isArray(body.weakAreas) ? body.weakAreas : [];
+    const weakAreas  = rawAreas.slice(0, 10).map((a) => sanitize(a, 80));
+
+    // Validate history — reject any role other than user/assistant, cap content length
+    const rawHist = Array.isArray(body.history) ? body.history : [];
+    const history = rawHist
+      .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+      .map((m) => ({ role: m.role, content: sanitize(m.content, 500) }))
+      .slice(-8);
 
     const ctxLines = [];
-    if (topic) ctxLines.push(`Aktuellt ämne: ${topic}`);
+    if (topic)          ctxLines.push(`Aktuellt ämne: ${topic}`);
     if (weakAreas.length) ctxLines.push(`Elevens svaga ämnen: ${weakAreas.join(", ")}`);
-    if (userRole === "premium") ctxLines.push("Premium-elev: ge detaljerade förklaringar.");
+    if (role === "premium") ctxLines.push("Premium-elev: ge detaljerade förklaringar.");
 
-    const systemContent = `Du är P.E.R, Provias AI-assistent.
+    const systemContent = `Du är P.E.R — Provias egna AI-resurs.
 ${ctxLines.length ? "\n" + ctxLines.join("\n") : ""}
 
+## MÅL BAKOM FRÅGAN
+Användaren frågar sällan efter information. De försöker uppnå något.
+"Hur många prov får jag?" → "Vilken plan passar mig?"
+"Jag fick 67 %." → "Är jag på rätt väg?"
+"Hur fungerar detta?" → "Vad gör jag härnäst?"
+Identifiera alltid målet. Hjälp användaren nå det — inte bara svara på frågan.
+
+## SVARSMÖNSTER
+1. Besvara frågan
+2. Ge relevant kontext om det behövs
+3. Peka ut nästa steg
+
+Kort när det räcker. Utförlig när det behövs.
+
+## FELSKYDD
+Hitta aldrig på funktioner, priser, statistik eller regler.
+Saknas information — säg det. Gissa aldrig.
+
+## FORMAT
 - Max 120 ord
 - Svenska alltid
-- Konkreta exempel framför abstrakt förklaring
-- När eleven gjort fel: peka ut nästa steg — inte tomt beröm
-- Osäker — säg det`;
+- Konkreta exempel framför abstrakt förklaring`;
 
     const userMsg = userQuestion
       ? userQuestion
@@ -54,7 +135,7 @@ ${ctxLines.length ? "\n" + ctxLines.join("\n") : ""}
 
     const msgs = [
       { role: "system", content: systemContent },
-      ...history.slice(-8),
+      ...history,
       { role: "user", content: userMsg },
     ];
 
