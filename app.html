@@ -1419,6 +1419,20 @@ function renderExam(exam){
   });
   const g=$("gradeBtn");if(g)g.disabled=qs.length===0;
   staggerIn(Array.from(eb.querySelectorAll(".qBox")),50);
+  // Inject exam questions into P.E.R context so PER can see "fråga 3" etc.
+  if (window.setPerContext) {
+    window.setPerContext({
+      page: 'prov',
+      questions: qs.slice(0, 20).map(function(q, idx) {
+        return {
+          number: idx + 1,
+          text: String(q.question || '').slice(0, 300),
+          type: q.type || 'short',
+          options: Array.isArray(q.options) ? q.options : []
+        };
+      })
+    });
+  }
   // Visa flytande rätta-bar
   const fb=$("floatingGradeBar");if(fb&&qs.length>0)fb.classList.add("show");
 }

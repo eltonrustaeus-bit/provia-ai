@@ -41,12 +41,28 @@ export function buildPERSystemPrompt({
 
   if (pageContext) {
     if (pageContext.page) lines.push(`Sida: ${pageContext.page}`);
+
     if (pageContext.currentQuestion?.text) {
-      lines.push(`Aktuell fråga: ${pageContext.currentQuestion.text}`);
+      const q = pageContext.currentQuestion;
+      const num = q.number ? `Fråga ${q.number}: ` : '';
+      lines.push(`${num}${q.text}`);
+      if (Array.isArray(q.options) && q.options.length) {
+        const letters = ['A','B','C','D','E','F'];
+        lines.push(q.options.map((o, i) => `${letters[i] || i+1}: ${o}`).join(' | '));
+      }
+      if (q.category) lines.push(`Kategori: ${q.category}`);
     }
-    if (Array.isArray(pageContext.currentQuestion?.options) && pageContext.currentQuestion.options.length) {
-      lines.push(`Alternativ: ${pageContext.currentQuestion.options.join(' | ')}`);
+
+    if (Array.isArray(pageContext.questions) && pageContext.questions.length) {
+      const qLines = pageContext.questions.slice(0, 20).map(q => {
+        const opts = Array.isArray(q.options) && q.options.length
+          ? ' [' + q.options.join(' / ') + ']'
+          : '';
+        return `Fråga ${q.number}: ${(q.text || '').slice(0, 200)}${opts}`;
+      });
+      lines.push(`Provet har ${pageContext.questions.length} frågor:\n${qLines.join('\n')}`);
     }
+
     if (typeof pageContext.userScore === 'number') {
       lines.push(`Elevens snittresultat: ${Math.round(pageContext.userScore * 100)}%`);
     }
