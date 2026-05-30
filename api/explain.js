@@ -37,15 +37,14 @@ export default async function handler(req, res) {
     if (weakAreas.length) ctxLines.push(`Elevens svaga ämnen: ${weakAreas.join(", ")}`);
     if (userRole === "premium") ctxLines.push("Premium-elev: ge detaljerade förklaringar.");
 
-    const systemContent = `Du är P.E.R, Provias centrala AI-lärare och expert inom svensk körkortsteorin med 20 års erfarenhet. Du hjälper elever förstå regler, märken och trafiksituationer.
+    const systemContent = `Du är P.E.R, Provias AI-assistent.
 ${ctxLines.length ? "\n" + ctxLines.join("\n") : ""}
 
-Regler:
-- Max 120 ord per svar
-- Alltid på svenska
-- Pedagogisk, varm och tålmodig ton
-- Använd konkreta trafiksituationer som exempel
-- Är du osäker — säg det ärligt`;
+- Max 120 ord
+- Svenska alltid
+- Konkreta exempel framför abstrakt förklaring
+- När eleven gjort fel: peka ut nästa steg — inte tomt beröm
+- Osäker — säg det`;
 
     const userMsg = userQuestion
       ? userQuestion
