@@ -54,7 +54,8 @@ export default async function handler(req, res) {
 
   // Server-side korkortet quota check + bump
   if (action === "bump_kk") {
-    const KK_LIMITS = { gratis: 2, basic: 30, premium: Infinity, admin: Infinity, user: Infinity };
+    // gratis = 2/week, basic = 30/month, premium+ = unlimited
+    const KK_LIMITS = { gratis: { cap: 2, period: "week" }, basic: { cap: 30, period: "month" } };
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -65,19 +66,22 @@ export default async function handler(req, res) {
       if (error) return res.status(500).json({ error: "DB error" });
 
       const role = String(data?.role || "gratis");
-      const limit = KK_LIMITS[role] ?? 2;
+      const cfg = KK_LIMITS[role];
 
-      if (limit === Infinity) return res.status(200).json({ ok: true, count: 0, limit });
+      if (!cfg) return res.status(200).json({ ok: true, count: 0, limit: Infinity });
 
       const now = new Date();
-      const weekKey = `${now.getUTCFullYear()}-W${String(Math.ceil((((now - new Date(Date.UTC(now.getUTCFullYear(),0,1)))/86400000)+1)/7)).padStart(2,"0")}`;
-      const storedWeek = data?.kk_quota_week || "";
-      const count = storedWeek === weekKey ? (data?.kk_quota_count || 0) : 0;
+      const periodKey = cfg.period === "month"
+        ? `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`
+        : `${now.getUTCFullYear()}-W${String(Math.ceil((((now - new Date(Date.UTC(now.getUTCFullYear(),0,1)))/86400000)+1)/7)).padStart(2,"0")}`;
 
-      if (count >= limit) return res.status(429).json({ error: "Quota exceeded", count, limit });
+      const storedKey = data?.kk_quota_week || "";
+      const count = storedKey === periodKey ? (data?.kk_quota_count || 0) : 0;
 
-      await supabase.from("profiles").update({ kk_quota_count: count + 1, kk_quota_week: weekKey }).eq("id", user.id);
-      return res.status(200).json({ ok: true, count: count + 1, limit });
+      if (count >= cfg.cap) return res.status(429).json({ error: "Quota exceeded", count, limit: cfg.cap });
+
+      await supabase.from("profiles").update({ kk_quota_count: count + 1, kk_quota_week: periodKey }).eq("id", user.id);
+      return res.status(200).json({ ok: true, count: count + 1, limit: cfg.cap });
     } catch (e) {
       return res.status(500).json({ error: "Internal server error" });
     }
