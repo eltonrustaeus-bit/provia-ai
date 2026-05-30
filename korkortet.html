@@ -2188,6 +2188,19 @@ function renderQ(i) {
   // Text
   $("qText").textContent = q.question;
 
+  // Inject current question into P.E.R context
+  if (window.setPerContext) {
+    window.setPerContext({
+      page: 'körkortsteorin',
+      currentQuestion: {
+        number: i + 1,
+        text: q.question,
+        options: [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean),
+        category: q.category || ''
+      }
+    });
+  }
+
   // Image
   const imgWrap = $("qImgWrap");
   if(q.image_url) {

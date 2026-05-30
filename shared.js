@@ -172,8 +172,8 @@
     function showNudge() {
       if (_open) return;
       var path = window.location.pathname.toLowerCase();
-      var onExamPage = path.includes('korkortet') || path.includes('app');
-      if (!onExamPage) return;
+      var noNudge = path.includes('index') || path.includes('pricing') || path === '/';
+      if (noNudge) return;
       var key = getNudgeKey() || path;
       if (key === _nudgeShownKey) return;
       _nudgeShownKey = key;
@@ -244,10 +244,11 @@
 
       try {
         var pageCtx = getPageContext();
+        var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'Provia';
         var r = await fetch('/api/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ userQuestion: q, history: hist, topic: 'Körkortsteorin', pageContext: pageCtx })
+          body: JSON.stringify({ userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx })
         });
         var data = {};
         try { data = await r.json(); } catch (_) {}
@@ -385,11 +386,10 @@
         }
       }
 
-      /* Start nudge timer for exam pages */
+      /* Start nudge timer on all app pages except landing/pricing */
       var initPath = window.location.pathname.toLowerCase();
-      if (initPath.includes('korkortet') || initPath.includes('app')) {
-        startNudgeTimer();
-      }
+      var noNudgeInit = initPath.includes('index') || initPath.includes('pricing') || initPath === '/';
+      if (!noNudgeInit) { startNudgeTimer(); }
     }
 
     if (document.readyState === 'loading') {

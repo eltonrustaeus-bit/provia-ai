@@ -29,14 +29,30 @@ function sanitizePageContext(pc) {
   if (!pc || typeof pc !== 'object') return null;
   const out = {};
   if (typeof pc.page === 'string') out.page = pc.page.slice(0, 50);
+
   if (pc.currentQuestion && typeof pc.currentQuestion === 'object') {
     out.currentQuestion = {
-      text: sanitize(pc.currentQuestion.text, 500),
+      number: typeof pc.currentQuestion.number === 'number' ? pc.currentQuestion.number : undefined,
+      text: sanitize(String(pc.currentQuestion.text || ''), 500),
       options: Array.isArray(pc.currentQuestion.options)
         ? pc.currentQuestion.options.slice(0, 6).map(o => sanitize(String(o), 100))
         : undefined,
+      category: typeof pc.currentQuestion.category === 'string'
+        ? pc.currentQuestion.category.slice(0, 80) : undefined,
     };
   }
+
+  if (Array.isArray(pc.questions)) {
+    out.questions = pc.questions.slice(0, 20).map(q => ({
+      number: typeof q.number === 'number' ? q.number : undefined,
+      text: sanitize(String(q.text || ''), 300),
+      type: typeof q.type === 'string' ? q.type.slice(0, 10) : undefined,
+      options: Array.isArray(q.options)
+        ? q.options.slice(0, 6).map(o => sanitize(String(o), 80))
+        : undefined,
+    }));
+  }
+
   if (typeof pc.userScore === 'number' && Number.isFinite(pc.userScore)) {
     out.userScore = Math.max(0, Math.min(1, pc.userScore));
   }
