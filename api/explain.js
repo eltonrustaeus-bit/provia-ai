@@ -1,6 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
-import { callAI, buildPERSystemPrompt } from "./_per-core.js";
+import { callAI, callAIStream, buildPERSystemPrompt } from "./_per-core.js";
+import { SALES_TRIGGER_REGEX } from "./_provia-kb.js";
+import { loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
+
+const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
+const FEYNMAN_REGEX     = /förklara för dig|lär dig|jag förklarar|testa om jag|quizza mig|feynman|förklara det för mig som/i;
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -113,6 +118,7 @@ export default async function handler(req, res) {
 
     const role = String(prof?.role || "gratis");
 
+    let quotaRemaining = null;
     const cfg = PER_LIMITS[role];
     if (cfg) {
       const key = currentPeriodKey(cfg.period);
@@ -122,6 +128,8 @@ export default async function handler(req, res) {
       if (count >= cfg.cap) {
         return res.status(429).json({ error: "Quota exceeded", count, limit: cfg.cap });
       }
+
+      quotaRemaining = Math.max(0, cfg.cap - count - 1);
 
       await supabase
         .from("profiles")
@@ -144,9 +152,28 @@ export default async function handler(req, res) {
       .map(m => ({ role: m.role, content: sanitize(String(m.content), 500) }))
       .slice(-8);
 
+    // Recent mistakes from frontend localStorage (optional — best-effort)
+    const rawMistakes = Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
+    const recentMistakes = rawMistakes.slice(0, 10).map(m => ({
+      question: sanitize(String(m.question || ''), 200),
+      category: sanitize(String(m.category || m.course || ''), 60),
+    }));
+
+    // Intent, mood, feynman detection
+    const intent   = SALES_TRIGGER_REGEX.test(userQuestion) ? 'sales' : 'study';
+    const mood     = FRUSTRATION_REGEX.test(userQuestion) ? 'frustrated' : 'normal';
+    const feynman  = FEYNMAN_REGEX.test(userQuestion) || body.mode === 'feynman';
+
     const ctxParts = [];
     if (topic) ctxParts.push(`Aktuellt ämne: ${topic}`);
     if (context) ctxParts.push(context);
+
+    const longMemory = await loadLongMemory(supabase, user.id);
+
+    const rawNamePart = (user.email || '').split('@')[0].split(/[.\-_+]/)[0];
+    const studentName = /^[a-zåäöA-ZÅÄÖ]{2,15}$/.test(rawNamePart)
+      ? rawNamePart.charAt(0).toUpperCase() + rawNamePart.slice(1).toLowerCase()
+      : null;
 
     const systemContent = buildPERSystemPrompt({
       context: ctxParts.join('\n'),
@@ -154,6 +181,13 @@ export default async function handler(req, res) {
       role,
       helpLevel,
       pageContext,
+      intent,
+      mood,
+      feynman,
+      quotaRemaining,
+      recentMistakes,
+      longMemory,
+      studentName,
     });
 
     const userMsg = userQuestion
@@ -168,6 +202,57 @@ export default async function handler(req, res) {
       { role: "user", content: userMsg },
     ];
 
+    // ── STREAMING MODE ──
+    const isStream = (req.headers['accept'] || '').includes('text/event-stream');
+    if (isStream) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      let fullText = '';
+      try {
+        const stream = await callAIStream(msgs, { timeout: 55_000 });
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') continue;
+            try {
+              const ev = JSON.parse(raw);
+              const delta = ev.choices?.[0]?.delta?.content;
+              if (delta) { fullText += delta; res.write(`data: ${JSON.stringify({ delta })}\n\n`); }
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        res.write(`data: ${JSON.stringify({ error: err.message || 'AI error' })}\n\n`);
+        return res.end();
+      }
+
+      if (!fullText) { res.write(`data: ${JSON.stringify({ error: 'No response' })}\n\n`); return res.end(); }
+
+      const newHistory = [
+        ...history,
+        { role: 'user', content: userMsg },
+        { role: 'assistant', content: fullText },
+      ].slice(-20);
+      await savePerHistory(user.id, newHistory);
+      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI).catch(() => {});
+
+      res.write(`data: ${JSON.stringify({ done: true, history: newHistory })}\n\n`);
+      return res.end();
+    }
+
+    // ── JSON MODE (fallback) ──
     try {
       const answer = await callAI(msgs, { timeout: 30_000 });
       if (!answer) return res.status(502).json({ error: "No response generated" });
@@ -177,6 +262,7 @@ export default async function handler(req, res) {
         { role: "assistant", content: answer },
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
+      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI).catch(() => {});
       return res.json({ answer, history: newHistory });
     } catch (err) {
       return res.status(500).json({ error: err.message || "AI error" });

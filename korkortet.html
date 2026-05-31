@@ -2542,6 +2542,12 @@ async function showResults() {
   try {
     if(uid) await db.from("driving_results").insert({user_id:uid,category:selCat,num_questions:total,num_correct:right,percent:pct,passed});
   } catch(e) { console.warn("Sparfel:",e) }
+
+  // Notify P.E.R widget — gentle redo-score nudge (non-blocking)
+  if (window.PER && window.PER.notifyExamDone) {
+    const weakCatNames = weakCats.map(([c]) => c);
+    window.PER.notifyExamDone(pct, weakCatNames);
+  }
 }
 
 $("newBtn").onclick = () => {
