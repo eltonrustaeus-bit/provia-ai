@@ -847,4 +847,78 @@
     return { register: register, send: send, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
+  /* ── GLOBAL BOTTOM NAV (inloggad) ── */
+  function initGlobalNav() {
+    if (document.getElementById('proviaGlobalNav')) return;
+    var raw = null;
+    try { raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
+    if (!raw) return;
+    var sess = null;
+    try { sess = JSON.parse(raw); } catch (_) {}
+    if (!sess || !sess.access_token) return;
+
+    var path = window.location.pathname.toLowerCase();
+    function isActive(href) {
+      var key = href.replace('.html','');
+      if (href === 'index.html' && (path === '/' || path.endsWith('index.html') || path === '')) return true;
+      if (href !== 'index.html' && path.includes(key)) return true;
+      return false;
+    }
+
+    var links = [
+      { href:'index.html',       icon:'🏠', label:'Hem' },
+      { href:'korkortet.html',   icon:'🚗', label:'Körkort' },
+      { href:'app.html',         icon:'📝', label:'Mockprov' },
+      { href:'förbättring.html', icon:'📈', label:'Coach' },
+      { href:'konto.html',       icon:'👤', label:'Konto' }
+    ];
+
+    var s = document.createElement('style');
+    s.textContent =
+      '#proviaGlobalNav{position:fixed;bottom:0;left:0;right:0;z-index:8888;'+
+        'background:rgba(8,16,13,.93);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);'+
+        'border-top:1px solid rgba(27,255,140,.12);'+
+        'display:flex;align-items:center;justify-content:space-around;'+
+        'padding:8px 0 max(10px,env(safe-area-inset-bottom));'+
+        'font-family:"DM Sans",sans-serif}'+
+      '@media(min-width:860px){#proviaGlobalNav{max-width:460px;left:50%;right:auto;transform:translateX(-50%);border-radius:14px 14px 0 0}}'+
+      '.gnLink{display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;padding:5px 14px;border-radius:8px;transition:background .15s;min-width:52px}'+
+      '.gnLink:hover{background:rgba(27,255,140,.07)}'+
+      '.gnLink.gna{background:rgba(27,255,140,.1)}'+
+      '.gnIcon{font-size:19px;line-height:1}'+
+      '.gnLabel{font-size:9px;font-weight:600;color:#6b8f7c;letter-spacing:.04em;text-transform:uppercase}'+
+      '.gnLink.gna .gnLabel{color:#1bff8c}'+
+      'body.has-gnav{padding-bottom:68px!important}'+
+      '#perWidget{bottom:80px!important}';
+    document.head.appendChild(s);
+
+    var nav = document.createElement('nav');
+    nav.id = 'proviaGlobalNav';
+    nav.setAttribute('aria-label','Sidnavigation');
+    nav.innerHTML = links.map(function(l) {
+      var a = isActive(l.href) ? ' gna' : '';
+      return '<a class="gnLink'+a+'" href="'+l.href+'" '+(a?'aria-current="page"':'')+'>'+
+        '<span class="gnIcon" aria-hidden="true">'+l.icon+'</span>'+
+        '<span class="gnLabel">'+l.label+'</span></a>';
+    }).join('');
+
+    document.body.appendChild(nav);
+    document.body.classList.add('has-gnav');
+
+    window.addEventListener('storage', function(e) {
+      if (e.key !== 'sb-mnmotdluigzeehdjbhbu-auth-token') return;
+      if (!e.newValue) {
+        var el = document.getElementById('proviaGlobalNav');
+        if (el) el.remove();
+        document.body.classList.remove('has-gnav');
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalNav);
+  } else {
+    initGlobalNav();
+  }
+
 })();
