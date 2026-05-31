@@ -202,6 +202,101 @@
       startNudgeTimer();
     }
 
+    var COACH_KEY = 'proviaai_coach_week';
+
+    function getWeekKey() {
+      var now = new Date();
+      var d = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+      var week = Math.ceil(((now - d) / 86400000 + d.getUTCDay() + 1) / 7);
+      return now.getUTCFullYear() + '-W' + week;
+    }
+
+    function buildWeeklyMsg() {
+      var hist = [];
+      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      var now = Date.now();
+      var lastWeek = hist.filter(function(e) { return e.ts && (now - Number(e.ts)) < 7 * 86400000; });
+      if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med körkortsträningen. Vad vill du fokusera på?';
+      var avg = Math.round(lastWeek.reduce(function(s, e) { return s + (Number(e.percent) || 0); }, 0) / lastWeek.length);
+      var cf = {};
+      lastWeek.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
+      var weakest = Object.keys(cf).sort(function(a, b) { return cf[b] - cf[a]; })[0];
+      return 'Ny vecka! Förra veckan: ' + lastWeek.length + ' prov, snitt ' + avg + '%.'
+        + (weakest ? ' Fokusera extra på ' + weakest + ' idag.' : ' Fortsätt det bra arbetet!')
+        + ' Vad kan jag hjälpa dig med?';
+    }
+
+    function maybeShowWeeklyCoach() {
+      var now = new Date();
+      if (now.getDay() !== 1) return; // only Monday
+      var key = getWeekKey();
+      try { if (localStorage.getItem(COACH_KEY) === key) return; } catch (_) {}
+      var hist = [];
+      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      if (hist.length < 3) return;
+      try { localStorage.setItem(COACH_KEY, key); } catch (_) {}
+      setTimeout(function() {
+        if (!_open) toggle();
+        var msgs = document.getElementById('perMessages');
+        if (msgs) {
+          var div = document.createElement('div');
+          div.className = 'per-msg teacher';
+          div.textContent = buildWeeklyMsg();
+          msgs.appendChild(div);
+          msgs.scrollTop = msgs.scrollHeight;
+        }
+      }, 3000);
+    }
+
+    function notifyExamDone(pct, weakCatNames) {
+      var hist = [];
+      try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
+      var totalExams = hist.length + 1;
+      if (totalExams < 3) return;
+      var todayKey = new Date().toISOString().slice(0, 10);
+      var seenKey = 'proviaai_readiness_nudge_' + todayKey;
+      try { if (localStorage.getItem(seenKey)) return; } catch (_) {}
+      try { localStorage.setItem(seenKey, '1'); } catch (_) {}
+
+      var nudge = document.getElementById('perNudge');
+      if (nudge) nudge.remove();
+      var newNudge = document.createElement('div');
+      newNudge.id = 'perNudge';
+      newNudge.textContent = '📊 Se din redo-score';
+      newNudge.onclick = function() {
+        hideNudge();
+        if (!_open) toggle();
+        var scores = [];
+        var wAreas = Array.isArray(weakCatNames) ? weakCatNames : [];
+        try {
+          var lsH = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+          scores = lsH.slice(-20).map(function(e) { return (Number(e.percent)||0)/100; }).filter(function(s){ return Number.isFinite(s); });
+        } catch (_) {}
+        scores.push(pct / 100);
+        if (scores.length < 3) { addMsg('Kör fler prov för att se redo-score.', 'teacher'); return; }
+        var t = addMsg('Räknar ut din körkortsredo-score…', 'teacher typing');
+        getToken().then(function(tok) {
+          return fetch('/api/readiness-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({ scores: scores, weakAreas: wAreas, examsCount: scores.length })
+          });
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (t) {
+            t.className = 'per-msg teacher';
+            t.textContent = d.assessment
+              ? '📊 ' + d.readiness + '% redo (' + (d.trend==='improving'?'↑':d.trend==='declining'?'↓':'→') + ')\n\n' + d.assessment
+              : d.error || 'Kunde inte hämta score.';
+          }
+          var msgsEl = document.getElementById('perMessages');
+          if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+        }).catch(function() { if (t) { t.className='per-msg teacher'; t.textContent='Nätverksfel.'; }});
+      };
+      var widget = document.getElementById('perWidget');
+      if (widget) widget.appendChild(newNudge);
+      setTimeout(hideNudge, 6000);
+    }
+
     function register(fn) { _getToken = fn; }
 
     async function getToken() {
@@ -245,22 +340,74 @@
       try {
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'Provia';
+
+        var recentMistakes = [];
+        try {
+          var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
+          recentMistakes = lsMistakes.slice(-10).map(function(m) {
+            return { question: String(m.question || '').slice(0, 200), category: String(m.course || m.category || '').slice(0, 60) };
+          });
+        } catch (_) {}
+
+        var weakAreas = [];
+        try {
+          var lsHist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+          var courseFreq = {};
+          lsHist.forEach(function(e) { if (e.course) courseFreq[e.course] = (courseFreq[e.course] || 0) + 1; });
+          weakAreas = Object.keys(courseFreq).sort(function(a,b) { return courseFreq[b]-courseFreq[a]; }).slice(0,5);
+        } catch (_) {}
+
+        var fetchBody = JSON.stringify({ userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas });
         var r = await fetch('/api/explain', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx })
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'Accept': 'text/event-stream' },
+          body: fetchBody
         });
-        var data = {};
-        try { data = await r.json(); } catch (_) {}
-        if (typing) {
-          typing.className = 'per-msg teacher';
-          if (r.status === 401) {
-            typing.textContent = 'Logga in för att chatta med P.E.R.';
-          } else if (!r.ok) {
-            typing.textContent = data.error || 'Fel — försök igen.';
-          } else {
-            typing.textContent = data.answer || 'Inget svar.';
-            if (data.history) perSaveHist(data.history);
+
+        var ct = r.headers.get('content-type') || '';
+        if (r.ok && ct.includes('text/event-stream')) {
+          /* ── SSE streaming ── */
+          var reader = r.body.getReader();
+          var sseDecoder = new TextDecoder();
+          var sseBuf = '';
+          var answerText = '';
+          if (typing) { typing.className = 'per-msg teacher'; typing.textContent = ''; }
+          while (true) {
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            sseBuf += sseDecoder.decode(chunk.value, { stream: true });
+            var sseLines = sseBuf.split('\n');
+            sseBuf = sseLines.pop();
+            for (var si = 0; si < sseLines.length; si++) {
+              var sseLine = sseLines[si];
+              if (!sseLine.startsWith('data: ')) continue;
+              try {
+                var ev = JSON.parse(sseLine.slice(6));
+                if (ev.delta) {
+                  answerText += ev.delta;
+                  if (typing) typing.textContent = answerText;
+                  var msgsEl = document.getElementById('perMessages');
+                  if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+                }
+                if (ev.error && typing) { typing.textContent = ev.error; }
+                if (ev.done && ev.history) perSaveHist(ev.history);
+              } catch (_) {}
+            }
+          }
+        } else {
+          /* ── JSON fallback ── */
+          var data = {};
+          try { data = await r.json(); } catch (_) {}
+          if (typing) {
+            typing.className = 'per-msg teacher';
+            if (r.status === 401) {
+              typing.textContent = 'Logga in för att chatta med P.E.R.';
+            } else if (!r.ok) {
+              typing.textContent = data.error || 'Fel — försök igen.';
+            } else {
+              typing.textContent = data.answer || 'Inget svar.';
+              if (data.history) perSaveHist(data.history);
+            }
           }
         }
       } catch (_) {
@@ -329,7 +476,11 @@
         '#perNudge{position:absolute;bottom:64px;right:0;background:var(--s,#111a15);border:1px solid rgba(27,255,140,.3);border-radius:10px;padding:9px 14px;font-size:12.5px;font-family:"DM Sans",sans-serif;color:var(--t,#e8f5ee);white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.55);cursor:pointer;animation:perUp .22s ease;z-index:1;user-select:none}',
         '#perNudge:hover{border-color:rgba(27,255,140,.55);background:var(--s2,#162019)}',
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
-        '@media(max-width:400px){#perPanel{width:90vw;right:-10px}}'
+        '@media(max-width:400px){#perPanel{width:90vw;right:-10px}}',
+        '#perMicBtn{background:none;border:1px solid var(--l,rgba(255,255,255,.08));border-radius:6px;padding:0 9px;cursor:pointer;font-size:14px;color:var(--t2,#a8c4b4);transition:border-color .2s,color .2s;flex-shrink:0}',
+        '#perMicBtn:hover{border-color:var(--l2,rgba(255,255,255,.25))}',
+        '#perMicBtn.listening{border-color:var(--a,#1bff8c);color:var(--a,#1bff8c);animation:perPulse .9s ease-in-out infinite}',
+        '.per-hdr-btns{display:flex;gap:4px;margin-left:auto}'
       ].join('');
       document.head.appendChild(style);
 
@@ -340,13 +491,18 @@
           '<div class="per-hdr">' +
             '<div class="per-av">👨‍🏫</div>' +
             '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIA AI-LÄRARE</div></div>' +
-            '<button class="per-clr" id="perClearBtn">Rensa</button>' +
+            '<div class="per-hdr-btns">' +
+              '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
+              '<button class="per-clr" id="perReadyBtn" title="Visa din körkortsredo-score">Redo?</button>' +
+              '<button class="per-clr" id="perClearBtn">Rensa</button>' +
+            '</div>' +
           '</div>' +
           '<div id="perMessages">' +
             '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias egna AI-resurs. Ställ din fråga specifikt så hjälper jag dig!</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
+            '<button id="perMicBtn" title="Tala med P.E.R">🎤</button>' +
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
@@ -369,6 +525,87 @@
         var msgs = document.getElementById('perMessages');
         if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Chat rensad. Ställ en ny fråga!</div>';
       };
+
+      /* ── QUIZ MODE ── */
+      document.getElementById('perQuizBtn').onclick = function () {
+        if (!_open) toggle();
+        var pc = window._perPageContext;
+        var topic = (pc && pc.currentQuestion && pc.currentQuestion.category)
+          ? pc.currentQuestion.category
+          : (pc && pc.page ? pc.page : 'körkortsteorin');
+        send('Quizza mig — välj en körkortsteorifråga om ' + topic + ' och ställ den till mig. Vänta på mitt svar innan du förklarar.');
+      };
+
+      /* ── READINESS SCORE ── */
+      document.getElementById('perReadyBtn').onclick = async function () {
+        if (!_open) toggle();
+        var scores = [];
+        var weakAreas = [];
+        try {
+          var lsHist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
+          scores = lsHist.slice(-20).map(function(e) { return (Number(e.percent) || 0) / 100; }).filter(function(s) { return Number.isFinite(s); });
+          var cf = {};
+          lsHist.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
+          weakAreas = Object.keys(cf).sort(function(a,b) { return cf[b]-cf[a]; }).slice(0,5);
+        } catch (_) {}
+        if (scores.length < 3) {
+          addMsg('Kör minst 3 prov för att se din redo-score.', 'teacher');
+          return;
+        }
+        var typing = addMsg('Analyserar din beredskap…', 'teacher typing');
+        try {
+          var tok = await getToken();
+          var r = await fetch('/api/readiness-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+            body: JSON.stringify({ scores: scores, weakAreas: weakAreas, examsCount: scores.length })
+          });
+          var d = await r.json();
+          if (typing) {
+            typing.className = 'per-msg teacher';
+            if (r.ok && d.assessment) {
+              typing.textContent = '📊 Redo-score: ' + d.readiness + '% (' + (d.trend === 'improving' ? '↑ förbättras' : d.trend === 'declining' ? '↓ försämras' : '→ stabil') + ')\n\n' + d.assessment;
+            } else {
+              typing.textContent = d.error || 'Kunde inte hämta score.';
+            }
+          }
+        } catch (_) {
+          if (typing) { typing.className = 'per-msg teacher'; typing.textContent = 'Nätverksfel — försök igen.'; }
+        }
+        var msgs = document.getElementById('perMessages');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      };
+
+      /* ── VOICE MODE (Web Speech API) ── */
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var micBtn = document.getElementById('perMicBtn');
+      if (SR && micBtn) {
+        var recognition = new SR();
+        recognition.lang = 'sv-SE';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        var _listening = false;
+        recognition.onresult = function(e) {
+          var transcript = e.results[0][0].transcript.trim();
+          if (transcript) send(transcript);
+        };
+        recognition.onend = function() {
+          _listening = false;
+          if (micBtn) micBtn.classList.remove('listening');
+        };
+        recognition.onerror = function() {
+          _listening = false;
+          if (micBtn) micBtn.classList.remove('listening');
+        };
+        micBtn.onclick = function() {
+          if (_listening) { recognition.stop(); return; }
+          _listening = true;
+          micBtn.classList.add('listening');
+          try { recognition.start(); } catch(_) { _listening = false; micBtn.classList.remove('listening'); }
+        };
+      } else if (micBtn) {
+        micBtn.style.display = 'none';
+      }
 
       /* Restore previous history — localStorage first, then sync from Supabase */
       var hist = perGetHist();
@@ -419,7 +656,10 @@
       /* Start nudge timer on all app pages except landing/pricing */
       var initPath = window.location.pathname.toLowerCase();
       var noNudgeInit = initPath.includes('index') || initPath.includes('pricing') || initPath === '/';
-      if (!noNudgeInit) { startNudgeTimer(); }
+      if (!noNudgeInit) {
+        startNudgeTimer();
+        maybeShowWeeklyCoach();
+      }
     }
 
     if (document.readyState === 'loading') {
@@ -428,7 +668,7 @@
       initWidget();
     }
 
-    return { register: register, send: send, _resetNudge: resetNudge };
+    return { register: register, send: send, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
 })();
