@@ -106,6 +106,32 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
+  // ── READINESS SCORE MODE ──
+  if (Array.isArray(body.scores)) {
+    const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+    const rawScores = body.scores.filter(s => typeof s === 'number' && Number.isFinite(s)).map(s => clamp(s, 0, 1));
+    if (rawScores.length < 3) return res.status(400).json({ error: 'Minst 3 prov krävs.', examsProvided: rawScores.length });
+    const rawAreas = Array.isArray(body.weakAreas) ? body.weakAreas.slice(0, 10).map(a => String(a).slice(0, 80)) : [];
+    const examsCount = typeof body.examsCount === 'number' ? body.examsCount : rawScores.length;
+    const recent5 = rawScores.slice(-5);
+    const avgRecent = recent5.reduce((a, b) => a + b, 0) / recent5.length;
+    const avgAll = rawScores.reduce((a, b) => a + b, 0) / rawScores.length;
+    const half = Math.floor(rawScores.length / 2);
+    const early = rawScores.slice(0, half).reduce((a, b) => a + b, 0) / (half || 1);
+    const late  = rawScores.slice(-half).reduce((a, b) => a + b, 0) / (half || 1);
+    const trend = late - early > 0.05 ? 'improving' : early - late > 0.05 ? 'declining' : 'stable';
+    const mean = avgAll;
+    const stdDev = Math.sqrt(rawScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rawScores.length);
+    const readiness = Math.round(clamp(avgRecent + (trend === 'improving' ? 0.04 : trend === 'declining' ? -0.04 : 0) + (stdDev > 0.15 ? -0.03 : 0), 0, 1) * 100);
+    const trendSv = trend === 'improving' ? 'förbättras' : trend === 'declining' ? 'försämras' : 'stabil';
+    const prompt = `Du är P.E.R — Provias körkortscoach. Bedöm elevens körkortsförberedelse.\n\nDATA:\n- Snitt senaste 5 proven: ${Math.round(avgRecent*100)}%\n- Snitt alla ${examsCount} prov: ${Math.round(avgAll*100)}%\n- Trend: ${trendSv}\n- Beräknad beredskap: ${readiness}%\n- Svaga ämnen: ${rawAreas.length ? rawAreas.join(', ') : 'inga identifierade'}\n- Variation: ${stdDev > 0.15 ? 'hög (ojämnt)' : stdDev > 0.08 ? 'måttlig' : 'låg (konsekvent)'}\n\nKörkortsprovet kräver 52/65 rätt (80%). Max 100 ord. Ge: omdöme (redo/nästan redo/inte redo), viktigaste åtgärd, kort motivation. Svenska.`;
+    try {
+      const assessment = await callAI([{ role: 'user', content: prompt }], { timeout: 20_000 });
+      if (!assessment) return res.status(502).json({ error: 'No response' });
+      return res.json({ ok: true, readiness, trend, avgRecent: Math.round(avgRecent*100), avgAll: Math.round(avgAll*100), assessment });
+    } catch (err) { return res.status(500).json({ error: err.message || 'AI error' }); }
+  }
+
   // ── TEACH MODE: P.E.R multi-turn chat ──
   if (body.topic || (Array.isArray(body.history) && body.history.length > 0)) {
     const { data: prof, error: profErr } = await supabase
