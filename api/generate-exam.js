@@ -54,6 +54,72 @@ function pickModel({ isMath }) {
   return isMath ? math : base;
 }
 
+function buildReviewerSchema() {
+  return {
+    type: "json_schema",
+    name: "exam_review_schema",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["passed", "flagged_ids", "quality"],
+      properties: {
+        passed: { type: "boolean" },
+        flagged_ids: { type: "array", items: { type: "string" } },
+        quality: { type: "string", enum: ["good", "acceptable", "poor"] }
+      }
+    }
+  };
+}
+
+async function reviewExam(exam, apiKey, model) {
+  const reviewItems = exam.questions.map(q => ({
+    id: q.id,
+    type: q.type,
+    question: q.question,
+    options: q.options,
+    correct_index: q.correct_index,
+  }));
+
+  const systemPrompt =
+    "Du är en kvalitetsgranskar för gymnasieprovfrågor. Granska varje fråga och flagga frågor som har:\n" +
+    "1) Tvetydiga formuleringar (mer än ett rimligt svar)\n" +
+    "2) Fel correct_index (svaret pekar på fel alternativ)\n" +
+    "3) MC-alternativ där flera är uppenbara rätt svar\n" +
+    "4) Frågor som saknar tillräcklig kontext för att kunna besvaras\n\n" +
+    "Flagga BARA uppenbara fel. Om du är osäker — flagga inte.\n" +
+    "passed=false om fler än 30% av frågorna är flaggade.\n" +
+    "quality: 'good'=0 flaggade, 'acceptable'=1-2, 'poor'=fler.";
+
+  const r = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: JSON.stringify(reviewItems) }
+      ],
+      text: { format: buildReviewerSchema() }
+    }),
+    signal: AbortSignal.timeout(20_000)
+  });
+
+  if (!r.ok) return null;
+  const raw = await r.text();
+  let data;
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const outputText =
+    (Array.isArray(data?.output) &&
+      data.output
+        .flatMap(o => (Array.isArray(o?.content) ? o.content : []))
+        .find(c => c?.type === "output_text")?.text) || null;
+
+  if (!outputText) return null;
+  try { return JSON.parse(outputText); } catch { return null; }
+}
+
 function buildMockExamSchema(numQuestions) {
   return {
     type: "json_schema",
@@ -306,7 +372,46 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    return json(res, 200, { ok: true, exam, meta: { isMath, model } });
+    // ── REVIEWER PASS ──────────────────────────────────────────────────
+    let reviewMeta = { quality: "good", flagged: 0, retried: false };
+    try {
+      const review = await reviewExam(exam, apiKey, model);
+      if (review) {
+        reviewMeta.quality = review.quality || "good";
+        reviewMeta.flagged = (review.flagged_ids || []).length;
+
+        if (!review.passed) {
+          // Too many issues — regenerate once
+          const r2 = await fetch("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(45_000)
+          });
+          const raw2 = await r2.text();
+          let data2;
+          try { data2 = JSON.parse(raw2); } catch { data2 = null; }
+
+          if (r2.ok && data2) {
+            const out2 =
+              (Array.isArray(data2.output) &&
+                data2.output
+                  .flatMap(o => (Array.isArray(o.content) ? o.content : []))
+                  .find(c => c.type === "output_text")?.text) || null;
+            let exam2;
+            try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
+
+            if (exam2 && Array.isArray(exam2.questions) && exam2.questions.length === numQuestions) {
+              exam = exam2;
+              reviewMeta.retried = true;
+              reviewMeta.quality = "good";
+            }
+          }
+        }
+      }
+    } catch { /* reviewer is best-effort — never block delivery */ }
+
+    return json(res, 200, { ok: true, exam, meta: { isMath, model, review: reviewMeta } });
   } catch (e) {
     return json(res, 500, { ok: false, error: "Server error", details: String(e) });
   }

@@ -1200,6 +1200,22 @@
       }
       setTopStatus(LANG==='sv'?`${h.length} prov synkade`:`${h.length} exams synced`,'ok');
       const lastA=(last&&last.attempt)?last.attempt:h[h.length-1],trend=computeTrend(h);
+
+      // Inject P.E.R context so the floating widget understands improvement page state
+      if (window.setPerContext) {
+        const avg5=avgPct(h.slice(-5));
+        const mc2=mostMistakeCourse(m);
+        const weakCourses=Object.entries(
+          m.slice(-30).reduce(function(acc,x){const c=String(x.course||'').trim();if(c)acc[c]=(acc[c]||0)+1;return acc;},{})
+        ).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0];});
+        window.setPerContext({
+          page:'förbättring',
+          userScore: avg5 / 100,
+          weakAreas: weakCourses,
+          examState: { answered: h.length, remaining: 0 }
+        });
+      }
+
       renderCoachSection(h,m,lastA);
       const lastP=Number(lastA?.percent||0),lastC=(lastA?.course||'').trim();
       $('lastText').textContent=LANG==='sv'?`${lastP}% · ${lastA?.level||'—'} · ${lastC||'Ingen kurs'}`:`${lastP}% · ${lastA?.level||'—'} · ${lastC||'No course'}`;

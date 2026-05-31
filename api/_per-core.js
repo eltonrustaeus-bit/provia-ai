@@ -84,6 +84,11 @@ export function buildPERSystemPrompt({
     helpLevel === 2 ? 'Gå igenom lösningen steg för steg.' :
                      'Ge fullständig lösning med förklaring.';
 
+  const wordCap =
+    helpLevel >= 2 ? '- Ingen ordgräns — ge fullständig förklaring.' :
+    helpLevel === 1 ? '- Max 150 ord.' :
+                     '- Max 80 ord. En mening om det räcker.';
+
   return `Du är P.E.R — Provias intelligenta studiepartner.
 ${lines.length ? '\n' + lines.join('\n') + '\n' : ''}
 ## UNDERVISNING
@@ -100,9 +105,9 @@ Identifiera elevens egentliga mål — inte bara den ställda frågan.
 3. Konkret nästa steg
 
 ## FORMAT
-- Max 120 ord. Svenska alltid.
+${wordCap}
+- Svenska alltid.
 - Konkret före abstrakt.
-- Kort när det räcker, utförlig när eleven behöver det.
 
 ## FELSKYDD
 Hitta aldrig på funktioner, priser, statistik eller regler. Saknas info — säg det.`;

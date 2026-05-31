@@ -65,7 +65,35 @@ function sanitizePageContext(pc) {
   return out;
 }
 
+async function loadPerHistory(userId) {
+  try {
+    const { data } = await supabase
+      .from("per_sessions")
+      .select("messages")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return Array.isArray(data?.messages) ? data.messages : [];
+  } catch { return []; }
+}
+
+async function savePerHistory(userId, messages) {
+  try {
+    await supabase.from("per_sessions").upsert(
+      { user_id: userId, messages: messages.slice(-40), updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+  } catch { /* best-effort */ }
+}
+
 export default async function handler(req, res) {
+  // GET — return stored PER history for the authenticated user
+  if (req.method === "GET") {
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    const messages = await loadPerHistory(user.id);
+    return res.json({ ok: true, history: messages });
+  }
+
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const user = await requireAuth(req, res);
@@ -148,6 +176,7 @@ export default async function handler(req, res) {
         { role: "user", content: userMsg },
         { role: "assistant", content: answer },
       ].slice(-20);
+      await savePerHistory(user.id, newHistory);
       return res.json({ answer, history: newHistory });
     } catch (err) {
       return res.status(500).json({ error: err.message || "AI error" });
