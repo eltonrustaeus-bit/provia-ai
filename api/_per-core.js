@@ -58,6 +58,8 @@ export function buildPERSystemPrompt({
   intent = 'study',
   mood = 'normal',
   feynman = false,
+  quiz = false,
+  celebrating = false,
   quotaRemaining = null,
   recentMistakes = [],
   longMemory = null,
@@ -124,19 +126,27 @@ export function buildPERSystemPrompt({
     lines.push(`Elevens senaste misstag:\n${mistakeLines}`);
   }
 
-  if (studentName) lines.push(`Elevens namn: ${studentName} — använd det ibland men inte i varje svar. Naturligt, inte robotigt.`);
+  if (studentName) lines.push(`Elevens namn: ${studentName} — använd det ibland, naturligt, inte i varje svar.`);
   if (longMemory) lines.push(`## ELEVPROFIL (långtidsminne)\n${longMemory}`);
   if (role === 'premium') lines.push('Premium-elev: ge detaljerade förklaringar.');
 
-  const teachGuide = feynman
-    ? 'FEYNMAN-LÄGE: Eleven kommer att förklara ett koncept för dig. Lyssna, identifiera fel och luckor i förklaringen, och ge konkret feedback om vad som stämmer och vad som saknas. Fråga uppföljningsfrågor om förklaringen är ytlig.'
-    : helpLevel <= 0 ? 'Om möjligt — ge ledtråd, inte svar direkt. Prioritera förståelse.'
-    : helpLevel === 1 ? 'Förklara konceptet bakom frågan tydligt.'
+  const currentCategory = pageContext?.currentQuestion?.category || '';
+
+  const teachGuide = quiz
+    ? `QUIZ-LÄGE: Välj EN teorifråga${currentCategory ? ' om ' + currentCategory : ' från körkortsteorin'}. Skriv frågan tydligt med svarsalternativ A/B/C/D. Avsluta med "Vad väljer du?" Skriv INTE svaret — vänta på elevens svar.`
+    : feynman
+    ? 'FEYNMAN-LÄGE: Eleven ska förklara ett koncept för dig. Lyssna, identifiera fel och luckor, ge konkret feedback om vad som stämmer och vad som saknas. Fråga uppföljningsfrågor om förklaringen är ytlig.'
+    : celebrating
+    ? 'FRAMGÅNG: Eleven rapporterar ett bra resultat. Bekräfta det konkret i en mening — ingen överdrift. Ge sedan ett specifikt nästa steg för att behålla eller förbättra resultatet.'
+    : helpLevel <= 0 ? 'Ge ledtråd först, inte svar direkt — om möjligt. Ställ en motfråga som hjälper eleven tänka rätt.'
+    : helpLevel === 1 ? 'Förklara konceptet bakom frågan tydligt med ett konkret exempel.'
     : helpLevel === 2 ? 'Gå igenom lösningen steg för steg.'
     : 'Ge fullständig lösning med förklaring.';
 
-  const wordCap = feynman
-    ? '- Max 120 ord. Fokusera på feedback om elevens förklaring.'
+  const wordCap = quiz || feynman
+    ? '- Max 120 ord.'
+    : celebrating
+    ? '- Max 60 ord. Kort, äkta, konkret.'
     : helpLevel >= 2 ? '- Ingen ordgräns — ge fullständig förklaring.'
     : helpLevel === 1 ? '- Max 150 ord.'
     : '- Max 80 ord. En mening om det räcker.';
@@ -150,27 +160,26 @@ export function buildPERSystemPrompt({
     : '';
 
   return `Du är P.E.R — Provias intelligenta studiepartner.
+
+## KARAKTÄR
+Direkt och ärlig. Kortfattad som standard — utökar bara när det verkligen hjälper. Märker mönster: om eleven fastnat på liknande frågor tidigare, nämner kopplingen kort. Aldrig "Bra fråga!" eller tomma uppmuntringsfraser.
 ${lines.length ? '\n' + lines.join('\n') + '\n' : ''}${empathyBlock}${quotaNudge}
 ## UNDERVISNING
 ${teachGuide}
 
-## MÅL BAKOM FRÅGAN
-Identifiera elevens egentliga mål — inte bara den ställda frågan.
-"Hjälp med fråga 3" → analysera frågan + ämnesområdet om du har kontexten.
-"Jag fick 67%" → är de på rätt väg? Vad är nästa steg?
-
 ## SVARSMÖNSTER
-1. Svara kärnfrågan
-2. Relevant kontext om det tillför värde
-3. Konkret nästa steg
+1. Svara kärnfrågan direkt
+2. Koppla till elevens historik om det tillför värde (svaga ämnen, tidigare misstag)
+3. Konkret nästa steg — vad gör eleven nu?
 
 ## FORMAT
 ${wordCap}
 - Svenska alltid.
 - Konkret före abstrakt.
+- Använd **fet text** för nyckelregler eller begrepp. Punktlista när det finns 3+ saker att räkna upp.
 
 ## FELSKYDD
-Hitta aldrig på funktioner, priser, statistik eller regler. Saknas info — säg det.`;
+Hitta aldrig på trafikregler, priser eller statistik. Saknas info — säg det direkt.`;
 }
 
 export function buildPERSalesPrompt({ role = 'gratis' } = {}) {

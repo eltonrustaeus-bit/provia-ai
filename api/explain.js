@@ -5,7 +5,9 @@ import { SALES_TRIGGER_REGEX } from "./_provia-kb.js";
 import { loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
 
 const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
-const FEYNMAN_REGEX     = /förklara för dig|lär dig|jag förklarar|testa om jag|quizza mig|feynman|förklara det för mig som/i;
+const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
+const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fråga|välj.*fråga.*ställ/i;
+const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -185,10 +187,12 @@ export default async function handler(req, res) {
       category: sanitize(String(m.category || m.course || ''), 60),
     }));
 
-    // Intent, mood, feynman detection
-    const intent   = SALES_TRIGGER_REGEX.test(userQuestion) ? 'sales' : 'study';
-    const mood     = FRUSTRATION_REGEX.test(userQuestion) ? 'frustrated' : 'normal';
-    const feynman  = FEYNMAN_REGEX.test(userQuestion) || body.mode === 'feynman';
+    // Intent, mood, mode detection
+    const intent      = SALES_TRIGGER_REGEX.test(userQuestion) ? 'sales' : 'study';
+    const mood        = FRUSTRATION_REGEX.test(userQuestion) ? 'frustrated' : 'normal';
+    const feynman     = FEYNMAN_REGEX.test(userQuestion) || body.mode === 'feynman';
+    const quiz        = QUIZ_REGEX.test(userQuestion) || body.mode === 'quiz';
+    const celebrating = SUCCESS_REGEX.test(userQuestion);
 
     const ctxParts = [];
     if (topic) ctxParts.push(`Aktuellt ämne: ${topic}`);
@@ -210,6 +214,8 @@ export default async function handler(req, res) {
       intent,
       mood,
       feynman,
+      quiz,
+      celebrating,
       quotaRemaining,
       recentMistakes,
       longMemory,
