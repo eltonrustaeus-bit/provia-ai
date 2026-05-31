@@ -4,18 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script>if(location.hostname.includes("vercel.app")){location.replace("https://proviaai.se"+location.pathname+location.search)}</script>
-  <title>ProviaAi – Provträning med AI</title>
-  <meta name="description" content="ProviaAi skapar mockprov från ditt material, rättar med feedback och modellsvar." />
-  <meta property="og:title" content="ProviaAi – Provträning med AI" />
-  <meta property="og:description" content="Klistra in studiematerial → få mockprov → rätta med AI-feedback. Gratis att starta." />
+  <title>ProviaAi – Klara teoriprovet med AI</title>
+  <meta name="description" content="368 körkortsteorifrågor med AI-förklaring. Träna fritt, simulera riktiga teoriprovet, bygg på dina misstag. Gratis att starta." />
+  <meta property="og:title" content="ProviaAi – Klara teoriprovet med AI" />
+  <meta property="og:description" content="368 frågor · 16 kategorier · Simulerat teoriprov · AI-förklaring varje svar. Gratis att starta." />
   <meta property="og:image" content="https://proviaai.se/image/proviaai-hero.png" />
   <meta property="og:url" content="https://proviaai.se/" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="ProviaAi – Provträning med AI" />
-  <meta name="twitter:description" content="Klistra in studiematerial → få mockprov → rätta med AI-feedback. Gratis att starta." />
+  <meta name="twitter:title" content="ProviaAi – Klara teoriprovet med AI" />
+  <meta name="twitter:description" content="368 frågor · 16 kategorier · Simulerat teoriprov · AI-förklaring varje svar." />
   <meta name="twitter:image" content="https://proviaai.se/image/proviaai-hero.png" />
-  <link rel="icon" href="/image/proviaai-logo.png" type="image/png" />
+  <link rel="icon" href="/image/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="icon" href="/image/favicon-64.png" sizes="64x64" type="image/png" />
+  <link rel="icon" href="/image/favicon-512.png" sizes="512x512" type="image/png" />
+  <link rel="apple-touch-icon" href="/image/favicon-180.png" />
   <link rel="canonical" href="https://proviaai.se/" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,237 +26,419 @@
   <link rel="stylesheet" href="style.css" />
   <script src="shared.js" defer></script>
   <style>
-  /* ── INDEX-SPECIFIC ── */
+  /* ═══════════════════════════════════
+     INDEX 2.0 — Körkortet-fokus
+  ═══════════════════════════════════ */
 
-  /* HERO — two columns, fits viewport */
-  .hero{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:24px;
-    align-items:center;
-    padding:28px 0 24px;
-    border-bottom:1px solid var(--l);
-  }
-  @media(max-width:800px){
-    .hero{grid-template-columns:1fr;padding:24px 0 20px}
-    .heroRight{order:-1}
-  }
-
-  /* LEFT */
-  .hTitle{
-    font-weight:700;font-size:clamp(24px,2.8vw,38px);
-    letter-spacing:-.04em;line-height:1.08;color:var(--t);margin-bottom:10px;
-  }
-  .hTitle em{font-style:normal;color:var(--a)}
-  .hSub{
-    font-size:15px;color:var(--t2);font-weight:400;
-    line-height:1.65;max-width:44ch;margin-bottom:18px;
-  }
-  .hActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
-  .hBadges{display:flex;gap:6px;flex-wrap:wrap}
-
-  /* RIGHT — DEMO CTA */
-  .demoCta{
-    background:var(--s);border:1px solid var(--l2);
-    border-radius:12px;padding:32px 28px;
-    box-shadow:var(--sh2);
-    position:relative;overflow:hidden;
-    display:flex;flex-direction:column;align-items:flex-start;gap:14px;
-  }
-  .demoCtaGlow{
-    position:absolute;top:-60px;right:-60px;
-    width:200px;height:200px;border-radius:50%;
-    background:radial-gradient(circle,rgba(27,255,140,.13),transparent 65%);
-    pointer-events:none;animation:pulse 3s ease-in-out infinite;
-  }
-  @keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.15);opacity:1}}
-  .demoCtaTag{
-    font-family:var(--mono);font-size:10px;font-weight:500;
-    color:var(--a);letter-spacing:.1em;text-transform:uppercase;
-    border:1px solid rgba(27,255,140,.3);border-radius:20px;
-    padding:4px 11px;background:rgba(27,255,140,.07);
-  }
-  .demoCtaTitle{
-    font-weight:700;font-size:clamp(20px,2.4vw,26px);color:var(--t);
-    letter-spacing:-.03em;line-height:1.15;
-  }
-  .demoCtaSub{
-    font-size:13.5px;color:var(--t2);line-height:1.65;max-width:38ch;
-  }
-  .demoCtaBtn{
-    height:44px;padding:0 28px;font-size:14.5px;font-weight:600;
-    letter-spacing:-.01em;
-    box-shadow:0 0 0 0 rgba(27,255,140,.4);
-    transition:box-shadow .25s ease,transform .15s ease;
-  }
-  .demoCtaBtn:hover{
-    box-shadow:0 0 22px 4px rgba(27,255,140,.22);
-    transform:translateY(-1px);
-  }
-  .demoCtaSteps{
-    display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-    font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:4px;
-  }
-  .demoCtaArrow{color:var(--a);opacity:.6}
-
-  /* ═══════════════════════════
-     BELOW HERO — sections
-  ═══════════════════════════ */
-  .sections{padding:20px 0 32px;display:grid;gap:7px}
-
-  .sec{
-    background:var(--s);border:1px solid var(--l);
-    border-radius:var(--r);overflow:hidden;
-    transition:border-color .2s cubic-bezier(.22,.61,.36,1);
-  }
-  .sec:hover{border-color:var(--l2)}
-  .secH{
-    display:flex;align-items:center;gap:14px;
-    padding:14px 18px;cursor:pointer;user-select:none;
-    transition:background .2s cubic-bezier(.22,.61,.36,1);
-  }
-  .secH:hover{background:var(--a-dim)}
-  .secN{font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--a);letter-spacing:.06em;flex-shrink:0}
-  .secM{flex:1;min-width:0}
-  .secT{font-weight:600;font-size:14px;color:var(--t);line-height:1.3}
-  .secD{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:1px}
-  .secCh{width:15px;height:15px;flex-shrink:0;color:var(--t3);transition:transform .2s cubic-bezier(.22,.61,.36,1),color .14s}
-  .sec:not(.col) .secCh{transform:rotate(90deg);color:var(--a)}
-  .secLine{height:1px;background:var(--l);transform:scaleX(0);transform-origin:left;transition:transform .2s cubic-bezier(.22,.61,.36,1)}
-  .sec:not(.col) .secLine{transform:scaleX(1)}
-  .secB{
-    max-height:1800px;opacity:1;padding:18px 20px;
-    transition:max-height .28s cubic-bezier(.22,.61,.36,1),opacity .2s ease,padding .2s ease;
-    overflow:hidden;
-  }
-  .sec.col .secB{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
-
-  .list{list-style:none;display:grid;gap:8px}
-  .list li{
-    display:flex;align-items:flex-start;gap:10px;
-    font-size:13.5px;color:var(--t2);line-height:1.6;
-  }
-  .list li::before{
-    content:"→";font-family:var(--mono);font-size:10.5px;
-    color:var(--a);flex-shrink:0;margin-top:4px;
-  }
-  .olist{list-style:none;display:grid;gap:9px;counter-reset:s}
-  .olist li{
-    display:flex;align-items:flex-start;gap:12px;
-    font-size:13.5px;color:var(--t2);line-height:1.6;
-    counter-increment:s;
-  }
-  .olist li::before{
-    content:counter(s,decimal-leading-zero);
-    font-family:var(--mono);font-size:10px;font-weight:500;
-    color:var(--a);flex-shrink:0;margin-top:4px;letter-spacing:.04em;
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 100px 24px 80px;
   }
 
-  /* PRICING CTA */
-  .pricingCta{
-    background:var(--s);border:1px solid var(--l2);
-    border-radius:var(--r);overflow:hidden;
+  /* Background */
+  .heroBg { position:absolute;inset:0;pointer-events:none;z-index:0; }
+
+  .bgG1 {
+    position:absolute;
+    width:700px;height:700px;
+    background:radial-gradient(circle,rgba(27,255,140,.11),transparent 65%);
+    top:-250px;left:calc(50% - 350px);
+    filter:blur(60px);
+    animation:gf1 9s ease-in-out infinite;
+    will-change:transform;
+  }
+  .bgG2 {
+    position:absolute;
+    width:360px;height:360px;
+    background:radial-gradient(circle,rgba(27,255,140,.07),transparent 65%);
+    bottom:-80px;right:-80px;
+    filter:blur(50px);
+    animation:gf1 12s ease-in-out infinite;
+    animation-delay:-4s;
+    will-change:transform;
+  }
+  @keyframes gf1 {
+    0%,100%{transform:translateY(0) scale(1)}
+    50%{transform:translateY(-28px) scale(1.06)}
+  }
+  .bgGrid {
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(27,255,140,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(27,255,140,.035) 1px,transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
+    -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
+  }
+
+  /* Content */
+  .heroContent {
+    position:relative;z-index:1;
+    display:flex;flex-direction:column;
+    align-items:center;text-align:center;
+  }
+
+  /* Logo */
+  .heroLogo {
+    width:72px;height:72px;
+    margin-bottom:28px;
+    filter:drop-shadow(0 0 20px rgba(27,255,140,.4));
+    animation:logoF 4.5s ease-in-out infinite;
+    will-change:transform,filter;
+  }
+  @keyframes logoF {
+    0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))}
+    50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.6))}
+  }
+
+  /* Eyebrow pill */
+  .heroEye {
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:var(--mono);font-size:10.5px;font-weight:500;
+    color:var(--a);letter-spacing:.12em;text-transform:uppercase;
+    border:1px solid rgba(27,255,140,.22);border-radius:20px;
+    padding:5px 14px;background:rgba(27,255,140,.06);
+    margin-bottom:22px;
+  }
+  .heroEye::before {
+    content:"";width:6px;height:6px;border-radius:50%;
+    background:var(--a);flex-shrink:0;
+    animation:eyeBlink 1.8s ease-in-out infinite;
+  }
+  @keyframes eyeBlink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* Title */
+  .heroTitle {
+    font-size:clamp(36px,6.5vw,68px);
+    font-weight:700;letter-spacing:-.045em;line-height:1.07;
+    color:var(--t);margin-bottom:22px;
+  }
+  .heroTitle em {
+    font-style:normal;color:var(--a);
+    position:relative;display:inline-block;
+  }
+  .heroTitle em::after {
+    content:"";position:absolute;
+    bottom:-3px;left:0;right:0;height:2px;
+    background:var(--a);border-radius:2px;
+    transform:scaleX(0);transform-origin:left;
+    animation:uLine .5s 1.3s cubic-bezier(.22,.61,.36,1) forwards;
+  }
+  @keyframes uLine{to{transform:scaleX(1)}}
+
+  /* Word-reveal spans */
+  .w { display:inline-block;overflow:hidden;vertical-align:bottom }
+  .wi { display:inline-block;transform:translateY(110%) }
+
+  /* Sub */
+  .heroSub {
+    font-size:clamp(14px,1.55vw,17px);
+    color:var(--t2);line-height:1.75;
+    max-width:40ch;margin-bottom:40px;
+    opacity:0;
+  }
+
+  /* CTA */
+  .ctaBtn {
+    position:relative;display:inline-flex;
+    align-items:center;gap:11px;
+    height:58px;padding:0 40px;
+    font-family:var(--sans);font-size:16px;font-weight:700;
+    letter-spacing:-.01em;color:#08100d;
+    background:var(--a);border:none;border-radius:32px;
+    cursor:pointer;overflow:hidden;
+    box-shadow:0 0 0 0 rgba(27,255,140,.45);
+    animation:ctaPulse 2.8s ease-in-out infinite;
+    transition:transform .15s ease,box-shadow .2s ease;
+    opacity:0;will-change:transform;
+    margin-bottom:36px;
+  }
+  .ctaBtn:hover {
+    transform:translateY(-2px) scale(1.02);
+    animation:none;
+    box-shadow:0 0 36px 8px rgba(27,255,140,.25);
+  }
+  .ctaBtn:active{transform:scale(.97)}
+  @keyframes ctaPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}
+    50%{box-shadow:0 0 0 16px rgba(27,255,140,0)}
+  }
+  .ctaShimmer {
+    position:absolute;inset:0;
+    background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.38) 50%,transparent 60%);
+    transform:translateX(-100%);
+    animation:shimmer 2.8s 1.6s ease-in-out infinite;
+  }
+  @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
+
+  /* Stats */
+  .heroStats {
+    display:flex;align-items:center;gap:0;
+    margin-bottom:18px;opacity:0;
+  }
+  .stat{display:flex;flex-direction:column;align-items:center;padding:0 22px}
+  .statN{
+    font-weight:700;font-size:clamp(24px,3vw,32px);
+    color:var(--t);letter-spacing:-.035em;line-height:1;
+  }
+  .statL{
+    font-family:var(--mono);font-size:10px;
+    color:var(--t3);letter-spacing:.06em;
+    text-transform:uppercase;margin-top:4px;
+  }
+  .statSep{width:1px;height:34px;background:var(--l);flex-shrink:0}
+
+  .heroFree{
+    font-family:var(--mono);font-size:10.5px;
+    color:var(--t3);letter-spacing:.05em;opacity:0;
+  }
+
+  /* Scroll indicator */
+  .scrollHint {
+    position:absolute;bottom:28px;left:50%;
+    transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+    font-family:var(--mono);font-size:9px;color:var(--t3);
+    letter-spacing:.1em;text-transform:uppercase;
+    opacity:0;animation:fadeUp .5s 2.4s forwards;
+  }
+  .scrollMouse {
+    width:20px;height:30px;
+    border:1.5px solid rgba(27,255,140,.22);border-radius:10px;
     position:relative;
   }
-  .pricingCta::before{
+  .scrollMouse::after {
+    content:"";position:absolute;
+    top:5px;left:50%;transform:translateX(-50%);
+    width:3px;height:5px;background:var(--a);border-radius:2px;
+    animation:scrollD 1.9s ease-in-out infinite;
+  }
+  @keyframes scrollD{0%,100%{transform:translateX(-50%) translateY(0);opacity:1}75%{transform:translateX(-50%) translateY(10px);opacity:0}}
+  @keyframes fadeUp{to{opacity:1}}
+
+  /* ── FEATURES ── */
+  .feats{padding:72px 0 48px}
+  .secEye {
+    font-family:var(--mono);font-size:10.5px;color:var(--a);
+    letter-spacing:.12em;text-transform:uppercase;
+    text-align:center;margin-bottom:12px;
+  }
+  .secTitle{
+    font-size:clamp(22px,3vw,30px);font-weight:700;
+    letter-spacing:-.035em;color:var(--t);
+    text-align:center;margin-bottom:36px;
+  }
+  .featsGrid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+  }
+  @media(max-width:700px){.featsGrid{grid-template-columns:1fr;gap:10px}}
+
+  .feat{
+    background:var(--s);border:1px solid var(--l);
+    border-radius:12px;padding:28px 24px;
+    position:relative;overflow:hidden;
+    transition:border-color .2s,transform .22s cubic-bezier(.22,.61,.36,1);
+    will-change:transform;
+  }
+  .feat::after{
+    content:"";position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(27,255,140,.5),transparent);
+    opacity:0;transition:opacity .2s;
+  }
+  .feat:hover{border-color:rgba(27,255,140,.28);transform:translateY(-4px)}
+  .feat:hover::after{opacity:1}
+
+  .featBig{
+    display:block;font-weight:700;
+    font-size:clamp(38px,5vw,52px);
+    color:var(--a);letter-spacing:-.04em;line-height:1;
+    margin-bottom:4px;
+  }
+  .featIcon{font-size:30px;display:block;margin-bottom:12px}
+  .featLabel{
+    font-family:var(--mono);font-size:10px;color:var(--a);
+    letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;
+  }
+  .featT{font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em;margin-bottom:8px;line-height:1.25}
+  .featD{font-size:13px;color:var(--t2);line-height:1.65}
+
+  /* ── STEPS ── */
+  .steps{padding:56px 0;border-top:1px solid var(--l);border-bottom:1px solid var(--l)}
+  .stepsRow{
+    display:grid;grid-template-columns:repeat(3,1fr);
+    gap:0;position:relative;margin-top:36px;
+  }
+  @media(max-width:580px){.stepsRow{grid-template-columns:1fr;gap:28px}.stepsConnector{display:none}}
+  .stepsConnector{
+    position:absolute;top:19px;
+    left:calc(16.6% + 24px);right:calc(16.6% + 24px);
+    height:1px;
+    background:linear-gradient(90deg,rgba(27,255,140,.5),rgba(27,255,140,.15),rgba(27,255,140,.5));
+  }
+  .step{display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 16px}
+  .stepNum{
+    width:38px;height:38px;border-radius:50%;
+    border:1.5px solid rgba(27,255,140,.35);
+    background:rgba(27,255,140,.07);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:11px;font-weight:500;color:var(--a);
+    margin-bottom:16px;position:relative;z-index:1;
+  }
+  .stepT{font-weight:600;font-size:14px;color:var(--t);margin-bottom:6px}
+  .stepD{font-size:12.5px;color:var(--t3);line-height:1.6}
+
+  /* ── FAQ ── */
+  .faq{padding:56px 0}
+  .faqItem{border-bottom:1px solid var(--l);overflow:hidden}
+  .faqQ{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:18px 0;cursor:pointer;
+    font-weight:600;font-size:14px;color:var(--t);user-select:none;
+    transition:color .15s;
+  }
+  .faqQ:hover{color:var(--a)}
+  .faqIco{
+    width:22px;height:22px;border-radius:50%;
+    border:1px solid var(--l2);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;color:var(--a);
+    transition:transform .22s cubic-bezier(.22,.61,.36,1),background .15s;
+  }
+  .faqItem.open .faqIco{transform:rotate(45deg);background:rgba(27,255,140,.1)}
+  .faqA{
+    max-height:0;overflow:hidden;padding-bottom:0;
+    font-size:13.5px;color:var(--t2);line-height:1.72;
+    transition:max-height .3s cubic-bezier(.22,.61,.36,1),padding .22s;
+  }
+  .faqItem.open .faqA{max-height:400px;padding-bottom:20px}
+
+  /* ── PRICING STRIP ── */
+  .pricingStrip{padding:32px 0 64px}
+  .pCard{
+    background:var(--s);border:1px solid var(--l2);
+    border-radius:14px;padding:28px 32px;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:24px;flex-wrap:wrap;position:relative;overflow:hidden;
+  }
+  .pCard::before{
     content:"";position:absolute;inset:0;
-    background:radial-gradient(ellipse 70% 100% at 100% 50%, rgba(27,255,140,.06), transparent 65%);
+    background:radial-gradient(ellipse 60% 100% at 100% 50%,rgba(27,255,140,.05),transparent 65%);
     pointer-events:none;
   }
-  .pricingInner{
-    display:flex;align-items:center;justify-content:space-between;
-    gap:24px;padding:22px 24px;flex-wrap:wrap;
-  }
-  .pricingLeft{flex:1;min-width:0}
-  .pricingEye{
-    font-family:var(--mono);font-size:10px;font-weight:500;
-    color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;
-  }
-  .pricingTitle{
-    font-weight:700;font-size:17px;color:var(--t);
-    letter-spacing:-.025em;line-height:1.2;margin-bottom:16px;
-  }
-  .pricingPlans{display:flex;align-items:center;gap:0;flex-wrap:wrap}
-  .plan{display:flex;flex-direction:column;gap:2px;padding:0 18px}
-  .plan:first-child{padding-left:0}
-  .planName{font-family:var(--mono);font-size:9.5px;font-weight:500;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
-  .planPrice{font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em;line-height:1}
-  .planPer{font-size:11px;font-weight:400;color:var(--t3);letter-spacing:0}
-  .planDesc{font-family:var(--mono);font-size:9.5px;color:var(--t2);margin-top:1px}
-  .planDivider{width:1px;height:36px;background:var(--l);flex-shrink:0;margin:0 4px}
-  .pricingRight{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
-  .pricingBtn{height:38px;padding:0 20px;font-size:13.5px}
-  .pricingNote{font-family:var(--mono);font-size:9.5px;color:var(--t3);letter-spacing:.04em}
+  .pLeft{flex:1;min-width:180px}
+  .pEye{font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+  .pH{font-weight:700;font-size:18px;color:var(--t);letter-spacing:-.025em;margin-bottom:16px}
+  .pTiers{display:flex;align-items:center;flex-wrap:wrap}
+  .tier{display:flex;flex-direction:column;gap:2px;padding:0 18px}
+  .tier:first-child{padding-left:0}
+  .tierName{font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
+  .tierPrice{font-weight:700;font-size:16px;color:var(--t);letter-spacing:-.02em;line-height:1}
+  .tierPrice sub{font-size:10px;font-weight:400;color:var(--t3);vertical-align:baseline}
+  .tierDesc{font-family:var(--mono);font-size:9px;color:var(--t3)}
+  .tierSep{width:1px;height:36px;background:var(--l);flex-shrink:0;margin:0 2px}
+  .pRight{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}
+  .pNote{font-family:var(--mono);font-size:9.5px;color:var(--t3);letter-spacing:.04em}
 
-  /* ── CUSTOM CURSOR ── */
-  @media (pointer: fine) {
-    * { cursor: none !important }
-    #cursorDot {
-      position:fixed;top:0;left:0;z-index:99999;
-      width:6px;height:6px;border-radius:50%;background:#1bff8c;
-      pointer-events:none;opacity:0;
-      transition:transform .08s ease,opacity .15s;
-      will-change:transform;
+  /* ── BOTTOM SHEET ── */
+  .backdrop{
+    position:fixed;inset:0;
+    background:rgba(8,16,13,.72);
+    backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+    z-index:900;opacity:0;pointer-events:none;
+    transition:opacity .28s ease;
+  }
+  .backdrop.show{opacity:1;pointer-events:all}
+
+  .sheet{
+    position:fixed;bottom:0;left:0;right:0;
+    z-index:901;
+    background:#121c15;
+    border-top:1px solid rgba(27,255,140,.18);
+    border-radius:20px 20px 0 0;
+    padding:12px 0 max(24px,env(safe-area-inset-bottom));
+    transform:translateY(102%);
+    transition:transform .36s cubic-bezier(.22,.61,.36,1);
+    will-change:transform;
+  }
+  .sheet.show{transform:translateY(0)}
+
+  @media(min-width:560px){
+    .sheet{
+      bottom:auto;top:50%;left:50%;right:auto;
+      transform:translate(-50%,-44%) scale(.94);
+      border-radius:16px;border:1px solid rgba(27,255,140,.18);
+      width:400px;opacity:0;
+      transition:transform .32s cubic-bezier(.22,.61,.36,1),opacity .24s ease;
     }
-    #cursorRing {
-      position:fixed;top:0;left:0;z-index:99998;
-      width:28px;height:28px;pointer-events:none;opacity:0;
-      transition:opacity .15s;will-change:transform;
-    }
-    #cursorRing > div {
-      width:100%;height:100%;border-radius:50%;
-      border:1.5px solid rgba(27,255,140,.5);
-      transform-origin:center center;
-      transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s ease;
-    }
-    #cursorRing.rHov > div { transform:scale(1.57);opacity:.3 }
-    #cursorRing.rDown > div { transform:scale(.64);opacity:.8 }
-    #cursorLabel {
-      position:fixed;z-index:99997;pointer-events:none;
-      font-family:var(--mono);font-size:10px;color:var(--t2);
-      background:rgba(8,16,13,.85);border:1px solid var(--l);
-      border-radius:4px;padding:3px 7px;
-      opacity:0;transition:opacity .15s ease;white-space:nowrap;
-    }
+    .sheet.show{transform:translate(-50%,-50%) scale(1);opacity:1}
   }
 
+  .sheetHandle{width:38px;height:4px;background:rgba(27,255,140,.18);border-radius:2px;margin:0 auto 20px}
+  @media(min-width:560px){.sheetHandle{display:none}}
 
-  /* ── ANIMATION POLISH ── */
-  .btn { will-change:transform }
-  header { will-change:transform }
-  .rev {
-    transition:opacity .32s cubic-bezier(.22,.61,.36,1),
-               transform .32s cubic-bezier(.22,.61,.36,1) !important;
+  .sheetHead{
+    font-weight:700;font-size:15px;color:var(--t);
+    letter-spacing:-.02em;padding:0 20px 14px;
+    border-bottom:1px solid rgba(27,255,140,.1);
   }
-  /* pricingCta entrance starts slightly lower */
-  .pricingCta.rev:not(.in) { transform:translateY(8px) }
+  .sheetOpts{display:flex;flex-direction:column;padding:6px 0}
+  .sOpt{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 20px;text-decoration:none;
+    transition:background .15s;
+    position:relative;
+  }
+  .sOpt+.sOpt::before{
+    content:"";position:absolute;top:0;left:20px;right:20px;
+    height:1px;background:rgba(27,255,140,.07);
+  }
+  .sOpt:hover{background:rgba(27,255,140,.05)}
+  .sOpt:active{background:rgba(27,255,140,.1)}
+
+  .sIco{
+    width:46px;height:46px;border-radius:12px;flex-shrink:0;
+    background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.14);
+    display:flex;align-items:center;justify-content:center;font-size:22px;
+  }
+  .sBody{flex:1;min-width:0}
+  .sT{font-weight:600;font-size:14px;color:var(--t);letter-spacing:-.01em;line-height:1.3}
+  .sS{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:2px}
+  .sArr{
+    width:16px;height:16px;color:var(--t3);flex-shrink:0;
+    transition:transform .15s,color .15s;
+  }
+  .sOpt:hover .sArr{transform:translateX(3px);color:var(--a)}
+
+  /* ── REVEAL ── */
+  .rev{opacity:0;transform:translateY(26px)}
+
+  /* ── CURSOR ── */
+  @media(pointer:fine){
+    *{cursor:none !important}
+    #cDot{position:fixed;top:0;left:0;z-index:99999;width:6px;height:6px;border-radius:50%;background:#1bff8c;pointer-events:none;opacity:0;will-change:transform;transition:opacity .15s}
+    #cRing{position:fixed;top:0;left:0;z-index:99998;width:28px;height:28px;pointer-events:none;opacity:0;will-change:transform;transition:opacity .15s}
+    #cRing>div{width:100%;height:100%;border-radius:50%;border:1.5px solid rgba(27,255,140,.5);transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s}
+    #cRing.rH>div{transform:scale(1.55);opacity:.3}
+    #cRing.rD>div{transform:scale(.62);opacity:.8}
+  }
 
   /* ── REDUCED MOTION ── */
-  @media (prefers-reduced-motion: reduce) {
-    * { cursor:auto !important }
-    #cursorDot,#cursorRing,#cursorLabel { display:none !important }
-    .rev { transition:none !important }
-    @keyframes fadeSlideIn { from { opacity:1;transform:none } }
-    @keyframes shim { from,to { transform:translateX(0) } }
+  @media(prefers-reduced-motion:reduce){
+    *{cursor:auto !important}
+    #cDot,#cRing{display:none !important}
+    .bgG1,.bgG2,.heroLogo,.ctaBtn{animation:none !important}
+    .heroSub,.ctaBtn,.heroStats,.heroFree{opacity:1 !important}
+    .wi{transform:none !important}
+    .rev{opacity:1 !important;transform:none !important}
+    .scrollHint{opacity:1 !important;animation:none !important}
   }
-
-  /* ── GSAP TAKES OVER .rev — kill CSS transitions ── */
-  .rev { transition: none !important }
-
-  /* ── GLASS UPGRADE — demoCta & pricingCta ── */
-  .demoCta {
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    background: rgba(17,26,21,.78) !important;
-  }
-  .pricingCta {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-  }
-
-  /* ── HERO GLOW PARALLAX ── */
-  .demoCtaGlow { will-change: transform }
-
   </style>
 </head>
 <body>
@@ -273,7 +458,7 @@
       <img src="image/proviaai-logo.png" alt="ProviaAi logga">
       <div>
         <div class="bName">ProviaAi</div>
-        <div class="bTag">Körkort · Mockprov · AI-coach</div>
+        <div class="bTag">Körkortsteorin · AI</div>
       </div>
     </a>
     <div class="hR">
@@ -286,207 +471,198 @@
           <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
         </button>
         <div class="drop" id="drop">
-          <a class="ddi" href="#how"    data-s="#how"     ><span>Hur det funkar</span><span class="dpill">Steg</span></a>
-          <a class="ddi" href="#feat"   data-s="#feat"    ><span>Funktioner</span><span class="dpill">AI</span></a>
-          <a class="ddi" href="#coach"  data-s="#coach"   ><span>AI-coach</span><span class="dpill">Coach</span></a>
-          <a class="ddi" href="#faq"    data-s="#faq"     ><span>FAQ</span><span class="dpill">Svar</span></a>
-          <a class="ddi" href="korkortet.html"            ><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Nytt</span></a>
-          <a class="ddi" href="pricing.html"              ><span>Priser</span><span class="dpill">29/79</span></a>
+          <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
+          <a class="ddi" href="app.html"><span>Mockprov</span><span class="dpill">AI</span></a>
+          <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">29/79</span></a>
         </div>
       </div>
     </div>
   </div>
 </header>
 
-<div id="betaBanner" style="background:#0d1a10;border-bottom:1px solid rgba(27,255,140,.15);padding:9px 48px 9px 16px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;color:#a8c4b4;position:relative;flex-wrap:wrap">
-  <span>⚡ ProviaAi är i tidig fas — småfel kan förekomma. Vi vill gärna höra vad du tycker och vad du saknar!</span>
+<!-- BETA BANNER -->
+<div id="betaBanner" style="background:#0c1810;border-bottom:1px solid rgba(27,255,140,.12);padding:8px 48px 8px 16px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;color:#a8c4b4;position:relative;flex-wrap:wrap">
+  <span>⚡ ProviaAi är i tidig fas — småfel kan förekomma. Vi vill gärna höra vad du tycker!</span>
   <button onclick="document.getElementById('betaBanner').style.display='none';sessionStorage.setItem('betaDismissed','1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#a8c4b4;cursor:pointer;font-size:16px;line-height:1;padding:4px 6px" aria-label="Stäng">✕</button>
 </div>
 <script>if(sessionStorage.getItem('betaDismissed')==='1'){var _b=document.getElementById('betaBanner');if(_b)_b.style.display='none'}</script>
 
 <main>
-<div class="wrap">
 
   <!-- ═══ HERO ═══ -->
-  <section class="hero">
-
-    <!-- LEFT: copy -->
-    <div class="heroLeft rev">
-      <div class="eyebrow">Körkortet &amp; Provträning med AI</div>
-      <h1 class="hTitle">Klara körkortet<br>och prov med <em>AI</em></h1>
-      <p class="hSub">Träna 368 körkortsteorifrågor med AI-förklaring. Generera mockprov från eget studiematerial. Bygg på dina misstag.</p>
-      <div class="hActions">
-        <a class="btn btnP" href="korkortet.html">Träna körkortsteorin</a>
-        <a class="btn btnG" href="app.html">Mockprov med AI</a>
-        <a class="btn btnG" href="pricing.html">Priser</a>
-      </div>
-      <div class="hBadges">
-        <span class="badge">368 körkortsteorifrågor</span>
-        <span class="badge">16 ämnesområden</span>
-        <span class="badge">Adaptivt lärande</span>
-        <span class="badge">AI-förklaring varje svar</span>
-      </div>
+  <section class="hero" aria-label="Startsida">
+    <div class="heroBg" aria-hidden="true">
+      <div class="bgG1"></div>
+      <div class="bgG2"></div>
+      <div class="bgGrid"></div>
     </div>
 
-    <!-- RIGHT: demo CTA -->
-    <div class="heroRight rev" style="transition-delay:.1s">
-      <div class="demoCta">
-        <div class="demoCtaGlow"></div>
-        <div class="demoCtaTag">Live-simulation</div>
-        <div class="demoCtaTitle">Se ProviaAI i aktion</div>
-        <div class="demoCtaSub">Följ Vilgot R genom ett helt provpass — material, mockprov, rättning och AI-coach.</div>
-        <a class="btn btnP demoCtaBtn" href="live-demo.html">Visa ProviaAI</a>
-        <div class="demoCtaSteps">
-          <span><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="2" width="10" height="12" rx="1"/><line x1="6" y1="6" x2="10" y2="6"/><line x1="6" y1="9" x2="10" y2="9"/></svg> Material</span>
-          <span class="demoCtaArrow">→</span>
-          <span><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 4h10M3 8h6M3 12h8"/></svg> Prov</span>
-          <span class="demoCtaArrow">→</span>
-          <span><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="2 9 6 13 14 3"/></svg> Rättning</span>
-          <span class="demoCtaArrow">→</span>
-          <span><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="7" r="4"/><path d="M4.5 13c.8-1.2 2-2 3.5-2s2.7.8 3.5 2"/></svg> Coach</span>
+    <div class="heroContent">
+      <img src="image/proviaai-logo.png" class="heroLogo" alt="" aria-hidden="true" width="72" height="72">
+
+      <div class="heroEye" id="heroEye">Körkortsteorin med AI</div>
+
+      <h1 class="heroTitle" aria-label="Klara teoriprovet på första försöket">
+        <span class="w"><span class="wi">Klara&nbsp;</span></span><span class="w"><span class="wi">teoriprovet</span></span><br>
+        <span class="w"><span class="wi">på&nbsp;</span></span><span class="w"><span class="wi"><em>första</em>&nbsp;</span></span><span class="w"><span class="wi">försöket</span></span>
+      </h1>
+
+      <p class="heroSub" id="heroSub">
+        368 frågor · 16 kategorier · AI-förklaring varje svar.<br>
+        Simulerat prov som Transportstyrelsens riktiga.
+      </p>
+
+      <button class="ctaBtn" id="ctaBtn" aria-haspopup="dialog">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><polygon points="3,1 15,8 3,15"/></svg>
+        <span>Starta körkortet</span>
+        <span class="ctaShimmer" aria-hidden="true"></span>
+      </button>
+
+      <div class="heroStats" id="heroStats" aria-label="Nyckeltal">
+        <div class="stat">
+          <span class="statN" data-target="368">0</span>
+          <span class="statL">frågor</span>
+        </div>
+        <div class="statSep" aria-hidden="true"></div>
+        <div class="stat">
+          <span class="statN" data-target="16">0</span>
+          <span class="statL">kategorier</span>
+        </div>
+        <div class="statSep" aria-hidden="true"></div>
+        <div class="stat">
+          <span class="statN" data-target="52">0</span>
+          <span class="statL">rätt = godkänt</span>
         </div>
       </div>
+
+      <p class="heroFree" id="heroFree">Gratis att starta · inget kort krävs</p>
+    </div>
+
+    <div class="scrollHint" aria-hidden="true">
+      <div class="scrollMouse"></div>
+      <span>Scrolla</span>
     </div>
   </section>
 
-  <!-- ═══ KÖRKORTSTEORIN FEATURE ═══ -->
-  <div class="pricingCta rev" style="margin-top:16px;margin-bottom:0">
-    <div class="pricingInner">
-      <div class="pricingLeft">
-        <div class="pricingEye">Körkortsteorin — huvudfunktionen</div>
-        <div class="pricingTitle" style="font-size:15px;margin-bottom:10px">Klara teoriprovet på <em style="font-style:normal;color:var(--a)">första försöket</em></div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">✓ 368 frågor · 16 kategorier</span>
-          <span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">✓ Adaptivt — fokuserar dina svagheter</span>
-          <span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">✓ Teoriprov som riktiga provet</span>
-          <span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">✓ AI-förklaring efter varje svar</span>
+  <div class="wrap">
+
+    <!-- ═══ FEATURES ═══ -->
+    <section class="feats" aria-label="Vad ingår">
+      <p class="secEye rev">Vad ingår</p>
+      <h2 class="secTitle rev">Allt du behöver för teoriprovet</h2>
+      <div class="featsGrid">
+
+        <div class="feat rev">
+          <span class="featBig counter" data-target="368">0</span>
+          <div class="featLabel">Frågor</div>
+          <div class="featT">Komplett frågebank</div>
+          <div class="featD">Alla 368 frågor fördelade på 16 ämnesområden — exakt som Transportstyrelsens teoriprov.</div>
+        </div>
+
+        <div class="feat rev" style="--d:.09s">
+          <span class="featIcon">🤖</span>
+          <div class="featLabel">AI-förklaring</div>
+          <div class="featT">Förstå varje svar</div>
+          <div class="featD">AI förklarar rätt och fel direkt efter varje fråga. Lär dig riktigt — inte bara memorera.</div>
+        </div>
+
+        <div class="feat rev" style="--d:.18s">
+          <span class="featIcon">🎯</span>
+          <div class="featLabel">Simulerat prov</div>
+          <div class="featT">Som riktiga provet</div>
+          <div class="featD">65 slumpade frågor på 50 minuter med 52 rätt för godkänt — precis som på Transportstyrelsen.</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══ STEPS ═══ -->
+    <section class="steps rev" aria-label="Hur det funkar">
+      <h2 class="secTitle" style="margin-bottom:0">Hur det funkar</h2>
+      <div class="stepsRow">
+        <div class="stepsConnector" aria-hidden="true"></div>
+        <div class="step">
+          <div class="stepNum">01</div>
+          <div class="stepT">Välj läge</div>
+          <div class="stepD">Träna fritt per kategori, kör simulerat teoriprov eller fokusera svaga delar.</div>
+        </div>
+        <div class="step">
+          <div class="stepNum">02</div>
+          <div class="stepT">Svara &amp; lär dig</div>
+          <div class="stepD">AI förklarar varje svar direkt. Förstå varför — inte bara vad.</div>
+        </div>
+        <div class="step">
+          <div class="stepNum">03</div>
+          <div class="stepT">Bygg på misstagen</div>
+          <div class="stepD">Systemet minns dina misstag och fokuserar träningen dit du behöver den mest.</div>
         </div>
       </div>
-      <div class="pricingRight">
-        <a class="btn btnP pricingBtn" href="korkortet.html">Starta körkortsteorin →</a>
-        <p class="pricingNote">2 gratis test / vecka · inget kort krävs</p>
-      </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- ═══ SECTIONS ═══ -->
-  <div class="sections">
+    <!-- ═══ FAQ ═══ -->
+    <section class="faq rev" aria-label="Vanliga frågor">
+      <h2 class="secTitle" style="text-align:left;margin-bottom:24px">Vanliga frågor</h2>
 
-    <div class="sec rev" id="how">
-      <div class="secH" data-t="how">
-        <span class="secN">01</span>
-        <div class="secM">
-          <div class="secT">Hur det funkar</div>
-          <div class="secD">Fem steg från material till rättning</div>
+      <div class="faqItem">
+        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+          <span>Är det gratis att använda?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
         </div>
-        <svg class="secCh" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
+        <div class="faqA" role="region">2 träningspass i veckan är helt gratis — inget kort krävs. Premium (79 kr/mån) ger obegränsad träning och AI-coach.</div>
       </div>
-      <div class="secLine"></div>
-      <div class="secB">
-        <ol class="olist">
-          <li>Klistra in studiematerialet — rubriker, punkter, definitioner.</li>
-          <li>Välj nivå (E/C/A), frågetyp och antal frågor.</li>
-          <li>Besvara mockprovet direkt i appen.</li>
-          <li>Rätta och få poäng, feedback och modellsvar.</li>
-          <li>Förbättringssidan sparar historik och bygger din felbank.</li>
-        </ol>
-      </div>
-    </div>
 
-    <div class="sec col rev" id="feat">
-      <div class="secH" data-t="feat">
-        <span class="secN">02</span>
-        <div class="secM">
-          <div class="secT">Funktioner</div>
-          <div class="secD">Allt som behövs för strukturerad provträning</div>
+      <div class="faqItem">
+        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+          <span>Hur likt är det riktiga teoriprovet?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
         </div>
-        <svg class="secCh" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
+        <div class="faqA" role="region">Simulerat teoriprovläge kör 65 slumpade frågor på 50 minuter med 52 rätt för godkänt — exakt samma upplägg som Transportstyrelsens officiella prov.</div>
       </div>
-      <div class="secLine"></div>
-      <div class="secB">
-        <ul class="list">
-          <li>Mockprov direkt från ditt material</li>
-          <li>Flervalsfrågor + kortsvar + OCR från bild</li>
-          <li>Poäng per fråga med förbättringstips och modellsvar</li>
-          <li>"Träna mina misstag"-läge — generera nytt prov från dina svagheter</li>
-          <li>Synk mellan enheter via konto</li>
-        </ul>
-      </div>
-    </div>
 
-    <div class="sec col rev" id="coach">
-      <div class="secH" data-t="coach">
-        <span class="secN">03</span>
-        <div class="secM">
-          <div class="secT">AI-coach</div>
-          <div class="secD">Personlig plan baserad på dina faktiska misstag</div>
+      <div class="faqItem">
+        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+          <span>Vad ingår i körkortsteorin?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
         </div>
-        <svg class="secCh" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
+        <div class="faqA" role="region">368 frågor på 16 ämnesområden: vägmärken, trafikregler, korsningar, alkohol &amp; droger, mörker, nödsituationer, miljö och mer. AI-förklaring till varje svar.</div>
       </div>
-      <div class="secLine"></div>
-      <div class="secB">
-        <ul class="list">
-          <li>Sammanfattning av senaste prov och din trend</li>
-          <li>Felbank med modellsvar för varje misstag</li>
-          <li>Träningsläge: generera prov utifrån just dina svaga delar</li>
-        </ul>
-      </div>
-    </div>
 
-    <div class="sec col rev" id="faq">
-      <div class="secH" data-t="faq">
-        <span class="secN">04</span>
-        <div class="secM">
-          <div class="secT">FAQ</div>
-          <div class="secD">Vanliga frågor</div>
-        </div>
-        <svg class="secCh" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
-      </div>
-      <div class="secLine"></div>
-      <div class="secB">
-        <ul class="list">
-          <li><strong style="color:var(--t)">Är det gratis?</strong><br>Ja — du kan träna körkortsteorin och göra 2 test i veckan helt gratis utan kortuppgifter. Premium (79 kr/mån) ger obegränsad träning + AI-coach.</li>
-          <li><strong style="color:var(--t)">Vad ingår i körkortsteorin?</strong><br>368 frågor fördelade på 16 ämnesområden — exakt som Transportstyrelsens teoriprov. Inkluderar vägmärken, trafikregler, korsningar, alkohol, mörker, nödsituationer och mer. AI förklarar varje svar.</li>
-          <li><strong style="color:var(--t)">Hur likt är det riktiga teoriprovet?</strong><br>Teoriprovsläget kör 65 slumpade frågor på 50 minuter med 52 rätt för godkänt — precis som Transportstyrelsens prov. Frågorna är kategorifördelade precis som i det officiella provet.</li>
-        </ul>
-      </div>
-    </div>
+    </section>
 
-    <!-- PRICING CTA -->
-    <div class="pricingCta rev">
-      <div class="pricingInner">
-        <div class="pricingLeft">
-          <div class="pricingEye">Priser &amp; medlemskap</div>
-          <div class="pricingTitle">Enkel prissättning.<br>Ingen bindningstid.</div>
-          <div class="pricingPlans">
-            <div class="plan">
-              <span class="planName">Gratis</span>
-              <span class="planPrice">0 kr</span>
-              <span class="planDesc">2 prov / vecka</span>
+    <!-- ═══ PRICING ═══ -->
+    <section class="pricingStrip rev" aria-label="Priser">
+      <div class="pCard">
+        <div class="pLeft">
+          <div class="pEye">Priser &amp; medlemskap</div>
+          <div class="pH">Enkel prissättning. Ingen bindningstid.</div>
+          <div class="pTiers">
+            <div class="tier">
+              <span class="tierName">Gratis</span>
+              <span class="tierPrice">0 kr</span>
+              <span class="tierDesc">2 prov / vecka</span>
             </div>
-            <div class="planDivider"></div>
-            <div class="plan">
-              <span class="planName">Basic</span>
-              <span class="planPrice">29 kr<span class="planPer">/mån</span></span>
-              <span class="planDesc">30 prov / månad</span>
+            <div class="tierSep" aria-hidden="true"></div>
+            <div class="tier">
+              <span class="tierName">Basic</span>
+              <span class="tierPrice">29 kr<sub>/mån</sub></span>
+              <span class="tierDesc">30 prov / månad</span>
             </div>
-            <div class="planDivider"></div>
-            <div class="plan">
-              <span class="planName">Premium</span>
-              <span class="planPrice">79 kr<span class="planPer">/mån</span></span>
-              <span class="planDesc">Obegränsat + AI-coach</span>
+            <div class="tierSep" aria-hidden="true"></div>
+            <div class="tier">
+              <span class="tierName">Premium</span>
+              <span class="tierPrice">79 kr<sub>/mån</sub></span>
+              <span class="tierDesc">Obegränsat + AI-coach</span>
             </div>
           </div>
         </div>
-        <div class="pricingRight">
-          <a class="btn btnP pricingBtn" href="pricing.html">Se alla planer →</a>
-          <p class="pricingNote">Ingen kortuppgift krävs för att starta.</p>
+        <div class="pRight">
+          <a class="btn btnP" href="pricing.html" style="height:40px;padding:0 22px;font-size:13.5px">Se alla planer →</a>
+          <p class="pNote">Ingen kortuppgift krävs för att starta.</p>
         </div>
       </div>
-    </div>
+    </section>
 
-  </div>
-</div><!-- /wrap -->
+  </div><!-- /wrap -->
 </main>
 
 <footer>
@@ -495,214 +671,202 @@
     <span style="color:var(--l2)">·</span>
     <a href="pricing.html" class="fLink">Priser</a>
     <span style="color:var(--l2)">·</span>
-    <a href="app.html" class="fLink">Starta appen</a>
+    <a href="app.html" class="fLink">Mockprov</a>
     <span style="color:var(--l2)">·</span>
     <span>Studiestöd — ingen officiell betygssättning</span>
   </div>
 </footer>
 
+<!-- BOTTOM SHEET -->
+<div class="backdrop" id="backdrop" aria-hidden="true"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Välj träningsläge" aria-hidden="true">
+  <div class="sheetHandle" aria-hidden="true"></div>
+  <div class="sheetHead">Välj läge</div>
+  <div class="sheetOpts">
+    <a class="sOpt" href="korkortet.html">
+      <div class="sIco" aria-hidden="true">📚</div>
+      <div class="sBody">
+        <div class="sT">Träna efter kategori</div>
+        <div class="sS">16 ämnesområden · välj själv</div>
+      </div>
+      <svg class="sArr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="6 3 11 8 6 13"/></svg>
+    </a>
+    <a class="sOpt" href="korkortet.html">
+      <div class="sIco" aria-hidden="true">🎯</div>
+      <div class="sBody">
+        <div class="sT">Simulerat teoriprov</div>
+        <div class="sS">65 frågor · 50 minuter · som riktiga</div>
+      </div>
+      <svg class="sArr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="6 3 11 8 6 13"/></svg>
+    </a>
+    <a class="sOpt" href="korkortet.html">
+      <div class="sIco" aria-hidden="true">🔁</div>
+      <div class="sBody">
+        <div class="sT">Träna mina misstag</div>
+        <div class="sS">AI fokuserar dina svaga delar</div>
+      </div>
+      <svg class="sArr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="6 3 11 8 6 13"/></svg>
+    </a>
+  </div>
+</div>
+
+<!-- CURSOR -->
+<div id="cDot" aria-hidden="true"></div>
+<div id="cRing" aria-hidden="true"><div></div></div>
+
 <script>
-/* ── LOADER ── */
-window.addEventListener("load", () => setTimeout(() => document.getElementById("ldr").classList.add("out"), 160));
+/* LOADER */
+window.addEventListener("load",()=>setTimeout(()=>document.getElementById("ldr").classList.add("out"),160));
 
-/* ── MENU ── */
-const mBtn = document.getElementById("mBtn");
-const drop = document.getElementById("drop");
+/* YEAR */
+document.getElementById("yr").textContent=new Date().getFullYear();
+
+/* MENU */
+const mBtn=document.getElementById("mBtn"),drop=document.getElementById("drop");
 let ct;
-function openDrop(){
-  clearTimeout(ct); drop.classList.remove("off");
-  drop.style.display = "block";
-  requestAnimationFrame(() => drop.classList.add("on"));
-  mBtn.setAttribute("aria-expanded","true");
-}
-function closeDrop(){
-  mBtn.setAttribute("aria-expanded","false");
-  drop.classList.remove("on"); drop.classList.add("off");
-  clearTimeout(ct);
-  ct = setTimeout(() => { drop.classList.remove("off"); drop.style.display="none"; }, 120);
-}
-mBtn.addEventListener("click", e => { e.stopPropagation(); drop.classList.contains("on") ? closeDrop() : openDrop(); });
-document.addEventListener("click", e => { if (!drop.classList.contains("on")) return; if (!drop.contains(e.target) && !mBtn.contains(e.target)) closeDrop(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrop(); });
-drop.addEventListener("click", e => {
-  const a = e.target.closest("[data-s]");
-  if (!a) return; e.preventDefault(); closeDrop();
-  const el = document.querySelector(a.dataset.s);
-  if (el) el.scrollIntoView({ behavior:"smooth", block:"start" });
+function openDrop(){clearTimeout(ct);drop.classList.remove("off");drop.style.display="block";requestAnimationFrame(()=>drop.classList.add("on"));mBtn.setAttribute("aria-expanded","true")}
+function closeDrop(){mBtn.setAttribute("aria-expanded","false");drop.classList.remove("on");drop.classList.add("off");clearTimeout(ct);ct=setTimeout(()=>{drop.classList.remove("off");drop.style.display="none"},120)}
+mBtn.addEventListener("click",e=>{e.stopPropagation();drop.classList.contains("on")?closeDrop():openDrop()});
+document.addEventListener("click",e=>{if(!drop.classList.contains("on"))return;if(!drop.contains(e.target)&&!mBtn.contains(e.target))closeDrop()});
+
+/* SHEET */
+const ctaBtn=document.getElementById("ctaBtn"),backdrop=document.getElementById("backdrop"),sheet=document.getElementById("sheet");
+function openSheet(){backdrop.classList.add("show");sheet.classList.add("show");backdrop.removeAttribute("aria-hidden");sheet.removeAttribute("aria-hidden");sheet.querySelector(".sOpt").focus()}
+function closeSheet(){backdrop.classList.remove("show");sheet.classList.remove("show");backdrop.setAttribute("aria-hidden","true");sheet.setAttribute("aria-hidden","true");ctaBtn.focus()}
+ctaBtn.addEventListener("click",openSheet);
+backdrop.addEventListener("click",closeSheet);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeDrop();closeSheet()}});
+let ty=0;
+sheet.addEventListener("touchstart",e=>{ty=e.touches[0].clientY},{passive:true});
+sheet.addEventListener("touchend",e=>{if(e.changedTouches[0].clientY-ty>60)closeSheet()},{passive:true});
+
+/* FAQ */
+document.querySelectorAll(".faqQ").forEach(q=>{
+  const activate=()=>{
+    const item=q.parentElement;
+    const wasOpen=item.classList.contains("open");
+    document.querySelectorAll(".faqItem.open").forEach(i=>{i.classList.remove("open");i.querySelector(".faqQ").setAttribute("aria-expanded","false")});
+    if(!wasOpen){item.classList.add("open");q.setAttribute("aria-expanded","true")}
+  };
+  q.addEventListener("click",activate);
+  q.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate()}});
 });
-/* hero scroll link */
-document.querySelectorAll("[data-s]").forEach(el => {
-  if (el.closest(".drop")) return;
-  el.addEventListener("click", e => {
-    e.preventDefault();
-    const t = document.querySelector(el.dataset.s);
-    if (t) t.scrollIntoView({ behavior:"smooth", block:"start" });
-  });
-});
-
-/* ── COLLAPSIBLE ── */
-document.querySelectorAll("[data-t]").forEach(btn => {
-  const sec = document.getElementById(btn.dataset.t);
-  btn.addEventListener("click", () => sec && sec.classList.toggle("col"));
-});
-
-/* ── SCROLL REVEAL — placeholder; GSAP block below handles this ── */
-
-/* ── FOOTER YEAR ── */
-const yrEl = document.getElementById("yr");
-if (yrEl) yrEl.textContent = new Date().getFullYear();
-
 </script>
 
-<!-- GSAP + ScrollTrigger -->
+<!-- GSAP -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
-/* ── GSAP SCROLL & HERO ANIMATIONS ── */
 (function(){
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  if (reduced) {
-    document.querySelectorAll(".rev").forEach(el => { el.style.opacity = "1"; el.style.transform = "none"; });
+  const reduced=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  if(reduced){
+    document.querySelectorAll(".rev,.heroSub,.ctaBtn,.heroStats,.heroFree").forEach(el=>{el.style.opacity="1";el.style.transform="none"});
+    document.querySelectorAll(".wi").forEach(el=>el.style.transform="none");
+    document.querySelectorAll(".statN,.counter").forEach(el=>el.textContent=el.dataset.target||el.textContent);
     return;
   }
 
   gsap.registerPlugin(ScrollTrigger);
 
-  /* initial states */
-  gsap.set(".heroLeft, .heroRight", { opacity: 1, y: 0 });
-  gsap.set(".heroLeft > *", { opacity: 0, y: 22 });
-  gsap.set(".heroRight .demoCta", { opacity: 0, y: 18, x: 12 });
-  gsap.utils.toArray(".sec, .pricingCta").forEach(el => gsap.set(el, { opacity: 0, y: 28 }));
+  /* — HERO — */
+  window.addEventListener("load",()=>{
+    setTimeout(()=>{
+      const tl=gsap.timeline({defaults:{ease:"power3.out"}});
 
-  /* hero entrance — small buffer so loader starts fading (loader hides at load+160ms) */
-  window.addEventListener("load", () => {
-    setTimeout(() => {
-      gsap.timeline({ defaults: { ease: "power3.out" } })
-        .to(".heroLeft > *", { opacity: 1, y: 0, duration: 0.5, stagger: 0.08 })
-        .to(".heroRight .demoCta", { opacity: 1, y: 0, x: 0, duration: 0.55 }, "-=0.3");
-    }, 80);
+      tl.from("#heroEye",{opacity:0,y:12,duration:.4});
+      tl.to(".wi",{y:"0%",duration:.55,stagger:.065,ease:"power3.out"},"-=.2");
+      tl.to("#heroSub",{opacity:1,duration:.4},"-=.25");
+      tl.to("#ctaBtn",{opacity:1,duration:.38,ease:"back.out(1.5)"},"-=.2");
+
+      /* stats count-up */
+      tl.to("#heroStats",{opacity:1,duration:.3},"-=.1");
+      document.querySelectorAll(".statN[data-target]").forEach((el,i)=>{
+        const target=+el.dataset.target;
+        tl.to(el,{
+          textContent:target,duration:.9,ease:"power2.out",
+          snap:{textContent:1},
+          onUpdate(){el.textContent=Math.round(+el.textContent)}
+        },i===0?"-=.45":"-=.82");
+      });
+
+      tl.to("#heroFree",{opacity:1,duration:.3},"-=.2");
+    },100);
   });
 
-  /* section reveals */
-  gsap.utils.toArray(".sec").forEach(el => {
-    gsap.to(el, {
-      scrollTrigger: { trigger: el, start: "top 87%", once: true },
-      opacity: 1, y: 0, duration: 0.52, ease: "power2.out"
+  /* — SCROLL REVEALS — */
+  gsap.utils.toArray(".rev").forEach(el=>{
+    const d=parseFloat(getComputedStyle(el).getPropertyValue("--d")||"0");
+    gsap.to(el,{
+      scrollTrigger:{trigger:el,start:"top 88%",once:true},
+      opacity:1,y:0,duration:.55,delay:d,ease:"power2.out"
     });
   });
 
-  /* pricing CTA */
-  gsap.to(".pricingCta", {
-    scrollTrigger: { trigger: ".pricingCta", start: "top 88%", once: true },
-    opacity: 1, y: 0, duration: 0.6, ease: "power3.out"
+  /* — FEATURE COUNTER — */
+  document.querySelectorAll(".counter[data-target]").forEach(el=>{
+    const target=+el.dataset.target;
+    ScrollTrigger.create({
+      trigger:el,start:"top 85%",once:true,
+      onEnter(){
+        gsap.to(el,{
+          textContent:target,duration:1.1,ease:"power2.out",
+          snap:{textContent:1},
+          onUpdate(){el.textContent=Math.round(+el.textContent)}
+        });
+      }
+    });
   });
 
-  /* hero glow parallax */
-  gsap.to(".demoCtaGlow", {
-    y: 50,
-    ease: "none",
-    scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1.5 }
-  });
+  /* — CARD TILT — desktop only */
+  if(window.matchMedia("(pointer:fine)").matches){
+    document.querySelectorAll(".feat").forEach(card=>{
+      card.addEventListener("mousemove",e=>{
+        const r=card.getBoundingClientRect();
+        const x=(e.clientX-r.left-r.width/2)/(r.width/2);
+        const y=(e.clientY-r.top-r.height/2)/(r.height/2);
+        gsap.to(card,{rotationY:x*6,rotationX:-y*4,duration:.3,ease:"power2.out",transformPerspective:700,transformOrigin:"center center"});
+      });
+      card.addEventListener("mouseleave",()=>{
+        gsap.to(card,{rotationY:0,rotationX:0,duration:.5,ease:"power3.out"});
+      });
+    });
+  }
 
-  /* list item stagger on open sections */
-  document.querySelectorAll(".secH[data-t]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const sec = document.getElementById(btn.dataset.t);
-      if (!sec || sec.classList.contains("col")) return;
-      const items = sec.querySelectorAll(".list li, .olist li");
-      gsap.from(items, { opacity: 0, x: -12, duration: 0.35, stagger: 0.06, ease: "power2.out", delay: 0.05 });
+  /* — STEPS STAGGER — */
+  document.querySelectorAll(".step").forEach((el,i)=>{
+    gsap.from(el,{
+      scrollTrigger:{trigger:el,start:"top 88%",once:true},
+      opacity:0,y:18,duration:.45,delay:i*.1,ease:"power2.out"
     });
   });
 })();
 </script>
 
-<!-- CUSTOM CURSOR -->
-<div id="cursorDot" aria-hidden="true"></div>
-<div id="cursorRing" aria-hidden="true"><div></div></div>
-<div id="cursorLabel" aria-hidden="true"></div>
-
+<!-- CURSOR -->
 <script>
-/* ── CUSTOM CURSOR ── */
 (function(){
-  /* touch / coarse pointer — skip */
-  if (window.matchMedia("(pointer: coarse)").matches || ("ontouchstart" in window)) return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-  const dot  = document.getElementById("cursorDot");
-  const ring = document.getElementById("cursorRing");
-  const lbl  = document.getElementById("cursorLabel");
-  if (!dot || !ring) return;
-
-  let mx = -200, my = -200;
-  let rx = -200, ry = -200;
-  let visible = false;
-
-  /* lerp ring via rAF */
-  (function raf() {
-    rx += (mx - rx) * 0.12;
-    ry += (my - ry) * 0.12;
-    ring.style.transform = `translate(${rx - 14}px,${ry - 14}px)`;
-    requestAnimationFrame(raf);
-  })();
-
-  const HOVER = "a,button,[data-t],input,select,label,.btn";
-  let lastEl = null;
-
-  function applyHover(el) {
-    if (el === lastEl) return;
-    lastEl = el;
-    if (el) {
-      ring.classList.add("rHov");
-      dot.style.transform = `translate(${mx - 3}px,${my - 3}px) scale(.5)`;
-      if (lbl) {
-        const isBtnP = el.matches(".btnP");
-        const isPricing = el.matches('[href="pricing.html"]') || el.closest('[href="pricing.html"]');
-        const isSec = el.matches("[data-t]") || el.closest("[data-t]");
-        const txt = isBtnP ? "Starta →" : isPricing ? "Se priser" : isSec ? "Öppna" : "";
-        lbl.textContent = txt;
-        lbl.style.opacity = txt ? "1" : "0";
-      }
-    } else {
-      ring.classList.remove("rHov");
-      dot.style.transform = `translate(${mx - 3}px,${my - 3}px)`;
-      if (lbl) lbl.style.opacity = "0";
-    }
+  if(window.matchMedia("(pointer:coarse)").matches||"ontouchstart" in window)return;
+  if(window.matchMedia("(prefers-reduced-motion:reduce)").matches)return;
+  const dot=document.getElementById("cDot"),ring=document.getElementById("cRing");
+  if(!dot||!ring)return;
+  let mx=-200,my=-200,rx=-200,ry=-200,vis=false,lastEl=null;
+  (function raf(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.transform=`translate(${rx-14}px,${ry-14}px)`;requestAnimationFrame(raf)})();
+  const SEL="a,button,.sOpt,.faqQ,.feat";
+  function applyH(el){
+    if(el===lastEl)return;lastEl=el;
+    if(el){ring.classList.add("rH");dot.style.transform=`translate(${mx-3}px,${my-3}px) scale(.5)`}
+    else{ring.classList.remove("rH");dot.style.transform=`translate(${mx-3}px,${my-3}px)`}
   }
-
-  document.addEventListener("mousemove", e => {
-    mx = e.clientX; my = e.clientY;
-    if (!visible) {
-      visible = true;
-      dot.style.opacity = "1";
-      ring.style.opacity = "1";
-    }
-    dot.style.transform = `translate(${mx - 3}px,${my - 3}px)${lastEl ? " scale(.5)" : ""}`;
-    if (lbl) { lbl.style.left = (mx + 14) + "px"; lbl.style.top = (my + 8) + "px"; }
-    applyHover(e.target?.closest ? e.target.closest(HOVER) : null);
+  document.addEventListener("mousemove",e=>{
+    mx=e.clientX;my=e.clientY;
+    if(!vis){vis=true;dot.style.opacity="1";ring.style.opacity="1"}
+    dot.style.transform=`translate(${mx-3}px,${my-3}px)${lastEl?" scale(.5)":""}`;
+    applyH(e.target?.closest?e.target.closest(SEL):null);
   });
-
-  document.addEventListener("mousedown", () => {
-    ring.classList.remove("rHov");
-    ring.classList.add("rDown");
-    dot.style.transform = `translate(${mx - 3}px,${my - 3}px) scale(1.5)`;
-    if (lbl) lbl.style.opacity = "0";
-  });
-
-  document.addEventListener("mouseup", () => {
-    ring.classList.remove("rDown");
-    applyHover(lastEl); /* restore hover state */
-  });
-
-  document.addEventListener("mouseleave", () => {
-    dot.style.opacity = "0"; ring.style.opacity = "0";
-    if (lbl) lbl.style.opacity = "0";
-    visible = false;
-  });
-
-  document.addEventListener("mouseenter", () => {
-    if (visible) { dot.style.opacity = "1"; ring.style.opacity = "1"; }
-  });
+  document.addEventListener("mousedown",()=>{ring.classList.remove("rH");ring.classList.add("rD")});
+  document.addEventListener("mouseup",()=>{ring.classList.remove("rD");applyH(lastEl)});
+  document.addEventListener("mouseleave",()=>{dot.style.opacity="0";ring.style.opacity="0";vis=false});
+  document.addEventListener("mouseenter",()=>{if(vis){dot.style.opacity="1";ring.style.opacity="1"}});
 })();
 </script>
 </body>
