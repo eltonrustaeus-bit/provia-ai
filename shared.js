@@ -212,6 +212,14 @@
     function landingQKey() { return 'proviaai_lq_' + new Date().toISOString().slice(0,10); }
     function landingGKey() { return 'proviaai_lg_' + new Date().toISOString().slice(0,10); }
 
+    var FIRST_VISIT_KEY = 'provia_per_intro_v1';
+    function isFirstVisit() {
+      try { return !localStorage.getItem(FIRST_VISIT_KEY); } catch(_) { return false; }
+    }
+    function markVisited() {
+      try { localStorage.setItem(FIRST_VISIT_KEY, '1'); } catch(_) {}
+    }
+
     function getLandingQuota() {
       try { return parseInt(localStorage.getItem(landingQKey()) || '0', 10); } catch (_) { return 0; }
     }
@@ -414,18 +422,38 @@
       return s;
     }
 
+    var _perNavLabels = {
+      'pricing.html': 'Se alla priser →',
+      'korkortet.html': 'Starta körkortsteorin →',
+      'app.html': 'Prova Mockprov →',
+      'förbättring.html': 'Öppna AI-coachen →',
+      'konto.html': 'Hantera konto →',
+      'live-demo.html': 'Se live-demo →'
+    };
+
     function finalizeMsg(div, text) {
+      var gotoMatch = text.match(/\s*\[GOTO:([^\]]+)\]/);
+      var cleanText = text.replace(/\s*\[GOTO:[^\]]+\]/g, '').trim();
       div.className = 'per-msg teacher';
-      div.innerHTML = renderMd(text);
+      div.innerHTML = renderMd(cleanText);
       div.title = 'Klicka för att kopiera';
       div.style.cursor = 'pointer';
       div.onclick = function() {
         if (!navigator.clipboard) return;
-        navigator.clipboard.writeText(text).then(function() {
+        navigator.clipboard.writeText(cleanText).then(function() {
           div.style.opacity = '0.5';
           setTimeout(function() { div.style.opacity = ''; }, 220);
         }).catch(function() {});
       };
+      if (gotoMatch) {
+        var href = gotoMatch[1].trim();
+        var navBtn = document.createElement('a');
+        navBtn.href = href;
+        navBtn.className = 'per-nav-cta';
+        navBtn.textContent = _perNavLabels[href] || 'Gå dit →';
+        navBtn.onclick = function(e) { e.stopPropagation(); };
+        div.appendChild(navBtn);
+      }
     }
 
     function addMsg(text, type) {
@@ -447,6 +475,10 @@
 
     async function send(q) {
       if (!q) return;
+      var chipsEl = document.querySelector('.per-chips');
+      if (chipsEl) chipsEl.remove();
+      var perAvEl = document.querySelector('.per-av');
+      if (perAvEl) perAvEl.classList.remove('per-listening');
       var input = document.getElementById('perInput');
       if (input) input.value = '';
       var sendBtn = document.getElementById('perSendBtn');
@@ -532,7 +564,7 @@
                 var ev = JSON.parse(sseLine.slice(6));
                 if (ev.delta) {
                   answerText += ev.delta;
-                  if (typing) typing.textContent = answerText;
+                  if (typing) typing.textContent = answerText.replace(/\s*\[GOTO:[^\]]+\]/g, '');
                   var msgsEl2 = document.getElementById('perMessages');
                   if (msgsEl2) msgsEl2.scrollTop = msgsEl2.scrollHeight;
                 }
@@ -592,20 +624,53 @@
       }
     }
 
+    function typewriterMsg(div, text, speed) {
+      var i = 0;
+      speed = speed || 18;
+      div.textContent = '';
+      function tick() {
+        if (i < text.length) {
+          div.textContent += text.charAt(i++);
+          var msgs = document.getElementById('perMessages');
+          if (msgs) msgs.scrollTop = msgs.scrollHeight;
+          setTimeout(tick, speed);
+        }
+      }
+      tick();
+    }
+
+    function addQuickReplies(chips) {
+      var msgs = document.getElementById('perMessages');
+      if (!msgs) return;
+      var existing = msgs.querySelector('.per-chips');
+      if (existing) existing.remove();
+      var row = document.createElement('div');
+      row.className = 'per-chips';
+      chips.forEach(function(chip) {
+        var btn = document.createElement('button');
+        btn.className = 'per-chip';
+        btn.textContent = chip;
+        btn.onclick = function() { row.remove(); send(chip); };
+        row.appendChild(btn);
+      });
+      msgs.appendChild(row);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
     function initWidget() {
       if (document.getElementById('perWidget')) return;
 
       var style = document.createElement('style');
       style.textContent = [
         '#perWidget{position:fixed;bottom:22px;right:22px;z-index:9999;font-family:"DM Sans",sans-serif}',
-        '#perBubble{width:52px;height:52px;border-radius:50%;background:var(--a,#1bff8c);border:none;cursor:pointer;display:grid;place-items:center;font-size:22px;box-shadow:0 4px 20px rgba(27,255,140,.4);transition:transform .15s,box-shadow .15s}',
+        '#perBubble{width:52px;height:52px;border-radius:50%;background:var(--a,#1bff8c);border:none;cursor:pointer;display:grid;place-items:center;font-size:10px;font-family:"DM Mono",monospace;font-weight:700;letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.4);transition:transform .15s,box-shadow .15s,color .15s}',
         '#perBubble:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(27,255,140,.5)}',
-        '#perBubble.per-open{background:var(--s2,#162019);border:1px solid var(--l2,rgba(255,255,255,.15))}',
+        '#perBubble.per-open{background:var(--s2,#162019);border:1px solid var(--l2,rgba(255,255,255,.15));color:var(--a,#1bff8c)}',
         '#perPanel{display:none;position:absolute;bottom:64px;right:0;width:320px;background:var(--s,#111a15);border:1px solid var(--l2,rgba(255,255,255,.15));border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden;flex-direction:column}',
         '#perPanel.per-open{display:flex;animation:perUp .2s ease}',
         '@keyframes perUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
         '.per-hdr{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--l,rgba(255,255,255,.08));background:var(--s2,#162019)}',
-        '.per-av{width:32px;height:32px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;font-size:16px;flex-shrink:0}',
+        '.per-av{width:32px;height:32px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;flex-shrink:0;transition:background .2s,border-color .2s;overflow:hidden}',
         '.per-nm{font-weight:700;font-size:13px;color:var(--t,#e8f5ee)}',
         '.per-rl{font-size:10px;color:var(--t3,#5a7a6a);font-family:"DM Mono",monospace}',
         '.per-clr{margin-left:auto;background:none;border:none;color:var(--t3,#5a7a6a);font-size:10px;cursor:pointer;font-family:"DM Mono",monospace;padding:2px 6px;border-radius:4px}',
@@ -644,7 +709,22 @@
         '#perLandingBar a{color:var(--a,#1bff8c);text-decoration:none;font-weight:600;flex-shrink:0;margin-left:8px}',
         '#perLandingBar a:hover{text-decoration:underline}',
         '.per-answer-cta{display:block;margin-top:10px;padding:9px 14px;background:var(--a,#1bff8c);color:#08100d;border-radius:6px;font-size:12.5px;font-weight:700;text-decoration:none;text-align:center}',
-        '.per-answer-cta:hover{opacity:.88}'
+        '.per-answer-cta:hover{opacity:.88}',
+        '.per-av-txt{font-size:9px;font-family:"DM Mono",monospace;font-weight:700;letter-spacing:1.5px;color:var(--a,#1bff8c);user-select:none}',
+        '.per-av-bars{display:none;align-items:flex-end;gap:2px;height:16px}',
+        '.per-av-bars span{display:inline-block;width:3px;border-radius:3px;background:var(--a,#1bff8c)}',
+        '.per-av-bars span:nth-child(1){height:5px;animation:perListen .9s ease-in-out infinite}',
+        '.per-av-bars span:nth-child(2){height:11px;animation:perListen .9s ease-in-out .15s infinite}',
+        '.per-av-bars span:nth-child(3){height:7px;animation:perListen .9s ease-in-out .3s infinite}',
+        '@keyframes perListen{0%,100%{transform:scaleY(1);opacity:.8}50%{transform:scaleY(1.7);opacity:1}}',
+        '.per-av.per-listening{background:rgba(27,255,140,.22);border-color:rgba(27,255,140,.55)}',
+        '.per-av.per-listening .per-av-txt{display:none}',
+        '.per-av.per-listening .per-av-bars{display:flex}',
+        '.per-chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 2px}',
+        '.per-chip{background:none;border:1px solid rgba(27,255,140,.3);border-radius:20px;color:var(--a,#1bff8c);font-size:11.5px;font-family:"DM Sans",sans-serif;padding:5px 11px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap}',
+        '.per-chip:hover{background:rgba(27,255,140,.08);border-color:rgba(27,255,140,.6)}',
+        '.per-nav-cta{display:inline-flex;align-items:center;margin-top:10px;padding:8px 14px;background:none;border:1px solid rgba(27,255,140,.35);color:var(--a,#1bff8c);border-radius:6px;font-size:12px;font-family:"DM Sans",sans-serif;font-weight:600;text-decoration:none;cursor:pointer;transition:background .15s,border-color .15s}',
+        '.per-nav-cta:hover{background:rgba(27,255,140,.08);border-color:rgba(27,255,140,.7)}'
       ].join('');
       document.head.appendChild(style);
 
@@ -653,7 +733,7 @@
       widget.innerHTML =
         '<div id="perPanel">' +
           '<div class="per-hdr">' +
-            '<div class="per-av">👨‍🏫</div>' +
+            '<div class="per-av"><span class="per-av-txt">PER</span><span class="per-av-bars"><span></span><span></span><span></span></span></div>' +
             '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS EGNA AI-RESOURCE</div></div>' +
             '<div class="per-hdr-btns">' +
               '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
@@ -671,7 +751,7 @@
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
-        '<button id="perBubble" title="Chatta med P.E.R">👨‍🏫</button>';
+        '<button id="perBubble" title="Chatta med P.E.R">P·E·R</button>';
       document.body.appendChild(widget);
 
       document.getElementById('perBubble').onclick = toggle;
@@ -772,6 +852,14 @@
         micBtn.style.display = 'none';
       }
 
+      /* Listening state — avatar animates when input is focused */
+      var perAvEl = widget.querySelector('.per-av');
+      var perInpEl = document.getElementById('perInput');
+      if (perAvEl && perInpEl) {
+        perInpEl.addEventListener('focus', function() { perAvEl.classList.add('per-listening'); });
+        perInpEl.addEventListener('blur', function() { perAvEl.classList.remove('per-listening'); });
+      }
+
       /* Restore previous history — localStorage first, then sync from Supabase */
       var hist = perGetHist();
       if (hist.length > 0) {
@@ -818,12 +906,34 @@
         }).catch(function() {});
       });
 
-      /* Landing pages: show quota bar + proactive greeting */
+      /* Landing pages: show quota bar + first-visit intro or recurring nudge */
       if (isLanding()) {
         updateLandingBar();
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
-        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Fråga mig vad du undrar om Provia: vad det kostar, vad som ingår eller om det passar dig!';
-        maybeShowLandingGreeting();
+        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — din guide till Provia. Fråga mig vad du undrar!';
+        if (isFirstVisit()) {
+          markVisited();
+          setTimeout(function() {
+            if (!_open) {
+              toggle();
+              var introMsgs = document.getElementById('perMessages');
+              if (introMsgs) {
+                var introDiv = introMsgs.querySelector('.per-msg.teacher');
+                if (introDiv) {
+                  introDiv.className = 'per-msg teacher';
+                  introDiv.innerHTML = '';
+                  var introText = 'Hej! Jag är P.E.R — din guide här på Provia. Jag kan svara på vad Provia är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Vad undrar du?';
+                  typewriterMsg(introDiv, introText, 14);
+                  setTimeout(function() {
+                    addQuickReplies(['Vad är Provia?', 'Varför inte ChatGPT?', 'Vad kostar det?']);
+                  }, 2600);
+                }
+              }
+            }
+          }, 3500);
+        } else {
+          maybeShowLandingGreeting();
+        }
       } else {
         startNudgeTimer();
         maybeShowWeeklyCoach();

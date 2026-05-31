@@ -37,6 +37,17 @@ Ingen bindningstid. Ingen kortuppgift krävs för Gratis.
 **Det starkaste argumentet**
 Körkortsprovet kostar 325–400 kr att boka om. En månad Premium = 79 kr. Att misslyckas en gång extra kostar mer än fyra månader Provia.
 
+**Varför Provia och inte ChatGPT / Gemini / Copilot?**
+ChatGPT, Gemini och Copilot är bra på det mesta — men inte på att hjälpa dig med just ditt körkortsprov:
+- De vet inte vilken fråga du sitter på just nu
+- De minns inte dina misstag och svagheter mellan sessioner
+- De kan hitta på trafikregler (AI-hallucination) — farligt när du tränar inför ett prov som kräver exakt kunskap
+- De är inte anpassade för svenska teoriprov med Transportstyrelsens 368 officiella frågor
+P.E.R är kontextmedveten: ser din aktuella fråga, vilka kategorier du fastnar på, din provhistorik. Det är kärnaskillnaden.
+
+**Varför inte bara googla?**
+Google ger blandade källor av varierande kvalitet. P.E.R svarar direkt, vet exakt vilken fråga du sitter på, och minns vad du tränat på tidigare.
+
 **Körkortsteorin — specifikt**
 368 frågor, 16 kategorier (vägmärken, trafikregler, korsningar, alkohol, mörker, nödsituationer, miljö m.fl.).
 Adaptivt lärande fokuserar automatiskt på dina svagheter.
@@ -50,4 +61,4 @@ Klistra in studiematerial → välj nivå (E/C/A) och frågetyp → AI genererar
 Visar historik, felbank med AI-tips per misstag, träningsläge som genererar nytt prov från just dina svaga delar.`;
 
 export const SALES_TRIGGER_REGEX =
-  /uppgradera|premium|basic|pris|kostar|betala|värt|varför provia|varför ska jag|ska jag köpa|bättre än|jämfört med|vad kostar|vad ingår|vad får jag|membersh|plan|abonnemang|prenumeration|gratis räcker|räcker gratis|hinna|limit|gräns|hur många|avsluta|avbryta|avslutar|avlustar|cancel|säga upp|säg upp|konto|logga ut|byta plan|hantera|portal|stripe/i;
+  /uppgradera|premium|basic|pris|kostar|betala|värt|varför provia|varför ska jag|ska jag köpa|bättre än|jämfört med|vad kostar|vad ingår|vad får jag|membersh|plan|abonnemang|prenumeration|gratis räcker|räcker gratis|hinna|limit|gräns|hur många|avsluta|avbryta|avslutar|avlustar|cancel|säga upp|säg upp|konto|logga ut|byta plan|hantera|portal|stripe|chatgpt|chat gpt|gpt-?[0-9]?o?|gemini|copilot|openai|öppen ai|generell.{0,6}ai|annan.{0,6}ai|ai.{0,8}istäl|jämföra med|skillnad mot|google.{0,6}det/i;
