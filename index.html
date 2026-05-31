@@ -195,10 +195,42 @@
   }
   .statSep{width:1px;height:34px;background:var(--l);flex-shrink:0}
 
+  .demoBtn{
+    display:inline-flex;align-items:center;
+    height:58px;padding:0 28px;
+    font-family:var(--sans);font-size:15px;font-weight:600;
+    color:var(--t);letter-spacing:-.01em;
+    background:transparent;
+    border:1.5px solid rgba(27,255,140,.25);
+    border-radius:32px;text-decoration:none;
+    transition:border-color .18s,color .18s,background .18s;
+  }
+  .demoBtn:hover{border-color:rgba(27,255,140,.55);color:var(--a);background:rgba(27,255,140,.05)}
+
   .heroFree{
     font-family:var(--mono);font-size:10.5px;
     color:var(--t3);letter-spacing:.05em;opacity:0;
   }
+
+  /* MOCKPROV STRIP */
+  .mockStrip{
+    background:var(--s);border:1px solid var(--l2);
+    border-radius:12px;padding:24px 28px;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;
+    margin-bottom:0;
+    position:relative;overflow:hidden;
+  }
+  .mockStrip::before{
+    content:"";position:absolute;inset:0;
+    background:radial-gradient(ellipse 50% 100% at 0% 50%,rgba(27,255,140,.05),transparent 65%);
+    pointer-events:none;
+  }
+  .mockStripLeft{flex:1;min-width:180px;display:flex;align-items:center;gap:16px}
+  .mockStripIcon{font-size:28px;flex-shrink:0}
+  .mockStripEye{font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+  .mockStripT{font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;margin-bottom:4px}
+  .mockStripD{font-size:12.5px;color:var(--t2);line-height:1.55}
 
   /* Scroll indicator */
   .scrollHint {
@@ -433,8 +465,8 @@
   @media(prefers-reduced-motion:reduce){
     *{cursor:auto !important}
     #cDot,#cRing{display:none !important}
-    .bgG1,.bgG2,.heroLogo,.ctaBtn{animation:none !important}
-    .heroSub,.ctaBtn,.heroStats,.heroFree{opacity:1 !important}
+    .bgG1,.bgG2,.heroLogo,.ctaBtn,.ctaShimmer{animation:none !important}
+    .heroSub,.heroCtas,.heroStats,.heroFree{opacity:1 !important}
     .wi{transform:none !important}
     .rev{opacity:1 !important;transform:none !important}
     .scrollHint{opacity:1 !important;animation:none !important}
@@ -512,11 +544,14 @@
         Simulerat prov som Transportstyrelsens riktiga.
       </p>
 
-      <button class="ctaBtn" id="ctaBtn" aria-haspopup="dialog">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><polygon points="3,1 15,8 3,15"/></svg>
-        <span>Starta körkortet</span>
-        <span class="ctaShimmer" aria-hidden="true"></span>
-      </button>
+      <div class="heroCtas" id="heroCtas" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center;opacity:0">
+        <button class="ctaBtn" id="ctaBtn" aria-haspopup="dialog">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><polygon points="3,1 15,8 3,15"/></svg>
+          <span>Starta körkortet</span>
+          <span class="ctaShimmer" aria-hidden="true"></span>
+        </button>
+        <a class="demoBtn" href="live-demo.html">Se demo →</a>
+      </div>
 
       <div class="heroStats" id="heroStats" aria-label="Nyckeltal">
         <div class="stat">
@@ -575,6 +610,19 @@
 
       </div>
     </section>
+
+    <!-- ═══ MOCKPROV STRIP ═══ -->
+    <div class="mockStrip rev" style="margin-bottom:48px" aria-label="Mockprov med AI">
+      <div class="mockStripLeft">
+        <div class="mockStripIcon" aria-hidden="true">📝</div>
+        <div>
+          <div class="mockStripEye">Mockprov med AI</div>
+          <div class="mockStripT">Träna på ditt eget material</div>
+          <div class="mockStripD">Klistra in studiematerial → AI genererar prov direkt. Rättar med feedback och modellsvar.</div>
+        </div>
+      </div>
+      <a class="btn btnG" href="app.html" style="height:40px;padding:0 22px;font-size:13.5px;flex-shrink:0">Prova mockprov →</a>
+    </div>
 
     <!-- ═══ STEPS ═══ -->
     <section class="steps rev" aria-label="Hur det funkar">
@@ -776,7 +824,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
       tl.from("#heroEye",{opacity:0,y:12,duration:.4});
       tl.to(".wi",{y:"0%",duration:.55,stagger:.065,ease:"power3.out"},"-=.2");
       tl.to("#heroSub",{opacity:1,duration:.4},"-=.25");
-      tl.to("#ctaBtn",{opacity:1,duration:.38,ease:"back.out(1.5)"},"-=.2");
+      tl.to("#heroCtas",{opacity:1,duration:.38,ease:"back.out(1.5)"},"-=.2");
 
       /* stats count-up */
       tl.to("#heroStats",{opacity:1,duration:.3},"-=.1");
