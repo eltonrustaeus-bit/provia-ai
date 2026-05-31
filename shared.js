@@ -313,12 +313,46 @@
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    function renderMd(text) {
+      var s = String(text || '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+      // bullet lists
+      s = s.replace(/(^|\n)[-•] (.+)/g, '$1<li>$2</li>');
+      s = s.replace(/(<li>.*?<\/li>)/g, function(m) { return m; });
+      s = s.replace(/(<li>[\s\S]+?<\/li>)+/g, function(m) { return '<ul class="per-ul">' + m + '</ul>'; });
+      s = s.replace(/\n\n/g, '<br><br>');
+      s = s.replace(/\n/g, '<br>');
+      return s;
+    }
+
+    function finalizeMsg(div, text) {
+      div.className = 'per-msg teacher';
+      div.innerHTML = renderMd(text);
+      div.title = 'Klicka för att kopiera';
+      div.style.cursor = 'pointer';
+      div.onclick = function() {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text).then(function() {
+          div.style.opacity = '0.5';
+          setTimeout(function() { div.style.opacity = ''; }, 220);
+        }).catch(function() {});
+      };
+    }
+
     function addMsg(text, type) {
       var msgs = document.getElementById('perMessages');
       if (!msgs) return null;
       var div = document.createElement('div');
       div.className = 'per-msg ' + type;
-      div.textContent = text;
+      if (type === 'teacher typing') {
+        div.innerHTML = '<span class="per-dots"><span></span><span></span><span></span></span>';
+      } else if (type === 'teacher' && text) {
+        finalizeMsg(div, text);
+      } else {
+        div.textContent = text || '';
+      }
       msgs.appendChild(div);
       msgs.scrollTop = msgs.scrollHeight;
       return div;
@@ -386,26 +420,28 @@
                 if (ev.delta) {
                   answerText += ev.delta;
                   if (typing) typing.textContent = answerText;
-                  var msgsEl = document.getElementById('perMessages');
-                  if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+                  var msgsEl2 = document.getElementById('perMessages');
+                  if (msgsEl2) msgsEl2.scrollTop = msgsEl2.scrollHeight;
                 }
-                if (ev.error && typing) { typing.textContent = ev.error; }
+                if (ev.error && typing) { typing.className = 'per-msg teacher'; typing.textContent = ev.error; }
                 if (ev.done && ev.history) perSaveHist(ev.history);
               } catch (_) {}
             }
           }
+          if (typing && answerText) finalizeMsg(typing, answerText);
         } else {
           /* ── JSON fallback ── */
           var data = {};
           try { data = await r.json(); } catch (_) {}
           if (typing) {
-            typing.className = 'per-msg teacher';
             if (r.status === 401) {
+              typing.className = 'per-msg teacher';
               typing.textContent = 'Logga in för att chatta med P.E.R.';
             } else if (!r.ok) {
+              typing.className = 'per-msg teacher';
               typing.textContent = data.error || 'Fel — försök igen.';
             } else {
-              typing.textContent = data.answer || 'Inget svar.';
+              finalizeMsg(typing, data.answer || 'Inget svar.');
               if (data.history) perSaveHist(data.history);
             }
           }
@@ -480,7 +516,15 @@
         '#perMicBtn{background:none;border:1px solid var(--l,rgba(255,255,255,.08));border-radius:6px;padding:0 9px;cursor:pointer;font-size:14px;color:var(--t2,#a8c4b4);transition:border-color .2s,color .2s;flex-shrink:0}',
         '#perMicBtn:hover{border-color:var(--l2,rgba(255,255,255,.25))}',
         '#perMicBtn.listening{border-color:var(--a,#1bff8c);color:var(--a,#1bff8c);animation:perPulse .9s ease-in-out infinite}',
-        '.per-hdr-btns{display:flex;gap:4px;margin-left:auto}'
+        '.per-hdr-btns{display:flex;gap:4px;margin-left:auto}',
+        '.per-dots{display:inline-flex;align-items:center;gap:3px;padding:2px 0}',
+        '.per-dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--a,#1bff8c);opacity:.7;animation:perBounce 1.1s ease-in-out infinite}',
+        '.per-dots span:nth-child(2){animation-delay:.18s}',
+        '.per-dots span:nth-child(3){animation-delay:.36s}',
+        '@keyframes perBounce{0%,60%,100%{transform:translateY(0);opacity:.7}30%{transform:translateY(-5px);opacity:1}}',
+        '.per-ul{margin:4px 0 4px 14px;padding:0;list-style:disc}',
+        '.per-ul li{margin:2px 0}',
+        '.per-msg.teacher:hover{border-color:rgba(27,255,140,.3)}'
       ].join('');
       document.head.appendChild(style);
 
@@ -660,6 +704,14 @@
         startNudgeTimer();
         maybeShowWeeklyCoach();
       }
+
+      /* Alt+P keyboard shortcut */
+      document.addEventListener('keydown', function(e) {
+        if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+          e.preventDefault();
+          toggle();
+        }
+      });
     }
 
     if (document.readyState === 'loading') {
