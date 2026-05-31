@@ -127,18 +127,18 @@
       var pc = window._perPageContext;
       if (path.includes('korkortet')) {
         if (pc && pc.currentQuestion && pc.currentQuestion.text) {
-          return 'Jag ser att du övar körkortsteorin. Fastnat på den här frågan? Fråga mig!';
+          return 'Kör fast på den här? Fråga på.';
         }
-        return 'Hej! Jag ser att du tränar körkortsteorin. Fråga mig om trafikregler, skyltar eller vad som helst!';
+        return 'Tränar körkortet? Fråga om regler, skyltar, korsningar — vad som helst.';
       }
       if (path.includes('förbättring') || path.includes('forbattring') || path.includes('rbattring')) {
-        return 'Hej! Ser du dina resultat? Vill du att jag förklarar ett specifikt misstag eller ger dig studietips?';
+        return 'Vill du gå igenom dina misstag? Jag kan förklara vad som hände.';
       }
       if (path.includes('app')) {
-        return 'Hej! Vad vill du ha hjälp med i ditt prov? Fråga mig om uppgifter, begrepp eller hur du ska tänka.';
+        return 'Fastnat på något i provet? Fråga på.';
       }
     } catch (_) {}
-    return 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Vad kan jag hjälpa dig med?';
+    return 'Vad kan jag hjälpa dig med?';
   }
 
   function perGetHist() {
@@ -269,7 +269,7 @@
           if (msgs) {
             var first = msgs.querySelector('.per-msg.teacher');
             if (first && !msgs.querySelector('.per-msg.user')) {
-              first.textContent = 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Vad undrar du om Provia? Priser, vad som ingår, varför du ska välja oss — ställ din fråga!';
+              first.textContent = 'Vad undrar du om Provia? Priser, vad som ingår, varför vi slår ChatGPT — fråga på.';
             }
           }
         };
@@ -738,7 +738,7 @@
         '<div id="perPanel">' +
           '<div class="per-hdr">' +
             '<div class="per-av"><span class="per-av-txt">PER</span><span class="per-av-bars"><span></span><span></span><span></span></span></div>' +
-            '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS EGNA AI-RESOURCE</div></div>' +
+            '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS AI</div></div>' +
             '<div class="per-hdr-btns">' +
               '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
               '<button class="per-clr" id="perReadyBtn" title="Visa din körkortsredo-score">Redo?</button>' +
@@ -747,7 +747,7 @@
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="korkortet.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
-            '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias Egna AI-Resource. Ställ din fråga så hjälper jag dig!</div>' +
+            '<div class="per-msg teacher">Vad kan jag hjälpa dig med?</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
@@ -772,7 +772,7 @@
       document.getElementById('perClearBtn').onclick = function () {
         localStorage.removeItem(PER_HIST_KEY);
         var msgs = document.getElementById('perMessages');
-        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Chat rensad. Ställ en ny fråga!</div>';
+        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Klart. Vad vill du veta?</div>';
       };
 
       /* ── QUIZ MODE ── */
@@ -825,43 +825,61 @@
         if (msgs) msgs.scrollTop = msgs.scrollHeight;
       };
 
+      /* Shared state for listening animation */
+      var perAvEl = widget.querySelector('.per-av');
+      var perInpEl = document.getElementById('perInput');
+      var _micListening = false;
+
       /* ── VOICE MODE (Web Speech API) ── */
       var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       var micBtn = document.getElementById('perMicBtn');
+
       if (SR && micBtn) {
-        var recognition = new SR();
-        recognition.lang = 'sv-SE';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-        var _listening = false;
-        recognition.onresult = function(e) {
-          var transcript = e.results[0][0].transcript.trim();
-          if (transcript) send(transcript);
-        };
-        recognition.onend = function() {
-          _listening = false;
-          if (micBtn) micBtn.classList.remove('listening');
-        };
-        recognition.onerror = function() {
-          _listening = false;
-          if (micBtn) micBtn.classList.remove('listening');
-        };
+        var _recognition = null;
+
+        function setListeningState(active) {
+          _micListening = active;
+          if (micBtn) micBtn.classList.toggle('listening', active);
+          if (perAvEl) perAvEl.classList.toggle('per-listening', active);
+          if (perInpEl) perInpEl.placeholder = active ? 'Lyssnar…' : 'Fråga P.E.R…';
+        }
+
+        function createRecognition() {
+          var r = new SR();
+          r.lang = 'sv-SE';
+          r.interimResults = false;
+          r.maxAlternatives = 1;
+          r.onresult = function(e) {
+            var transcript = e.results[0][0].transcript.trim();
+            if (transcript) send(transcript);
+          };
+          r.onend = function() { setListeningState(false); };
+          r.onerror = function() { setListeningState(false); };
+          return r;
+        }
+
         micBtn.onclick = function() {
-          if (_listening) { recognition.stop(); return; }
-          _listening = true;
-          micBtn.classList.add('listening');
-          try { recognition.start(); } catch(_) { _listening = false; micBtn.classList.remove('listening'); }
+          if (_micListening) {
+            if (_recognition) _recognition.stop();
+            return;
+          }
+          _recognition = createRecognition();
+          setListeningState(true);
+          try { _recognition.start(); } catch(_) { setListeningState(false); }
         };
       } else if (micBtn) {
-        micBtn.style.display = 'none';
+        micBtn.disabled = true;
+        micBtn.title = 'Röst stöds ej i din webbläsare — prova Chrome eller Safari';
+        micBtn.style.opacity = '0.35';
+        micBtn.style.cursor = 'not-allowed';
       }
 
-      /* Listening state — avatar animates when input is focused */
-      var perAvEl = widget.querySelector('.per-av');
-      var perInpEl = document.getElementById('perInput');
+      /* Text typing → avatar listening animation */
       if (perAvEl && perInpEl) {
         perInpEl.addEventListener('focus', function() { perAvEl.classList.add('per-listening'); });
-        perInpEl.addEventListener('blur', function() { perAvEl.classList.remove('per-listening'); });
+        perInpEl.addEventListener('blur', function() {
+          if (!_micListening) perAvEl.classList.remove('per-listening');
+        });
       }
 
       /* Restore previous history — localStorage first, then sync from Supabase */
@@ -914,7 +932,7 @@
       if (isLanding()) {
         updateLandingBar();
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
-        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — din guide till Provia. Fråga mig vad du undrar!';
+        if (firstMsg) firstMsg.textContent = 'Vad undrar du om Provia?';
         if (isFirstVisit()) {
           markVisited();
           setTimeout(function() {
@@ -926,7 +944,7 @@
                 if (introDiv) {
                   introDiv.className = 'per-msg teacher';
                   introDiv.innerHTML = '';
-                  var introText = 'Hej! Jag är P.E.R — din guide här på Provia. Jag kan svara på vad Provia är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Vad undrar du?';
+                  var introText = 'Hallå! Jag är P.E.R. Jag svarar på allt om Provia — vad det är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Fråga på!';
                   typewriterMsg(introDiv, introText, 14);
                   setTimeout(function() {
                     addQuickReplies(['Vad är Provia?', 'Varför inte ChatGPT?', 'Vad kostar det?']);
