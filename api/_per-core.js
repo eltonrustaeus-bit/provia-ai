@@ -130,8 +130,6 @@ export function buildPERSystemPrompt({
   if (longMemory) lines.push(`## ELEVPROFIL (långtidsminne)\n${longMemory}`);
   if (role === 'premium') lines.push('Premium-elev: ge detaljerade förklaringar.');
 
-  const currentCategory = pageContext?.currentQuestion?.category || '';
-
   const teachGuide = quiz
     ? `QUIZ-LÄGE: Välj EN teorifråga${currentCategory ? ' om ' + currentCategory : ' från körkortsteorin'}. Skriv frågan tydligt med svarsalternativ A/B/C/D. Avsluta med "Vad väljer du?" Skriv INTE svaret — vänta på elevens svar.`
     : feynman
