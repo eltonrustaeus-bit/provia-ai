@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "1ed164d7458189d5",
+        "id": "d9c72edf1afdd3b9",
         "type": "tabs",
         "children": [
           {
-            "id": "16e0a0df20788aa7",
+            "id": "062f727b175adadf",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -70,8 +70,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -177,9 +176,11 @@
       "bases:Create new base": false
     }
   },
-  "active": "16e0a0df20788aa7",
+  "active": "062f727b175adadf",
   "lastOpenFiles": [
-    "Untitled.md",
-    "Resend Email Notification.md"
+    "Untitled.base",
+    "2026-05-31.md",
+    "Resend Email Notification.md",
+    "Untitled.md"
   ]
 }
