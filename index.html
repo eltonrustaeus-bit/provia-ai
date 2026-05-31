@@ -157,8 +157,8 @@
     box-shadow:0 0 0 0 rgba(27,255,140,.45);
     animation:ctaPulse 2.8s ease-in-out infinite;
     transition:transform .15s ease,box-shadow .2s ease;
-    opacity:0;will-change:transform;
-    margin-bottom:36px;
+    will-change:transform;
+    margin-bottom:0;
   }
   .ctaBtn:hover {
     transform:translateY(-2px) scale(1.02);
@@ -207,9 +207,16 @@
   }
   .demoBtn:hover{border-color:rgba(27,255,140,.55);color:var(--a);background:rgba(27,255,140,.05)}
 
+  .heroCtas{margin-bottom:32px}
+
   .heroFree{
     font-family:var(--mono);font-size:10.5px;
     color:var(--t3);letter-spacing:.05em;opacity:0;
+  }
+
+  /* Push PER widget up on mobile so it doesn't cover stats */
+  @media(max-width:600px){
+    #perWidget{bottom:88px!important}
   }
 
   /* MOCKPROV STRIP */
