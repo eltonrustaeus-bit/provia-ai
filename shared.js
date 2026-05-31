@@ -493,7 +493,7 @@
       try {
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'Provia';
-        var isLandingMode = isLanding() && !token;
+        var isLandingMode = !token; // 2 free questions for any unauthenticated user, any page
 
         // Landing quota gate
         if (isLandingMode) {
@@ -928,9 +928,16 @@
         }).catch(function() {});
       });
 
-      /* Landing pages: show quota bar + first-visit intro or recurring nudge */
+      /* Show quota bar for unauthenticated users on all pages */
+      var _hasSession = false;
+      try {
+        var _rawSess = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token');
+        if (_rawSess) { var _sessObj = JSON.parse(_rawSess); _hasSession = !!(_sessObj && _sessObj.access_token); }
+      } catch (_) {}
+      if (!_hasSession) updateLandingBar();
+
+      /* Landing pages: first-visit intro or recurring nudge */
       if (isLanding()) {
-        updateLandingBar();
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
         if (firstMsg) firstMsg.textContent = 'Vad undrar du om Provia?';
         if (isFirstVisit()) {
