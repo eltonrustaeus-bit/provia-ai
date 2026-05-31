@@ -650,7 +650,11 @@
         var btn = document.createElement('button');
         btn.className = 'per-chip';
         btn.textContent = chip;
-        btn.onclick = function() { row.remove(); send(chip); };
+        btn.onclick = (function(c) { return function() {
+          row.remove();
+          var inp = document.getElementById('perInput');
+          if (inp) { inp.value = c; inp.focus(); }
+        }; })(chip);
         row.appendChild(btn);
       });
       msgs.appendChild(row);
