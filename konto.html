@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>if(location.hostname.includes("vercel.app")&&!location.hostname.includes("provia-ai-uf")){location.replace("https://provia-ai-uf.vercel.app"+location.pathname+location.search)}</script>
+  <title>ProviaAi – Mitt konto</title>
+  <link rel="icon" href="/image/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="icon" href="/image/favicon-64.png" sizes="64x64" type="image/png" />
+  <link rel="icon" href="/image/favicon-512.png" sizes="512x512" type="image/png" />
+  <link rel="apple-touch-icon" href="/image/favicon-180.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="shared.js" defer></script>
+  <style>
+  /* ── KONTO PAGE ── */
+  .kontoWrap{max-width:560px;margin:0 auto;padding:32px 16px 80px}
+
+  .kontoHero{margin-bottom:32px}
+  .kontoEye{font-family:var(--mono);font-size:10.5px;color:var(--a);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+  .kontoTitle{font-weight:700;font-size:clamp(22px,4vw,30px);color:var(--t);letter-spacing:-.035em;margin-bottom:6px}
+  .kontoEmail{font-family:var(--mono);font-size:12px;color:var(--t3)}
+
+  /* Cards */
+  .kCard{
+    background:var(--s);border:1px solid var(--l);
+    border-radius:10px;margin-bottom:10px;overflow:hidden;
+  }
+  .kCardHead{
+    display:flex;align-items:center;gap:14px;
+    padding:16px 20px;
+    border-bottom:1px solid var(--l);
+  }
+  .kCardIcon{font-size:18px;flex-shrink:0}
+  .kCardLabel{font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.1em;text-transform:uppercase}
+  .kCardTitle{font-weight:600;font-size:14px;color:var(--t);letter-spacing:-.01em;margin-top:1px}
+  .kCardBody{padding:18px 20px}
+
+  /* Plan row */
+  .planRow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .planBadge{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:11px;font-weight:500;
+    color:var(--a);letter-spacing:.06em;text-transform:uppercase;
+    border:1px solid rgba(27,255,140,.3);border-radius:20px;
+    padding:5px 12px;background:rgba(27,255,140,.07);
+  }
+  .planBadge.free{color:var(--t3);border-color:var(--l);background:transparent}
+  .planBadgeDot{width:6px;height:6px;border-radius:50%;background:var(--a);flex-shrink:0;animation:eyeBlink 1.8s ease-in-out infinite}
+  .planBadge.free .planBadgeDot{background:var(--t3);animation:none}
+  @keyframes eyeBlink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .usageBar{margin-top:14px}
+  .usageLabel{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-bottom:6px}
+  .usageTrack{height:4px;background:rgba(27,255,140,.1);border-radius:2px;overflow:hidden}
+  .usageFill{height:100%;background:var(--a);border-radius:2px;transition:width .5s cubic-bezier(.22,.61,.36,1)}
+
+  .planNote{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:10px}
+
+  /* Action buttons */
+  .kBtn{
+    display:inline-flex;align-items:center;gap:8px;
+    height:40px;padding:0 18px;
+    font-family:var(--sans);font-size:13.5px;font-weight:600;
+    letter-spacing:-.01em;border-radius:6px;
+    cursor:pointer;transition:background .15s,border-color .15s,color .15s;
+    text-decoration:none;border:1px solid transparent;
+  }
+  .kBtnPrimary{background:var(--a);color:#08100d;border-color:var(--a)}
+  .kBtnPrimary:hover{background:#15e67a}
+  .kBtnOutline{background:transparent;color:var(--t);border-color:var(--l2)}
+  .kBtnOutline:hover{border-color:rgba(27,255,140,.4);color:var(--a);background:rgba(27,255,140,.05)}
+  .kBtnDanger{background:transparent;color:#ff6b6b;border-color:rgba(255,107,107,.3)}
+  .kBtnDanger:hover{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.5)}
+
+  .kBtnRow{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* Upgrade plans */
+  .upgradePlans{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:400px){.upgradePlans{grid-template-columns:1fr}}
+  .upgPlan{
+    border:1px solid var(--l);border-radius:8px;
+    padding:16px;cursor:pointer;
+    transition:border-color .18s,background .18s;
+    position:relative;
+  }
+  .upgPlan:hover{border-color:rgba(27,255,140,.3);background:rgba(27,255,140,.03)}
+  .upgPlan.featured{border-color:rgba(27,255,140,.35)}
+  .upgPlanName{font-weight:700;font-size:14px;color:var(--t);letter-spacing:-.01em;margin-bottom:2px}
+  .upgPlanPrice{font-weight:700;font-size:22px;color:var(--t);letter-spacing:-.03em;line-height:1}
+  .upgPlanPer{font-family:var(--mono);font-size:10px;color:var(--t3)}
+  .upgPlanDesc{font-family:var(--mono);font-size:10px;color:var(--t2);margin-top:6px;line-height:1.5}
+  .upgPlanBtn{margin-top:12px;width:100%;height:36px;font-size:13px;font-weight:600;border:none;border-radius:5px;cursor:pointer;transition:background .15s}
+  .upgPlanBtn.primary{background:var(--a);color:#08100d}
+  .upgPlanBtn.primary:hover{background:#15e67a}
+  .upgPlanBtn.outline{background:transparent;color:var(--t);border:1px solid var(--l2)}
+  .upgPlanBtn.outline:hover{border-color:rgba(27,255,140,.4);color:var(--a)}
+
+  /* Divider */
+  .kDivider{height:1px;background:var(--l);margin:14px 0}
+
+  /* Status msg */
+  #kontoMsg{
+    font-family:var(--mono);font-size:12px;
+    padding:10px 14px;border-radius:6px;
+    margin-bottom:12px;display:none;
+  }
+  #kontoMsg.ok{background:rgba(27,255,140,.08);color:var(--a);border:1px solid rgba(27,255,140,.2)}
+  #kontoMsg.err{background:rgba(255,107,107,.07);color:#ff6b6b;border:1px solid rgba(255,107,107,.2)}
+
+  /* Auth gate */
+  #authGate{display:none;text-align:center;padding:60px 24px}
+  #authGate .agTitle{font-weight:700;font-size:20px;color:var(--t);letter-spacing:-.03em;margin-bottom:8px}
+  #authGate .agSub{font-size:14px;color:var(--t2);margin-bottom:24px}
+
+  /* Loading skeleton */
+  .kSkel{height:16px;background:rgba(27,255,140,.06);border-radius:4px;animation:skel 1.4s ease-in-out infinite}
+  @keyframes skel{0%,100%{opacity:.5}50%{opacity:1}}
+  </style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="ldr" class="loader" aria-hidden="true">
+  <div style="display:grid;place-items:center">
+    <div class="lOrb"></div>
+    <div class="lTxt">ProviaAI</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="hWrap">
+    <a class="brand" href="index.html">
+      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <div>
+        <div class="bName">ProviaAi</div>
+        <div class="bTag">Körkortsteorin · AI</div>
+      </div>
+    </a>
+    <div class="hR">
+      <span class="aiDot" aria-label="AI-status">
+        <span class="dot" aria-hidden="true"></span>
+        <span>AI aktiv</span>
+      </span>
+      <div class="mWrap">
+        <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false">
+          <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
+        </button>
+        <div class="drop" id="drop">
+          <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
+          <a class="ddi" href="app.html"><span>Mockprov</span><span class="dpill">AI</span></a>
+          <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">29/79</span></a>
+          <a class="ddi" href="konto.html"><span>Mitt konto</span><span class="dpill" style="color:var(--a)">Konto</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+<div class="kontoWrap">
+
+  <!-- AUTH GATE -->
+  <div id="authGate">
+    <div class="agTitle">Logga in för att se ditt konto</div>
+    <div class="agSub">Du behöver vara inloggad för att hantera din prenumeration.</div>
+    <a class="btn btnP" href="app.html" style="height:44px;padding:0 28px">Logga in →</a>
+  </div>
+
+  <!-- KONTO CONTENT -->
+  <div id="kontoContent" style="display:none">
+
+    <div class="kontoHero">
+      <div class="kontoEye">Mitt konto</div>
+      <div class="kontoTitle" id="kontoName">Ditt konto</div>
+      <div class="kontoEmail" id="kontoEmail"></div>
+    </div>
+
+    <!-- STATUS MSG -->
+    <div id="kontoMsg" role="alert"></div>
+
+    <!-- PLAN CARD -->
+    <div class="kCard">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">⚡</div>
+        <div>
+          <div class="kCardLabel">Nuvarande plan</div>
+          <div class="kCardTitle" id="planTitle">Laddar…</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <div class="planRow">
+          <span class="planBadge free" id="planBadge">
+            <span class="planBadgeDot" aria-hidden="true"></span>
+            <span id="planBadgeText">Gratis</span>
+          </span>
+          <span class="planNote" id="planUsage"></span>
+        </div>
+        <div class="usageBar" id="usageBarWrap" style="display:none">
+          <div class="usageLabel">
+            <span id="usageLeft"></span>
+            <span id="usageRight"></span>
+          </div>
+          <div class="usageTrack"><div class="usageFill" id="usageFill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPGRADE CARD — visas bara för gratis -->
+    <div class="kCard" id="upgradeCard" style="display:none">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">🚀</div>
+        <div>
+          <div class="kCardLabel">Uppgradera</div>
+          <div class="kCardTitle">Lås upp mer med Basic eller Premium</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <div class="upgradePlans">
+          <div class="upgPlan">
+            <div class="upgPlanName">Basic</div>
+            <div class="upgPlanPrice">29 kr<span class="upgPlanPer"> /mån</span></div>
+            <div class="upgPlanDesc">30 prov / månad<br>Historik & synk</div>
+            <button class="upgPlanBtn outline" onclick="startCheckout('basic')">Välj Basic</button>
+          </div>
+          <div class="upgPlan featured">
+            <div class="upgPlanName">Premium</div>
+            <div class="upgPlanPrice">79 kr<span class="upgPlanPer"> /mån</span></div>
+            <div class="upgPlanDesc">Obegränsat<br>AI-coach & felbank</div>
+            <button class="upgPlanBtn primary" onclick="startCheckout('premium')">Välj Premium</button>
+          </div>
+        </div>
+        <p style="font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:12px">Ingen bindningstid · avbryt när som helst</p>
+      </div>
+    </div>
+
+    <!-- MANAGE SUB CARD — visas för basic/premium -->
+    <div class="kCard" id="manageCard" style="display:none">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">💳</div>
+        <div>
+          <div class="kCardLabel">Prenumeration</div>
+          <div class="kCardTitle">Hantera betalning och plan</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <p style="font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:16px">Uppdatera kortuppgifter, byt plan, se fakturor eller avsluta prenumerationen via Stripes säkra portal.</p>
+        <button class="kBtn kBtnOutline" id="portalBtn">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6h12"/><path d="M5 9.5h2"/></svg>
+          Hantera prenumeration →
+        </button>
+      </div>
+    </div>
+
+    <!-- NAVIGATION CARD -->
+    <div class="kCard">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">🔗</div>
+        <div>
+          <div class="kCardLabel">Snabbnavigation</div>
+          <div class="kCardTitle">Gå till</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <div class="kBtnRow">
+          <a class="kBtn kBtnOutline" href="korkortet.html">Körkortsteorin</a>
+          <a class="kBtn kBtnOutline" href="app.html">Mockprov</a>
+          <a class="kBtn kBtnOutline" href="förbättring.html">Förbättring</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT CARD -->
+    <div class="kCard">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">👤</div>
+        <div>
+          <div class="kCardLabel">Konto</div>
+          <div class="kCardTitle">Kontoinställningar</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <div class="kBtnRow">
+          <button class="kBtn kBtnDanger" id="logoutBtn">Logga ut</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /kontoContent -->
+</div>
+</div>
+</main>
+
+<footer>
+  <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
+    <span>© <span id="yr"></span> ProviaAi</span>
+    <span style="color:var(--l2)">·</span>
+    <a href="pricing.html" class="fLink">Priser</a>
+    <span style="color:var(--l2)">·</span>
+    <span>Studiestöd — ingen officiell betygssättning</span>
+  </div>
+</footer>
+
+<script>
+window.addEventListener("load",()=>setTimeout(()=>document.getElementById("ldr").classList.add("out"),160));
+document.getElementById("yr").textContent=new Date().getFullYear();
+
+const mBtn=document.getElementById("mBtn"),drop=document.getElementById("drop");
+let ct;
+function openDrop(){clearTimeout(ct);drop.classList.remove("off");drop.style.display="block";requestAnimationFrame(()=>drop.classList.add("on"));mBtn.setAttribute("aria-expanded","true")}
+function closeDrop(){mBtn.setAttribute("aria-expanded","false");drop.classList.remove("on");drop.classList.add("off");clearTimeout(ct);ct=setTimeout(()=>{drop.classList.remove("off");drop.style.display="none"},120)}
+mBtn.addEventListener("click",e=>{e.stopPropagation();drop.classList.contains("on")?closeDrop():openDrop()});
+document.addEventListener("click",e=>{if(!drop.classList.contains("on"))return;if(!drop.contains(e.target)&&!mBtn.contains(e.target))closeDrop()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(async function(){
+  const SUPA_URL="https://mnmotdluigzeehdjbhbu.supabase.co";
+  const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
+  const sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+
+  const ROLE_LABELS={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
+  const ROLE_DESCS={
+    gratis:"2 körkortstest · 2 mockprov per vecka",
+    basic:"30 prov per månad · historik · synk",
+    premium:"Obegränsat · AI-coach · felbank",
+    admin:"Full tillgång",user:"Obegränsat · AI-coach · felbank"
+  };
+
+  function showMsg(txt,type){
+    const el=document.getElementById("kontoMsg");
+    el.textContent=txt;el.className=type==="ok"?"ok":"err";el.style.display="block";
+    if(type==="ok")setTimeout(()=>el.style.display="none",4000);
+  }
+
+  /* AUTH CHECK */
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){
+    document.getElementById("authGate").style.display="block";
+    return;
+  }
+  document.getElementById("kontoContent").style.display="block";
+
+  const user=session.user;
+  const email=user.email||"";
+  const name=email.split("@")[0];
+  document.getElementById("kontoEmail").textContent=email;
+  document.getElementById("kontoName").textContent=name.charAt(0).toUpperCase()+name.slice(1)+"s konto";
+
+  /* LOAD PROFILE */
+  const {data:prof}=await sb.from("profiles").select("role,kk_quota_count,kk_quota_week").eq("id",user.id).maybeSingle();
+  const role=prof?.role||"gratis";
+
+  /* Plan display */
+  const planTitle=document.getElementById("planTitle");
+  const planBadge=document.getElementById("planBadge");
+  const planBadgeText=document.getElementById("planBadgeText");
+
+  planTitle.textContent=ROLE_LABELS[role]||role;
+  planBadgeText.textContent=ROLE_LABELS[role]||role;
+
+  if(role!=="gratis"){
+    planBadge.classList.remove("free");
+  }
+
+  document.getElementById("planUsage").textContent=ROLE_DESCS[role]||"";
+
+  /* Show upgrade or manage card */
+  if(role==="gratis"){
+    document.getElementById("upgradeCard").style.display="";
+  } else {
+    document.getElementById("manageCard").style.display="";
+  }
+
+  /* PORTAL BUTTON */
+  document.getElementById("portalBtn")?.addEventListener("click",async()=>{
+    const btn=document.getElementById("portalBtn");
+    btn.disabled=true;btn.textContent="Laddar…";
+    try{
+      const r=await fetch("/api/check-role",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({action:"portal"})
+      });
+      const data=await r.json();
+      if(r.ok&&data.url){window.location.href=data.url}
+      else{showMsg("Fel: "+(data.message||data.error||"Okänt fel"),"err");btn.disabled=false;btn.textContent="Hantera prenumeration →"}
+    }catch{showMsg("Nätverksfel. Försök igen.","err");btn.disabled=false;btn.textContent="Hantera prenumeration →"}
+  });
+
+  /* LOGOUT */
+  document.getElementById("logoutBtn").addEventListener("click",async()=>{
+    await sb.auth.signOut();
+    window.location.href="index.html";
+  });
+
+  /* CHECKOUT */
+  window.startCheckout=async function(plan){
+    const btn=document.querySelector(`[onclick="startCheckout('${plan}')"]`);
+    const orig=btn.textContent;btn.disabled=true;btn.textContent="Laddar…";
+    try{
+      const r=await fetch("/api/create-checkout-session",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({plan})
+      });
+      const data=await r.json();
+      if(data.url){window.location.href=data.url}
+      else{showMsg("Fel: "+(data.error||"Okänt"),"err");btn.disabled=false;btn.textContent=orig}
+    }catch{showMsg("Nätverksfel.","err");btn.disabled=false;btn.textContent=orig}
+  };
+})();
+</script>
+</body>
+</html>
