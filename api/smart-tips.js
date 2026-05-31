@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
   const courseGuide = pickCourseGuide(c);
 
-  const systemPrompt = `Du är P.E.R — Provias intelligenta studiepartner.
+  const systemPrompt = `Du är P.E.R — Provias Egna AI-Resource.
 Du ska ge korta, konkreta tips för en fråga eleven fått fel på.
 Tipsen måste anpassas efter kursen.
 

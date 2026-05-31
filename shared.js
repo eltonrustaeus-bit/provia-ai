@@ -138,7 +138,7 @@
         return 'Hej! Vad vill du ha hjälp med i ditt prov? Fråga mig om uppgifter, begrepp eller hur du ska tänka.';
       }
     } catch (_) {}
-    return 'Hej! Jag är P.E.R — Provias intelligenta studiepartner. Vad kan jag hjälpa dig med?';
+    return 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Vad kan jag hjälpa dig med?';
   }
 
   function perGetHist() {
@@ -261,7 +261,7 @@
           if (msgs) {
             var first = msgs.querySelector('.per-msg.teacher');
             if (first && !msgs.querySelector('.per-msg.user')) {
-              first.textContent = 'Hej! Jag är P.E.R — Provias AI-guide. Vad undrar du om Provia? Priser, vad som ingår, varför du ska välja oss — ställ din fråga!';
+              first.textContent = 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Vad undrar du om Provia? Priser, vad som ingår, varför du ska välja oss — ställ din fråga!';
             }
           }
         };
@@ -654,7 +654,7 @@
         '<div id="perPanel">' +
           '<div class="per-hdr">' +
             '<div class="per-av">👨‍🏫</div>' +
-            '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIA AI-LÄRARE</div></div>' +
+            '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS EGNA AI-RESOURCE</div></div>' +
             '<div class="per-hdr-btns">' +
               '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
               '<button class="per-clr" id="perReadyBtn" title="Visa din körkortsredo-score">Redo?</button>' +
@@ -663,7 +663,7 @@
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="korkortet.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
-            '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias egna AI-resurs. Ställ din fråga specifikt så hjälper jag dig!</div>' +
+            '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias Egna AI-Resource. Ställ din fråga så hjälper jag dig!</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
@@ -822,7 +822,7 @@
       if (isLanding()) {
         updateLandingBar();
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
-        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — Provias AI-guide. Fråga mig vad du undrar om Provia: vad det kostar, vad som ingår eller om det passar dig!';
+        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — Provias Egna AI-Resource. Fråga mig vad du undrar om Provia: vad det kostar, vad som ingår eller om det passar dig!';
         maybeShowLandingGreeting();
       } else {
         startNudgeTimer();
