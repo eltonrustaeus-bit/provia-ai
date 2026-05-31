@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
-import { callAI, callAIStream, buildPERSystemPrompt } from "./_per-core.js";
+import { callAI, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt } from "./_per-core.js";
 import { SALES_TRIGGER_REGEX } from "./_provia-kb.js";
 import { loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
 
@@ -103,10 +103,25 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
+  const body = req.body || {};
+
+  // ── LANDING MODE — unauthenticated visitors on index/pricing ──
+  if (body.landingMode === true) {
+    const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
+    if (!question) return res.status(400).json({ error: 'No question' });
+    const msgs = [
+      { role: 'system', content: buildPERLandingPrompt() },
+      { role: 'user', content: question },
+    ];
+    try {
+      const answer = await callAI(msgs, { timeout: 20_000 });
+      if (!answer) return res.status(502).json({ error: 'No response' });
+      return res.json({ answer });
+    } catch (err) { return res.status(500).json({ error: err.message || 'AI error' }); }
+  }
+
   const user = await requireAuth(req, res);
   if (!user) return;
-
-  const body = req.body || {};
 
   // ── READINESS SCORE MODE ──
   if (Array.isArray(body.scores)) {
