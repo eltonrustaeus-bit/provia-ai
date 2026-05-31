@@ -204,6 +204,93 @@
 
     var COACH_KEY = 'proviaai_coach_week';
 
+    function isLanding() {
+      var p = window.location.pathname.toLowerCase();
+      return p === '/' || p === '' || p.includes('index') || p.includes('pricing');
+    }
+
+    function landingQKey() { return 'proviaai_lq_' + new Date().toISOString().slice(0,10); }
+    function landingGKey() { return 'proviaai_lg_' + new Date().toISOString().slice(0,10); }
+
+    function getLandingQuota() {
+      try { return parseInt(localStorage.getItem(landingQKey()) || '0', 10); } catch (_) { return 0; }
+    }
+    function incLandingQuota() {
+      try { localStorage.setItem(landingQKey(), String(getLandingQuota() + 1)); } catch (_) {}
+    }
+
+    function updateLandingBar() {
+      var bar = document.getElementById('perLandingBar');
+      var leftEl = document.getElementById('perLandingLeft');
+      if (!bar || !leftEl) return;
+      var used = getLandingQuota();
+      var left = Math.max(0, 2 - used);
+      leftEl.textContent = left > 0 ? left + ' av 2 gratisfrågor kvar' : 'Gränsen nådd för idag';
+      bar.classList.add('visible');
+    }
+
+    function addAnswerCTA(div) {
+      var btn = document.createElement('a');
+      btn.href = 'korkortet.html';
+      btn.className = 'per-answer-cta';
+      btn.textContent = 'Skapa gratis konto — inget kort krävs →';
+      div.appendChild(btn);
+    }
+
+    function maybeShowLandingGreeting() {
+      if (!isLanding()) return;
+      var gkey = landingGKey();
+      try { if (localStorage.getItem(gkey)) return; } catch (_) {}
+      try { localStorage.setItem(gkey, '1'); } catch (_) {}
+
+      var timerDone = false;
+      var nudgeText = '💬 Har du frågor om Provia?';
+
+      function showLandingNudge() {
+        if (_open || timerDone) return;
+        timerDone = true;
+        var existing = document.getElementById('perNudge');
+        if (existing) existing.remove();
+        var nudge = document.createElement('div');
+        nudge.id = 'perNudge';
+        nudge.textContent = nudgeText;
+        nudge.onclick = function() {
+          hideNudge();
+          if (!_open) toggle();
+          var msgs = document.getElementById('perMessages');
+          if (msgs) {
+            var first = msgs.querySelector('.per-msg.teacher');
+            if (first && !msgs.querySelector('.per-msg.user')) {
+              first.textContent = 'Hej! Jag är P.E.R — Provias AI-guide. Vad undrar du om Provia? Priser, vad som ingår, varför du ska välja oss — ställ din fråga!';
+            }
+          }
+        };
+        var widget = document.getElementById('perWidget');
+        if (widget) widget.appendChild(nudge);
+        var bubble = document.getElementById('perBubble');
+        if (bubble) { bubble.classList.add('per-nudge'); setTimeout(function() { bubble.classList.remove('per-nudge'); }, 2400); }
+        setTimeout(hideNudge, 7000);
+      }
+
+      var t = setTimeout(showLandingNudge, 20000);
+
+      if (window.IntersectionObserver) {
+        var targets = document.querySelectorAll('.pricingCta');
+        if (targets.length) {
+          var obs = new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) {
+              if (e.isIntersecting && !timerDone) {
+                clearTimeout(t);
+                showLandingNudge();
+                obs.disconnect();
+              }
+            });
+          }, { threshold: 0.3 });
+          targets.forEach(function(el) { obs.observe(el); });
+        }
+      }
+    }
+
     function getWeekKey() {
       var now = new Date();
       var d = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
@@ -374,6 +461,24 @@
       try {
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'Provia';
+        var isLandingMode = isLanding() && !token;
+
+        // Landing quota gate
+        if (isLandingMode) {
+          var lq = getLandingQuota();
+          if (lq >= 2) {
+            if (typing) {
+              finalizeMsg(typing, 'Du har använt dina **2 gratisfrågor** för idag.\n\nSkapa ett gratis konto för att fortsätta — det tar 30 sekunder.');
+              addAnswerCTA(typing);
+            }
+            if (sendBtn) sendBtn.disabled = false;
+            var msgsQuota = document.getElementById('perMessages');
+            if (msgsQuota) msgsQuota.scrollTop = msgsQuota.scrollHeight;
+            return;
+          }
+          incLandingQuota();
+          updateLandingBar();
+        }
 
         var recentMistakes = [];
         try {
@@ -391,10 +496,18 @@
           weakAreas = Object.keys(courseFreq).sort(function(a,b) { return courseFreq[b]-courseFreq[a]; }).slice(0,5);
         } catch (_) {}
 
-        var fetchBody = JSON.stringify({ userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas });
+        var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas };
+        var fetchHdrs = { 'Content-Type': 'application/json' };
+        if (isLandingMode) {
+          fetchBodyObj.landingMode = true;
+        } else {
+          fetchHdrs['Authorization'] = 'Bearer ' + token;
+          fetchHdrs['Accept'] = 'text/event-stream';
+        }
+        var fetchBody = JSON.stringify(fetchBodyObj);
         var r = await fetch('/api/explain', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'Accept': 'text/event-stream' },
+          headers: fetchHdrs,
           body: fetchBody
         });
 
@@ -443,6 +556,7 @@
             } else {
               finalizeMsg(typing, data.answer || 'Inget svar.');
               if (data.history) perSaveHist(data.history);
+              if (isLandingMode) addAnswerCTA(typing);
             }
           }
         }
@@ -524,7 +638,13 @@
         '@keyframes perBounce{0%,60%,100%{transform:translateY(0);opacity:.7}30%{transform:translateY(-5px);opacity:1}}',
         '.per-ul{margin:4px 0 4px 14px;padding:0;list-style:disc}',
         '.per-ul li{margin:2px 0}',
-        '.per-msg.teacher:hover{border-color:rgba(27,255,140,.3)}'
+        '.per-msg.teacher:hover{border-color:rgba(27,255,140,.3)}',
+        '#perLandingBar{display:none;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(27,255,140,.04);border-bottom:1px solid rgba(27,255,140,.1);font-size:11px;font-family:var(--mono);color:var(--t3,#5a7a6a)}',
+        '#perLandingBar.visible{display:flex}',
+        '#perLandingBar a{color:var(--a,#1bff8c);text-decoration:none;font-weight:600;flex-shrink:0;margin-left:8px}',
+        '#perLandingBar a:hover{text-decoration:underline}',
+        '.per-answer-cta{display:block;margin-top:10px;padding:9px 14px;background:var(--a,#1bff8c);color:#08100d;border-radius:6px;font-size:12.5px;font-weight:700;text-decoration:none;text-align:center}',
+        '.per-answer-cta:hover{opacity:.88}'
       ].join('');
       document.head.appendChild(style);
 
@@ -541,6 +661,7 @@
               '<button class="per-clr" id="perClearBtn">Rensa</button>' +
             '</div>' +
           '</div>' +
+          '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="korkortet.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
             '<div class="per-msg teacher">Hej! Jag är P.E.R — Provias egna AI-resurs. Ställ din fråga specifikt så hjälper jag dig!</div>' +
           '</div>' +
@@ -697,10 +818,13 @@
         }).catch(function() {});
       });
 
-      /* Start nudge timer on all app pages except landing/pricing */
-      var initPath = window.location.pathname.toLowerCase();
-      var noNudgeInit = initPath.includes('index') || initPath.includes('pricing') || initPath === '/';
-      if (!noNudgeInit) {
+      /* Landing pages: show quota bar + proactive greeting */
+      if (isLanding()) {
+        updateLandingBar();
+        var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
+        if (firstMsg) firstMsg.textContent = 'Hej! Jag är P.E.R — Provias AI-guide. Fråga mig vad du undrar om Provia: vad det kostar, vad som ingår eller om det passar dig!';
+        maybeShowLandingGreeting();
+      } else {
         startNudgeTimer();
         maybeShowWeeklyCoach();
       }
