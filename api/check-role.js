@@ -87,6 +87,33 @@ export default async function handler(req, res) {
     }
   }
 
+  // Open Stripe Customer Portal
+  if (action === "portal") {
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("stripe_customer_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!prof?.stripe_customer_id) {
+        return res.status(400).json({ error: "no_subscription", message: "Inget Stripe-konto kopplat till din profil." });
+      }
+
+      const stripeKey = (process.env.STRIPE_SECRET_KEY || "").replace(/^﻿/, "").trim();
+      const portalRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: `customer=${encodeURIComponent(prof.stripe_customer_id)}&return_url=${encodeURIComponent("https://proviaai.se/app.html")}`,
+      });
+      const portalSession = await portalRes.json();
+      if (!portalRes.ok) return res.status(500).json({ error: "portal_failed", details: portalSession });
+      return res.status(200).json({ url: portalSession.url });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   // Cancel Stripe subscription
   if (action === "cancel_sub") {
     try {

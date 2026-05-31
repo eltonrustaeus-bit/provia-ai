@@ -342,6 +342,19 @@
     </table>
   </div>
 
+  <!-- MANAGE SUBSCRIPTION -->
+  <div id="manageSubSection" style="display:none;margin-bottom:32px" class="rev">
+    <div style="background:var(--s);border:1px solid var(--l2);border-radius:10px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Din plan</div>
+        <div style="font-weight:600;font-size:14px;color:var(--t)">Hantera eller avsluta din prenumeration via säker betalningsportal.</div>
+      </div>
+      <button id="manageSubBtn" style="height:38px;padding:0 20px;font-size:13px;font-weight:600;background:transparent;color:var(--t);border:1px solid var(--l2);border-radius:6px;cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='rgba(27,255,140,.4)';this.style.color='var(--a)'" onmouseout="this.style.borderColor='var(--l2)';this.style.color='var(--t)'">
+        Hantera prenumeration →
+      </button>
+    </div>
+  </div>
+
   <!-- FAQ -->
   <div class="faqGrid rev">
 
@@ -360,7 +373,7 @@
         <svg class="faqChev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
       </div>
       <div class="faqDiv"></div>
-      <div class="faqA">Du kan avsluta när som helst via kontoinställningarna. Det finns ingen bindningstid och du debiteras inte för nästa period efter avslut.</div>
+      <div class="faqA">Du kan avsluta när som helst via prenumerationsportalen — klicka på "Hantera prenumeration" ovanför (visas om du är inloggad med ett aktivt konto), eller via menyn i appen. Ingen bindningstid och du debiteras inte för nästa period efter avslut.</div>
     </div>
 
     <div class="faqItem faqCol" id="fq3">
@@ -386,11 +399,6 @@
 </div>
 </main>
 
-<section id="cancelSection" style="display:none;text-align:center;padding:32px 16px 8px;max-width:480px;margin:0 auto">
-  <p style="font-size:13px;color:var(--t2);margin-bottom:12px">Vill du avsluta din prenumeration? Du kan avbryta när som helst.</p>
-  <button id="cancelSubPricingBtn" style="background:none;border:1px solid #ff6b6b;color:#ff6b6b;border-radius:5px;padding:10px 24px;font-size:13px;font-family:var(--mono);cursor:pointer;letter-spacing:.04em">Avbryt prenumeration</button>
-  <p id="cancelMsg" style="font-size:12px;color:var(--t3);margin-top:10px"></p>
-</section>
 
 <footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
 
@@ -492,7 +500,7 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
 
 })();
 
-// Show cancel button for paying users
+// Show manage-subscription section for paying users
 (async function() {
   if (!window.supabase) return;
   const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co";
@@ -503,30 +511,30 @@ document.querySelectorAll("[data-faq]").forEach(btn => {
   const { data: prof } = await sb.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
   if (!prof || !["basic","premium"].includes(prof.role)) return;
 
-  document.getElementById("cancelSection").style.display = "";
-  document.getElementById("cancelSubPricingBtn").onclick = async function() {
-    if (!confirm("Avbryta prenumerationen? Du förlorar tillgång till betalfunktioner direkt.")) return;
-    this.disabled = true;
+  document.getElementById("manageSubSection").style.display = "";
+
+  document.getElementById("manageSubBtn").onclick = async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = "Laddar…";
     try {
       const r = await fetch("/api/check-role", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
-        body: JSON.stringify({ action: "cancel_sub" }),
+        body: JSON.stringify({ action: "portal" }),
       });
       const data = await r.json();
-      const msg = document.getElementById("cancelMsg");
-      if (r.ok) {
-        msg.style.color = "var(--a)";
-        msg.textContent = "Prenumeration avbruten. Din plan är nu Gratis.";
-        document.getElementById("cancelSection").querySelector("button").style.display = "none";
+      if (r.ok && data.url) {
+        window.location.href = data.url;
       } else {
-        msg.style.color = "#ff6b6b";
-        msg.textContent = "Fel: " + (data.error || "Okänt fel");
-        this.disabled = false;
+        alert("Fel: " + (data.message || data.error || "Okänt fel"));
+        btn.disabled = false;
+        btn.textContent = "Hantera prenumeration →";
       }
     } catch {
-      document.getElementById("cancelMsg").textContent = "Nätverksfel. Försök igen.";
-      this.disabled = false;
+      alert("Nätverksfel. Försök igen.");
+      btn.disabled = false;
+      btn.textContent = "Hantera prenumeration →";
     }
   };
 })();
