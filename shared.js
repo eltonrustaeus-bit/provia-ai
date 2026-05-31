@@ -276,7 +276,7 @@
         if (scores.length < 3) { addMsg('Kör fler prov för att se redo-score.', 'teacher'); return; }
         var t = addMsg('Räknar ut din körkortsredo-score…', 'teacher typing');
         getToken().then(function(tok) {
-          return fetch('/api/readiness-score', {
+          return fetch('/api/explain', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
             body: JSON.stringify({ scores: scores, weakAreas: wAreas, examsCount: scores.length })
@@ -555,7 +555,7 @@
         var typing = addMsg('Analyserar din beredskap…', 'teacher typing');
         try {
           var tok = await getToken();
-          var r = await fetch('/api/readiness-score', {
+          var r = await fetch('/api/explain', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
             body: JSON.stringify({ scores: scores, weakAreas: weakAreas, examsCount: scores.length })
