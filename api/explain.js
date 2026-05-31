@@ -141,7 +141,7 @@ export default async function handler(req, res) {
     const stdDev = Math.sqrt(rawScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rawScores.length);
     const readiness = Math.round(clamp(avgRecent + (trend === 'improving' ? 0.04 : trend === 'declining' ? -0.04 : 0) + (stdDev > 0.15 ? -0.03 : 0), 0, 1) * 100);
     const trendSv = trend === 'improving' ? 'förbättras' : trend === 'declining' ? 'försämras' : 'stabil';
-    const prompt = `Du är P.E.R — Provias körkortscoach. Bedöm elevens körkortsförberedelse.\n\nDATA:\n- Snitt senaste 5 proven: ${Math.round(avgRecent*100)}%\n- Snitt alla ${examsCount} prov: ${Math.round(avgAll*100)}%\n- Trend: ${trendSv}\n- Beräknad beredskap: ${readiness}%\n- Svaga ämnen: ${rawAreas.length ? rawAreas.join(', ') : 'inga identifierade'}\n- Variation: ${stdDev > 0.15 ? 'hög (ojämnt)' : stdDev > 0.08 ? 'måttlig' : 'låg (konsekvent)'}\n\nKörkortsprovet kräver 52/65 rätt (80%). Max 100 ord. Ge: omdöme (redo/nästan redo/inte redo), viktigaste åtgärd, kort motivation. Svenska.`;
+    const prompt = `Du är P.E.R — Provias Egna AI-Resource och körkortscoach. Bedöm elevens körkortsförberedelse.\n\nDATA:\n- Snitt senaste 5 proven: ${Math.round(avgRecent*100)}%\n- Snitt alla ${examsCount} prov: ${Math.round(avgAll*100)}%\n- Trend: ${trendSv}\n- Beräknad beredskap: ${readiness}%\n- Svaga ämnen: ${rawAreas.length ? rawAreas.join(', ') : 'inga identifierade'}\n- Variation: ${stdDev > 0.15 ? 'hög (ojämnt)' : stdDev > 0.08 ? 'måttlig' : 'låg (konsekvent)'}\n\nKörkortsprovet kräver 52/65 rätt (80%). Max 100 ord. Ge: omdöme (redo/nästan redo/inte redo), viktigaste åtgärd, kort motivation. Svenska.`;
     try {
       const assessment = await callAI([{ role: 'user', content: prompt }], { timeout: 20_000 });
       if (!assessment) return res.status(502).json({ error: 'No response' });
@@ -322,7 +322,7 @@ export default async function handler(req, res) {
 
   const opts = { A: option_a, B: option_b, C: option_c, D: option_d };
   const correctText = opts[correct] || correct;
-  const prompt = `Du är P.E.R — Provias intelligenta studiepartner. Förklara kortfattat (max 60 ord) varför svaret på följande teorifråga är ${correct}: ${correctText}.
+  const prompt = `Du är P.E.R — Provias Egna AI-Resource. Förklara kortfattat (max 60 ord) varför svaret på följande teorifråga är ${correct}: ${correctText}.
 
 Fråga: ${question}
 A: ${option_a || "—"}

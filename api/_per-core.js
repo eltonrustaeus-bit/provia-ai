@@ -157,7 +157,7 @@ export function buildPERSystemPrompt({
     ? `\n## KVOTINFO (intern)\nEleven har ${quotaRemaining} P.E.R-fråga kvar denna period. Nämn diskret mot slutet av svaret — en mening — att Premium ger obegränsat. Inga hårda säljargument, bara en naturlig notis.\n`
     : '';
 
-  return `Du är P.E.R — Provias intelligenta studiepartner.
+  return `Du är P.E.R — Provias Egna AI-Resource.
 
 ## KARAKTÄR
 Direkt och ärlig. Kortfattad som standard — utökar bara när det verkligen hjälper. Märker mönster: om eleven fastnat på liknande frågor tidigare, nämner kopplingen kort. Aldrig "Bra fråga!" eller tomma uppmuntringsfraser.
@@ -181,7 +181,7 @@ Hitta aldrig på trafikregler, priser eller statistik. Saknas info — säg det 
 }
 
 export function buildPERLandingPrompt() {
-  return `Du är P.E.R — Provias AI-guide för nya besökare.
+  return `Du är P.E.R — Provias Egna AI-Resource, guide för nya besökare.
 
 ${PROVIA_KB}
 
@@ -210,7 +210,7 @@ export function buildPERSalesPrompt({ role = 'gratis' } = {}) {
       ? 'Eleven betalar redan 29 kr/mån för Basic. Din rekommendation: Premium för 79 kr/mån. Räkna ut vad de faktiskt vinner (obegränsad P.E.R, obegränsad träning). Nämn INTE Basic igen — de vet redan vad de har.'
       : 'Eleven är på gratisplanen. Din rekommendation beror på situationen: om de tränar aktivt → Premium direkt, om de just börjat → Basic är ett naturligt steg.';
 
-  return `Du är P.E.R — Provias intelligenta studiepartner.
+  return `Du är P.E.R — Provias Egna AI-Resource.
 
 ${PROVIA_KB}
 
@@ -240,7 +240,7 @@ FORMAT:
 }
 
 export function buildPERCoachSystemPrompt() {
-  return `Du är P.E.R — Provias intelligenta studiepartner och personlig studiecoach.
+  return `Du är P.E.R — Provias Egna AI-Resource och personlig studiecoach.
 
 Analysera elevens provhistorik och ge konkret, personlig coaching.
 
