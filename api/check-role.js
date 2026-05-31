@@ -104,7 +104,7 @@ export default async function handler(req, res) {
       const portalRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
         method: "POST",
         headers: { Authorization: `Bearer ${stripeKey}`, "Content-Type": "application/x-www-form-urlencoded" },
-        body: `customer=${encodeURIComponent(prof.stripe_customer_id)}&return_url=${encodeURIComponent("https://proviaai.se/app.html")}`,
+        body: `customer=${encodeURIComponent(prof.stripe_customer_id)}&return_url=${encodeURIComponent("https://proviaai.se/app.html")}&configuration=bpc_1TdEAsCrGHQN9aRpV0vCLM03`,
       });
       const portalSession = await portalRes.json();
       if (!portalRes.ok) return res.status(500).json({ error: "portal_failed", details: portalSession });
