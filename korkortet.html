@@ -2189,7 +2189,7 @@ function renderQ(i) {
   // Text
   $("qText").textContent = q.question;
 
-  // Inject current question into P.E.R context
+  // Inject current question + exam state into P.E.R context
   if (window.setPerContext) {
     window.setPerContext({
       page: 'körkortsteorin',
@@ -2198,6 +2198,10 @@ function renderQ(i) {
         text: q.question,
         options: [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean),
         category: q.category || ''
+      },
+      examState: {
+        answered: ans.filter(function(a) { return a !== null; }).length,
+        remaining: total - i - 1
       }
     });
   }

@@ -370,7 +370,7 @@
         if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Chat rensad. Ställ en ny fråga!</div>';
       };
 
-      /* Restore previous history into view */
+      /* Restore previous history — localStorage first, then sync from Supabase */
       var hist = perGetHist();
       if (hist.length > 0) {
         var msgs = document.getElementById('perMessages');
@@ -385,6 +385,36 @@
           msgs.scrollTop = msgs.scrollHeight;
         }
       }
+
+      /* Background Supabase sync — load cross-device history */
+      getToken().then(function(tok) {
+        if (!tok) return;
+        fetch('/api/explain', {
+          headers: { 'Authorization': 'Bearer ' + tok }
+        }).then(function(r) {
+          if (!r.ok) return null;
+          return r.json();
+        }).then(function(data) {
+          if (!data || !Array.isArray(data.history) || data.history.length <= hist.length) return;
+          perSaveHist(data.history);
+          /* Only update UI if chat is closed and user hasn't started a new conversation */
+          var currentHist = perGetHist();
+          var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
+          if (!_open && !hasNewUserMsg) {
+            var msgsEl = document.getElementById('perMessages');
+            if (msgsEl) {
+              msgsEl.innerHTML = '';
+              data.history.forEach(function(msg) {
+                var div = document.createElement('div');
+                div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
+                div.textContent = msg.content;
+                msgsEl.appendChild(div);
+              });
+              msgsEl.scrollTop = msgsEl.scrollHeight;
+            }
+          }
+        }).catch(function() {});
+      });
 
       /* Start nudge timer on all app pages except landing/pricing */
       var initPath = window.location.pathname.toLowerCase();
