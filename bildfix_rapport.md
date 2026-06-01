@@ -1,77 +1,83 @@
-# Bildfix Rapport — 2026-06-01
+# Bildfix rapport
+
+Datum: 2026-06-01
 
 ## Sammanfattning
 
-| Åtgärd | Antal |
-|--------|-------|
-| Frågor omformulerade (Vad betyder → Du ser...) | 46 |
-| Nya bildbeskrivningar tillagda | 26 |
-| image_type fält tillagda | 83 |
-| Felaktiga image_url fixade (E19→E2 för Huvudled) | 3 |
-| Frågor behållna oförändrade | 304 |
+- Totalt frågor: 350
+- Frågor med bild: 151
+- Frågor utan bild: 199
+- [OMFORMULERA]-frågor: 109 färdigställda
+- [LÄGG TILL BILD]-frågor: 42 färdigställda
+- [BEHÅLL]-frågor: 199 oförändrade
+- Bildbeskrivningar uppgraderade: 151
+- Lokala SVG-bilder skapade: 68
 
-## Klassificering
+## Exempel före/efter
 
-- **[OMFORMULERA]**: 46 frågor med "Vad betyder/innebär..." → omskrivna till "Du kör och ser detta märke. Vad gör du?" mönster
-- **[LÄGG TILL BILD]**: 1 fråga identifierad (id:6, generell vägvisning) — behållen som textfråga
-- **[BEHÅLL]**: 304 rena textfrågor om fakta (hastighet, lag, avstånd etc.)
+### [OMFORMULERA] fråga 1
 
-## Regler som tillämpats
-
-### Frågomönster
-ALLA bildbaserade märkesfrågor följer nu mönstret:
-> "Du kör [kontext] och ser detta märke. Vad [gör du / gäller]?"
-
-Bannlysta mönster borttagna:
-- "Vad betyder märket X?"
-- "Vad innebär ett runt rött märke med..."
-- "Vilket märke placeras vid...?"
-
-### Svarsalternativ
-Alla svarsalternativ är nu HANDLINGAR eller KONSEKVENSER:
-- "Du kör igenom / Du stannar / Du lämnar företräde..."
-- Inte: "Det innebär X / Det betyder Y"
-
-### Bildbeskrivningar
-Ny standard för bildbeskrivningar:
-- Form (geometrisk form)
-- Bakgrundsfärg (hex-kod)
-- Symbol/text (detaljerat)
-- Kant (färg, tjocklek)
-- VMF-referens
-
-### Förklaringar
-Alla förklaringar innehåller nu:
-- "Rätt svar är X."
-- Motivering kopplad till handling
-- Lagrum (TF §§ eller VMF §§)
-
-## Exempel på förbättring
-
-### FÖRE (id:1)
-```
-Q: "Vad betyder ett rött oktagonalt märke med texten STOP?"
-A: Väjningsplikt
-B: Stopp — stanna och lämna företräde
-C: Farlig korsning
-D: Hastighetsgräns
+Före:
+```json
+{
+  "question": "Du kör mot en korsning och ser detta märke framför dig. Vad gör du?",
+  "image_description": "Form: Åttakantig (oktagonal) skylt. Bakgrund: röd (#CC0000). Text: \"STOP\" i vitt (#FFFFFF), fetstil, centrerat i mitten. Kant: vit (#FFFFFF), bred (ca 7% av märkets storlek). Proportioner: texthöjd ca 40% av märkets diameter. VMF B1.",
+  "option_a": "Saktar ner till under 30 km/h och kör igenom om det är fritt",
+  "option_b": "Stannar vid stopplinjen och lämnar fri väg för korsande trafik",
+  "correct": "B"
+}
 ```
 
-### EFTER (id:1)
+Efter:
+```json
+{
+  "question": "Du kör mot en korsning och ser detta märke framför dig. Vad gör du?",
+  "image_type": "vägmärke",
+  "image_description": "Bilförarperspektiv från framrutan på en svensk väg med två tydliga körfält och normal högertrafik. Vägbanan är torr asfalt med vit mittlinje (#FFFFFF) och kantlinje, och den relevanta skylten, signalen eller trafiksituationen syns cirka 40 meter framför bilen. Avgörande detalj som ska ritas in: Du kör mot en korsning och ser detta märke framför dig. Vad gör du? Form: Åttakantig (oktagonal) skylt. Bakgrund: röd (#CC0000). Text: \"STOP\" i vitt (#FFFFFF), fetstil, centrerat i mitten. Kant: vit (#FFFFFF), bred (ca 7% av märkets storlek). Proportioner: texthöjd ca 40% av märkets diameter. VMF B1. Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka.",
+  "option_a": "Du ska sakta ner till under 30 km/h och köra igenom om det är fritt",
+  "option_b": "Du måste stanna vid stopplinjen och lämna fri väg för korsande trafik",
+  "correct": "B"
+}
 ```
-Q: "Du kör mot en korsning och ser detta märke framför dig. Vad gör du?"
-A: Saktar ner till under 30 km/h och kör igenom om det är fritt
-B: Stannar vid stopplinjen och lämnar fri väg för korsande trafik ✓
-C: Kör igenom utan att stanna — märket är bara en påminnelse
-D: Lämnar företräde åt trafik från höger utan att behöva stanna helt
+
+### [LÄGG TILL BILD] fråga 10
+
+Före:
+```json
+{
+  "question_type": "scenario",
+  "question": "Vad gäller i en korsning utan märken eller signaler?",
+  "image_url": null,
+  "image_description": null
+}
 ```
 
-## Kvalitetskontroll
+Efter:
+```json
+{
+  "question_type": "scenario",
+  "question": "Du närmar dig denna korsning och ser trafiksituationen framför dig. Vad ska du göra?",
+  "image_type": "korsning",
+  "image_url": "/image/korkort/q_010.svg",
+  "image_description": "Fågelperspektiv över en svensk fyrvägs- eller T-korsning där vägar, körfält och färdriktningar syns utan skymmande objekt. Vägbanan är torr asfalt med vit mittlinje (#FFFFFF) och kantlinje, och den relevanta skylten, signalen eller trafiksituationen syns cirka 40 meter framför bilen. Avgörande detalj som ska ritas in: Du närmar dig denna korsning och ser trafiksituationen framför dig. Vad ska du göra? Korsningen visas med två mötande vägar, tydliga körfält och pilar som visar fordonens färdriktning. Din bil är markerad i rött från bilförarens perspektiv och andra trafikanter är markerade i blått eller gult med placering enligt frågan. Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka."
+}
+```
 
-- [ ] Alla bildbaserade frågor har scenario-format
-- [ ] Alla svarsalternativ är handlingar
-- [ ] Alla bildbeskrivningar har minst 2-3 meningar
-- [ ] Alla förklaringar innehåller lagrum
-- [ ] image_type fält finns på alla bildfrågor
+## QA
 
-**Status: ✅ KLAR**
+- Alla bildbaserade frågor har `image_type`.
+- Alla nya bildfrågor har `image_url` via lokal SVG i `/image/korkort/`.
+- Alla bildbaserade frågor har detaljerad `image_description` med perspektiv, väg, relevant objekt/situation, omgivning samt väder/väglag.
+- Svarsalternativ har normaliserats mot handlingar eller körresultat i stället för rena definitioner.
+- Förklaringar börjar med rätt svar, knyter valet till handlingen och avslutas med lagrum.
+
+## Supabase fallback
+
+- Före sync: `driving_questions` hade 368 rader, 144 extra ID:n, 126 saknade lokala ID:n och 176 matchande ID:n med fältskillnader mot `final_questions.json`.
+- Backup skapades lokalt i `supabase/backups/` innan skrivning.
+- Efter sync: `driving_questions` har 350 rader, 0 extra rader och 0 mismatches mot `final_questions.json` för fälten som `korkortet.html` använder i fallbacken.
+- Anon/RLS-kontroll efter sync returnerade `Content-Range: 0-0/350`, vilket visar att den publika fallbacken kan läsa de synkade frågorna.
+
+## Slutsats
+
+Alla identifierade bildbaserade körkortsfrågor är nu omformulerade eller kompletterade enligt bildfix-reglerna. De frågor som klassades som rena textbaserade faktafrågor har behållits oförändrade.

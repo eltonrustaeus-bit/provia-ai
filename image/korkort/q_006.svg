@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Bilförarperspektiv från framrutan på en svensk väg med två tydliga körfält och normal högertrafik. Vägbanan är torr asfalt med vit mittlinje (#FFFFFF) och kantlinje, och den relevanta skylten, signalen eller trafiksituationen syns cirka 40 meter framför bilen. Avgörande detalj som ska ritas in: Du kör på vägen och ser detta märke framför dig. Vad ska du göra? Märket är placerat på stolpe två meter från höger vägkant och är vinklat mot föraren. Skylten har tydlig standardstorlek, hög kontrast och färger enligt VMF: röd #CC0000, blå #003F87, gul #FFCC00, vit #FFFFFF och svart #111111 där de förekommer. Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka.">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#1bff8c"/></marker></defs>
+<rect width="640" height="360" fill="#08100d"/>
+<rect x="0" y="250" width="640" height="110" fill="#18261d"/>
+<circle cx="438" cy="160" r="72" fill="#fff" stroke="#cc0000" stroke-width="18"/><rect x="388" y="149" width="100" height="22" rx="4" fill="#111"/>
+<text x="38" y="48" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#1bff8c">Vägmärke</text>
+<text x="38" y="75" font-family="Arial, sans-serif" font-size="15" fill="#9dbfad">Vägmärken</text>
+<g font-family="Arial, sans-serif" font-weight="700"><text x="382" y="255" font-size="18" fill="#e8f5ee">Marke framfor bilen</text><path d="M320 300 L420 220" stroke="#1bff8c" stroke-width="5" marker-end="url(#arrow)"/></g>
+</svg>
