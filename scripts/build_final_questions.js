@@ -12,9 +12,10 @@ const REPORT_FILE = path.join(ROOT, 'validation_report.md');
 const LOG_FILE = path.join(ROOT, 'agents_log.md');
 
 // ─── Load source files ───────────────────────────────────────────────────────
-const q1 = require('./questions.json');         // 225 questions, old schema
-const q2 = require('./q_351_390.json');         // 40 questions, new schema
-const q3 = require('./extra_questions.json');   // 85 new questions (parkering + hastighet + övrigt)
+const q1 = require('./questions.json');               // 225 questions, old schema
+const q2 = require('./q_351_390.json');               // 40 questions, new schema
+const q3 = require('./extra_questions.json');         // 85 new questions (parkering + hastighet + övrigt)
+const IMG_OVERRIDES = require('./image_url_overrides.json'); // Wikipedia URLs for missing sign images
 
 // ─── Schema normalization helpers ────────────────────────────────────────────
 
@@ -225,7 +226,7 @@ const processed3 = q3.map(q => {
     subcategory: q.subcategory || getSubcategory(q),
     question_type: q.question_type || getQuestionType(q),
     question: q.question,
-    image_url: q.image_url || null,
+    image_url: q.image_url || IMG_OVERRIDES[q.id]?.url || null,
     image_description: q.image_description || null,
     option_a: q.option_a,
     option_b: q.option_b,
@@ -282,7 +283,7 @@ const processed1 = q1.map(q => {
     subcategory: sub,
     question_type: getQuestionType(q),
     question: q.question,
-    image_url: q.image_url || null,
+    image_url: q.image_url || IMG_OVERRIDES[q.id]?.url || null,
     image_description: imgDesc,
     option_a: q.option_a,
     option_b: q.option_b,
@@ -331,7 +332,7 @@ const processed2 = q2.map(q => {
     subcategory: q.subcategory || getSubcategory(q),
     question_type: q.question_type || getQuestionType(q),
     question: q.question,
-    image_url: q.image_url || null,
+    image_url: q.image_url || IMG_OVERRIDES[q.id]?.url || null,
     image_description: imgDesc,
     option_a: q.option_a,
     option_b: q.option_b,
