@@ -685,6 +685,7 @@ body.light .aiSendBtn{color:#fff}
         <span class="diffDot" id="diffDot" style="display:none"></span>
         <span class="qCat" id="qCat"></span>
         <span class="streakBadge" id="streakBadge"></span>
+        <span id="cfBadge" style="display:none;font-family:'DM Mono',monospace;font-size:9.5px;color:#f4c842;border:1px solid rgba(244,200,66,.35);border-radius:var(--r2);padding:1px 7px" title="Vanligt fel på körkortsprovet">⚠ Vanligt svår</span>
       </div>
       <p class="qText" id="qText"></p>
       <div id="qImgWrap" style="display:none"></div>
@@ -2184,10 +2185,12 @@ function renderQ(i) {
 
   // Meta
   $("qNum").textContent = `${String(i+1).padStart(2,"0")}/${String(total).padStart(2,"0")}`;
-  $("qCat").textContent = `${CAT_ICONS[q.category]||""} ${q.category}`;
+  $("qCat").textContent = `${CAT_ICONS[q.category]||""} ${q.subcategory || q.category}`;
   const dd = $("diffDot");
   if(q.difficulty) { dd.className=`diffDot ${q.difficulty}`; dd.title=q.difficulty; dd.style.display="inline-block"; }
   else dd.style.display = "none";
+  const cfBadge = $("cfBadge");
+  if(cfBadge) cfBadge.style.display = q.commonly_failed ? "" : "none";
 
   // Text
   $("qText").textContent = q.question;
@@ -2348,7 +2351,10 @@ function loadExpl(q) {
   const box = $("explBox"), txt = $("explText");
   const cache = safeJSON(localStorage.getItem(LS_EXPL), {});
   if(cache[q.id]) { txt.textContent = cache[q.id]; box.classList.add("show"); return; }
-  if(q.explanation?.trim()) { txt.textContent = q.explanation; box.classList.add("show"); return; }
+  if(q.explanation?.trim()) {
+    txt.textContent = q.explanation + (q.law_reference ? `\n\nLagrum: ${q.law_reference}` : "");
+    box.classList.add("show"); return;
+  }
   box.classList.add("show");
   txt.innerHTML = `<span class="spinner"></span> Hämtar förklaring…`;
   fetch("/api/explain",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -2678,31 +2684,39 @@ async function init() {
       if(_prof?.role){ role=_prof.role; localStorage.setItem(LS_ROLE,role); }
     } catch(_) {}
 
-    // 1. Load questions — try Supabase client, fall back to raw fetch
+    // 1. Load questions — primary: /final_questions.json (350 validated), fallback: Supabase
     step("Hämtar frågor…");
     let questions_raw = null;
     try {
-      const {data, error} = await raceTimeout(
-        db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description"),
-        12000, "frågeinladdning"
-      );
-      if(error) throw new Error(error.message);
-      questions_raw = data;
-    } catch(clientErr) {
-      // Fallback: raw fetch directly to PostgREST
-      step("Försöker direktanslutning…");
-      const resp = await raceTimeout(
-        fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description`, {
-          headers: { apikey: SUPA_ANON, Authorization: `Bearer ${SUPA_ANON}` }
-        }),
-        12000, "direktfetch"
-      );
-      if(!resp.ok) throw new Error(`Databasfel ${resp.status}: ${await resp.text()}`);
-      questions_raw = await resp.json();
+      const resp = await raceTimeout(fetch("/final_questions.json"), 8000, "frågeinladdning");
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      if(!Array.isArray(json?.questions) || json.questions.length === 0) throw new Error("Tom JSON");
+      questions_raw = json.questions;
+    } catch(_) {
+      // Fallback: Supabase
+      step("Försöker Supabase…");
+      try {
+        const {data, error} = await raceTimeout(
+          db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description"),
+          12000, "supabase"
+        );
+        if(error) throw new Error(error.message);
+        questions_raw = data;
+      } catch(__) {
+        const resp2 = await raceTimeout(
+          fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description`, {
+            headers: { apikey: SUPA_ANON, Authorization: `Bearer ${SUPA_ANON}` }
+          }),
+          12000, "direktfetch"
+        );
+        if(!resp2.ok) throw new Error(`Databasfel ${resp2.status}: ${await resp2.text()}`);
+        questions_raw = await resp2.json();
+      }
     }
 
     if(!Array.isArray(questions_raw) || questions_raw.length === 0) {
-      throw new Error("Inga frågor returnerades från databasen.");
+      throw new Error("Inga frågor returnerades.");
     }
     questions = questions_raw;
 

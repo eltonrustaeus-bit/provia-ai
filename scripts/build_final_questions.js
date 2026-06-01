@@ -220,14 +220,13 @@ function ensureExplanationFormat(q) {
 const processed3 = q3.map(q => {
   const cf = q.commonly_failed || isCommonlyFailed(q);
   return {
-    id: `q${q.id}`,
-    source_id: q.id,
+    id: q.id,
     category: q.category,
     subcategory: q.subcategory || getSubcategory(q),
     question_type: q.question_type || getQuestionType(q),
     question: q.question,
+    image_url: q.image_url || null,
     image_description: q.image_description || null,
-    image_source: null,
     option_a: q.option_a,
     option_b: q.option_b,
     option_c: q.option_c,
@@ -278,14 +277,13 @@ const processed1 = q1.map(q => {
   if (!q.explanation || q.explanation.length < 20) stats.explanationsShort++;
 
   return {
-    id: `q${q.id}`,
-    source_id: q.id,
+    id: q.id,
     category: q.category,
     subcategory: sub,
     question_type: getQuestionType(q),
     question: q.question,
+    image_url: q.image_url || null,
     image_description: imgDesc,
-    image_source: q.image_url ? 'driving' : null,
     option_a: q.option_a,
     option_b: q.option_b,
     option_c: q.option_c,
@@ -328,14 +326,13 @@ const processed2 = q2.map(q => {
   if (cf) stats.commonlyFailedFlagged++;
 
   return {
-    id: `q${q.id}`,
-    source_id: q.id,
+    id: q.id,
     category: q.category,
     subcategory: q.subcategory || getSubcategory(q),
     question_type: q.question_type || getQuestionType(q),
     question: q.question,
+    image_url: q.image_url || null,
     image_description: imgDesc,
-    image_source: 'driving',
     option_a: q.option_a,
     option_b: q.option_b,
     option_c: q.option_c,
@@ -358,10 +355,10 @@ const allIds = new Set();
 const merged = [];
 
 for (const q of [...processed1, ...processed2, ...processed3]) {
-  if (allIds.has(q.source_id)) {
+  if (allIds.has(q.id)) {
     stats.duplicatesRemoved++;
   } else {
-    allIds.add(q.source_id);
+    allIds.add(q.id);
     merged.push(q);
   }
 }
