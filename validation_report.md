@@ -1,5 +1,5 @@
 # Validation Report — Körkortsfrågsdatabas
-Genererad: 2026-06-01T20:03:02.585Z
+Genererad: 2026-06-01T20:08:13.559Z
 
 ## Källfiler analyserade
 - **scripts/questions.json**: 225 frågor (gammal schema, saknade subcategory/image_description/law_reference/commonly_failed)
