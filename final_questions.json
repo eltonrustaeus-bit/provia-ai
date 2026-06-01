@@ -23,7 +23,8 @@
       "easy": "28%",
       "normal": "49%",
       "hard": "23%"
-    }
+    },
+    "fix_applied": "bildfix_v1"
   },
   "questions": [
     {
@@ -31,115 +32,120 @@
       "category": "Vägmärken",
       "subcategory": "Väjning och stopp",
       "question_type": "image",
-      "question": "Vad betyder ett rött oktagonalt märke med texten STOP?",
+      "question": "Du kör mot en korsning och ser detta märke framför dig. Vad gör du?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
       "image_description": "Form: Åttakantig (oktagonal) skylt. Bakgrund: röd (#CC0000). Text: \"STOP\" i vitt (#FFFFFF), fetstil, centrerat i mitten. Kant: vit (#FFFFFF), bred (ca 7% av märkets storlek). Proportioner: texthöjd ca 40% av märkets diameter. VMF B1.",
-      "option_a": "Väjningsplikt",
-      "option_b": "Stopp — stanna och lämna företräde",
-      "option_c": "Farlig korsning",
-      "option_d": "Hastighetsgräns",
+      "option_a": "Saktar ner till under 30 km/h och kör igenom om det är fritt",
+      "option_b": "Stannar vid stopplinjen och lämnar fri väg för korsande trafik",
+      "option_c": "Kör igenom utan att stanna — märket är bara en påminnelse",
+      "option_d": "Lämnar företräde åt trafik från höger utan att behöva stanna helt",
       "correct": "B",
-      "explanation": "STOP-märket kräver att du stannar vid stopplinje och lämnar fri väg för korsande trafik.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. STOP-märket (VMF B1) kräver att du stannar vid stopplinjen och lämnar fri väg, även om det ser fritt ut. Du MÅSTE stanna — att bara sakta ner räcker inte. Lagrum: TF 3 kap 17§, VMF B1.",
+      "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 2,
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken",
       "question_type": "image",
-      "question": "Vad innebär en cirkulär blå skylt med vit pil rakt upp?",
+      "question": "Du ser detta blå märke vid en korsning. Vad gäller för din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
       "image_description": "Form: Rund påbudsskylt. Bakgrund: blå (#003F87). Symbol: Vit pil (#FFFFFF) riktad rakt uppåt, centrerat. Kant: vit (#FFFFFF), ca 8% av diametern. Proportioner: Pilens höjd ca 60% av märkets diameter, bred pilspets. VMF D1-3.",
-      "option_a": "Påbudsskylt — kör i pilens riktning",
-      "option_b": "Rekommenderad körriktning",
-      "option_c": "Enkelriktat",
-      "option_d": "Motorled börjar",
-      "correct": "A",
-      "explanation": "Blå cirkulär skylt är en påbudsskylt. Pil rakt upp innebär att du är skyldig att köra rakt fram.",
-      "law_reference": null,
+      "option_a": "Du rekommenderas att köra rakt fram men kan ändå svänga vid behov",
+      "option_b": "Du MÅSTE köra rakt fram — avvikelse är förbjuden",
+      "option_c": "Gatan är enkelriktad och all trafik kör i samma riktning",
+      "option_d": "Du befinner dig vid en motorvägs påfart",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Blå rund skylt med pil rakt upp (VMF D1-3) är ett påbudsmärke — du är skyldig att köra rakt fram. Det är inte en rekommendation utan ett lagkrav. Lagrum: TF 3 kap 14§.",
+      "law_reference": "TF 3 kap 14§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 3,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vilket märke placeras direkt vid en obevakad järnvägskorsning?",
+      "question": "Du kör mot en järnvägskorsning och ser detta märke monterat på stolpe. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Sweden_road_sign_A37.svg/330px-Sweden_road_sign_A37.svg.png",
       "image_description": "Form: Andreaskors — två vita plankor i X-form. Bakgrund: Vit med svarta kanter. Symbol: Bokstäverna \"J\" och \"V\" (Järnvägskorsning) på plankorna. Placering: Direkt vid obevakad järnvägskorsning. Proportioner: Varje arm ca 1,2 m lång. VMF A37.",
-      "option_a": "Andreaskors (X-märke)",
-      "option_b": "Rött triangelmärke med lok",
-      "option_c": "Blinkande gult ljus",
-      "option_d": "Gul triangel med lok",
-      "correct": "A",
-      "explanation": "Andreaskors placeras direkt vid obevakad järnvägskorsning och varnar för tåg från båda riktningarna.",
-      "law_reference": null,
+      "option_a": "Du är vid en bevakad järnvägskorsning — vänta tills eventuella bommar öppnas",
+      "option_b": "Du är direkt vid en obevakad järnvägskorsning — se upp för tåg från båda håll",
+      "option_c": "Det är 150 meter kvar till järnvägskorsningen — börja bromsa nu",
+      "option_d": "Du har just passerat järnvägskorsningen — märket markerar slutet",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Andreaskors (VMF A37) placeras direkt vid obevakad järnvägskorsning. Märket varnar att tåg kan komma från båda håll utan bommar eller ljussignaler. Säkerställ att spåren är fria innan du passerar. Lagrum: TF 3 kap 39§.",
+      "law_reference": "TF 3 kap 39§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 4,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett rött triangelmärke med utropstecken?",
+      "question_type": "image",
+      "question": "Du kör på en landsväg och ser detta märke. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
-      "image_description": null,
-      "option_a": "Farlig kurva",
-      "option_b": "Korsning med sämre väg",
-      "option_c": "Allmänt varningmärke — fara av okänt slag",
-      "option_d": "Vägarbete",
+      "image_description": "Form: Liksidig triangel med spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart utropstecken (!) centrerat, höjd ca 50% av märkessidan. Kant: röd (#CC0000), bred (ca 12%). Används när ingen specifik varningsskylt passar. VMF A17.",
+      "option_a": "Farlig kurva strax framme — sänk hastigheten",
+      "option_b": "Korsning med sämre väg — ge akt på utfarter",
+      "option_c": "Okänd fara framåt — var extra uppmärksam och anpassa hastigheten",
+      "option_d": "Vägarbete pågår — kör varsamt förbi",
       "correct": "C",
-      "explanation": "Triangelmärke med utropstecken är ett allmänt varningmärke när ingen specifik varningsskylt passar.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Triangelmärket med utropstecken (VMF A17) används som allmänt varningmärke när ingen specifik varningsskylt finns för faran framåt. Det kan stå framför allt från tillfälliga hinder till farliga situationer. Lagrum: VMF A17.",
+      "law_reference": "VMF A17",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 5,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad visar ett blått rektangulärt märke med P?",
+      "question_type": "image",
+      "question": "Du kör in i ett område och ser detta blå märke. Vad innebär det för parkering här?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "image_description": null,
-      "option_a": "Parkering förbjuden",
-      "option_b": "Parkering tillåten",
-      "option_c": "Parkeringsförbud upphör",
-      "option_d": "Motorstopp förbjudet",
+      "image_description": "Form: Rektangulär skylt (stående format). Bakgrund: blå (#003F87). Symbol: stor vit bokstav 'P' centrerat, fetstil. Eventuell tilläggsskylt nedan med tider eller begränsningar. VMF E19.",
+      "option_a": "Parkering är förbjuden vid detta märke",
+      "option_b": "Det är en parkeringsplats — parkering är tillåten",
+      "option_c": "Parkeringsförbudet upphör vid märket men parkering är inte garanterad",
+      "option_d": "Avgiftsbelagd parkering — betala vid automaten",
       "correct": "B",
-      "explanation": "Blå rektangulär P-skylt anger att parkering är tillåten, med eventuella begränsningar nedanför.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Det blå rektangulära märket med 'P' (VMF E19) anger en parkeringsplats där parkering är tillåten. Eventuella begränsningar anges på tilläggsskylt. Lagrum: VMF E19.",
+      "law_reference": "VMF E19",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 6,
@@ -169,23 +175,24 @@
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Vad anger en gul romb med vit kant?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "image_description": "Form: Rombformad skylt (45° roterad kvadrat). Bakgrund: gul (#FFCC00). Kant: vit (#FFFFFF), bred. Ingen symbol. Proportioner: Alla 4 sidor lika långa, ca 40×40 cm. VMF E19.",
-      "option_a": "Varningsskylt för korsning",
-      "option_b": "Du kör på en väg med företräde (huvudledsmärke)",
-      "option_c": "Rekommenderad hastighet",
-      "option_d": "Betalväg",
+      "question": "Du kör på en väg och ser detta märke. Vad innebär det för ditt företräde?",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
+      "image_description": "Form: Rombformad skylt (kvadrat roterad 45°, ca 45×45 cm). Bakgrund: gul (#FFCC00). Symbol: ingen. Kant: vit (#FFFFFF), bred (ca 8% av märkets storlek). Monterad på stolpe vid vägkanten. Anger att du kör på en väg med förkörsrätt. VMF E2.",
+      "option_a": "Du är vid en korsning — trafik från sidovägar och höger har företräde",
+      "option_b": "Du kör på en väg med förkörsrätt (huvudled)",
+      "option_c": "Rekommenderad maxhastighet gäller på denna väg",
+      "option_d": "Betalväg — kontrollera om du ska betala",
       "correct": "B",
-      "explanation": "Gul romb med vit kant (huvudledsmärket) anger att du kör på en väg med företräde.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Gul romb med vit kant (VMF E2) är huvudledsmärket — du kör på en väg med förkörsrätt. Fordon från korsande vägar ska lämna dig företräde. Lagrum: TF 3 kap 18§, VMF E2.",
+      "law_reference": "TF 3 kap 18§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 8,
@@ -1434,230 +1441,240 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vad betyder en vit triangel med spetsen nedåt på vägbanan?",
+      "question": "Du kör mot en korsning och ser denna markering på vägbanan. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_B2.svg/330px-Sweden_road_sign_B2.svg.png",
       "image_description": "Form: Triangel med spetsen nedåt, vit bakgrund med röd kant (#CC0000). Symbol: röd nedåtpekande triangel, placerad på vägbanan. Färger: Bakgrund #FFFFFF, Kant #CC0000. Proportioner: Sidlängd ca 60 cm. VMF B2.",
-      "option_a": "Väjningsplikt",
-      "option_b": "Stopplikt",
-      "option_c": "Gångbana framåt",
-      "option_d": "Farlig korsning",
+      "option_a": "Du har väjningsplikt — lämna företräde åt korsande trafik",
+      "option_b": "Du måste stanna helt vid den vita triangeln",
+      "option_c": "Du kör på en väg med förkörsrätt — korsande trafik väjer",
+      "option_d": "Markeringen gäller bara för cyklister och mopedister",
       "correct": "A",
-      "explanation": "En vit triangel med spetsen nedåt på vägbanan markerar väjningsplikt.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Vit omvänd triangel (spets nedåt) på vägbanan (VMF B2) anger väjningsplikt. Du måste lämna företräde åt trafik på den korsande vägen — du behöver inte stanna om det är fritt. Lagrum: TF 3 kap 17§.",
+      "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 74,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vad innebär märket Väjningsplikt mot mötande fordon?",
+      "question": "Du kör mot en smal passage och ser detta märke. En bil kommer mot dig. Vad gör du?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_B4.svg/330px-Sweden_road_sign_B4.svg.png",
       "image_description": "Form: Rund skylt med vit bakgrund. Symbol: Blå pil pekar höger (din riktning) och röd pil pekar vänster (mötandets riktning). Röd pil ovanför blå. Kant: Röd (#CC0000). Proportioner: Pilarna upptar ca 60% av ytan. VMF B4.",
-      "option_a": "Du har företräde framför mötande fordon",
-      "option_b": "Du ska stanna och vänta tills mötande fordon passerat",
-      "option_c": "Du ska köra i 30 km/h",
-      "option_d": "Mötande fordon har företräde och du ska väja",
-      "correct": "D",
-      "explanation": "Märket innebär att du ska lämna företräde åt mötande fordon, exempelvis vid en smal passage.",
-      "law_reference": null,
+      "option_a": "Kör igenom — mötande fordon har väjningsplikt mot dig",
+      "option_b": "Stannar och väntar tills mötande fordon passerat",
+      "option_c": "Sänker hastigheten till 30 km/h och kör igenom om det ser fritt ut",
+      "option_d": "Högerregeln avgör vem som ska väja",
+      "correct": "B",
+      "explanation": "Rätt svar är B. VMF B4 (Väjningsplikt mot mötande fordon) innebär att du måste lämna företräde åt mötande fordon — stanna och vänta. Märket sitter på din sida. Mötande fordon har VMF B5 som ger dem förkörsrätt. Lagrum: TF 3 kap 17§.",
+      "law_reference": "TF 3 kap 17§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 76,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
       "question_type": "image",
-      "question": "Vad gäller vid märket Förbud mot fordonstrafik i båda riktningarna?",
+      "question": "Du kör mot en gata och ser detta märke vid infarten. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Sweden_road_sign_C1.svg/330px-Sweden_road_sign_C1.svg.png",
       "image_description": "Form: Rund skylt. Bakgrund: vit (#FFFFFF). Symbol: Röd cirkel (#CC0000) som ram, med rött snedstreck från övre vänster till nedre höger. Innerytan är vit. Kant: röd (#CC0000). VMF C1.",
-      "option_a": "Alla fordon förbjudna utom cyklar",
-      "option_b": "Alla motordrivna fordon förbjudna",
-      "option_c": "Alla fordon förbjudna i båda riktningarna",
-      "option_d": "Fordon tyngre än 3,5 ton förbjudna",
+      "option_a": "Alla fordon utom cyklar är förbjudna att köra in",
+      "option_b": "Alla motordrivna fordon är förbjudna",
+      "option_c": "Alla fordon är förbjudna i båda riktningarna",
+      "option_d": "Fordon tyngre än 3,5 ton är förbjudna",
       "correct": "C",
-      "explanation": "Märket C1 innebär att alla fordon är förbjudna att passera i båda riktningarna.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. VMF C1 (Förbud mot fordonstrafik i båda riktningarna) förbjuder alla fordon i båda riktningarna. Gatan är helt stängd för fordonstrafik. Lagrum: VMF C1.",
+      "law_reference": "VMF C1",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 77,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Vad betyder ett gult-rött rombformat märke på en väg?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
+      "question": "Du kör in i en korsning och ser detta gula märke. Vad innebär det för ditt körbeteende?",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
       "image_description": "Form: Rombformad skylt (45° roterad kvadrat). Bakgrund: gul (#FFCC00). Kant: vit (#FFFFFF), bred. Ingen symbol. Proportioner: Alla 4 sidor lika långa, ca 40×40 cm. VMF E19.",
-      "option_a": "Du befinner dig på en huvudled med företräde",
-      "option_b": "Skola framför",
-      "option_c": "Farlig kurva",
-      "option_d": "Vägarbete",
+      "option_a": "Du kör på en väg med förkörsrätt — trafik från korsande vägar väjer",
+      "option_b": "Korsning med skola framåt — sänk hastigheten",
+      "option_c": "Farlig kurva — sänk hastigheten",
+      "option_d": "Vägarbete pågår — extra uppmärksamhet",
       "correct": "A",
-      "explanation": "Det gula rombformade märket markerar att du befinner dig på en prioriterad väg och har företräde i korsningar.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Gult rombformat märke (VMF E2, Huvudled) anger att du befinner dig på en väg med förkörsrätt. Trafik på korsande vägar ska lämna dig företräde. Lagrum: TF 3 kap 18§.",
+      "law_reference": "TF 3 kap 18§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 78,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
       "question_type": "image",
-      "question": "Vad innebär ett märke med siffran 3,8 och en bild av en bil?",
+      "question": "Du kör mot en passage och ser detta märke med siffran 3,8. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sweden_road_sign_C16.svg/330px-Sweden_road_sign_C16.svg.png",
       "image_description": "Form: Rund skylt. Bakgrund: vit (#FFFFFF). Symbol: Röd cirkel (#CC0000) som ram, med rött snedstreck från övre vänster till nedre höger. Innerytan är vit. Kant: röd (#CC0000). VMF C1.",
-      "option_a": "Fordon högre än 3,8 meter är förbjudna",
-      "option_b": "Hastighetsgränsen är 3,8 km/h",
-      "option_c": "Bron tål max 3,8 ton",
-      "option_d": "Vägen slutar om 3,8 km",
+      "option_a": "Fordon som är högre än 3,8 meter är förbjudna att passera",
+      "option_b": "Hastighetsgränsen på sträckan är 3,8 km/h",
+      "option_c": "Bron håller max 3,8 ton — fordon tyngre än så är förbjudna",
+      "option_d": "Vägen slutar om 3,8 kilometer — välj annan väg",
       "correct": "A",
-      "explanation": "Märket anger maximal tillåten fordonshöjd. Fordon eller last som är högre än 3,8 meter får inte passera.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Märket VMF C16 (Förbud mot fordon högre än X meter) innebär att fordon högre än 3,8 meter är förbjudna. Typiskt vid tunnlar, broar och viadukter. Lagrum: VMF C16.",
+      "law_reference": "VMF C16",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 79,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vad varnar ett rödrandat trekantigt märke med ett lok för?",
+      "question": "Du kör mot en järnvägskorsning och ser detta märke. Vad varnar det för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Sweden_road_sign_A35.svg/330px-Sweden_road_sign_A35.svg.png",
       "image_description": "Form: Triangulär varningsmärke med spetsen uppåt. Bakgrund: vit (#FFFFFF). Kant: röd (#CC0000). Symbol: Svart siluett av ånglok framifrån utan bommar. Proportioner: Loket upptar ca 55% av ytan, hjul synliga. VMF A35.",
-      "option_a": "Järnvägsövergång med bom",
-      "option_b": "Varning för kollision",
-      "option_c": "Vägkorsning med spårväg",
-      "option_d": "Järnvägsövergång utan bom",
+      "option_a": "Järnvägskorsning med bommar — vänta på bommarnas signal",
+      "option_b": "Risk för kollision vid järnvägsspåret",
+      "option_c": "Spårväg korsar vägen framåt",
+      "option_d": "Järnvägskorsning utan bommar — extra aktsam passage krävs",
       "correct": "D",
-      "explanation": "Det trekantiga märket med lok varnar för en obevakad järnvägsövergång utan bommar.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Triangelmärke med lok utan bommar (VMF A35) varnar för järnvägskorsning UTAN bommar. Det finns inga bommar som stoppar dig — du måste själv säkerställa att spåren är fria. Jämför VMF A36 som varnar för korsning MED bommar. Lagrum: TF 3 kap 39§.",
+      "law_reference": "TF 3 kap 39§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 80,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Vad innebär ett grönt märke med en vit motorvägssymbol?",
+      "question": "Du kör på en landsväg och ser detta gröna märke. Vad börjar gälla?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
       "image_description": "Form: Rektangulär blå skylt. Bakgrund: grön (#007A3D). Symbol: Vit motorvägssymbol — två parallella körbanor med mittremsa och pilar framåt. Kant: vit (#FFFFFF). Proportioner: Märket är bredare än högt. VMF E3.",
-      "option_a": "Motortrafikled börjar",
-      "option_b": "Motorväg börjar med speciella regler",
-      "option_c": "Rekommenderad hastighet 110 km/h",
-      "option_d": "Omkörning förbjuden upphör",
+      "option_a": "Motortrafikled börjar — andra regler än motorväg gäller",
+      "option_b": "Motorväg börjar med hastighetsgräns 110 km/h och speciella regler",
+      "option_c": "Rekommenderad hastighet på vägen är 110 km/h",
+      "option_d": "Omkörningsförbudet upphör",
       "correct": "B",
-      "explanation": "Det gröna märket med motorvägssymbol markerar att motorväg börjar. Mopeder och cyklar är förbjudna.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Grönt märke med vit motorvägssymbol (VMF E3) anger att motorväg börjar. På motorväg gäller: max 110 km/h, gång-/cykeltrafik förbjuden, stopp förbjudet utom vid nödsituation. Lagrum: TF 3 kap 58§.",
+      "law_reference": "TF 3 kap 58§",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 81,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vad varnar ett rödrandat trekantigt märke med en figur som faller för?",
+      "question": "Du kör i ett bostadsområde och ser detta märke. Vad varnar det för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
       "image_description": "Form: Triangulär varningsmärke med spetsen uppåt. Bakgrund: vit (#FFFFFF). Kant: röd (#CC0000). Symbol: Svart siluett av gående människa med ryggsäck. Proportioner: Symbol upptar ca 50% av ytan. VMF A20.",
-      "option_a": "Varning för vilt",
-      "option_b": "Varning för halt väglag",
-      "option_c": "Varning för barn",
-      "option_d": "Varning för fotgängare",
+      "option_a": "Varning för vilt som kan korsa vägen",
+      "option_b": "Varning för halt eller isigt väglag",
+      "option_c": "Varning för barnpassage — barn kan springa ut",
+      "option_d": "Varning för gångtrafikanter som korsar vägen",
       "correct": "D",
-      "explanation": "Märket varnar för platser där fotgängare ofta korsar vägen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Triangelmärke med gående person (VMF A20) varnar för gångtrafikanter som korsar eller rör sig längs vägen. Sänk hastigheten och var beredd att stanna. Lagrum: VMF A20.",
+      "law_reference": "VMF A20",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 82,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad innebär ett märke med texten ZONE 30 i rött?",
+      "question_type": "image",
+      "question": "Du kör in i ett område och ser detta märke med texten ZONE 30. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Sweden_road_sign_E23.svg/330px-Sweden_road_sign_E23.svg.png",
-      "image_description": null,
-      "option_a": "Rekommenderad hastighet 30 km/h i zonen",
-      "option_b": "Hastighetsgränsen 30 km/h gäller i hela zonen",
-      "option_c": "Skolzon, 30 km/h gäller bara på dagtid",
-      "option_d": "Minsta hastighet 30 km/h",
+      "image_description": "Form: Rektangulär skylt. Bakgrund: vit (#FFFFFF). Symbol: texten 'ZONE 30' i röd (#CC0000) fetstil. Kant: röd kantlinje. Anger att en hastighetsbegränsningszon på 30 km/h börjar. VMF E23.",
+      "option_a": "Hastighetsgränsen 30 km/h rekommenderas i hela zonen",
+      "option_b": "Hastighetsgränsen 30 km/h är bindande och gäller i hela zonen",
+      "option_c": "Skolzon — 30 km/h gäller bara under skoltid",
+      "option_d": "Minsta tillåtna hastighet är 30 km/h i zonen",
       "correct": "B",
-      "explanation": "En 30-zon innebär att 30 km/h gäller i hela zonen tills du ser det avslutande märket.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. ZONE 30-märket (VMF E23) innebär att hastighetsgränsen 30 km/h gäller i HELA zonen — det är bindande, inte en rekommendation. Gäller tills du ser att zonen avslutas. Lagrum: TF 3 kap 17§, VMF E23.",
+      "law_reference": "VMF E23",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 83,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Vad varnar märket A13 — en röd triangel med bild av en studsande bil — för?",
+      "question": "Du kör på en landsväg och ser detta märke med en studsande bil. Vad bör du göra?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
       "image_description": "Form: Triangulär varningsmärke med spetsen uppåt. Bakgrund: vit (#FFFFFF). Kant: röd (#CC0000). Symbol: Svart siluett av bil som studsar på ojämnheter (vågig linje). Proportioner: Symbol upptar ca 55% av ytan. VMF A13.",
-      "option_a": "Stigning",
-      "option_b": "Brant utförsbacke",
-      "option_c": "Ojämn väg",
-      "option_d": "Farlig vägsida",
-      "correct": "C",
-      "explanation": "Märket A13 varnar för en vägsträcka med ojämnheter, gropar eller stötiga partier.",
-      "law_reference": null,
+      "option_a": "Sänker farten — risk för att lös sten skjuter upp och träffar bilen",
+      "option_b": "Sänker farten — risk för vattensamlingar och djupa sjunkhål",
+      "option_c": "Kör i normal hastighet — märket är bara informativt",
+      "option_d": "Sänker farten och håller ratten stadigt — ojämn vägbana framåt",
+      "correct": "D",
+      "explanation": "Rätt svar är D. Triangelmärket med studsande bil (VMF A13) varnar för ojämn vägbana — potthål, gupp, sättningar. Sänk hastigheten och håll ratten stadigt. Lagrum: VMF A13.",
+      "law_reference": "VMF A13",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 84,
@@ -2813,323 +2830,337 @@
       "id": 143,
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt blått märke med en vit pil rakt upp?",
+      "question_type": "image",
+      "question": "Du kör mot en korsning och ser detta blå märke. Vad måste du göra?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-      "image_description": null,
-      "option_a": "Motortrafik förbjuden",
-      "option_b": "Avkörning förbjuden",
-      "option_c": "Hastighetsbegränsning upphör",
-      "option_d": "Påbjuden körriktning rakt fram",
-      "correct": "D",
-      "explanation": "Runda blå märken med vita pilar är påbudsmärken. Pil rakt upp = du måste fortsätta rakt fram.",
-      "law_reference": null,
+      "image_description": "Form: Rund påbudsskylt (diameter ca 40 cm). Bakgrund: blå (#003F87). Symbol: vit pil riktad rakt uppåt, centrerat. Kant: vit (#FFFFFF), bred (ca 8%). Pilens höjd ca 60% av märkets diameter. VMF D1-3.",
+      "option_a": "Köra i pilens riktning — du måste köra rakt fram",
+      "option_b": "Du förbjuds att köra av från vägen",
+      "option_c": "Hastighetsbegränsning på vägen upphör",
+      "option_d": "Du har nått en motorvägs påfart — anpassa hastigheten",
+      "correct": "A",
+      "explanation": "Rätt svar är A. Blå rund skylt med pil rakt upp (VMF D1-3) är ett påbudsmärke — du är skyldig att köra rakt fram. Avvikelse är förbjuden. Lagrum: TF 3 kap 14§.",
+      "law_reference": "TF 3 kap 14§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 144,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt rött märke med en vit horisontell bård?",
+      "question_type": "image",
+      "question": "Du kör mot en gata och ser detta märke vid infarten. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "image_description": null,
-      "option_a": "Förbud mot infart",
-      "option_b": "Stopplikt",
-      "option_c": "Väjningsplikt",
-      "option_d": "Parkering förbjuden",
+      "image_description": "Form: Rund förbudsskylt (diameter ca 50 cm). Bakgrund: vit (#FFFFFF). Symbol: horisontell rektangulär vit bård i mitten. Kant: röd (#CC0000), bred (ca 12%). Innebär förbud mot infart i aktuell riktning. VMF C2.",
+      "option_a": "Du får inte köra in — förbud mot infart gäller",
+      "option_b": "Du måste stanna och lämna företräde",
+      "option_c": "Du har väjningsplikt för trafik på gatan",
+      "option_d": "Parkering är förbjuden på gatan",
       "correct": "A",
-      "explanation": "Märket Förbud mot infart (C2) är ett runt rött märke med vit horisontell bård. Ingen trafik får köra in på den vägen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Det runda röda märket med vit horisontell bård (VMF C2) innebär förbud mot infart. Du får inte köra in på gatan i den riktningen. Lagrum: VMF C2.",
+      "law_reference": "VMF C2",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 145,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett gult varningsmärke med en svart bil som glider i sida?",
+      "question_type": "image",
+      "question": "Du kör på en väg i november och ser detta märke. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
-      "image_description": null,
-      "option_a": "Varning för is och snö",
-      "option_b": "Varning för slirigt väglag",
-      "option_c": "Varning för backig väg",
-      "option_d": "Varning för vägkorsning",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart bil som glider kraftigt i sidled (slirant), framhjulen pekar åt ett håll, bilen glider åt annat håll. Kant: röd (#CC0000). VMF A15.",
+      "option_a": "Varning för is och snö — använd vinterdäck",
+      "option_b": "Varning för slirigt väglag — sänk hastigheten och öka säkerhetsavståndet",
+      "option_c": "Varning för brant backe — välj lägre växel",
+      "option_d": "Varning för smal väg med korsning",
       "correct": "B",
-      "explanation": "Det gula varningsmärket med ett fordon i sladd varnar för särskilt halt och slirigt väglag. Minska hastigheten.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Triangelmärket med slirant bil (VMF A15) varnar för halt väglag — is, snö eller blött underlag. Sänk hastigheten, öka säkerhetsavståndet och undvik häftiga manövrar. Lagrum: VMF A15.",
+      "law_reference": "VMF A15",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 146,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad innebär ett grönmärke med vit motorvägssymbol?",
+      "question_type": "image",
+      "question": "Du kör på landsvägen och ser detta gröna märke. Vad börjar gälla nu?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "image_description": null,
-      "option_a": "Motortrafikled börjar",
-      "option_b": "Huvudled börjar",
-      "option_c": "Motorväg börjar",
-      "option_d": "Genomfartsled",
+      "image_description": "Form: Rektangulär grön skylt. Bakgrund: grön (#007A3D). Symbol: vit motorvägssymbol (stiliserad motorväg med mittlinje och körfält). Kant: vit. VMF E3.",
+      "option_a": "Motortrafikled börjar — lägre standard men liknande regler som motorväg",
+      "option_b": "En ny huvudled börjar",
+      "option_c": "Motorväg börjar med speciella regler",
+      "option_d": "Genomfartsled med begränsad tillgång",
       "correct": "C",
-      "explanation": "Gröna märken med vit motorvägsymbol markerar att motorvägen börjar med tillhörande regler.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Grönt märke med vit motorvägssymbol (VMF E3) anger att motorväg börjar. Regler: max 110 km/h, gång-/cykeltrafik förbjuden, stopp förbjudet utom vid nödsituation. Lagrum: TF 3 kap 58§.",
+      "law_reference": "TF 3 kap 58§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 147,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett rött triangelmärke med en svart järnväg och bommar?",
+      "question_type": "image",
+      "question": "Du nalkas en järnvägskorsning och ser detta märke med lok och bommar. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Sweden_road_sign_A36.svg/330px-Sweden_road_sign_A36.svg.png",
-      "image_description": null,
-      "option_a": "Järnvägskorsning med bommar",
-      "option_b": "Spårväg korsar",
-      "option_c": "Järnvägskorsning utan bommar",
-      "option_d": "Järnvägsstation",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart lok i profil med diagonala linjer (bommar) som korsas. Kant: röd (#CC0000). Varnar för järnvägskorsning med bomanläggning. VMF A36.",
+      "option_a": "Järnvägskorsning med bommar — bommar signalerar när tåg kommer",
+      "option_b": "Spårväg korsar vägen utan bommar",
+      "option_c": "Järnvägskorsning utan bommar — var extra försiktig",
+      "option_d": "Järnvägsstation i närheten",
       "correct": "A",
-      "explanation": "Triangelmärket med järnväg och bommar varnar för en bevakad järnvägskorsning. Sakta ner och var beredd att stanna.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Triangelmärket med lok och bommar (VMF A36) varnar för järnvägskorsning MED bommar. Vänta tills bommarna öppnas och all trafik är klar. Jämför VMF A35 utan bommar. Lagrum: TF 3 kap 39§.",
+      "law_reference": "TF 3 kap 39§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 148,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär det vita märket med ett rött P och ett diagonalt streck?",
+      "question_type": "image",
+      "question": "Du kör på en gata och ser detta märke. Vad gäller för parkering?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "image_description": null,
-      "option_a": "Parkering tillåten",
-      "option_b": "Lastning förbjuden",
-      "option_c": "Stannande förbjudet",
-      "option_d": "Parkering förbjuden",
+      "image_description": "Form: Rund förbudsskylt. Bakgrund: vit (#FFFFFF). Symbol: rött 'P' med ett rött diagonalt streck (/) igenom. Kant: röd (#CC0000). Innebär parkeringsförbud. VMF C35.",
+      "option_a": "Parkering är tillåten vid märkets sida",
+      "option_b": "Lastning och lossning är förbjuden",
+      "option_c": "Stannande är förbjudet — du får inte ens stanna kort",
+      "option_d": "Parkering är förbjuden vid märkets sida",
       "correct": "D",
-      "explanation": "Märket 'Parkering förbjuden' är vitt med rött P och ett snedstreck. Du får inte parkera på platsen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Det runda märket med rött P och snedstreck (VMF C35) innebär parkeringsförbud — du får inte parkera här. Stannande kortare tid för på-/avstigning är tillåtet. Jämför VMF C39 som förbjuder BÅDE stannande och parkering. Lagrum: TF 3 kap 48§.",
+      "law_reference": "TF 3 kap 48§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 149,
       "category": "Vägmärken",
       "subcategory": "Vägmärken – övrigt",
-      "question_type": "text",
-      "question": "Vad innebär ett blått märke med en vit buss?",
+      "question_type": "image",
+      "question": "Du kör och ser detta blå märke med en buss. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.svg/330px-Sweden_road_sign_E11.svg.png",
-      "image_description": null,
-      "option_a": "Busstation",
-      "option_b": "Bussar har förkörsrätt",
-      "option_c": "Bussfil",
-      "option_d": "Busshållplats",
+      "image_description": "Form: Rektangulär blå skylt. Bakgrund: blå (#003F87). Symbol: vit buss i profil, stiliserad. Kant: vit. Märket anger en hållplats för kollektivtrafik. VMF E11.",
+      "option_a": "Bussterminal eller bytesplats för buss",
+      "option_b": "Bussar har förkörsrätt i korsningen",
+      "option_c": "Exklusivt körfält reserverat för bussar",
+      "option_d": "Busshållplats — stanna inte här med personbil",
       "correct": "D",
-      "explanation": "Det blå märket med vit bussymbol markerar en busshållplats. Parkering är förbjuden i zonen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Blått märke med vit buss (VMF E11) anger busshållplats. Du som bilförare får inte parkera eller stanna vid märket på ett sätt som hindrar bussens framfart. Lagrum: TF 3 kap 48§.",
+      "law_reference": "TF 3 kap 48§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 150,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett gult varningsmärke med en triangel och ett utropstecken?",
+      "question_type": "image",
+      "question": "Du kör på en landsväg och ser detta märke med utropstecken. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
-      "image_description": null,
-      "option_a": "Varning – okänd fara",
-      "option_b": "Varning för vägarbete",
-      "option_c": "Varning för djur",
-      "option_d": "Varning för halt väglag",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart utropstecken (!) centrerat. Kant: röd (#CC0000). Allmänt varningmärke. VMF A17.",
+      "option_a": "Okänd fara framåt — var extra uppmärksam och anpassa hastigheten",
+      "option_b": "Vägarbete pågår längs sträckan",
+      "option_c": "Djur kan korsa vägen framåt",
+      "option_d": "Halt väglag vid regn eller is",
       "correct": "A",
-      "explanation": "Det gula triangelmärket med utropstecken är ett generellt varningmärke för 'annan fara'. En tilläggsskylt specificerar ofta faran.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Triangelmärket med utropstecken (VMF A17) används när ingen specifik varningsskylt passar. Det varnar för en okänd fara framåt. Var extra uppmärksam och anpassa hastigheten. Lagrum: VMF A17.",
+      "law_reference": "VMF A17",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 152,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett gult märke med en pil rakt fram och en böjd pil till sidan?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "image_description": null,
-      "option_a": "Korsning med förkörsrätt",
-      "option_b": "Vägkorsning utan förkörsrätt",
-      "option_c": "Farlig kurva",
-      "option_d": "Vägvisare för omväg",
+      "question_type": "image",
+      "question": "Du kör mot en korsning och ser detta märke. Vad innebär det för din körning?",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
+      "image_description": "Form: Rombformad gul skylt med pilar som visar korsningens utformning. Bakgrund: gul (#FFCC00). Symbol: en pil rakt fram och en böjd pil till sidan. Kant: vit. Anger att du kör på en väg med förkörsrätt. VMF E2 (Förkörsrättsmärke med korsningsutformning).",
+      "option_a": "Du kör på en väg med förkörsrätt mot korsande trafik",
+      "option_b": "Korsning utan förkörsrätt — högerregeln gäller",
+      "option_c": "Farlig kurva framåt — bromsa nu",
+      "option_d": "Vägvisare för omväg — sväng vid lämplig plats",
       "correct": "A",
-      "explanation": "Det gula märket med pilar visar att du är på huvudleden med förkörsrätt. Sidotrafik måste ge dig företräde.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Märket visar att du kör på en väg med förkörsrätt och anger korsningens utformning. Trafik från korsande vägar ska lämna dig företräde. Lagrum: TF 3 kap 18§.",
+      "law_reference": "TF 3 kap 18§",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 153,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett märke med en röd triangel och pilar uppåt och nedåt?",
+      "question_type": "image",
+      "question": "Du kör mot en smal passage och ser detta märke med dubbla pilar. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Sweden_road_sign_A9.svg/330px-Sweden_road_sign_A9.svg.png",
-      "image_description": null,
-      "option_a": "Varning för möte med mötande trafik",
-      "option_b": "Varning för tvåfältstrafik",
-      "option_c": "Varning för att vägen slutar",
-      "option_d": "Smal väg – möte kan kräva att en stanna",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart pil uppåt och svart pil nedåt som möts (mötespilar). Kant: röd (#CC0000). Varnar för smal väg med begränsat mötningsutrymme. VMF A9.",
+      "option_a": "Varning för intensiv mötande trafik — kör försiktigt",
+      "option_b": "Tvåfältstrafik börjar framåt",
+      "option_c": "Vägen slutar — vändplan framåt",
+      "option_d": "Smal passage — möte kan kräva att ett fordon stannar",
       "correct": "D",
-      "explanation": "Märket 'Smal väg' varnar för att vägen är så smal att mötande fordon kan behöva stanna för att passera.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Triangelmärket med mötespilar (VMF A9) varnar för smal väg där möte kan kräva att ett fordon stannar och väjer. Sänk hastigheten och var beredd att stanna. Lagrum: VMF A9.",
+      "law_reference": "VMF A9",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 154,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt rött märke med en vit horisontell linje?",
+      "question_type": "image",
+      "question": "Du kör mot en gata och ser detta runda märke med en vit horisontell linje. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "image_description": null,
-      "option_a": "Förbud mot infart",
-      "option_b": "Förbud mot all trafik",
-      "option_c": "Stannande förbjudet",
-      "option_d": "Väjningsplikt",
+      "image_description": "Form: Rund förbudsskylt (diameter ca 50 cm). Bakgrund: vit (#FFFFFF). Symbol: horisontell vit rektangulär bård i mitten. Kant: röd (#CC0000), bred (ca 12%). Innebär förbud mot infart. VMF C2.",
+      "option_a": "Du får inte köra in — förbud mot infart i aktuell riktning",
+      "option_b": "All trafik är förbjuden i båda riktningarna",
+      "option_c": "Stannande är förbjudet längs gatan",
+      "option_d": "Du har väjningsplikt vid infarten",
       "correct": "A",
-      "explanation": "Det runda röda märket med vit horisontell bård (C2) är 'Förbud mot infart'. Ingen trafik får köra i den riktningen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Runt rött märke med vit horisontell linje (VMF C2) innebär förbud mot infart. Du får inte köra in i aktuell riktning. Lagrum: VMF C2.",
+      "law_reference": "VMF C2",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 155,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett märke med en röd triangel och en svart gående person?",
+      "question_type": "image",
+      "question": "Du kör i ett bostadsområde och ser detta märke med en gående person. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
-      "image_description": null,
-      "option_a": "Varning för skola",
-      "option_b": "Varning för gångtrafikanter",
-      "option_c": "Övergångställe framåt",
-      "option_d": "Gångfartsområde",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart stiliserad gående person. Kant: röd (#CC0000). Varnar för gångtrafikanter. VMF A20.",
+      "option_a": "Varning för skola framåt — barn kan plötsligt springa ut",
+      "option_b": "Varning för gångtrafikanter som korsar eller rör sig längs vägen",
+      "option_c": "Övergångställe finns 50 meter framåt",
+      "option_d": "Gångfartsområde börjar — fotgängare har fri passage",
       "correct": "B",
-      "explanation": "Det gula triangelmärket med en gående person varnar förare om att gångtrafikanter kan korsa eller röra sig längs vägen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Triangelmärket med gående person (VMF A20) varnar för gångtrafikanter som korsar eller rör sig längs vägen. Sänk hastigheten och var beredd att stanna. Lagrum: VMF A20.",
+      "law_reference": "VMF A20",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 156,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vilket märke visar att du lämnar en motorväg?",
+      "question_type": "image",
+      "question": "Du kör på motorvägen och ser att du lämnar motorvägsavsnittet. Vilket märke markerar detta?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "image_description": null,
+      "image_description": "Form: Rektangulär grön skylt. Bakgrund: grön (#007A3D). Symbol: vit motorvägssymbol med ett svart eller rött diagonalt streck igenom. Kant: vit. Anger att motorvägen slutar. VMF E4.",
       "option_a": "Blått märke med vit pil nedåt",
       "option_b": "Vitt märke med röd kant",
       "option_c": "Gult märke med svart pil",
-      "option_d": "Grönt märke med vit motorvägssymbol och streck",
+      "option_d": "Grönt märke med motorvägssymbol och ett streck/kors igenom",
       "correct": "D",
-      "explanation": "Märket 'Motorväg slut' är grönt med motorvägssymbol och ett genomstrykningstecken. Det innebär att motorvägsreglerna upphör.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Grönt märke med motorvägssymbol och streck (VMF E4) anger att motorvägen slutar. Normala trafikregler återupptas omedelbart efter märket. Lagrum: VMF E4.",
+      "law_reference": "VMF E4",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 157,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt blått märke med vita pilar som visar vänster och höger?",
+      "question_type": "image",
+      "question": "Du kör mot en korsning och ser detta blå märke med pilar åt båda håll. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Sweden_road_sign_D1-2.svg/330px-Sweden_road_sign_D1-2.svg.png",
-      "image_description": null,
-      "option_a": "Påbjuden körriktning – du måste svänga",
-      "option_b": "Vägen delar sig – välj sida",
-      "option_c": "Rekommendation att svänga",
-      "option_d": "Omkörningsförbud upphör",
+      "image_description": "Form: Rund påbudsskylt (diameter ca 40 cm). Bakgrund: blå (#003F87). Symbol: vita pilar som pekar åt höger och vänster (förklyven pil). Kant: vit (#FFFFFF). Innebär att du måste svänga. VMF D1-2.",
+      "option_a": "Du MÅSTE svänga — antingen höger eller vänster, inte rakt fram",
+      "option_b": "Vägen delar sig — välj önskad riktning",
+      "option_c": "Svängning rekommenderas men är inte obligatorisk",
+      "option_d": "Omkörningsförbudet upphör vid märket",
       "correct": "A",
-      "explanation": "Runda blå märken med vita pilar är påbudsmärken. Pilar som visar vänster och höger innebär att du måste svänga åt något av de angivna hållen.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Blå rund skylt med pilar åt båda håll (VMF D1-2) är ett påbudsmärke — du måste svänga antingen höger eller vänster. Att köra rakt fram är förbjudet. Lagrum: TF 3 kap 14§.",
+      "law_reference": "TF 3 kap 14§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 159,
@@ -5206,23 +5237,24 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – kurvor",
       "question_type": "image",
-      "question": "Vad varnar det här märket för?",
+      "question": "Du kör in på en sträcka med detta märke. Vad riskerar du om du håller för hög fart?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Sweden_road_sign_A1-1.svg/330px-Sweden_road_sign_A1-1.svg.png",
       "image_description": "Rödrandad triangel med en kurva åt höger",
-      "option_a": "Korsning med skymd sikt",
-      "option_b": "Farlig kurva till vänster",
-      "option_c": "Farlig kurva till höger",
-      "option_d": "Backig sträcka",
-      "correct": "C",
-      "explanation": "A1-1 är ett varningsmärke (röd triangel) för en farlig kurva till höger. Kurvan är tillräckligt skarp för att kräva sänkt hastighet.",
-      "law_reference": null,
+      "option_a": "Du riskerar att krocka med korsande trafik",
+      "option_b": "Du kan tappa kontrollen i kurvan och köra av vägen",
+      "option_c": "Kurvan böjer åt vänster — risk för kollision med mötande trafik",
+      "option_d": "Vägen sluttar brant och bilen accelererar okontrollerat",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Triangelmärket med kurva till höger (VMF A1-1) varnar för en farlig kurva. Vid för hög hastighet kan du tappa kontrollen och köra av vägen. Bromsa INNAN kurvan — aldrig i den. Lagrum: VMF A1-1.",
+      "law_reference": "VMF A1-1",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 352,
@@ -5245,30 +5277,32 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 353,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – kurvor",
       "question_type": "image",
-      "question": "Vad innebär det här märket jämfört med ett märke med en enda kurva?",
+      "question": "Du kör in på en sträcka med detta märke. Vad skiljer det från ett märke med en enda kurva?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Sweden_road_sign_A3.svg/330px-Sweden_road_sign_A3.svg.png",
       "image_description": "Rödrandad triangel med ett S-format kurvmönster",
-      "option_a": "En skarpare kurva till höger",
-      "option_b": "En skarpare kurva till vänster",
-      "option_c": "En enstaka kurva med extra dålig sikt",
-      "option_d": "En sträcka med flera farliga kurvor i följd",
+      "option_a": "Nästa kurva är skarpare till höger",
+      "option_b": "Nästa kurva är skarpare till vänster",
+      "option_c": "En enstaka kurva med extra skymd sikt",
+      "option_d": "Sträckan har flera farliga kurvor i följd — anpassa hastigheten för hela sträckan",
       "correct": "D",
-      "explanation": "A3 (S-kurva) varnar för en sträcka med flera farliga kurvor i följd. En tilläggsskylt kan ange sträckans längd.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Märket med S-kurva (VMF A3) varnar för en sträcka med flera farliga kurvor i följd. Anpassa hastigheten för hela sträckan — inte bara för en punkt. Lagrum: VMF A3.",
+      "law_reference": "VMF A3",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 354,
@@ -5291,30 +5325,32 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 355,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – vägyta",
       "question_type": "image",
-      "question": "Vad varnar märket med en studsande bil på ojämn vägbana om?",
+      "question": "Du kör på en landsväg och ser detta märke med en studsande bil. Vad bör du göra?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Sweden_road_sign_A14.svg/330px-Sweden_road_sign_A14.svg.png",
       "image_description": "Rödrandad triangel med en bil som studsar på ojämn vägbana",
-      "option_a": "Lös stenskärv — risk för stenskott",
-      "option_b": "Vägbanan sjunker — risk för vattensamlingar",
-      "option_c": "Halt väglag på grund av is",
-      "option_d": "Fartgupp eller vägbula som kan vara osynlig tills du är nära",
+      "option_a": "Sänker farten — risk för att lös sten skjuter upp mot bilen",
+      "option_b": "Sänker farten — risk för vattensamlingar och djupa sjunkhål",
+      "option_c": "Kör i normal hastighet — märket är bara informativt",
+      "option_d": "Sänker farten och håller ratten stadigt — ojämn vägbana framåt",
       "correct": "D",
-      "explanation": "A14 varnar för ett fartgupp eller en vägbula. Gupp kan vara svåra att se i tid — sänk hastigheten för att undvika stötar och tappa kontroll.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Märket med studsande bil (VMF A13/A14) varnar för ojämn vägbana — potthål, gupp, sättningar. Sänk hastigheten och håll ratten stadigt. Lagrum: VMF A13.",
+      "law_reference": "VMF A13",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 356,
@@ -5337,7 +5373,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 357,
@@ -5360,7 +5397,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 358,
@@ -5383,7 +5421,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 359,
@@ -5406,7 +5445,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 360,
@@ -5429,7 +5469,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 361,
@@ -5452,7 +5493,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 362,
@@ -5475,7 +5517,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 363,
@@ -5498,30 +5541,32 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 364,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – infart",
       "question_type": "image",
-      "question": "Vad innebär det här märket?",
+      "question": "Du kör mot en gata och ser detta märke vid infarten. Vad gäller för dig?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
       "image_description": "Rött runt märke med en horisontell vit bård",
-      "option_a": "Stannande förbjudet",
-      "option_b": "Förbud mot all trafik i båda riktningarna",
-      "option_c": "Väjningsplikt gäller framåt",
-      "option_d": "Förbud mot infart — du får inte köra in på vägen i den riktningen",
+      "option_a": "Du måste stanna och lämna företräde",
+      "option_b": "Alla fordon förbjudna — gatan helt stängd",
+      "option_c": "Du har väjningsplikt mot trafik på gatan",
+      "option_d": "Du får inte köra in — förbud mot infart i denna riktning",
       "correct": "D",
-      "explanation": "C2 (Förbud mot infart) är ett runt rött märke med en vit horisontell bård. Du får inte köra in på vägen eller platsen i den riktning märket vetter.",
-      "law_reference": "TF 10 kap 1§",
+      "explanation": "Rätt svar är D. Runt rött märke med vit bård (VMF C2) innebär förbud mot infart. Du får inte köra in på gatan i den riktningen. Välj en alternativ väg. Lagrum: VMF C2.",
+      "law_reference": "VMF C2",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 365,
@@ -5544,7 +5589,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 366,
@@ -5567,7 +5613,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 367,
@@ -5590,7 +5637,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 368,
@@ -5613,7 +5661,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 369,
@@ -5636,7 +5685,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 370,
@@ -5659,7 +5709,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 371,
@@ -5682,7 +5733,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 372,
@@ -5705,7 +5757,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 373,
@@ -5728,7 +5781,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 374,
@@ -5751,7 +5805,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 375,
@@ -5774,7 +5829,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 376,
@@ -5797,53 +5853,56 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ PASS",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 377,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – vägyta",
       "question_type": "image",
-      "question": "Vad varnar det här märket om och vad bör du göra?",
+      "question": "Du kör på en väg och ser detta märke med en studsande bil. Vad bör du göra omedelbart?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
       "image_description": "Rödrandad triangel med en bil som kör på ojämn vägbana",
-      "option_a": "Halt väglag — välj vinterdäck",
-      "option_b": "Ojämn vägbana med potthål, gupp eller stötar — sänk hastigheten",
-      "option_c": "Vägarbete pågår — extra uppmärksamhet",
-      "option_d": "Lös stenskärv — stäng av ventilation",
+      "option_a": "Kontrollera däcktrycket — risk för punktering på ojämn väg",
+      "option_b": "Sänker hastigheten och håller ratten stadigt — ojämn vägbana med potthål eller gupp framåt",
+      "option_c": "Ökar hastigheten för att snabbt passera det ojämna partiet",
+      "option_d": "Stänger av ventilationen — risk för stenskott",
       "correct": "B",
-      "explanation": "A13 (Ojämn väg) varnar för en sträcka med ojämnheter, potthål eller stötar. Sänk hastigheten för att undvika däckskador och bevara kontroll.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Märket med studsande bil (VMF A13) varnar för ojämn vägbana. Sänk hastigheten och håll ratten stadigt för att behålla kontrollen vid stötar och gupp. Lagrum: VMF A13.",
+      "law_reference": "VMF A13",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 378,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – uppförsbacke",
       "question_type": "image",
-      "question": "Vad varnar märket med en bil på brant uppförsbacke om?",
+      "question": "Du ser detta märke med en bil på uppförsbacke. Vad gäller och hur bör du förbereda dig?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Sweden_road_sign_A5-1.svg/330px-Sweden_road_sign_A5-1.svg.png",
       "image_description": "Rödrandad triangel med en bil som kör uppför en brant backe",
-      "option_a": "Brant utförsbacke — välj lägre växel",
-      "option_b": "Backkrön med skymd sikt framåt",
-      "option_c": "Lång stigning — välj låg växel i god tid och håll säkerhetsavstånd till tung trafik",
-      "option_d": "Brant uppförsbacke med risk för att motorn stannar",
+      "option_a": "Brant utförsbacke framåt — välj lägre växel och använd motorbromsen",
+      "option_b": "Backkrön med skymd sikt — undvik omkörning",
+      "option_c": "Lång stigning framåt — välj låg växel i god tid och håll ökat säkerhetsavstånd",
+      "option_d": "Brant uppförsbacke — risk för att motorn stannar vid låg hastighet",
       "correct": "C",
-      "explanation": "A5-1 varnar för en brant uppförsbacke. Tunga fordon tappar fart — håll säkerhetsavstånd. Välj lägre växel i god tid för att behålla drivkraften.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Märket med bil på uppförsbacke (VMF A5-1) varnar för en lång eller brant stigning. Välj lägre växel i god tid och håll ökat säkerhetsavstånd till tung trafik som saktar ner i backen. Lagrum: VMF A5-1.",
+      "law_reference": "VMF A5-1",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 379,
@@ -5866,7 +5925,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 380,
@@ -5889,7 +5949,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 381,
@@ -5912,7 +5973,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 382,
@@ -5935,7 +5997,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 383,
@@ -5958,7 +6021,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 384,
@@ -5981,7 +6045,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 385,
@@ -6004,7 +6069,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 386,
@@ -6027,7 +6093,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 387,
@@ -6050,7 +6117,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 388,
@@ -6073,7 +6141,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 389,
@@ -6096,7 +6165,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 390,
@@ -6119,7 +6189,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 500,
@@ -7298,30 +7369,31 @@
       "id": 551,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär märket C39 (stoppförbud) med rött P och ett diagonalt kors (X)?",
+      "question_type": "image",
+      "question": "Du kör på en gata och ser detta märke (C39). Vad gäller för dig?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/330px-Sweden_road_sign_C39.svg.png",
       "image_description": "Form: Rund skylt, vit bakgrund. Symbol: Rött P med ett rött diagonalt kors (X) som täcker hela märket. Kant: röd (#CC0000). Proportioner: Korset sträcker sig till märkets kanter. VMF C39.",
-      "option_a": "Parkering och stannande förbjudet",
-      "option_b": "Bara parkering förbjudet",
-      "option_c": "Bara stannande förbjudet",
-      "option_d": "Bara lastning förbjudet",
+      "option_a": "Du får inte stanna eller parkera här",
+      "option_b": "Du får bara parkera kortare tid för av-/påstigning",
+      "option_c": "Du får stanna för av-/påstigning men inte parkera",
+      "option_d": "Bara lastning och lossning är förbjuden",
       "correct": "A",
-      "explanation": "Rätt svar är A. C39 stoppförbud förbjuder all form av stannande — varken parkering eller kortvarigt stannande är tillåtet. Det är det strängaste parkeringsrelaterade förbudet. Lagrum: VMF §C39.",
-      "law_reference": "VMF §C39",
+      "explanation": "Rätt svar är A. Märket C39 (Förbud mot stannande och parkering) innebär att du varken får stanna eller parkera. Inte ens kort stopp för av-/påstigning tillåts. Strängare än C35 (parkeringsförbud). Lagrum: TF 3 kap 48§, VMF C39.",
+      "law_reference": "TF 3 kap 48§",
       "difficulty": "normal",
       "commonly_failed": true,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 552,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
+      "question_type": "image",
       "question": "Vad varnar ett rödrandat triangelmärke med en bil som kör ned i vatten för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Sweden_road_sign_A33.svg/330px-Sweden_road_sign_A33.svg.png",
       "image_description": null,
@@ -7338,59 +7410,62 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 553,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt rött märke med texten '3,5 ton'?",
+      "question_type": "image",
+      "question": "Du kör mot en bro och ser detta runda märke med '3,5 ton'. Du kör lastbil med totalvikt 4,2 ton. Vad gör du?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Sweden_road_sign_C31.svg/330px-Sweden_road_sign_C31.svg.png",
-      "image_description": null,
-      "option_a": "Max last 3,5 ton",
-      "option_b": "Bro eller väg tål max 3,5 tons totalvikt — tyngre fordon förbjudna",
-      "option_c": "Fordon tyngre än 3,5 ton måste sänka hastigheten",
-      "option_d": "Rekommenderad last 3,5 ton",
+      "image_description": "Form: Rund förbudsskylt. Bakgrund: vit (#FFFFFF). Symbol: svart siffra med litet 't' för ton (ex. '3,5 t'), centrerat. Kant: röd (#CC0000). Innebär att fordon tyngre än angiven totalvikt är förbjudna. VMF C31.",
+      "option_a": "Kör igenom — märket anger maxlast, inte totalvikt",
+      "option_b": "Stannar och söker alternativ väg — bro eller väg tål max 3,5 tons totalvikt",
+      "option_c": "Kör försiktigt och sakta",
+      "option_d": "Kör igenom om det inte ser ut som att bron är trasig",
       "correct": "B",
-      "explanation": "Rätt svar är B. Märket C31 anger att fordon med totalvikt över 3,5 ton är förbjudna. Det sitter vanligen vid broar eller vägar med begränsad bärighet. Lagrum: VMF §C31.",
-      "law_reference": "VMF §C31",
+      "explanation": "Rätt svar är B. Märket C31 anger maximal totalvikt. Ditt fordon på 4,2 ton överskrider gränsen 3,5 ton — du är förbjuden att passera och måste hitta en alternativ väg. Lagrum: VMF C31.",
+      "law_reference": "VMF C31",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 554,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad betyder ett grönt märke med en vit bil och en vit pil som pekar nedåt till höger?",
+      "question_type": "image",
+      "question": "Du kör på motorvägen och ser ett grönt märke med vit bil och nedåtpekande pil. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "image_description": null,
-      "option_a": "Tankstation",
-      "option_b": "Avfart från motorväg",
-      "option_c": "Vägsidan farlig",
-      "option_d": "Nödstoppsficka",
+      "image_description": "Form: Rektangulär grön skylt. Bakgrund: grön (#007A3D). Symbol: vit bil med en vit pil som pekar nedåt och åt höger — indikerar avfart. Kant: vit. VMF E4 (avfartsmärke).",
+      "option_a": "Tankstation vid nästa avfart",
+      "option_b": "Avfart från motorvägen — flytta till höger körfält",
+      "option_c": "Vägkanten farlig — håll avstånd till höger",
+      "option_d": "Nödstoppsficka 500 meter framåt",
       "correct": "B",
-      "explanation": "Rätt svar är B. Gröna märken med pilar används som vägvisare på motorvägar. En pil nedåt till höger anger avfart. Lagrum: VMF.",
-      "law_reference": "VMF",
+      "explanation": "Rätt svar är B. Grönt märke med bil och nedåtpil (VMF E4) anger avfart från motorväg. Flytta i god tid till höger körfält för att ta avfarten säkert. Lagrum: VMF E4.",
+      "law_reference": "VMF E4",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 555,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
+      "question_type": "image",
       "question": "Vad varnar märket A25 (röd triangel med en älg) för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Sweden_road_sign_A25.svg/330px-Sweden_road_sign_A25.svg.png",
       "image_description": null,
@@ -7407,82 +7482,86 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 556,
       "category": "Vägmärken",
       "subcategory": "Väjning och stopp",
-      "question_type": "text",
-      "question": "Vad innebär ett rödrandat triangelmärke med en nedåtpekande röd triangel inuti?",
+      "question_type": "image",
+      "question": "Du kör mot en korsning och ser detta märke med en nedåtpekande triangel. Vad gäller?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_B2.svg/330px-Sweden_road_sign_B2.svg.png",
       "image_description": "Form: Triangulär skylt med spetsen nedåt. Bakgrund: vit (#FFFFFF). Kant: röd (#CC0000), bred. Inuti: röd liten triangel med spetsen nedåt, centrerat. Proportioner: Märkessida ca 90 cm. VMF B2.",
-      "option_a": "Stoppförbud",
-      "option_b": "Väjningsplikt — lämna företräde åt annan trafik",
-      "option_c": "Vägarbete",
-      "option_d": "Farlig korsning",
+      "option_a": "Stopp vid linjen — stanna alltid",
+      "option_b": "Väjningsplikt — lämna företräde åt korsande trafik",
+      "option_c": "Vägarbete pågår i korsningen",
+      "option_d": "Farlig korsning — sänk hastigheten",
       "correct": "B",
-      "explanation": "Rätt svar är B. Märket B2 (väjningsplikt) är en röd triangel med spetsen nedåt. Det innebär att du ska lämna företräde åt all annan trafik i korsningen. Lagrum: VMF §B2.",
-      "law_reference": "VMF §B2",
+      "explanation": "Rätt svar är B. Triangelmärket med nedåtpekande röd triangel (VMF B2) anger väjningsplikt. Du måste lämna företräde åt korsande trafik — du behöver inte stanna om det är fritt. Lagrum: TF 3 kap 17§.",
+      "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "vägmärke"
     },
     {
       "id": 557,
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett blått runt märke med vit cykel?",
+      "question_type": "image",
+      "question": "Du kör på en väg och ser detta blå runda märke med en cykel. Vad innebär det för dig som bilförare?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Sweden_road_sign_D3.svg/330px-Sweden_road_sign_D3.svg.png",
-      "image_description": null,
-      "option_a": "Cyklar förbjudna",
-      "option_b": "Cykelväg — obligatorisk för cyklister",
-      "option_c": "Cyklar rekommenderas",
-      "option_d": "Cykeluthyrning",
+      "image_description": "Form: Rund påbudsskylt (diameter ca 40 cm). Bakgrund: blå (#003F87). Symbol: vit cykel centrerat, stiliserad. Kant: vit (#FFFFFF). Innebär obligatorisk cykel- och mopedväg. VMF D3.",
+      "option_a": "Cyklister är förbjudna att använda körfältet",
+      "option_b": "Obligatorisk cykelväg — som bilförare är du förbjuden att köra här",
+      "option_c": "Cyklar rekommenderas ta denna väg",
+      "option_d": "Cykeluthyrning finns i närheten",
       "correct": "B",
-      "explanation": "Rätt svar är B. Märket D3 (cykelväg) är ett blått runt påbudsmärke med vit cykel. Cyklister är skyldiga att använda cykelvägen om den finns. Motorfordon är förbjudna. Lagrum: VMF §D3.",
-      "law_reference": "VMF §D3",
+      "explanation": "Rätt svar är B. Blå rund skylt med vit cykel (VMF D3) anger cykel- och mopedväg — obligatorisk för cyklister och moped klass II. Som bilförare är du förbjuden att köra här. Lagrum: VMF D3.",
+      "law_reference": "VMF D3",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "påbudsmärke"
     },
     {
       "id": 558,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad visar ett blått rektangulärt märke med ett vitt 'P' och en tidsskylt?",
+      "question_type": "image",
+      "question": "Du ser detta blå märke med ett 'P' och en tidsskylt. Vad gäller för parkering?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "image_description": null,
-      "option_a": "Parkering förbjuden",
-      "option_b": "Parkeringsplats — parkering tillåten, eventuellt tidsbegränsad",
-      "option_c": "Avgiftsbelagd parkering alltid",
-      "option_d": "Lastzon",
+      "image_description": "Form: Rektangulär blå skylt. Bakgrund: blå (#003F87). Symbol: stor vit 'P' i mitten. Tilläggsskylt nedan med tider (ex. '8–18 Mån–Fre'). VMF E19.",
+      "option_a": "Parkering är förbjuden — P-märket med tidsskylt = förbud",
+      "option_b": "Parkering är tillåten, eventuellt tidsbegränsad enligt skylten",
+      "option_c": "Alltid avgiftsbelagd parkering",
+      "option_d": "Lastzon — bara lastbilar",
       "correct": "B",
-      "explanation": "Rätt svar är B. Det blå märket E19 (parkeringsplats) anger att parkering är tillåten. En tilläggsskylt kan ange maximaltid eller avgift. Lagrum: VMF §E19.",
-      "law_reference": "VMF §E19",
+      "explanation": "Rätt svar är B. Blått P-märke (VMF E19) anger parkeringsplats. Parkering är tillåten. Om tilläggsskylt finns med tider gäller begränsningen under de tiderna. Lagrum: VMF E19.",
+      "law_reference": "VMF E19",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 559,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
+      "question_type": "image",
       "question": "Vad varnar ett rödrandat triangelmärke med en svart bil i ett backkrön för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Sweden_road_sign_A7.svg/330px-Sweden_road_sign_A7.svg.png",
       "image_description": null,
@@ -7499,99 +7578,104 @@
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 560,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett runt rött märke med siffran '2,0' och en bild av en lastbil?",
+      "question_type": "image",
+      "question": "Du kör mot en smal passage och ser detta märke med '2,0'. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Sweden_road_sign_C17.svg/330px-Sweden_road_sign_C17.svg.png",
-      "image_description": null,
-      "option_a": "Fordon bredare än 2,0 meter förbjudna",
-      "option_b": "Hastigheten 2,0 km/h (gångfart)",
-      "option_c": "Fordon högre än 2,0 meter förbjudna",
-      "option_d": "Fordon tyngre än 2,0 ton förbjudna",
+      "image_description": "Form: Rund förbudsskylt. Bakgrund: vit (#FFFFFF). Symbol: siffran '2,0 m' centrerat, svart text. Kant: röd (#CC0000). Innebär breddförbud. VMF C17.",
+      "option_a": "Fordon bredare än 2,0 meter är förbjudna att passera",
+      "option_b": "Hastigheten 2,0 km/h gäller — gångfart",
+      "option_c": "Fordon högre än 2,0 meter är förbjudna",
+      "option_d": "Fordon tyngre än 2,0 ton är förbjudna",
       "correct": "A",
-      "explanation": "Rätt svar är A. Märket C17 anger maximal tillåten fordonsbredd. Fordon bredare än angiven måttangivelse (inklusive last) är förbjudna att passera. Lagrum: VMF §C17.",
-      "law_reference": "VMF §C17",
+      "explanation": "Rätt svar är A. Märket C17 (Förbud mot fordon bredare än X meter) innebär att fordon bredare än 2,0 meter är förbjudna. Typiskt vid smala passager, broar och tunnlar. Lagrum: VMF C17.",
+      "law_reference": "VMF C17",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "förbudsmärke"
     },
     {
       "id": 561,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad visar ett märke med 'H' och en röd ring (E11)?",
+      "question_type": "image",
+      "question": "Du kör längs en väg och ser detta märke med ett 'H'. Vad innebär det?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.svg/330px-Sweden_road_sign_E11.svg.png",
-      "image_description": null,
-      "option_a": "Hospital — sjukhus i närheten",
-      "option_b": "Hållplats för buss och spårväg",
-      "option_c": "Helipad",
-      "option_d": "Hastighetsgränsen höjs",
+      "image_description": "Form: Rektangulär blå skylt. Bakgrund: blå (#003F87). Symbol: vit stor bokstav 'H' centrerat, fetstil. Eventuell tilläggsskylt med hållplatsnamn. VMF E11.",
+      "option_a": "Hospital — sjukhus finns i närheten",
+      "option_b": "Hållplats för buss och spårväg — stanna inte här med bil",
+      "option_c": "Helipad — landningsplats för helikopter",
+      "option_d": "Hastigheten höjs vid märket",
       "correct": "B",
-      "explanation": "Rätt svar är B. Märket E11 anger att det är en hållplats för buss och/eller spårväg. Stannande och parkering är förbjudet inom hållplatsens markerade yta. Lagrum: VMF §E11.",
-      "law_reference": "VMF §E11",
+      "explanation": "Rätt svar är B. Märket E11 med 'H' anger hållplats för buss och spårväg. Som bilförare ska du inte parkera eller stanna vid hållplatsen på ett sätt som hindrar kollektivtrafiken. Lagrum: TF 3 kap 48§.",
+      "law_reference": "TF 3 kap 48§",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 562,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
-      "question_type": "text",
-      "question": "Vad innebär ett rödrandat triangelmärke med en bild av en barnvagn?",
+      "question_type": "image",
+      "question": "Du kör förbi en förskola och ser detta triangelmärke med en barnvagn. Vad bör du göra?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_A21.svg/330px-Sweden_road_sign_A21.svg.png",
-      "image_description": null,
-      "option_a": "Lekplats",
-      "option_b": "Varning för barnpassage eller förskola",
-      "option_c": "Barnsjukhus",
-      "option_d": "Gångfart krävs",
+      "image_description": "Form: Liksidig triangel, spets uppåt. Bakgrund: gul (#FFCC00). Symbol: svart barnvagn med ett barn, stiliserad. Kant: röd (#CC0000). Varnar för barnpassage eller förskola/skola. VMF A22.",
+      "option_a": "Parkerar bilen och kontrollerar att inga barn är i vägen",
+      "option_b": "Sänker hastigheten och är extra uppmärksam — barn kan plötsligt springa ut",
+      "option_c": "Stannar vid märket tills inga barn är synliga",
+      "option_d": "Kör i normal hastighet — märket gäller bara under skoltid",
       "correct": "B",
-      "explanation": "Rätt svar är B. Märket varnar för platser där barn ofta befinner sig, t.ex. nära skolor, förskolor eller lekplatser. Sänk hastigheten och var extra uppmärksam. Lagrum: VMF §A20.",
-      "law_reference": "VMF §A20",
+      "explanation": "Rätt svar är B. Triangelmärket med barnvagn (VMF A22) varnar för barn som kan korsa vägen. Sänk hastigheten och var extra uppmärksam — barn är oförutsägbara. Lagrum: VMF A22.",
+      "law_reference": "VMF A22",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "varningsmärke"
     },
     {
       "id": 563,
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "text",
-      "question": "Vad visar ett blått märke med en vit bil och ett vitt 'M' under?",
+      "question_type": "image",
+      "question": "Du kör på en väg och ser detta blå märke med en bil och ett 'M'. Vad börjar gälla?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_E5.svg/330px-Sweden_road_sign_E5.svg.png",
-      "image_description": null,
-      "option_a": "Motortrafikled — liknande regler som motorväg men lägre standard",
+      "image_description": "Form: Rektangulär blå skylt. Bakgrund: blå (#003F87). Symbol: vit bil med texten 'M' nedan, stiliserad motortrafikled-symbol. Kant: vit. Anger att motortrafikled börjar. VMF E5.",
+      "option_a": "Motortrafikled — liknande motorväg men lägre standard",
       "option_b": "Motorväg börjar",
-      "option_c": "Märket saknas i Sverige",
-      "option_d": "Mötesfri väg",
+      "option_c": "Märket finns inte i Sverige",
+      "option_d": "Mötesfri väg med mittbarriär",
       "correct": "A",
-      "explanation": "Rätt svar är A. En motortrafikled har samma förbud (inga cyklar, mopeder, fotgängare) men lägre hastighetsgräns — vanligen 90 km/h. Den skiljer sig från motorväg (grönt märke). Lagrum: VMF §E3-E4.",
-      "law_reference": "VMF §E3-E4",
+      "explanation": "Rätt svar är A. Märket för motortrafikled (VMF E5) anger att motortrafikled börjar — likt motorväg men lägre standard. Gångtrafikanter och cyklar förbjudna. Lagrum: VMF E5.",
+      "law_reference": "VMF E5",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ N/A",
         "qa_approved": "✅ APPROVED"
-      }
+      },
+      "image_type": "anvisningsmärke"
     },
     {
       "id": 564,
