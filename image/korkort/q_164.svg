@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Bilförarperspektiv från framrutan på en svensk väg med två tydliga körfält och normal högertrafik. Vägen har markerad mittlinje, höger vägren och den risk eller regel som frågan gäller placerad cirka 30-50 meter framför bilen. Avgörande detalj som ska ritas in: Du kör i denna vägsituation och ser förhållandena framför dig. Vad ska du göra? Vägsituationen visar körbanan, vägrenen, körfältslinjer och relevanta trafikanter från bilförarpositionen. Riskfaktorn i frågan syns tydligt i vägbanan eller omgivningen så föraren kan välja rätt handling. Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka.">
-<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#1bff8c"/></marker></defs>
-<rect width="640" height="360" fill="#08100d"/>
-<rect x="0" y="250" width="640" height="110" fill="#18261d"/>
-<path d="M0 300 L230 150 L410 150 L640 300 Z" fill="#2c2f32"/><path d="M320 162 L320 292" stroke="#fff" stroke-width="9" stroke-dasharray="24 18"/><circle cx="438" cy="178" r="42" fill="#ffcc00" stroke="#111" stroke-width="8"/>
-<text x="38" y="48" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#1bff8c">Vägsituation</text>
-<text x="38" y="75" font-family="Arial, sans-serif" font-size="15" fill="#9dbfad">Trafikregler</text>
-<g font-family="Arial, sans-serif" font-weight="700"><text x="72" y="284" font-size="18" fill="#e8f5ee">Bilforarperspektiv</text><text x="374" y="244" font-size="18" fill="#e8f5ee">Risk/situation</text></g>
-</svg>

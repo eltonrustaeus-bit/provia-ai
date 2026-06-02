@@ -756,6 +756,36 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const safeJSON = (s, fb) => { try { return JSON.parse(s) ?? fb } catch { return fb } };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
+const BLOCKED_IMAGE_STATUSES = new Set(["ai_generated","irrelevant","broken","needs_verified_image"]);
+
+function isLocalGeneratedKorkortImage(url) {
+  return /^\/?image\/korkort\/q_\d+\.svg$/i.test(String(url || ""));
+}
+
+function isWikimediaRoadSign(url) {
+  const s = String(url || "");
+  return /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i.test(s) && /Sweden_road_sign_/i.test(s);
+}
+
+function normalizeQuestion(q) {
+  const imageStatus = q.imageStatus || q.image_status ||
+    (isLocalGeneratedKorkortImage(q.image_url) ? "needs_verified_image" :
+      (isWikimediaRoadSign(q.image_url) ? "verified" : (q.image_url ? "needs_verified_image" : "missing")));
+  const blockedImage = BLOCKED_IMAGE_STATUSES.has(imageStatus);
+  return {
+    ...q,
+    imageStatus,
+    requiresImage: Boolean(q.requiresImage ?? (q.question_type === "image" || q.question_type === "scenario" || q.image_url)),
+    imageUrl: blockedImage ? null : (q.imageUrl || q.image_url || null),
+    options: q.options || { A:q.option_a, B:q.option_b, C:q.option_c, D:q.option_d },
+    correctAnswer: q.correctAnswer || q.correct,
+    sourceStatus: q.sourceStatus || q.source_status || (blockedImage ? "blocked_unverified_image" : "legacy_or_local_source"),
+  };
+}
+
+function isQuestionSafeForPractice(q) {
+  return !BLOCKED_IMAGE_STATUSES.has(q.imageStatus);
+}
 
 const SUPA_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
 const SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
@@ -2214,8 +2244,8 @@ function renderQ(i) {
 
   // Image
   const imgWrap = $("qImgWrap");
-  if(q.image_url) {
-    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.image_url)}" alt="${esc(q.image_description||'')}" loading="eager">`;
+  if(q.imageUrl && !BLOCKED_IMAGE_STATUSES.has(q.imageStatus)) {
+    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.imageUrl)}" alt="${esc(q.image_description||'')}" loading="eager">`;
     imgWrap.style.display = "";
   } else {
     imgWrap.innerHTML = ""; imgWrap.style.display = "none";
@@ -2684,7 +2714,7 @@ async function init() {
       if(_prof?.role){ role=_prof.role; localStorage.setItem(LS_ROLE,role); }
     } catch(_) {}
 
-    // 1. Load questions — primary: /final_questions.json (350 validated), fallback: Supabase
+    // 1. Load questions — primary: /final_questions.json, fallback: Supabase
     step("Hämtar frågor…");
     let questions_raw = null;
     try {
@@ -2718,7 +2748,10 @@ async function init() {
     if(!Array.isArray(questions_raw) || questions_raw.length === 0) {
       throw new Error("Inga frågor returnerades.");
     }
-    questions = questions_raw;
+    questions = questions_raw.map(normalizeQuestion).filter(isQuestionSafeForPractice);
+    if(questions.length === 0) {
+      throw new Error("Inga kvalitetssäkrade frågor är tillgängliga.");
+    }
 
     // 2. Show UI — always hide loader first, then build UI pieces individually
     loader.classList.add("hide");
