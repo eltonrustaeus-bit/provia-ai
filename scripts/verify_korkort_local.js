@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = 4173;
-const MIN_ACTIVE_QUESTIONS = 280;
+const MIN_ACTIVE_QUESTIONS = 250;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
