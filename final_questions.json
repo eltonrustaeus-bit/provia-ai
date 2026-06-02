@@ -32,8 +32,8 @@
       "text_questions_kept": 199,
       "local_svg_images_created": 68
     },
-    "active_questions": 277,
-    "blocked_questions": 73,
+    "active_questions": 266,
+    "blocked_questions": 84,
     "blocked_image_statuses": [
       "ai_generated",
       "irrelevant",
@@ -48,6 +48,18 @@
       "blocked": 70,
       "unknown": 0,
       "cleaned": 148
+    },
+    "manual_image_review": {
+      "reviewed": 13,
+      "approved": 12,
+      "blocked": 1,
+      "rewritten": 1,
+      "source": "https://www.transportstyrelsen.se/globalassets/global/publikationer-och-rapporter/vag/vagmarken/ts_poster70x100_2021-10-01_webb.pdf"
+    },
+    "manual_text_review": {
+      "approved": 24,
+      "blocked": 10,
+      "reviewed": 34
     }
   },
   "questions": [
@@ -85,11 +97,21 @@
       },
       "correctAnswer": "A",
       "requiresImage": true,
-      "expectedConcept": "Vajningsplikt / B1",
-      "legalTopic": "Vajningsplikt",
+      "expectedConcept": "Väjningsplikt / B1",
+      "legalTopic": "Väjningsplikt",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.131Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "B1 is Väjningsplikt. Question, image, correct answer and explanation match."
+      }
     },
     {
       "id": 2,
@@ -125,11 +147,21 @@
       },
       "correctAnswer": "B",
       "requiresImage": true,
-      "expectedConcept": "Pabjuden korbana / D1",
-      "legalTopic": "Pabjuden korbana",
+      "expectedConcept": "Påbjuden körriktning rakt fram / D1-3",
+      "legalTopic": "Påbjuden körriktning rakt fram",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "D1-3 is a mandatory direction sign. The correct answer requires driving straight ahead."
+      }
     },
     {
       "id": 3,
@@ -258,7 +290,17 @@
       "legalTopic": "Parkering",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "E19 is parking. Question and correct answer match."
+      }
     },
     {
       "id": 6,
@@ -273,8 +315,8 @@
       "option_c": "Förbudsskylt",
       "option_d": "Upplysningsskylt för vägvisning",
       "correct": "D",
-      "explanation": "Rätt svar är D. upplysningsskylt för vägvisning. Gula rektangulära skyltar används för vägvisning och orienteringsinformation. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Gula rektangulära vägvisningsmärken används för vägvisning och orientering. De är inte varnings-, påbuds- eller förbudsmärken. Källa: Transportstyrelsens vägmärkesförteckning.",
+      "law_reference": "VMF vägvisningsmärken",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -297,7 +339,18 @@
       "legalTopic": "Varningsmärken",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF vägvisningsmärken",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.156Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 7,
@@ -386,16 +439,16 @@
       "category": "Trafikregler",
       "subcategory": "Övergångställe",
       "question_type": "text",
-      "question": "Hur nära framför ett övergångställe (i körriktningen) är det förbjudet att parkera?",
+      "question": "Hur nära före ett övergångsställe är det förbjudet att parkera?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Du ska hålla 5 meter",
-      "option_b": "Du ska hålla 10 meter",
-      "option_c": "Du ska hålla 15 meter",
-      "option_d": "Du ska hålla 20 meter",
+      "option_a": "5 meter före övergångsstället",
+      "option_b": "10 meter före övergångsstället",
+      "option_c": "15 meter före övergångsstället",
+      "option_d": "20 meter före övergångsstället",
       "correct": "B",
-      "explanation": "Rätt svar är B. Du ska hålla 10 meter. Du får inte parkera inom 10 meter före ett övergångställe. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Du får inte parkera på ett övergångsställe eller närmare än 10 meter före det. Regeln finns för att sikten mot gående inte ska skymmas. Lagrum: TF 3 kap 53 §.",
+      "law_reference": "TF 3 kap 53 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -407,10 +460,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "scenario",
       "options": {
-        "A": "Du ska hålla 5 meter",
-        "B": "Du ska hålla 10 meter",
-        "C": "Du ska hålla 15 meter",
-        "D": "Du ska hålla 20 meter"
+        "A": "5 meter före övergångsstället",
+        "B": "10 meter före övergångsstället",
+        "C": "15 meter före övergångsstället",
+        "D": "20 meter före övergångsstället"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -418,7 +471,18 @@
       "legalTopic": "Övergångställe",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 53 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 10,
@@ -501,16 +565,16 @@
       "category": "Trafikregler",
       "subcategory": "Parkering och stoppförbud",
       "question_type": "text",
-      "question": "Vad ska du göra när trafikljuset visar gult och du kan bromsa på ett säkert sätt?",
+      "question": "Vad ska du göra när en trafiksignal visar gult och du kan stanna utan fara?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Öka för att hinna",
-      "option_b": "Alltid fri passage",
-      "option_c": "Fri passage under 3 sekunder",
-      "option_d": "Bromsa och stanna om det är säkert",
+      "option_a": "Öka farten för att hinna över innan det blir rött",
+      "option_b": "Köra vidare eftersom gult alltid betyder fri passage",
+      "option_c": "Köra vidare om signalen nyss slog om",
+      "option_d": "Stanna om det kan ske utan fara",
       "correct": "D",
-      "explanation": "Rätt svar är D. bromsa och stanna om det är säkert. Gult ljus: stanna om möjligt utan fara. Kör igenom bara om du inte kan stanna säkert. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Gul signal betyder att du ska stanna om det kan ske utan fara. Du får bara fortsätta om du är så nära signalen att en säker inbromsning inte är möjlig. Källa: Transportstyrelsen, trafiksignaler.",
+      "law_reference": "VMF trafiksignaler",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -522,10 +586,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "trafiksignal",
       "options": {
-        "A": "Öka för att hinna",
-        "B": "Alltid fri passage",
-        "C": "Fri passage under 3 sekunder",
-        "D": "Bromsa och stanna om det är säkert"
+        "A": "Öka farten för att hinna över innan det blir rött",
+        "B": "Köra vidare eftersom gult alltid betyder fri passage",
+        "C": "Köra vidare om signalen nyss slog om",
+        "D": "Stanna om det kan ske utan fara"
       },
       "correctAnswer": "D",
       "requiresImage": false,
@@ -533,7 +597,18 @@
       "legalTopic": "Parkering och stoppförbud",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF trafiksignaler",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 13,
@@ -696,8 +771,8 @@
       "option_c": "Bara om det finns märke",
       "option_d": "Du måste lämna företräde åt trafik på gatan",
       "correct": "D",
-      "explanation": "Rätt svar är D. Du måste lämna företräde åt trafik på gatan. Fordon som lämnar parkeringsplats måste alltid lämna företräde åt gatutrafiken. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. När du kör ut från en parkeringsplats ska du lämna företräde åt trafiken på vägen du kör ut på. Lagrum: TF 3 kap 21 §.",
+      "law_reference": "TF 3 kap 21 §",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -720,7 +795,18 @@
       "legalTopic": "Företrädesregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 21 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 18,
@@ -780,7 +866,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "korsning",
@@ -794,9 +881,18 @@
       "requiresImage": false,
       "expectedConcept": "Korsningar / Korsningssituationer / korsning",
       "legalTopic": "Korsningssituationer",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Heldragna gula mittlinjer beskrivs som absolut körförbud utan verifierad modern svensk källa i denna QA-runda."
+      }
     },
     {
       "id": 20,
@@ -842,16 +938,16 @@
       "category": "Korsningar",
       "subcategory": "Trafiksignaler",
       "question_type": "text",
-      "question": "Du har precis passerat stopplinjen när trafikljuset slår om till rött. Vad gör du?",
+      "question": "Du har kört in i en korsning och signalen slår om till rött bakom dig. Vad ska du göra?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Backar tillbaka",
-      "option_b": "Du ska fortsätta och rensar korsningen",
-      "option_c": "Du måste stanna mitt i",
-      "option_d": "Du ska vänta på grönt",
+      "option_a": "Backa tillbaka till stopplinjen",
+      "option_b": "Fortsätta och lämna korsningen så säkert och snabbt som möjligt",
+      "option_c": "Stanna mitt i korsningen",
+      "option_d": "Vänta på grönt där du står",
       "correct": "B",
-      "explanation": "Rätt svar är B. Du ska fortsätta och rensar korsningen. Om du redan passerat stopplinjen vid rött ska du fortsätta och lämna korsningen. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Om du redan befinner dig i korsningen ska du inte backa eller stanna mitt i korsningen. Lämna korsningen så säkert och snabbt som möjligt. Källa: Transportstyrelsen, trafiksignaler.",
+      "law_reference": "VMF trafiksignaler",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
@@ -863,10 +959,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "trafiksignal",
       "options": {
-        "A": "Backar tillbaka",
-        "B": "Du ska fortsätta och rensar korsningen",
-        "C": "Du måste stanna mitt i",
-        "D": "Du ska vänta på grönt"
+        "A": "Backa tillbaka till stopplinjen",
+        "B": "Fortsätta och lämna korsningen så säkert och snabbt som möjligt",
+        "C": "Stanna mitt i korsningen",
+        "D": "Vänta på grönt där du står"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -874,7 +970,18 @@
       "legalTopic": "Trafiksignaler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF trafiksignaler",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 22,
@@ -897,7 +1004,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "trafiksignal",
@@ -911,9 +1019,18 @@
       "requiresImage": false,
       "expectedConcept": "Korsningar / Trafiksignaler / trafiksignal",
       "legalTopic": "Trafiksignaler",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Påståendet blandar fotgängare och cyklister vid grönt ljus för brett och kan bli fel beroende på passage/överfart."
+      }
     },
     {
       "id": 23,
@@ -1335,8 +1452,8 @@
       "option_c": "Minimihastighet 70",
       "option_d": "Motorled 70 km/h",
       "correct": "B",
-      "explanation": "Rätt svar är B. Du får inte köra fortare än 70 km/h. Runt märke med röd kant är ett förbudsmärke — du får inte köra fortare. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Ett runt hastighetsmärke med röd kant är C31, hastighetsbegränsning. Det anger högsta tillåtna hastighet från märket. Lagrum: VMF C31.",
+      "law_reference": "VMF C31",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -1359,7 +1476,18 @@
       "legalTopic": "Hastighetsgränser",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF C31",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 35,
@@ -2398,7 +2526,17 @@
       "legalTopic": "Stopplikt",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_B2.svg/330px-Sweden_road_sign_B2.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "B2 is Stopplikt. The answer requires a full stop before entering the crossing road/area."
+      }
     },
     {
       "id": 74,
@@ -2926,8 +3064,8 @@
       "option_c": "Den som kom dit först",
       "option_d": "Trafiken bara om det finns STOP-märke",
       "correct": "B",
-      "explanation": "Rätt svar är B. Trafiken på den väg du kör ut till. När du lämnar en parkeringsplats ska du alltid lämna företräde åt trafiken på den väg du kör ut till. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Trafiken på vägen du kör ut till behöver inte väja för dig. När du lämnar en parkeringsplats ska du lämna företräde åt trafiken på vägen. Lagrum: TF 3 kap 21 §.",
+      "law_reference": "TF 3 kap 21 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -2950,23 +3088,34 @@
       "legalTopic": "Parkering och stoppförbud",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 21 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 88,
       "category": "Trafikregler",
       "subcategory": "Allmänna trafikregler",
       "question_type": "text",
-      "question": "Hur nära en korsning är parkering förbjudet?",
+      "question": "Hur nära en vägkorsning är det förbjudet att parkera?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Du ska hålla 5 meter",
-      "option_b": "Du ska hålla 20 meter",
-      "option_c": "Du ska hålla 15 meter",
-      "option_d": "Du ska hålla 10 meter",
+      "option_a": "5 meter från korsningen",
+      "option_b": "20 meter från korsningen",
+      "option_c": "15 meter från korsningen",
+      "option_d": "10 meter från korsningen",
       "correct": "D",
-      "explanation": "Rätt svar är D. Du ska hålla 10 meter. Du får inte parkera inom 10 meter från en korsning. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. Du får inte parkera i en vägkorsning eller närmare än 10 meter från den korsande körbanans närmaste ytterkant. Lagrum: TF 3 kap 53 §.",
+      "law_reference": "TF 3 kap 53 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -2978,10 +3127,10 @@
       "bildfix_status": "OMFORMULERA",
       "image_type": "korsning",
       "options": {
-        "A": "Du ska hålla 5 meter",
-        "B": "Du ska hålla 20 meter",
-        "C": "Du ska hålla 15 meter",
-        "D": "Du ska hålla 10 meter"
+        "A": "5 meter från korsningen",
+        "B": "20 meter från korsningen",
+        "C": "15 meter från korsningen",
+        "D": "10 meter från korsningen"
       },
       "correctAnswer": "D",
       "requiresImage": false,
@@ -2989,7 +3138,18 @@
       "legalTopic": "Allmänna trafikregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 53 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 89,
@@ -3088,7 +3248,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "OMFORMULERA",
       "image_type": "korsning",
@@ -3102,9 +3263,18 @@
       "requiresImage": false,
       "expectedConcept": "Trafikregler / Övergångställe / korsning",
       "legalTopic": "Övergångställe",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Frågan använder gårdsgata/max 10 km/h på ett sätt som riskerar att blanda äldre begrepp med gångfartsområde."
+      }
     },
     {
       "id": 92,
@@ -3261,16 +3431,16 @@
       "category": "Korsningar",
       "subcategory": "Körfältsregler",
       "question_type": "text",
-      "question": "Vad gäller när ett körfält avsmalnar och fordon ska foga in i ett kvarvarande körfält?",
+      "question": "Vad bör du göra när ett körfält upphör och trafiken ska vävas samman?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Du ska bromsa kraftigt och stanna",
-      "option_b": "Fordonen turas om att foga in ett i taget",
-      "option_c": "Det fordon som är längst fram har alltid företräde",
-      "option_d": "Det är förbjudet att byta körfil",
+      "option_a": "Bromsa kraftigt och stanna även om trafiken flyter",
+      "option_b": "Samarbeta och låta fordonen vävas in växelvis",
+      "option_c": "Kräva företräde om du ligger längst fram",
+      "option_d": "Aldrig byta körfält",
       "correct": "B",
-      "explanation": "Rätt svar är B. fordonen turas om att foga in ett i taget. Vid avsmalnande körfil turas fordonen om att foga in i det kvarvarande körfältet som en dragkedja. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. När körfält upphör ska du anpassa hastigheten, visa hänsyn och samarbeta så att trafiken kan vävas samman säkert. Lagrum: TF 2 kap 1 §.",
+      "law_reference": "TF 2 kap 1 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -3282,10 +3452,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "korsning",
       "options": {
-        "A": "Du ska bromsa kraftigt och stanna",
-        "B": "Fordonen turas om att foga in ett i taget",
-        "C": "Det fordon som är längst fram har alltid företräde",
-        "D": "Det är förbjudet att byta körfil"
+        "A": "Bromsa kraftigt och stanna även om trafiken flyter",
+        "B": "Samarbeta och låta fordonen vävas in växelvis",
+        "C": "Kräva företräde om du ligger längst fram",
+        "D": "Aldrig byta körfält"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -3293,7 +3463,18 @@
       "legalTopic": "Körfältsregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 2 kap 1 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 98,
@@ -3308,8 +3489,8 @@
       "option_c": "Det beror på hastighetsgränsen",
       "option_d": "Du på huvudleden",
       "correct": "D",
-      "explanation": "Rätt svar är D. Du på huvudleden. På en huvudled har du företräde framför trafik från korsande vägar. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är D. På huvudled har trafiken på korsande vägar normalt väjningsplikt. Du ska ändå vara uppmärksam och anpassa körningen om någon gör fel. Lagrum: VMF B4.",
+      "law_reference": "VMF B4",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
@@ -3332,7 +3513,18 @@
       "legalTopic": "Företrädesregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF B4",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 99,
@@ -3347,8 +3539,8 @@
       "option_c": "Du ska blinka och stannar",
       "option_d": "Du måste stanna bara om det finns fotgängare",
       "correct": "A",
-      "explanation": "Rätt svar är A. Du måste stanna vid stopplinjen. Vid rött ljus ska du stanna vid stopplinjen. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Vid röd signal ska du stanna vid stopplinjen eller, om stopplinje saknas, före signalen eller korsningen. Källa: Transportstyrelsen, trafiksignaler.",
+      "law_reference": "VMF trafiksignaler",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -3371,7 +3563,18 @@
       "legalTopic": "Trafiksignaler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF trafiksignaler",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 100,
@@ -3386,8 +3589,8 @@
       "option_c": "Du ska köra med försiktighet och lämna företräde vid behov",
       "option_d": "Signalen är trasig, kör inte",
       "correct": "C",
-      "explanation": "Rätt svar är C. Du ska köra med försiktighet och lämna företräde vid behov. Blinkande gult ljus innebär att du ska köra försiktigt och observera trafiken. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Blinkande gult ljus betyder att du ska vara särskilt försiktig. Du ska följa vägmärken och övriga väjningsregler på platsen. Källa: Transportstyrelsen, trafiksignaler.",
+      "law_reference": "VMF trafiksignaler",
       "difficulty": "hard",
       "commonly_failed": true,
       "validation": {
@@ -3410,7 +3613,18 @@
       "legalTopic": "Trafiksignaler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF trafiksignaler",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 102,
@@ -3644,13 +3858,13 @@
       "question": "Du kör i 90 km/h. Hur lång sträcka tillryggalägger bilen under 1 sekunds reaktionstid?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Du ska hålla 15 meter",
-      "option_b": "Du ska hålla 20 meter",
-      "option_c": "Du ska hålla 25 meter",
-      "option_d": "Du ska hålla 30 meter",
+      "option_a": "15 meter",
+      "option_b": "20 meter",
+      "option_c": "25 meter",
+      "option_d": "30 meter",
       "correct": "C",
-      "explanation": "Rätt svar är C. Du ska hålla 25 meter. I 90 km/h kör du 25 meter per sekund (90 dividerat med 3,6). Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. 90 km/h motsvarar 25 meter per sekund eftersom 90 / 3,6 = 25. Det är en beräkningsfråga om reaktionssträcka, inte en särskild paragraf.",
+      "law_reference": "Beräkningsfråga",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -3662,10 +3876,10 @@
       "bildfix_status": "OMFORMULERA",
       "image_type": "vägsituation",
       "options": {
-        "A": "Du ska hålla 15 meter",
-        "B": "Du ska hålla 20 meter",
-        "C": "Du ska hålla 25 meter",
-        "D": "Du ska hålla 30 meter"
+        "A": "15 meter",
+        "B": "20 meter",
+        "C": "25 meter",
+        "D": "30 meter"
       },
       "correctAnswer": "C",
       "requiresImage": false,
@@ -3673,7 +3887,18 @@
       "legalTopic": "Bromssträcka och reaktionstid",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "Beräkningsfråga",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 111,
@@ -4029,7 +4254,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "OMFORMULERA",
       "image_type": "scenario",
@@ -4043,9 +4269,18 @@
       "requiresImage": false,
       "expectedConcept": "Alkohol & Droger / Droger och läkemedel / scenario",
       "legalTopic": "Droger och läkemedel",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Polisens provtagnings- och testbefogenheter kräver mer exakt juridisk verifiering än datan har."
+      }
     },
     {
       "id": 124,
@@ -4654,8 +4889,8 @@
       "option_c": "Du ska köra om så snart möjligt",
       "option_d": "Du ska hålla samma avstånd som normalt",
       "correct": "B",
-      "explanation": "Rätt svar är B. öka säkerhetsavståndet — tung bil tar längre att stanna. Tunga fordon har längre bromssträcka. Håll ett extra stort säkerhetsavstånd. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Håll större säkerhetsavstånd bakom tunga fordon. Du får bättre sikt och mer tid att reagera, och tunga fordon kan skymma hinder längre fram. Lagrum: TF 2 kap 1 §.",
+      "law_reference": "TF 2 kap 1 §",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -4678,7 +4913,18 @@
       "legalTopic": "Bromssystem och avstånd",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 2 kap 1 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 143,
@@ -4714,11 +4960,21 @@
       },
       "correctAnswer": "A",
       "requiresImage": true,
-      "expectedConcept": "Pabjuden korbana / D1",
-      "legalTopic": "Pabjuden korbana",
+      "expectedConcept": "Påbjuden körriktning rakt fram / D1-3",
+      "legalTopic": "Påbjuden körriktning rakt fram",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "D1-3 image and mandatory straight-ahead answer match."
+      }
     },
     {
       "id": 144,
@@ -4931,11 +5187,21 @@
       },
       "correctAnswer": "D",
       "requiresImage": true,
-      "expectedConcept": "Forbud mot att parkera fordon / C35",
-      "legalTopic": "Forbud mot att parkera fordon",
+      "expectedConcept": "Förbud mot att parkera fordon / C35",
+      "legalTopic": "Förbud mot att parkera fordon",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "C35 is parking prohibition. The answer distinguishes it from C39."
+      }
     },
     {
       "id": 149,
@@ -5310,7 +5576,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "vägsituation",
@@ -5324,9 +5591,18 @@
       "requiresImage": false,
       "expectedConcept": "Trafikregler / Vägmarkeringar / vägsituation",
       "legalTopic": "Vägmarkeringar",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Dubbla heldragna gula mittlinjer saknar säker verifierad formulering för livefråga."
+      }
     },
     {
       "id": 161,
@@ -5423,7 +5699,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "vägsituation",
@@ -5437,25 +5714,34 @@
       "requiresImage": false,
       "expectedConcept": "Trafikregler / Motorväg / vägsituation",
       "legalTopic": "Motorväg",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Körfältssignal med gult X kan vara felaktigt/otydligt formulerad och blockeras tills signalbetydelsen verifieras."
+      }
     },
     {
       "id": 164,
       "category": "Trafikregler",
       "subcategory": "Parkering och stoppförbud",
       "question_type": "text",
-      "question": "Är det tillåtet att parkera framför en garageuppfart?",
+      "question": "Får du parkera så att du hindrar in- eller utfart från en fastighet?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Tillåtet om du parkerar högst 30 min",
-      "option_b": "Alltid förbjudet",
-      "option_c": "Tillåtet om garaget inte är i bruk",
-      "option_d": "Tillåtet om du lämnar kontaktuppgifter",
+      "option_a": "Ja, om du parkerar högst 30 minuter",
+      "option_b": "Nej, du får inte parkera så att du hindrar in- eller utfart",
+      "option_c": "Ja, om garaget inte används just då",
+      "option_d": "Ja, om du lämnar kontaktuppgifter",
       "correct": "B",
-      "explanation": "Rätt svar är B. alltid förbjudet. Parkering framför garageuppfart är alltid förbjudet. Det hindrar ägare från att komma ut eller in. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Du får inte parkera så att du hindrar in- eller utfart från en fastighet, till exempel framför en garageuppfart. Lagrum: TF 3 kap 49 §.",
+      "law_reference": "TF 3 kap 49 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -5467,10 +5753,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "vägsituation",
       "options": {
-        "A": "Tillåtet om du parkerar högst 30 min",
-        "B": "Alltid förbjudet",
-        "C": "Tillåtet om garaget inte är i bruk",
-        "D": "Tillåtet om du lämnar kontaktuppgifter"
+        "A": "Ja, om du parkerar högst 30 minuter",
+        "B": "Nej, du får inte parkera så att du hindrar in- eller utfart",
+        "C": "Ja, om garaget inte används just då",
+        "D": "Ja, om du lämnar kontaktuppgifter"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -5478,7 +5764,18 @@
       "legalTopic": "Parkering och stoppförbud",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 49 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 165,
@@ -5501,7 +5798,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "vägmärke",
@@ -5515,9 +5813,18 @@
       "requiresImage": false,
       "expectedConcept": "Trafikregler / Prioriterade fordon och körfält / vägmärke",
       "legalTopic": "Prioriterade fordon och körfält",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Kollektivtrafikfält/taxi/cykel kan bero på lokal skyltning och tilläggstavlor; frågan är för generell."
+      }
     },
     {
       "id": 166,
@@ -5727,7 +6034,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "OMFORMULERA",
       "image_type": "vägsituation",
@@ -5741,9 +6049,18 @@
       "requiresImage": false,
       "expectedConcept": "Trafikregler / Parkering och stoppförbud / vägsituation",
       "legalTopic": "Parkering och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Rådet vid felkörning på motorväg i fel riktning är potentiellt farligt och måste skrivas om med myndighetsstöd."
+      }
     },
     {
       "id": 172,
@@ -5803,7 +6120,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "OMFORMULERA",
       "image_type": "korsning",
@@ -5817,25 +6135,34 @@
       "requiresImage": false,
       "expectedConcept": "Korsningar / Företrädesregler / korsning",
       "legalTopic": "Företrädesregler",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Frågan säger alltid och blandar fotgängare/cyklister/överfart för brett."
+      }
     },
     {
       "id": 174,
       "category": "Korsningar",
       "subcategory": "Trafiksignaler",
       "question_type": "text",
-      "question": "Är det tillåtet att svänga höger mot rött ljus i Sverige?",
+      "question": "Får du svänga höger mot rött ljus om det inte finns någon särskild signal som tillåter svängen?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Ja, om det är säkert",
-      "option_b": "Ja, om det finns en separat grön pil",
-      "option_c": "Nej, alltid förbjudet vid rött",
-      "option_d": "Ja, efter att ha stannat",
+      "option_a": "Ja, om det är fritt",
+      "option_b": "Ja, efter att du har stannat helt",
+      "option_c": "Nej, du får inte köra mot rött",
+      "option_d": "Ja, om du blinkar och kör försiktigt",
       "correct": "C",
-      "explanation": "Rätt svar är C. Nej, alltid förbjudet vid rött. I Sverige är det förbjudet att svänga höger vid rött om det inte finns en separat grön pil som uttryckligen tillåter det. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Röd signal betyder stopp. Du får inte svänga höger mot rött om det inte finns en särskild signal eller anvisning som tillåter det. Källa: Transportstyrelsen, trafiksignaler.",
+      "law_reference": "VMF trafiksignaler",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -5847,10 +6174,10 @@
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "trafiksignal",
       "options": {
-        "A": "Ja, om det är säkert",
-        "B": "Ja, om det finns en separat grön pil",
-        "C": "Nej, alltid förbjudet vid rött",
-        "D": "Ja, efter att ha stannat"
+        "A": "Ja, om det är fritt",
+        "B": "Ja, efter att du har stannat helt",
+        "C": "Nej, du får inte köra mot rött",
+        "D": "Ja, om du blinkar och kör försiktigt"
       },
       "correctAnswer": "C",
       "requiresImage": false,
@@ -5858,7 +6185,18 @@
       "legalTopic": "Trafiksignaler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF trafiksignaler",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 175,
@@ -5873,8 +6211,8 @@
       "option_c": "Den som kört in i korsningen sist",
       "option_d": "Den med tyngst fordon",
       "correct": "B",
-      "explanation": "Rätt svar är B. Du som kör rakt fram. Den som svänger vänster måste alltid ge företräde åt mötande trafik som kör rakt fram eller svänger höger. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Den som svänger vänster ska lämna företräde åt mötande trafik som kör rakt fram eller svänger höger. Lagrum: TF 3 kap 24 §.",
+      "law_reference": "TF 3 kap 24 §",
       "difficulty": "hard",
       "commonly_failed": false,
       "validation": {
@@ -5897,7 +6235,18 @@
       "legalTopic": "Företrädesregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 24 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 177,
@@ -5912,8 +6261,8 @@
       "option_c": "Genomför manövern säkert och ge sedan plats",
       "option_d": "Ignorera det",
       "correct": "C",
-      "explanation": "Rätt svar är C. genomför manövern säkert och ge sedan plats. Slutför din manöver säkert, kör ur korsningen och dra åt sidan. Stanna aldrig i mitten av en korsning. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är C. Du ska underlätta framkomligheten för utryckningsfordon, men inte skapa en ny fara. Lämna korsningen säkert och ge plats så snart det kan göras. Lagrum: TF 2 kap 5 §.",
+      "law_reference": "TF 2 kap 5 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -5936,7 +6285,18 @@
       "legalTopic": "Korsningssituationer",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 2 kap 5 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 178,
@@ -5990,8 +6350,8 @@
       "option_c": "Du ska köra i mitten",
       "option_d": "Positionen spelar ingen roll",
       "correct": "A",
-      "explanation": "Rätt svar är A. Du ska hålla dig till vänster i körfältet. Vid vänstersväng håll dig till vänster i körfältet så mötande trafik kan passera på höger sida. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Vid vänstersväng ska du placera fordonet nära körbanans mitt eller i lämpligt vänstersvängfält, så att svängen kan göras säkert. Lagrum: TF 3 kap 25 §.",
+      "law_reference": "TF 3 kap 25 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -6014,7 +6374,18 @@
       "legalTopic": "Korsningssituationer",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 3 kap 25 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 180,
@@ -6024,13 +6395,13 @@
       "question": "Vad markerar en heldragen vit väjningslinje tvärs över körriktningen?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Markerar var du stanna om du måste ge företräde",
+      "option_a": "Den markerar var du ska stanna om du måste lämna företräde",
       "option_b": "Stopplinje – du måste alltid stanna",
       "option_c": "Markerar korsningens mitt",
       "option_d": "Visar var cyklister får korsa",
       "correct": "A",
-      "explanation": "Rätt svar är A. markerar var du stanna om du måste ge företräde. En heldragen vit väjningslinje markerar var du stannar om du behöver ge ett annat fordon företräde. Du behöver inte stanna om vägen är klar. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. En väjningslinje markerar var du ska stanna om du behöver lämna företräde. Till skillnad från stopplinje innebär den inte att du alltid måste stanna. Källa: Transportstyrelsens vägmärkes- och vägmarkeringsregler.",
+      "law_reference": "VMF vägmarkeringar",
       "difficulty": "easy",
       "commonly_failed": false,
       "validation": {
@@ -6042,7 +6413,7 @@
       "bildfix_status": "OMFORMULERA",
       "image_type": "korsning",
       "options": {
-        "A": "Markerar var du stanna om du måste ge företräde",
+        "A": "Den markerar var du ska stanna om du måste lämna företräde",
         "B": "Stopplinje – du måste alltid stanna",
         "C": "Markerar korsningens mitt",
         "D": "Visar var cyklister får korsa"
@@ -6053,7 +6424,18 @@
       "legalTopic": "Företrädesregler",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF vägmarkeringar",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 181,
@@ -6068,8 +6450,8 @@
       "option_c": "Spara bränsle",
       "option_d": "Det är bara rekommenderat",
       "correct": "A",
-      "explanation": "Rätt svar är A. för att ha bättre sikt och tid att reagera. Att sakta ner tidigt ger bättre sikt, tid att bedöma situationen och reagera vid oväntade händelser. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Genom att sänka hastigheten i god tid får du bättre sikt, mer tid att bedöma korsningen och bättre möjlighet att undvika risker. Lagrum: TF 2 kap 1 §.",
+      "law_reference": "TF 2 kap 1 §",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -6092,7 +6474,18 @@
       "legalTopic": "Korsningssituationer",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "TF 2 kap 1 §",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 182,
@@ -6228,7 +6621,8 @@
         "question_validator": "✅ PASS",
         "image_validator": "BLOCKED: local generated SVG, needs verified image",
         "qa_approved": "NEEDS_REVIEW",
-        "text_conversion": "converted_from_blocked_scenario_question"
+        "text_conversion": "converted_from_blocked_scenario_question",
+        "manual_text_review": "blocked"
       },
       "bildfix_status": "LÄGG TILL BILD",
       "image_type": "vägsituation",
@@ -6242,9 +6636,18 @@
       "requiresImage": false,
       "expectedConcept": "Möte & Omkörning / Omkörning / vägsituation",
       "legalTopic": "Omkörning",
-      "imageStatus": "missing",
+      "imageStatus": "needs_verified_image",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "blocked_manual_text_review_uncertain",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Manual QA found uncertainty or over-broad rule statement"
+        ],
+        "note": "Streckade gula mittlinjer är inte tillräckligt verifierade som generell svensk livefråga."
+      }
     },
     {
       "id": 186,
@@ -6594,8 +6997,8 @@
       "option_c": "Minsta tillåtna hastighet",
       "option_d": "Gäller bara tung trafik",
       "correct": "B",
-      "explanation": "Rätt svar är B. lämplig hastighet under normala förhållanden. En gul hastighetsskylt visar rekommenderad hastighet. Det är inte lag, men avvikelse kan ses som oaktsamhet om olycka sker. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. En gul rektangulär hastighetsskylt är E11, rekommenderad lägre hastighet. Den anger en lämplig hastighet under normala förhållanden och är inte samma sak som en bindande C31-hastighetsbegränsning. Lagrum: VMF E11.",
+      "law_reference": "VMF E11",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -6618,7 +7021,18 @@
       "legalTopic": "Hastighetsgränser",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "VMF E11",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 196,
@@ -7924,16 +8338,16 @@
       "category": "Fordon & Besiktning",
       "subcategory": "Besiktning och fordonskrav",
       "question_type": "text",
-      "question": "Vad händer om du kör ett fordon utan giltig trafikförsäkring i Sverige?",
+      "question": "Vad händer om ett trafikpliktigt fordon saknar trafikförsäkring?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Ingenting om du inte orsakar olycka",
-      "option_b": "Du betalar en trafikförsäkringsavgift (TFA) och kan dömas",
-      "option_c": "Bilen beslagtas direkt",
-      "option_d": "Enbart körkortsåterkallelse",
+      "option_a": "Ingenting om fordonet inte orsakar en olycka",
+      "option_b": "Ägaren får betala trafikförsäkringsavgift",
+      "option_c": "Fordonet beslagtas alltid direkt",
+      "option_d": "Endast körkortet återkallas",
       "correct": "B",
-      "explanation": "Rätt svar är B. Du betalar en trafikförsäkringsavgift (TFA) och kan dömas. Utan trafikförsäkring debiteras en Trafikförsäkringsavgift (TFA) från Trafikförsäkringsföreningen — ofta dubbla premien per dag. Du kan också dömas för fortkörning om du orsakat skada. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är B. Trafikförsäkring är obligatorisk för trafikpliktiga motordrivna fordon. Om fordonet saknar trafikförsäkring rapporteras det till Trafikförsäkringsföreningen och ägaren får betala trafikförsäkringsavgift. Källa: Transportstyrelsen, trafikförsäkring.",
+      "law_reference": "Trafikskadelagen (1975:1410)",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -7945,10 +8359,10 @@
       "bildfix_status": "OMFORMULERA",
       "image_type": "vägsituation",
       "options": {
-        "A": "Ingenting om du inte orsakar olycka",
-        "B": "Du betalar en trafikförsäkringsavgift (TFA) och kan dömas",
-        "C": "Bilen beslagtas direkt",
-        "D": "Enbart körkortsåterkallelse"
+        "A": "Ingenting om fordonet inte orsakar en olycka",
+        "B": "Ägaren får betala trafikförsäkringsavgift",
+        "C": "Fordonet beslagtas alltid direkt",
+        "D": "Endast körkortet återkallas"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -7956,7 +8370,18 @@
       "legalTopic": "Besiktning och fordonskrav",
       "imageStatus": "missing",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "manual_text_review_approved",
+      "law": "Trafikskadelagen (1975:1410)",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      }
     },
     {
       "id": 408,
@@ -8695,11 +9120,21 @@
       },
       "correctAnswer": "B",
       "requiresImage": true,
-      "expectedConcept": "Varning for farlig kurva / A1",
-      "legalTopic": "Varning for farlig kurva",
+      "expectedConcept": "Varning för farlig kurva åt höger / A1-1",
+      "legalTopic": "Varning för farlig kurva åt höger",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Sweden_road_sign_A1-1.svg/330px-Sweden_road_sign_A1-1.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "A1-1 warns for a dangerous curve. The question tests speed adaptation before a curve."
+      }
     },
     {
       "id": 352,
@@ -8714,8 +9149,8 @@
       "option_c": "Bromsa hårt mitt i kurvan för bäst kontroll",
       "option_d": "Accelerera lätt för att ta kurvan stabilt",
       "correct": "A",
-      "explanation": "Rätt svar är A. bromsa till lämplig fart INNAN kurvan börjar. Bromsa alltid till rätt fart INNAN kurvan. Att bromsa i kurvan minskar styrförmågan och ökar risken för sladd. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: relevant trafikregel.",
-      "law_reference": null,
+      "explanation": "Rätt svar är A. Märket A1-2 varnar för farlig kurva åt vänster. Anpassa hastigheten innan kurvan så att du kan köra igenom den med kontroll. Lagrum: VMF A1-2.",
+      "law_reference": "VMF A1-2",
       "difficulty": "normal",
       "commonly_failed": true,
       "validation": {
@@ -8735,11 +9170,22 @@
       },
       "correctAnswer": "A",
       "requiresImage": true,
-      "expectedConcept": "Varning for farlig kurva / A1",
-      "legalTopic": "Varning for farlig kurva",
+      "expectedConcept": "Varning för farlig kurva åt vänster / A1-2",
+      "legalTopic": "Varning för farlig kurva åt vänster",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Sweden_road_sign_A1-2.svg/330px-Sweden_road_sign_A1-2.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "manual_text_review_approved",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T19:02:30.158Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen official pages",
+          "Transportstyrelsen vägmärkesaffisch when applicable"
+        ],
+        "note": "Generic law placeholder replaced or factual wording corrected."
+      },
+      "law": "VMF A1-2"
     },
     {
       "id": 353,
@@ -8790,7 +9236,7 @@
       "subcategory": "Varningsmärken – backig väg",
       "question_type": "image",
       "question": "Du ser det här märket vid en nedförsbacke. Vad bör du göra?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_A6.svg/330px-Sweden_road_sign_A6.svg.png",
+      "image_url": null,
       "image_description": "Bilförarperspektiv från framrutan på en svensk väg med två tydliga körfält och normal högertrafik. Vägbanan är torr asfalt med vit mittlinje (#FFFFFF) och kantlinje, och den relevanta skylten, signalen eller trafiksituationen syns cirka 40 meter framför bilen. Avgörande detalj som ska ritas in: Du ser det här märket vid en nedförsbacke. Vad bör du göra? Rödrandad triangel med en bil som kör nerför en brant backe Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka.",
       "option_a": "Du ska hålla bromspedalen nedtryckt hela vägen ned",
       "option_b": "Du ska hålla konstant hastighet med gasen",
@@ -8804,9 +9250,10 @@
       "validation": {
         "question_validator": "✅ PASS",
         "image_validator": "✅ IMPROVED",
-        "qa_approved": "✅ APPROVED",
+        "qa_approved": "NEEDS_REVIEW",
         "road_sign_code": "A6",
-        "expected_sign": "Varning for bro"
+        "expected_sign": "Varning for bro",
+        "manual_image_review": "blocked"
       },
       "image_type": "vägmärke",
       "bildfix_status": "OMFORMULERA",
@@ -8820,9 +9267,19 @@
       "requiresImage": true,
       "expectedConcept": "Varning for bro / A6",
       "legalTopic": "Varning for bro",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_A6.svg/330px-Sweden_road_sign_A6.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "imageStatus": "needs_verified_image",
+      "imageUrl": null,
+      "sourceStatus": "blocked_manual_image_review_mismatch",
+      "manualReview": {
+        "status": "blocked",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "A6 is Varning för bro, but the question/explanation concerns a steep downhill. Blocked instead of pretending the image fits."
+      }
     },
     {
       "id": 355,
@@ -9413,16 +9870,16 @@
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – hastighetsbegränsning",
       "question_type": "image",
-      "question": "Du kör på vägen och ser detta märke framför dig. Vad ska du göra?",
+      "question": "Du ser ett hastighetsmärke som anger 30 km/h. Hur länge gäller hastighetsbegränsningen?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Sweden_road_sign_C31-3.svg/330px-Sweden_road_sign_C31-3.svg.png",
       "image_description": "Bilförarperspektiv från framrutan på en svensk väg med två tydliga körfält och normal högertrafik. Vägbanan är torr asfalt med vit mittlinje (#FFFFFF) och kantlinje, och den relevanta skylten, signalen eller trafiksituationen syns cirka 40 meter framför bilen. Avgörande detalj som ska ritas in: Du kör på vägen och ser detta märke framför dig. Vad ska du göra? Märket är placerat på stolpe två meter från höger vägkant och är vinklat mot föraren. Skylten har tydlig standardstorlek, hög kontrast och färger enligt VMF: röd #CC0000, blå #003F87, gul #FFCC00, vit #FFFFFF och svart #111111 där de förekommer. Omgivningen innehåller realistiska detaljer: vägkant, stolpar, eventuella parkerade bilar, cykelbana eller fotgängare bara när de påverkar regeln i frågan. Väder: dagsljus, soligt till lätt molnigt, torrt och klart väglag om inte frågan uttryckligen gäller mörker, regn eller halka.",
-      "option_a": "Tills du ser ett upphörandemärke eller en ny hastighetsgräns",
-      "option_b": "Bara under skoltid 7–16",
+      "option_a": "Tills du passerar ett nytt hastighetsmärke eller ett upphörandemärke",
+      "option_b": "Bara under skoltid klockan 7-16",
       "option_c": "Bara för tung trafik",
-      "option_d": "500 meter framåt",
+      "option_d": "Endast 500 meter framåt",
       "correct": "A",
-      "explanation": "Rätt svar är A. tills du ser ett upphörandemärke eller en ny hastighetsgräns. Hastighetsbegränsning gäller tills du ser ett upphörandemärke (med snedstreck) eller ett nytt hastighetsmärke. Det är ett lagkrav dygnet runt — inte en rekommendation. Fel svar: B är fel eftersom det inte är rätt handling i den visade situationen. C är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: TF 3 kap 17§.",
-      "law_reference": "TF 3 kap 17§",
+      "explanation": "Rätt svar är A. Märket C31 anger högsta tillåtna hastighet. Hastighetsbegränsningen gäller från märket tills en ny hastighetsbegränsning eller ett upphörandemärke anger något annat. Lagrum: VMF C31.",
+      "law_reference": "VMF C31",
       "difficulty": "normal",
       "commonly_failed": false,
       "validation": {
@@ -9435,18 +9892,28 @@
       "image_type": "vägmärke",
       "bildfix_status": "OMFORMULERA",
       "options": {
-        "A": "Tills du ser ett upphörandemärke eller en ny hastighetsgräns",
-        "B": "Bara under skoltid 7–16",
+        "A": "Tills du passerar ett nytt hastighetsmärke eller ett upphörandemärke",
+        "B": "Bara under skoltid klockan 7-16",
         "C": "Bara för tung trafik",
-        "D": "500 meter framåt"
+        "D": "Endast 500 meter framåt"
       },
       "correctAnswer": "A",
       "requiresImage": true,
-      "expectedConcept": "Hastighetsbegransning / C31",
-      "legalTopic": "Hastighetsbegransning",
+      "expectedConcept": "Hastighetsbegränsning 30 km/h / C31-3",
+      "legalTopic": "Hastighetsbegränsning 30 km/h",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Sweden_road_sign_C31-3.svg/330px-Sweden_road_sign_C31-3.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved_after_rewrite",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "Image is a C31 speed limit sign. Original wording was incomplete; rewritten to match image and concept."
+      }
     },
     {
       "id": 369,
@@ -12391,11 +12858,21 @@
       },
       "correctAnswer": "A",
       "requiresImage": true,
-      "expectedConcept": "Forbud mot att stanna och parkera fordon / C39",
-      "legalTopic": "Forbud mot att stanna och parkera fordon",
+      "expectedConcept": "Förbud mot att stanna och parkera fordon / C39",
+      "legalTopic": "Förbud mot att stanna och parkera fordon",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/330px-Sweden_road_sign_C39.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "C39 forbids both stopping and parking. Question and answer match."
+      }
     },
     {
       "id": 552,
@@ -12612,11 +13089,21 @@
       },
       "correctAnswer": "B",
       "requiresImage": true,
-      "expectedConcept": "Vajningsplikt / B1",
-      "legalTopic": "Vajningsplikt",
+      "expectedConcept": "Väjningsplikt / B1",
+      "legalTopic": "Väjningsplikt",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "B1 is Väjningsplikt. Question and answer match."
+      }
     },
     {
       "id": 557,
@@ -12700,7 +13187,17 @@
       "legalTopic": "Parkering",
       "imageStatus": "verified",
       "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "sourceStatus": "curated_wikimedia_swedish_road_sign"
+      "sourceStatus": "curated_wikimedia_swedish_road_sign",
+      "manualReview": {
+        "status": "approved",
+        "reviewedAt": "2026-06-02T18:58:56.132Z",
+        "reviewedBy": "Codex manual QA",
+        "evidence": [
+          "Transportstyrelsen vägmärkesaffisch",
+          "Wikimedia Sweden road sign image"
+        ],
+        "note": "E19 is parking. Question and answer match."
+      }
     },
     {
       "id": 559,
