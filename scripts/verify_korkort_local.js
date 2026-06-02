@@ -5,6 +5,7 @@ const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = 4173;
+const MIN_ACTIVE_QUESTIONS = 280;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -35,20 +36,7 @@ function serveFile(req, res) {
   fs.createReadStream(filePath).pipe(res);
 }
 
-async function main() {
-  const server = http.createServer(serveFile);
-  await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));
-
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  const consoleErrors = [];
-  page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  page.on('pageerror', err => consoleErrors.push(err.message));
-
-  await page.goto(`http://127.0.0.1:${PORT}/korkortet.html`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForTimeout(5000);
+async function verifyViewport(page, label) {
   const result = await page.evaluate(() => ({
     title: document.title,
     loaderHidden: document.querySelector('#pageLoader')?.classList.contains('hide') || false,
@@ -56,28 +44,96 @@ async function main() {
     questionCount: window.questions?.length || 0,
     localImageRefs: (window.questions || []).filter(q => String(q.image_url || q.imageUrl || '').includes('/image/korkort/')).length,
     blockedInPool: (window.questions || []).filter(q => ['ai_generated','irrelevant','broken','needs_verified_image'].includes(q.imageStatus)).length,
-    visibleImages: document.querySelectorAll('.qImg').length,
-    visibleText: document.body.innerText.slice(0, 300),
+    duValjerInPool: (window.questions || []).filter(q => {
+      const opts = [q.option_a, q.option_b, q.option_c, q.option_d];
+      return opts.some(o => typeof o === 'string' && /^Du väljer:/i.test(o));
+    }).length,
   }));
-  const dataResult = await page.evaluate(async () => {
+  return { label, ...result };
+}
+
+async function main() {
+  const server = http.createServer(serveFile);
+  await new Promise(resolve => server.listen(PORT, '127.0.0.1', resolve));
+
+  const browser = await chromium.launch({ headless: true });
+  const consoleErrors = [];
+
+  // ── Desktop viewport ──
+  const desktopPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  desktopPage.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(`[desktop] ${msg.text()}`); });
+  desktopPage.on('pageerror', err => consoleErrors.push(`[desktop:pageerror] ${err.message}`));
+
+  await desktopPage.goto(`http://127.0.0.1:${PORT}/korkortet.html`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await desktopPage.waitForTimeout(5000);
+  const desktopResult = await verifyViewport(desktopPage, 'desktop-1280');
+
+  // ── Mobile viewport ──
+  const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  mobilePage.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(`[mobile] ${msg.text()}`); });
+  mobilePage.on('pageerror', err => consoleErrors.push(`[mobile:pageerror] ${err.message}`));
+
+  await mobilePage.goto(`http://127.0.0.1:${PORT}/korkortet.html`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await mobilePage.waitForTimeout(5000);
+  const mobileResult = await verifyViewport(mobilePage, 'mobile-390');
+
+  // ── JSON data checks ──
+  const dataResult = await desktopPage.evaluate(async () => {
     const json = await fetch('/final_questions.json').then(r => r.json());
     const blockedStatuses = ['ai_generated','irrelevant','broken','needs_verified_image'];
     const blocked = json.questions.filter(q => blockedStatuses.includes(q.imageStatus));
+    const REQUIRED = ['id','category','difficulty','question','options','correctAnswer','explanation','requiresImage','imageUrl','imageStatus','expectedConcept','legalTopic','sourceStatus'];
+    const missingFields = json.questions.filter(q => REQUIRED.some(k => q[k] === undefined)).length;
+    const localImageRefs = json.questions.filter(q => String(q.image_url || q.imageUrl || '').includes('/image/korkort/')).length;
+    const duValjerOpts = json.questions.filter(q => {
+      const opts = [q.option_a, q.option_b, q.option_c, q.option_d];
+      return opts.some(o => typeof o === 'string' && /^Du väljer:/i.test(o));
+    }).length;
+    const shortExpl = json.questions.filter(q => !blockedStatuses.includes(q.imageStatus) && (q.explanation||'').length < 40).length;
+    const blockedButRequiresImage = json.questions.filter(q =>
+      !blockedStatuses.includes(q.imageStatus) && q.requiresImage && !q.imageUrl && !q.image_url
+    ).length;
     return {
       total: json.questions.length,
       active: json.questions.length - blocked.length,
       blocked: blocked.length,
-      missingRequired: json.questions.filter(q => ['id','category','difficulty','question','options','correctAnswer','explanation','requiresImage','imageUrl','imageStatus','expectedConcept','legalTopic','sourceStatus'].some(k => q[k] === undefined)).length,
-      localImageRefs: json.questions.filter(q => String(q.image_url || q.imageUrl || '').includes('/image/korkort/')).length,
+      missingFields,
+      localImageRefs,
+      duValjerOpts,
+      shortExpl,
+      blockedButRequiresImage,
+      metadata: json.metadata,
     };
   });
 
   await browser.close();
   await new Promise(resolve => server.close(resolve));
 
-  console.log(JSON.stringify({ result, dataResult, consoleErrors }, null, 2));
-  if (!result.loaderHidden || !result.loginVisible || dataResult.active < 250 || dataResult.localImageRefs || dataResult.missingRequired || consoleErrors.length) {
+  const output = { desktopResult, mobileResult, dataResult, consoleErrors };
+  console.log(JSON.stringify(output, null, 2));
+
+  // ── Assertions ──
+  const fails = [];
+
+  if (!desktopResult.loaderHidden) fails.push('desktop: loader still visible');
+  if (!desktopResult.loginVisible) fails.push('desktop: login screen not shown');
+  if (!mobileResult.loaderHidden) fails.push('mobile: loader still visible');
+  if (!mobileResult.loginVisible) fails.push('mobile: login screen not shown');
+
+  if (dataResult.active < MIN_ACTIVE_QUESTIONS) fails.push(`active questions ${dataResult.active} < ${MIN_ACTIVE_QUESTIONS}`);
+  if (dataResult.localImageRefs > 0) fails.push(`${dataResult.localImageRefs} local /image/korkort/ refs remain`);
+  if (dataResult.missingFields > 0) fails.push(`${dataResult.missingFields} questions missing required fields`);
+  if (dataResult.duValjerOpts > 0) fails.push(`${dataResult.duValjerOpts} questions still have "Du väljer:" in options`);
+  if (desktopResult.blockedInPool > 0) fails.push(`${desktopResult.blockedInPool} blocked questions leaked into live pool`);
+  if (desktopResult.localImageRefs > 0) fails.push(`${desktopResult.localImageRefs} local image refs in live pool`);
+  if (consoleErrors.length > 0) fails.push(`${consoleErrors.length} console errors: ${consoleErrors.slice(0,3).join('; ')}`);
+
+  if (fails.length > 0) {
+    console.error('\nFAILED:');
+    fails.forEach(f => console.error('  ✗', f));
     process.exit(1);
+  } else {
+    console.log('\nPASSED: all checks green');
   }
 }
 
