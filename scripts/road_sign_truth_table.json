@@ -38,7 +38,7 @@
     "C16": { "name": "Begransad fordonsbredd", "category": "Forbudsmarken", "required": ["bredd", "bredare"], "forbidden": ["hogre", "hojd", "ton"] },
     "C17": { "name": "Begransad fordonshojd", "category": "Forbudsmarken", "required": ["hojd", "hogre"], "forbidden": ["bredare", "bredd", "ton"] },
     "C31": { "name": "Hastighetsbegransning", "category": "Forbudsmarken", "required": ["hastighet", "km/h"], "forbidden": ["totalvikt", "ton"] },
-    "C35": { "name": "Forbud mot att parkera fordon", "category": "Forbudsmarken", "required": ["parkering forbjuden", "far inte parkera"], "forbidden": ["omkorning", "stannande forbjudet"] },
+    "C35": { "name": "Forbud mot att parkera fordon", "category": "Forbudsmarken", "required": ["forbud mot att parkera", "parkering forbjuden", "far inte parkera"], "forbidden": ["omkorning", "stannande forbjudet"] },
     "C38": { "name": "Datumparkering", "category": "Forbudsmarken", "required": ["datumparkering", "datum"], "forbidden": ["omkorning"] },
     "C39": { "name": "Forbud mot att stanna och parkera fordon", "category": "Forbudsmarken", "required": ["stanna", "parkera"], "forbidden": ["far stanna men inte parkera"] },
 
