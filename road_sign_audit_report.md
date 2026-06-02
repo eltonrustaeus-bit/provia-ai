@@ -1,6 +1,6 @@
 # Road Sign Audit Report
 
-Generated: 2026-06-02T19:12:18.147Z
+Generated: 2026-06-02T19:30:08.163Z
 
 Source: Transportstyrelsen vagmarkesaffisch, TS poster 2021-10-01
 
