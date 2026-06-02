@@ -878,27 +878,21 @@ async function loadProgressFromSupabase() {
     if (!r.ok) return;
     const { data } = await r.json();
 
-    if (!data) {
-      // No server record yet — push current local state as initial save
-      await saveProgressToSupabase();
-      return;
-    }
+    // Server is authoritative — overwrite local completely (including empty/null = clear)
+    const d = data || {};
+    setSrs(d.srs_data || {});
+    localStorage.setItem(XP_KEY, String(d.xp || 0));
+    localStorage.setItem(LS_WRONG, JSON.stringify(d.wrong_ids || []));
 
-    // Server is authoritative — overwrite local completely
-    setSrs(data.srs_data || {});
-    localStorage.setItem(XP_KEY, String(data.xp || 0));
-    localStorage.setItem(LS_WRONG, JSON.stringify(data.wrong_ids || []));
-
-    const cp = data.cat_prog || {};
+    const cp = d.cat_prog || {};
     localStorage.setItem(LS_CAT_PROG, JSON.stringify(cp));
 
-    // Reconstruct mastered from cat_prog entries
     const mastered = {};
     for (const [cat, v] of Object.entries(cp)) {
       if (Array.isArray(v.mastered)) mastered[cat] = v.mastered;
     }
     localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(mastered));
-    localStorage.setItem(LS_BM, JSON.stringify(data.bookmarks || []));
+    localStorage.setItem(LS_BM, JSON.stringify(d.bookmarks || []));
   } catch (_) {}
 }
 
