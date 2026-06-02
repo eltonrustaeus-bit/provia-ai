@@ -877,52 +877,28 @@ async function loadProgressFromSupabase() {
     const r = await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_load" }) });
     if (!r.ok) return;
     const { data } = await r.json();
-    if (!data) return;
 
-    // Merge SRS: union by question key, take latest nextReview
-    const localSrs = getSrs();
-    const remoteSrs = data.srs_data || {};
-    const mergedSrs = { ...localSrs };
-    for (const [k, v] of Object.entries(remoteSrs)) {
-      if (!mergedSrs[k] || (v.nextReview || 0) > (mergedSrs[k].nextReview || 0)) mergedSrs[k] = v;
+    if (!data) {
+      // No server record yet — push current local state as initial save
+      await saveProgressToSupabase();
+      return;
     }
-    setSrs(mergedSrs);
 
-    // XP: take max
-    const remoteXp = data.xp || 0;
-    const localXp = getXP();
-    if (remoteXp > localXp) localStorage.setItem(XP_KEY, String(remoteXp));
+    // Server is authoritative — overwrite local completely
+    setSrs(data.srs_data || {});
+    localStorage.setItem(XP_KEY, String(data.xp || 0));
+    localStorage.setItem(LS_WRONG, JSON.stringify(data.wrong_ids || []));
 
-    // Wrong IDs: union capped at 150
-    const localW = getWrongIds();
-    const remoteW = data.wrong_ids || [];
-    const merged = [...new Set([...localW, ...remoteW])].slice(-150);
-    localStorage.setItem(LS_WRONG, JSON.stringify(merged));
+    const cp = data.cat_prog || {};
+    localStorage.setItem(LS_CAT_PROG, JSON.stringify(cp));
 
-    // Cat progress: merge best
-    const localCp = safeJSON(localStorage.getItem(LS_CAT_PROG), {});
-    const remoteCp = data.cat_prog || {};
-    const mergedCp = { ...localCp };
-    const localMastered = getMastered();
-    for (const [cat, v] of Object.entries(remoteCp)) {
-      if (!mergedCp[cat]) { mergedCp[cat] = { best: v.best||0, attempts: v.attempts||0, done: v.done||false }; }
-      else {
-        mergedCp[cat].best = Math.max(mergedCp[cat].best || 0, v.best || 0);
-        mergedCp[cat].attempts = (mergedCp[cat].attempts || 0) + (v.attempts || 0);
-        mergedCp[cat].done = mergedCp[cat].done || v.done;
-      }
-      // Union mastered IDs from server (stored inside cat_prog)
-      if (Array.isArray(v.mastered)) {
-        localMastered[cat] = [...new Set([...(localMastered[cat]||[]), ...v.mastered])];
-      }
+    // Reconstruct mastered from cat_prog entries
+    const mastered = {};
+    for (const [cat, v] of Object.entries(cp)) {
+      if (Array.isArray(v.mastered)) mastered[cat] = v.mastered;
     }
-    localStorage.setItem(LS_CAT_PROG, JSON.stringify(mergedCp));
-    localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(localMastered));
-
-    // Bookmarks: union
-    const localBm = safeJSON(localStorage.getItem(LS_BM), []);
-    const remoteBm = data.bookmarks || [];
-    localStorage.setItem(LS_BM, JSON.stringify([...new Set([...localBm, ...remoteBm])]));
+    localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(mastered));
+    localStorage.setItem(LS_BM, JSON.stringify(data.bookmarks || []));
   } catch (_) {}
 }
 
@@ -1840,6 +1816,9 @@ async function startCourseQuiz(stage) {
             const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
             if(r.status===429){toast("Gränsen nådd — uppgradera för mer.","bad");window.location.href="pricing.html";return;}
             if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
+            // Sync local quota display with server count
+            const {count} = await r.json().catch(()=>({}));
+            if(count != null) localStorage.setItem(qKey(), String(count));
           } else {
             // Not logged in — fallback localStorage
             if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
@@ -1922,10 +1901,26 @@ $("theoryBackBtn") && ($("theoryBackBtn").onclick = () => {
 $("courseStartBtn") && ($("courseStartBtn").onclick = () => {});
 
 // ── TEORIPROV ──
-$("teoriStartBtn").onclick = () => {
+$("teoriStartBtn").onclick = async () => {
   if(!uid){showLoginScreen();return;}
   const cfg=LIMITS[role]||LIMITS.gratis;
-  if(cfg.cap!==Infinity&&readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera för fler test.","bad");return;}
+  if(cfg.cap!==Infinity) {
+    try {
+      const tok = (await db.auth.getSession()).data.session?.access_token;
+      if(tok) {
+        const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
+        if(r.status===429){toast("Gränsen nådd — uppgradera för fler test.","bad");window.location.href="pricing.html";return;}
+        if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
+        const {count,limit} = await r.json();
+        // Sync local quota display with server count
+        localStorage.setItem(qKey(), String(count));
+        refreshQuotaUI();
+      } else {
+        if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+        bumpQ();
+      }
+    } catch { if(readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;} bumpQ(); }
+  }
   $("modeTabs").style.display="none";
   runExam("Alla kategorier",65,"");
 };
@@ -1954,6 +1949,7 @@ function toggleBM(id) {
   const bm = getBM(); const i = bm.indexOf(id);
   if(i >= 0) bm.splice(i, 1); else bm.push(id);
   localStorage.setItem(LS_BM, JSON.stringify(bm));
+  if(uid) saveProgressToSupabase();
   return i < 0;
 }
 
@@ -2164,7 +2160,7 @@ async function runExam(cat, n, diff) {
     exam = buildTeoriExam();
     idx = 0; ans = new Array(exam.length).fill(null);
     streak = 0; updateStreak();
-    bumpQ(); refreshQuotaUI();
+    // quota already bumped by teoriStartBtn / startExam caller
     showExam(); startTimer(50*60); renderQ(0);
     return;
   }
@@ -2188,7 +2184,7 @@ async function runExam(cat, n, diff) {
 
   idx = 0; ans = new Array(exam.length).fill(null);
   streak = 0; updateStreak();
-  bumpQ(); refreshQuotaUI();
+  // quota already bumped by startExam / teoriStartBtn caller
   showExam(); renderQ(0);
 }
 
@@ -2587,6 +2583,9 @@ async function showResults() {
     const weakCatNames = weakCats.map(([c]) => c);
     window.PER.notifyExamDone(pct, weakCatNames);
   }
+
+  // Persist progress immediately after every exam
+  if(uid) saveProgressToSupabase();
 }
 
 $("newBtn").onclick = () => {
@@ -2753,14 +2752,8 @@ async function init() {
       throw new Error("Inga kvalitetssäkrade frågor är tillgängliga.");
     }
 
-    // 2. Show UI — always hide loader first, then build UI pieces individually
+    // 2. Show UI — load server progress first so buildCats has fresh data
     loader.classList.add("hide");
-
-    try { buildCats(); } catch(e) {
-      console.error("[korkortet] buildCats:", e);
-      $("catGrid").innerHTML = `<div class="loadingCat" style="color:var(--danger)">⚠️ ${esc(e?.message||"Fel vid kategorier")} &nbsp;<button onclick="location.reload()" style="background:none;border:none;color:var(--a);cursor:pointer;font:inherit;text-decoration:underline">Ladda om</button></div>`;
-    }
-    try { refreshQuotaUI(); } catch(_) {}
 
     const authBtn = $("logoutBtn"), authSpan = authBtn.querySelector("span");
     if(uid) {
@@ -2771,9 +2764,22 @@ async function init() {
       authBtn.onclick = () => showLoginScreen();
     }
 
+    // Load server progress BEFORE building UI so progress indicators are correct
+    if(uid) {
+      await loadProgressFromSupabase();
+      updateXpBar();
+      setInterval(saveProgressToSupabase, 60000);
+    } else {
+      updateXpBar();
+    }
+
     if(uid) await loadHistory();
-    if(uid) { await loadProgressFromSupabase(); updateXpBar(); setInterval(saveProgressToSupabase, 60000); }
-    else updateXpBar();
+
+    try { buildCats(); } catch(e) {
+      console.error("[korkortet] buildCats:", e);
+      $("catGrid").innerHTML = `<div class="loadingCat" style="color:var(--danger)">⚠️ ${esc(e?.message||"Fel vid kategorier")} &nbsp;<button onclick="location.reload()" style="background:none;border:none;color:var(--a);cursor:pointer;font:inherit;text-decoration:underline">Ladda om</button></div>`;
+    }
+    try { refreshQuotaUI(); } catch(_) {}
 
   } catch(err) {
     console.error("[korkortet] init-fel:", err);
