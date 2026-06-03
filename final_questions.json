@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "total_questions": 350,
-    "last_updated": "2026-06-02",
+    "total_questions": 348,
+    "last_updated": "2026-06-04",
     "validation_status": "TEXT_POLISHED_NEEDS_EXPERT_SPOTCHECK",
     "sources": [
       "scripts/questions.json",
@@ -32,7 +32,7 @@
       "text_questions_kept": 199,
       "local_svg_images_created": 68
     },
-    "active_questions": 350,
+    "active_questions": 348,
     "blocked_questions": 0,
     "blocked_image_statuses": [
       "ai_generated",
@@ -11434,63 +11434,6 @@
       "imageDescription": "Svenskt vägmärke A15: Varning för barn."
     },
     {
-      "id": 386,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – trafikanter",
-      "question_type": "image",
-      "question": "Du närmar dig trafiksignaler och ser märket på bilden. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Sweden_road_sign_A22.svg/330px-Sweden_road_sign_A22.svg.png",
-      "image_description": "Svenskt vägmärke A22: Varning för flerfärgssignal.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för flerfärgssignal",
-      "option_d": "Varning för farlig kurva",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder varning för flerfärgssignal. Du ska vara beredd på trafiksignal längre fram. Lagrum: VMF A22.",
-      "law_reference": "VMF A22",
-      "difficulty": "hard",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A22",
-        "expected_sign": "Varning for flerfargssignal",
-        "audit_issues": [
-          "missing required concept: trafiksignal | trafikljus | signal",
-          "forbidden concept in correct path: barn"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för flerfärgssignal",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Varning för flerfärgssignal",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Sweden_road_sign_A22.svg/330px-Sweden_road_sign_A22.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för flerfärgssignal",
-      "imageDescription": "Svenskt vägmärke A22: Varning för flerfärgssignal."
-    },
-    {
       "id": 387,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – infart",
@@ -14288,68 +14231,6 @@
       },
       "image_alt": "Rekommenderad lägre hastighet",
       "imageDescription": "Svenskt vägmärke E11: Rekommenderad lägre hastighet."
-    },
-    {
-      "id": 562,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du närmar dig trafiksignaler och ser märket på bilden. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Sweden_road_sign_A22.svg/330px-Sweden_road_sign_A22.svg.png",
-      "image_description": "Svenskt vägmärke A22: Varning för flerfärgssignal.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för flerfärgssignal",
-      "option_d": "Varning för farlig kurva",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder varning för flerfärgssignal. Du ska vara beredd på trafiksignal längre fram. Lagrum: VMF A22.",
-      "law_reference": "VMF A22",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A22",
-        "expected_sign": "Varning for flerfargssignal",
-        "audit_issues": [
-          "missing required concept: trafiksignal | trafikljus | signal",
-          "forbidden concept in correct path: barn",
-          "forbidden concept in correct path: skola",
-          "forbidden concept in correct path: forskol",
-          "forbidden concept in question metadata/text: barn",
-          "forbidden concept in question metadata/text: skola",
-          "forbidden concept in question metadata/text: forskol"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för flerfärgssignal",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Varning för flerfärgssignal",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Sweden_road_sign_A22.svg/330px-Sweden_road_sign_A22.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för flerfärgssignal",
-      "imageDescription": "Svenskt vägmärke A22: Varning för flerfärgssignal."
     },
     {
       "id": 563,
