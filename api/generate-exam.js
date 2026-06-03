@@ -195,6 +195,79 @@ async function requireAuth(req) {
   } catch { return null; }
 }
 
+async function loadCentralRules() {
+  return import("./_provia-rules.js");
+}
+
+async function loadUserRole(userId) {
+  try {
+    const r = await fetch(
+      process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + encodeURIComponent(userId),
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+        signal: AbortSignal.timeout(5000)
+      }
+    );
+    if (!r.ok) return "gratis";
+    const data = await r.json();
+    return String(data?.[0]?.role || "gratis");
+  } catch {
+    return "gratis";
+  }
+}
+
+async function consumeMockExamQuota(userId, limit, rules) {
+  if (limit.cap === Infinity) {
+    return {
+      ok: true,
+      count: 0,
+      limit: null,
+      period: limit.period,
+      unlimited: true,
+      enforced: true
+    };
+  }
+
+  const periodKey = rules.currentPeriodKey(limit.period);
+  const r = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/consume_mock_exam_quota", {
+    method: "POST",
+    headers: {
+      "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      p_user_id: userId,
+      p_period_key: periodKey,
+      p_limit: limit.cap
+    }),
+    signal: AbortSignal.timeout(5000)
+  });
+
+  const raw = await r.text();
+  let data;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+
+  if (!r.ok) {
+    const err = new Error("Mock quota schema or RPC failed");
+    err.status = r.status;
+    err.details = data || raw;
+    throw err;
+  }
+
+  return {
+    ok: data?.ok === true,
+    count: Number(data?.count || 0),
+    limit: data?.limit ?? limit.cap,
+    period: data?.period || periodKey,
+    unlimited: data?.unlimited === true,
+    enforced: true
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -203,6 +276,11 @@ module.exports = async function handler(req, res) {
 
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
+
+  const rules = await loadCentralRules();
+  const role = rules.normalizeRole(await loadUserRole(user.id));
+  const mockLimit = rules.getFeatureLimit(role, "mockExam");
+  const entitlements = rules.getEntitlementSnapshot(role);
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
@@ -224,6 +302,28 @@ module.exports = async function handler(req, res) {
   const numQuestions = Math.min(20, Math.max(3, numQuestionsRaw));
 
   if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText" });
+
+  let quota;
+  try {
+    quota = await consumeMockExamQuota(user.id, mockLimit, rules);
+  } catch (e) {
+    return json(res, 500, {
+      ok: false,
+      error: "mock_quota_unavailable",
+      message: "Mockprovskvoten kunde inte kontrolleras. Kör Supabase-migrationen innan den här versionen deployas.",
+      details: e.details || String(e)
+    });
+  }
+
+  if (!quota.ok) {
+    return json(res, 429, {
+      ok: false,
+      error: "Quota exceeded",
+      count: quota.count,
+      limit: quota.limit,
+      period: quota.period
+    });
+  }
 
   const isMath = looksLikeMath(course, pastedText);
   const model = pickModel({ isMath });
@@ -411,7 +511,24 @@ module.exports = async function handler(req, res) {
       }
     } catch { /* reviewer is best-effort — never block delivery */ }
 
-    return json(res, 200, { ok: true, exam, meta: { isMath, model, review: reviewMeta } });
+    return json(res, 200, {
+      ok: true,
+      exam,
+      meta: {
+        isMath,
+        model,
+        review: reviewMeta,
+        entitlements,
+        quota: {
+          feature: "mockExam",
+          period: quota.period,
+          count: quota.count,
+          limit: quota.limit,
+          unlimited: quota.unlimited,
+          enforced: quota.enforced
+        }
+      }
+    });
   } catch (e) {
     return json(res, 500, { ok: false, error: "Server error", details: String(e) });
   }

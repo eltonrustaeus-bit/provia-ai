@@ -96,6 +96,12 @@
         var pc = window._perPageContext;
         if (pc.currentQuestion) ctx.currentQuestion = pc.currentQuestion;
         if (pc.examState) ctx.examState = pc.examState;
+        if (Array.isArray(pc.questions)) ctx.questions = pc.questions;
+        if (typeof pc.userScore === 'number') ctx.userScore = pc.userScore;
+        if (Array.isArray(pc.weakAreas)) ctx.weakAreas = pc.weakAreas;
+        if (pc.course) ctx.course = pc.course;
+        if (pc.level) ctx.level = pc.level;
+        if (pc.mode) ctx.mode = pc.mode;
       }
 
       /* User score from localStorage history */

@@ -77,6 +77,8 @@
   .kBtnDanger:hover{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.5)}
 
   .kBtnRow{display:flex;gap:8px;flex-wrap:wrap}
+  .kHelpText{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px}
+  .kPrivacyNote{font-family:var(--mono);font-size:10.5px;color:var(--t3);line-height:1.55;margin-top:10px}
 
   /* Upgrade plans */
   .upgradePlans{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -275,6 +277,24 @@
       </div>
     </div>
 
+    <!-- P.E.R MEMORY CARD -->
+    <div class="kCard">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">P</div>
+        <div>
+          <div class="kCardLabel">P.E.R-minne</div>
+          <div class="kCardTitle">Personlig coachning</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <p class="kHelpText">P.E.R kan använda en kort lärprofil för att komma ihåg svaga områden, hjälpstil och nästa studieprioritet. Råa frågor, kontouppgifter och privata uppgifter ska inte sparas i minnet.</p>
+        <div class="kBtnRow">
+          <button class="kBtn kBtnDanger" id="clearPerMemoryBtn">Rensa P.E.R-minne</button>
+        </div>
+        <div class="kPrivacyNote">Rensar P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Dina prov, resultat och felbank påverkas inte.</div>
+      </div>
+    </div>
+
     <!-- ACCOUNT CARD -->
     <div class="kCard">
       <div class="kCardHead">
@@ -354,9 +374,28 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
   document.getElementById("kontoEmail").textContent=email;
   document.getElementById("kontoName").textContent=name.charAt(0).toUpperCase()+name.slice(1)+"s konto";
 
+  async function loadEntitlements(){
+    try{
+      const r=await fetch("/api/check-role",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({action:"entitlements"})
+      });
+      const data=await r.json();
+      return r.ok&&data.entitlements?data.entitlements:null;
+    }catch{return null}
+  }
+
+  function formatLimit(feature,label){
+    if(!feature)return"";
+    if(feature.unlimited)return`Obegränsat ${label}`;
+    const period=feature.period==="day"?"dag":feature.period==="week"?"vecka":"månad";
+    return`${feature.cap} ${label}/${period}`;
+  }
+
   /* LOAD PROFILE */
-  const {data:prof}=await sb.from("profiles").select("role,kk_quota_count,kk_quota_week").eq("id",user.id).maybeSingle();
-  const role=prof?.role||"gratis";
+  const entitlements=await loadEntitlements();
+  const role=entitlements?.role||"gratis";
 
   /* Plan display */
   const planTitle=document.getElementById("planTitle");
@@ -370,7 +409,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
     planBadge.classList.remove("free");
   }
 
-  document.getElementById("planUsage").textContent=ROLE_DESCS[role]||"";
+  document.getElementById("planUsage").textContent=entitlements
+    ? `${formatLimit(entitlements.features.mockExam,"mockprov")} · ${formatLimit(entitlements.features.perChat,"P.E.R")}`
+    : (ROLE_DESCS[role]||"");
 
   /* Show upgrade or manage card */
   if(role==="gratis"){
@@ -393,6 +434,33 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
       if(r.ok&&data.url){window.location.href=data.url}
       else{showMsg("Fel: "+(data.message||data.error||"Okänt fel"),"err");btn.disabled=false;btn.textContent="Hantera prenumeration →"}
     }catch{showMsg("Nätverksfel. Försök igen.","err");btn.disabled=false;btn.textContent="Hantera prenumeration →"}
+  });
+
+  /* P.E.R MEMORY */
+  document.getElementById("clearPerMemoryBtn")?.addEventListener("click",async()=>{
+    const ok=confirm("Rensa P.E.R-minnet?\n\nDetta tar bort P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Dina provresultat och felbank påverkas inte.");
+    if(!ok)return;
+    const btn=document.getElementById("clearPerMemoryBtn");
+    const orig=btn.textContent;
+    btn.disabled=true;btn.textContent="Rensar…";
+    try{
+      const r=await fetch("/api/check-role",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({action:"per_memory_clear"})
+      });
+      const data=await r.json().catch(()=>({}));
+      if(r.ok&&data.ok){
+        try{localStorage.removeItem("proviaai_per_history")}catch{}
+        showMsg("P.E.R-minnet är rensat.","ok");
+      }else{
+        showMsg("Fel: "+(data.error||"Kunde inte rensa P.E.R-minnet."),"err");
+      }
+    }catch{
+      showMsg("Nätverksfel. Försök igen.","err");
+    }finally{
+      btn.disabled=false;btn.textContent=orig;
+    }
   });
 
   /* LOGOUT */
