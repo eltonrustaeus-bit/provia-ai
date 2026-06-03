@@ -122,12 +122,12 @@ export function buildPublicProviaKnowledge() {
   return `## PROVIA - FAKTA P.E.R FÅR CITERA
 
 Vad är ProviaAI?
-ProviaAI (proviaai.se) är en AI-driven studieapp för svenska elever. Den innehåller körkortsteori med ${questionCount} verifierade frågor, AI-genererade mockprov från eget material, förbättringssida med AI-coach, felbank, lärarrapport, OCR och P.E.R.
+ProviaAI (proviaai.se) är en AI-driven studieapp för svenska elever. Provia stödjer både skolarbete/skolämnen och körkortsteori. Elever kan använda eget material eller OCR för att skapa AI-genererade mockprov, få rättning, feedback, modellsvar, förbättringssida med AI-coach, felbank, lärarrapport och P.E.R. Körkortsteorin är en egen del med ${questionCount} verifierade frågor.
 
 Sidor:
 - Startsida: översikt, demo och launcher.
+- Mockprov/skolarbete: eget skolmaterial eller OCR -> AI genererar prov -> rättning med feedback och modellsvar.
 - Körkortsteorin: ${questionCount} frågor, kategorier, adaptivt lärande, SRS/repetition och simulerat teoriprov.
-- Mockprov: eget material eller OCR -> AI genererar prov -> rättning med feedback och modellsvar.
 - Förbättring: historik, felbank, P.E.R-tips, lärarrapport, träningsläge och personlig studieplan.
 - Mitt konto: plan, uppgradering, Stripe-portal, avsluta abonnemang och logga ut.
 - Priser: jämför Gratis, Basic och Premium.
