@@ -1,7 +1,9 @@
 """Upload new questions (ID >= 391) to Supabase driving_questions table."""
-import json, urllib.request, sys
+import json, os, urllib.request, sys
 
-KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDMzNzA4NCwiZXhwIjoyMDg1OTEzMDg0fQ.Fn-8x3vlgyU8OP6D5Cz1jiA7qSjqnXV5Wx-hR3nl5cc"
+KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+if not KEY:
+    raise RuntimeError("Missing SUPABASE_SERVICE_ROLE_KEY")
 URL = "https://mnmotdluigzeehdjbhbu.supabase.co/rest/v1/driving_questions"
 HEADERS = {
     "apikey": KEY,

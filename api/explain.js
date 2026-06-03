@@ -1,8 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import { callAI, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt } from "./_per-core.js";
-import { SALES_TRIGGER_REGEX } from "./_provia-kb.js";
-import { loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
+import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
+import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
+import { getFeatureLimit, normalizeRole } from "./_provia-rules.js";
+import { buildPERContextPack } from "./_per-context.js";
 
 const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
 const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
@@ -14,12 +16,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PER_LIMITS = {
-  gratis:  { cap: 5,  period: "week"  },
-  basic:   { cap: 5,  period: "day"   },
-  // premium: no cap — unlimited
-};
-
 function currentPeriodKey(period) {
   const now = new Date();
   if (period === "day") return now.toISOString().slice(0, 10);
@@ -30,46 +26,6 @@ function currentPeriodKey(period) {
 
 function sanitize(str, maxLen) {
   return typeof str === "string" ? str.slice(0, maxLen) : "";
-}
-
-function sanitizePageContext(pc) {
-  if (!pc || typeof pc !== 'object') return null;
-  const out = {};
-  if (typeof pc.page === 'string') out.page = pc.page.slice(0, 50);
-
-  if (pc.currentQuestion && typeof pc.currentQuestion === 'object') {
-    out.currentQuestion = {
-      number: typeof pc.currentQuestion.number === 'number' ? pc.currentQuestion.number : undefined,
-      text: sanitize(String(pc.currentQuestion.text || ''), 500),
-      options: Array.isArray(pc.currentQuestion.options)
-        ? pc.currentQuestion.options.slice(0, 6).map(o => sanitize(String(o), 100))
-        : undefined,
-      category: typeof pc.currentQuestion.category === 'string'
-        ? pc.currentQuestion.category.slice(0, 80) : undefined,
-    };
-  }
-
-  if (Array.isArray(pc.questions)) {
-    out.questions = pc.questions.slice(0, 20).map(q => ({
-      number: typeof q.number === 'number' ? q.number : undefined,
-      text: sanitize(String(q.text || ''), 300),
-      type: typeof q.type === 'string' ? q.type.slice(0, 10) : undefined,
-      options: Array.isArray(q.options)
-        ? q.options.slice(0, 6).map(o => sanitize(String(o), 80))
-        : undefined,
-    }));
-  }
-
-  if (typeof pc.userScore === 'number' && Number.isFinite(pc.userScore)) {
-    out.userScore = Math.max(0, Math.min(1, pc.userScore));
-  }
-  if (pc.examState && typeof pc.examState === 'object') {
-    out.examState = {
-      answered: typeof pc.examState.answered === 'number' ? pc.examState.answered : undefined,
-      remaining: typeof pc.examState.remaining === 'number' ? pc.examState.remaining : undefined,
-    };
-  }
-  return out;
 }
 
 async function loadPerHistory(userId) {
@@ -159,11 +115,11 @@ export default async function handler(req, res) {
 
     if (profErr) return res.status(500).json({ error: "DB error" });
 
-    const role = String(prof?.role || "gratis");
+    const role = normalizeRole(prof?.role);
 
     let quotaRemaining = null;
-    const cfg = PER_LIMITS[role];
-    if (cfg) {
+    const cfg = getFeatureLimit(role, "perChat");
+    if (cfg.cap !== Infinity) {
       const key = currentPeriodKey(cfg.period);
       const storedKey = prof?.per_quota_period || "";
       const count = storedKey === key ? (prof?.per_quota_count || 0) : 0;
@@ -187,8 +143,6 @@ export default async function handler(req, res) {
     const weakAreas    = rawAreas.slice(0, 10).map(a => sanitize(String(a), 80));
     const helpLevel    = (typeof body.helpLevel === 'number' && Number.isFinite(body.helpLevel))
       ? Math.min(3, Math.max(0, Math.floor(body.helpLevel))) : 0;
-    const pageContext  = sanitizePageContext(body.pageContext);
-
     const rawHist = Array.isArray(body.history) ? body.history : [];
     const history = rawHist
       .filter(m => m && (m.role === "user" || m.role === "assistant"))
@@ -202,8 +156,26 @@ export default async function handler(req, res) {
       category: sanitize(String(m.category || m.course || ''), 60),
     }));
 
+    const contextPack = buildPERContextPack({
+      rawPageContext: body.pageContext,
+      topic,
+      context,
+      weakAreas,
+      recentMistakes,
+    });
+    const pageContext = contextPack.pageContext;
+    const learningSignals = buildLearningSignals({
+      weakAreas: contextPack.weakAreas,
+      recentMistakes: contextPack.recentMistakes,
+      pageContext,
+    });
+
     // Intent, mood, mode detection
-    const intent      = SALES_TRIGGER_REGEX.test(userQuestion) ? 'sales' : 'study';
+    const intent      = SUPPORT_TRIGGER_REGEX.test(userQuestion)
+      ? 'support'
+      : SALES_TRIGGER_REGEX.test(userQuestion)
+        ? 'sales'
+        : 'study';
     const mood        = FRUSTRATION_REGEX.test(userQuestion) ? 'frustrated' : 'normal';
     const feynman     = FEYNMAN_REGEX.test(userQuestion) || body.mode === 'feynman';
     const quiz        = QUIZ_REGEX.test(userQuestion) || body.mode === 'quiz';
@@ -212,6 +184,7 @@ export default async function handler(req, res) {
     const ctxParts = [];
     if (topic) ctxParts.push(`Aktuellt ämne: ${topic}`);
     if (context) ctxParts.push(context);
+    if (contextPack.summary) ctxParts.push(`Prioriterad sidkontext:\n${contextPack.summary}`);
 
     const longMemory = await loadLongMemory(supabase, user.id);
 
@@ -222,7 +195,7 @@ export default async function handler(req, res) {
 
     const systemContent = buildPERSystemPrompt({
       context: ctxParts.join('\n'),
-      weakAreas,
+      weakAreas: contextPack.weakAreas,
       role,
       helpLevel,
       pageContext,
@@ -232,7 +205,7 @@ export default async function handler(req, res) {
       quiz,
       celebrating,
       quotaRemaining,
-      recentMistakes,
+      recentMistakes: contextPack.recentMistakes,
       longMemory,
       studentName,
     });
@@ -293,7 +266,7 @@ export default async function handler(req, res) {
         { role: 'assistant', content: fullText },
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
-      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI).catch(() => {});
+      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
 
       res.write(`data: ${JSON.stringify({ done: true, history: newHistory })}\n\n`);
       return res.end();
@@ -309,7 +282,7 @@ export default async function handler(req, res) {
         { role: "assistant", content: answer },
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
-      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI).catch(() => {});
+      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
       return res.json({ answer, history: newHistory });
     } catch (err) {
       return res.status(500).json({ error: err.message || "AI error" });

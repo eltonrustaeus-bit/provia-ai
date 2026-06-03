@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
+import { currentPeriodKey, getEntitlementSnapshot, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
+import { clearLongMemory } from "./_per-memory.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,6 +27,29 @@ export default async function handler(req, res) {
   if (!user) return;
 
   const action = req.body?.action;
+
+  if (action === "entitlements") {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) return res.status(500).json({ error: "Role lookup failed" });
+      const role = normalizeRole(data?.role);
+      return res.status(200).json({ ok: true, entitlements: getEntitlementSnapshot(role) });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  if (action === "per_memory_clear") {
+    const ok = await clearLongMemory(supabase, user.id);
+    return ok
+      ? res.status(200).json({ ok: true })
+      : res.status(500).json({ ok: false, error: "Memory clear failed" });
+  }
 
   // Save korkortet progress
   if (action === "kk_save") {
@@ -54,8 +79,6 @@ export default async function handler(req, res) {
 
   // Server-side korkortet quota check + bump
   if (action === "bump_kk") {
-    // gratis = 2/week, basic = 30/month, premium+ = unlimited
-    const KK_LIMITS = { gratis: { cap: 2, period: "week" }, basic: { cap: 30, period: "month" } };
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -65,15 +88,12 @@ export default async function handler(req, res) {
 
       if (error) return res.status(500).json({ error: "DB error" });
 
-      const role = String(data?.role || "gratis");
-      const cfg = KK_LIMITS[role];
+      const role = normalizeRole(data?.role);
+      const cfg = getFeatureLimit(role, "drivingTest");
 
-      if (!cfg) return res.status(200).json({ ok: true, count: 0, limit: Infinity });
+      if (cfg.cap === Infinity) return res.status(200).json({ ok: true, count: 0, limit: Infinity });
 
-      const now = new Date();
-      const periodKey = cfg.period === "month"
-        ? `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`
-        : `${now.getUTCFullYear()}-W${String(Math.ceil((((now - new Date(Date.UTC(now.getUTCFullYear(),0,1)))/86400000)+1)/7)).padStart(2,"0")}`;
+      const periodKey = currentPeriodKey(cfg.period);
 
       const storedKey = data?.kk_quota_week || "";
       const count = storedKey === periodKey ? (data?.kk_quota_count || 0) : 0;

@@ -1051,6 +1051,27 @@ async function postJson(path,payload){
   return{ok:resp.ok,status:resp.status,raw,data};
 }
 
+function applyServerEntitlements(entitlements){
+  if(!entitlements||typeof entitlements!=="object")return;
+  const role=String(entitlements.role||currentRole||"gratis");
+  const mock=entitlements.features&&entitlements.features.mockExam;
+  if(mock&&typeof mock==="object"){
+    ROLE_LIMITS[role]={
+      period: mock.period==="week"?"week":"month",
+      limit: mock.unlimited?Infinity:Number(mock.cap||0)
+    };
+  }
+  currentRole=role;
+  localStorage.setItem(LS_ROLE,currentRole);
+}
+
+async function refreshServerEntitlements(){
+  try{
+    const res=await postJson("/api/check-role",{action:"entitlements"});
+    if(res.ok&&res.data&&res.data.entitlements)applyServerEntitlements(res.data.entitlements);
+  }catch{}
+}
+
 async function saveExamToAccount({material,course,level,qType,exam,answers,result}){
   if(!db)return{ok:false,error:"Supabase not configured"};
   const userId=await getUserId(); if(!userId)return{ok:false,error:"Not logged in"};
@@ -1279,6 +1300,7 @@ async function checkApprovalAndUnlock(session){
     currentRole = prof.role || "gratis";
   }
   localStorage.setItem(LS_ROLE, currentRole);
+  await refreshServerEntitlements();
   setLockError("");
   hideLock();
   if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
@@ -1619,11 +1641,19 @@ try{
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload);
-    if(res.status===429&&res.data){setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();return;}
+    if(res.status===429&&res.data){
+      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
+      setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();return;
+    }
     if(!res.ok||!res.data||!res.data.ok){setBusy(false);setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);return;}
+    if(res.data.meta&&res.data.meta.entitlements)applyServerEntitlements(res.data.meta.entitlements);
 
-    // Räkna upp quota lokalt vid lyckat svar
-    await bumpQuotaCount();
+    // Servern är auktoritativ när persisted quota är aktiv; localStorage används bara för UI-visning/fallback.
+    if(res.data.meta&&res.data.meta.quota&&res.data.meta.quota.enforced&&typeof res.data.meta.quota.count==="number"){
+      localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.meta.quota.count));
+    }else{
+      await bumpQuotaCount();
+    }
     await refreshQuotaUi();
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
