@@ -1,7 +1,7 @@
 {
   "metadata": {
     "total_questions": 348,
-    "last_updated": "2026-06-04",
+    "last_updated": "2026-06-05",
     "validation_status": "TEXT_POLISHED_NEEDS_EXPERT_SPOTCHECK",
     "sources": [
       "scripts/questions.json",
@@ -32,7 +32,7 @@
       "text_questions_kept": 199,
       "local_svg_images_created": 68
     },
-    "active_questions": 348,
+    "active_questions": 343,
     "blocked_questions": 0,
     "blocked_image_statuses": [
       "ai_generated",
@@ -72,7 +72,14 @@
       "duplicate_question_text_policy": "verified road-sign questions use varied natural Swedish templates without sign codes in question text"
     },
     "total": 374,
-    "lastUpdated": "2026-06-05"
+    "lastUpdated": "2026-06-05",
+    "sign_dedup": {
+      "run_at": "2026-06-05T10:28:31.610Z",
+      "dup_groups_fixed": 21,
+      "questions_removed": 31,
+      "questions_rewritten": 25,
+      "no_code_image_questions": 0
+    }
   },
   "questions": [
     {
@@ -80,7 +87,7 @@
       "category": "Vägmärken",
       "subcategory": "Väjning och stopp",
       "question_type": "image",
-      "question": "Du kommer fram till en korsning med märket på bilden. Vad betyder vägmärket?",
+      "question": "Hur påverkar detta märke din företrädesrätt?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
       "image_description": "Svenskt vägmärke B1: Väjningsplikt.",
       "option_a": "Stopplikt",
@@ -132,7 +139,7 @@
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken",
       "question_type": "image",
-      "question": "Du kommer fram till en plats där en blå pil visar tillåten färdväg. Vad betyder vägmärket?",
+      "question": "Vilket krav ställer detta märke på din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
       "image_description": "Svenskt vägmärke D1: Påbjuden körriktning.",
       "option_a": "Påbjuden cykelbana",
@@ -184,7 +191,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du kör mot en korsning där spårvagnstrafik kan förekomma. Vad betyder vägmärket?",
+      "question": "Vilket beteende kräver detta varningsmärke av dig som förare?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Sweden_road_sign_A37.svg/330px-Sweden_road_sign_A37.svg.png",
       "image_description": "Svenskt vägmärke A37: Varning för korsning med spårväg.",
       "option_a": "Varning för vägarbete",
@@ -242,7 +249,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du närmar dig en plats där skidåkare eller kabinbana kan förekomma. Vad betyder vägmärket?",
+      "question": "Du ser detta märke vid sidan av vägen. Vad innebär det för din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
       "image_description": "Svenskt vägmärke A17: Varning för skid- eller kabinbana.",
       "option_a": "Varning för skid- eller kabinbana",
@@ -299,7 +306,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du letar efter en plats att parkera och ser märket på bilden. Vad betyder vägmärket?",
+      "question": "Vad innebär det att du kör förbi detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
       "image_description": "Svenskt vägmärke E19: Parkering.",
       "option_a": "Motorväg upphör",
@@ -401,7 +408,7 @@
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Du lämnar en motorvägssträcka och ser märket på bilden. Vad betyder vägmärket?",
+      "question": "Vad gäller omedelbart efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
       "image_description": "Svenskt vägmärke E2: Motorväg upphör.",
       "option_a": "Motortrafikled",
@@ -2582,7 +2589,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du kommer fram till en korsning där märket på bilden sitter före korsningen. Vad betyder vägmärket?",
+      "question": "Vad kräver detta märke av dig i korsningen?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_B2.svg/330px-Sweden_road_sign_B2.svg.png",
       "image_description": "Svenskt vägmärke B2: Stopplikt.",
       "option_a": "Väjningsplikt",
@@ -2634,7 +2641,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du kör in på en väg där märket på bilden sitter vid början av sträckan. Vad betyder vägmärket?",
+      "question": "Hur påverkar detta märke din företrädesrätt?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_B4.svg/330px-Sweden_road_sign_B4.svg.png",
       "image_description": "Svenskt vägmärke B4: Huvudled.",
       "option_a": "Väjningsplikt",
@@ -2692,7 +2699,7 @@
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
       "question_type": "image",
-      "question": "Du ser märket vid en infart från ditt håll. Vad betyder vägmärket?",
+      "question": "Vilket förbud gäller på en väg med detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Sweden_road_sign_C1.svg/330px-Sweden_road_sign_C1.svg.png",
       "image_description": "Svenskt vägmärke C1: Förbud mot infart med fordon.",
       "option_a": "Förbud mot infart med fordon",
@@ -2744,69 +2751,11 @@
       "imageDescription": "Svenskt vägmärke C1: Förbud mot infart med fordon."
     },
     {
-      "id": 77,
-      "category": "Vägmärken",
-      "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "image",
-      "question": "Du lämnar en motorvägssträcka och ser märket på bilden. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
-      "image_description": "Svenskt vägmärke E2: Motorväg upphör.",
-      "option_a": "Motortrafikled",
-      "option_b": "Motorväg upphör",
-      "option_c": "Gågata",
-      "option_d": "Parkering",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder motorväg upphör. Motorvägen upphör och du ska anpassa körningen till de regler som gäller efter märket. Lagrum: VMF E2.",
-      "law_reference": "VMF E2",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ PASS",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E2",
-        "expected_sign": "Motorvag upphor",
-        "audit_issues": [
-          "missing required concept: motorvag upphor | lamnar motorvag",
-          "forbidden concept in correct path: huvudled",
-          "forbidden concept in correct path: forkorsratt"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motortrafikled",
-        "B": "Motorväg upphör",
-        "C": "Gågata",
-        "D": "Parkering"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Motorväg upphör",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.501Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motorväg upphör",
-      "imageDescription": "Svenskt vägmärke E2: Motorväg upphör."
-    },
-    {
       "id": 78,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
       "question_type": "image",
-      "question": "Du kör mot en passage där fordonsbredden är begränsad. Vad betyder vägmärket?",
+      "question": "Vad är du som förare begränsad till vid detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sweden_road_sign_C16.svg/330px-Sweden_road_sign_C16.svg.png",
       "image_description": "Svenskt vägmärke C16: Begränsad fordonsbredd.",
       "option_a": "Förbud mot trafik med fordon",
@@ -2863,7 +2812,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du närmar dig en järnvägskorsning med bommar. Vad betyder vägmärket?",
+      "question": "Du ser detta märke vid sidan av vägen. Vad innebär det för din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Sweden_road_sign_A35.svg/330px-Sweden_road_sign_A35.svg.png",
       "image_description": "Svenskt vägmärke A35: Varning för järnvägskorsning med bommar.",
       "option_a": "Varning för vägarbete",
@@ -2919,7 +2868,7 @@
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Du kör in på en väg som anges med märket på bilden. Vad betyder vägmärket?",
+      "question": "Vad anger detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
       "image_description": "Svenskt vägmärke E3: Motortrafikled.",
       "option_a": "Motortrafikled",
@@ -2976,7 +2925,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du kommer fram mot en sträcka med arbete på eller vid vägen. Vad betyder vägmärket?",
+      "question": "Du ser detta märke vid sidan av vägen. Vad innebär det för din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
       "image_description": "Svenskt vägmärke A20: Varning för vägarbete.",
       "option_a": "Varning för barn",
@@ -3033,7 +2982,7 @@
       "category": "Vägmärken",
       "subcategory": "Anvisnings- och upplysningsskylt",
       "question_type": "image",
-      "question": "Du ser märket vid en plats avsedd för taxitrafik. Vad betyder vägmärket?",
+      "question": "Vad gäller efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Sweden_road_sign_E23.svg/330px-Sweden_road_sign_E23.svg.png",
       "image_description": "Svenskt vägmärke E23: Taxi.",
       "option_a": "Motorväg upphör",
@@ -3090,7 +3039,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du närmar dig en plats där gående kan korsa vägen. Vad betyder vägmärket?",
+      "question": "Vilket beteende kräver detta varningsmärke av dig som förare?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
       "image_description": "Svenskt vägmärke A13: Varning för övergångsställe.",
       "option_a": "Varning för vägarbete",
@@ -5143,63 +5092,11 @@
       }
     },
     {
-      "id": 143,
-      "category": "Vägmärken",
-      "subcategory": "Påbudsmärken",
-      "question_type": "image",
-      "question": "Du kommer fram till en plats där en blå pil visar tillåten färdväg. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-      "image_description": "Svenskt vägmärke D1: Påbjuden körriktning.",
-      "option_a": "Påbjuden cykelbana",
-      "option_b": "Påbjuden cirkulationsplats",
-      "option_c": "Påbjudet körfält för fordon i linjetrafik",
-      "option_d": "Påbjuden körriktning",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder påbjuden körriktning. Du måste köra i den riktning pilen visar. Lagrum: VMF D1.",
-      "law_reference": "TF 3 kap 14§",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "✅ APPROVED",
-        "road_sign_code": "D1",
-        "expected_sign": "Pabjuden korbana"
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Påbjuden cykelbana",
-        "B": "Påbjuden cirkulationsplats",
-        "C": "Påbjudet körfält för fordon i linjetrafik",
-        "D": "Påbjuden körriktning"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Påbjuden körriktning",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T18:58:56.132Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image"
-        ],
-        "note": "D1-3 image and mandatory straight-ahead answer match."
-      },
-      "image_alt": "Påbjuden körriktning",
-      "imageDescription": "Svenskt vägmärke D1: Påbjuden körriktning."
-    },
-    {
       "id": 144,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vad betyder vägmärket?",
+      "question": "Vad innebär detta förbudsmärke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
       "image_description": "Svenskt vägmärke C2: Förbud mot trafik med fordon.",
       "option_a": "Förbud mot trafik med fordon",
@@ -5256,7 +5153,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du kör i ett område där barn ofta rör sig nära vägen. Vad betyder vägmärket?",
+      "question": "Vad varnar detta märke dig för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
       "image_description": "Svenskt vägmärke A15: Varning för barn.",
       "option_a": "Varning för vägarbete",
@@ -5309,63 +5206,6 @@
       },
       "image_alt": "Varning för barn",
       "imageDescription": "Svenskt vägmärke A15: Varning för barn."
-    },
-    {
-      "id": 146,
-      "category": "Vägmärken",
-      "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "image",
-      "question": "Du kör in på en väg som anges med märket på bilden. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "image_description": "Svenskt vägmärke E3: Motortrafikled.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Gågata",
-      "option_c": "Motortrafikled",
-      "option_d": "Parkering",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder motortrafikled. Vägen är motortrafikled. Lagrum: VMF E3.",
-      "law_reference": "VMF E3",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E3",
-        "expected_sign": "Motortrafikled",
-        "audit_issues": [
-          "missing required concept: motortrafikled",
-          "forbidden concept in correct path: motorvag borjar"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Gågata",
-        "C": "Motortrafikled",
-        "D": "Parkering"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Motortrafikled",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motortrafikled",
-      "imageDescription": "Svenskt vägmärke E3: Motortrafikled."
     },
     {
       "id": 147,
@@ -5428,7 +5268,7 @@
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken",
       "question_type": "image",
-      "question": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vad betyder vägmärket?",
+      "question": "Vad innebär detta förbudsmärke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
       "image_description": "Svenskt vägmärke C35: Förbud mot att parkera fordon.",
       "option_a": "Förbud mot att parkera fordon",
@@ -5480,7 +5320,7 @@
       "category": "Vägmärken",
       "subcategory": "Vägmärken – övrigt",
       "question_type": "image",
-      "question": "Du ser ett blått märke som rekommenderar en lägre hastighet. Vad betyder vägmärket?",
+      "question": "Vad gäller efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.svg/330px-Sweden_road_sign_E11.svg.png",
       "image_description": "Svenskt vägmärke E11: Rekommenderad lägre hastighet.",
       "option_a": "Motorväg upphör",
@@ -5532,120 +5372,6 @@
       },
       "image_alt": "Rekommenderad lägre hastighet",
       "imageDescription": "Svenskt vägmärke E11: Rekommenderad lägre hastighet."
-    },
-    {
-      "id": 150,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du närmar dig en plats där skidåkare eller kabinbana kan förekomma. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
-      "image_description": "Svenskt vägmärke A17: Varning för skid- eller kabinbana.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för skid- eller kabinbana",
-      "option_d": "Varning för farlig kurva",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder varning för skid- eller kabinbana. Du ska vara uppmärksam på skidåkare eller kabinbana i närheten. Lagrum: VMF A17.",
-      "law_reference": "VMF A17",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A17",
-        "expected_sign": "Varning for skid- eller kabrant",
-        "audit_issues": [
-          "missing required concept: skid | kab | sittlift | lift",
-          "forbidden concept in correct path: okand fara"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för skid- eller kabinbana",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Varning för skid- eller kabinbana",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för skid- eller kabinbana",
-      "imageDescription": "Svenskt vägmärke A17: Varning för skid- eller kabinbana."
-    },
-    {
-      "id": 152,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du lämnar en motorvägssträcka och ser märket på bilden. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
-      "image_description": "Svenskt vägmärke E2: Motorväg upphör.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Gågata",
-      "option_d": "Parkering",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder motorväg upphör. Motorvägen upphör och du ska anpassa körningen till de regler som gäller efter märket. Lagrum: VMF E2.",
-      "law_reference": "VMF E2",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E2",
-        "expected_sign": "Motorvag upphor",
-        "audit_issues": [
-          "missing required concept: motorvag upphor | lamnar motorvag",
-          "forbidden concept in correct path: forkorsratt"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Gågata",
-        "D": "Parkering"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Motorväg upphör",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motorväg upphör",
-      "imageDescription": "Svenskt vägmärke E2: Motorväg upphör."
     },
     {
       "id": 153,
@@ -5706,125 +5432,11 @@
       "imageDescription": "Svenskt vägmärke A9: Varning för farthinder."
     },
     {
-      "id": 154,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "image_description": "Svenskt vägmärke C2: Förbud mot trafik med fordon.",
-      "option_a": "Förbud mot infart med fordon",
-      "option_b": "Förbud mot att parkera fordon",
-      "option_c": "Förbud mot trafik med fordon",
-      "option_d": "Hastighetsbegränsning",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder förbud mot trafik med fordon. Du får inte köra in på vägen eftersom trafik med fordon är förbjuden. Lagrum: VMF C2.",
-      "law_reference": "VMF C2",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C2",
-        "expected_sign": "Forbud mot trafik med fordon",
-        "audit_issues": [
-          "missing required concept: forbud mot trafik | alla fordon",
-          "forbidden concept in correct path: forbud mot infart"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot infart med fordon",
-        "B": "Förbud mot att parkera fordon",
-        "C": "Förbud mot trafik med fordon",
-        "D": "Hastighetsbegränsning"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot trafik med fordon",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot trafik med fordon",
-      "imageDescription": "Svenskt vägmärke C2: Förbud mot trafik med fordon."
-    },
-    {
-      "id": 155,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du kommer fram mot en sträcka med arbete på eller vid vägen. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
-      "image_description": "Svenskt vägmärke A20: Varning för vägarbete.",
-      "option_a": "Varning för barn",
-      "option_b": "Varning för farlig kurva",
-      "option_c": "Varning för övergångsställe",
-      "option_d": "Varning för vägarbete",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder varning för vägarbete. Du ska anpassa farten och vara beredd på vägarbetare, hinder och ändrad vägledning. Lagrum: VMF A20.",
-      "law_reference": "VMF A20",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A20",
-        "expected_sign": "Varning for vagarbete",
-        "audit_issues": [
-          "missing required concept: vagarbete | arbete",
-          "forbidden concept in correct path: gangtrafikant"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för barn",
-        "B": "Varning för farlig kurva",
-        "C": "Varning för övergångsställe",
-        "D": "Varning för vägarbete"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Varning för vägarbete",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för vägarbete",
-      "imageDescription": "Svenskt vägmärke A20: Varning för vägarbete."
-    },
-    {
       "id": 156,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken",
       "question_type": "image",
-      "question": "Du passerar märket när en motortrafikled tar slut. Vad betyder vägmärket?",
+      "question": "Vad gäller omedelbart efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
       "image_description": "Svenskt vägmärke E4: Motortrafikled upphör.",
       "option_a": "Motortrafikled upphör",
@@ -9674,128 +9286,11 @@
       "imageDescription": "Svenskt vägmärke A6: Varning för bro."
     },
     {
-      "id": 355,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – vägyta",
-      "question_type": "image",
-      "question": "Du närmar dig en plats där gående kan korsa vägen. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
-      "image_description": "Svenskt vägmärke A13: Varning för övergångsställe.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för farlig kurva",
-      "option_d": "Varning för övergångsställe",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder varning för övergångsställe. Du ska vara beredd på ett övergångsställe och på gående som kan korsa vägen. Lagrum: VMF A13.",
-      "law_reference": "VMF A13",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A13",
-        "expected_sign": "Varning for overgangsstalle",
-        "audit_issues": [
-          "missing required concept: overgangsstalle | gangtrafikant | fotgangare",
-          "forbidden concept in correct path: ojamn vag",
-          "forbidden concept in correct path: studsande",
-          "forbidden concept in question metadata/text: studsande"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för farlig kurva",
-        "D": "Varning för övergångsställe"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Varning för övergångsställe",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för övergångsställe",
-      "imageDescription": "Svenskt vägmärke A13: Varning för övergångsställe."
-    },
-    {
-      "id": 356,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – väglag",
-      "question_type": "image",
-      "question": "Du kör i ett område där barn ofta rör sig nära vägen. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
-      "image_description": "Svenskt vägmärke A15: Varning för barn.",
-      "option_a": "Varning för barn",
-      "option_b": "Varning för vägarbete",
-      "option_c": "Varning för farlig kurva",
-      "option_d": "Varning för övergångsställe",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder varning för barn. Du ska vara extra uppmärksam på barn och anpassa farten. Lagrum: VMF A15.",
-      "law_reference": "VMF A15",
-      "difficulty": "hard",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A15",
-        "expected_sign": "Varning for barn",
-        "audit_issues": [
-          "missing required concept: barn | skola | forskol",
-          "forbidden concept in correct path: vaglag",
-          "forbidden concept in question metadata/text: vaglag"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för barn",
-        "B": "Varning för vägarbete",
-        "C": "Varning för farlig kurva",
-        "D": "Varning för övergångsställe"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Varning för barn",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för barn",
-      "imageDescription": "Svenskt vägmärke A15: Varning för barn."
-    },
-    {
       "id": 357,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – trafikanter",
       "question_type": "image",
-      "question": "Du passerar märket i slutet av en vägarbetssträcka. Vad betyder vägmärket?",
+      "question": "Vad gäller omedelbart efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_A21.svg/330px-Sweden_road_sign_A21.svg.png",
       "image_description": "Svenskt vägmärke A21: Slut på sträcka med vägarbete.",
       "option_a": "Varning för vägarbete",
@@ -9909,7 +9404,7 @@
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – djur",
       "question_type": "image",
-      "question": "Du kör på en öppen sträcka där sidvind kan påverka bilen. Vad betyder vägmärket?",
+      "question": "Vad varnar detta märke dig för?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
       "image_description": "Svenskt vägmärke A24: Varning för sidvind.",
       "option_a": "Varning för vägarbete",
@@ -10081,70 +9576,11 @@
       "imageDescription": "Svenskt vägmärke A31: Varning för långsamtgående fordon."
     },
     {
-      "id": 362,
-      "category": "Vägmärken",
-      "subcategory": "Väjnings- och stopplikt",
-      "question_type": "image",
-      "question": "Du kör in på en väg där märket på bilden sitter vid början av sträckan. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_B4.svg/330px-Sweden_road_sign_B4.svg.png",
-      "image_description": "Svenskt vägmärke B4: Huvudled.",
-      "option_a": "Väjningsplikt",
-      "option_b": "Stopplikt",
-      "option_c": "Huvudled",
-      "option_d": "Mötande trafik har väjningsplikt",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder huvudled. Du kör på huvudled, men ska fortfarande anpassa körningen och vara uppmärksam. Lagrum: VMF B4.",
-      "law_reference": "VMF B4",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ PASS",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "B4",
-        "expected_sign": "Huvudled",
-        "audit_issues": [
-          "missing required concept: huvudled | forkorsratt",
-          "forbidden concept in correct path: motande",
-          "forbidden concept in correct path: stopplikt",
-          "forbidden concept in question metadata/text: stopplikt"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Väjningsplikt",
-        "B": "Stopplikt",
-        "C": "Huvudled",
-        "D": "Mötande trafik har väjningsplikt"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Huvudled",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_B4.svg/330px-Sweden_road_sign_B4.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Huvudled",
-      "imageDescription": "Svenskt vägmärke B4: Huvudled."
-    },
-    {
       "id": 363,
       "category": "Vägmärken",
       "subcategory": "Väjnings- och stopplikt",
       "question_type": "image",
-      "question": "Du passerar märket på bilden efter att ha kört på huvudled. Vad betyder vägmärket?",
+      "question": "Vad gäller omedelbart efter att du passerat detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Sweden_road_sign_B5.svg/330px-Sweden_road_sign_B5.svg.png",
       "image_description": "Svenskt vägmärke B5: Huvudled upphör.",
       "option_a": "Väjningsplikt",
@@ -10195,63 +9631,6 @@
       },
       "image_alt": "Huvudled upphör",
       "imageDescription": "Svenskt vägmärke B5: Huvudled upphör."
-    },
-    {
-      "id": 364,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – infart",
-      "question_type": "image",
-      "question": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "image_description": "Svenskt vägmärke C2: Förbud mot trafik med fordon.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot infart med fordon",
-      "option_c": "Förbud mot att parkera fordon",
-      "option_d": "Hastighetsbegränsning",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder förbud mot trafik med fordon. Du får inte köra in på vägen eftersom trafik med fordon är förbjuden. Lagrum: VMF C2.",
-      "law_reference": "VMF C2",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C2",
-        "expected_sign": "Forbud mot trafik med fordon",
-        "audit_issues": [
-          "missing required concept: forbud mot trafik | alla fordon",
-          "forbidden concept in correct path: forbud mot infart"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot infart med fordon",
-        "C": "Förbud mot att parkera fordon",
-        "D": "Hastighetsbegränsning"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot trafik med fordon",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot trafik med fordon",
-      "imageDescription": "Svenskt vägmärke C2: Förbud mot trafik med fordon."
     },
     {
       "id": 365,
@@ -10314,7 +9693,7 @@
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – fordonskategori",
       "question_type": "image",
-      "question": "Du ser märket vid en väg där tvåhjuliga motordrivna fordon begränsas. Vad betyder vägmärket?",
+      "question": "Vad innebär detta förbudsmärke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.svg/330px-Sweden_road_sign_C5.svg.png",
       "image_description": "Svenskt vägmärke C5: Förbud mot trafik med motorcykel och moped klass I.",
       "option_a": "Förbud mot trafik med fordon",
@@ -10372,7 +9751,7 @@
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – parkering",
       "question_type": "image",
-      "question": "Du ser märket vid en väg där mopedtrafik begränsas. Vad betyder vägmärket?",
+      "question": "Vad innebär detta förbudsmärke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.svg/330px-Sweden_road_sign_C11.svg.png",
       "image_description": "Svenskt vägmärke C11: Förbud mot trafik med moped klass II.",
       "option_a": "Förbud mot trafik med fordon",
@@ -10479,62 +9858,6 @@
       "imageDescription": "Svenskt vägmärke C31: Hastighetsbegränsning."
     },
     {
-      "id": 369,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – omkörning",
-      "question_type": "image",
-      "question": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "image_description": "Svenskt vägmärke C35: Förbud mot att parkera fordon.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot att parkera fordon",
-      "option_c": "Förbud mot infart med fordon",
-      "option_d": "Hastighetsbegränsning",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder förbud mot att parkera fordon. Du får inte parkera på den sida där märket gäller. Lagrum: VMF C35.",
-      "law_reference": "VMF C35",
-      "difficulty": "normal",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C35",
-        "expected_sign": "Forbud mot att parkera fordon",
-        "audit_issues": [
-          "missing required concept: parkering forbjuden | far inte parkera"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot att parkera fordon",
-        "C": "Förbud mot infart med fordon",
-        "D": "Hastighetsbegränsning"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot att parkera fordon",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:11:58.617Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot att parkera fordon",
-      "imageDescription": "Svenskt vägmärke C35: Förbud mot att parkera fordon."
-    },
-    {
       "id": 370,
       "category": "Vägmärken",
       "subcategory": "Förbudsmärken – omkörning",
@@ -10597,7 +9920,7 @@
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken – cirkulationsplats",
       "question_type": "image",
-      "question": "Du ser märket ovanför eller vid ett körfält för linjetrafik. Vad betyder vägmärket?",
+      "question": "Vilket krav ställer detta märke på din körning?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.svg/330px-Sweden_road_sign_D10.svg.png",
       "image_description": "Svenskt vägmärke D10: Påbjudet körfält för fordon i linjetrafik.",
       "option_a": "Påbjuden cykelbana",
@@ -10707,123 +10030,11 @@
       "imageDescription": "Svenskt vägmärke D11: Slut på påbjuden bana, körfält, väg eller led."
     },
     {
-      "id": 373,
-      "category": "Vägmärken",
-      "subcategory": "Anvisningsmärken – motorväg",
-      "question_type": "image",
-      "question": "Du kör in på en väg som anges med märket på bilden. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "image_description": "Svenskt vägmärke E3: Motortrafikled.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Gågata",
-      "option_d": "Parkering",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder motortrafikled. Vägen är motortrafikled. Lagrum: VMF E3.",
-      "law_reference": "VMF E3",
-      "difficulty": "normal",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E3",
-        "expected_sign": "Motortrafikled",
-        "audit_issues": [
-          "missing required concept: motortrafikled"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Gågata",
-        "D": "Parkering"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Motortrafikled",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motortrafikled",
-      "imageDescription": "Svenskt vägmärke E3: Motortrafikled."
-    },
-    {
-      "id": 374,
-      "category": "Vägmärken",
-      "subcategory": "Anvisningsmärken – motortrafikled",
-      "question_type": "image",
-      "question": "Du passerar märket när en motortrafikled tar slut. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "image_description": "Svenskt vägmärke E4: Motortrafikled upphör.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Motortrafikled upphör",
-      "option_d": "Gågata",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder motortrafikled upphör. Motortrafikleden upphör. Lagrum: VMF E4.",
-      "law_reference": "VMF E4",
-      "difficulty": "hard",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E4",
-        "expected_sign": "Motortrafikled upphor",
-        "audit_issues": [
-          "missing required concept: motortrafikled upphor | slut pa motortrafikled"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Motortrafikled upphör",
-        "D": "Gågata"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Motortrafikled upphör",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motortrafikled upphör",
-      "imageDescription": "Svenskt vägmärke E4: Motortrafikled upphör."
-    },
-    {
       "id": 375,
       "category": "Vägmärken",
       "subcategory": "Anvisningsmärken – gångfartsområde",
       "question_type": "image",
-      "question": "Du kör fram mot en gata där gående har en särskild ställning. Vad betyder vägmärket?",
+      "question": "Vad innebär det att du kör förbi detta märke?",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sweden_road_sign_E7.svg/330px-Sweden_road_sign_E7.svg.png",
       "image_description": "Svenskt vägmärke E7: Gågata.",
       "option_a": "Motorväg upphör",
@@ -10936,67 +10147,6 @@
       "imageDescription": "Svenskt vägmärke A7: Varning för kaj."
     },
     {
-      "id": 377,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – vägyta",
-      "question_type": "image",
-      "question": "Du närmar dig en plats där gående kan korsa vägen. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
-      "image_description": "Svenskt vägmärke A13: Varning för övergångsställe.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för övergångsställe",
-      "option_c": "Varning för barn",
-      "option_d": "Varning för farlig kurva",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder varning för övergångsställe. Du ska vara beredd på ett övergångsställe och på gående som kan korsa vägen. Lagrum: VMF A13.",
-      "law_reference": "VMF A13",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A13",
-        "expected_sign": "Varning for overgangsstalle",
-        "audit_issues": [
-          "missing required concept: overgangsstalle | gangtrafikant | fotgangare",
-          "forbidden concept in correct path: ojamn vag",
-          "forbidden concept in correct path: studsande",
-          "forbidden concept in correct path: gupp",
-          "forbidden concept in correct path: potthal",
-          "forbidden concept in question metadata/text: studsande"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för övergångsställe",
-        "C": "Varning för barn",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Varning för övergångsställe",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för övergångsställe",
-      "imageDescription": "Svenskt vägmärke A13: Varning för övergångsställe."
-    },
-    {
       "id": 378,
       "category": "Vägmärken",
       "subcategory": "Varningsmärken – uppförsbacke",
@@ -11054,640 +10204,6 @@
       },
       "image_alt": "Varning för avsmalnande väg",
       "imageDescription": "Svenskt vägmärke A5: Varning för avsmalnande väg."
-    },
-    {
-      "id": 379,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – parkering med tilläggsskylt",
-      "question_type": "image",
-      "question": "Du ser märket vid en väg där mopedtrafik begränsas. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.svg/330px-Sweden_road_sign_C11.svg.png",
-      "image_description": "Svenskt vägmärke C11: Förbud mot trafik med moped klass II.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot infart med fordon",
-      "option_c": "Förbud mot att parkera fordon",
-      "option_d": "Förbud mot trafik med moped klass II",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder förbud mot trafik med moped klass ii. Förbudet gäller trafik med moped klass II. Lagrum: VMF C11.",
-      "law_reference": "VMF C11",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C11",
-        "expected_sign": "Forbud mot trafik med moped klass II",
-        "audit_issues": [
-          "missing required concept: moped klass ii",
-          "forbidden concept in correct path: parkering",
-          "forbidden concept in correct path: tillaggsskylt",
-          "forbidden concept in question metadata/text: parkering",
-          "forbidden concept in question metadata/text: tillaggsskylt"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot infart med fordon",
-        "C": "Förbud mot att parkera fordon",
-        "D": "Förbud mot trafik med moped klass II"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot trafik med moped klass II",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.svg/330px-Sweden_road_sign_C11.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot trafik med moped klass II",
-      "imageDescription": "Svenskt vägmärke C11: Förbud mot trafik med moped klass II."
-    },
-    {
-      "id": 380,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – djur",
-      "question_type": "image",
-      "question": "Du kör på en öppen sträcka där sidvind kan påverka bilen. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
-      "image_description": "Svenskt vägmärke A24: Varning för sidvind.",
-      "option_a": "Varning för sidvind",
-      "option_b": "Varning för vägarbete",
-      "option_c": "Varning för barn",
-      "option_d": "Varning för farlig kurva",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder varning för sidvind. Du ska hålla stadigt i ratten och vara beredd på kraftig sidvind. Lagrum: VMF A24.",
-      "law_reference": "VMF A24-1",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A24",
-        "expected_sign": "Varning for sidvind",
-        "audit_issues": [
-          "missing required concept: sidvind | vind",
-          "forbidden concept in correct path: alg",
-          "forbidden concept in correct path: djur",
-          "forbidden concept in question metadata/text: alg",
-          "forbidden concept in question metadata/text: djur"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för sidvind",
-        "B": "Varning för vägarbete",
-        "C": "Varning för barn",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Varning för sidvind",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för sidvind",
-      "imageDescription": "Svenskt vägmärke A24: Varning för sidvind."
-    },
-    {
-      "id": 381,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – omkörning",
-      "question_type": "image",
-      "question": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "image_description": "Svenskt vägmärke C35: Förbud mot att parkera fordon.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot att parkera fordon",
-      "option_c": "Förbud mot infart med fordon",
-      "option_d": "Hastighetsbegränsning",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder förbud mot att parkera fordon. Du får inte parkera på den sida där märket gäller. Lagrum: VMF C35.",
-      "law_reference": "VMF C35",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C35",
-        "expected_sign": "Forbud mot att parkera fordon",
-        "audit_issues": [
-          "missing required concept: parkering forbjuden | far inte parkera"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot att parkera fordon",
-        "C": "Förbud mot infart med fordon",
-        "D": "Hastighetsbegränsning"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot att parkera fordon",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:11:58.619Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot att parkera fordon",
-      "imageDescription": "Svenskt vägmärke C35: Förbud mot att parkera fordon."
-    },
-    {
-      "id": 382,
-      "category": "Vägmärken",
-      "subcategory": "Påbudsmärken – cirkulationsplats",
-      "question_type": "image",
-      "question": "Du ser märket ovanför eller vid ett körfält för linjetrafik. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.svg/330px-Sweden_road_sign_D10.svg.png",
-      "image_description": "Svenskt vägmärke D10: Påbjudet körfält för fordon i linjetrafik.",
-      "option_a": "Påbjuden cykelbana",
-      "option_b": "Påbjuden cirkulationsplats",
-      "option_c": "Påbjudet körfält för fordon i linjetrafik",
-      "option_d": "Påbjuden körriktning",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder påbjudet körfält för fordon i linjetrafik. Körfältet är påbjudet för fordon i linjetrafik. Lagrum: VMF D10.",
-      "law_reference": "VMF D10",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "D10",
-        "expected_sign": "Pabjudet korfalt for fordon i linjetrafik",
-        "audit_issues": [
-          "missing required concept: buss | linjetrafik | kollektivtrafik",
-          "forbidden concept in correct path: cirkulationsplats",
-          "forbidden concept in question metadata/text: cirkulationsplats"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Påbjuden cykelbana",
-        "B": "Påbjuden cirkulationsplats",
-        "C": "Påbjudet körfält för fordon i linjetrafik",
-        "D": "Påbjuden körriktning"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Påbjudet körfält för fordon i linjetrafik",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.svg/330px-Sweden_road_sign_D10.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Påbjudet körfält för fordon i linjetrafik",
-      "imageDescription": "Svenskt vägmärke D10: Påbjudet körfält för fordon i linjetrafik."
-    },
-    {
-      "id": 383,
-      "category": "Vägmärken",
-      "subcategory": "Anvisningsmärken – gångfartsområde",
-      "question_type": "image",
-      "question": "Du kör fram mot en gata där gående har en särskild ställning. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sweden_road_sign_E7.svg/330px-Sweden_road_sign_E7.svg.png",
-      "image_description": "Svenskt vägmärke E7: Gågata.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Parkering",
-      "option_d": "Gågata",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder gågata. Vägen är gågata och fordonstrafik är starkt begränsad. Lagrum: VMF E7.",
-      "law_reference": "VMF E7",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E7",
-        "expected_sign": "Gagata",
-        "audit_issues": [
-          "missing required concept: gagata",
-          "forbidden concept in correct path: gangfartsomrade",
-          "forbidden concept in question metadata/text: gangfartsomrade"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Parkering",
-        "D": "Gågata"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Gågata",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sweden_road_sign_E7.svg/330px-Sweden_road_sign_E7.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Gågata",
-      "imageDescription": "Svenskt vägmärke E7: Gågata."
-    },
-    {
-      "id": 384,
-      "category": "Vägmärken",
-      "subcategory": "Anvisningsmärken – motorväg",
-      "question_type": "image",
-      "question": "Du kör in på en väg som anges med märket på bilden. Hur ska du tolka märket?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "image_description": "Svenskt vägmärke E3: Motortrafikled.",
-      "option_a": "Motortrafikled",
-      "option_b": "Motorväg upphör",
-      "option_c": "Gågata",
-      "option_d": "Parkering",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder motortrafikled. Vägen är motortrafikled. Lagrum: VMF E3.",
-      "law_reference": "VMF E3",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E3",
-        "expected_sign": "Motortrafikled",
-        "audit_issues": [
-          "missing required concept: motortrafikled"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motortrafikled",
-        "B": "Motorväg upphör",
-        "C": "Gågata",
-        "D": "Parkering"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Motortrafikled",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motortrafikled",
-      "imageDescription": "Svenskt vägmärke E3: Motortrafikled."
-    },
-    {
-      "id": 385,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – väglag",
-      "question_type": "image",
-      "question": "Du kör i ett område där barn ofta rör sig nära vägen. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
-      "image_description": "Svenskt vägmärke A15: Varning för barn.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för farlig kurva",
-      "option_d": "Varning för övergångsställe",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder varning för barn. Du ska vara extra uppmärksam på barn och anpassa farten. Lagrum: VMF A15.",
-      "law_reference": "VMF A15",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A15",
-        "expected_sign": "Varning for barn",
-        "audit_issues": [
-          "missing required concept: barn | skola | forskol",
-          "forbidden concept in correct path: vaglag",
-          "forbidden concept in question metadata/text: vaglag"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för farlig kurva",
-        "D": "Varning för övergångsställe"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Varning för barn",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för barn",
-      "imageDescription": "Svenskt vägmärke A15: Varning för barn."
-    },
-    {
-      "id": 387,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – infart",
-      "question_type": "image",
-      "question": "Du ser märket vid början av en väg där fordonstrafik begränsas. Hur ska du tolka märket?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "image_description": "Svenskt vägmärke C2: Förbud mot trafik med fordon.",
-      "option_a": "Förbud mot infart med fordon",
-      "option_b": "Förbud mot att parkera fordon",
-      "option_c": "Hastighetsbegränsning",
-      "option_d": "Förbud mot trafik med fordon",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder förbud mot trafik med fordon. Du får inte köra in på vägen eftersom trafik med fordon är förbjuden. Lagrum: VMF C2.",
-      "law_reference": "VMF C2",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C2",
-        "expected_sign": "Forbud mot trafik med fordon",
-        "audit_issues": [
-          "missing required concept: forbud mot trafik | alla fordon"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot infart med fordon",
-        "B": "Förbud mot att parkera fordon",
-        "C": "Hastighetsbegränsning",
-        "D": "Förbud mot trafik med fordon"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot trafik med fordon",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot trafik med fordon",
-      "imageDescription": "Svenskt vägmärke C2: Förbud mot trafik med fordon."
-    },
-    {
-      "id": 388,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken – trafikanter",
-      "question_type": "image",
-      "question": "Du passerar märket i slutet av en vägarbetssträcka. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_A21.svg/330px-Sweden_road_sign_A21.svg.png",
-      "image_description": "Svenskt vägmärke A21: Slut på sträcka med vägarbete.",
-      "option_a": "Slut på sträcka med vägarbete",
-      "option_b": "Varning för vägarbete",
-      "option_c": "Varning för barn",
-      "option_d": "Varning för farlig kurva",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder slut på sträcka med vägarbete. Vägarbetssträckan upphör, men du ska fortsätta köra efter de märken och förhållanden som gäller. Lagrum: VMF A21.",
-      "law_reference": "VMF A21",
-      "difficulty": "hard",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A21",
-        "expected_sign": "Slut pa stracka med vagarbete",
-        "audit_issues": [
-          "missing required concept: slut | vagarbete",
-          "forbidden concept in correct path: cyklist"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Slut på sträcka med vägarbete",
-        "B": "Varning för vägarbete",
-        "C": "Varning för barn",
-        "D": "Varning för farlig kurva"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Slut på sträcka med vägarbete",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_A21.svg/330px-Sweden_road_sign_A21.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Slut på sträcka med vägarbete",
-      "imageDescription": "Svenskt vägmärke A21: Slut på sträcka med vägarbete."
-    },
-    {
-      "id": 389,
-      "category": "Vägmärken",
-      "subcategory": "Väjnings- och stopplikt",
-      "question_type": "image",
-      "question": "Du passerar märket på bilden efter att ha kört på huvudled. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Sweden_road_sign_B5.svg/330px-Sweden_road_sign_B5.svg.png",
-      "image_description": "Svenskt vägmärke B5: Huvudled upphör.",
-      "option_a": "Väjningsplikt",
-      "option_b": "Huvudled upphör",
-      "option_c": "Stopplikt",
-      "option_d": "Huvudled",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder huvudled upphör. Huvudleden upphör och därefter avgörs företrädet av andra märken eller grundregler. Lagrum: VMF B5.",
-      "law_reference": "VMF B5",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "B5",
-        "expected_sign": "Huvudled upphor",
-        "audit_issues": [
-          "missing required concept: huvudled upphor | upphor",
-          "forbidden concept in correct path: motande"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Väjningsplikt",
-        "B": "Huvudled upphör",
-        "C": "Stopplikt",
-        "D": "Huvudled"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Huvudled upphör",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Sweden_road_sign_B5.svg/330px-Sweden_road_sign_B5.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Huvudled upphör",
-      "imageDescription": "Svenskt vägmärke B5: Huvudled upphör."
-    },
-    {
-      "id": 390,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – fordonskategori",
-      "question_type": "image",
-      "question": "Du ser märket vid en väg där tvåhjuliga motordrivna fordon begränsas. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.svg/330px-Sweden_road_sign_C5.svg.png",
-      "image_description": "Svenskt vägmärke C5: Förbud mot trafik med motorcykel och moped klass I.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot infart med fordon",
-      "option_c": "Förbud mot trafik med motorcykel och moped klass I",
-      "option_d": "Förbud mot att parkera fordon",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder förbud mot trafik med motorcykel och moped klass i. Förbudet gäller motorcykel och moped klass I. Lagrum: VMF C5.",
-      "law_reference": "VMF C5",
-      "difficulty": "hard",
-      "commonly_failed": true,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ IMPROVED",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C5",
-        "expected_sign": "Forbud mot trafik med motorcykel och moped klass I",
-        "audit_issues": [
-          "missing required concept: motorcykel | moped klass i",
-          "forbidden concept in correct path: lastbil",
-          "forbidden concept in correct path: buss"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot infart med fordon",
-        "C": "Förbud mot trafik med motorcykel och moped klass I",
-        "D": "Förbud mot att parkera fordon"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Förbud mot trafik med motorcykel och moped klass I",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.svg/330px-Sweden_road_sign_C5.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Förbud mot trafik med motorcykel och moped klass I",
-      "imageDescription": "Svenskt vägmärke C5: Förbud mot trafik med motorcykel och moped klass I."
     },
     {
       "id": 500,
@@ -13899,174 +12415,6 @@
       "imageDescription": "Svenskt vägmärke C31: Hastighetsbegränsning."
     },
     {
-      "id": 554,
-      "category": "Vägmärken",
-      "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "image",
-      "question": "Du passerar märket när en motortrafikled tar slut. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "image_description": "Svenskt vägmärke E4: Motortrafikled upphör.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Motortrafikled upphör",
-      "option_d": "Gågata",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder motortrafikled upphör. Motortrafikleden upphör. Lagrum: VMF E4.",
-      "law_reference": "VMF E4",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E4",
-        "expected_sign": "Motortrafikled upphor",
-        "audit_issues": [
-          "missing required concept: motortrafikled upphor | slut pa motortrafikled",
-          "forbidden concept in correct path: avfart fran motorvag"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Motortrafikled upphör",
-        "D": "Gågata"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Motortrafikled upphör",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Motortrafikled upphör",
-      "imageDescription": "Svenskt vägmärke E4: Motortrafikled upphör."
-    },
-    {
-      "id": 555,
-      "category": "Vägmärken",
-      "subcategory": "Varningsmärken",
-      "question_type": "image",
-      "question": "Du kör på en öppen sträcka där sidvind kan påverka bilen. Vad gäller för dig som förare?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
-      "image_description": "Svenskt vägmärke A24: Varning för sidvind.",
-      "option_a": "Varning för vägarbete",
-      "option_b": "Varning för barn",
-      "option_c": "Varning för farlig kurva",
-      "option_d": "Varning för sidvind",
-      "correct": "D",
-      "explanation": "Rätt svar är D. Märket betyder varning för sidvind. Du ska hålla stadigt i ratten och vara beredd på kraftig sidvind. Lagrum: VMF A24.",
-      "law_reference": "VMF A24-1",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "A24",
-        "expected_sign": "Varning for sidvind",
-        "audit_issues": [
-          "missing required concept: sidvind | vind",
-          "forbidden concept in correct path: alg",
-          "forbidden concept in correct path: vilt",
-          "forbidden concept in correct path: djur"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Varning för vägarbete",
-        "B": "Varning för barn",
-        "C": "Varning för farlig kurva",
-        "D": "Varning för sidvind"
-      },
-      "correctAnswer": "D",
-      "requiresImage": true,
-      "expectedConcept": "Varning för sidvind",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Varning för sidvind",
-      "imageDescription": "Svenskt vägmärke A24: Varning för sidvind."
-    },
-    {
-      "id": 556,
-      "category": "Vägmärken",
-      "subcategory": "Väjning och stopp",
-      "question_type": "image",
-      "question": "Du kommer fram till en korsning med märket på bilden. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
-      "image_description": "Svenskt vägmärke B1: Väjningsplikt.",
-      "option_a": "Väjningsplikt",
-      "option_b": "Stopplikt",
-      "option_c": "Huvudled",
-      "option_d": "Mötande trafik har väjningsplikt",
-      "correct": "A",
-      "explanation": "Rätt svar är A. Märket betyder väjningsplikt. Du ska lämna företräde åt trafiken på den korsande vägen och stanna bara om det behövs. Lagrum: VMF B1.",
-      "law_reference": "TF 3 kap 5 §",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "✅ APPROVED",
-        "road_sign_code": "B1",
-        "expected_sign": "Vajningsplikt"
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Väjningsplikt",
-        "B": "Stopplikt",
-        "C": "Huvudled",
-        "D": "Mötande trafik har väjningsplikt"
-      },
-      "correctAnswer": "A",
-      "requiresImage": true,
-      "expectedConcept": "Väjningsplikt",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T18:58:56.132Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image"
-        ],
-        "note": "B1 is Väjningsplikt. Question and answer match."
-      },
-      "image_alt": "Väjningsplikt",
-      "imageDescription": "Svenskt vägmärke B1: Väjningsplikt."
-    },
-    {
       "id": 557,
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken",
@@ -14122,58 +12470,6 @@
       },
       "image_alt": "Påbjuden cirkulationsplats",
       "imageDescription": "Svenskt vägmärke D3: Påbjuden cirkulationsplats."
-    },
-    {
-      "id": 558,
-      "category": "Vägmärken",
-      "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "image",
-      "question": "Du letar efter en plats att parkera och ser märket på bilden. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "image_description": "Svenskt vägmärke E19: Parkering.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Motortrafikled",
-      "option_c": "Parkering",
-      "option_d": "Gågata",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder parkering. Märket anger plats eller område där parkering är tillåten enligt villkoren på platsen. Lagrum: VMF E19.",
-      "law_reference": "VMF E19",
-      "difficulty": "easy",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "✅ APPROVED",
-        "road_sign_code": "E19",
-        "expected_sign": "Parkering"
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Motortrafikled",
-        "C": "Parkering",
-        "D": "Gågata"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Parkering",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T18:58:56.132Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image"
-        ],
-        "note": "E19 is parking. Question and answer match."
-      },
-      "image_alt": "Parkering",
-      "imageDescription": "Svenskt vägmärke E19: Parkering."
     },
     {
       "id": 559,
@@ -14288,64 +12584,6 @@
       },
       "image_alt": "Begränsad fordonshöjd",
       "imageDescription": "Svenskt vägmärke C17: Begränsad fordonshöjd."
-    },
-    {
-      "id": 561,
-      "category": "Vägmärken",
-      "subcategory": "Anvisnings- och upplysningsskylt",
-      "question_type": "image",
-      "question": "Du ser ett blått märke som rekommenderar en lägre hastighet. Vilket alternativ beskriver märket korrekt?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.svg/330px-Sweden_road_sign_E11.svg.png",
-      "image_description": "Svenskt vägmärke E11: Rekommenderad lägre hastighet.",
-      "option_a": "Motorväg upphör",
-      "option_b": "Rekommenderad lägre hastighet",
-      "option_c": "Motortrafikled",
-      "option_d": "Gågata",
-      "correct": "B",
-      "explanation": "Rätt svar är B. Märket betyder rekommenderad lägre hastighet. Märket anger en rekommenderad lägre hastighet. Lagrum: VMF E11.",
-      "law_reference": "VMF E11",
-      "difficulty": "hard",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ N/A",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "E11",
-        "expected_sign": "Rekommenderad lagre hastighet",
-        "audit_issues": [
-          "missing required concept: rekommenderad | hastighet",
-          "forbidden concept in correct path: spårvag",
-          "forbidden concept in correct path: hallplats"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Motorväg upphör",
-        "B": "Rekommenderad lägre hastighet",
-        "C": "Motortrafikled",
-        "D": "Gågata"
-      },
-      "correctAnswer": "B",
-      "requiresImage": true,
-      "expectedConcept": "Rekommenderad lägre hastighet",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.svg/330px-Sweden_road_sign_E11.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Rekommenderad lägre hastighet",
-      "imageDescription": "Svenskt vägmärke E11: Rekommenderad lägre hastighet."
     },
     {
       "id": 563,
