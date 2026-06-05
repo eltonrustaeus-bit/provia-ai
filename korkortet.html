@@ -2870,14 +2870,13 @@ $("rSubmitBtn").onclick = async () => {
   $("rSubmitBtn").disabled = true;
   $("rSubmitBtn").textContent = "Skickar…";
   try {
-    const tok = await getAuthToken();
-    if(!tok) { toast("Logga in för att rapportera.", "bad"); return; }
-    const r = await fetch("/api/report-question", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
-      body: JSON.stringify({ question_id: _rQid, reason, comment })
-    });
-    if(r.ok) {
+    const { data: { user } } = await db.auth.getUser();
+    if(!user) { toast("Logga in för att rapportera.", "bad"); $("rSubmitBtn").disabled = false; $("rSubmitBtn").textContent = "Skicka rapport"; return; }
+    const { error } = await db.from("question_reports").upsert(
+      { question_id: _rQid, user_id: user.id, reason, comment, resolved: false },
+      { onConflict: "user_id,question_id" }
+    );
+    if(!error) {
       toast("Tack! Rapporten är skickad — vi granskar frågan.", "ok");
       $("rModal").style.display = "none";
     } else {
