@@ -366,7 +366,7 @@
       "option_c": "Förbudsskylt",
       "option_d": "Upplysningsskylt för vägvisning",
       "correct": "D",
-      "explanation": "Rätt svar är D. Gula rektangulära vägvisningsmärken används för vägvisning och orientering. De är inte varnings-, påbuds- eller förbudsmärken. Källa: Transportstyrelsens vägmärkesförteckning.",
+      "explanation": "Rätt svar är D. Gula rektangulära märken används för vägvisning och orientering — t.ex. omledningsskyltar och tillfälliga vägvisare. De tillhör kategorin upplysningsskylt för vägvisning och är varken varnings-, påbuds- eller förbudsmärken. Källa: VMF bilaga 2.",
       "law_reference": "VMF vägvisningsmärken",
       "difficulty": "easy",
       "commonly_failed": false,
@@ -13975,12 +13975,12 @@
       "subcategory": "Vägmärken",
       "difficulty": "normal",
       "question": "Vad innebär detta märke?",
-      "option_a": "Varning för korsning med väg med väjningsplikt",
+      "option_a": "Varning för korsning där du har förkörsrätt",
       "option_b": "Varning för korsning med huvudled",
       "option_c": "Varning för oreglerad vägkorsning",
       "option_d": "Korsning med motorväg",
       "options": {
-        "A": "Varning för korsning med väg med väjningsplikt",
+        "A": "Varning för korsning där du har förkörsrätt",
         "B": "Varning för korsning med huvudled",
         "C": "Varning för oreglerad vägkorsning",
         "D": "Korsning med motorväg"
