@@ -277,6 +277,22 @@
       </div>
     </div>
 
+    <!-- ADMIN CARD — only shown for role=admin -->
+    <div class="kCard" id="adminCard" style="display:none">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">🛡</div>
+        <div>
+          <div class="kCardLabel">Admin</div>
+          <div class="kCardTitle">Adminpanel</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <div class="kBtnRow">
+          <a class="kBtn kBtnOutline" href="admin.html">Öppna adminpanel →</a>
+        </div>
+      </div>
+    </div>
+
     <!-- P.E.R MEMORY CARD -->
     <div class="kCard">
       <div class="kCardHead">
@@ -412,6 +428,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
   document.getElementById("planUsage").textContent=entitlements
     ? `${formatLimit(entitlements.features.mockExam,"mockprov")} · ${formatLimit(entitlements.features.perChat,"P.E.R")}`
     : (ROLE_DESCS[role]||"");
+
+  /* Show admin card */
+  if(role==="admin") document.getElementById("adminCard").style.display="";
 
   /* Show upgrade or manage card */
   if(role==="gratis"){
