@@ -2309,7 +2309,7 @@ function renderQ(i) {
 
   // Report button — show only when logged in, set current question id
   const rqb = $("reportQuestionBtn");
-  if(rqb) { rqb.dataset.qid = String(q.id); rqb.style.display = uid ? "" : "none"; }
+  if(rqb) { rqb.dataset.qid = String(q.id); rqb.style.display = uid ? "block" : "none"; }
 
   // Reset feedback
   $("explBox").className = "explBox";
