@@ -70,7 +70,9 @@
       "road_sign_questions_rewritten": 83,
       "fields_polished": 0,
       "duplicate_question_text_policy": "verified road-sign questions use varied natural Swedish templates without sign codes in question text"
-    }
+    },
+    "total": 374,
+    "lastUpdated": "2026-06-05"
   },
   "questions": [
     {
@@ -458,8 +460,8 @@
       "subcategory": "Allmänna trafikregler",
       "question_type": "text",
       "question": "Vem har företräde i en rondell?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sweden_road_sign_A8.svg/200px-Sweden_road_sign_A8.svg.png",
+      "image_description": "Rondell — cirkulär korsning, trafik inne i rondellen har alltid företräde (märke A8)",
       "option_a": "Den som kör in",
       "option_b": "Den som redan är i rondellen",
       "option_c": "Den till höger",
@@ -482,12 +484,18 @@
         "D": "Den med högre hastighet"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Trafikregler / Allmänna trafikregler",
       "legalTopic": "Allmänna trafikregler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Rondell A8",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 9,
@@ -708,8 +716,8 @@
       "subcategory": "Allmänna trafikregler",
       "question_type": "text",
       "question": "Vilken är maxhastigheten för moped klass I?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Sweden_road_sign_E8-45.svg/200px-Sweden_road_sign_E8-45.svg.png",
+      "image_description": "Hastighetsgräns 45 km/h — maxhastighet för moped klass I",
       "option_a": "30 km/h",
       "option_b": "45 km/h",
       "option_c": "50 km/h",
@@ -732,12 +740,18 @@
         "D": "60 km/h"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Trafikregler / Allmänna trafikregler",
       "legalTopic": "Allmänna trafikregler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 45",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 15,
@@ -956,8 +970,8 @@
       "subcategory": "Företrädesregler",
       "question_type": "text",
       "question": "Vad gäller vid en cykelöverfart markerad med blå skylt?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sweden_road_sign_E14.svg/200px-Sweden_road_sign_E14.svg.png",
+      "image_description": "E14 Cykelöverfart — blå rektangulär skylt med vit cykel",
       "option_a": "Cyklisten och mopedisten",
       "option_b": "Biltrafiken",
       "option_c": "Beror på tätort",
@@ -974,7 +988,7 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "LÄGG TILL BILD",
-      "image_type": "korsning",
+      "image_type": "vägmärke",
       "options": {
         "A": "Cyklisten och mopedisten",
         "B": "Biltrafiken",
@@ -982,12 +996,17 @@
         "D": "Hastigheten avgör"
       },
       "correctAnswer": "A",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Korsningar / Företrädesregler / korsning",
       "legalTopic": "Företrädesregler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Cykelöverfart E14",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 21,
@@ -1317,8 +1336,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad är den allmänna hastighetsgränsen i tätort?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Sweden_road_sign_E8-50.svg/200px-Sweden_road_sign_E8-50.svg.png",
+      "image_description": "Hastighetsgräns 50 km/h, standardgräns i tätort",
       "option_a": "30 km/h",
       "option_b": "50 km/h",
       "option_c": "60 km/h",
@@ -1341,27 +1360,33 @@
         "D": "70 km/h"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 50",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 30,
       "category": "Hastighet",
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
-      "question": "Vad är maxhastigheten på svensk motorväg?",
-      "image_url": null,
-      "image_description": null,
-      "option_a": "100 km/h",
-      "option_b": "110 km/h",
-      "option_c": "120 km/h",
-      "option_d": "130 km/h",
+      "question": "På vilka vägar kan Trafikverket höja hastighetsgränsen till 120 km/h?",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Sweden_road_sign_F5.svg/200px-Sweden_road_sign_F5.svg.png",
+      "image_description": "Motorvägsskylt (F5) — blå skylt med vit symbol för motorväg",
+      "option_a": "Alla landsvägar",
+      "option_b": "Motorvägar och motortrafikled",
+      "option_c": "Enbart motorvägar",
+      "option_d": "Vägar i städer",
       "correct": "C",
-      "explanation": "Maxhastigheten på svenska motorvägar är 120 km/h om inte lägre gräns anges.",
+      "explanation": "Rätt svar är C. Trafikverket kan besluta om 120 km/h på specifika motorvägssträckor. Grundhastigheten på motorväg är 110 km/h, men Trafikverket kan höja till 120 km/h på välutbyggda sträckor. Motortrafikled har max 100 km/h grundhastighet.",
       "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
@@ -1372,18 +1397,24 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "100 km/h",
-        "B": "110 km/h",
-        "C": "120 km/h",
-        "D": "130 km/h"
+        "A": "Alla landsvägar",
+        "B": "Motorvägar och motortrafikled",
+        "C": "Enbart motorvägar",
+        "D": "Vägar i städer"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Motorväg F5",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 31,
@@ -1465,14 +1496,14 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Hastighetsgräns utanför tätort för personbil utan märke?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Sweden_road_sign_E8-70.svg/200px-Sweden_road_sign_E8-70.svg.png",
+      "image_description": "Hastighetsgräns 70 km/h — grundhastighet på landsväg",
       "option_a": "70 km/h",
       "option_b": "80 km/h",
       "option_c": "90 km/h",
       "option_d": "100 km/h",
-      "correct": "C",
-      "explanation": "Personbilar och lätta lastbilar får köra 90 km/h utanför tätort om inget annat anges.",
+      "correct": "A",
+      "explanation": "Rätt svar är A. Grundhastigheten för personbilar utanför tättbebyggt område är 70 km/h om ingen annan hastighetsgräns är skyltat (TF 3 kap 17§). Många vägar har dock skyltar med 80, 90 eller 100 km/h — det är dessa som gäller på den specifika sträckan. Utan skylt: 70 km/h.",
       "law_reference": null,
       "difficulty": "easy",
       "commonly_failed": false,
@@ -1488,13 +1519,19 @@
         "C": "90 km/h",
         "D": "100 km/h"
       },
-      "correctAnswer": "C",
-      "requiresImage": false,
+      "correctAnswer": "A",
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 70",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 34,
@@ -1502,8 +1539,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad innebär ett runt vägmärke med röd kant och hastighetssiffran 70?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Sweden_road_sign_E8-70.svg/200px-Sweden_road_sign_E8-70.svg.png",
+      "image_description": "Hastighetsgräns 70 km/h — runt märke med röd kant",
       "option_a": "Rekommenderad hastighet 70",
       "option_b": "Du får inte köra fortare än 70 km/h",
       "option_c": "Minimihastighet 70",
@@ -1528,23 +1565,18 @@
         "D": "Motorled 70 km/h"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser / vägmärke",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_text_review_approved",
       "law": "VMF C31",
       "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T19:02:30.158Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official pages",
-          "Transportstyrelsen vägmärkesaffisch when applicable"
-        ],
-        "note": "Generic law placeholder replaced or factual wording corrected."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Hastighetsgräns 70"
     },
     {
       "id": 35,
@@ -2439,7 +2471,7 @@
       "category": "Väglag & Bromssträcka",
       "subcategory": "Aquaplaning",
       "question_type": "text",
-      "question": "Vad är aquaplaning?",
+      "question": "Vad är aquaplaning och hur uppstår det?",
       "image_url": null,
       "image_description": null,
       "option_a": "Bilen glider på ett vattenskikt och förlorar vägkontakt",
@@ -3119,15 +3151,15 @@
       "category": "Trafikregler",
       "subcategory": "Allmänna trafikregler",
       "question_type": "text",
-      "question": "Vilken högsta hastighet gäller utanför tättbebyggt område om ingen gräns är skyltat?",
+      "question": "Vad är grundhastigheten på motortrafikled om ingen annan skylt finns?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Du får köra högst 70 km/h",
-      "option_b": "Du får köra högst 110 km/h",
-      "option_c": "Du får köra högst 90 km/h",
-      "option_d": "Du får köra högst 80 km/h",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Du får köra högst 90 km/h. Utanför tättbebyggt område gäller normalt 90 km/h om inget annat anges. Fel svar: A är fel eftersom det inte är rätt handling i den visade situationen. B är fel eftersom det inte är rätt handling i den visade situationen. D är fel eftersom det inte är rätt handling i den visade situationen. Lagrum: TF 3 kap 17§.",
+      "option_a": "90 km/h",
+      "option_b": "100 km/h",
+      "option_c": "110 km/h",
+      "option_d": "70 km/h",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Grundhastigheten på motortrafikled är 100 km/h (TF 3 kap 17§ + 9 kap). Motortrafikled är en väg för motorfordon men inte full motorväg — vanlig skyltning 90 eller 100 km/h. Utan skylt gäller 100 km/h.",
       "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
@@ -3138,20 +3170,25 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "OMFORMULERA",
-      "image_type": "scenario",
+      "image_type": "vägmärke",
       "options": {
-        "A": "Du får köra högst 70 km/h",
-        "B": "Du får köra högst 110 km/h",
-        "C": "Du får köra högst 90 km/h",
-        "D": "Du får köra högst 80 km/h"
+        "A": "90 km/h",
+        "B": "100 km/h",
+        "C": "110 km/h",
+        "D": "70 km/h"
       },
-      "correctAnswer": "C",
-      "requiresImage": false,
+      "correctAnswer": "B",
+      "requiresImage": true,
       "expectedConcept": "Trafikregler / Allmänna trafikregler / scenario",
       "legalTopic": "Allmänna trafikregler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": null,
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 85,
@@ -3659,8 +3696,8 @@
       "subcategory": "Företrädesregler",
       "question_type": "text",
       "question": "Du kör på en huvudled. Ett fordon från en korsande väg ska komma in. Vem har företräde?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Sweden_road_sign_B8.svg/200px-Sweden_road_sign_B8.svg.png",
+      "image_description": "B8 Huvudled — gul romb visar att du kör på en väg med rätt att passera korsningar",
       "option_a": "Bilen från höger via högerregeln",
       "option_b": "Den som kom till korsningen först",
       "option_c": "Det beror på hastighetsgränsen",
@@ -3677,7 +3714,7 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "OMFORMULERA",
-      "image_type": "korsning",
+      "image_type": "vägmärke",
       "options": {
         "A": "Bilen från höger via högerregeln",
         "B": "Den som kom till korsningen först",
@@ -3685,23 +3722,18 @@
         "D": "Du på huvudleden"
       },
       "correctAnswer": "D",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Korsningar / Företrädesregler / korsning",
       "legalTopic": "Företrädesregler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_text_review_approved",
       "law": "VMF B4",
       "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T19:02:30.158Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official pages",
-          "Transportstyrelsen vägmärkesaffisch when applicable"
-        ],
-        "note": "Generic law placeholder replaced or factual wording corrected."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Huvudled B8"
     },
     {
       "id": 99,
@@ -3759,8 +3791,8 @@
       "subcategory": "Trafiksignaler",
       "question_type": "text",
       "question": "Vad innebär blinkande gult trafikljus i en korsning?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Traffic_lights_4_phases.svg/200px-Traffic_lights_4_phases.svg.png",
+      "image_description": "Trafikljus — blinkande gult ljus signalerar varsamhet",
       "option_a": "Du ska köra igenom snabbt",
       "option_b": "Du måste stanna som vid rött",
       "option_c": "Du ska köra med försiktighet och lämna företräde vid behov",
@@ -3777,7 +3809,7 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "LÄGG TILL BILD",
-      "image_type": "trafiksignal",
+      "image_type": "trafikljus",
       "options": {
         "A": "Du ska köra igenom snabbt",
         "B": "Du måste stanna som vid rött",
@@ -3785,23 +3817,18 @@
         "D": "Signalen är trasig, kör inte"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Korsningar / Trafiksignaler / trafiksignal",
       "legalTopic": "Trafiksignaler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_text_review_approved",
       "law": "VMF trafiksignaler",
       "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T19:02:30.158Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official pages",
-          "Transportstyrelsen vägmärkesaffisch when applicable"
-        ],
-        "note": "Generic law placeholder replaced or factual wording corrected."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Trafikljus"
     },
     {
       "id": 102,
@@ -3957,8 +3984,8 @@
       "subcategory": "Omkörning",
       "question_type": "text",
       "question": "Vad innebär märket C38 (runt märke med bild av bil som kör om ett annat fordon)?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sweden_road_sign_C38.svg/200px-Sweden_road_sign_C38.svg.png",
+      "image_description": "C38 Omkörningsförbud — märket visar bil som kör om ett annat fordon med rött kryss",
       "option_a": "Förbjudet att köra om cyklar",
       "option_b": "Förbjudet att köra om motorfordon med mer än 2 hjul",
       "option_c": "Förbjudet att köra om alla fordon",
@@ -3983,12 +4010,17 @@
         "D": "Förbjudet att köra om lastbilar"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Möte & Omkörning / Omkörning / vägmärke",
       "legalTopic": "Omkörning",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Omkörningsförbud C38",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 107,
@@ -4157,8 +4189,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad är maxhastigheten för tung lastbil över 3,5 ton på landsväg?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Sweden_road_sign_E8-80.svg/200px-Sweden_road_sign_E8-80.svg.png",
+      "image_description": "Hastighetsgräns 80 km/h — maxhastighet för tung lastbil på landsväg",
       "option_a": "80 km/h",
       "option_b": "70 km/h",
       "option_c": "90 km/h",
@@ -4181,12 +4213,18 @@
         "D": "Samma som personbilar"
       },
       "correctAnswer": "A",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 80",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 114,
@@ -4763,15 +4801,15 @@
       "category": "Mörker & Sikt",
       "subcategory": "Möte i mörker",
       "question_type": "text",
-      "question": "Vad gör du om du bländas av ett mötande fordon?",
+      "question": "I vilka situationer är det förbjudet eller olämpligt att använda helljus?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Tuta och blinka",
-      "option_b": "Ökar hastigheten",
-      "option_c": "Stänger ögonen",
-      "option_d": "Titta mot höger vägkant och sakta ner",
-      "correct": "D",
-      "explanation": "Om du bländas ska du titta mot höger vägkant och sakta ner.",
+      "option_a": "Bara i tunnel",
+      "option_b": "Vid möte, på tättbebyggt område, i dimma och nära fordon framför",
+      "option_c": "Bara vid möte",
+      "option_d": "Det finns inga regler för helljus",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Helljus är förbjudet/olämpligt vid möte med annat fordon, i tättbebyggt område med gatubelysning, i dimma eller kraftigt snöfall (reflekteras och bländar mer), och när du kör nära bakom ett annat fordon. Annars är helljus starkt rekommenderat för bästa sikt.",
       "law_reference": null,
       "difficulty": "normal",
       "commonly_failed": false,
@@ -4782,12 +4820,12 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "Tuta och blinka",
-        "B": "Ökar hastigheten",
-        "C": "Stänger ögonen",
-        "D": "Titta mot höger vägkant och sakta ner"
+        "A": "Bara i tunnel",
+        "B": "Vid möte, på tättbebyggt område, i dimma och nära fordon framför",
+        "C": "Bara vid möte",
+        "D": "Det finns inga regler för helljus"
       },
-      "correctAnswer": "D",
+      "correctAnswer": "B",
       "requiresImage": false,
       "expectedConcept": "Mörker & Sikt / Möte i mörker",
       "legalTopic": "Möte i mörker",
@@ -4911,15 +4949,15 @@
       "category": "Väglag & Bromssträcka",
       "subcategory": "Halt väglag",
       "question_type": "text",
-      "question": "Hur förändras bromssträckan på is jämfört med torr asfalt?",
+      "question": "Hur påverkar snö på vägbanan bromssträckan jämfört med torr asfalt?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Ungefär densamma",
-      "option_b": "2 gånger längre",
-      "option_c": "Upp till 10 gånger längre",
-      "option_d": "5 gånger längre",
+      "option_a": "Lika lång",
+      "option_b": "1,5-2 gånger längre",
+      "option_c": "2-5 gånger längre",
+      "option_d": "10 gånger längre",
       "correct": "C",
-      "explanation": "På is kan bromssträckan vara upp till 10 gånger längre än på torr asfalt.",
+      "explanation": "Rätt svar är C. På snöig väg kan bromssträckan bli 2-5 gånger längre jämfört med torr asfalt (beroende på typ av snö och temperatur). På is är det ännu värre: 5-10 gånger längre. Justera alltid hastigheten och öka säkerhetsavståndet på vinterväglag.",
       "law_reference": null,
       "difficulty": "easy",
       "commonly_failed": false,
@@ -4930,10 +4968,10 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "Ungefär densamma",
-        "B": "2 gånger längre",
-        "C": "Upp till 10 gånger längre",
-        "D": "5 gånger längre"
+        "A": "Lika lång",
+        "B": "1,5-2 gånger längre",
+        "C": "2-5 gånger längre",
+        "D": "10 gånger längre"
       },
       "correctAnswer": "C",
       "requiresImage": false,
@@ -6023,8 +6061,8 @@
       "subcategory": "Körfältssignaler",
       "question_type": "text",
       "question": "Vad innebär ett rött kryss ovanför ett körfält?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Traffic_lights_4_phases.svg/200px-Traffic_lights_4_phases.svg.png",
+      "image_description": "Körfältsstyrning — rött kryss ovanför körfält innebär att körfältet är stängt",
       "option_a": "Körfältet får användas med försiktighet",
       "option_b": "Körfältet är stängt och får inte användas",
       "option_c": "Körfältet är reserverat för tung trafik",
@@ -6043,7 +6081,7 @@
         "repaired_from_blocked": true
       },
       "bildfix_status": "LÄGG TILL BILD",
-      "image_type": "vägsituation",
+      "image_type": "vägmärken",
       "options": {
         "A": "Körfältet får användas med försiktighet",
         "B": "Körfältet är stängt och får inte användas",
@@ -6051,21 +6089,17 @@
         "D": "Hastigheten är begränsad till 30 km/h"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Trafikregler / Körfältssignaler",
       "legalTopic": "Körfältssignaler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_repair_text_question",
       "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official rules or sign material"
-        ],
-        "note": "Blocked question repaired as text-only question to avoid unsupported images."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Trafikljus"
     },
     {
       "id": 164,
@@ -6123,8 +6157,8 @@
       "subcategory": "Kollektivtrafikfält",
       "question_type": "text",
       "question": "Får du som vanlig personbilsförare köra i ett körfält som är reserverat för fordon i linjetrafik om ingen tilläggstavla tillåter det?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Sweden_road_sign_D4.svg/200px-Sweden_road_sign_D4.svg.png",
+      "image_description": "D4 Körfält för fordon i linjetrafik — bussfält",
       "option_a": "Ja, alltid om körfältet är tomt",
       "option_b": "Nej, du får inte använda körfältet",
       "option_c": "Ja, om du ska svänga inom fem minuter",
@@ -6151,21 +6185,17 @@
         "D": "Ja, men bara under rusningstid"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Trafikregler / Kollektivtrafikfält",
       "legalTopic": "Kollektivtrafikfält",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_repair_text_question",
       "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official rules or sign material"
-        ],
-        "note": "Blocked question repaired as text-only question to avoid unsupported images."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Bussfält D4"
     },
     {
       "id": 166,
@@ -6497,8 +6527,8 @@
       "subcategory": "Trafiksignaler",
       "question_type": "text",
       "question": "Får du svänga höger mot rött ljus om det inte finns någon särskild signal som tillåter svängen?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Traffic_lights_4_phases.svg/200px-Traffic_lights_4_phases.svg.png",
+      "image_description": "Trafikljus — röd signal innebär stopp",
       "option_a": "Ja, om det är fritt",
       "option_b": "Ja, efter att du har stannat helt",
       "option_c": "Nej, du får inte köra mot rött",
@@ -6515,7 +6545,7 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "LÄGG TILL BILD",
-      "image_type": "trafiksignal",
+      "image_type": "trafikljus",
       "options": {
         "A": "Ja, om det är fritt",
         "B": "Ja, efter att du har stannat helt",
@@ -6523,23 +6553,18 @@
         "D": "Ja, om du blinkar och kör försiktigt"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Korsningar / Trafiksignaler / trafiksignal",
       "legalTopic": "Trafiksignaler",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
       "sourceStatus": "manual_text_review_approved",
       "law": "VMF trafiksignaler",
       "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T19:02:30.158Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official pages",
-          "Transportstyrelsen vägmärkesaffisch when applicable"
-        ],
-        "note": "Generic law placeholder replaced or factual wording corrected."
-      }
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      },
+      "image_alt": "Trafikljus"
     },
     {
       "id": 175,
@@ -7186,8 +7211,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad är normalhastigheten inne i en tätort om ingen annan hastighet är skyltad?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Sweden_road_sign_E8-50.svg/200px-Sweden_road_sign_E8-50.svg.png",
+      "image_description": "Hastighetsgräns 50 km/h, standardgräns i tätort",
       "option_a": "30 km/h",
       "option_b": "60 km/h",
       "option_c": "70 km/h",
@@ -7210,12 +7235,18 @@
         "D": "50 km/h"
       },
       "correctAnswer": "D",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 50",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 192,
@@ -7260,14 +7291,14 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad är maxhastigheten på en svensk motorväg om inget annat anges?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Sweden_road_sign_E8-110.svg/200px-Sweden_road_sign_E8-110.svg.png",
+      "image_description": "Hastighetsgräns 110 km/h — motorväg",
       "option_a": "90 km/h",
       "option_b": "100 km/h",
       "option_c": "110 km/h",
       "option_d": "120 km/h",
-      "correct": "D",
-      "explanation": "Grundregeln på svenska motorvägar är 120 km/h (TF 3 kap 17§). Lägre hastighetsgräns kan vara skyltad.",
+      "correct": "C",
+      "explanation": "Rätt svar är C. Grundhastigheten på motorväg är 110 km/h om inget annat anges (TF 9 kap 1§). Trafikverket kan skyltia upp till 120 km/h på specifika motorvägssträckor, men 110 km/h är standarden utan skylt.",
       "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
@@ -7283,13 +7314,19 @@
         "C": "110 km/h",
         "D": "120 km/h"
       },
-      "correctAnswer": "D",
-      "requiresImage": false,
+      "correctAnswer": "C",
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 110",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 194,
@@ -7297,8 +7334,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad gäller för hastighetsgräns för ett tungt fordon (>3,5 ton) på landsväg?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Sweden_road_sign_E8-80.svg/200px-Sweden_road_sign_E8-80.svg.png",
+      "image_description": "Hastighetsgräns 80 km/h — tungt fordon på landsväg",
       "option_a": "Samma som för personbil",
       "option_b": "Max 90 km/h",
       "option_c": "Max 80 km/h",
@@ -7321,12 +7358,18 @@
         "D": "Max 70 km/h"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Hastighetsgräns 80",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 195,
@@ -7334,8 +7377,6 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad innebär en gul rektangulär hastighetsskylt (till skillnad från ett runt vitt märke med röd kant)?",
-      "image_url": null,
-      "image_description": null,
       "option_a": "Obligatorisk maxhastighet",
       "option_b": "Lämplig hastighet under normala förhållanden",
       "option_c": "Minsta tillåtna hastighet",
@@ -7352,7 +7393,6 @@
         "text_conversion": "converted_from_blocked_scenario_question"
       },
       "bildfix_status": "LÄGG TILL BILD",
-      "image_type": "vägmärke",
       "options": {
         "A": "Obligatorisk maxhastighet",
         "B": "Lämplig hastighet under normala förhållanden",
@@ -7360,23 +7400,11 @@
         "D": "Gäller bara tung trafik"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
       "expectedConcept": "Hastighet / Hastighetsgränser / vägmärke",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
       "imageUrl": null,
       "sourceStatus": "manual_text_review_approved",
-      "law": "VMF E11",
-      "manualReview": {
-        "status": "approved",
-        "reviewedAt": "2026-06-02T19:02:30.158Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen official pages",
-          "Transportstyrelsen vägmärkesaffisch when applicable"
-        ],
-        "note": "Generic law placeholder replaced or factual wording corrected."
-      }
+      "law": "VMF E11"
     },
     {
       "id": 196,
@@ -7864,15 +7892,15 @@
       "category": "Mörker & Sikt",
       "subcategory": "Ljusanvändning",
       "question_type": "text",
-      "question": "Hur långt lyser halvljuset normalt på en personbil?",
+      "question": "Hur långt lyser helljuset normalt på en personbil?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Ca 20-30 meter",
-      "option_b": "Ca 40-60 meter",
-      "option_c": "Ca 100 meter",
-      "option_d": "Ca 150 meter",
-      "correct": "B",
-      "explanation": "Halvljuset lyser normalt 40-60 meter framåt. Det räcker för hastigheter upp till ca 80 km/h.",
+      "option_a": "Ca 40-60 meter",
+      "option_b": "Ca 80-100 meter",
+      "option_c": "Ca 100-150 meter",
+      "option_d": "Ca 200-250 meter",
+      "correct": "C",
+      "explanation": "Rätt svar är C. Helljuset lyser normalt 100-150 meter. Halvljuset lyser bara 40-60 meter. Därför ska du byta ned till halvljus vid möte på ca 200 meters avstånd för att hinna anpassa hastigheten efter den kortare räckvidden.",
       "law_reference": null,
       "difficulty": "easy",
       "commonly_failed": false,
@@ -7883,12 +7911,12 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "Ca 20-30 meter",
-        "B": "Ca 40-60 meter",
-        "C": "Ca 100 meter",
-        "D": "Ca 150 meter"
+        "A": "Ca 40-60 meter",
+        "B": "Ca 80-100 meter",
+        "C": "Ca 100-150 meter",
+        "D": "Ca 200-250 meter"
       },
-      "correctAnswer": "B",
+      "correctAnswer": "C",
       "requiresImage": false,
       "expectedConcept": "Mörker & Sikt / Ljusanvändning",
       "legalTopic": "Ljusanvändning",
@@ -8012,15 +8040,15 @@
       "category": "Väglag & Bromssträcka",
       "subcategory": "Halt väglag",
       "question_type": "text",
-      "question": "Hur mycket längre är bromssträckan på is jämfört med torr asfalt?",
+      "question": "Vid vilken yttemperatur uppstår is extra lätt på vägbanan?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Dubbelt",
-      "option_b": "Tre gånger",
-      "option_c": "5-10 gånger",
-      "option_d": "Lika med vinterdäck",
-      "correct": "C",
-      "explanation": "Bromssträckan på is kan vara 5-10 gånger längre än på torr asfalt. Vinterdäck förbättrar bromsen men eliminerar inte risken.",
+      "option_a": "Vid -10°C och lägre",
+      "option_b": "Kring 0°C (strax under eller strax over)",
+      "option_c": "Bara vid -20°C",
+      "option_d": "Is uppstår lika lätt vid alla minusgrader",
+      "correct": "B",
+      "explanation": "Rätt svar är B. Vägis uppstår extra lätt kring 0°C när regn eller fukt fryser på vägbanan. Lite under 0°C är extra farligt eftersom isen kan vara tunn och nästan osynlig (svart is). Vid -10°C eller kalla temperaturer är vägbanan ofta torr och lite säkrare.",
       "law_reference": "TSF 1§",
       "difficulty": "normal",
       "commonly_failed": false,
@@ -8031,12 +8059,12 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "Dubbelt",
-        "B": "Tre gånger",
-        "C": "5-10 gånger",
-        "D": "Lika med vinterdäck"
+        "A": "Vid -10°C och lägre",
+        "B": "Kring 0°C (strax under eller strax över)",
+        "C": "Bara vid -20°C",
+        "D": "Is uppstår lika lätt vid alla minusgrader"
       },
-      "correctAnswer": "C",
+      "correctAnswer": "B",
       "requiresImage": false,
       "expectedConcept": "Väglag & Bromssträcka / Halt väglag",
       "legalTopic": "Halt väglag",
@@ -9287,15 +9315,15 @@
       "category": "Nödsituationer",
       "subcategory": "Nödsituationer",
       "question_type": "text",
-      "question": "Var placeras varningstriangeln vid haveri på landsväg?",
+      "question": "Var placeras varningstriangeln vid haveri i tättbebyggt område (tätort)?",
       "image_url": null,
       "image_description": null,
       "option_a": "5 meter bakom bilen",
       "option_b": "Minst 30-50 meter bakom bilen",
-      "option_c": "Bredvid bilen",
+      "option_c": "Minst 100 meter bakom bilen",
       "option_d": "Framför bilen",
       "correct": "B",
-      "explanation": "På vanlig landsväg placeras varningstriangeln minst 30-50 meter bakom bilen. Vid dålig sikt eller hög hastighetsgräns: längre bort. Håll dig borta från körfältet när du ställer ut triangeln.",
+      "explanation": "Rätt svar är B. I tättbebyggt område placeras varningstriangeln minst 30-50 meter bakom fordonet. På landsväg är rekommendationen minst 100 meter (se TF och NTF:s riktlinjer). Placera alltid triangeln på säkert avstånd för att varna andra trafikanter.",
       "law_reference": "TF 5 kap 3§",
       "difficulty": "normal",
       "commonly_failed": false,
@@ -9308,7 +9336,7 @@
       "options": {
         "A": "5 meter bakom bilen",
         "B": "Minst 30-50 meter bakom bilen",
-        "C": "Bredvid bilen",
+        "C": "Minst 100 meter bakom bilen",
         "D": "Framför bilen"
       },
       "correctAnswer": "B",
@@ -11667,8 +11695,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad är skillnaden mellan förbudsmärkena C35 och C39?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — ett av två förbudsmärken för parkering",
       "option_a": "Det är ingen skillnad — de gäller lika",
       "option_b": "C35 förbjuder parkering. C39 förbjuder både stannande och parkering",
       "option_c": "C39 förbjuder parkering. C35 förbjuder stannande",
@@ -11693,12 +11721,17 @@
         "D": "C35 gäller bara lastbilar. C39 gäller alla fordon"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud / vägmärke",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 501,
@@ -11755,8 +11788,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad innebär datumparkering i Sverige?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_C36.svg/200px-Sweden_road_sign_C36.svg.png",
+      "image_description": "C36 Datumparkering — parkering tillåten varannan dag beroende på datum",
       "option_a": "Jämna datum: 2, 4, 6 …",
       "option_b": "Alla dagar",
       "option_c": "Udda datum: 1, 3, 5 …",
@@ -11781,12 +11814,17 @@
         "D": "Bara helgdagar"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud / vägmärke",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Datumparkering C36",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 503,
@@ -11831,8 +11869,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Var är stannande alltid förbjudet?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/200px-Sweden_road_sign_C39.svg.png",
+      "image_description": "C39 Förbud mot stannande och parkering — det strängaste förbudet",
       "option_a": "Vid en busshållplats med stoppförbud (C39)",
       "option_b": "Bara vid gångpassage",
       "option_c": "Bara nattetid",
@@ -11855,12 +11893,18 @@
         "D": "Bara vid vägarbete"
       },
       "correctAnswer": "A",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Stannande och parkeringsförbud C39",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 505,
@@ -11954,8 +11998,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Är det tillåtet att dubbelparkera (parkera bredvid ett parkerat fordon)?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/200px-Sweden_road_sign_C39.svg.png",
+      "image_description": "C39 Förbud mot stannande och parkering gäller alltid",
       "option_a": "Ja, om det inte blockerar trafiken",
       "option_b": "Ja, om du är kvar i bilen",
       "option_c": "Ja, kortvarigt för lastning",
@@ -11978,12 +12022,18 @@
         "D": "Nej, alltid förbjudet"
       },
       "correctAnswer": "D",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Stannande och parkeringsförbud C39",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 508,
@@ -11991,8 +12041,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Parkering på trottoar eller cykelbana — vad gäller?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — gäller även på trottoar och cykelbana",
       "option_a": "Tillåtet om bilen inte sticker ut mer än 0,5 meter",
       "option_b": "Tillåtet om det finns utrymme",
       "option_c": "Förbjudet om det hindrar fotgängare eller cyklister",
@@ -12015,12 +12065,18 @@
         "D": "Alltid tillåtet om du har P-skiva"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 509,
@@ -12067,8 +12123,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad innebär en parkeringsskylt märkt \"P 2 tim\"?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/200px-Sweden_road_sign_E22.svg.png",
+      "image_description": "E22 Parkeringstid med parkeringsskiva — \"P 2 tim\" innebär max 2 timmar med P-skiva",
       "option_a": "Tills nästa dag",
       "option_b": "Obegränsat med P-skiva",
       "option_c": "Maximalt 2 timmar",
@@ -12093,12 +12149,17 @@
         "D": "2 timmar om du lämnar bilen"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud / vägmärke",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringstid E22",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 511,
@@ -12106,8 +12167,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Är det tillåtet att parkera framför en garageinfart eller utfart?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — förbjudet framför garageinfart",
       "option_a": "Ja om det är kortvarigt",
       "option_b": "Ja om garaget inte används",
       "option_c": "Nej, det är alltid förbjudet",
@@ -12130,12 +12191,18 @@
         "D": "Ja om du lämnar kontaktuppgifter"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 512,
@@ -12143,8 +12210,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Är parkering på motorvägen tillåten?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — parkering förbjuden på motorväg",
       "option_a": "Ja, på nödstoppsfickan om det är nödstopp",
       "option_b": "Ja, alltid i höger körfält",
       "option_c": "Nej, absolut förbjudet",
@@ -12167,12 +12234,18 @@
         "D": "Ja, om du stannar under 15 minuter"
       },
       "correctAnswer": "A",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 513,
@@ -12180,8 +12253,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Var ska du placera parkeringsskivan (P-skiva) i bilen?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/200px-Sweden_road_sign_E22.svg.png",
+      "image_description": "E22 Parkeringstid med parkeringsskiva — anger var P-skivan används",
       "option_a": "I handskfacket",
       "option_b": "Väl synlig bakom vindrutan",
       "option_c": "På instrumentbrädan",
@@ -12204,12 +12277,18 @@
         "D": "Var som helst i bilen"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringstid E22",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 514,
@@ -12217,8 +12296,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad innebär vägmärket E22?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/200px-Sweden_road_sign_E22.svg.png",
+      "image_description": "E22 Parkeringstid med parkeringsskiva",
       "option_a": "Parkeringsförbudet börjar",
       "option_b": "Parkeringsförbudet som angavs av föregående märke upphör att gälla",
       "option_c": "P-zon upphör",
@@ -12243,12 +12322,17 @@
         "D": "Ingen parkeringsrätt längre"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud / vägmärke",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringstid E22",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 515,
@@ -12293,8 +12377,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad gäller för parkering på en busshållplats?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — busshållplatser är förbudszon",
       "option_a": "Tillåtet om bussen inte är där",
       "option_b": "Tillåtet kortvarigt om du stannar max 3 min",
       "option_c": "Förbjudet att stanna eller parkera inom busshållplatsens markerade yta",
@@ -12317,12 +12401,18 @@
         "D": "Tillåtet om du parkerar utanför bussfickan"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 517,
@@ -12330,8 +12420,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vilket märke är ett vitt runt märke med ett rött P och ett diagonalt rött streck?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — vitt runt märke med rött P och diagonalt streck",
       "option_a": "Tidsbegränsad parkering",
       "option_b": "Parkering tillåten",
       "option_c": "Parkering förbjuden (C35)",
@@ -12356,12 +12446,17 @@
         "D": "Stannande förbjudet (C39)"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud / vägmärke",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 518,
@@ -12406,8 +12501,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Du parkerar på en gata med parkeringsskiva. Klockan är 14:00. Hur ställer du in skivan?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/200px-Sweden_road_sign_E22.svg.png",
+      "image_description": "E22 Parkeringstid med parkeringsskiva — du ställer in ankomsttid",
       "option_a": "På närmaste hela timme uppåt — 15:00",
       "option_b": "På exakt tid — 14:00",
       "option_c": "På närmaste halvtimme uppåt — 14:30",
@@ -12430,12 +12525,18 @@
         "D": "Det spelar ingen roll"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringstid E22",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 520,
@@ -12443,8 +12544,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vem får använda parkeringsplats reserverad för rörelsehindrade (rullstolssymbol)?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/200px-Sweden_road_sign_E19.svg.png",
+      "image_description": "E19 Parkering — tilläggstavla visar rörelsehindrad-symbol",
       "option_a": "Alla som kör äldre eller sjuka passagerare",
       "option_b": "Alla med handikapptillstånd utfärdat av kommunen",
       "option_c": "Bara fordon med blå handikappskylt utfärdad av Transportstyrelsen",
@@ -12467,12 +12568,18 @@
         "D": "Alla om platsen är ledig"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkering E19",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 521,
@@ -12644,8 +12751,8 @@
       "subcategory": "Parkeringsförbud och stoppförbud",
       "question_type": "text",
       "question": "Vad händer om du parkerar fel och det finns ett parkeringsförbud?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/200px-Sweden_road_sign_C35.svg.png",
+      "image_description": "C35 Parkeringsförbud — fordonet kan bötfällas och bogseras bort",
       "option_a": "Du får en varning",
       "option_b": "Du riskerar kontrollavgift (parkeringsbot) och eventuell bortbogsering",
       "option_c": "Ingenting om det inte skapar fara",
@@ -12668,12 +12775,18 @@
         "D": "Bara böter om du blockerar trafiken"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Parkering / Parkeringsförbud och stoppförbud",
       "legalTopic": "Parkeringsförbud och stoppförbud",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Parkeringsförbud C35",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 526,
@@ -13322,8 +13435,8 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Hur snabbt får du köra i en 30-zon?",
-      "image_url": null,
-      "image_description": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sweden_road_sign_E10-30.svg/200px-Sweden_road_sign_E10-30.svg.png",
+      "image_description": "Zon 30 — gul rektangulär hastighetsskylt",
       "option_a": "Upp till 40 km/h om det är säkert",
       "option_b": "Max 30 km/h",
       "option_c": "Max 30 km/h under skoltid, 50 annars",
@@ -13346,12 +13459,18 @@
         "D": "Max 25 km/h om det finns barn"
       },
       "correctAnswer": "B",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
+      "imageStatus": "auto-added-2026-06-05",
       "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": "Zon 30",
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 544,
@@ -13509,8 +13628,6 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Vad är maxhastigheten på en 2+1-väg (tre körfält varannat) om inget märke anges?",
-      "image_url": null,
-      "image_description": null,
       "option_a": "90 km/h",
       "option_b": "100 km/h",
       "option_c": "110 km/h",
@@ -13533,10 +13650,8 @@
         "D": "Beror på skyltar"
       },
       "correctAnswer": "D",
-      "requiresImage": false,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
       "imageUrl": null,
       "sourceStatus": "curated_text_question_needs_official_review"
     },
@@ -13546,8 +13661,6 @@
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
       "question": "Maxhastighet i tunnel om ingen skylt anges?",
-      "image_url": null,
-      "image_description": null,
       "option_a": "50 km/h",
       "option_b": "70 km/h",
       "option_c": "Den gällande hastighetsgränsen på sträckan",
@@ -13570,10 +13683,8 @@
         "D": "30 km/h"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
       "imageUrl": null,
       "sourceStatus": "curated_text_question_needs_official_review"
     },
@@ -13582,15 +13693,14 @@
       "category": "Hastighet",
       "subcategory": "Hastighetsgränser",
       "question_type": "text",
-      "question": "Vilken hastighetsgräns gäller för en personbil på landsväg om det saknas hastighetsmärke?",
-      "image_url": null,
+      "question": "Vilken hastighet är minst tillåten på motorväg?",
       "image_description": null,
-      "option_a": "70 km/h",
-      "option_b": "80 km/h",
-      "option_c": "90 km/h",
-      "option_d": "100 km/h",
+      "option_a": "20 km/h",
+      "option_b": "30 km/h",
+      "option_c": "40 km/h",
+      "option_d": "50 km/h",
       "correct": "C",
-      "explanation": "Rätt svar är C. Utanför tättbebyggt område (tätortsgränsen) är den allmänna hastighetsgränsen 90 km/h för personbilar och lätta lastbilar om inget annat märke anges. Lagrum: TF 3 kap 17§.",
+      "explanation": "Rätt svar är C. På motorväg är minimum­hastigheten 40 km/h (TF 9 kap 1§). Fordon som inte kan hålla 40 km/h är inte tillåtna på motorväg — exempelvis traktorer och mopeder.",
       "law_reference": "TF 3 kap 17§",
       "difficulty": "easy",
       "commonly_failed": false,
@@ -13601,18 +13711,23 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "70 km/h",
-        "B": "80 km/h",
-        "C": "90 km/h",
-        "D": "100 km/h"
+        "A": "20 km/h",
+        "B": "30 km/h",
+        "C": "40 km/h",
+        "D": "50 km/h"
       },
       "correctAnswer": "C",
-      "requiresImage": false,
+      "requiresImage": true,
       "expectedConcept": "Hastighet / Hastighetsgränser",
       "legalTopic": "Hastighetsgränser",
-      "imageStatus": "missing",
-      "imageUrl": null,
-      "sourceStatus": "curated_text_question_needs_official_review"
+      "imageStatus": "auto-added-2026-06-05",
+      "sourceStatus": "curated_text_question_needs_official_review",
+      "image_alt": null,
+      "image_type": "vägmärke",
+      "manualReview": {
+        "status": "pending",
+        "note": "Auto-added by add_images_and_fixes.js. Verify image matches question intent."
+      }
     },
     {
       "id": 551,
@@ -14857,15 +14972,15 @@
       "category": "Nödsituationer",
       "subcategory": "Nödsituationer",
       "question_type": "text",
-      "question": "Din bil fattar eld under körning. Vad gör du?",
+      "question": "Du kör på motorvägen och märker att ditt däck spricker (punktering). Vad gör du?",
       "image_url": null,
       "image_description": null,
-      "option_a": "Accelererar för att nå en brandstation",
-      "option_b": "Stannar säkert, slår av tändning, evakuerar alla och ringer 112",
-      "option_c": "Hämtar brandsläckaren och försöker släcka medan du kör",
-      "option_d": "Kör till en bensinstation",
+      "option_a": "Stanna omedelbart och byt däck i körfältet",
+      "option_b": "Håll hårt i ratten, sakta ner mjukt, kör av motorvägen eller stanna på vägrenen — slå på varningsblinkers",
+      "option_c": "Bromsa hårt och stanna snabbt",
+      "option_d": "Fortsätt köra till närmaste bensinstation",
       "correct": "B",
-      "explanation": "Rätt svar är B. Stanna så säkert och snabbt som möjligt. Slå av tändningen. Evakuera alla passagerare och flytta bort från bilen (minst 30 meter). Ring 112. Försök inte köra vidare — elden kan snabbt bli okontrollerbar. Lagrum: TF 5 kap.",
+      "explanation": "Rätt svar är B. Vid punktering på motorvägen: håll hårt i ratten (bilen drar åt sidan), lyft försiktigt foten från gasen, styr till vägrenen eller närmaste avfart, slå på varningsblinkers. Bromsa INTE hårt — det ökar risken för sladd. Stanna INTE i körfältet om du kan undvika det.",
       "law_reference": "TF 5 kap",
       "difficulty": "normal",
       "commonly_failed": false,
@@ -14876,10 +14991,10 @@
       },
       "bildfix_status": "BEHÅLL",
       "options": {
-        "A": "Accelererar för att nå en brandstation",
-        "B": "Stannar säkert, slår av tändning, evakuerar alla och ringer 112",
-        "C": "Hämtar brandsläckaren och försöker släcka medan du kör",
-        "D": "Kör till en bensinstation"
+        "A": "Stanna omedelbart och byt däck i körfältet",
+        "B": "Håll hårt i ratten, sakta ner mjukt, kör av motorvägen eller stanna på vägrenen — slå på varningsblinkers",
+        "C": "Bromsa hårt och stanna snabbt",
+        "D": "Fortsätt köra till närmaste bensinstation"
       },
       "correctAnswer": "B",
       "requiresImage": false,
@@ -15073,6 +15188,668 @@
       "imageStatus": "missing",
       "imageUrl": null,
       "sourceStatus": "curated_text_question_needs_official_review"
+    },
+    {
+      "id": 585,
+      "category": "Körning med Släp",
+      "subcategory": "Hastighet med släp",
+      "question_type": "multiple_choice",
+      "question": "Vad är maxhastigheten för personbil med lätt obromsat släp (totalvikt ≤ 750 kg) på landsväg?",
+      "option_a": "90 km/h",
+      "option_b": "80 km/h",
+      "option_c": "70 km/h",
+      "option_d": "50 km/h",
+      "options": {
+        "A": "90 km/h",
+        "B": "80 km/h",
+        "C": "70 km/h",
+        "D": "50 km/h"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Med lätt obromsat släp (≤ 750 kg totalvikt) gäller max 80 km/h på landsväg. Med bromsad husvagn på motorväg gäller 80 km/h. Kontrollera alltid att hastighetsgränserna för fordonskombinationen följs. Lagrum: TF 4 kap.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Sweden_road_sign_E8-80.svg/200px-Sweden_road_sign_E8-80.svg.png",
+      "image_description": "Hastighetsgräns 80 km/h — maxhastighet med lätt släp",
+      "image_alt": "Hastighetsgräns 80",
+      "image_type": "vägmärke",
+      "requiresImage": false,
+      "imageStatus": "auto-added-2026-06-05"
+    },
+    {
+      "id": 586,
+      "category": "Körning med Släp",
+      "subcategory": "Kopplingstyngd",
+      "question_type": "multiple_choice",
+      "question": "Vad menas med \"kopplingstyngd\" (kuggning) vid koppling av släpvagn?",
+      "option_a": "Vikten av dragkroken",
+      "option_b": "Den vertikala belastningen på dragkroken från kopplade släpet",
+      "option_c": "Totalvikten av släpet",
+      "option_d": "Vikten som sticker ut bakom bilen",
+      "options": {
+        "A": "Vikten av dragkroken",
+        "B": "Den vertikala belastningen på dragkroken från kopplade släpet",
+        "C": "Totalvikten av släpet",
+        "D": "Vikten som sticker ut bakom bilen"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Kopplingstyngden (eller kopplingslast) är den vertikala kraft som ett kopplat släp utövar nedåt på dragkroken. Rätt kopplingstyngd (normalt 50-75 kg) förbättrar stabilitet. För låg kopplingstyngd → svajning. För hög → sämre styrning.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 587,
+      "category": "Körning med Släp",
+      "subcategory": "Stabilitet",
+      "question_type": "multiple_choice",
+      "question": "Varför bör du inte lasta tungt längst bak i en husvagn/trailer?",
+      "option_a": "Det sliter mer på däcken",
+      "option_b": "Det minskar kopplingstyngden och ökar risken för svajning",
+      "option_c": "Det ökar kopplingstyngden för mycket",
+      "option_d": "Det påverkar inte körningen",
+      "options": {
+        "A": "Det sliter mer på däcken",
+        "B": "Det minskar kopplingstyngden och ökar risken för svajning",
+        "C": "Det ökar kopplingstyngden för mycket",
+        "D": "Det påverkar inte körningen"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Tung last längst bak i en trailer/husvagn minskar kopplingstyngden (den nedåttryckande kraften på dragkroken). För låg kopplingstyngd gör kombinationen instabil — husvagnen kan börja svänga (svajning). Lasten ska placeras framtill och lågt.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 588,
+      "category": "Körning med Släp",
+      "subcategory": "Bromsning",
+      "question_type": "multiple_choice",
+      "question": "Hur påverkar en bromsad husvagn bromssträckan jämfört med en obromsad?",
+      "option_a": "Bromssträckan ökar lika mycket",
+      "option_b": "Bromssträckan minskar — den bromsade husvagnen hjälper till att bromsa",
+      "option_c": "Bromssträckan minskar men kontrollen försämras",
+      "option_d": "Det spelar ingen roll",
+      "options": {
+        "A": "Bromssträckan ökar lika mycket",
+        "B": "Bromssträckan minskar — den bromsade husvagnen hjälper till att bromsa",
+        "C": "Bromssträckan minskar men kontrollen försämras",
+        "D": "Det spelar ingen roll"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. En bromsad husvagn/trailer har egna bromsar som aktiveras när dragbilen bromsar. Det förkortar bromssträckan jämfört med en obromsad trailer. En obromsad trailer skjuter på bakifrån vid inbromsning och förlänger bromssträckan.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 589,
+      "category": "Körning med Släp",
+      "subcategory": "Belysning",
+      "question_type": "multiple_choice",
+      "question": "Husvagnen är bredare än bilen. Vad krävs extra vid körning i mörker?",
+      "option_a": "Inget extra behövs",
+      "option_b": "Sidomarkeringsljus eller bredmarkering om husvagnen överstiger 2,10 m",
+      "option_c": "Helljus på dragbilen",
+      "option_d": "En medhjälpare med ficklampa",
+      "options": {
+        "A": "Inget extra behövs",
+        "B": "Sidomarkeringsljus eller bredmarkering om husvagnen överstiger 2,10 m",
+        "C": "Helljus på dragbilen",
+        "D": "En medhjälpare med ficklampa"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Om husvagnen/trailern är bredare än 2,10 meter krävs sidomarkeringsljus (orange/vita framtill, röda baktill). Dessa indikerar fordonets fulla bredd för mötande trafik. Dragbilens bakljus täcker inte husvagnens bredd.",
+      "law_reference": "TSVFS",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 590,
+      "category": "Körning med Släp",
+      "subcategory": "Lagar",
+      "question_type": "multiple_choice",
+      "question": "Vad måste du kontrollera INNAN du kopplar på en trailer?",
+      "option_a": "Enbart kopplingsskålen",
+      "option_b": "Kopplingsenhet, säkerhetsvajer/säkerhetskedja, elsladd, broms och belysning",
+      "option_c": "Bara elsladden",
+      "option_d": "Bara att hjulen sitter fast",
+      "options": {
+        "A": "Enbart kopplingsskålen",
+        "B": "Kopplingsenhet, säkerhetsvajer/säkerhetskedja, elsladd, broms och belysning",
+        "C": "Bara elsladden",
+        "D": "Bara att hjulen sitter fast"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Innan körning med trailer ska du kontrollera: kopplingsenhet (korrekt låst), säkerhetsvajer/kedja (håller trailern om kopplingen lossar), elsladd (belysning och bromsar fungerar), broms, belysning och däcktryck på trailern.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 591,
+      "category": "Körning med Släp",
+      "subcategory": "Vändradie",
+      "question_type": "multiple_choice",
+      "question": "Varför tar en bil med husvagn eller lång trailer mer plats vid svängar?",
+      "option_a": "Bilen bromsar sämre",
+      "option_b": "Trailern följer en kortare kurva (\"skär inåt\") och kräver mer utrymme i innersväng",
+      "option_c": "Bilen styr sämre",
+      "option_d": "Det spelar ingen roll — en trailer följer exakt bilens spår",
+      "options": {
+        "A": "Bilen bromsar sämre",
+        "B": "Trailern följer en kortare kurva (\"skär inåt\") och kräver mer utrymme i innersväng",
+        "C": "Bilen styr sämre",
+        "D": "Det spelar ingen roll — en trailer följer exakt bilens spår"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. En trailer/husvagn skär inåt vid svängar — den tar en kortare inre kurva än bilen. Ju längre trailern är, desto mer skär den in. Sväng därför brett och kontrollera speglar noga för att undvika att trailerns inre hörn kolliderar med vägkanten eller cyklister.",
+      "law_reference": "TF 3 kap",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 592,
+      "category": "Bogsering & Lastsäkring",
+      "subcategory": "Stångbogsering",
+      "question_type": "multiple_choice",
+      "question": "Vad är maxhastigheten vid stångbogsering (bogseringsstång, inte tross)?",
+      "option_a": "30 km/h",
+      "option_b": "50 km/h",
+      "option_c": "70 km/h",
+      "option_d": "80 km/h",
+      "options": {
+        "A": "30 km/h",
+        "B": "50 km/h",
+        "C": "70 km/h",
+        "D": "80 km/h"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Vid stångbogsering (fast stång) är maxhastigheten 50 km/h. Vid linebogsering (rep/tross) är det 30 km/h. En stång ger bättre kontroll än ett rep och tillåter därför något högre hastighet.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 593,
+      "category": "Bogsering & Lastsäkring",
+      "subcategory": "Framskjuten last",
+      "question_type": "multiple_choice",
+      "question": "En last sticker ut mer än 1 meter FRAMFÖR fordonets front. Vad krävs?",
+      "option_a": "Inget krävs om det är under 2 meter",
+      "option_b": "En vit markering eller flagga framtill",
+      "option_c": "En röd flagga framtill och varseltriangel baktill",
+      "option_d": "Inget krävs om chauffören är medveten",
+      "options": {
+        "A": "Inget krävs om det är under 2 meter",
+        "B": "En vit markering eller flagga framtill",
+        "C": "En röd flagga framtill och varseltriangel baktill",
+        "D": "Inget krävs om chauffören är medveten"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. En last som sticker ut mer än 1 meter framtill ska markeras med en VIT reflexmarkering eller vit flagga. Last som sticker ut mer än 1 meter baktill ska markeras med RÖD reflexmarkering eller röd flagga. Syftet är att varna andra trafikanter.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 594,
+      "category": "Bogsering & Lastsäkring",
+      "subcategory": "Tyngdpunkt",
+      "question_type": "multiple_choice",
+      "question": "Hur påverkar en hög tyngdpunkt (last lastas högt upp) bilens stabilitet?",
+      "option_a": "Förbättrar stabiliteten",
+      "option_b": "Försämrar stabiliteten och ökar risken för välta i kurvor",
+      "option_c": "Påverkar inte stabiliteten",
+      "option_d": "Förbättrar stabiliteten men minskar bromsförmågan",
+      "options": {
+        "A": "Förbättrar stabiliteten",
+        "B": "Försämrar stabiliteten och ökar risken för välta i kurvor",
+        "C": "Påverkar inte stabiliteten",
+        "D": "Förbättrar stabiliteten men minskar bromsförmågan"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Hög tyngdpunkt höjer gravitationscentrum vilket gör fordonet mer benäget att välta i kurvor. Lasta alltid tungt gods lågt och nära mitten av lastbäraren. Högt placerad last skapar kraftiga rörelser vid kurvtagning och inbromsning.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "normal",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 595,
+      "category": "Bogsering & Lastsäkring",
+      "subcategory": "Kontrollskyldighet",
+      "question_type": "multiple_choice",
+      "question": "En poliskontroll avslöjar att lasten är dåligt säkrad. Vem är ansvarig?",
+      "option_a": "Lastaren (den som lastade bilen)",
+      "option_b": "Föraren är alltid ytterst ansvarig för att lasten är säkrad",
+      "option_c": "Fordonsägaren, inte föraren",
+      "option_d": "Ingen är ansvarig om lasten inte har ramlat av",
+      "options": {
+        "A": "Lastaren (den som lastade bilen)",
+        "B": "Föraren är alltid ytterst ansvarig för att lasten är säkrad",
+        "C": "Fordonsägaren, inte föraren",
+        "D": "Ingen är ansvarig om lasten inte har ramlat av"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Föraren har alltid det yttersta ansvaret för att lasten är korrekt säkrad. Även om en annan person lastade bilen ska föraren kontrollera och godkänna lastens säkring innan avfärd. Osäkrad last är straffbelagd och ytterst farlig.",
+      "law_reference": "TF 4 kap 22§",
+      "difficulty": "easy",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 596,
+      "category": "Vägtunnlar",
+      "subcategory": "Mötande brand",
+      "question_type": "multiple_choice",
+      "question": "Du kör in i en tunnel och ser ett brinnande fordon framför dig. Vad gör du?",
+      "option_a": "Stanna bakom det brinnande fordonet och vänta på hjälp",
+      "option_b": "Om möjligt: backa ut ur tunneln. Om inte: parkera vid sidan, ta nycklarna, gå mot den NÄRMASTE nödutgången",
+      "option_c": "Kör snabbt förbi det brinnande fordonet",
+      "option_d": "Stanna, stäng av motor och vänta i bilen",
+      "options": {
+        "A": "Stanna bakom det brinnande fordonet och vänta på hjälp",
+        "B": "Om möjligt: backa ut ur tunneln. Om inte: parkera vid sidan, ta nycklarna, gå mot den NÄRMASTE nödutgången",
+        "C": "Kör snabbt förbi det brinnande fordonet",
+        "D": "Stanna, stäng av motor och vänta i bilen"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Vid brand i en tunnel: backa ut om det är säkert. Annars parkera vid sidan (lämna OLåst), ta nyckeln, gå mot NÄRMASTE nödutgång (inte nödvändigtvis entrén). Stanna INTE i bilen — rök och eld är dödliga. Ring 112 när du är säker.",
+      "law_reference": "Tunnelsäkerhetslagen",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 597,
+      "category": "Vägtunnlar",
+      "subcategory": "Regler",
+      "question_type": "multiple_choice",
+      "question": "Varför är det förbjudet att stanna i en vägtunnel (utom vid nödsituationer)?",
+      "option_a": "Det är inte förbjudet — bara olämpligt",
+      "option_b": "Avgaser samlas och risk för brand/kollision gör stillastående mycket farligt",
+      "option_c": "Bara för att det saktas ner trafikflödet",
+      "option_d": "Ljusförhållandena är dåliga",
+      "options": {
+        "A": "Det är inte förbjudet — bara olämpligt",
+        "B": "Avgaser samlas och risk för brand/kollision gör stillastående mycket farligt",
+        "C": "Bara för att det saktas ner trafikflödet",
+        "D": "Ljusförhållandena är dåliga"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Tunnlar är slutna miljöer där avgaser (CO, CO2) snabbt kan nå farliga nivåer. Brand i tunnel är extremt farlig eftersom utrymmet är begränsat och räddningstjänsten har svårt att komma in. Stanna är förbjudet och parkering är alltid förbjudet. (TF 9 kap tunnelbestämmelserna)",
+      "law_reference": "TF 9 kap",
+      "difficulty": "easy",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 598,
+      "category": "Vägtunnlar",
+      "subcategory": "Säkerhetsavstånd",
+      "question_type": "multiple_choice",
+      "question": "Varför ska du hålla extra stort säkerhetsavstånd inne i en lång tunnel?",
+      "option_a": "Belysningen är dåligare",
+      "option_b": "Möjligheterna att undkomma vid brand/haveri är begränsade och det kan ta lång tid att utrymma",
+      "option_c": "Hastigheten är högre i tunnel",
+      "option_d": "Det finns inga speciella skäl",
+      "options": {
+        "A": "Belysningen är dåligare",
+        "B": "Möjligheterna att undkomma vid brand/haveri är begränsade och det kan ta lång tid att utrymma",
+        "C": "Hastigheten är högre i tunnel",
+        "D": "Det finns inga speciella skäl"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. I en tunnel finns begränsade utrymnings- och räddningsmöjligheter. Om du krockar in i bilen framför dig kan kedjeolyckor blockera hela tunneln och omöjliggöra utrymning. Minst 50 meters säkerhetsavstånd rekommenderas för att kunna reagera och undvika kollision.",
+      "law_reference": "Tunnelsäkerhetslagen",
+      "difficulty": "normal",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 599,
+      "category": "Vägtunnlar",
+      "subcategory": "Nödutrustning",
+      "question_type": "multiple_choice",
+      "question": "Vad hittar du normalt i en nödnisch (SOS-nisch) längs en tunnelvägg?",
+      "option_a": "Bara nödtelefon",
+      "option_b": "Nödtelefon och brandsläckare",
+      "option_c": "Nödtelefon, brandsläckare och förbandslåda",
+      "option_d": "Enbart brandsläckare",
+      "options": {
+        "A": "Bara nödtelefon",
+        "B": "Nödtelefon och brandsläckare",
+        "C": "Nödtelefon, brandsläckare och förbandslåda",
+        "D": "Enbart brandsläckare"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. I tunnlars nödnischer finns normalt: nödtelefon (kopplad till räddningsledning) och brandsläckare. I vissa tunnlar finns också defibrillator. Nödtelefonerna är orange och placeras med jämna mellanrum längs tunnelväggen.",
+      "law_reference": "Tunnelsäkerhetslagen",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 600,
+      "category": "Nödsituationer",
+      "subcategory": "Älgolycka",
+      "question_type": "multiple_choice",
+      "question": "Du kör på en landsväg och en älg hoppar ut framför dig. Du kan inte undvika kollision. Vad ska du prioritera?",
+      "option_a": "Svänga kraftigt för att missa älgen",
+      "option_b": "Bromsa så hårt som möjligt rakt fram — sväng bara om det finns plats utan att hamna i diket",
+      "option_c": "Accelerera för att ta kraften kortare",
+      "option_d": "Stäng av motorn direkt",
+      "options": {
+        "A": "Svänga kraftigt för att missa älgen",
+        "B": "Bromsa så hårt som möjligt rakt fram — sväng bara om det finns plats utan att hamna i diket",
+        "C": "Accelerera för att ta kraften kortare",
+        "D": "Stäng av motorn direkt"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Vid oundviklig kollision med älg: bromsa maximalt rakt fram. Att svänga kraftigt riskerar att du kör av vägen eller in i mötande trafik — ofta farligare än älgkollisionen. Krama in huvudet, luta dig bakåt och låt airbagen/bältet skydda dig. Älg på tak är vanlig och extremt farlig.",
+      "law_reference": "TF 2 kap",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 601,
+      "category": "Nödsituationer",
+      "subcategory": "El-olycka",
+      "question_type": "multiple_choice",
+      "question": "Du är vid en trafikolycka och elledningar hänger ned på ett fordon. Vad gör du?",
+      "option_a": "Dra ut de skadade ur fordonet omedelbart",
+      "option_b": "Stanna på avstånd, ring 112 och kontakta elnätsägaren — RÖR INTE fordonet",
+      "option_c": "Klipp av kabeln med en sax",
+      "option_d": "Stå på marken och rör vid kabeln snabbt för att känna om det är ström",
+      "options": {
+        "A": "Dra ut de skadade ur fordonet omedelbart",
+        "B": "Stanna på avstånd, ring 112 och kontakta elnätsägaren — RÖR INTE fordonet",
+        "C": "Klipp av kabeln med en sax",
+        "D": "Stå på marken och rör vid kabeln snabbt för att känna om det är ström"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Elledningar på ett fordon är extremt farliga — RÖRV INTE fordonet eller kabeln. Markkontakt kan sprida ström (stegelspänning). Ring 112 och elnätsleverantören omedelbart. Vänta tills elnätsbolaget bekräftat att strömmen är bruten. Att dra ut skadade kan döda dig och dem.",
+      "law_reference": "Räddningstjänstlagen",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 602,
+      "category": "Nödsituationer",
+      "subcategory": "Livräddning",
+      "question_type": "multiple_choice",
+      "question": "En skadad person vid olyckan verkar ha nackskada. Hur hanterar du detta?",
+      "option_a": "Flytta personen till ett säkrare ställe omedelbart oavsett skada",
+      "option_b": "Rör personen minimalt — flytta bara om livshotande fara (brand, trafik). Håll nacken stilla och vänta på ambulans",
+      "option_c": "Böj nacken bakåt för att öppna luftvägen",
+      "option_d": "Sätt personen i sittande ställning",
+      "options": {
+        "A": "Flytta personen till ett säkrare ställe omedelbart oavsett skada",
+        "B": "Rör personen minimalt — flytta bara om livshotande fara (brand, trafik). Håll nacken stilla och vänta på ambulans",
+        "C": "Böj nacken bakåt för att öppna luftvägen",
+        "D": "Sätt personen i sittande ställning"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Vid misstänkt nackskada: rör personen minimalt. Felaktigt förflyttning kan förvärra ryggmärgsskada och orsaka permanent förlamning. Flytta bara om personen befinner sig i omedelbar livsfara (brand, trafik). Håll huvudet/nacken stabiliserat och ring 112.",
+      "law_reference": "Räddningstjänstlagen",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 603,
+      "category": "Nödsituationer",
+      "subcategory": "Barn i varm bil",
+      "question_type": "multiple_choice",
+      "question": "Du ser ett barn inlåst i en bil på en varm sommardag. Barnet verkar opåverkat men du kan inte nå föräldrarna. Vad gör du?",
+      "option_a": "Vänta 30 minuter och ring sedan 112",
+      "option_b": "Ring 112 direkt. Om barnets tillstånd försämras snabbt kan du krossa rutan — du kan ha nödrätt",
+      "option_c": "Ring bara polisen, inte SOS 112",
+      "option_d": "Gå och leta efter föräldrarna i 15 minuter",
+      "options": {
+        "A": "Vänta 30 minuter och ring sedan 112",
+        "B": "Ring 112 direkt. Om barnets tillstånd försämras snabbt kan du krossa rutan — du kan ha nödrätt",
+        "C": "Ring bara polisen, inte SOS 112",
+        "D": "Gå och leta efter föräldrarna i 15 minuter"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Ring 112 OMEDELBART. Bilar kan nå livsfarliga temperaturer på 10-15 minuter på en varm dag. Om barnet tappar medvetandet eller slutar röra sig och du inte kan nå 112 snabbt nog, kan du ha nödrätt att krossa rutan. Nödrätt ger ansvarsfrihet för skadegörelse vid livsfara.",
+      "law_reference": "BrB 24 kap (nödrätt)",
+      "difficulty": "normal",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 604,
+      "category": "Nödsituationer",
+      "subcategory": "Stopp på motorväg",
+      "question_type": "multiple_choice",
+      "question": "Bilen stannar mitt på motorvägen (maskinfel). Vad är det VIKTIGASTE du gör DIREKT?",
+      "option_a": "Stäng av motorn och börja ringa försäkringsbolaget",
+      "option_b": "Slå på varningsblinkers OMEDELBART, försök rulla till vägrenen, sätt ut varningstriangel och utrym fordonet till bakom räcket",
+      "option_c": "Öppna huven och vifta till mötande bilar",
+      "option_d": "Stanna kvar i bilen och vänta på bärgning",
+      "options": {
+        "A": "Stäng av motorn och börja ringa försäkringsbolaget",
+        "B": "Slå på varningsblinkers OMEDELBART, försök rulla till vägrenen, sätt ut varningstriangel och utrym fordonet till bakom räcket",
+        "C": "Öppna huven och vifta till mötande bilar",
+        "D": "Stanna kvar i bilen och vänta på bärgning"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Prioritetsordning vid stopp på motorväg: 1) Varningsblinkers DIREKT, 2) rulla av till vägren om möjligt, 3) utrym alla passagerare BAKOM räcket/vägvallar (INTE stå på körbanan), 4) sätt ut varningstriangel (minst 100m bak), 5) ring bärgning/112. Att stanna i bilen är livsfarligt.",
+      "law_reference": "TF 9 kap",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 605,
+      "category": "Nödsituationer",
+      "subcategory": "Kraftig blödning",
+      "question_type": "multiple_choice",
+      "question": "En skadad person vid en trafikolycka har kraftig blödning. Vad ska du göra omedelbart?",
+      "option_a": "Lägga personen i stabilt sidoläge och vänta",
+      "option_b": "Pressa hårt mot såret med ett tryckt förbandet eller händerna och håll trycket tills ambulansen kommer",
+      "option_c": "Lägga på ett löst förband utan tryck",
+      "option_d": "Lyfta den skadade armen/benet och vänta",
+      "options": {
+        "A": "Lägga personen i stabilt sidoläge och vänta",
+        "B": "Pressa hårt mot såret med ett tryckt förbandet eller händerna och håll trycket tills ambulansen kommer",
+        "C": "Lägga på ett löst förband utan tryck",
+        "D": "Lyfta den skadade armen/benet och vänta"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Vid kraftig blödning: applicera DIREKT tryck mot såret med händerna eller ett förband och HÅLL trycket. Lyft inte händerna — det stoppar koaguleringen. Hårdt direkttryck är den effektivaste metoden att stoppa kraftig blödning. Ring 112 parallellt.",
+      "law_reference": "Första hjälpen-riktlinjer",
+      "difficulty": "easy",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 606,
+      "category": "Trafikregler",
+      "subcategory": "Motorväg",
+      "question_type": "multiple_choice",
+      "question": "Vilka fordon är FÖRBJUDNA att köra på motorväg?",
+      "option_a": "Mopeder, cyklister, traktorer och fordon som inte klarar 40 km/h",
+      "option_b": "Motorcyklar och husbilar",
+      "option_c": "Lastbilar med tillstånd",
+      "option_d": "Bussar med fler än 30 passagerare",
+      "options": {
+        "A": "Mopeder, cyklister, traktorer och fordon som inte klarar 40 km/h",
+        "B": "Motorcyklar och husbilar",
+        "C": "Lastbilar med tillstånd",
+        "D": "Bussar med fler än 30 passagerare"
+      },
+      "correct": "A",
+      "correctAnswer": "A",
+      "explanation": "Rätt svar är A. På motorväg är mopeder, cyklister, traktorer, fordon som inte klarar minimihastighetskravet på 40 km/h samt gående förbjudna (TF 9 kap 1§). Motorcyklar, husbilar, lastbilar och bussar är tillåtna. Förbudet skyddar snabb trafik från långsamma fordon.",
+      "law_reference": "TF 9 kap 1§",
+      "difficulty": "easy",
+      "commonly_failed": false,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Sweden_road_sign_F5.svg/200px-Sweden_road_sign_F5.svg.png",
+      "image_description": "Motorvägsskylten F5 — motorväg börjar",
+      "image_alt": "Motorväg F5",
+      "image_type": "vägmärke",
+      "requiresImage": false,
+      "imageStatus": "auto-added-2026-06-05"
+    },
+    {
+      "id": 607,
+      "category": "Korsningar",
+      "subcategory": "Rondell",
+      "question_type": "multiple_choice",
+      "question": "Du kör in i en rondell och ska svänga av vid tredje avfarten. Vilken signal använder du?",
+      "option_a": "Blinka höger redan när du kör in",
+      "option_b": "Kör in utan blinkers, blinka höger när du passerat ANDRA avfarten och ska ta den tredje",
+      "option_c": "Blinka vänster när du kör in, höger när du svänger av",
+      "option_d": "Blinkers behövs inte i rondell",
+      "options": {
+        "A": "Blinka höger redan när du kör in",
+        "B": "Kör in utan blinkers, blinka höger när du passerat ANDRA avfarten och ska ta den tredje",
+        "C": "Blinka vänster när du kör in, höger när du svänger av",
+        "D": "Blinkers behövs inte i rondell"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. I rondell: kör in utan blinkers (eller vänster om du tar mer än halva rondellen). Blinka HÖGER när du passerat avfarten INNAN den du ska ta. Kör aldrig in i rondell med höger blinker — det signalerar att du tar första avfarten.",
+      "law_reference": "TF 3 kap",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sweden_road_sign_A8.svg/200px-Sweden_road_sign_A8.svg.png",
+      "image_description": "Varning för rondell (A8) — cirkulär körning med pilsymbol",
+      "image_alt": "Rondell A8",
+      "image_type": "vägmärke",
+      "requiresImage": false,
+      "imageStatus": "auto-added-2026-06-05"
+    },
+    {
+      "id": 608,
+      "category": "Korsningar",
+      "subcategory": "Spårvagn",
+      "question_type": "multiple_choice",
+      "question": "Du ska köra om en spårvagn som stannat för att ta upp passagerare. Vad gäller?",
+      "option_a": "Du kan köra om spårvagnen om det är säkert",
+      "option_b": "Du måste stanna och vänta tills passagerarna stigit ombord och spårvagnen kört",
+      "option_c": "Du ska sakta ned men behöver inte stanna",
+      "option_d": "Du kan köra om i vänstertrafik",
+      "options": {
+        "A": "Du kan köra om spårvagnen om det är säkert",
+        "B": "Du måste stanna och vänta tills passagerarna stigit ombord och spårvagnen kört",
+        "C": "Du ska sakta ned men behöver inte stanna",
+        "D": "Du kan köra om i vänstertrafik"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Fordon ska stanna och vänta när en spårvagn stannar för att ta upp eller lämna av passagerare (TF 3 kap). Passagerarna rör sig ofta framför spårvagnen. Du får inte köra förbi förrän alla passagerare är säkert ombord och spårvägen rör sig igen.",
+      "law_reference": "TF 3 kap 67§",
+      "difficulty": "normal",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 609,
+      "category": "Korsningar",
+      "subcategory": "Gående",
+      "question_type": "multiple_choice",
+      "question": "Du svänger in på en gata och en gående vill korsa den gatan (utan övergångställe). Vad gäller?",
+      "option_a": "Gående har alltid företräde",
+      "option_b": "Du har företräde — gående ska vänta",
+      "option_c": "Du ska lämna gående skälig möjlighet att passera om du svänger in från en annan väg",
+      "option_d": "Gående har företräde bara om de kliver ut framför bilen",
+      "options": {
+        "A": "Gående har alltid företräde",
+        "B": "Du har företräde — gående ska vänta",
+        "C": "Du ska lämna gående skälig möjlighet att passera om du svänger in från en annan väg",
+        "D": "Gående har företräde bara om de kliver ut framför bilen"
+      },
+      "correct": "C",
+      "correctAnswer": "C",
+      "explanation": "Rätt svar är C. Utanför övergångställe har gående normalt inte företräde. Men TF 3 kap 61§ säger att den som svänger in ska lämna gående skälig möjlighet att passera. I praktiken: var beredd att stanna och låt gående passera tryggt. Vid övergångställe har gående alltid företräde.",
+      "law_reference": "TF 3 kap 61§",
+      "difficulty": "hard",
+      "commonly_failed": true,
+      "image_url": null,
+      "requiresImage": false
+    },
+    {
+      "id": 610,
+      "category": "Väglag & Bromssträcka",
+      "subcategory": "Däcktryck",
+      "question_type": "multiple_choice",
+      "question": "Hur påverkar lågt däcktryck körning och säkerhet?",
+      "option_a": "Bättre grepp och kortare bromssträcka",
+      "option_b": "Sämre grepp, längre bromssträcka, ökad risk för punktering och ökat bränsleförbrukning",
+      "option_c": "Ingen påverkan om trycket inte är under hälften",
+      "option_d": "Bara bränsleförbrukningen ökar",
+      "options": {
+        "A": "Bättre grepp och kortare bromssträcka",
+        "B": "Sämre grepp, längre bromssträcka, ökad risk för punktering och ökat bränsleförbrukning",
+        "C": "Ingen påverkan om trycket inte är under hälften",
+        "D": "Bara bränsleförbrukningen ökar"
+      },
+      "correct": "B",
+      "correctAnswer": "B",
+      "explanation": "Rätt svar är B. Lågt däcktryck ger: sämre väggrepp (mer däck böjer sig), längre bromssträcka, ökad risk för punktering (däcket överhettas), ökat bränsleförbrukning (rullmotstånd ökar) och försämrad styrning. Kontrollera däcktryck regelbundet — minst en gång i månaden.",
+      "law_reference": "TF 4 kap",
+      "difficulty": "easy",
+      "commonly_failed": false,
+      "image_url": null,
+      "requiresImage": false
     }
   ]
 }

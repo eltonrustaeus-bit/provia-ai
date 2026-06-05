@@ -1,0 +1,732 @@
+{
+  "summary": {
+    "total": 374,
+    "withImage": 117,
+    "issues": {
+      "duplicates": 0,
+      "formulation": 0,
+      "imageMissing": 88,
+      "answerSuspect": 2,
+      "explanationMissing": 0,
+      "shortExplanation": 0
+    }
+  },
+  "imageCoverage": [
+    {
+      "category": "Vägmärken",
+      "total": 82,
+      "withImage": 81,
+      "pct": "99%"
+    },
+    {
+      "category": "Trafikregler",
+      "total": 44,
+      "withImage": 5,
+      "pct": "11%"
+    },
+    {
+      "category": "Korsningar",
+      "total": 28,
+      "withImage": 5,
+      "pct": "18%"
+    },
+    {
+      "category": "Möte & Omkörning",
+      "total": 19,
+      "withImage": 1,
+      "pct": "5%"
+    },
+    {
+      "category": "Hastighet",
+      "total": 36,
+      "withImage": 9,
+      "pct": "25%"
+    },
+    {
+      "category": "Miljö & Ekonomi",
+      "total": 13,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Alkohol & Droger",
+      "total": 14,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Säkerhet & Utrustning",
+      "total": 17,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Mörker & Sikt",
+      "total": 15,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Väglag & Bromssträcka",
+      "total": 16,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Vägtunnlar",
+      "total": 12,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Bogsering & Lastsäkring",
+      "total": 11,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Fordon & Besiktning",
+      "total": 8,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Körning med Släp",
+      "total": 12,
+      "withImage": 1,
+      "pct": "8%"
+    },
+    {
+      "category": "Nödsituationer",
+      "total": 17,
+      "withImage": 0,
+      "pct": "0%"
+    },
+    {
+      "category": "Parkering",
+      "total": 30,
+      "withImage": 15,
+      "pct": "50%"
+    }
+  ],
+  "issues": {
+    "duplicates": [],
+    "formulation": [],
+    "imageMissing": [
+      {
+        "id": 6,
+        "cat": "Vägmärken",
+        "q": "Gula rektangulära skyltar som används för vägvisning tillhör vilken märkeskatego"
+      },
+      {
+        "id": 16,
+        "cat": "Korsningar",
+        "q": "Du svänger vänster — cyklist kommer rakt fram. Vem har företräde?"
+      },
+      {
+        "id": 17,
+        "cat": "Korsningar",
+        "q": "Du ska lämna en parkeringsplats och köra in på gatan. Vem har företräde?"
+      },
+      {
+        "id": 18,
+        "cat": "Korsningar",
+        "q": "Du svänger höger — cyklist i cykelfil kör rakt fram. Vad gäller?"
+      },
+      {
+        "id": 21,
+        "cat": "Korsningar",
+        "q": "Du har kört in i en korsning och signalen slår om till rött bakom dig. Vad ska d"
+      },
+      {
+        "id": 22,
+        "cat": "Korsningar",
+        "q": "Du svänger vid grön signal och ska korsa ett övergångsställe där gående redan är"
+      },
+      {
+        "id": 23,
+        "cat": "Möte & Omkörning",
+        "q": "Var är omkörning alltid förbjuden?"
+      },
+      {
+        "id": 24,
+        "cat": "Möte & Omkörning",
+        "q": "När lägger du tillbaka i körfältet efter omkörning?"
+      },
+      {
+        "id": 25,
+        "cat": "Möte & Omkörning",
+        "q": "Vad gäller vid möte på smal bro utan mötesplats?"
+      },
+      {
+        "id": 26,
+        "cat": "Möte & Omkörning",
+        "q": "Det är förbjudet att köra om ett spårfordon som...?"
+      },
+      {
+        "id": 27,
+        "cat": "Möte & Omkörning",
+        "q": "Vilket sidoavstånd bör du hålla till en cyklist?"
+      },
+      {
+        "id": 28,
+        "cat": "Möte & Omkörning",
+        "q": "Hur lång sträcka krävs för säker omkörning vid 90 km/h?"
+      },
+      {
+        "id": 51,
+        "cat": "Mörker & Sikt",
+        "q": "Vad ska du använda i mörker utanför tätort?"
+      },
+      {
+        "id": 52,
+        "cat": "Mörker & Sikt",
+        "q": "Hur långt lyser halvljuset normalt?"
+      },
+      {
+        "id": 53,
+        "cat": "Mörker & Sikt",
+        "q": "Vad gör du om du bländas av mötande fordon?"
+      },
+      {
+        "id": 54,
+        "cat": "Mörker & Sikt",
+        "q": "När får du använda frontdimljus?"
+      },
+      {
+        "id": 55,
+        "cat": "Mörker & Sikt",
+        "q": "Hur nedsatt sikt krävs för bakre dimljus?"
+      },
+      {
+        "id": 56,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Hur mycket längre bromssträcka på is vs torr asfalt?"
+      },
+      {
+        "id": 57,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Bromssträcka vid 50 km/h på torr asfalt utan reaktionstid?"
+      },
+      {
+        "id": 58,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad gör du om bilen börjar sladda?"
+      },
+      {
+        "id": 59,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vilka däck krävs vid vinterväglag i Sverige?"
+      },
+      {
+        "id": 60,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad är aquaplaning och hur uppstår det?"
+      },
+      {
+        "id": 61,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad gör du vid aquaplaning?"
+      },
+      {
+        "id": 95,
+        "cat": "Korsningar",
+        "q": "Du svänger vänster. Mötande bil kör rakt fram. Vem har företräde?"
+      },
+      {
+        "id": 96,
+        "cat": "Korsningar",
+        "q": "Högerregeln: du och ett fordon till vänster om dig möts i en korsning. Vem har f"
+      },
+      {
+        "id": 97,
+        "cat": "Korsningar",
+        "q": "Vad bör du göra när ett körfält upphör och trafiken ska vävas samman?"
+      },
+      {
+        "id": 99,
+        "cat": "Korsningar",
+        "q": "Vad ska du göra när trafikljuset visar rött?"
+      },
+      {
+        "id": 102,
+        "cat": "Korsningar",
+        "q": "Hur signalerar du att du ska svänga höger?"
+      },
+      {
+        "id": 103,
+        "cat": "Möte & Omkörning",
+        "q": "Var är det absolut förbjudet att köra om?"
+      },
+      {
+        "id": 104,
+        "cat": "Möte & Omkörning",
+        "q": "Vilket sidoavstånd rekommenderas vid omkörning av cyklist?"
+      },
+      {
+        "id": 105,
+        "cat": "Möte & Omkörning",
+        "q": "I vilket körfält ska du normalt köra på en flerfältsväg?"
+      },
+      {
+        "id": 107,
+        "cat": "Möte & Omkörning",
+        "q": "Vad ska du göra innan du påbörjar en omkörning?"
+      },
+      {
+        "id": 131,
+        "cat": "Mörker & Sikt",
+        "q": "Vilket ljus ska du använda när du möter ett fordon i mörker?"
+      },
+      {
+        "id": 132,
+        "cat": "Mörker & Sikt",
+        "q": "På vilket avstånd byter du till halvljus vid möte?"
+      },
+      {
+        "id": 133,
+        "cat": "Mörker & Sikt",
+        "q": "I vilka situationer är det förbjudet eller olämpligt att använda helljus?"
+      },
+      {
+        "id": 134,
+        "cat": "Mörker & Sikt",
+        "q": "Vad gäller om sikten är sämre än 50 meter på grund av dimma?"
+      },
+      {
+        "id": 135,
+        "cat": "Mörker & Sikt",
+        "q": "Vilka ljus ska du alltid ha på i Sverige?"
+      },
+      {
+        "id": 136,
+        "cat": "Mörker & Sikt",
+        "q": "När är det lämpligt att använda helljus?"
+      },
+      {
+        "id": 137,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Hur påverkar snö på vägbanan bromssträckan jämfört med torr asfalt?"
+      },
+      {
+        "id": 138,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad gör du om du börjar glida på is?"
+      },
+      {
+        "id": 140,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vilket system hjälper dig styra under kraftig bromsning?"
+      },
+      {
+        "id": 141,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Hur långt bör säkerhetsavståndet vara i sekunder?"
+      },
+      {
+        "id": 142,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Du kör bakom ett tungt fordon. Hur bör du anpassa ditt säkerhetsavstånd jämfört "
+      },
+      {
+        "id": 173,
+        "cat": "Korsningar",
+        "q": "Du svänger och korsar ett övergångsställe där gående är på väg över. Vad ska du "
+      },
+      {
+        "id": 175,
+        "cat": "Korsningar",
+        "q": "Du kör rakt fram i en korsning. En mötande bil svänger vänster. Vem har företräd"
+      },
+      {
+        "id": 177,
+        "cat": "Korsningar",
+        "q": "Du genomför en manöver i en korsning och ett utryckningsfordon med blåljus/larm "
+      },
+      {
+        "id": 178,
+        "cat": "Korsningar",
+        "q": "Du möter en spårvagn i en korsning och högerregeln ger dig företräde. Vad bör du"
+      },
+      {
+        "id": 179,
+        "cat": "Korsningar",
+        "q": "I vilken del av körfältet håller du dig när du väntar på att svänga vänster i en"
+      },
+      {
+        "id": 180,
+        "cat": "Korsningar",
+        "q": "Vad markerar en heldragen vit väjningslinje tvärs över körriktningen?"
+      },
+      {
+        "id": 181,
+        "cat": "Korsningar",
+        "q": "Varför bör du sakta ner i god tid inför en korsning?"
+      },
+      {
+        "id": 182,
+        "cat": "Korsningar",
+        "q": "Högerregeln gäller och inget fordon befinner sig till din höger i korsningen. Va"
+      },
+      {
+        "id": 183,
+        "cat": "Möte & Omkörning",
+        "q": "Du möter ett fordon på en smal väg. Vad gör du?"
+      },
+      {
+        "id": 184,
+        "cat": "Möte & Omkörning",
+        "q": "Är det tillåtet att köra om ett fordon som väntar för att svänga vänster?"
+      },
+      {
+        "id": 185,
+        "cat": "Möte & Omkörning",
+        "q": "Vad måste vara uppfyllt innan du påbörjar en omkörning?"
+      },
+      {
+        "id": 186,
+        "cat": "Möte & Omkörning",
+        "q": "Du har påbörjat en omkörning men ser att det inte räcker. Vad ska du göra?"
+      },
+      {
+        "id": 187,
+        "cat": "Möte & Omkörning",
+        "q": "Vad ska du kontrollera innan du börjar köra om?"
+      },
+      {
+        "id": 188,
+        "cat": "Möte & Omkörning",
+        "q": "På motorväg med tre körfält – vilket körfält ska du normalt använda?"
+      },
+      {
+        "id": 189,
+        "cat": "Möte & Omkörning",
+        "q": "Är omkörning tillåtet i eller precis inför en korsning?"
+      },
+      {
+        "id": 190,
+        "cat": "Möte & Omkörning",
+        "q": "Vilket avstånd är lämpligt till fordonet framför när du börjar köra om?"
+      },
+      {
+        "id": 211,
+        "cat": "Mörker & Sikt",
+        "q": "Hur långt lyser helljuset normalt på en personbil?"
+      },
+      {
+        "id": 212,
+        "cat": "Mörker & Sikt",
+        "q": "Vad ska du göra om mötande bil inte bländar ner sina helljus?"
+      },
+      {
+        "id": 213,
+        "cat": "Mörker & Sikt",
+        "q": "När ska du använda dimljus?"
+      },
+      {
+        "id": 214,
+        "cat": "Mörker & Sikt",
+        "q": "Vad innebär 'överhastighet i förhållande till ljuskäglan'?"
+      },
+      {
+        "id": 215,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vid vilken yttemperatur uppstår is extra lätt på vägbanan?"
+      },
+      {
+        "id": 217,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad bör du göra om bilens bak börjar glida ut i en kurva på halt underlag?"
+      },
+      {
+        "id": 501,
+        "cat": "Parkering",
+        "q": "Varför är det förbjudet att parkera nära före ett övergångsställe?"
+      },
+      {
+        "id": 503,
+        "cat": "Parkering",
+        "q": "Vad är skillnaden mellan 'stanna' och 'parkera'?"
+      },
+      {
+        "id": 505,
+        "cat": "Parkering",
+        "q": "Hur nära en vägkorsning får du normalt inte parkera?"
+      },
+      {
+        "id": 506,
+        "cat": "Parkering",
+        "q": "Hur långt framför ett backkrön med skymd sikt är parkering förbjudet?"
+      },
+      {
+        "id": 509,
+        "cat": "Parkering",
+        "q": "En parkeringsskylt anger förbudet måndag–fredag kl 8–17. När är parkering tillåt"
+      },
+      {
+        "id": 515,
+        "cat": "Parkering",
+        "q": "Hur nära ett järnvägsspår är parkering förbjuden?"
+      },
+      {
+        "id": 518,
+        "cat": "Parkering",
+        "q": "Vad är klampning och när tillämpas det?"
+      },
+      {
+        "id": 521,
+        "cat": "Parkering",
+        "q": "Vad innebär en skylt med \"P\" och en myntsymbol vid en parkeringsplats?"
+      },
+      {
+        "id": 522,
+        "cat": "Parkering",
+        "q": "Det råder stannande- och parkeringsförbud. Tilläggsskylten visar \"Utom taxi\". Gä"
+      },
+      {
+        "id": 523,
+        "cat": "Parkering",
+        "q": "Är det tillåtet att lämna bilen i ett bussfält under kvällstid när busstrafiken "
+      },
+      {
+        "id": 524,
+        "cat": "Parkering",
+        "q": "Du vill parkera nära en korsning. Vilket avstånd ska du minst hålla från den kor"
+      },
+      {
+        "id": 526,
+        "cat": "Parkering",
+        "q": "Vad innebär en gul heldragen kantlinje längs vägkanten?"
+      },
+      {
+        "id": 527,
+        "cat": "Parkering",
+        "q": "En parkeringsskylt visar \"Förbjudet röda dagar\". Gäller förbudet även söndagar?"
+      },
+      {
+        "id": 528,
+        "cat": "Parkering",
+        "q": "Gäller parkeringsförbudet (10 m) även på sidan BAKOM ett övergångställe (i kören"
+      },
+      {
+        "id": 529,
+        "cat": "Parkering",
+        "q": "Ska du tända parkeringsljus på bilen när du parkerar på en väg i mörker?"
+      },
+      {
+        "id": 574,
+        "cat": "Korsningar",
+        "q": "Högerregeln gäller. Bil A är till din vänster, Bil B till din höger. Vem lämnar "
+      },
+      {
+        "id": 575,
+        "cat": "Korsningar",
+        "q": "Grön cirkulär signal lyser. Du ska svänga vänster. Måste du ändå väja för någon?"
+      },
+      {
+        "id": 576,
+        "cat": "Korsningar",
+        "q": "Varför är högerregeln viktig att kunna i detalj?"
+      },
+      {
+        "id": 581,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Vad är 'svart is' och varför är det farligt?"
+      },
+      {
+        "id": 582,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Hur stort säkerhetsavstånd bör du hålla vid 90 km/h i normalt väder?"
+      },
+      {
+        "id": 608,
+        "cat": "Korsningar",
+        "q": "Du ska köra om en spårvagn som stannat för att ta upp passagerare. Vad gäller?"
+      },
+      {
+        "id": 609,
+        "cat": "Korsningar",
+        "q": "Du svänger in på en gata och en gående vill korsa den gatan (utan övergångställe"
+      },
+      {
+        "id": 610,
+        "cat": "Väglag & Bromssträcka",
+        "q": "Hur påverkar lågt däcktryck körning och säkerhet?"
+      }
+    ],
+    "imageUrlSuspect": [
+      {
+        "id": 76,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Sweden_road_sign_C1.sv",
+        "q": "Du ser märket vid en infart från ditt håll. Vad betyder vägmärket?"
+      },
+      {
+        "id": 82,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Sweden_road_sign_E23.s",
+        "q": "Du ser märket vid en plats avsedd för taxitrafik. Vad betyder vägmärket?"
+      },
+      {
+        "id": 143,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.",
+        "q": "Du kommer fram till en plats där en blå pil visar tillåten färdväg. Vilket alter"
+      },
+      {
+        "id": 144,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.sv",
+        "q": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vad betyder vägm"
+      },
+      {
+        "id": 148,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.s",
+        "q": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vad betyder väg"
+      },
+      {
+        "id": 149,
+        "code": "som",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.s",
+        "q": "Du ser ett blått märke som rekommenderar en lägre hastighet. Vad betyder vägmärk"
+      },
+      {
+        "id": 150,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.s",
+        "q": "Du närmar dig en plats där skidåkare eller kabinbana kan förekomma. Vilket alter"
+      },
+      {
+        "id": 153,
+        "code": "innan",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Sweden_road_sign_A9.sv",
+        "q": "Du ser märket innan ett farthinder på vägen. Vad betyder vägmärket?"
+      },
+      {
+        "id": 154,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.sv",
+        "q": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vilket alternati"
+      },
+      {
+        "id": 155,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.s",
+        "q": "Du kommer fram mot en sträcka med arbete på eller vid vägen. Vilket alternativ b"
+      },
+      {
+        "id": 355,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.s",
+        "q": "Du närmar dig en plats där gående kan korsa vägen. Vilket alternativ beskriver m"
+      },
+      {
+        "id": 356,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.s",
+        "q": "Du kör i ett område där barn ofta rör sig nära vägen. Vilket alternativ beskrive"
+      },
+      {
+        "id": 364,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.sv",
+        "q": "Du ser märket vid början av en väg där fordonstrafik begränsas. Vad gäller för d"
+      },
+      {
+        "id": 365,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Sweden_road_sign_C3.sv",
+        "q": "Du ser märket vid en väg där motordrivna fordon begränsas. Vad betyder vägmärket"
+      },
+      {
+        "id": 366,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.sv",
+        "q": "Du ser märket vid en väg där tvåhjuliga motordrivna fordon begränsas. Vad betyde"
+      },
+      {
+        "id": 367,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.s",
+        "q": "Du ser märket vid en väg där mopedtrafik begränsas. Vad betyder vägmärket?"
+      },
+      {
+        "id": 369,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.s",
+        "q": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vilket alternat"
+      },
+      {
+        "id": 371,
+        "code": "ovanf",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.s",
+        "q": "Du ser märket ovanför eller vid ett körfält för linjetrafik. Vad betyder vägmärk"
+      },
+      {
+        "id": 379,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.s",
+        "q": "Du ser märket vid en väg där mopedtrafik begränsas. Vilket alternativ beskriver "
+      },
+      {
+        "id": 380,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1",
+        "q": "Du kör på en öppen sträcka där sidvind kan påverka bilen. Vilket alternativ besk"
+      },
+      {
+        "id": 381,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.s",
+        "q": "Du ser märket vid sidan av vägen där du funderar på att parkera. Vad gäller för "
+      },
+      {
+        "id": 382,
+        "code": "ovanf",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.s",
+        "q": "Du ser märket ovanför eller vid ett körfält för linjetrafik. Vilket alternativ b"
+      },
+      {
+        "id": 383,
+        "code": "korrekt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sweden_road_sign_E7.sv",
+        "q": "Du kör fram mot en gata där gående har en särskild ställning. Vilket alternativ "
+      },
+      {
+        "id": 387,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.sv",
+        "q": "Du ser märket vid början av en väg där fordonstrafik begränsas. Hur ska du tolka"
+      },
+      {
+        "id": 390,
+        "code": "vid",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.sv",
+        "q": "Du ser märket vid en väg där tvåhjuliga motordrivna fordon begränsas. Vilket alt"
+      },
+      {
+        "id": 561,
+        "code": "som",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_E11.s",
+        "q": "Du ser ett blått märke som rekommenderar en lägre hastighet. Vilket alternativ b"
+      }
+    ],
+    "answerSuspect": [
+      {
+        "id": 33,
+        "note": "50 km/h i tättbebyggt",
+        "correctOpt": "70 km/h",
+        "q": "Hastighetsgräns utanför tätort för personbil utan märke?"
+      },
+      {
+        "id": 110,
+        "note": "Normal reaktionstid ~1 sekund",
+        "correctOpt": "25 meter",
+        "q": "Du kör i 90 km/h. Hur lång sträcka tillryggalägger bilen under 1 sekunds reaktio"
+      }
+    ],
+    "explanationMissing": [],
+    "shortExplanation": []
+  }
+}
