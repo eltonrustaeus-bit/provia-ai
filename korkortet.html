@@ -374,6 +374,24 @@ body.light .aiSendBtn{color:#fff}
 .dashAreaPct.g{color:var(--ok)}
 .dashAreaPct.r{color:var(--danger)}
 
+/* ── REPORT QUESTION ── */
+.reportQuestionBtn{display:none;background:none;border:none;color:var(--t3);font-family:var(--mono);font-size:10px;cursor:pointer;padding:8px 0 0;transition:color .15s;text-align:left;width:100%}
+.reportQuestionBtn:hover{color:#e8a24a}
+.rModal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px}
+.rCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;max-width:380px;width:100%}
+.rTitle{font-size:14px;font-weight:600;color:var(--t);margin-bottom:3px}
+.rSub{font-size:11px;color:var(--t3);font-family:var(--mono);margin-bottom:14px}
+.rGroup{display:grid;gap:6px;margin-bottom:12px}
+.rOpt{display:flex;align-items:center;gap:9px;padding:9px 12px;border:1px solid var(--l);border-radius:var(--r);cursor:pointer;transition:border-color .13s,background .13s}
+.rOpt:hover,.rOpt.sel{border-color:var(--l2);background:var(--a-dim)}
+.rOpt input{accent-color:var(--a);width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.rOpt span{font-size:12.5px;color:var(--t2)}
+.rTxt{width:100%;padding:9px 12px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:var(--font);font-size:12.5px;resize:none;outline:none;transition:border-color .15s;margin-bottom:12px;box-sizing:border-box}
+.rTxt:focus{border-color:var(--l2)}
+.rRow{display:flex;gap:8px;justify-content:flex-end}
+/* broken image fallback */
+.imgError{font-size:11px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);padding:8px 12px;background:var(--s2);font-family:var(--mono);margin-bottom:10px}
+
 </style>
 </head>
 <body>
@@ -662,6 +680,10 @@ body.light .aiSendBtn{color:#fff}
       <div id="historyBody"></div>
     </div>
 
+    <div style="text-align:center;padding:4px 0 8px">
+      <button onclick="resetMastered()" style="background:none;border:none;color:var(--t3);font-family:var(--mono);font-size:10.5px;cursor:pointer;padding:6px 10px;border-radius:var(--r);transition:color .15s" onmouseover="this.style.color='var(--warn)'" onmouseout="this.style.color='var(--t3)'">↺ Nollställ klarade frågor</button>
+    </div>
+
   </div>
 
   <!-- ② EXAM VIEW -->
@@ -699,6 +721,7 @@ body.light .aiSendBtn{color:#fff}
           Gå vidare
           <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
         </button>
+        <button class="reportQuestionBtn" id="reportQuestionBtn" type="button">⚑ Rapportera fel i frågan</button>
       </div>
     </div>
 
@@ -864,6 +887,7 @@ function markMastered(cat, id) {
   if (!m[cat].includes(id)) { m[cat].push(id); localStorage.setItem(LS_CAT_MASTERED, JSON.stringify(m)); }
 }
 const masteredFor = (cat) => getMastered()[cat] || [];
+const isMastered = (q) => (getMastered()[q.category] || []).includes(q.id);
 
 // ── SUPABASE PROGRESS SYNC ──
 async function getAuthToken() {
@@ -1794,7 +1818,7 @@ async function startCourseQuiz(stage) {
   if(!uid) { showLoginScreen(); return; }
   const cat = activeCourse;
   const isTest = stage === "test";
-  const n = isTest ? Math.min(10, questions.filter(q=>q.category===cat).length) : Math.min(7, questions.filter(q=>q.category===cat).length);
+  const n = isTest ? null : Math.min(7, questions.filter(q=>q.category===cat).length);
   miniQuizMode = !isTest;
   // Hide stage view, show exam
   $("courseStageView").style.display = "none";
@@ -1844,14 +1868,22 @@ async function startCourseQuiz(stage) {
     const other = remaining.filter(q=>q.difficulty&&q.difficulty!=="easy");
     pool = [...shuffle(easy), ...shuffle(other)];
   } else {
-    // Adaptive for test: boost wrong answers
+    // Test mode: ALL non-mastered questions, wrong answers first
+    const masteredIds = masteredFor(cat);
+    pool = pool.filter(q => !masteredIds.includes(q.id));
+    if(pool.length === 0) {
+      miniQuizMode = false;
+      $("modeTabs").style.display = "";
+      $("courseStageView").style.display = "";
+      renderCourseMastered(cat);
+      return;
+    }
     const wrongIds = getWrongIds();
-    const weak = shuffle(pool.filter(q=>wrongIds.includes(q.id)));
-    const strong = shuffle(pool.filter(q=>!wrongIds.includes(q.id)));
-    const weakTarget = Math.min(weak.length, Math.floor(n*0.4));
-    pool = shuffle([...weak.slice(0,weakTarget), ...strong.slice(0, n-weakTarget)]);
+    const weak = shuffle(pool.filter(q => wrongIds.includes(q.id)));
+    const strong = shuffle(pool.filter(q => !wrongIds.includes(q.id)));
+    pool = [...weak, ...strong]; // weak-first, no cap
   }
-  exam = pool.slice(0, n);
+  exam = n !== null ? pool.slice(0, n) : pool;
   idx = 0; ans = new Array(exam.length).fill(null);
   streak = 0; updateStreak();
   showExam(); renderQ(0);
@@ -2168,6 +2200,15 @@ async function runExam(cat, n, diff) {
   if(diff) pool = pool.filter(q => q.difficulty === diff);
   if(pool.length === 0) { toast("Inga frågor hittades för dessa filter.", "bad"); return; }
 
+  // Filter mastered questions — skip ones already answered correctly
+  const beforeMastered = pool.length;
+  pool = pool.filter(q => !isMastered(q));
+  if(pool.length === 0) {
+    const lbl = cat === "⭐ Bokmärkta" ? "bokmärkta" : cat === "Alla kategorier" ? "valda" : `"${cat}"`;
+    toast(`Du har klarat alla ${lbl}-frågor! 🎉 Välj en annan kategori eller nollställ framsteg.`, "ok");
+    return;
+  }
+
   // Adaptive: boost wrong-answer questions (up to 40% of exam)
   const wrongIds = getWrongIds();
   const weak = shuffle(pool.filter(q => wrongIds.includes(q.id)));
@@ -2235,7 +2276,7 @@ function renderQ(i) {
   // Image
   const imgWrap = $("qImgWrap");
   if(q.imageUrl && !BLOCKED_IMAGE_STATUSES.has(q.imageStatus)) {
-    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.imageUrl)}" alt="${esc(q.image_description||'')}" loading="eager">`;
+    imgWrap.innerHTML = `<img class="qImg" src="${esc(q.imageUrl)}" alt="${esc(q.image_description||'')}" loading="eager" onerror="this.style.display='none';var d=document.createElement('div');d.className='imgError';d.textContent='⚠ Bilden kunde inte laddas';this.parentNode.insertBefore(d,this.nextSibling)">`;
     imgWrap.style.display = "";
   } else {
     imgWrap.innerHTML = ""; imgWrap.style.display = "none";
@@ -2246,6 +2287,10 @@ function renderQ(i) {
   bm.style.display = "grid";
   bm.classList.toggle("saved", getBM().includes(q.id));
   bm.onclick = () => { const s = toggleBM(q.id); bm.classList.toggle("saved", s); toast(s?"Bokmärkt ⭐":"Borttaget","ok") };
+
+  // Report button — show only when logged in, set current question id
+  const rqb = $("reportQuestionBtn");
+  if(rqb) { rqb.dataset.qid = String(q.id); rqb.style.display = uid ? "" : "none"; }
 
   // Reset feedback
   $("explBox").className = "explBox";
@@ -2291,7 +2336,7 @@ function handleAns(chosen, q) {
   const ch = chosen.toUpperCase();
   const ok = ch === correct;
   ans[idx] = ch;
-  if (ok && miniQuizMode && activeCourse) markMastered(activeCourse, q.id);
+  if (ok) markMastered(q.category, q.id);
 
   document.querySelectorAll("#ansGrid .ansBtn").forEach((b, i) => {
     b.disabled = true;
@@ -2794,7 +2839,92 @@ window.addEventListener("unhandledrejection", e => {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && uid) saveProgressToSupabase(); });
 window.addEventListener("pagehide", () => { if (uid) saveProgressToSupabase(); });
 
+// ── REPORT MODAL ──
+let _rQid = null;
+
+function showReportModal(qid) {
+  _rQid = qid;
+  $("rModalQid").textContent = qid;
+  $("rTxt").value = "";
+  document.querySelectorAll('input[name="rReason"]').forEach(r => r.checked = false);
+  document.querySelectorAll(".rOpt").forEach(r => r.classList.remove("sel"));
+  $("rSubmitBtn").disabled = false;
+  $("rSubmitBtn").textContent = "Skicka rapport";
+  $("rModal").style.display = "";
+}
+
+$("rCancelBtn").onclick = () => { $("rModal").style.display = "none"; };
+$("rModal").addEventListener("click", e => { if(e.target === $("rModal")) $("rModal").style.display = "none"; });
+document.querySelectorAll('input[name="rReason"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    document.querySelectorAll(".rOpt").forEach(r => r.classList.remove("sel"));
+    radio.closest(".rOpt").classList.add("sel");
+  });
+});
+
+$("rSubmitBtn").onclick = async () => {
+  if(!_rQid) return;
+  const reason = document.querySelector('input[name="rReason"]:checked')?.value;
+  if(!reason) { toast("Välj en orsak för rapporten.", "bad"); return; }
+  const comment = $("rTxt").value.trim().slice(0, 140) || null;
+  $("rSubmitBtn").disabled = true;
+  $("rSubmitBtn").textContent = "Skickar…";
+  try {
+    const tok = await getAuthToken();
+    if(!tok) { toast("Logga in för att rapportera.", "bad"); return; }
+    const r = await fetch("/api/report-question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ question_id: _rQid, reason, comment })
+    });
+    if(r.ok) {
+      toast("Tack! Rapporten är skickad — vi granskar frågan.", "ok");
+      $("rModal").style.display = "none";
+    } else {
+      toast("Kunde inte skicka rapport. Försök igen.", "bad");
+      $("rSubmitBtn").disabled = false;
+      $("rSubmitBtn").textContent = "Skicka rapport";
+    }
+  } catch {
+    toast("Nätverksfel — försök igen.", "bad");
+    $("rSubmitBtn").disabled = false;
+    $("rSubmitBtn").textContent = "Skicka rapport";
+  }
+};
+
+$("reportQuestionBtn").onclick = () => {
+  const qid = parseInt($("reportQuestionBtn").dataset.qid);
+  if(qid) showReportModal(qid);
+};
+
+// ── RESET MASTERED ──
+function resetMastered() {
+  if(!confirm("Nollställa alla klarade frågor? Du börjar om från början.")) return;
+  localStorage.removeItem(LS_CAT_MASTERED);
+  if(uid) saveProgressToSupabase();
+  toast("Framsteg nollställda.", "ok");
+}
+
 init();
 </script>
+
+<!-- REPORT MODAL -->
+<div id="rModal" class="rModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="rModalTitle">
+  <div class="rCard">
+    <div class="rTitle" id="rModalTitle">Rapportera fråga</div>
+    <div class="rSub">Fråga #<span id="rModalQid"></span></div>
+    <div class="rGroup" id="rGroup">
+      <label class="rOpt"><input type="radio" name="rReason" value="wrong_answer"><span>Fel svar angett som rätt</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="wrong_image"><span>Fel eller missvisande bild</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="unclear"><span>Otydlig eller felaktig formulering</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="other"><span>Annat</span></label>
+    </div>
+    <textarea class="rTxt" id="rTxt" rows="2" maxlength="140" placeholder="Valfri kommentar (max 140 tecken)…"></textarea>
+    <div class="rRow">
+      <button class="btn btnG" id="rCancelBtn" type="button">Avbryt</button>
+      <button class="btn btnP" id="rSubmitBtn" type="button">Skicka rapport</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
