@@ -771,6 +771,25 @@ body.light .aiSendBtn{color:#fff}
 
 <footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
 
+<!-- REPORT MODAL -->
+<div id="rModal" class="rModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="rModalTitle">
+  <div class="rCard">
+    <div class="rTitle" id="rModalTitle">Rapportera fråga</div>
+    <div class="rSub">Fråga #<span id="rModalQid"></span></div>
+    <div class="rGroup" id="rGroup">
+      <label class="rOpt"><input type="radio" name="rReason" value="wrong_answer"><span>Fel svar angett som rätt</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="wrong_image"><span>Fel eller missvisande bild</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="unclear"><span>Otydlig eller felaktig formulering</span></label>
+      <label class="rOpt"><input type="radio" name="rReason" value="other"><span>Annat</span></label>
+    </div>
+    <textarea class="rTxt" id="rTxt" rows="2" maxlength="140" placeholder="Valfri kommentar (max 140 tecken)…"></textarea>
+    <div class="rRow">
+      <button class="btn btnG" id="rCancelBtn" type="button">Avbryt</button>
+      <button class="btn btnP" id="rSubmitBtn" type="button">Skicka rapport</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
@@ -2911,23 +2930,5 @@ function resetMastered() {
 init();
 </script>
 
-<!-- REPORT MODAL -->
-<div id="rModal" class="rModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="rModalTitle">
-  <div class="rCard">
-    <div class="rTitle" id="rModalTitle">Rapportera fråga</div>
-    <div class="rSub">Fråga #<span id="rModalQid"></span></div>
-    <div class="rGroup" id="rGroup">
-      <label class="rOpt"><input type="radio" name="rReason" value="wrong_answer"><span>Fel svar angett som rätt</span></label>
-      <label class="rOpt"><input type="radio" name="rReason" value="wrong_image"><span>Fel eller missvisande bild</span></label>
-      <label class="rOpt"><input type="radio" name="rReason" value="unclear"><span>Otydlig eller felaktig formulering</span></label>
-      <label class="rOpt"><input type="radio" name="rReason" value="other"><span>Annat</span></label>
-    </div>
-    <textarea class="rTxt" id="rTxt" rows="2" maxlength="140" placeholder="Valfri kommentar (max 140 tecken)…"></textarea>
-    <div class="rRow">
-      <button class="btn btnG" id="rCancelBtn" type="button">Avbryt</button>
-      <button class="btn btnP" id="rSubmitBtn" type="button">Skicka rapport</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
