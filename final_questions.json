@@ -9858,64 +9858,6 @@
       "imageDescription": "Svenskt vägmärke C31: Hastighetsbegränsning."
     },
     {
-      "id": 370,
-      "category": "Vägmärken",
-      "subcategory": "Förbudsmärken – omkörning",
-      "question_type": "image",
-      "question": "Vad innebär detta förbudsmärke?",
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sweden_road_sign_C38.svg/330px-Sweden_road_sign_C38.svg.png",
-      "image_description": "Svenskt vägmärke C38: Datumparkering.",
-      "option_a": "Förbud mot trafik med fordon",
-      "option_b": "Förbud mot infart med fordon",
-      "option_c": "Datumparkering",
-      "option_d": "Förbud mot att parkera fordon",
-      "correct": "C",
-      "explanation": "Rätt svar är C. Märket betyder datumparkering. Datumparkering gäller enligt reglerna för udda och jämna datum. Lagrum: VMF C38.",
-      "law_reference": "VMF C38",
-      "difficulty": "normal",
-      "commonly_failed": false,
-      "validation": {
-        "question_validator": "✅ PASS",
-        "image_validator": "✅ PASS",
-        "qa_approved": "APPROVED_AFTER_REPAIR",
-        "road_sign_code": "C38",
-        "expected_sign": "Datumparkering",
-        "audit_issues": [
-          "missing required concept: datumparkering | datum",
-          "forbidden concept in correct path: omkorning",
-          "forbidden concept in question metadata/text: omkorning"
-        ],
-        "repaired_from_blocked": true
-      },
-      "image_type": "vägmärke",
-      "bildfix_status": "OMFORMULERA",
-      "options": {
-        "A": "Förbud mot trafik med fordon",
-        "B": "Förbud mot infart med fordon",
-        "C": "Datumparkering",
-        "D": "Förbud mot att parkera fordon"
-      },
-      "correctAnswer": "C",
-      "requiresImage": true,
-      "expectedConcept": "Datumparkering",
-      "legalTopic": "Vägmärken och anvisningar",
-      "imageStatus": "verified",
-      "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sweden_road_sign_C38.svg/330px-Sweden_road_sign_C38.svg.png",
-      "sourceStatus": "verified",
-      "manualReview": {
-        "status": "approved_after_repair",
-        "reviewedAt": "2026-06-02T19:10:57.502Z",
-        "reviewedBy": "Codex manual QA",
-        "evidence": [
-          "Transportstyrelsen vägmärkesaffisch",
-          "Wikimedia Sweden road sign image URL recovered from prior committed dataset"
-        ],
-        "note": "Original question/image mismatch repaired by rewriting the question to match the verified road-sign image."
-      },
-      "image_alt": "Datumparkering",
-      "imageDescription": "Svenskt vägmärke C38: Datumparkering."
-    },
-    {
       "id": 371,
       "category": "Vägmärken",
       "subcategory": "Påbudsmärken – cirkulationsplats",
