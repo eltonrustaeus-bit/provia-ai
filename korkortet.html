@@ -898,7 +898,7 @@ async function loadProgressFromSupabase() {
   const tok = await getAuthToken();
   if (!tok) return;
   try {
-    const r = await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_load" }) });
+    const r = await fetch("/api/check-role", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok }, body: JSON.stringify({ action: "kk_load" }), signal: AbortSignal.timeout(9000) });
     if (!r.ok) return;
     const { data } = await r.json();
 
@@ -2748,7 +2748,10 @@ async function init() {
     uid = _session.user.id;
     if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
     try {
-      const {data: _prof} = await db.from("profiles").select("role").eq("id",uid).single();
+      const {data: _prof} = await raceTimeout(
+        db.from("profiles").select("role").eq("id",uid).single(),
+        5000, "role-lookup"
+      );
       if(_prof?.role){ role=_prof.role; localStorage.setItem(LS_ROLE,role); }
     } catch(_) {}
 
@@ -2804,15 +2807,16 @@ async function init() {
     }
 
     // Load server progress BEFORE building UI so progress indicators are correct
+    // Non-rejecting timeouts: if server is slow we still show categories with local data
     if(uid) {
-      await loadProgressFromSupabase();
+      await Promise.race([loadProgressFromSupabase(), new Promise(r => setTimeout(r, 10000))]);
       updateXpBar();
       setInterval(saveProgressToSupabase, 60000);
     } else {
       updateXpBar();
     }
 
-    if(uid) await loadHistory();
+    if(uid) await Promise.race([loadHistory(), new Promise(r => setTimeout(r, 8000))]);
 
     try { buildCats(); } catch(e) {
       console.error("[korkortet] buildCats:", e);
