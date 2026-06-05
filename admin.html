@@ -110,6 +110,12 @@
 
   .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--l2);border-top-color:var(--a);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .reportCount{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:var(--r2);font-family:var(--mono);font-size:11px;font-weight:700;background:rgba(212,64,22,.12);color:#d44016;border:1px solid rgba(212,64,22,.25)}
+  .reportCount.hi{background:rgba(212,64,22,.22);border-color:rgba(212,64,22,.45)}
+  .reasonBadge{display:inline-block;padding:2px 8px;border-radius:var(--r2);font-family:var(--mono);font-size:9.5px;border:1px solid var(--l);color:var(--t3)}
+  .resolveBtn{padding:5px 11px;border-radius:var(--r2);border:1px solid var(--l2);background:var(--a-dim);color:var(--a2);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .14s}
+  .resolveBtn:hover{background:rgba(27,255,140,.16);color:var(--t)}
+  .qTextCell{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t);font-size:12.5px}
   </style>
 </head>
 <body>
@@ -200,6 +206,35 @@
         </td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- REPORTS SECTION -->
+  <div style="margin-top:32px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">Körkort</div>
+        <h2 style="font-size:17px;font-weight:700;color:var(--t);margin:0">Rapporterade frågor</h2>
+      </div>
+      <button class="btn" id="refreshReportsBtn">↻ Uppdatera</button>
+    </div>
+    <div id="reportsStatus" style="font-family:var(--mono);font-size:11px;color:var(--t3);margin-bottom:10px">Laddar…</div>
+    <div class="tableWrap" id="reportsWrap" style="display:none">
+      <table class="userTable" aria-label="Rapporterade frågor">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Kategori</th>
+            <th>Fråga</th>
+            <th>Rapporter</th>
+            <th>Vanligaste orsak</th>
+            <th>Senast</th>
+            <th>Åtgärd</th>
+          </tr>
+        </thead>
+        <tbody id="reportsBody">
+        </tbody>
+      </table>
+    </div>
   </div>
 
 </div>
@@ -386,6 +421,7 @@ async function init() {
 
   lbl.textContent = `Admin · ${session.user.email}`;
   await loadUsers();
+  await loadReports();
 }
 
 /* FILTER CHIPS */
@@ -406,6 +442,89 @@ document.getElementById('searchBox').addEventListener('input', e => {
 
 /* REFRESH */
 document.getElementById('refreshBtn').addEventListener('click', () => loadUsers());
+
+/* REPORTS */
+const REASON_LABELS = {
+  wrong_answer: 'Fel svar',
+  wrong_image: 'Fel bild',
+  unclear: 'Otydlig',
+  other: 'Annat'
+};
+
+async function loadReports() {
+  const statusEl = document.getElementById('reportsStatus');
+  const wrapEl = document.getElementById('reportsWrap');
+  const bodyEl = document.getElementById('reportsBody');
+  statusEl.textContent = 'Laddar rapporter…';
+  wrapEl.style.display = 'none';
+
+  const { data: session } = await db.auth.getSession();
+  if (!session?.session) return;
+
+  // Fetch all reports with question info
+  const { data, error } = await db
+    .from('question_reports')
+    .select('question_id, reason, created_at, resolved, driving_questions!question_id(id, question, category, report_count)')
+    .eq('resolved', false)
+    .order('created_at', { ascending: false });
+
+  if (error) { statusEl.textContent = 'Fel vid hämtning: ' + error.message; return; }
+  if (!data || data.length === 0) { statusEl.textContent = 'Inga öppna rapporter.'; return; }
+
+  // Group by question_id
+  const grouped = {};
+  data.forEach(r => {
+    const qid = r.question_id;
+    if (!grouped[qid]) {
+      grouped[qid] = {
+        q: r.driving_questions,
+        reports: [],
+        reasons: {},
+        latest: r.created_at
+      };
+    }
+    grouped[qid].reports.push(r);
+    grouped[qid].reasons[r.reason] = (grouped[qid].reasons[r.reason] || 0) + 1;
+    if (r.created_at > grouped[qid].latest) grouped[qid].latest = r.created_at;
+  });
+
+  const sorted = Object.values(grouped).sort((a, b) => b.reports.length - a.reports.length);
+
+  bodyEl.innerHTML = sorted.map(g => {
+    const topReason = Object.entries(g.reasons).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const count = g.reports.length;
+    const dateStr = new Date(g.latest).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' });
+    return `<tr>
+      <td><span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">#${g.q?.id ?? '?'}</span></td>
+      <td><span class="reasonBadge">${esc(g.q?.category ?? '—')}</span></td>
+      <td class="qTextCell" title="${esc(g.q?.question ?? '')}">${esc(g.q?.question ?? '—')}</td>
+      <td><span class="reportCount ${count >= 3 ? 'hi' : ''}">${count}</span></td>
+      <td><span class="reasonBadge">${REASON_LABELS[topReason] ?? '—'}</span></td>
+      <td class="dateCell">${dateStr}</td>
+      <td><button class="resolveBtn" onclick="resolveReports(${g.q?.id ?? 0}, this)">✓ Löst</button></td>
+    </tr>`;
+  }).join('');
+
+  statusEl.textContent = `${sorted.length} frågor med ${data.length} totala rapporter`;
+  wrapEl.style.display = '';
+}
+
+async function resolveReports(questionId, btn) {
+  if (!questionId) return;
+  btn.disabled = true; btn.textContent = '…';
+  const { error } = await db
+    .from('question_reports')
+    .update({ resolved: true })
+    .eq('question_id', questionId);
+  if (error) { btn.disabled = false; btn.textContent = '✓ Löst'; alert('Fel: ' + error.message); return; }
+  // Reset count
+  await db.from('driving_questions').update({ report_count: 0 }).eq('id', questionId);
+  btn.closest('tr').remove();
+  const remaining = document.querySelectorAll('#reportsBody tr').length;
+  document.getElementById('reportsStatus').textContent = remaining + ' frågor kvar med öppna rapporter';
+}
+
+document.getElementById('refreshReportsBtn').addEventListener('click', loadReports);
 
 init();
 </script>
