@@ -166,5 +166,16 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, question: data });
   }
 
+  /* ── DELETE QUESTION ── */
+  if (action === "delete-question") {
+    if (!await requireAdmin(req, res)) return;
+    const { questionId } = req.body || {};
+    if (!Number.isInteger(questionId) || questionId < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+    const { error } = await supabase.from("driving_questions").delete().eq("id", questionId);
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, deletedId: questionId });
+  }
+
   return res.status(400).json({ ok: false, error: "Unknown action" });
 }
