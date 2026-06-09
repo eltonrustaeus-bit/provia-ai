@@ -479,6 +479,57 @@ body.light .adminSaveBtn{color:#fff}
 .adminWikiItem img{width:64px;height:64px;object-fit:contain;display:block;margin:0 auto 5px}
 .adminWikiItemName{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--t3);word-break:break-all;line-height:1.3}
 
+/* ── ADMIN ELEVPREVIEW MODAL ── */
+.adminPreviewOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px);z-index:900;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+.adminPreviewOverlay.open{display:flex}
+.adminPreviewCard{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.adminPreviewHead{padding:13px 16px;border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.adminPreviewTitle{font-family:'DM Mono',monospace;font-size:10px;color:var(--a);letter-spacing:.1em;text-transform:uppercase}
+.adminPreviewClose{width:28px;height:28px;border:1px solid var(--l);border-radius:var(--r2);background:transparent;cursor:pointer;color:var(--t3);font-size:14px;display:grid;place-items:center;transition:border-color .13s,color .13s}
+.adminPreviewClose:hover{border-color:var(--l2);color:var(--t)}
+.adminPreviewBody{padding:18px}
+.adminPreviewImg{width:100%;max-height:200px;object-fit:contain;border-radius:var(--r);border:1px solid var(--l);margin-bottom:14px;display:block;background:var(--s2)}
+.adminPreviewMeta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.adminPreviewChip{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r2);padding:2px 8px}
+.adminPreviewQ{font-weight:700;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:14px}
+.adminPreviewOpt{display:flex;align-items:center;gap:12px;padding:13px 15px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);margin-bottom:8px;font-size:14px;color:var(--t2);font-weight:500;transition:border-color .13s}
+.adminPreviewOpt.correct{border-color:var(--a);background:rgba(27,255,140,.1);color:var(--t)}
+.adminPreviewLetter{width:28px;height:28px;border-radius:var(--r2);border:1px solid var(--l);background:var(--s);display:grid;place-items:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);flex-shrink:0;transition:all .13s}
+.adminPreviewOpt.correct .adminPreviewLetter{background:var(--a);border-color:var(--a);color:#08100d}
+.adminPreviewExpl{margin-top:12px;padding:13px 14px;border-radius:var(--r);background:rgba(27,255,140,.06);border:1px solid rgba(27,255,140,.2);font-size:13px;color:var(--t2);line-height:1.7}
+/* Dirty banner */
+.adminDirtyBanner{background:rgba(212,160,22,.07);border:1px solid rgba(212,160,22,.25);border-radius:var(--r2);padding:7px 12px;font-family:'DM Mono',monospace;font-size:11px;color:#d4a016;display:none;align-items:center;gap:8px;margin:10px 16px 0}
+.adminDirtyBanner.show{display:flex}
+.adminDirtyAction{background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;padding:0;transition:color .12s}
+/* Undo toast */
+.adminUndoToast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:10px 16px;display:none;align-items:center;gap:12px;font-family:'DM Mono',monospace;font-size:12px;color:var(--t2);box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:500;white-space:nowrap;animation:slideUp .2s ease}
+.adminUndoToast.show{display:flex}
+@keyframes slideUp{from{transform:translateX(-50%) translateY(10px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+.adminUndoBtn{color:var(--a);cursor:pointer;background:none;border:none;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;padding:0;transition:color .12s}
+.adminUndoBtn:hover{color:var(--t)}
+/* Img quality warn */
+.adminImgWarn{font-family:'DM Mono',monospace;font-size:10px;color:#d4a016;background:rgba(212,160,22,.08);border:1px solid rgba(212,160,22,.22);border-radius:var(--r2);padding:5px 9px;margin-top:6px;display:none}
+.adminImgWarn.show{display:block}
+/* Duplicate warn */
+.adminDupWarn{font-family:'DM Mono',monospace;font-size:10px;color:#d4a016;background:rgba(212,160,22,.08);border:1px solid rgba(212,160,22,.22);border-radius:var(--r2);padding:6px 9px;margin-top:5px;display:none;line-height:1.5;cursor:pointer;transition:background .12s}
+.adminDupWarn.show{display:block}
+.adminDupWarn:hover{background:rgba(212,160,22,.13)}
+/* Report badge in list */
+.adminQReport{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;background:rgba(212,64,22,.15);color:#d44016;border:1px solid rgba(212,64,22,.3);flex-shrink:0;margin-top:3px;line-height:1}
+/* Image filter chips */
+.adminImgFilter{display:flex;gap:4px;padding:0 12px 8px;flex-wrap:wrap}
+.adminImgChip{height:22px;padding:0 9px;font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r2);background:transparent;cursor:pointer;transition:all .12s;white-space:nowrap}
+.adminImgChip:hover{border-color:var(--l2);color:var(--t)}
+.adminImgChip.active{background:var(--a-dim);border-color:var(--l2);color:var(--a2)}
+/* Action buttons */
+.adminActionBtn{height:24px;padding:0 9px;font-size:10px;background:transparent;border:1px solid var(--l);color:var(--t3);border-radius:var(--r2);cursor:pointer;transition:border-color .12s,color .12s;font-family:'DM Mono',monospace;white-space:nowrap}
+.adminActionBtn:hover{border-color:var(--l2);color:var(--t)}
+.adminActionBtn.accent{border-color:var(--l2);color:var(--a2);background:var(--a-dim)}
+.adminActionBtn.accent:hover{background:rgba(27,255,140,.14);color:var(--t)}
+/* Copy URL btn */
+.adminCopyBtn{height:24px;padding:0 8px;font-size:10px;background:transparent;border:1px solid var(--l);color:var(--t3);border-radius:var(--r2);cursor:pointer;transition:all .12s;font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0}
+.adminCopyBtn:hover{border-color:var(--l2);color:var(--t)}
+
 </style>
 </head>
 <body>
@@ -853,13 +904,22 @@ body.light .adminSaveBtn{color:#fff}
       <div class="adminPanel">
         <div class="adminPanelHead">
           <span class="adminPanelTitle">Frågor</span>
-          <span class="adminCount" id="adminCount">–</span>
+          <div style="display:flex;align-items:center;gap:5px">
+            <button class="adminActionBtn" onclick="adminExport()" type="button" title="Exportera som JSON">↓ JSON</button>
+            <span class="adminCount" id="adminCount">–</span>
+          </div>
         </div>
         <div class="adminFilters">
           <input class="adminSearchInput" id="adminSearch" type="search" placeholder="Sök frågetext…" autocomplete="off" />
           <select class="adminCatSelect" id="adminCatFilter">
             <option value="">Alla kategorier</option>
           </select>
+        </div>
+        <div class="adminImgFilter" id="adminImgFilter">
+          <button class="adminImgChip active" data-imgf="all" onclick="adminSetImgFilter('all')">Alla</button>
+          <button class="adminImgChip" data-imgf="has" onclick="adminSetImgFilter('has')">Med bild</button>
+          <button class="adminImgChip" data-imgf="none" onclick="adminSetImgFilter('none')">Utan bild</button>
+          <button class="adminImgChip" data-imgf="report" onclick="adminSetImgFilter('report')">Rapporterade</button>
         </div>
         <div class="adminQList" id="adminQList">
           <div class="adminWikiStatus">Laddar frågor…</div>
@@ -882,13 +942,22 @@ body.light .adminSaveBtn{color:#fff}
         <div id="adminFormWrap" style="display:none">
           <div class="adminEditHead">
             <span class="adminEditTitle">Redigera fråga</span>
-            <span class="adminEditId" id="adminEditId">#–</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="adminActionBtn accent" onclick="adminOpenPreview()" type="button">👁 Elevvy</button>
+              <span class="adminEditId" id="adminEditId">#–</span>
+            </div>
+          </div>
+          <div class="adminDirtyBanner" id="adminDirtyBanner">
+            ⚠ Osparade ändringar
+            <button class="adminDirtyAction" onclick="adminSave()" style="color:var(--a)">Spara</button>
+            <button class="adminDirtyAction" onclick="adminDiscardChanges()" style="color:var(--t3)">Kasta</button>
           </div>
           <div class="adminForm">
 
             <div class="adminField">
               <label class="adminLabel" for="adminQ">Frågetext</label>
               <textarea class="adminTextarea" id="adminQ" rows="3" placeholder="Skriv frågan här…"></textarea>
+              <div class="adminDupWarn" id="adminDupWarn"></div>
             </div>
 
             <div class="adminField">
@@ -955,12 +1024,16 @@ body.light .adminSaveBtn{color:#fff}
                     <div class="adminImgNone" id="adminImgNone">Ingen<br>bild</div>
                     <img class="adminImgThumb" id="adminImgThumb" src="" alt="" onerror="this.style.opacity='.3'" />
                   </div>
+                  <div class="adminImgWarn" id="adminImgWarn"></div>
                   <div class="adminImgMeta">
                     <div class="adminImgInfo">
                       <div class="adminImgUrl" id="adminImgUrlTxt">—</div>
                       <div class="adminImgDescText" id="adminImgDescTxt"></div>
                     </div>
-                    <button class="adminImgClearBtn" onclick="adminClearImage()" type="button">✕ Ta bort</button>
+                    <div style="display:flex;gap:5px;flex-shrink:0">
+                      <button class="adminCopyBtn" onclick="adminCopyImgUrl()" type="button" title="Kopiera URL">⎘</button>
+                      <button class="adminImgClearBtn" onclick="adminClearImage()" type="button">✕ Ta bort</button>
+                    </div>
                   </div>
                 </div>
                 <input type="hidden" id="adminImgUrl" />
@@ -1005,6 +1078,24 @@ body.light .adminSaveBtn{color:#fff}
       </button>
     </div>
   </div>
+</div>
+
+<!-- ADMIN ELEVPREVIEW MODAL -->
+<div id="adminPreviewOverlay" class="adminPreviewOverlay" onclick="if(event.target===this)adminClosePreview()">
+  <div class="adminPreviewCard">
+    <div class="adminPreviewHead">
+      <span class="adminPreviewTitle">Elevvy — Förhandsgranskning</span>
+      <button class="adminPreviewClose" onclick="adminClosePreview()" type="button">✕</button>
+    </div>
+    <div class="adminPreviewBody" id="adminPreviewBody"></div>
+  </div>
+</div>
+
+<!-- ADMIN UNDO TOAST -->
+<div id="adminUndoToast" class="adminUndoToast">
+  <span>✓ Sparat</span>
+  <button class="adminUndoBtn" onclick="adminUndo()" type="button">Ångra</button>
+  <button onclick="adminHideUndoToast()" style="color:var(--t3);background:none;border:none;cursor:pointer;font-size:13px;padding:0;line-height:1">✕</button>
 </div>
 
 <footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
@@ -3208,6 +3299,7 @@ function adminUpdateImgPreview() {
     urlTxt.textContent = "—";
     descTxt.textContent = "";
   }
+  adminCheckImageQuality(url);
 }
 
 function adminClearImage() {
@@ -3269,7 +3361,11 @@ async function adminWikiSearch() {
 function adminSelectQuestion(id) {
   const q = _adminQMap.get(Number(id));
   if (!q) return;
+  if (_adminDirty && _adminSelectedQ && _adminSelectedQ.id !== Number(id)) {
+    if (!confirm("Du har osparade ändringar. Kasta dem och byt fråga?")) return;
+  }
   _adminSelectedQ = q;
+  adminSetDirty(false);
   document.querySelectorAll(".adminQItem").forEach(el => el.classList.toggle("sel", el.dataset.id === String(id)));
   $("adminEditEmpty").style.display = "none";
   $("adminFormWrap").style.display = "";
@@ -3301,6 +3397,9 @@ function adminSelectQuestion(id) {
     $("adminWikiQ").value = "";
     if (autoBtn) autoBtn.style.display = "none";
   }
+  adminCheckImageQuality(q.image_url || "");
+  // Dup check after short delay (avoids blocking render)
+  setTimeout(() => adminCheckDuplicates($("adminQ")?.value || ""), 300);
   if (window.innerWidth < 860) $("adminEdit").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -3316,7 +3415,8 @@ function adminRenderList(qs, total, page, limit) {
   list.innerHTML = qs.map(q =>
     `<div class="adminQItem${_adminSelectedQ?.id === q.id ? " sel" : ""}" data-id="${q.id}" onclick="adminSelectQuestion(${q.id})">` +
     `<span class="adminQId">${q.id}</span>` +
-    `<span class="adminQSnippet">${esc(q.question.slice(0, 62) + (q.question.length > 62 ? "…" : ""))}</span>` +
+    `<span class="adminQSnippet">${esc(q.question.slice(0, 58) + (q.question.length > 58 ? "…" : ""))}</span>` +
+    (q.report_count > 0 ? `<span class="adminQReport">${q.report_count}</span>` : "") +
     `<span class="adminQDot${q.image_url ? " has" : ""}"></span></div>`
   ).join("");
   const totalPages = Math.ceil(total / limit);
@@ -3337,6 +3437,7 @@ async function adminLoadQuestions() {
     const category = $("adminCatFilter")?.value || "";
     if (search) body.search = search;
     if (category) body.category = category;
+    if (_adminImgFilter && _adminImgFilter !== "all") body.imgFilter = _adminImgFilter;
     const r = await fetch("/api/admin", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
@@ -3377,6 +3478,7 @@ async function adminSave() {
 
   if (!Object.keys(updates).length) { adminMsg("Inga ändringar.", ""); return; }
 
+  const snapshot = { ...q };
   $("adminSaveBtn").disabled = true;
   adminMsg("Sparar…", "");
   try {
@@ -3393,14 +3495,204 @@ async function adminSave() {
     _adminQMap.set(updated.id, updated);
     const item = $("adminQList").querySelector(`[data-id="${updated.id}"]`);
     if (item) {
-      item.querySelector(".adminQSnippet").textContent = updated.question.slice(0, 62) + (updated.question.length > 62 ? "…" : "");
+      item.querySelector(".adminQSnippet").textContent = updated.question.slice(0, 58) + (updated.question.length > 58 ? "…" : "");
       item.querySelector(".adminQDot").classList.toggle("has", Boolean(updated.image_url));
+      const repBadge = item.querySelector(".adminQReport");
+      if (repBadge) repBadge.style.display = updated.report_count > 0 ? "" : "none";
     }
-    adminMsg("✓ Sparat!", "ok");
+    adminSetDirty(false);
+    adminMsg("", "");
+    adminShowUndoToast(snapshot);
   } catch(e) {
     adminMsg("⚠ " + (e.message || "Nätverksfel"), "err");
   } finally {
     $("adminSaveBtn").disabled = false;
+  }
+}
+
+// ── DIRTY TRACKING ──
+let _adminDirty = false;
+let _adminUndoSnapshot = null;
+let _adminUndoTimer = null;
+let _adminImgFilter = "all";
+
+function adminSetDirty(v) {
+  _adminDirty = v;
+  const b = $("adminDirtyBanner");
+  if (b) b.classList.toggle("show", !!v);
+}
+
+function adminDiscardChanges() {
+  if (!_adminSelectedQ) return;
+  _adminDirty = false;
+  adminSelectQuestion(_adminSelectedQ.id);
+}
+
+// ── UNDO ──
+function adminHideUndoToast() {
+  clearTimeout(_adminUndoTimer);
+  _adminUndoSnapshot = null;
+  const t = $("adminUndoToast");
+  if (t) t.classList.remove("show");
+}
+
+function adminShowUndoToast(snapshot) {
+  _adminUndoSnapshot = snapshot;
+  clearTimeout(_adminUndoTimer);
+  const t = $("adminUndoToast");
+  if (t) t.classList.add("show");
+  _adminUndoTimer = setTimeout(adminHideUndoToast, 30000);
+}
+
+async function adminUndo() {
+  if (!_adminUndoSnapshot) return;
+  const snap = { ..._adminUndoSnapshot };
+  adminHideUndoToast();
+  try {
+    const tok = await getAuthToken();
+    const updates = {};
+    ["question","option_a","option_b","option_c","option_d","correct","explanation","category","difficulty","image_url","image_description"]
+      .forEach(f => { updates[f] = snap[f] ?? null; });
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "update-question", questionId: snap.id, updates })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error);
+    _adminSelectedQ = json.question;
+    _adminQMap.set(json.question.id, json.question);
+    _adminDirty = false;
+    adminSelectQuestion(json.question.id);
+    toast("Ångrat.", "ok");
+  } catch(e) {
+    toast("Kunde inte ångra: " + esc(e.message || "nätverksfel"), "err");
+  }
+}
+
+// ── ELEVPREVIEW ──
+function adminOpenPreview() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const overlay = $("adminPreviewOverlay");
+  const body = $("adminPreviewBody");
+  if (!overlay || !body) return;
+  const live = {
+    question: $("adminQ")?.value || q.question,
+    a: $("adminOptA")?.value || q.option_a,
+    b: $("adminOptB")?.value || q.option_b,
+    c: $("adminOptC")?.value || q.option_c,
+    d: $("adminOptD")?.value || q.option_d,
+    correct: (document.querySelector('input[name="adminCorrect"]:checked')?.value || q.correct || "").toUpperCase(),
+    expl: $("adminExpl")?.value || q.explanation || "",
+    imgUrl: $("adminImgUrl")?.value || q.image_url || "",
+    cat: $("adminCat")?.value || q.category || "",
+    diff: { easy:"Lätt", normal:"Normal", hard:"Svår" }[$("adminDiff")?.value || q.difficulty || "normal"] || "Normal"
+  };
+  const opts = ["A","B","C","D"].map((k,i) => ({ k, v: [live.a,live.b,live.c,live.d][i] || "" }));
+  body.innerHTML =
+    `<div class="adminPreviewMeta">` +
+      `<span class="adminPreviewChip">${esc(live.cat)}</span>` +
+      `<span class="adminPreviewChip">${esc(live.diff)}</span>` +
+      `<span class="adminPreviewChip">#${q.id}</span>` +
+    `</div>` +
+    (live.imgUrl ? `<img class="adminPreviewImg" src="${esc(live.imgUrl)}" alt="" />` : "") +
+    `<div class="adminPreviewQ">${esc(live.question)}</div>` +
+    opts.map(o =>
+      `<div class="adminPreviewOpt${o.k === live.correct ? " correct" : ""}">` +
+        `<div class="adminPreviewLetter">${o.k}</div>` +
+        `<div>${esc(o.v)}</div>` +
+      `</div>`
+    ).join("") +
+    (live.expl ? `<div class="adminPreviewExpl"><span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--a);letter-spacing:.06em;text-transform:uppercase">Förklaring</span><br><br>${esc(live.expl)}</div>` : "");
+  overlay.classList.add("open");
+}
+
+function adminClosePreview() {
+  const overlay = $("adminPreviewOverlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
+// ── IMAGE QUALITY CHECK ──
+function adminCheckImageQuality(url) {
+  const warn = $("adminImgWarn");
+  if (!warn) return;
+  if (!url) { warn.classList.remove("show"); return; }
+  const img = new Image();
+  img.onload = () => {
+    if (img.naturalWidth < 100 || img.naturalHeight < 100) {
+      warn.textContent = `⚠ Låg upplösning: ${img.naturalWidth}×${img.naturalHeight}px`;
+      warn.classList.add("show");
+    } else {
+      warn.classList.remove("show");
+    }
+  };
+  img.onerror = () => { warn.textContent = "⚠ Bilden laddades inte — trasig URL?"; warn.classList.add("show"); };
+  img.src = url;
+}
+
+// ── DUPLICATE DETECTOR ──
+function adminCheckDuplicates(text) {
+  const warn = $("adminDupWarn");
+  if (!warn) return;
+  if (!text || text.length < 20) { warn.classList.remove("show"); return; }
+  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  if (words.length < 4) { warn.classList.remove("show"); return; }
+  let best = null, bestScore = 0;
+  _adminQMap.forEach((q, id) => {
+    if (id === _adminSelectedQ?.id) return;
+    const qw = (q.question || "").toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    if (!qw.length) return;
+    const shared = words.filter(w => qw.includes(w)).length;
+    const score = shared / Math.max(words.length, qw.length);
+    if (score > bestScore) { bestScore = score; best = q; }
+  });
+  if (bestScore >= 0.7 && best) {
+    warn.innerHTML = `⚠ Liknar #${best.id}: <em style="color:var(--t2);font-style:normal">${esc((best.question || "").slice(0,65))}…</em> — klicka för att hoppa`;
+    warn.classList.add("show");
+    warn.onclick = () => { adminSelectQuestion(best.id); };
+  } else {
+    warn.classList.remove("show");
+  }
+}
+
+// ── COPY IMAGE URL ──
+function adminCopyImgUrl() {
+  const url = $("adminImgUrl")?.value || "";
+  if (!url) { toast("Ingen bild att kopiera.", "warn"); return; }
+  navigator.clipboard?.writeText(url).then(() => toast("URL kopierad.", "ok")).catch(() => toast("Kopiera misslyckades.", "err"));
+}
+
+// ── EXPORT ──
+function adminExport() {
+  const questions = [..._adminQMap.values()].sort((a,b) => a.id - b.id);
+  if (!questions.length) { toast("Ladda frågor först.", "warn"); return; }
+  const blob = new Blob([JSON.stringify(questions, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `driving_questions_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast(`${questions.length} frågor exporterade.`, "ok");
+}
+
+// ── IMAGE FILTER ──
+function adminSetImgFilter(f) {
+  _adminImgFilter = f;
+  document.querySelectorAll(".adminImgChip").forEach(c => c.classList.toggle("active", c.dataset.imgf === f));
+  _adminPage = 1;
+  adminLoadQuestions();
+}
+
+// ── J/K NAVIGATION ──
+function adminNavQuestion(dir) {
+  const items = [...document.querySelectorAll(".adminQItem")];
+  if (!items.length) return;
+  const cur = items.findIndex(el => el.dataset.id === String(_adminSelectedQ?.id));
+  const ni = Math.max(0, Math.min(items.length - 1, (cur < 0 ? 0 : cur) + dir));
+  if (ni !== cur || cur < 0) {
+    items[ni].click();
+    items[ni].scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 
@@ -3433,19 +3725,43 @@ async function adminInit() {
     });
     const catEl = $("adminCatFilter");
     if (catEl) catEl.addEventListener("change", () => { _adminPage = 1; adminLoadQuestions(); });
+    // Dirty tracking: single delegated listener on form
+    const formWrap = $("adminFormWrap");
+    if (formWrap) {
+      formWrap.addEventListener("input", () => adminSetDirty(true));
+      formWrap.addEventListener("change", () => adminSetDirty(true));
+    }
+    // Dup check on question text input
+    const qEl = $("adminQ");
+    if (qEl) qEl.addEventListener("input", () => {
+      clearTimeout(qEl._dupTimer);
+      qEl._dupTimer = setTimeout(() => adminCheckDuplicates(qEl.value), 500);
+    });
+    // Image quality check on URL change (adminWikiGrid click handled via adminUpdateImgPreview)
   }
   await adminLoadQuestions();
 }
 
-// Admin Ctrl+S / Cmd+S shortcut
+// Admin keyboard shortcuts
 document.addEventListener("keydown", e => {
+  const av = $("adminView");
+  const adminOpen = av && av.style.display !== "none";
+  // Ctrl+S / Cmd+S → save
   if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-    const av = $("adminView");
-    if (av && av.style.display !== "none" && _adminSelectedQ) {
-      e.preventDefault();
-      adminSave();
-    }
+    if (adminOpen && _adminSelectedQ) { e.preventDefault(); adminSave(); }
+    return;
   }
+  // Escape → close preview modal
+  if (e.key === "Escape") {
+    if ($("adminPreviewOverlay")?.classList.contains("open")) { adminClosePreview(); return; }
+  }
+  // J/K navigation — only when not typing in an input/textarea
+  if (!adminOpen || !_adminSelectedQ) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); adminNavQuestion(1); }
+  if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); adminNavQuestion(-1); }
+  if (e.key === "p") { adminOpenPreview(); }
 });
 
 init();
