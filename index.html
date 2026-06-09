@@ -816,6 +816,53 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 });
 </script>
 
+<!-- LIVE STATS -->
+<script>
+window._statsReady = (async function() {
+  const SB = "https://mnmotdluigzeehdjbhbu.supabase.co";
+  const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
+  const H = { apikey: KEY, Authorization: "Bearer " + KEY };
+  try {
+    const [cntRes, catRes] = await Promise.all([
+      fetch(SB + "/rest/v1/driving_questions?select=id&limit=1", { headers: { ...H, Prefer: "count=exact", Range: "0-0" } }),
+      fetch(SB + "/rest/v1/driving_questions?select=category&limit=500", { headers: H })
+    ]);
+    const cr = cntRes.headers.get("content-range");
+    const qCount = cr ? parseInt(cr.split("/")[1]) : null;
+    const cats = await catRes.json();
+    const cCount = Array.isArray(cats) ? new Set(cats.map(r => r.category).filter(Boolean)).size : null;
+
+    if (qCount) {
+      document.querySelectorAll("[data-target='368']").forEach(el => { el.dataset.target = qCount; });
+      const sub = document.getElementById("heroSub");
+      if (sub) sub.innerHTML = sub.innerHTML.replace(/\d+ frågor/, qCount + " frågor");
+      document.querySelectorAll(".sS").forEach(el => {
+        if (el.textContent.includes("frågor")) el.textContent = el.textContent.replace(/\d+ frågor/, qCount + " frågor");
+      });
+      document.querySelectorAll(".featD").forEach(el => {
+        if (el.textContent.includes("frågor fördelade")) el.textContent = el.textContent.replace(/\d+ frågor/, qCount + " frågor");
+      });
+    }
+    if (cCount) {
+      document.querySelectorAll("[data-target='16']").forEach(el => { el.dataset.target = cCount; });
+      const sub = document.getElementById("heroSub");
+      if (sub) sub.innerHTML = sub.innerHTML.replace(/\d+ kategorier/, cCount + " kategorier");
+      document.querySelectorAll(".sS").forEach(el => {
+        if (el.textContent.includes("kategorier")) el.textContent = el.textContent.replace(/\d+ kategorier/, cCount + " kategorier");
+      });
+    }
+    if (qCount || cCount) {
+      document.querySelectorAll(".faqA").forEach(el => {
+        el.innerHTML = el.innerHTML
+          .replace(/\d+ frågor/, (qCount || 368) + " frågor")
+          .replace(/\d+ ämnesområden/, (cCount || 16) + " ämnesområden");
+      });
+    }
+    return { qCount, cCount };
+  } catch(e) { return {}; }
+})();
+</script>
+
 <!-- GSAP -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -833,7 +880,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
   /* — HERO — */
   window.addEventListener("load",()=>{
-    setTimeout(()=>{
+    window._statsReady.then(()=>setTimeout(()=>{
       const tl=gsap.timeline({defaults:{ease:"power3.out"}});
 
       tl.from("#heroEye",{opacity:0,y:12,duration:.4});
@@ -853,7 +900,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
       });
 
       tl.to("#heroFree",{opacity:1,duration:.3},"-=.2");
-    },100);
+    },100));
   });
 
   /* — SCROLL REVEALS — */
@@ -867,10 +914,10 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
   /* — FEATURE COUNTER — */
   document.querySelectorAll(".counter[data-target]").forEach(el=>{
-    const target=+el.dataset.target;
     ScrollTrigger.create({
       trigger:el,start:"top 85%",once:true,
       onEnter(){
+        const target=+el.dataset.target;
         gsap.to(el,{
           textContent:target,duration:1.1,ease:"power2.out",
           snap:{textContent:1},
