@@ -94,14 +94,19 @@ export default async function handler(req, res) {
     const limit = 50;
     const offset = (Math.max(1, Number(page)) - 1) * limit;
 
+    const { imgFilter } = req.body || {};
+
     let query = supabase
       .from("driving_questions")
-      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description", { count: "exact" })
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description, report_count", { count: "exact" })
       .order("id", { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (category) query = query.eq("category", category);
     if (search && String(search).trim()) query = query.ilike("question", `%${String(search).trim()}%`);
+    if (imgFilter === "none") query = query.is("image_url", null);
+    if (imgFilter === "has") query = query.not("image_url", "is", null);
+    if (imgFilter === "report") query = query.gt("report_count", 0);
 
     const { data, count, error } = await query;
     if (error) return res.status(500).json({ ok: false, error: error.message });
