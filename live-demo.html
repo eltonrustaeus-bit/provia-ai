@@ -284,6 +284,36 @@
       border-radius:0 var(--r) var(--r) 0;margin-top:16px;font:400 13px/1.65 var(--f);color:var(--t2)}
     .howTo strong{color:var(--t)}
 
+    /* FÖRBÄTTRING SIMULATION — real component classes */
+    .fbNavRail{display:flex;gap:2px;padding:3px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
+    .fbNavRail::-webkit-scrollbar{display:none}
+    .fbNavBtn{flex:1;min-width:56px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:var(--r2);border:1px solid transparent;background:transparent;transition:all .15s}
+    .fbNavBtn.fbAct{background:var(--ad);border-color:var(--l2)}
+    .fbNavNum{font:500 9px var(--m);color:var(--a);letter-spacing:.06em}
+    .fbNavLabel{font:600 11px var(--f);color:var(--t2)}
+    .fbNavBtn.fbAct .fbNavLabel{color:var(--t)}
+    .fbSection{border:1px solid var(--l);border-radius:var(--r);background:var(--s);margin-bottom:8px;overflow:hidden}
+    .fbSHead{display:flex;align-items:center;justify-content:space-between;padding:18px 22px}
+    .fbSDivider{height:1px;background:var(--l)}
+    .fbSBody{padding:0 22px;max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.22,.61,.36,1)}
+    .fbSBodyInner{padding:18px 0}
+    .coachBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:18px;margin-bottom:10px}
+    .coachLabel{font:500 10px var(--m);color:var(--a);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+    .coachText{font:400 13px/1.72 var(--f);color:var(--t2)}
+    .statsRow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+    .statBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:14px}
+    .statLabel{font:500 10px var(--m);color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+    .statValue{font:500 13px var(--f);color:var(--t)}
+    .mistakeGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+    .mCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:15px}
+    .mHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+    .mMeta{font:400 10px var(--m);color:var(--t3);letter-spacing:.02em}
+    .mScore{font:500 11px var(--m);color:#d4a016;padding:2px 8px;border:1px solid rgba(212,160,22,.2);border-radius:var(--r2);background:rgba(212,160,22,.07);flex-shrink:0}
+    .mQ{font:500 13px/1.55 var(--f);color:var(--t);margin-bottom:10px}
+    .mDiv{height:1px;background:var(--l);margin:10px 0}
+    .mFL{font:500 10px var(--m);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+    .mFV{font:400 12px/1.6 var(--f);color:var(--t2);margin-bottom:6px}
+
     /* PRICING CTA */
     #ctaWrap{width:100%;max-width:540px;text-align:center}
     #ctaTitle{font:700 24px/1.2 var(--f);color:var(--t);margin-bottom:6px}
@@ -326,6 +356,13 @@
       .card,.qcard,.sbox{padding:14px}
       .sbig{font-size:52px}
       #chatbox{max-width:100%}
+      .fbNavBtn{min-width:44px;padding:8px 4px}
+      .fbNavLabel{font-size:10px}
+      .fbNavNum{display:none}
+      .fbSHead{padding:14px 16px}
+      .fbSBody{padding:0 16px}
+      .statsRow{grid-template-columns:1fr}
+      .mistakeGrid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -393,8 +430,8 @@
     <div class="pill" style="margin-bottom:13px">📐 Matematik 2b — Andragradsekvationer</div>
     <div class="card">
       <div class="prow">
-        <div class="av">PL</div>
-        <div><div class="pname">Per Lindström</div><div class="psub">Gymnasiet åk 2</div></div>
+        <div class="av">ER</div>
+        <div><div class="pname">Elton Rustaeus</div><div class="psub">Gymnasiet åk 2</div></div>
         <div class="pill" style="margin-left:auto;font-size:10px">📷 OCR</div>
       </div>
       <div id="m1mat"></div><span id="m1cur"></span>
@@ -463,8 +500,8 @@
   <div id="m1res" style="display:none">
     <div class="sbox">
       <div class="prow" style="justify-content:center;margin-bottom:14px">
-        <div class="av">PL</div>
-        <div><div class="pname">Per Lindström</div><div class="psub">Matematik 2b</div></div>
+        <div class="av">ER</div>
+        <div><div class="pname">Elton Rustaeus</div><div class="psub">Matematik 2b</div></div>
       </div>
       <div class="sbig" id="scorenum">0%</div>
       <div class="slbl">3 av 4 rätt · 3 min 44 sek</div>
@@ -493,8 +530,8 @@
 
   <div id="m2catw" style="display:none;width:100%;max-width:560px">
     <div class="prow" style="margin-bottom:12px">
-      <div class="av">PL</div>
-      <div><div class="pname">Per Lindström</div><div class="psub">14/16 kategorier startade · 78% genomsnitt</div></div>
+      <div class="av">ER</div>
+      <div><div class="pname">Elton Rustaeus</div><div class="psub">14/16 kategorier startade · 78% genomsnitt</div></div>
     </div>
     <div id="catgrid"></div>
   </div>
@@ -502,8 +539,8 @@
   <div id="m2signw" style="display:none">
     <div class="card" id="sigcard">
       <div class="prow">
-        <div class="av">PL</div>
-        <div><div class="pname">Per Lindström</div><div class="psub">Hastighet — Fråga 8 av 8</div></div>
+        <div class="av">ER</div>
+        <div><div class="pname">Elton Rustaeus</div><div class="psub">Hastighet — Fråga 8 av 8</div></div>
       </div>
       <div class="sgnwrap">
         <svg id="signsvg" viewBox="0 0 120 120" width="140" height="140">
@@ -539,15 +576,15 @@
         <div class="sstt">Kvar: <strong id="siml">22</strong></div>
         <div class="sstt">Behöver: <strong>52</strong></div>
       </div>
-      <div id="simres"><div class="rb">53 / 65</div><div class="rs">✓ GODKÄNT — Bra jobbat, Per!</div></div>
+      <div id="simres"><div class="rb">53 / 65</div><div class="rs">✓ GODKÄNT — Bra jobbat, Elton!</div></div>
     </div>
   </div>
 
   <div id="m2statsw" style="display:none;width:100%;max-width:540px">
     <div class="card">
       <div class="stshdr">
-        <div class="av" style="width:44px;height:44px;font-size:16px">PL</div>
-        <div><div class="pname">Per Lindström</div><div class="stslbl">Körkortsstatistik</div></div>
+        <div class="av" style="width:44px;height:44px;font-size:16px">ER</div>
+        <div><div class="pname">Elton Rustaeus</div><div class="stslbl">Körkortsstatistik</div></div>
         <div style="margin-left:auto;text-align:right"><div class="stsavg">78%</div><div class="stslbl">genomsnitt</div></div>
       </div>
       <div id="radarwrap"><svg id="radarsvg" viewBox="0 0 200 200" width="180" height="180"></svg></div>
@@ -574,8 +611,8 @@
       </svg>
     </div>
     <div style="font:700 28px/1.2 var(--f);color:var(--t)" id="perTitle">P.E.R</div>
-    <div style="font:600 14px var(--f);color:var(--a);margin-top:4px">Provias AI-studiekomp</div>
-    <div class="perTagline">Precis · Effektiv · Relevant</div>
+    <div style="font:600 14px var(--f);color:var(--a);margin-top:4px">Provias Egna AI-Resource</div>
+    <div class="perTagline">Direkt · Kortfattad · Aldrig fyllnad</div>
     <div class="perCaps" id="perCaps">
       <div class="perCap"><span class="ci">📚</span>Studiehjälp</div>
       <div class="perCap"><span class="ci">🧠</span>Feynman-teknik</div>
@@ -603,33 +640,128 @@
     </div>
   </div>
 
-  <div id="m3improve" style="display:none">
-    <div class="card" id="improveCard">
-      <div class="improveHero">
-        <div class="heroEye">Förbättring</div>
-        <div class="improveTitle">P.E.R ser ditt mönster</div>
-        <div style="font:400 13px var(--f);color:var(--t2);margin-top:6px">Baserat på dina 47 senaste svar</div>
+  <div id="m3improve" style="display:none;width:100%;max-width:560px">
+
+    <!-- Hero eye + title -->
+    <div id="fbHero" style="margin-bottom:18px;opacity:0">
+      <div style="display:inline-flex;align-items:center;gap:8px;font:500 10.5px var(--m);color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px">
+        <span style="display:block;width:18px;height:1px;background:var(--a)"></span>Förbättring
       </div>
-      <div style="font:600 11px var(--m);color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Svaga kategorier</div>
-      <div class="weakRow">
-        <div class="weakLabel">Väglag &amp; Bromssträcka</div>
-        <div class="weakBar"><div class="weakFill" id="wf1" style="width:0%"></div></div>
-        <div class="weakPct">52%</div>
+      <div style="font:700 22px/1.2 var(--f);color:var(--t)">P.E.R ser ditt mönster</div>
+      <div style="font:400 13px var(--f);color:var(--t2);margin-top:5px">Baserat på dina 47 senaste svar</div>
+    </div>
+
+    <!-- navRail — 5 sections exactly like förbättring.html -->
+    <div class="fbNavRail" id="fbNavRail" style="opacity:0">
+      <div class="fbNavBtn fbAct" id="fbN1">
+        <div style="font-size:15px;line-height:1">📋</div>
+        <div class="fbNavNum">01</div>
+        <div class="fbNavLabel">Prov</div>
       </div>
-      <div class="weakRow">
-        <div class="weakLabel">Mörker &amp; Sikt</div>
-        <div class="weakBar"><div class="weakFill" id="wf2" style="width:0%"></div></div>
-        <div class="weakPct" style="color:#f0a830">68%</div>
+      <div class="fbNavBtn" id="fbN2">
+        <div style="font-size:15px;line-height:1">🤖</div>
+        <div class="fbNavNum">02</div>
+        <div class="fbNavLabel">Coach</div>
       </div>
-      <div class="weakRow">
-        <div class="weakLabel">Koncentration</div>
-        <div class="weakBar"><div class="weakFill" id="wf3" style="width:0%;background:#f0a830"></div></div>
-        <div class="weakPct" style="color:#f0a830">60%</div>
+      <div class="fbNavBtn" id="fbN3">
+        <div style="font-size:15px;line-height:1">📄</div>
+        <div class="fbNavNum">03</div>
+        <div class="fbNavLabel">Rapport</div>
       </div>
-      <div class="howTo" id="howToBox" style="opacity:0">
-        <strong>P.E.R rekommenderar:</strong> Starta med 10 frågor om <em>Väglag &amp; Bromssträcka</em> idag — det är din svagaste punkt. Statistik visar att elever som tränar detta klara teoriprovet med 18% högre sannolikhet.
+      <div class="fbNavBtn" id="fbN4">
+        <div style="font-size:15px;line-height:1">🎯</div>
+        <div class="fbNavNum">04</div>
+        <div class="fbNavLabel">Träna</div>
+      </div>
+      <div class="fbNavBtn" id="fbN5">
+        <div style="font-size:15px;line-height:1">❌</div>
+        <div class="fbNavNum">05</div>
+        <div class="fbNavLabel">Felbank</div>
       </div>
     </div>
+
+    <!-- Coach section (accordion) -->
+    <div class="fbSection" id="fbCoachSec" style="opacity:0">
+      <div class="fbSHead">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font:500 10.5px var(--m);color:var(--a);width:22px;flex-shrink:0">02</span>
+          <div>
+            <div style="font:600 13.5px var(--f);color:var(--t2)">P.E.R Coach</div>
+            <div style="font:400 11.5px var(--f);color:var(--t3);margin-top:1px">AI-rekommendationer</div>
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="rgba(168,196,180,.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="fbSDivider"></div>
+      <div class="fbSBody" id="fbCoachBody">
+        <div class="fbSBodyInner">
+          <div class="coachBox">
+            <div class="coachLabel">P.E.R · Rekommendation</div>
+            <div class="coachText" id="fbCoachTxt"></div>
+          </div>
+          <div class="statsRow">
+            <div class="statBox">
+              <div class="statLabel">Senaste</div>
+              <div class="statValue" id="fbS1" style="opacity:0">—</div>
+            </div>
+            <div class="statBox">
+              <div class="statLabel">Trend</div>
+              <div class="statValue" id="fbS2" style="opacity:0">—</div>
+            </div>
+            <div class="statBox">
+              <div class="statLabel">Fokus</div>
+              <div class="statValue" id="fbS3" style="opacity:0">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Felbank section (accordion) -->
+    <div class="fbSection" id="fbMistakeSec" style="opacity:0">
+      <div class="fbSHead">
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font:500 10.5px var(--m);color:var(--a);width:22px;flex-shrink:0">05</span>
+          <div>
+            <div style="font:600 13.5px var(--f);color:var(--t2)">Felbank</div>
+            <div style="font:400 11.5px var(--f);color:var(--t3);margin-top:1px">3 frågor att repetera</div>
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="rgba(168,196,180,.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="fbSDivider"></div>
+      <div class="fbSBody" id="fbMistakeBody">
+        <div class="fbSBodyInner">
+          <div class="mistakeGrid">
+            <div class="mCard" id="mc1" style="opacity:0;transform:translateY(6px)">
+              <div class="mHeader">
+                <div class="mMeta">Väglag &amp; Bromssträcka · 2026-06-07</div>
+                <div class="mScore">52%</div>
+              </div>
+              <div class="mQ">Hur lång är bromssträckan vid halt väglag jämfört med torr asfalt?</div>
+              <div class="mDiv"></div>
+              <div class="mFL">Ditt svar</div>
+              <div class="mFV">Ungefär dubbelt så lång</div>
+              <div class="mFL">Rätt svar</div>
+              <div class="mFV">Upp till 10× längre — friktionen avgör allt</div>
+            </div>
+            <div class="mCard" id="mc2" style="opacity:0;transform:translateY(6px)">
+              <div class="mHeader">
+                <div class="mMeta">Mörker &amp; Sikt · 2026-06-08</div>
+                <div class="mScore">68%</div>
+              </div>
+              <div class="mQ">Vad gäller vid körning i tät dimma — halvljus eller dimljus?</div>
+              <div class="mDiv"></div>
+              <div class="mFL">Ditt svar</div>
+              <div class="mFV">Halvljus räcker alltid</div>
+              <div class="mFL">Rätt svar</div>
+              <div class="mFV">Dimljus fram vid sikt under 100 m — halvljus bländar i dimma</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <div id="m3cta" style="display:none">
@@ -735,7 +867,7 @@ function buildCatGrid(){
 const NData={
   1:[{s:'Material',t:'Per klistrar in Matte 2b — vilket ämne som helst'},{s:'AI-generering',t:'Sekunder senare: 4 skräddarsydda frågor med pq-formeln'},{s:'Träning',t:'Välj svar, sen rätta hela provet på en gång — precis som riktigt prov'},{s:'Resultat',t:'75% och P.E.R identifierar exakt vad Per behöver träna på'}],
   2:[{s:'Kategorier',t:'368 frågor, 16 kategorier — som riktiga Transportstyrelsen'},{s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},{s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — exakt som verkligheten'},{s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar träning'}],
-  3:[{s:'P.E.R',t:'Precis, Effektiv, Relevant — Provias inbyggda AI-komp'},{s:'Chat',t:'Ger steg-för-steg förklaringar och navigerar dig i appen'},{s:'Förbättring',t:'Analyserar dina mönster och pekar ut exakt vad som behöver tränas'},{s:'Kom igång',t:'Gratis att starta — Basic 29 kr/mån för obegränsade AI-prov'}],
+  3:[{s:'P.E.R',t:'Provias Egna AI-Resource — direkt, aldrig "Bra fråga!", navigerar med GOTO-chip'},{s:'Chat',t:'Identifierar svaga punkter och navigerar dig direkt till rätt övning'},{s:'Förbättring',t:'navRail + Coach-sektion + Felbank — exakt samma vy som i appen'},{s:'Kom igång',t:'Gratis att starta — Basic 29 kr/mån för obegränsade AI-prov'}],
 };
 function setNarrator(mode,idx){document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>`<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('')}
 
@@ -773,6 +905,13 @@ function chatType(elId,curId,text,speed,done){
   const t=setInterval(()=>{if(i>=text.length){clearInterval(t);cur.style.display='none';if(done)done();return}el.textContent+=text[i++]},speed||25);
   return t;
 }
+let fbTyper=null;
+function typeInto(elId,text,speed,done){
+  const el=document.getElementById(elId);if(!el)return;
+  el.textContent='';let i=0;
+  if(fbTyper)clearInterval(fbTyper);
+  fbTyper=setInterval(()=>{if(i>=text.length){clearInterval(fbTyper);fbTyper=null;if(done)done();return}el.textContent+=text[i++]},speed||25);
+}
 
 /* ─── SCORE ─── */
 let scoreCountTimer=null,scoreFillTimer=null;
@@ -803,6 +942,7 @@ function clearAllTimers(){
   clearInterval(aiCountTimer);clearTimeout(aiGoTimer);
   clearInterval(q3TwTimer);clearInterval(scoreCountTimer);clearTimeout(scoreFillTimer);
   clearInterval(chatTimer1);clearInterval(chatTimer2);
+  if(fbTyper){clearInterval(fbTyper);fbTyper=null;}
   catTimers.forEach(clearTimeout);catTimers=[];
   aiCountTimer=aiGoTimer=q3TwTimer=scoreCountTimer=scoreFillTimer=chatTimer1=chatTimer2=null;
 }
@@ -1062,11 +1202,15 @@ function buildTL3(){
   document.getElementById('gotoChip').style.display='none';
   document.getElementById('chat2txt').textContent='';
   document.getElementById('chat4txt').textContent='';
-  gsap.set(['#wf1','#wf2','#wf3'],{});
-  document.getElementById('wf1').style.width='0%';
-  document.getElementById('wf2').style.width='0%';
-  document.getElementById('wf3').style.width='0%';
-  gsap.set('#howToBox',{opacity:0});
+  /* förbättring reset */
+  gsap.set(['#fbHero','#fbNavRail','#fbCoachSec','#fbMistakeSec'],{opacity:0});
+  const _cb=document.getElementById('fbCoachBody');if(_cb)_cb.style.maxHeight='0px';
+  const _mb=document.getElementById('fbMistakeBody');if(_mb)_mb.style.maxHeight='0px';
+  const _ct=document.getElementById('fbCoachTxt');if(_ct)_ct.textContent='';
+  ['fbS1','fbS2','fbS3'].forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='—';gsap.set(e,{opacity:0})}});
+  gsap.set(['#mc1','#mc2'],{opacity:0,y:6});
+  ['fbN1','fbN2','fbN3','fbN4','fbN5'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.remove('fbAct')});
+  const _n1=document.getElementById('fbN1');if(_n1)_n1.classList.add('fbAct');
   gsap.set(['.planCard','#ctaBtn'],{opacity:0,y:12});
   buildDots(3);
 
@@ -1074,7 +1218,7 @@ function buildTL3(){
 
   /* 0–10s P.E.R INTRO */
   tl3
-    .call(()=>{hideAll(M3SEC);show('m3intro');setDot(0,'on');setNarrator(3,0);startCountdown(68)})
+    .call(()=>{hideAll(M3SEC);show('m3intro');setDot(0,'on');setNarrator(3,0);startCountdown(73)})
     .from('#m3intro > .perHex',{opacity:0,scale:.6,duration:.9,ease:'back.out(1.8)'})
     .from('#perTitle',{opacity:0,y:12,duration:.7},'-=.2')
     .from('#m3intro > div:nth-child(3)',{opacity:0,duration:.5},'-=.1')
@@ -1095,7 +1239,7 @@ function buildTL3(){
     .to('#chat1',{opacity:1,duration:.4},10.6)
     .call(()=>{
       gsap.to('#chat2',{opacity:1,duration:.3});
-      chatTimer1=chatType('chat2txt','chat2cur','Absolut Per! pq-formeln löser x² + px + q = 0. Du sätter p och q direkt från ekvationen — inget a att dela med. x = −p/2 ± √((p/2)²−q). Vill du att jag visar ett steg-för-steg-exempel?',18);
+      chatTimer1=chatType('chat2txt','chat2cur','Elton — pq-formeln: x = −p/2 ± √((p/2)²−q). p och q läser du direkt från x² + px + q = 0. Inget a att dela med. Steg-för-steg-exempel?',18);
     },[],12)
     .call(()=>{
       document.getElementById('chat3').style.display='';
@@ -1112,34 +1256,62 @@ function buildTL3(){
       });
     },[],22)
 
-  /* 30–50s FÖRBÄTTRING */
+  /* 30–52s FÖRBÄTTRING — full page simulation */
   tl3
     .call(()=>{
       hideAll(M3SEC);show('m3improve');setDot(1,'dn');setDot(2,'on');setNarrator(3,2);
-      gsap.set('#improveCard',{opacity:0,y:10});
     },[],30)
-    .to('#improveCard',{opacity:1,y:0,duration:.7},30.3)
+    .to('#fbHero',{opacity:1,duration:.6},30.2)
+    .to('#fbNavRail',{opacity:1,y:0,duration:.5},31.2)
+    /* nav cycling: Prov → Coach → Felbank */
     .call(()=>{
-      gsap.to('#wf1',{width:'52%',duration:1.2,ease:'power2.out'});
-      setTimeout(()=>gsap.to('#wf2',{width:'68%',duration:1,ease:'power2.out'}),250);
-      setTimeout(()=>gsap.to('#wf3',{width:'60%',duration:1,ease:'power2.out'}),450);
-    },[],32)
-    .to('#howToBox',{opacity:1,y:0,duration:.7},35)
+      const n1=document.getElementById('fbN1');const n2=document.getElementById('fbN2');
+      if(n1)n1.classList.remove('fbAct');if(n2)n2.classList.add('fbAct');
+    },[],32.5)
+    .call(()=>{
+      const n2=document.getElementById('fbN2');const n5=document.getElementById('fbN5');
+      if(n2)n2.classList.remove('fbAct');if(n5)n5.classList.add('fbAct');
+    },[],33.8)
+    /* Coach section opens */
+    .call(()=>{
+      const n5=document.getElementById('fbN5');const n2=document.getElementById('fbN2');
+      if(n5)n5.classList.remove('fbAct');if(n2)n2.classList.add('fbAct');
+    },[],35)
+    .to('#fbCoachSec',{opacity:1,duration:.5},35)
+    .call(()=>{const b=document.getElementById('fbCoachBody');if(b)b.style.maxHeight='400px';},[],35.3)
+    .call(()=>typeInto('fbCoachTxt','Fokus: Väglag & Bromssträcka (52%). Träna 10 frågor idag — svagaste punkt. Elever som gör detta klarar teoriprovet med 18% högre sannolikhet.',22),[],36)
+    .call(()=>{
+      ['fbS1','fbS2','fbS3'].forEach((id,i)=>{
+        setTimeout(()=>{
+          const e=document.getElementById(id);
+          if(e){e.textContent=['75%','↓ −8%','Väglag'][i];gsap.to(e,{opacity:1,duration:.4})}
+        },i*200)
+      });
+    },[],39)
+    /* Felbank section opens */
+    .call(()=>{
+      const n2=document.getElementById('fbN2');const n5=document.getElementById('fbN5');
+      if(n2)n2.classList.remove('fbAct');if(n5)n5.classList.add('fbAct');
+    },[],41)
+    .to('#fbMistakeSec',{opacity:1,duration:.4},41)
+    .call(()=>{const b=document.getElementById('fbMistakeBody');if(b)b.style.maxHeight='600px';},[],41.4)
+    .to('#mc1',{opacity:1,y:0,duration:.4},42)
+    .to('#mc2',{opacity:1,y:0,duration:.4},42.5)
 
-  /* 50–65s PRICING CTA */
+  /* 55–70s PRICING CTA */
   tl3
     .call(()=>{
       hideAll(M3SEC);show('m3cta');setDot(2,'dn');setDot(3,'on');setNarrator(3,3);
       gsap.set('#ctaWrap',{opacity:0});gsap.set('.planCard',{opacity:0,y:12});gsap.set('#ctaBtn',{opacity:0,y:8});
-    },[],50)
-    .to('#ctaWrap',{opacity:1,duration:.5},50.2)
-    .to('#plan1',{opacity:1,y:0,duration:.5},51)
-    .to('#plan2',{opacity:1,y:0,duration:.5},51.25)
-    .to('#plan3',{opacity:1,y:0,duration:.5},51.5)
-    .to('#ctaBtn',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)'},53)
-    .call(()=>spawnConfetti(),[],54)
+    },[],55)
+    .to('#ctaWrap',{opacity:1,duration:.5},55.2)
+    .to('#plan1',{opacity:1,y:0,duration:.5},56)
+    .to('#plan2',{opacity:1,y:0,duration:.5},56.25)
+    .to('#plan3',{opacity:1,y:0,duration:.5},56.5)
+    .to('#ctaBtn',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)'},58)
+    .call(()=>spawnConfetti(),[],58.5)
 
-  tl3.to('#mode3',{opacity:0,duration:1.4},65.5).set('#mode3',{opacity:1},68);
+  tl3.to('#mode3',{opacity:0,duration:1.4},70.5).set('#mode3',{opacity:1},73);
   return tl3;
 }
 
