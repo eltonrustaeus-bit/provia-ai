@@ -1203,7 +1203,8 @@ function buildTL3(){
   document.getElementById('chat2txt').textContent='';
   document.getElementById('chat4txt').textContent='';
   /* förbättring reset */
-  gsap.set(['#fbHero','#fbNavRail','#fbCoachSec','#fbMistakeSec'],{opacity:0});
+  gsap.set(['#fbHero','#fbCoachSec','#fbMistakeSec'],{opacity:0});
+  gsap.set('#fbNavRail',{opacity:0,y:8});
   const _cb=document.getElementById('fbCoachBody');if(_cb)_cb.style.maxHeight='0px';
   const _mb=document.getElementById('fbMistakeBody');if(_mb)_mb.style.maxHeight='0px';
   const _ct=document.getElementById('fbCoachTxt');if(_ct)_ct.textContent='';
