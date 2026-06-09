@@ -450,6 +450,8 @@ body.light .aiSendBtn{color:#fff}
 .adminSaveBtn:hover{background:var(--a2);transform:translateY(-1px)}
 .adminSaveBtn:disabled{opacity:.4;cursor:default;transform:none}
 body.light .adminSaveBtn{color:#fff}
+.adminDeleteBtn{height:38px;width:38px;background:transparent;border:1px solid rgba(255,107,107,.3);color:#ff8484;border-radius:var(--r);cursor:pointer;transition:background .13s,border-color .13s;font-size:15px;flex-shrink:0}
+.adminDeleteBtn:hover{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.6)}
 .adminImgSection{border:1px solid var(--l);border-radius:var(--r);overflow:hidden}
 .adminImgCurrent{padding:12px;display:flex;flex-direction:column;gap:10px}
 .adminImgPreviewBox{border:1px solid var(--l);border-radius:var(--r);background:var(--s2);min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:default}
@@ -1055,6 +1057,7 @@ body.light .adminSaveBtn{color:#fff}
 
             <div class="adminSaveRow">
               <span class="adminSaveMsg" id="adminSaveMsg"></span>
+              <button class="adminDeleteBtn" id="adminDeleteBtn" onclick="adminDelete()" type="button">🗑</button>
               <button class="adminSaveBtn" id="adminSaveBtn" onclick="adminSave()" type="button">Spara ändringar</button>
             </div>
 
@@ -3693,6 +3696,36 @@ function adminNavQuestion(dir) {
   if (ni !== cur || cur < 0) {
     items[ni].click();
     items[ni].scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+async function adminDelete() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  if (!confirm(`Radera fråga #${q.id} permanent?\n\n"${q.question.slice(0, 80)}"\n\nDetta går inte att ångra.`)) return;
+  const btn = $("adminDeleteBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "delete-question", questionId: q.id })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    _adminQMap.delete(q.id);
+    _adminSelectedQ = null;
+    adminSetDirty(false);
+    $("adminFormWrap").style.display = "none";
+    $("adminEditEmpty").style.display = "";
+    $("adminQList").querySelector(`[data-id="${q.id}"]`)?.remove();
+    const cnt = $("adminCount");
+    if (cnt) cnt.textContent = (_adminQMap.size) + " st";
+    toast(`Fråga #${q.id} raderad.`, "ok");
+  } catch(e) {
+    toast("Fel: " + esc(e.message || "nätverksfel"), "err");
+    if (btn) { btn.disabled = false; btn.textContent = "🗑"; }
   }
 }
 
