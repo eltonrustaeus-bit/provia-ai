@@ -57,6 +57,11 @@
 .catName{font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:2px}
 .catCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
 .catCard.active .catCount{color:var(--a)}
+.catProg{margin-top:5px;height:3px;border-radius:999px;background:var(--l);overflow:hidden}
+.catProgFill{height:100%;border-radius:999px;background:var(--a);transition:width .4s ease}
+.catDone{position:absolute;top:8px;right:8px;font-size:11px;color:var(--a);font-weight:700}
+.catCard.catCompleted{border-color:rgba(27,255,140,.22)}
+.catCard.catCompleted .catName{color:var(--a)}
 .loadingCat{grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);padding:8px 0}
 
 /* CONFIG */
@@ -97,6 +102,7 @@ body.light .startBtn{color:#fff}
 .bookmarkBtn{position:absolute;top:14px;right:14px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .15s,border-color .15s;padding:0}
 .bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4)}
 .qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:16px}
+@media(max-width:600px){.qText{font-size:18px;line-height:1.6}}
 .qImg{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);display:block;margin:0 auto 14px}
 
 /* ANSWER BUTTONS */
@@ -105,7 +111,8 @@ body.light .startBtn{color:#fff}
 .ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
 .ansBtn:disabled{cursor:default;transform:none}
 .ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t);animation:correctPulse .55s ease}
-.ansBtn.wrong{border-color:var(--danger);background:rgba(255,107,107,.10);color:var(--t)}
+.ansBtn.wrong{border-color:var(--danger);background:rgba(255,107,107,.10);color:var(--t);animation:wrongShake .4s ease}
+@keyframes wrongShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
 .ansLetter{width:28px;height:28px;border-radius:var(--r2);display:grid;place-items:center;flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:var(--s);border:1px solid var(--l);color:var(--t3);transition:background .15s,border-color .15s,color .15s}
 .ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
 body.light .ansBtn.correct .ansLetter{color:#fff}
@@ -2469,12 +2476,16 @@ function buildCats() {
   const bm = getBM().filter(id => questions.some(q => q.id === id));
   const cats = ["Alla kategorier", ...Object.keys(counts).sort()];
   if(bm.length > 0) cats.push("⭐ Bokmärkta");
+  const catProgData = getCatProg();
   cats.forEach(cat => {
     const n = cat==="Alla kategorier" ? questions.length : cat==="⭐ Bokmärkta" ? bm.length : counts[cat]||0;
     const icon = CAT_ICONS[cat] || "";
+    const prog = catProgData[cat] || {};
+    const best = prog.best || 0;
+    const done = prog.done || false;
     const btn = document.createElement("button");
-    btn.type = "button"; btn.className = "catCard" + (cat===selCat?" active":"");
-    btn.innerHTML = `<div class="catName">${icon ? icon+" " : ""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${n} frågor</div>`;
+    btn.type = "button"; btn.className = "catCard" + (cat===selCat?" active":"") + (done?" catCompleted":"");
+    btn.innerHTML = `<div class="catName">${icon ? icon+" " : ""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${n} frågor${best?" · "+best+"%":""}</div><div class="catProg"><div class="catProgFill" style="width:${best}%"></div></div>${done?'<div class="catDone">✓</div>':""}`;
     btn.onclick = () => {
       grid.querySelectorAll(".catCard").forEach(c => c.classList.remove("active"));
       btn.classList.add("active"); selCat = cat; updateHint();
