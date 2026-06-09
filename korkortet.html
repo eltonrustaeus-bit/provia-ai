@@ -516,6 +516,16 @@ body.light .adminSaveBtn{color:#fff}
 .adminDupWarn{font-family:'DM Mono',monospace;font-size:10px;color:#d4a016;background:rgba(212,160,22,.08);border:1px solid rgba(212,160,22,.22);border-radius:var(--r2);padding:6px 9px;margin-top:5px;display:none;line-height:1.5;cursor:pointer;transition:background .12s}
 .adminDupWarn.show{display:block}
 .adminDupWarn:hover{background:rgba(212,160,22,.13)}
+/* Checked/reviewed state */
+.adminQItem.checked .adminQSnippet{color:var(--t3);text-decoration:line-through}
+.adminQCheck{width:18px;height:18px;border:1px solid var(--l);border-radius:3px;background:transparent;cursor:pointer;flex-shrink:0;display:grid;place-items:center;font-size:10px;color:transparent;transition:all .12s;margin-top:2px}
+.adminQCheck:hover{border-color:var(--l2)}
+.adminQItem.checked .adminQCheck{background:rgba(27,255,140,.15);border-color:var(--a);color:var(--a)}
+.adminCheckedBar{padding:6px 12px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--l)}
+.adminCheckedInfo{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
+.adminCheckedInfo span{color:var(--a)}
+.adminClearChecksBtn{height:20px;padding:0 8px;font-size:9.5px;background:transparent;border:1px solid var(--l);color:var(--t3);border-radius:var(--r2);cursor:pointer;font-family:'DM Mono',monospace;transition:border-color .12s,color .12s;white-space:nowrap}
+.adminClearChecksBtn:hover{border-color:rgba(255,107,107,.4);color:#ff8484}
 /* Report badge in list */
 .adminQReport{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:999px;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;background:rgba(212,64,22,.15);color:#d44016;border:1px solid rgba(212,64,22,.3);flex-shrink:0;margin-top:3px;line-height:1}
 /* Image filter chips */
@@ -916,6 +926,10 @@ body.light .adminSaveBtn{color:#fff}
           <select class="adminCatSelect" id="adminCatFilter">
             <option value="">Alla kategorier</option>
           </select>
+        </div>
+        <div class="adminCheckedBar" id="adminCheckedBar">
+          <div class="adminCheckedInfo">Kollat: <span id="adminCheckedCount">0</span> / <span id="adminCheckedTotal">0</span></div>
+          <button class="adminClearChecksBtn" onclick="adminClearChecks()" type="button">✕ Nollställ</button>
         </div>
         <div class="adminImgFilter" id="adminImgFilter">
           <button class="adminImgChip active" data-imgf="all" onclick="adminSetImgFilter('all')">Alla</button>
@@ -3415,13 +3429,16 @@ function adminRenderList(qs, total, page, limit) {
     return;
   }
   qs.forEach(q => _adminQMap.set(q.id, q));
-  list.innerHTML = qs.map(q =>
-    `<div class="adminQItem${_adminSelectedQ?.id === q.id ? " sel" : ""}" data-id="${q.id}" onclick="adminSelectQuestion(${q.id})">` +
-    `<span class="adminQId">${q.id}</span>` +
-    `<span class="adminQSnippet">${esc(q.question.slice(0, 58) + (q.question.length > 58 ? "…" : ""))}</span>` +
-    (q.report_count > 0 ? `<span class="adminQReport">${q.report_count}</span>` : "") +
-    `<span class="adminQDot${q.image_url ? " has" : ""}"></span></div>`
-  ).join("");
+  list.innerHTML = qs.map(q => {
+    const checked = _adminChecked.has(q.id);
+    return `<div class="adminQItem${_adminSelectedQ?.id === q.id ? " sel" : ""}${checked ? " checked" : ""}" data-id="${q.id}" onclick="adminSelectQuestion(${q.id})">` +
+      `<button class="adminQCheck" onclick="adminToggleCheck(${q.id},event)" type="button" title="Markera som kollad">${checked ? "✓" : ""}</button>` +
+      `<span class="adminQId">${q.id}</span>` +
+      `<span class="adminQSnippet">${esc(q.question.slice(0, 54) + (q.question.length > 54 ? "…" : ""))}</span>` +
+      (q.report_count > 0 ? `<span class="adminQReport">${q.report_count}</span>` : "") +
+      `<span class="adminQDot${q.image_url ? " has" : ""}"></span></div>`;
+  }).join("");
+  adminUpdateCheckedBar(total);
   const totalPages = Math.ceil(total / limit);
   const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
@@ -3511,6 +3528,47 @@ async function adminSave() {
   } finally {
     $("adminSaveBtn").disabled = false;
   }
+}
+
+// ── CHECKED/REVIEWED STATE ──
+const LS_ADMIN_CHECKED = "admin_checked_ids";
+let _adminChecked = new Set(JSON.parse(localStorage.getItem(LS_ADMIN_CHECKED) || "[]"));
+
+function adminSaveChecked() {
+  localStorage.setItem(LS_ADMIN_CHECKED, JSON.stringify([..._adminChecked]));
+}
+
+function adminUpdateCheckedBar(total) {
+  const cnt = $("adminCheckedCount");
+  const tot = $("adminCheckedTotal");
+  if (cnt) cnt.textContent = _adminChecked.size;
+  if (tot && total !== undefined) tot.textContent = total;
+}
+
+function adminToggleCheck(id, e) {
+  e.stopPropagation();
+  const numId = Number(id);
+  if (_adminChecked.has(numId)) _adminChecked.delete(numId);
+  else _adminChecked.add(numId);
+  adminSaveChecked();
+  const item = $("adminQList").querySelector(`[data-id="${id}"]`);
+  if (item) {
+    item.classList.toggle("checked", _adminChecked.has(numId));
+    item.querySelector(".adminQCheck").textContent = _adminChecked.has(numId) ? "✓" : "";
+  }
+  adminUpdateCheckedBar();
+}
+
+function adminClearChecks() {
+  if (!_adminChecked.size) return;
+  if (!confirm(`Nollställa alla ${_adminChecked.size} markeringar?`)) return;
+  _adminChecked.clear();
+  adminSaveChecked();
+  document.querySelectorAll(".adminQItem.checked").forEach(el => {
+    el.classList.remove("checked");
+    el.querySelector(".adminQCheck").textContent = "";
+  });
+  adminUpdateCheckedBar();
 }
 
 // ── DIRTY TRACKING ──
