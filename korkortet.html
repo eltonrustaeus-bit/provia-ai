@@ -402,6 +402,78 @@ body.light .aiSendBtn{color:#fff}
 /* broken image fallback */
 .imgError{font-size:11px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);padding:8px 12px;background:var(--s2);font-family:var(--mono);margin-bottom:10px}
 
+/* ── ADMIN QUESTION STUDIO ── */
+#adminView{padding:0 0 80px}
+.adminWrap{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.adminWrap{grid-template-columns:1fr}}
+.adminPanel,.adminEdit{background:var(--s);border:1px solid var(--l);border-radius:var(--r);overflow:hidden}
+@media(min-width:860px){.adminPanel{position:sticky;top:12px;max-height:calc(100vh - 24px);display:flex;flex-direction:column}}
+.adminPanelHead,.adminEditHead{padding:13px 16px;border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+.adminPanelTitle,.adminEditTitle{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--a);letter-spacing:.1em;text-transform:uppercase}
+.adminCount,.adminEditId{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)}
+.adminFilters{padding:10px 12px;border-bottom:1px solid var(--l);display:flex;flex-direction:column;gap:7px;flex-shrink:0}
+.adminSearchInput,.adminCatSelect{width:100%;padding:8px 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none;box-sizing:border-box;transition:border-color .15s}
+.adminSearchInput::placeholder{color:var(--t3)}
+.adminSearchInput:focus,.adminCatSelect:focus{border-color:var(--l2)}
+.adminQList{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--l) transparent}
+.adminQItem{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;display:flex;align-items:flex-start;gap:7px;border-left:2px solid transparent}
+.adminQItem:hover{background:rgba(255,255,255,.03)}
+.adminQItem.sel{background:rgba(27,255,140,.05);border-left-color:var(--a)}
+.adminQId{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);flex-shrink:0;padding-top:2px;min-width:26px}
+.adminQSnippet{font-size:12px;color:var(--t2);line-height:1.4;word-break:break-word;flex:1}
+.adminQDot{width:6px;height:6px;border-radius:50%;background:var(--l);flex-shrink:0;margin-top:5px;opacity:0}
+.adminQDot.has{background:var(--a);opacity:1}
+.adminPager{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-top:1px solid var(--l);flex-shrink:0}
+.adminPagerInfo{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
+.adminPagerBtns{display:flex;gap:4px}
+.adminPagerBtn{height:26px;padding:0 10px;font-size:11px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r2);color:var(--t2);cursor:pointer;transition:border-color .13s,color .13s;font-family:'DM Mono',monospace}
+.adminPagerBtn:hover:not(:disabled){border-color:var(--l2);color:var(--t)}
+.adminPagerBtn:disabled{opacity:.3;cursor:default}
+.adminEditEmpty{padding:48px 24px;text-align:center;font-size:13px;color:var(--t3);font-family:'DM Mono',monospace;display:flex;flex-direction:column;align-items:center;gap:10px}
+.adminForm{padding:16px;display:flex;flex-direction:column;gap:14px}
+.adminField{display:flex;flex-direction:column;gap:5px}
+.adminLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase}
+.adminInput,.adminTextarea,.adminSelect{width:100%;padding:9px 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box;transition:border-color .15s}
+.adminInput:focus,.adminTextarea:focus,.adminSelect:focus{border-color:var(--l2)}
+.adminTextarea{resize:vertical;min-height:70px;line-height:1.55}
+.adminOptionsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.adminOptionsGrid{grid-template-columns:1fr}}
+.adminOptWrap{display:flex;flex-direction:column;gap:4px}
+.adminOptLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.adminOptLabel input[type=radio]{accent-color:var(--a);cursor:pointer}
+.adminMetaRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:420px){.adminMetaRow{grid-template-columns:1fr}}
+.adminSaveRow{display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--l);margin-top:2px}
+.adminSaveMsg{font-family:'DM Mono',monospace;font-size:11px;flex:1}
+.adminSaveMsg.ok{color:var(--ok)}.adminSaveMsg.err{color:var(--danger)}
+.adminSaveBtn{height:38px;padding:0 20px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);font-weight:700;font-size:13px;cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap;flex-shrink:0}
+.adminSaveBtn:hover{background:var(--a2);transform:translateY(-1px)}
+.adminSaveBtn:disabled{opacity:.4;cursor:default;transform:none}
+body.light .adminSaveBtn{color:#fff}
+.adminImgSection{border:1px solid var(--l);border-radius:var(--r);overflow:hidden}
+.adminImgCurrent{padding:12px;display:flex;gap:10px;align-items:flex-start}
+.adminImgThumb{width:72px;height:72px;object-fit:contain;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);flex-shrink:0;display:none}
+.adminImgNone{width:72px;height:72px;border:1px dashed var(--l);border-radius:var(--r);background:var(--s2);flex-shrink:0;display:grid;place-items:center;font-size:9.5px;color:var(--t3);font-family:'DM Mono',monospace;text-align:center;line-height:1.35}
+.adminImgInfo{flex:1;min-width:0}
+.adminImgUrl{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);word-break:break-all;line-height:1.4;margin-bottom:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.adminImgDescText{font-size:12px;color:var(--t2);line-height:1.4;margin-bottom:6px}
+.adminImgClearBtn{height:26px;padding:0 10px;font-size:11px;background:transparent;border:1px solid rgba(255,107,107,.3);color:#ff8484;border-radius:var(--r2);cursor:pointer;transition:background .13s;font-family:'DM Mono',monospace}
+.adminImgClearBtn:hover{background:rgba(255,107,107,.1)}
+.adminWikiSection{border-top:1px solid var(--l);padding:12px}
+.adminWikiHdr{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.adminWikiRow{display:flex;gap:6px;margin-bottom:8px}
+.adminWikiInput{flex:1;padding:7px 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none;transition:border-color .15s}
+.adminWikiInput::placeholder{color:var(--t3)}
+.adminWikiInput:focus{border-color:var(--l2)}
+.adminWikiSearchBtn{height:34px;padding:0 12px;font-size:12px;background:var(--s2);border:1px solid var(--l2);color:var(--t2);border-radius:var(--r);cursor:pointer;transition:border-color .13s,color .13s,background .13s;white-space:nowrap;font-weight:600}
+.adminWikiSearchBtn:hover{border-color:var(--a);color:var(--a);background:rgba(27,255,140,.06)}
+.adminWikiStatus{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);padding:4px 0;text-align:center}
+.adminWikiGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:7px;max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--l) transparent}
+.adminWikiItem{border:1px solid var(--l);border-radius:var(--r);padding:6px;cursor:pointer;text-align:center;transition:border-color .13s,background .13s;background:var(--s2)}
+.adminWikiItem:hover,.adminWikiItem.sel{border-color:var(--a);background:rgba(27,255,140,.07)}
+.adminWikiItem img{width:50px;height:50px;object-fit:contain;display:block;margin:0 auto 4px}
+.adminWikiItemName{font-family:'DM Mono',monospace;font-size:8px;color:var(--t3);word-break:break-all;line-height:1.3}
+
 </style>
 </head>
 <body>
@@ -533,6 +605,10 @@ body.light .aiSendBtn{color:#fff}
     <button class="modeTab" id="tab-repetition" onclick="setMode('repetition')" type="button">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2 8 5 2 8 8 11 5 14 8"/></svg>
       Repetition<span class="dueBadge" id="dueBadge"></span>
+    </button>
+    <button class="modeTab" id="tab-admin" onclick="setMode('admin')" type="button" style="display:none">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Studio
     </button>
   </div>
 
@@ -761,6 +837,148 @@ body.light .aiSendBtn{color:#fff}
     <div class="card" id="errCard" style="display:none">
       <div class="cardTitle">Felbank — dina misstag</div>
       <div class="errBank" id="errBank"></div>
+    </div>
+  </div>
+
+  <!-- ADMIN QUESTION STUDIO -->
+  <div id="adminView" style="display:none">
+    <div class="adminWrap">
+
+      <!-- Left: Question browser -->
+      <div class="adminPanel">
+        <div class="adminPanelHead">
+          <span class="adminPanelTitle">Frågor</span>
+          <span class="adminCount" id="adminCount">–</span>
+        </div>
+        <div class="adminFilters">
+          <input class="adminSearchInput" id="adminSearch" type="search" placeholder="Sök frågetext…" autocomplete="off" />
+          <select class="adminCatSelect" id="adminCatFilter">
+            <option value="">Alla kategorier</option>
+          </select>
+        </div>
+        <div class="adminQList" id="adminQList">
+          <div class="adminWikiStatus">Laddar frågor…</div>
+        </div>
+        <div class="adminPager" id="adminPager" style="display:none">
+          <span class="adminPagerInfo" id="adminPagerInfo"></span>
+          <div class="adminPagerBtns">
+            <button class="adminPagerBtn" id="adminPrevBtn" onclick="adminChangePage(-1)" type="button" disabled>←</button>
+            <button class="adminPagerBtn" id="adminNextBtn" onclick="adminChangePage(1)" type="button">→</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Edit form -->
+      <div class="adminEdit" id="adminEdit">
+        <div class="adminEditEmpty" id="adminEditEmpty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.22"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Välj en fråga till vänster
+        </div>
+        <div id="adminFormWrap" style="display:none">
+          <div class="adminEditHead">
+            <span class="adminEditTitle">Redigera fråga</span>
+            <span class="adminEditId" id="adminEditId">#–</span>
+          </div>
+          <div class="adminForm">
+
+            <div class="adminField">
+              <label class="adminLabel" for="adminQ">Frågetext</label>
+              <textarea class="adminTextarea" id="adminQ" rows="3" placeholder="Skriv frågan här…"></textarea>
+            </div>
+
+            <div class="adminField">
+              <label class="adminLabel">Svarsalternativ <small style="font-family:'DM Sans',sans-serif;text-transform:none;letter-spacing:0;color:var(--t3);font-size:10px">— markera korrekt</small></label>
+              <div class="adminOptionsGrid">
+                <div class="adminOptWrap">
+                  <label class="adminOptLabel"><input type="radio" name="adminCorrect" value="A"> A — Korrekt</label>
+                  <input class="adminInput" id="adminOptA" placeholder="Alternativ A" />
+                </div>
+                <div class="adminOptWrap">
+                  <label class="adminOptLabel"><input type="radio" name="adminCorrect" value="B"> B — Korrekt</label>
+                  <input class="adminInput" id="adminOptB" placeholder="Alternativ B" />
+                </div>
+                <div class="adminOptWrap">
+                  <label class="adminOptLabel"><input type="radio" name="adminCorrect" value="C"> C — Korrekt</label>
+                  <input class="adminInput" id="adminOptC" placeholder="Alternativ C" />
+                </div>
+                <div class="adminOptWrap">
+                  <label class="adminOptLabel"><input type="radio" name="adminCorrect" value="D"> D — Korrekt</label>
+                  <input class="adminInput" id="adminOptD" placeholder="Alternativ D" />
+                </div>
+              </div>
+            </div>
+
+            <div class="adminField">
+              <label class="adminLabel" for="adminExpl">Förklaring</label>
+              <textarea class="adminTextarea" id="adminExpl" rows="3" placeholder="Förklaring till korrekt svar…"></textarea>
+            </div>
+
+            <div class="adminField">
+              <label class="adminLabel">Metadata</label>
+              <div class="adminMetaRow">
+                <select class="adminSelect" id="adminCat">
+                  <option value="Vägmärken">Vägmärken</option>
+                  <option value="Trafikregler">Trafikregler</option>
+                  <option value="Korsningar">Korsningar</option>
+                  <option value="Möte &amp; Omkörning">Möte &amp; Omkörning</option>
+                  <option value="Hastighet">Hastighet</option>
+                  <option value="Parkering">Parkering</option>
+                  <option value="Miljö &amp; Ekonomi">Miljö &amp; Ekonomi</option>
+                  <option value="Alkohol &amp; Droger">Alkohol &amp; Droger</option>
+                  <option value="Säkerhet &amp; Utrustning">Säkerhet &amp; Utrustning</option>
+                  <option value="Mörker &amp; Sikt">Mörker &amp; Sikt</option>
+                  <option value="Väglag &amp; Bromssträcka">Väglag &amp; Bromssträcka</option>
+                  <option value="Vägtunnlar">Vägtunnlar</option>
+                  <option value="Bogsering &amp; Lastsäkring">Bogsering &amp; Lastsäkring</option>
+                  <option value="Fordon &amp; Besiktning">Fordon &amp; Besiktning</option>
+                  <option value="Körning med Släp">Körning med Släp</option>
+                  <option value="Nödsituationer">Nödsituationer</option>
+                </select>
+                <select class="adminSelect" id="adminDiff">
+                  <option value="easy">Lätt</option>
+                  <option value="normal">Normal</option>
+                  <option value="hard">Svår</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="adminField">
+              <label class="adminLabel">Bild</label>
+              <div class="adminImgSection">
+                <div class="adminImgCurrent">
+                  <div style="position:relative;flex-shrink:0">
+                    <div class="adminImgNone" id="adminImgNone">Ingen<br>bild</div>
+                    <img class="adminImgThumb" id="adminImgThumb" src="" alt="" onerror="this.style.opacity='.25'" />
+                  </div>
+                  <div class="adminImgInfo">
+                    <div class="adminImgUrl" id="adminImgUrlTxt">—</div>
+                    <div class="adminImgDescText" id="adminImgDescTxt"></div>
+                    <button class="adminImgClearBtn" onclick="adminClearImage()" type="button">Ta bort bild</button>
+                  </div>
+                </div>
+                <input type="hidden" id="adminImgUrl" />
+                <input type="hidden" id="adminImgDesc" />
+                <div class="adminWikiSection">
+                  <div class="adminWikiHdr">Sök Wikimedia Commons — Sweden road signs</div>
+                  <div class="adminWikiRow">
+                    <input class="adminWikiInput" id="adminWikiQ" type="text" placeholder="t.ex. B1 eller E11-1" onkeydown="if(event.key==='Enter')adminWikiSearch()" />
+                    <button class="adminWikiSearchBtn" onclick="adminWikiSearch()" type="button">Sök</button>
+                  </div>
+                  <div class="adminWikiStatus" id="adminWikiStatus"></div>
+                  <div class="adminWikiGrid" id="adminWikiGrid"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="adminSaveRow">
+              <span class="adminSaveMsg" id="adminSaveMsg"></span>
+              <button class="adminSaveBtn" id="adminSaveBtn" onclick="adminSave()" type="button">Spara ändringar</button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1594,7 +1812,7 @@ function setMode(mode) {
   currentMode = mode;
   const views = {
     ovning:"configView", kurser:"kurserView", teoriprov:"teoriView",
-    repetition:"repetitionView"
+    repetition:"repetitionView", admin:"adminView"
   };
   Object.entries(views).forEach(([m, id]) => {
     const tab=$("tab-"+m), view=$(id);
@@ -1606,6 +1824,7 @@ function setMode(mode) {
   if(mode==="kurser") buildCourseGrid();
   if(mode==="teoriprov") loadTeoriHist();
   if(mode==="repetition") buildRepetitionView();
+  if(mode==="admin") adminInit();
   updateXpBar();
 }
 
@@ -2059,6 +2278,7 @@ function refreshQuotaUI() {
   const cfg = LIMITS[role] || LIMITS.gratis;
   const rl = {gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
   const rp = $("rolePill"); if(rp) rp.textContent = rl[role] || role;
+  const adminTab = $("tab-admin"); if(adminTab) adminTab.style.display = role === "admin" ? "" : "none";
 
   if(cfg.cap === Infinity) {
     $("quotaLabel").textContent = "OBEGRÄNSAT ANTAL TEST";
@@ -2935,6 +3155,252 @@ function resetMastered() {
   localStorage.removeItem(LS_CAT_MASTERED);
   if(uid) saveProgressToSupabase();
   toast("Framsteg nollställda.", "ok");
+}
+
+// ── ADMIN QUESTION STUDIO ──
+let _adminPage = 1;
+let _adminLoaded = false;
+let _adminSelectedQ = null;
+let _adminSearchTimer = null;
+const _adminQMap = new Map();
+
+function adminChangePage(delta) {
+  _adminPage = Math.max(1, _adminPage + delta);
+  adminLoadQuestions();
+}
+
+function adminMsg(text, type) {
+  const el = $("adminSaveMsg");
+  if (!el) return;
+  el.textContent = text;
+  el.className = "adminSaveMsg" + (type ? " " + type : "");
+  if (type === "ok") setTimeout(() => { if (el.textContent === text) { el.textContent = ""; el.className = "adminSaveMsg"; } }, 3000);
+}
+
+function adminUpdateImgPreview() {
+  const url = $("adminImgUrl")?.value || "";
+  const desc = $("adminImgDesc")?.value || "";
+  const thumb = $("adminImgThumb");
+  const none = $("adminImgNone");
+  const urlTxt = $("adminImgUrlTxt");
+  const descTxt = $("adminImgDescTxt");
+  if (!thumb) return;
+  if (url) {
+    thumb.src = url;
+    thumb.style.display = "";
+    none.style.display = "none";
+    urlTxt.textContent = url.length > 55 ? url.slice(0, 10) + "…" + url.slice(-42) : url;
+    descTxt.textContent = desc || "";
+  } else {
+    thumb.src = "";
+    thumb.style.display = "none";
+    none.style.display = "";
+    urlTxt.textContent = "—";
+    descTxt.textContent = "";
+  }
+}
+
+function adminClearImage() {
+  $("adminImgUrl").value = "";
+  $("adminImgDesc").value = "";
+  adminUpdateImgPreview();
+  document.querySelectorAll(".adminWikiItem").forEach(el => el.classList.remove("sel"));
+}
+
+async function adminWikiSearch() {
+  const raw = ($("adminWikiQ")?.value || "").trim();
+  if (!raw) return;
+  const q = /^sweden/i.test(raw) ? raw : "Sweden road sign " + raw;
+  const status = $("adminWikiStatus");
+  const grid = $("adminWikiGrid");
+  status.textContent = "Söker…";
+  grid.innerHTML = "";
+  try {
+    const params = new URLSearchParams({
+      action: "query", generator: "search",
+      gsrsearch: q, gsrnamespace: "6",
+      prop: "imageinfo", iiprop: "url",
+      iiurlwidth: "330",
+      format: "json", origin: "*",
+      gsrlimit: "16"
+    });
+    const r = await fetch("https://commons.wikimedia.org/w/api.php?" + params, { signal: AbortSignal.timeout(9000) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const json = await r.json();
+    const pages = Object.values(json?.query?.pages || {});
+    if (!pages.length) { status.textContent = "Inga resultat hittades."; return; }
+    status.textContent = "";
+    const curUrl = $("adminImgUrl")?.value || "";
+    grid.innerHTML = pages.map(p => {
+      const info = p.imageinfo?.[0];
+      if (!info?.thumburl) return "";
+      const url330 = info.thumburl;
+      const url80 = url330.replace(/\/\d+px-/, "/80px-");
+      const filename = (p.title || "").replace(/^File:/, "");
+      const label = filename.replace(/_/g, " ").replace(/\.svg$/i, "").replace(/^Sweden road sign /i, "");
+      const isSel = curUrl === url330;
+      return `<div class="adminWikiItem${isSel ? " sel" : ""}" data-url="${esc(url330)}" data-desc="${esc(label)}" title="${esc(filename.replace(/_/g," "))}">` +
+        `<img src="${esc(url80)}" alt="${esc(label)}" loading="lazy" onerror="this.style.opacity='.2'" />` +
+        `<div class="adminWikiItemName">${esc(label)}</div></div>`;
+    }).join("");
+    grid.onclick = e => {
+      const item = e.target.closest(".adminWikiItem");
+      if (!item) return;
+      $("adminImgUrl").value = item.dataset.url || "";
+      $("adminImgDesc").value = item.dataset.desc || "";
+      adminUpdateImgPreview();
+      document.querySelectorAll(".adminWikiItem").forEach(el => el.classList.toggle("sel", el === item));
+    };
+  } catch(e) {
+    status.textContent = "Sökfel: " + esc(e.message || "nätverksfel");
+  }
+}
+
+function adminSelectQuestion(id) {
+  const q = _adminQMap.get(Number(id));
+  if (!q) return;
+  _adminSelectedQ = q;
+  document.querySelectorAll(".adminQItem").forEach(el => el.classList.toggle("sel", el.dataset.id === String(id)));
+  $("adminEditEmpty").style.display = "none";
+  $("adminFormWrap").style.display = "";
+  $("adminEditId").textContent = "#" + q.id;
+  $("adminQ").value = q.question || "";
+  $("adminOptA").value = q.option_a || "";
+  $("adminOptB").value = q.option_b || "";
+  $("adminOptC").value = q.option_c || "";
+  $("adminOptD").value = q.option_d || "";
+  document.querySelectorAll('input[name="adminCorrect"]').forEach(r => { r.checked = r.value === (q.correct || "").toUpperCase(); });
+  $("adminExpl").value = q.explanation || "";
+  $("adminCat").value = q.category || "Vägmärken";
+  $("adminDiff").value = q.difficulty || "normal";
+  $("adminImgUrl").value = q.image_url || "";
+  $("adminImgDesc").value = q.image_description || "";
+  adminUpdateImgPreview();
+  $("adminWikiGrid").innerHTML = "";
+  $("adminWikiStatus").textContent = "";
+  $("adminWikiQ").value = "";
+  adminMsg("", "");
+  if (window.innerWidth < 860) $("adminEdit").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function adminRenderList(qs, total, page, limit) {
+  $("adminCount").textContent = total + " st";
+  const list = $("adminQList");
+  if (!qs.length) {
+    list.innerHTML = `<div class="adminWikiStatus">Inga frågor matchade.</div>`;
+    $("adminPager").style.display = "none";
+    return;
+  }
+  qs.forEach(q => _adminQMap.set(q.id, q));
+  list.innerHTML = qs.map(q =>
+    `<div class="adminQItem${_adminSelectedQ?.id === q.id ? " sel" : ""}" data-id="${q.id}" onclick="adminSelectQuestion(${q.id})">` +
+    `<span class="adminQId">${q.id}</span>` +
+    `<span class="adminQSnippet">${esc(q.question.slice(0, 62) + (q.question.length > 62 ? "…" : ""))}</span>` +
+    `<span class="adminQDot${q.image_url ? " has" : ""}"></span></div>`
+  ).join("");
+  const totalPages = Math.ceil(total / limit);
+  const from = (page - 1) * limit + 1;
+  const to = Math.min(page * limit, total);
+  $("adminPagerInfo").textContent = from + "–" + to + " av " + total;
+  $("adminPrevBtn").disabled = page <= 1;
+  $("adminNextBtn").disabled = page >= totalPages;
+  $("adminPager").style.display = total > limit ? "" : "none";
+}
+
+async function adminLoadQuestions() {
+  $("adminQList").innerHTML = `<div class="adminWikiStatus">Laddar…</div>`;
+  try {
+    const tok = await getAuthToken();
+    const body = { action: "list-questions", page: _adminPage };
+    const search = $("adminSearch")?.value.trim() || "";
+    const category = $("adminCatFilter")?.value || "";
+    if (search) body.search = search;
+    if (category) body.category = category;
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify(body)
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    adminRenderList(json.questions, json.total, json.page, json.limit);
+  } catch(e) {
+    $("adminQList").innerHTML = `<div class="adminWikiStatus" style="color:var(--danger)">⚠ ${esc(e.message)}</div>`;
+  }
+}
+
+async function adminSave() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const updates = {};
+  const v = id => $(id)?.value ?? "";
+
+  const qText = v("adminQ").trim();
+  if (qText !== (q.question || "")) updates.question = qText;
+  const oa = v("adminOptA").trim(), ob = v("adminOptB").trim(),
+        oc = v("adminOptC").trim(), od = v("adminOptD").trim();
+  if (oa !== (q.option_a || "")) updates.option_a = oa;
+  if (ob !== (q.option_b || "")) updates.option_b = ob;
+  if (oc !== (q.option_c || "")) updates.option_c = oc;
+  if (od !== (q.option_d || "")) updates.option_d = od;
+  const correct = document.querySelector('input[name="adminCorrect"]:checked')?.value || "";
+  if (correct !== (q.correct || "")) updates.correct = correct;
+  const expl = v("adminExpl").trim();
+  if (expl !== (q.explanation || "")) updates.explanation = expl || null;
+  if ($("adminCat").value !== q.category) updates.category = $("adminCat").value;
+  if ($("adminDiff").value !== q.difficulty) updates.difficulty = $("adminDiff").value;
+  const imgUrl = v("adminImgUrl");
+  const imgDesc = v("adminImgDesc").trim();
+  if (imgUrl !== (q.image_url || "")) updates.image_url = imgUrl || null;
+  if (imgDesc !== (q.image_description || "")) updates.image_description = imgDesc || null;
+
+  if (!Object.keys(updates).length) { adminMsg("Inga ändringar.", ""); return; }
+
+  $("adminSaveBtn").disabled = true;
+  adminMsg("Sparar…", "");
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "update-question", questionId: q.id, updates })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    const updated = json.question;
+    _adminSelectedQ = updated;
+    _adminQMap.set(updated.id, updated);
+    const item = $("adminQList").querySelector(`[data-id="${updated.id}"]`);
+    if (item) {
+      item.querySelector(".adminQSnippet").textContent = updated.question.slice(0, 62) + (updated.question.length > 62 ? "…" : "");
+      item.querySelector(".adminQDot").classList.toggle("has", Boolean(updated.image_url));
+    }
+    adminMsg("✓ Sparat!", "ok");
+  } catch(e) {
+    adminMsg("⚠ " + (e.message || "Nätverksfel"), "err");
+  } finally {
+    $("adminSaveBtn").disabled = false;
+  }
+}
+
+async function adminInit() {
+  if (role !== "admin") return;
+  if (!_adminLoaded) {
+    _adminLoaded = true;
+    const CATS = ["Vägmärken","Trafikregler","Korsningar","Möte & Omkörning","Hastighet","Parkering","Miljö & Ekonomi","Alkohol & Droger","Säkerhet & Utrustning","Mörker & Sikt","Väglag & Bromssträcka","Vägtunnlar","Bogsering & Lastsäkring","Fordon & Besiktning","Körning med Släp","Nödsituationer"];
+    const catSel = $("adminCatFilter");
+    if (catSel && catSel.options.length <= 1) {
+      CATS.forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; catSel.appendChild(o); });
+    }
+    const searchEl = $("adminSearch");
+    if (searchEl) searchEl.addEventListener("input", () => {
+      clearTimeout(_adminSearchTimer);
+      _adminSearchTimer = setTimeout(() => { _adminPage = 1; adminLoadQuestions(); }, 400);
+    });
+    const catEl = $("adminCatFilter");
+    if (catEl) catEl.addEventListener("change", () => { _adminPage = 1; adminLoadQuestions(); });
+  }
+  await adminLoadQuestions();
 }
 
 init();

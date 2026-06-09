@@ -86,5 +86,80 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  /* ── LIST QUESTIONS ── */
+  if (action === "list-questions") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { category, search, page = 1 } = req.body || {};
+    const limit = 50;
+    const offset = (Math.max(1, Number(page)) - 1) * limit;
+
+    let query = supabase
+      .from("driving_questions")
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description", { count: "exact" })
+      .order("id", { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (category) query = query.eq("category", category);
+    if (search && String(search).trim()) query = query.ilike("question", `%${String(search).trim()}%`);
+
+    const { data, count, error } = await query;
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, questions: data, total: count, page: Number(page), limit });
+  }
+
+  /* ── UPDATE QUESTION ── */
+  if (action === "update-question") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { questionId, updates } = req.body || {};
+    if (!Number.isInteger(questionId) || questionId < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+    if (!updates || typeof updates !== "object" || Array.isArray(updates))
+      return res.status(400).json({ ok: false, error: "updates required" });
+
+    const VALID_CATS = ["Vägmärken","Trafikregler","Korsningar","Möte & Omkörning","Hastighet",
+      "Parkering","Miljö & Ekonomi","Alkohol & Droger","Säkerhet & Utrustning","Mörker & Sikt",
+      "Väglag & Bromssträcka","Vägtunnlar","Bogsering & Lastsäkring","Fordon & Besiktning",
+      "Körning med Släp","Nödsituationer"];
+
+    const safe = {};
+    const str = (v, max) => { const s = String(v ?? "").trim(); return s.length > 0 && s.length <= max ? s : null; };
+
+    if (updates.question    !== undefined) { const v = str(updates.question, 500);    if (!v || v.length < 5)         return res.status(400).json({ ok: false, error: "question invalid" });   safe.question    = v; }
+    if (updates.option_a    !== undefined) { const v = str(updates.option_a, 300);    if (!v)                          return res.status(400).json({ ok: false, error: "option_a invalid" });  safe.option_a    = v; }
+    if (updates.option_b    !== undefined) { const v = str(updates.option_b, 300);    if (!v)                          return res.status(400).json({ ok: false, error: "option_b invalid" });  safe.option_b    = v; }
+    if (updates.option_c    !== undefined) { const v = str(updates.option_c, 300);    if (!v)                          return res.status(400).json({ ok: false, error: "option_c invalid" });  safe.option_c    = v; }
+    if (updates.option_d    !== undefined) { const v = str(updates.option_d, 300);    if (!v)                          return res.status(400).json({ ok: false, error: "option_d invalid" });  safe.option_d    = v; }
+    if (updates.correct     !== undefined) { const v = String(updates.correct || "").toUpperCase(); if (!["A","B","C","D"].includes(v)) return res.status(400).json({ ok: false, error: "correct invalid" }); safe.correct = v; }
+    if (updates.explanation !== undefined) { safe.explanation = updates.explanation ? String(updates.explanation).trim().slice(0, 2000) || null : null; }
+    if (updates.difficulty  !== undefined) { if (!["easy","normal","hard"].includes(updates.difficulty)) return res.status(400).json({ ok: false, error: "difficulty invalid" }); safe.difficulty = updates.difficulty; }
+    if (updates.category    !== undefined) { if (!VALID_CATS.includes(updates.category)) return res.status(400).json({ ok: false, error: "category invalid" }); safe.category = updates.category; }
+    if ("image_url" in updates) {
+      if (!updates.image_url) { safe.image_url = null; }
+      else {
+        const vs = String(updates.image_url).trim();
+        if (!/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i.test(vs) || vs.length > 1000)
+          return res.status(400).json({ ok: false, error: "image_url must be Wikimedia commons URL or null" });
+        safe.image_url = vs;
+      }
+    }
+    if ("image_description" in updates) {
+      safe.image_description = updates.image_description ? String(updates.image_description).trim().slice(0, 500) || null : null;
+    }
+
+    if (!Object.keys(safe).length) return res.status(400).json({ ok: false, error: "No valid fields to update" });
+
+    const { data, error } = await supabase
+      .from("driving_questions")
+      .update(safe)
+      .eq("id", questionId)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, question: data });
+  }
+
   return res.status(400).json({ ok: false, error: "Unknown action" });
 }
