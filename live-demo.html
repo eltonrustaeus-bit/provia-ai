@@ -3,288 +3,330 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProviaAi — Investor Demo</title>
+  <title>ProviaAi — Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <style>
-    :root {
-      --bg:  #08100d;
-      --a:   #1bff8c;
-      --ad:  rgba(27,255,140,.08);
-      --s:   #111a15;
-      --s2:  #162019;
-      --t:   #e8f5ee;
-      --t2:  #a8c4b4;
-      --t3:  #6b8f7c;
-      --l:   rgba(27,255,140,.10);
-      --l2:  rgba(27,255,140,.22);
-      --ok:  #1bff8c;
-      --err: #ff6b6b;
-      --r:   5px;
-      --r2:  4px;
-      --f:   'DM Sans', sans-serif;
-      --m:   'DM Mono', monospace;
+    :root{
+      --bg:#08100d;--a:#1bff8c;--ad:rgba(27,255,140,.08);
+      --s:#111a15;--s2:#162019;
+      --t:#e8f5ee;--t2:#a8c4b4;--t3:#6b8f7c;
+      --l:rgba(27,255,140,.10);--l2:rgba(27,255,140,.22);
+      --ok:#1bff8c;--err:#ff6b6b;
+      --r:5px;--r2:4px;
+      --f:'DM Sans',sans-serif;--m:'DM Mono',monospace;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; background: var(--bg); color: var(--t); font-family: var(--f); overflow: hidden; }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;background:var(--bg);color:var(--t);font-family:var(--f);overflow:hidden}
 
     /* BG */
-    .bgGrid {
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background-image:
-        linear-gradient(rgba(27,255,140,.03) 1px,transparent 1px),
-        linear-gradient(90deg,rgba(27,255,140,.03) 1px,transparent 1px);
-      background-size: 56px 56px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
-      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
-    }
-    .bgG1 {
-      position: fixed; z-index: 0; pointer-events: none;
-      width: 600px; height: 600px;
-      background: radial-gradient(circle,rgba(27,255,140,.10),transparent 65%);
-      top: -200px; left: calc(50% - 300px); filter: blur(60px);
-      animation: gf1 9s ease-in-out infinite;
-    }
-    .bgG2 {
-      position: fixed; z-index: 0; pointer-events: none;
-      width: 300px; height: 300px;
-      background: radial-gradient(circle,rgba(27,255,140,.06),transparent 65%);
-      bottom: -80px; right: -60px; filter: blur(50px);
-      animation: gf1 12s ease-in-out infinite; animation-delay: -4s;
-    }
-    @keyframes gf1 { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-24px) scale(1.05)} }
+    .bgGrid{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(27,255,140,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(27,255,140,.03) 1px,transparent 1px);
+      background-size:56px 56px;
+      mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
+      -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent)}
+    .bgG1{position:fixed;z-index:0;pointer-events:none;width:600px;height:600px;
+      background:radial-gradient(circle,rgba(27,255,140,.10),transparent 65%);
+      top:-200px;left:calc(50% - 300px);filter:blur(60px);animation:gf1 9s ease-in-out infinite}
+    .bgG2{position:fixed;z-index:0;pointer-events:none;width:300px;height:300px;
+      background:radial-gradient(circle,rgba(27,255,140,.06),transparent 65%);
+      bottom:-80px;right:-60px;filter:blur(50px);animation:gf1 12s ease-in-out infinite;animation-delay:-4s}
+    @keyframes gf1{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-24px) scale(1.05)}}
+    #cvBg{position:fixed;inset:0;z-index:1;pointer-events:none}
 
-    #cvBg { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
-    #cvFx { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+    /* HEADER */
+    #hdr{
+      position:fixed;top:0;left:0;right:0;height:52px;z-index:500;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 18px;background:rgba(8,16,13,.90);backdrop-filter:blur(18px);
+      border-bottom:1px solid var(--l)}
+    #hdrLogo{display:flex;align-items:center;gap:9px;text-decoration:none}
+    #hdrLogo img{height:28px;width:28px;object-fit:contain}
+    #hdrLogo span{font:700 15px var(--f);color:var(--t)}
+    #modeTabs{display:flex;gap:3px;background:rgba(8,16,13,.80);
+      border:1px solid var(--l2);border-radius:24px;padding:3px}
+    .mTab{font:600 11px var(--m);color:var(--t3);padding:5px 13px;border-radius:20px;
+      cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:6px;
+      letter-spacing:.04em;user-select:none;white-space:nowrap}
+    .mTab.on{color:#08100d;background:var(--a)}
+    .mTab:not(.on):hover{color:var(--t2)}
+    .mTab .dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+    .mTab.on .dot{animation:dp 1.8s ease-in-out infinite}
+    #hdrRight{display:flex;gap:6px;align-items:center}
+    .kh{font:500 10px var(--m);color:var(--t3);border:1px solid var(--l);
+      border-radius:4px;padding:3px 7px;background:rgba(8,16,13,.7)}
+    .kh b{color:var(--a)}
 
-    /* MODE TABS */
-    #modeTabs {
-      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 400; display: flex; gap: 4px;
-      background: rgba(8,16,13,.92); backdrop-filter: blur(12px);
-      border: 1px solid var(--l2); border-radius: 24px; padding: 4px;
-    }
-    .mTab {
-      font: 600 11px var(--m); color: var(--t3);
-      padding: 6px 16px; border-radius: 20px; cursor: pointer;
-      transition: all .25s; display: flex; align-items: center; gap: 7px;
-      letter-spacing: .04em; user-select: none;
-    }
-    .mTab.on { color: #08100d; background: var(--a); }
-    .mTab:not(.on):hover { color: var(--t2); }
-    .mTab .dot {
-      width: 5px; height: 5px; border-radius: 50%;
-      background: currentColor; flex-shrink: 0;
-    }
-    .mTab.on .dot { animation: dp 1.8s ease-in-out infinite; }
+    /* PROGRESS BAR */
+    #cbar{position:fixed;top:52px;left:0;right:0;height:2px;background:var(--l);z-index:490}
+    #cfill{height:100%;width:0%;background:var(--a);box-shadow:0 0 6px rgba(27,255,140,.6)}
 
-    #keyhints {
-      position: fixed; bottom: 14px; right: 18px; z-index: 400;
-      display: flex; gap: 6px;
-    }
-    .kh { font: 500 10px var(--m); color: var(--t3); border: 1px solid var(--l); border-radius: 4px; padding: 3px 8px; background: rgba(8,16,13,.7); }
-    .kh b { color: var(--a); }
+    /* PROGRESS DOTS */
+    #pdots{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+      z-index:300;display:flex;gap:8px;align-items:center}
+    .pd{width:7px;height:7px;border-radius:50%;background:var(--l2);transition:all .3s}
+    .pd.on{width:22px;border-radius:4px;background:var(--a);box-shadow:0 0 8px rgba(27,255,140,.5)}
+    .pd.dn{background:rgba(27,255,140,.35)}
 
-    #narrator {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
-      background: rgba(8,16,13,.96); backdrop-filter: blur(14px);
-      border-top: 1px solid var(--l2); padding: 14px 28px 18px;
-      transform: translateY(100%); transition: transform .35s cubic-bezier(.4,0,.2,1);
-    }
-    #narrator.open { transform: translateY(0); }
-    .nLbl { font: 600 10px var(--m); color: var(--a); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 9px; }
-    #nSteps { display: flex; gap: 22px; flex-wrap: wrap; }
-    .nst  { font: 400 12px/1.5 var(--f); color: var(--t2); }
-    .nst b { color: var(--t); font-weight: 600; }
+    /* NARRATOR */
+    #narrator{position:fixed;bottom:0;left:0;right:0;z-index:300;
+      background:rgba(8,16,13,.96);backdrop-filter:blur(14px);
+      border-top:1px solid var(--l2);padding:14px 28px 20px;
+      transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1)}
+    #narrator.open{transform:translateY(0)}
+    .nLbl{font:600 10px var(--m);color:var(--a);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}
+    #nSteps{display:flex;gap:22px;flex-wrap:wrap}
+    .nst{font:400 12px/1.5 var(--f);color:var(--t2)}
+    .nst b{color:var(--t);font-weight:600}
 
-    #pdots {
-      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 300; display: flex; gap: 8px; align-items: center;
-    }
-    .pd { width: 7px; height: 7px; border-radius: 50%; background: var(--l2); transition: all .3s; }
-    .pd.on { width: 22px; border-radius: 4px; background: var(--a); box-shadow: 0 0 8px rgba(27,255,140,.5); }
-    .pd.dn { background: rgba(27,255,140,.35); }
+    /* FX */
+    .ptsbdg{position:fixed;z-index:600;pointer-events:none;font:700 16px var(--f);color:var(--a);text-shadow:0 0 12px rgba(27,255,140,.6);opacity:0}
+    .ripring{position:fixed;z-index:500;pointer-events:none;border:2px solid rgba(27,255,140,.6);border-radius:50%;width:40px;height:40px;opacity:0}
 
-    #cbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: var(--l); z-index: 500; }
-    #cfill { height: 100%; width: 0%; background: var(--a); box-shadow: 0 0 6px rgba(27,255,140,.6); }
+    /* SCREENS */
+    .ms{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      padding:70px 18px 52px;opacity:0;pointer-events:none;overflow-y:auto}
+    .ms.act{opacity:1;pointer-events:auto}
 
-    #streak {
-      position: fixed; top: 14px; right: 18px; z-index: 400;
-      font: 700 14px var(--f); color: var(--t);
-      background: rgba(8,16,13,.9); border: 1px solid var(--l2);
-      border-radius: 20px; padding: 5px 14px; opacity: 0;
-    }
+    /* CARDS */
+    .card{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;width:100%;max-width:540px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;
+      border:1px solid var(--l2);background:var(--ad);
+      font:600 11px var(--m);color:var(--a);letter-spacing:.06em}
+    .av{width:36px;height:36px;border-radius:50%;flex-shrink:0;
+      background:linear-gradient(135deg,#1bff8c,#0aaa5e);
+      display:flex;align-items:center;justify-content:center;
+      font:700 13px var(--f);color:#000}
+    .prow{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .pname{font:600 14px var(--f);color:var(--t)}
+    .psub{font:400 11px var(--m);color:var(--t3)}
 
-    .ms {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 64px 20px 52px; opacity: 0; pointer-events: none;
-    }
-    .ms.act { opacity: 1; pointer-events: auto; }
+    /* QUESTION CARDS */
+    .qcard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:18px;width:100%;max-width:540px;margin-bottom:8px}
+    .qmeta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+    .qnum{font:600 10px var(--m);color:var(--t3);letter-spacing:.05em;text-transform:uppercase}
+    .qcat{font:600 9.5px var(--m);color:var(--a);border:1px solid var(--l2);border-radius:var(--r2);padding:1px 7px}
+    .qtxt{font:600 16px/1.5 var(--f);color:var(--t);margin-bottom:14px}
 
-    .card {
-      background: var(--s); border: 1px solid var(--l);
-      border-radius: var(--r); padding: 20px;
-      width: 100%; max-width: 540px;
-    }
-    .pill {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 20px;
-      border: 1px solid var(--l2); background: var(--ad);
-      font: 600 11px var(--m); color: var(--a); letter-spacing: .06em;
-    }
-    .av {
-      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-      background: linear-gradient(135deg,#1bff8c,#0aaa5e);
-      display: flex; align-items: center; justify-content: center;
-      font: 700 13px var(--f); color: #000;
-    }
-    .prow { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .pname { font: 600 14px var(--f); color: var(--t); }
-    .psub  { font: 400 11px var(--m); color: var(--t3); }
+    /* ANSWER BUTTONS */
+    .ansGrid{display:flex;flex-direction:column;gap:8px}
+    .ansBtn{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r);
+      border:1px solid var(--l);background:var(--s2);
+      font:500 14px var(--f);color:var(--t2);text-align:left;width:100%;cursor:default;
+      transition:border-color .15s,background .15s;min-height:48px}
+    .ansLetter{width:26px;height:26px;border-radius:var(--r2);display:grid;place-items:center;
+      flex-shrink:0;font:500 11px var(--m);background:var(--s);
+      border:1px solid var(--l);color:var(--t3);transition:all .15s}
+    .ansBtn.sel{border-color:var(--a);background:var(--ad);color:var(--t)}
+    .ansBtn.sel .ansLetter{background:rgba(27,255,140,.15);border-color:var(--a);color:var(--a)}
+    .ansBtn.ok{border-color:var(--ok);background:rgba(27,255,140,.10);color:var(--t);animation:correctPulse .55s ease}
+    .ansBtn.ok .ansLetter{background:var(--a);border-color:var(--a);color:#000}
+    .ansBtn.bad{border-color:var(--err);background:rgba(255,107,107,.09);color:var(--t);animation:wrongShake .4s ease}
+    .ansBtn.bad .ansLetter{background:rgba(255,107,107,.2);border-color:var(--err);color:#ff8484}
+    @keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
+    @keyframes wrongShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
 
-    @keyframes dp     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.25;transform:scale(1.5)} }
-    @keyframes blink  { 50%{opacity:0} }
-    @keyframes hexspin{ to{transform:rotate(360deg)} }
-    @keyframes scan   { 0%{left:-100%} 100%{left:100%} }
-    @keyframes logoF  { 0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))} 50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.65))} }
+    /* WRITTEN FIELD */
+    .wfield{min-height:56px;border:1px solid var(--l);border-radius:var(--r);
+      padding:10px 13px;font:500 13px var(--m);color:var(--t2);
+      background:var(--bg);word-break:break-word;line-height:1.8;transition:border-color .2s,box-shadow .2s}
+    .wfield.active{border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
+    .wfield.bad{border-color:var(--err);background:rgba(255,107,107,.06);color:var(--err)}
+    .aifb{margin-top:10px;padding:12px 14px;background:var(--s2);border-left:3px solid var(--a);
+      border-radius:0 var(--r) var(--r) 0;font:400 12px/1.65 var(--f);color:var(--t2)}
+    .aifb .fml{font:500 13px var(--m);color:var(--a);display:block;margin:5px 0}
+    .aifb strong{color:var(--t)}
 
-    /* ANSWER BUTTONS — matching real Provia */
-    .ansGrid { display: flex; flex-direction: column; gap: 8px; }
-    .ansBtn {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; border-radius: var(--r);
-      border: 1px solid var(--l); background: var(--s2);
-      font: 500 14px var(--f); color: var(--t2);
-      text-align: left; width: 100%; cursor: default;
-      transition: border-color .15s, background .15s;
-      min-height: 48px;
-    }
-    .ansLetter {
-      width: 26px; height: 26px; border-radius: var(--r2);
-      display: grid; place-items: center; flex-shrink: 0;
-      font: 500 11px var(--m); background: var(--s);
-      border: 1px solid var(--l); color: var(--t3);
-      transition: all .15s;
-    }
-    .ansBtn.sel  { border-color: var(--a); background: var(--ad); color: var(--t); }
-    .ansBtn.sel .ansLetter { background: rgba(27,255,140,.15); border-color: var(--a); color: var(--a); }
-    .ansBtn.ok   { border-color: var(--ok); background: rgba(27,255,140,.10); color: var(--t); animation: correctPulse .55s ease; }
-    .ansBtn.ok  .ansLetter { background: var(--a); border-color: var(--a); color: #000; }
-    .ansBtn.bad  { border-color: var(--err); background: rgba(255,107,107,.09); color: var(--t); animation: wrongShake .4s ease; }
-    .ansBtn.bad .ansLetter { background: rgba(255,107,107,.2); border-color: var(--err); color: #ff8484; }
-    @keyframes correctPulse { 0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)} 60%{box-shadow:0 0 0 14px rgba(27,255,140,0)} 100%{box-shadow:none} }
-    @keyframes wrongShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(3px)} }
+    /* FLOATING GRADE BAR */
+    #floatingGradeBar{position:fixed;bottom:0;left:0;right:0;z-index:200;
+      background:rgba(8,16,13,.96);backdrop-filter:blur(14px);
+      border-top:1px solid var(--l2);padding:12px 20px;
+      display:flex;align-items:center;justify-content:space-between;
+      transform:translateY(100%);transition:transform .4s cubic-bezier(.4,0,.2,1)}
+    #floatingGradeBar.vis{transform:translateY(0)}
+    #gradeBarInfo{font:400 13px var(--f);color:var(--t2)}
+    #gradeBarInfo b{color:var(--t)}
+    #gradeBtn{background:var(--a);color:#000;font:700 14px var(--f);
+      border:none;border-radius:var(--r);padding:10px 24px;cursor:pointer;
+      box-shadow:0 0 16px rgba(27,255,140,.3)}
 
-    /* MODE 1 */
-    #m1logo { width: 72px; height: 72px; margin-bottom: 20px; animation: logoF 4.5s ease-in-out infinite; }
-    #m1mat { font: 400 13px/1.85 var(--m); color: var(--t2); min-height: 120px; word-break: break-word; }
-    #m1cur { display: inline-block; width: 2px; height: 14px; background: var(--a); margin-left:1px; vertical-align: middle; animation: blink 1s step-end infinite; }
-    #m1cnt { font: 400 11px var(--m); color: var(--t3); text-align: right; margin-top: 6px; }
-    .hexwrap { display: flex; justify-content: center; margin-bottom: 10px; }
-    .hexsvg  { animation: hexspin 1.8s linear infinite; }
-    #aistatus { font: 500 14px var(--f); color: var(--t2); text-align: center; }
-    #aibig    { font: 700 28px var(--f); color: var(--a); text-align: center; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    #aisub    { font: 400 11px var(--m); color: var(--t3); text-align: center; margin-top: 2px; }
-    .aicard { overflow: hidden; position: relative; }
-    .aicard::before { content:''; position:absolute; top:0; left:-100%; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--a),transparent); animation: scan 2.4s linear infinite; }
+    /* GRADING OVERLAY */
+    #gradingOverlay{position:fixed;inset:0;z-index:800;
+      background:rgba(8,16,13,.97);backdrop-filter:blur(20px);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+      opacity:0;pointer-events:none;transition:opacity .3s}
+    #gradingOverlay.vis{opacity:1;pointer-events:auto}
+    .gradingOrb{position:relative;width:72px;height:72px}
+    .gradingRing{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;animation:spin 1.2s linear infinite}
+    .gradingRing:nth-child(1){border-top-color:var(--a);animation-duration:1.2s}
+    .gradingRing:nth-child(2){border-right-color:rgba(27,255,140,.4);animation-duration:1.8s;animation-direction:reverse}
+    .gradingCenter{position:absolute;inset:10px;background:var(--ad);border-radius:50%;display:grid;place-items:center;font:700 18px var(--f);color:var(--a)}
+    .gradingLabel{font:600 15px var(--f);color:var(--t2);text-align:center}
+    .gradingSub{font:400 11px var(--m);color:var(--t3)}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
-    .qcard { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 18px; width: 100%; max-width: 540px; }
-    .qmeta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-    .qnum  { font: 600 10px var(--m); color: var(--t3); letter-spacing:.05em; text-transform:uppercase; }
-    .qcat  { font: 600 9.5px var(--m); color: var(--a); border: 1px solid var(--l2); border-radius: var(--r2); padding: 1px 7px; }
-    .qtxt  { font: 600 16px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
+    /* IMPROVE BANNER */
+    .improveBanner{background:rgba(27,255,140,.07);border-left:3px solid var(--a);
+      border-radius:0 var(--r) var(--r) 0;padding:13px 15px;margin-top:10px;
+      font:400 13px/1.6 var(--f);color:var(--t2);width:100%;max-width:540px}
+    .improveBanner strong{color:var(--t)}
+    .improveBanner a{color:var(--a);text-decoration:none;font-weight:600}
 
-    .wfield {
-      min-height: 60px; border: 1px solid var(--l); border-radius: var(--r);
-      padding: 10px 13px; font: 500 13px var(--m); color: var(--t2);
-      background: var(--bg); word-break: break-word; line-height: 1.8;
-      transition: border-color .2s, box-shadow .2s;
-    }
-    .wfield.active { border-color: var(--a); box-shadow: 0 0 0 3px rgba(27,255,140,.08); }
-    .wfield.bad    { border-color: var(--err); background: rgba(255,107,107,.06); color: var(--err); }
-    .aifb {
-      margin-top: 10px; padding: 12px 14px;
-      background: var(--s2); border-left: 3px solid var(--a);
-      border-radius: 0 var(--r) var(--r) 0;
-      font: 400 12px/1.65 var(--f); color: var(--t2);
-    }
-    .aifb .fml { font: 500 13px var(--m); color: var(--a); display: block; margin: 5px 0; }
-    .aifb strong { color: var(--t); }
+    /* MODE 1 specific */
+    #m1logo{width:72px;height:72px;margin-bottom:20px;animation:logoF 4.5s ease-in-out infinite}
+    #m1mat{font:400 13px/1.85 var(--m);color:var(--t2);min-height:100px;word-break:break-word}
+    #m1cur{display:inline-block;width:2px;height:14px;background:var(--a);margin-left:1px;vertical-align:middle;animation:blink 1s step-end infinite}
+    #m1cnt{font:400 11px var(--m);color:var(--t3);text-align:right;margin-top:6px}
+    .hexwrap{display:flex;justify-content:center;margin-bottom:10px}
+    .hexsvg{animation:hexspin 1.8s linear infinite}
+    #aistatus{font:500 14px var(--f);color:var(--t2);text-align:center}
+    #aibig{font:700 28px var(--f);color:var(--a);text-align:center;margin-top:4px;font-variant-numeric:tabular-nums}
+    #aisub{font:400 11px var(--m);color:var(--t3);text-align:center;margin-top:2px}
+    .aicard{overflow:hidden;position:relative}
+    .aicard::before{content:'';position:absolute;top:0;left:-100%;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--a),transparent);animation:scan 2.4s linear infinite}
 
-    .sbox { background: var(--s); border: 1px solid var(--l2); border-radius: var(--r); padding: 30px; text-align: center; width: 100%; max-width: 540px; }
-    .sbig { font: 700 64px/1 var(--f); color: var(--a); font-variant-numeric: tabular-nums; }
-    .slbl { font: 400 13px var(--f); color: var(--t2); margin: 6px 0 16px; }
-    .sbar { height: 6px; background: var(--s2); border-radius: 3px; max-width: 240px; margin: 0 auto 16px; overflow: hidden; }
-    .sfill{ height: 100%; width: 0%; background: linear-gradient(90deg,var(--a),rgba(27,255,140,.5)); box-shadow: 0 0 8px rgba(27,255,140,.4); border-radius: 3px; transition: width 1.4s cubic-bezier(.4,0,.2,1); }
-    .rankp{ display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: var(--ad); border: 1px solid var(--a); border-radius: 20px; font: 600 12px var(--m); color: var(--a); }
-    .xpbar{ height: 5px; background: var(--l); border-radius: 3px; margin: 12px auto 0; max-width: 240px; overflow: hidden; }
-    .xpfill{ height: 100%; width: 0%; background: var(--a); border-radius: 3px; }
-    .lvlbdg{ font: 700 12px var(--m); color: var(--a); text-align: center; margin-top: 8px; }
-
-    .ptsbdg { position: fixed; z-index: 600; pointer-events: none; font: 700 16px var(--f); color: var(--a); text-shadow: 0 0 12px rgba(27,255,140,.6); opacity: 0; }
-    .ripring{ position: fixed; z-index: 500; pointer-events: none; border: 2px solid rgba(27,255,140,.6); border-radius: 50%; width: 40px; height: 40px; opacity: 0; }
+    /* RESULT */
+    .sbox{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:30px;text-align:center;width:100%;max-width:540px}
+    .sbig{font:700 64px/1 var(--f);color:var(--a);font-variant-numeric:tabular-nums}
+    .slbl{font:400 13px var(--f);color:var(--t2);margin:6px 0 16px}
+    .sbar{height:6px;background:var(--s2);border-radius:3px;max-width:240px;margin:0 auto 16px;overflow:hidden}
+    .sfill{height:100%;width:0%;background:linear-gradient(90deg,var(--a),rgba(27,255,140,.5));box-shadow:0 0 8px rgba(27,255,140,.4);border-radius:3px;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+    .rankp{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;background:var(--ad);border:1px solid var(--a);border-radius:20px;font:600 12px var(--m);color:var(--a)}
+    .xpbar{height:5px;background:var(--l);border-radius:3px;margin:12px auto 0;max-width:240px;overflow:hidden}
+    .xpfill{height:100%;width:0%;background:var(--a);border-radius:3px}
+    .lvlbdg{font:700 12px var(--m);color:var(--a);text-align:center;margin-top:8px}
 
     /* MODE 2 */
-    #catgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; width: 100%; max-width: 560px; }
-    .catCard {
-      padding: 10px; border-radius: var(--r); border: 1px solid var(--l);
-      background: var(--s2); text-align: left;
-      opacity: 0; transform: translateY(8px);
-      position: relative; overflow: hidden;
+    #catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;max-width:560px}
+    .catCard{padding:10px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);
+      text-align:left;opacity:0;transform:translateY(8px);position:relative;overflow:hidden}
+    .catCard.active{border-color:var(--a);background:rgba(27,255,140,.07)}
+    .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
+    .catCard.weak{border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.04)}
+    .catCard.nd{opacity:.35!important;transform:none!important}
+    .catEmi{font-size:14px;margin-bottom:3px}
+    .catName{font:600 10px var(--f);color:var(--t);line-height:1.3;margin-bottom:2px}
+    .catCount{font:400 10px var(--m);color:var(--t3)}
+    .catCard.active .catCount{color:var(--a)}
+    .catProg{margin-top:5px;height:3px;border-radius:999px;background:var(--l);overflow:hidden}
+    .catProgFill{height:100%;border-radius:999px;background:var(--a);transition:width .8s ease}
+    .catCard.weak .catProgFill{background:var(--err)}
+    .catDone{position:absolute;top:6px;right:7px;font:700 10px var(--m);color:var(--a)}
+
+    #sigcard{width:100%;max-width:480px}
+    .sgnwrap{display:flex;justify-content:center;margin-bottom:18px}
+    #signsvg{transform:scale(.4);opacity:0}
+    .sgnq{font:600 15px/1.5 var(--f);color:var(--t);margin-bottom:14px}
+    #catprog{font:600 12px var(--m);color:var(--a);margin-top:14px;display:flex;align-items:center;gap:8px;opacity:0}
+
+    .simhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .simmode{font:600 11px var(--m);color:var(--a);letter-spacing:.06em;text-transform:uppercase}
+    #simtimer{font:700 28px var(--m);color:var(--t);font-variant-numeric:tabular-nums}
+    #simqcnt{font:500 13px var(--f);color:var(--t2);margin-bottom:10px}
+    .simsbr{background:var(--s2);border-radius:var(--r);padding:11px 13px;display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px}
+    .sstt{font:400 12px var(--f);color:var(--t3)}
+    .sstt strong{color:var(--t);font-weight:600}
+    .sstt.ok strong{color:var(--a)}
+    .simpb{height:5px;background:var(--l);border-radius:3px;overflow:hidden}
+    .simpf{height:100%;width:0%;background:var(--a);border-radius:3px;transition:width .4s ease}
+    #simres{background:var(--ad);border:1px solid var(--a);border-radius:var(--r);padding:18px;text-align:center;margin-top:12px;opacity:0;transform:scale(.92)}
+    #simres .rb{font:700 32px var(--f);color:var(--a)}
+    #simres .rs{font:400 13px var(--f);color:var(--t2);margin-top:4px}
+
+    .stshdr{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+    .stsavg{font:700 36px var(--f);color:var(--a)}
+    .stslbl{font:400 12px var(--f);color:var(--t2)}
+    #radarwrap{display:flex;justify-content:center;margin-bottom:14px}
+    .wkalert{background:rgba(255,107,107,.07);border:1px solid rgba(255,107,107,.28);border-radius:var(--r);padding:12px 13px;display:flex;align-items:center;gap:10px}
+    .wkico{font-size:16px}
+    .wktxt{font:400 12px/1.5 var(--f);color:var(--t2)}
+    .wkbtn{font:600 11px var(--m);color:var(--a);margin-left:auto;flex-shrink:0;background:var(--ad);border:1px solid var(--l2);border-radius:var(--r);padding:4px 10px}
+
+    /* MODE 3 — P.E.R */
+    .perHex{display:flex;justify-content:center;margin-bottom:16px}
+    .perTagline{font:400 13px var(--m);color:var(--t3);text-align:center;margin-top:6px;letter-spacing:.08em}
+    .perCaps{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px;max-width:440px}
+    .perCap{display:flex;align-items:center;gap:7px;padding:7px 13px;background:var(--s2);
+      border:1px solid var(--l);border-radius:20px;font:500 12px var(--f);color:var(--t2);opacity:0}
+    .perCap .ci{font-size:14px}
+
+    /* P.E.R CHAT */
+    #chatbox{width:100%;max-width:540px;display:flex;flex-direction:column;gap:10px}
+    .chatMsg{max-width:88%;padding:11px 14px;border-radius:12px;font:400 13px/1.6 var(--f);opacity:0}
+    .chatMsg.user{align-self:flex-end;background:var(--s2);border:1px solid var(--l);color:var(--t2);border-radius:12px 12px 4px 12px}
+    .chatMsg.per{align-self:flex-start;background:rgba(27,255,140,.07);border:1px solid var(--l2);color:var(--t);border-radius:12px 12px 12px 4px}
+    .chatMsg.per .perBadge{display:inline-flex;align-items:center;gap:5px;font:600 10px var(--m);color:var(--a);margin-bottom:6px;letter-spacing:.06em}
+    .chatMsg.per .perBadge .dot{width:5px;height:5px;border-radius:50%;background:var(--a);animation:dp 1.8s infinite}
+    .chatCur{display:inline-block;width:2px;height:12px;background:var(--a);margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite}
+    .gotoChip{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:5px 12px;
+      background:var(--ad);border:1px solid var(--a);border-radius:20px;
+      font:600 11px var(--m);color:var(--a);cursor:default}
+
+    /* FÖRBÄTTRING */
+    #improveCard{width:100%;max-width:540px}
+    .improveHero{text-align:center;margin-bottom:20px}
+    .heroEye{display:inline-flex;align-items:center;gap:8px;font:600 10px var(--m);
+      color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+    .heroEye::before{content:'';display:block;width:24px;height:1px;background:var(--l2)}
+    .heroEye::after{content:'';display:block;width:24px;height:1px;background:var(--l2)}
+    .improveTitle{font:700 22px/1.2 var(--f);color:var(--t)}
+    .weakRow{display:flex;align-items:center;gap:12px;padding:12px 14px;
+      background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.25);
+      border-radius:var(--r);margin-top:12px}
+    .weakBar{flex:1;height:5px;background:rgba(255,107,107,.2);border-radius:3px;overflow:hidden}
+    .weakFill{height:100%;background:var(--err);border-radius:3px}
+    .weakPct{font:700 12px var(--m);color:var(--err);flex-shrink:0}
+    .weakLabel{font:500 12px var(--f);color:var(--t2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .howTo{border-left:3px solid var(--a);padding:12px 14px;background:var(--ad);
+      border-radius:0 var(--r) var(--r) 0;margin-top:16px;font:400 13px/1.65 var(--f);color:var(--t2)}
+    .howTo strong{color:var(--t)}
+
+    /* PRICING CTA */
+    #ctaWrap{width:100%;max-width:540px;text-align:center}
+    #ctaTitle{font:700 24px/1.2 var(--f);color:var(--t);margin-bottom:6px}
+    #ctaSub{font:400 14px var(--f);color:var(--t2);margin-bottom:20px}
+    #planGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+    .planCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:18px;text-align:left;opacity:0;transform:translateY(12px)}
+    .planCard.featured{border-color:var(--a);background:var(--ad);box-shadow:0 0 20px rgba(27,255,140,.15)}
+    .planBadge{font:700 10px var(--m);color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+    .planCard.featured .planBadge{color:var(--a)}
+    .planName{font:700 16px var(--f);color:var(--t);margin-bottom:6px}
+    .planPriceRow{margin-bottom:10px}
+    .planAmt{font:700 26px var(--f);color:var(--t)}
+    .planCurr{font:400 13px var(--f);color:var(--t2)}
+    .planPer{font:400 11px var(--m);color:var(--t3)}
+    .planCard.featured .planAmt{color:var(--a)}
+    .featureList{list-style:none;display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+    .featureList li{font:400 11px var(--f);color:var(--t3);display:flex;align-items:center;gap:6px}
+    .featureList li::before{content:'✓';color:var(--a);font-weight:700;flex-shrink:0}
+    .planCard.featured .featureList li{color:var(--t2)}
+    #ctaBtn{display:inline-flex;align-items:center;gap:8px;padding:14px 36px;
+      background:var(--a);color:#000;font:700 15px var(--f);border:none;border-radius:var(--r);
+      cursor:pointer;text-decoration:none;box-shadow:0 0 24px rgba(27,255,140,.35)}
+
+    /* ANIMATIONS */
+    @keyframes dp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(1.5)}}
+    @keyframes blink{50%{opacity:0}}
+    @keyframes hexspin{to{transform:rotate(360deg)}}
+    @keyframes scan{0%{left:-100%}100%{left:100%}}
+    @keyframes logoF{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))}50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.65))}}
+
+    /* MOBILE */
+    @media(max-width:620px){
+      #hdrLogo span{display:none}
+      .mTab{padding:5px 9px;font-size:9.5px}
+      .kh{display:none}
+      #catgrid{grid-template-columns:repeat(2,1fr)}
+      #planGrid{grid-template-columns:1fr}
+      .qtxt{font-size:14px}
+      .ms{padding:66px 14px 54px}
+      .card,.qcard,.sbox{padding:14px}
+      .sbig{font-size:52px}
+      #chatbox{max-width:100%}
     }
-    .catCard.active { border-color: var(--a); background: rgba(27,255,140,.07); }
-    .catCard.active::before { content:""; position:absolute; top:0; left:0; right:0; height:2px; background:var(--a); }
-    .catCard.weak { border-color: rgba(255,107,107,.3); background: rgba(255,107,107,.04); }
-    .catCard.nd { opacity: .35!important; transform: none!important; }
-    .catEmi   { font-size: 15px; margin-bottom: 3px; }
-    .catName  { font: 600 10px var(--f); color: var(--t); line-height: 1.3; margin-bottom: 2px; }
-    .catCount { font: 400 10px var(--m); color: var(--t3); }
-    .catCard.active .catCount { color: var(--a); }
-    .catProg  { margin-top: 5px; height: 3px; border-radius: 999px; background: var(--l); overflow: hidden; }
-    .catProgFill { height: 100%; border-radius: 999px; background: var(--a); transition: width .8s ease; }
-    .catCard.weak .catProgFill { background: var(--err); }
-    .catDone  { position: absolute; top: 6px; right: 7px; font: 700 10px var(--m); color: var(--a); }
-
-    #sigcard { width: 100%; max-width: 480px; }
-    .sgnwrap { display: flex; justify-content: center; margin-bottom: 18px; }
-    #signsvg { transform: scale(.4); opacity: 0; }
-    .sgnq  { font: 600 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
-    #catprog { font: 600 12px var(--m); color: var(--a); margin-top: 14px; display: flex; align-items: center; gap: 8px; opacity: 0; }
-
-    .simhdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .simmode { font: 600 11px var(--m); color: var(--a); letter-spacing: .06em; text-transform: uppercase; }
-    #simtimer{ font: 700 28px var(--m); color: var(--t); font-variant-numeric: tabular-nums; }
-    #simqcnt { font: 500 13px var(--f); color: var(--t2); margin-bottom: 10px; }
-    .simsbr  { background: var(--s2); border-radius: var(--r); padding: 11px 13px; display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
-    .sstt    { font: 400 12px var(--f); color: var(--t3); }
-    .sstt strong { color: var(--t); font-weight: 600; }
-    .sstt.ok strong { color: var(--a); }
-    .simpb   { height: 5px; background: var(--l); border-radius: 3px; overflow: hidden; }
-    .simpf   { height: 100%; width: 0%; background: var(--a); border-radius: 3px; transition: width .4s ease; }
-    #simres  { background: var(--ad); border: 1px solid var(--a); border-radius: var(--r); padding: 18px; text-align: center; margin-top: 12px; opacity: 0; transform: scale(.92); }
-    #simres .rb { font: 700 32px var(--f); color: var(--a); }
-    #simres .rs { font: 400 13px var(--f); color: var(--t2); margin-top: 4px; }
-
-    .stshdr { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-    .stsavg { font: 700 36px var(--f); color: var(--a); }
-    .stslbl { font: 400 12px var(--f); color: var(--t2); }
-    #radarwrap { display: flex; justify-content: center; margin-bottom: 14px; }
-    .wkalert { background: rgba(255,107,107,.07); border: 1px solid rgba(255,107,107,.28); border-radius: var(--r); padding: 12px 13px; display: flex; align-items: center; gap: 10px; }
-    .wkico { font-size: 16px; }
-    .wktxt { font: 400 12px/1.5 var(--f); color: var(--t2); }
-    .wkbtn { font: 600 11px var(--m); color: var(--a); margin-left: auto; flex-shrink: 0; background: var(--ad); border: 1px solid var(--l2); border-radius: var(--r); padding: 4px 10px; }
-
-    #pgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%; max-width: 540px; }
-    .pc { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 16px; opacity: 0; transform: translateY(12px); }
-    .pc.hl { border-color: var(--a); background: var(--ad); box-shadow: 0 0 16px rgba(27,255,140,.18); }
-    .ptier { font: 700 11px var(--m); color: var(--t3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; }
-    .ptier.acc { color: var(--a); }
-    .pprice { font: 700 22px var(--f); color: var(--t); margin-bottom: 4px; }
-    .pdesc  { font: 400 11px var(--f); color: var(--t3); line-height: 1.5; }
-    #pupgr  { font: 600 11px var(--m); color: var(--a); margin-top: 8px; opacity: 0; }
   </style>
 </head>
 <body>
@@ -293,46 +335,63 @@
 <div class="bgG1"></div>
 <div class="bgG2"></div>
 <canvas id="cvBg"></canvas>
-<canvas id="cvFx"></canvas>
 
-<div id="cbar"><div id="cfill"></div></div>
-
-<div id="modeTabs">
-  <div class="mTab on" id="tab1" onclick="switchMode(1)">
-    <div class="dot"></div>Mockprov AI
+<!-- HEADER -->
+<div id="hdr">
+  <a id="hdrLogo" href="index.html">
+    <img src="image/proviaai-logo.png" width="28" height="28" alt="ProviaAi">
+    <span>ProviaAi</span>
+  </a>
+  <div id="modeTabs">
+    <div class="mTab on" id="tab1" onclick="switchMode(1)"><div class="dot"></div>Mockprov AI</div>
+    <div class="mTab"    id="tab2" onclick="switchMode(2)"><div class="dot"></div>Körkortsteorin</div>
+    <div class="mTab"    id="tab3" onclick="switchMode(3)"><div class="dot"></div>P.E.R</div>
   </div>
-  <div class="mTab" id="tab2" onclick="switchMode(2)">
-    <div class="dot"></div>Körkortsteorin
+  <div id="hdrRight">
+    <div class="kh"><b>N</b> Narrator</div>
+    <div class="kh"><b>ESC</b> Pausa</div>
   </div>
 </div>
 
-<div id="streak"></div>
+<div id="cbar"><div id="cfill"></div></div>
+<div id="pdots"></div>
 
+<!-- GRADING OVERLAY -->
+<div id="gradingOverlay">
+  <div class="gradingOrb">
+    <div class="gradingRing"></div>
+    <div class="gradingRing"></div>
+    <div class="gradingCenter">P</div>
+  </div>
+  <div class="gradingLabel" id="gradingLabel">P.E.R rättar ditt prov...</div>
+  <div class="gradingSub" id="gradingSub">Analyserar dina svar</div>
+</div>
+
+<!-- FLOATING GRADE BAR -->
+<div id="floatingGradeBar">
+  <div id="gradeBarInfo"><b>4/4</b> besvarade — redo att rätta?</div>
+  <button id="gradeBtn">Rätta prov →</button>
+</div>
+
+<!-- NARRATOR -->
 <div id="narrator">
   <div class="nLbl">Talarpunkter — <kbd style="font:inherit;opacity:.6">N</kbd> döljer</div>
   <div id="nSteps"></div>
 </div>
 
-<div id="pdots"></div>
-
-<div id="keyhints">
-  <div class="kh"><b>N</b> Narrator</div>
-  <div class="kh"><b>ESC</b> Pausa</div>
-</div>
-
-<!-- MODE 1 — MOCKPROV AI -->
+<!-- ═══════════════════════════════ MODE 1 — MOCKPROV AI ═════════════════════════════════ -->
 <div id="mode1" class="ms act">
 
   <div id="m1intro" style="text-align:center;display:none">
     <img id="m1logo" src="image/proviaai-logo.png" width="72" height="72" alt="ProviaAi">
-    <div style="font:700 34px/1.2 var(--f);color:var(--t);margin:0 0 10px" id="m1htitle">ProviaAi</div>
+    <div id="m1htitle" style="font:700 32px/1.2 var(--f);color:var(--t);margin:0 0 10px">ProviaAi</div>
     <div class="pill" id="m1hpill">📚 AI-prov på ditt eget material</div>
-    <div id="m1hsub" style="font:400 15px var(--f);color:var(--t2);margin-top:10px">Klistra in material → AI genererar → Träna smart</div>
+    <div style="font:400 15px var(--f);color:var(--t2);margin-top:10px">Klistra in material → AI genererar → Träna smart</div>
   </div>
 
   <div id="m1matw" style="display:none;width:100%;max-width:540px">
-    <div class="pill" id="m1cpill" style="margin-bottom:13px">📐 Matematik 2b — Andragradsekvationer</div>
-    <div class="card" id="m1crd">
+    <div class="pill" style="margin-bottom:13px">📐 Matematik 2b — Andragradsekvationer</div>
+    <div class="card">
       <div class="prow">
         <div class="av">PL</div>
         <div><div class="pname">Per Lindström</div><div class="psub">Gymnasiet åk 2</div></div>
@@ -344,7 +403,7 @@
   </div>
 
   <div id="m1aiw" style="display:none;width:100%;max-width:540px">
-    <div class="card aicard" id="m1aicrd">
+    <div class="card aicard">
       <div class="hexwrap">
         <svg class="hexsvg" viewBox="0 0 60 60" width="62" height="62" fill="none">
           <polygon points="30,3 53,16.5 53,43.5 30,57 7,43.5 7,16.5" stroke="rgba(27,255,140,.2)" stroke-width="1.5"/>
@@ -360,41 +419,40 @@
 
   <div id="m1qw" style="display:none;width:100%;max-width:540px">
     <div class="qcard" id="q1">
-      <div class="qmeta"><span class="qnum">Fråga 1 av 6</span><span class="qcat">Flerval</span></div>
-      <div class="qtxt">Vilka är lösningarna till x² − 5x + 6 = 0?</div>
+      <div class="qmeta"><span class="qnum">Fråga 1 av 4</span><span class="qcat">Flerval</span></div>
+      <div class="qtxt">Vilka är lösningarna till x² − 5x + 6 = 0 löst med pq-formeln?</div>
       <div class="ansGrid">
         <button class="ansBtn" id="q1a"><span class="ansLetter">A</span>x = 2 och x = 3</button>
         <button class="ansBtn" id="q1b"><span class="ansLetter">B</span>x = 1 och x = 6</button>
         <button class="ansBtn" id="q1c"><span class="ansLetter">C</span>x = −2 och x = −3</button>
-        <button class="ansBtn" id="q1d"><span class="ansLetter">D</span>x = 2 och x = −3</button>
+        <button class="ansBtn" id="q1d"><span class="ansLetter">D</span>x = 5 och x = 0</button>
       </div>
     </div>
     <div class="qcard" id="q2" style="display:none">
-      <div class="qmeta"><span class="qnum">Fråga 2 av 6</span><span class="qcat">Flerval</span></div>
-      <div class="qtxt">Vad kallas en ekvation av formen ax² + bx + c = 0 (a ≠ 0)?</div>
+      <div class="qmeta"><span class="qnum">Fråga 2 av 4</span><span class="qcat">Flerval</span></div>
+      <div class="qtxt">Vad kallas lösningsmetoden x = −p/2 ± √((p/2)²−q)?</div>
       <div class="ansGrid">
-        <button class="ansBtn" id="q2a"><span class="ansLetter">A</span>Linjär ekvation</button>
-        <button class="ansBtn" id="q2b"><span class="ansLetter">B</span>Andragradsekvation</button>
-        <button class="ansBtn" id="q2c"><span class="ansLetter">C</span>Kubisk ekvation</button>
-        <button class="ansBtn" id="q2d"><span class="ansLetter">D</span>Exponentialekvation</button>
+        <button class="ansBtn" id="q2a"><span class="ansLetter">A</span>ABC-formeln</button>
+        <button class="ansBtn" id="q2b"><span class="ansLetter">B</span>pq-formeln</button>
+        <button class="ansBtn" id="q2c"><span class="ansLetter">C</span>Kvadratkomplettering</button>
+        <button class="ansBtn" id="q2d"><span class="ansLetter">D</span>Newtons metod</button>
       </div>
     </div>
     <div class="qcard" id="q3" style="display:none">
-      <div class="qmeta"><span class="qnum">Fråga 3 av 6</span><span class="qcat">Skriven</span></div>
-      <div class="qtxt">Lös ekvationen x² + 4x − 12 = 0 med ABC-formeln.</div>
+      <div class="qmeta"><span class="qnum">Fråga 3 av 4</span><span class="qcat">Skriven</span></div>
+      <div class="qtxt">Lös ekvationen x² − 2x − 8 = 0 med pq-formeln.</div>
       <div class="wfield" id="q3f"></div>
-      <div class="aifb" id="q3fb" style="display:none">
-        <strong>AI-förklaring:</strong> Använd ABC-formeln:
-        <span class="fml">x = (−b ± √(b²−4ac)) / 2a</span>
-        a = 1, b = 4, c = −12 → diskriminant = 16 + 48 = 64<br>
-        x = (−4 ± 8) / 2 → <strong>x = 2 eller x = −6</strong> ✓
+      <div class="aifb" id="q3fb" style="display:none;opacity:0">
+        <strong>P.E.R förklarar:</strong> Pq-formeln: <span class="fml">x = −p/2 ± √((p/2)²−q)</span>
+        p = −2, q = −8 → x = 1 ± √(1+8) = 1 ± 3<br>
+        <strong>x = 4 eller x = −2</strong> ✓ (du skriver fel tecken på q)
       </div>
     </div>
     <div class="qcard" id="q4" style="display:none">
-      <div class="qmeta"><span class="qnum">Fråga 4 av 6</span><span class="qcat">Flerval</span></div>
-      <div class="qtxt">Hur många reella lösningar har x² + 2x + 5 = 0?</div>
+      <div class="qmeta"><span class="qnum">Fråga 4 av 4</span><span class="qcat">Flerval</span></div>
+      <div class="qtxt">Hur många reella lösningar har x² + 2x + 5 = 0? (p=2, q=5)</div>
       <div class="ansGrid">
-        <button class="ansBtn" id="q4a"><span class="ansLetter">A</span>Inga reella lösningar</button>
+        <button class="ansBtn" id="q4a"><span class="ansLetter">A</span>Inga reella lösningar — (p/2)²−q &lt; 0</button>
         <button class="ansBtn" id="q4b"><span class="ansLetter">B</span>Exakt en lösning</button>
         <button class="ansBtn" id="q4c"><span class="ansLetter">C</span>Två lösningar</button>
         <button class="ansBtn" id="q4d"><span class="ansLetter">D</span>Oändligt många</button>
@@ -409,25 +467,28 @@
         <div><div class="pname">Per Lindström</div><div class="psub">Matematik 2b</div></div>
       </div>
       <div class="sbig" id="scorenum">0%</div>
-      <div class="slbl">5 av 6 rätt · 4 min 12 sek</div>
+      <div class="slbl">3 av 4 rätt · 3 min 44 sek</div>
       <div class="sbar"><div class="sfill" id="sfill"></div></div>
       <div class="rankp" id="rankp" style="opacity:0">🏆 Bättre än 74% av alla elever</div>
       <div class="xpbar"><div class="xpfill" id="xpfill"></div></div>
       <div class="lvlbdg" id="lvlbdg" style="opacity:0">⬆ Matematik 2b — Nivå 3 uppnådd!</div>
     </div>
+    <div class="improveBanner" id="improveBanner" style="opacity:0">
+      <strong>P.E.R ser ett mönster:</strong> Du missar ofta tecknet på q. Träna på ekvationer med negativt q — <a href="app.html">starta ett fokuspass →</a>
+    </div>
   </div>
 
 </div>
 
-<!-- MODE 2 — KÖRKORTSTEORIN -->
+<!-- ═══════════════════════════════ MODE 2 — KÖRKORTSTEORIN ══════════════════════════════ -->
 <div id="mode2" class="ms">
 
   <div id="m2intro" style="display:none;text-align:center">
     <img src="image/proviaai-logo.png" width="60" height="60" alt="ProviaAi"
          style="margin-bottom:16px;animation:logoF 4.5s ease-in-out infinite">
-    <div class="pill" id="m2pill" style="margin-bottom:14px">🚗 368 frågor · 16 kategorier</div>
-    <div id="m2title" style="font:700 30px/1.2 var(--f);color:var(--t);margin-bottom:8px">Körkortsteorin</div>
-    <div id="m2sub" style="font:400 14px var(--f);color:var(--t2)">Exakt som Transportstyrelsens teoriprov</div>
+    <div class="pill" style="margin-bottom:14px">🚗 368 frågor · 16 kategorier</div>
+    <div style="font:700 30px/1.2 var(--f);color:var(--t);margin-bottom:8px">Körkortsteorin</div>
+    <div style="font:400 14px var(--f);color:var(--t2)">Exakt som Transportstyrelsens teoriprov</div>
   </div>
 
   <div id="m2catw" style="display:none;width:100%;max-width:560px">
@@ -478,10 +539,7 @@
         <div class="sstt">Kvar: <strong id="siml">22</strong></div>
         <div class="sstt">Behöver: <strong>52</strong></div>
       </div>
-      <div id="simres">
-        <div class="rb">53 / 65</div>
-        <div class="rs">✓ GODKÄNT — Bra jobbat, Per!</div>
-      </div>
+      <div id="simres"><div class="rb">53 / 65</div><div class="rs">✓ GODKÄNT — Bra jobbat, Per!</div></div>
     </div>
   </div>
 
@@ -490,447 +548,469 @@
       <div class="stshdr">
         <div class="av" style="width:44px;height:44px;font-size:16px">PL</div>
         <div><div class="pname">Per Lindström</div><div class="stslbl">Körkortsstatistik</div></div>
-        <div style="margin-left:auto;text-align:right">
-          <div class="stsavg">78%</div><div class="stslbl">genomsnitt</div>
-        </div>
+        <div style="margin-left:auto;text-align:right"><div class="stsavg">78%</div><div class="stslbl">genomsnitt</div></div>
       </div>
-      <div id="radarwrap">
-        <svg id="radarsvg" viewBox="0 0 200 200" width="180" height="180"></svg>
-      </div>
+      <div id="radarwrap"><svg id="radarsvg" viewBox="0 0 200 200" width="180" height="180"></svg></div>
       <div class="wkalert" id="wkalert" style="opacity:0">
         <div class="wkico">⚠️</div>
-        <div class="wktxt"><strong>Väglag & Bromssträcka — 52%</strong><br>AI rekommenderar: träna denna kategori idag</div>
+        <div class="wktxt"><strong>Väglag &amp; Bromssträcka — 52%</strong><br>AI rekommenderar: träna denna kategori idag</div>
         <div class="wkbtn">Träna →</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="m2pricew" style="display:none">
-    <div style="font:700 18px var(--f);color:var(--t);text-align:center;margin-bottom:14px">Välj din plan</div>
-    <div id="pgrid">
-      <div class="pc" id="pc1">
-        <div class="ptier">Gratis</div>
-        <div class="pprice">0 kr</div>
-        <div class="pdesc">Körkortsträning<br>2 AI-prov/vecka</div>
-      </div>
-      <div class="pc" id="pc2">
-        <div class="ptier acc">Basic ✦</div>
-        <div class="pprice">29 kr/mån</div>
-        <div class="pdesc">30 AI-prov/månad<br>Obegränsad körkortsträning</div>
-        <div id="pupgr">✓ Per uppgraderade!</div>
-      </div>
-      <div class="pc" id="pc3">
-        <div class="ptier">Premium</div>
-        <div class="pprice">79 kr/mån</div>
-        <div class="pdesc">Obegränsat<br>AI-coach ingår</div>
       </div>
     </div>
   </div>
 
 </div>
 
+<!-- ═══════════════════════════════ MODE 3 — P.E.R ══════════════════════════════════════ -->
+<div id="mode3" class="ms">
+
+  <div id="m3intro" style="display:none;text-align:center;width:100%;max-width:480px">
+    <div class="perHex">
+      <svg viewBox="0 0 60 60" width="78" height="78" fill="none">
+        <polygon points="30,3 53,16.5 53,43.5 30,57 7,43.5 7,16.5" stroke="rgba(27,255,140,.2)" stroke-width="1.5"/>
+        <polygon points="30,11 47,21 47,39 30,49 13,39 13,21" stroke="rgba(27,255,140,.45)" stroke-width="1.5"/>
+        <polygon points="30,19 41,25.5 41,38.5 30,45 19,38.5 19,25.5" stroke="#1bff8c" stroke-width="2" fill="rgba(27,255,140,.06)"/>
+        <text x="30" y="34" text-anchor="middle" font-family="DM Sans" font-weight="700" font-size="11" fill="#1bff8c">P.E.R</text>
+      </svg>
+    </div>
+    <div style="font:700 28px/1.2 var(--f);color:var(--t)" id="perTitle">P.E.R</div>
+    <div style="font:600 14px var(--f);color:var(--a);margin-top:4px">Provias AI-studiekomp</div>
+    <div class="perTagline">Precis · Effektiv · Relevant</div>
+    <div class="perCaps" id="perCaps">
+      <div class="perCap"><span class="ci">📚</span>Studiehjälp</div>
+      <div class="perCap"><span class="ci">🧠</span>Feynman-teknik</div>
+      <div class="perCap"><span class="ci">🎯</span>Quiz-läge</div>
+      <div class="perCap"><span class="ci">💬</span>AI-coach</div>
+      <div class="perCap"><span class="ci">🔄</span>Kursmaterial</div>
+      <div class="perCap"><span class="ci">🧭</span>Navigering</div>
+    </div>
+  </div>
+
+  <div id="m3chat" style="display:none">
+    <div class="pill" style="margin-bottom:12px;align-self:flex-start">💬 P.E.R i aktion</div>
+    <div id="chatbox">
+      <div class="chatMsg user" id="chat1">Kan du hjälpa mig med andragradsekvationer? Jag fattar inte pq-formeln</div>
+      <div class="chatMsg per" id="chat2">
+        <div class="perBadge"><div class="dot"></div>P.E.R</div>
+        <span id="chat2txt"></span><span class="chatCur" id="chat2cur" style="display:none"></span>
+      </div>
+      <div class="chatMsg user" id="chat3" style="display:none">Kan du visa ett exempel steg-för-steg?</div>
+      <div class="chatMsg per" id="chat4" style="display:none">
+        <div class="perBadge"><div class="dot"></div>P.E.R</div>
+        <span id="chat4txt"></span><span class="chatCur" id="chat4cur" style="display:none"></span>
+        <div class="gotoChip" id="gotoChip" style="display:none">🧭 <span id="gotoLabel">Navigerar till app.html</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="m3improve" style="display:none">
+    <div class="card" id="improveCard">
+      <div class="improveHero">
+        <div class="heroEye">Förbättring</div>
+        <div class="improveTitle">P.E.R ser ditt mönster</div>
+        <div style="font:400 13px var(--f);color:var(--t2);margin-top:6px">Baserat på dina 47 senaste svar</div>
+      </div>
+      <div style="font:600 11px var(--m);color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Svaga kategorier</div>
+      <div class="weakRow">
+        <div class="weakLabel">Väglag &amp; Bromssträcka</div>
+        <div class="weakBar"><div class="weakFill" id="wf1" style="width:0%"></div></div>
+        <div class="weakPct">52%</div>
+      </div>
+      <div class="weakRow">
+        <div class="weakLabel">Mörker &amp; Sikt</div>
+        <div class="weakBar"><div class="weakFill" id="wf2" style="width:0%"></div></div>
+        <div class="weakPct" style="color:#f0a830">68%</div>
+      </div>
+      <div class="weakRow">
+        <div class="weakLabel">Koncentration</div>
+        <div class="weakBar"><div class="weakFill" id="wf3" style="width:0%;background:#f0a830"></div></div>
+        <div class="weakPct" style="color:#f0a830">60%</div>
+      </div>
+      <div class="howTo" id="howToBox" style="opacity:0">
+        <strong>P.E.R rekommenderar:</strong> Starta med 10 frågor om <em>Väglag &amp; Bromssträcka</em> idag — det är din svagaste punkt. Statistik visar att elever som tränar detta klara teoriprovet med 18% högre sannolikhet.
+      </div>
+    </div>
+  </div>
+
+  <div id="m3cta" style="display:none">
+    <div id="ctaWrap">
+      <div id="ctaTitle">Redo att börja?</div>
+      <div id="ctaSub">Gå med 2 400+ elever som tränar smartare med ProviaAi</div>
+      <div id="planGrid">
+        <div class="planCard" id="plan1">
+          <div class="planBadge">Gratis</div>
+          <div class="planName">Gratis</div>
+          <div class="planPriceRow"><span class="planAmt">0</span><span class="planCurr"> kr</span></div>
+          <ul class="featureList">
+            <li>Körkortsteorin</li>
+            <li>2 AI-prov / vecka</li>
+            <li>Grundläggande stats</li>
+          </ul>
+        </div>
+        <div class="planCard featured" id="plan2">
+          <div class="planBadge">Basic ✦</div>
+          <div class="planName">Basic</div>
+          <div class="planPriceRow"><span class="planAmt">29</span><span class="planCurr">kr</span><span class="planPer">/mån</span></div>
+          <ul class="featureList">
+            <li>30 AI-prov / månad</li>
+            <li>Obegränsad körkortsträning</li>
+            <li>P.E.R AI-coach</li>
+            <li>Detaljerad statistik</li>
+          </ul>
+        </div>
+        <div class="planCard" id="plan3">
+          <div class="planBadge">Premium</div>
+          <div class="planName">Premium</div>
+          <div class="planPriceRow"><span class="planAmt">79</span><span class="planCurr">kr</span><span class="planPer">/mån</span></div>
+          <ul class="featureList">
+            <li>Obegränsat allt</li>
+            <li>Prioriterad support</li>
+            <li>Exportera resultat</li>
+          </ul>
+        </div>
+      </div>
+      <a id="ctaBtn" href="pricing.html">Kom igång gratis →</a>
+    </div>
+  </div>
+
+</div>
+
 <script>
-/* PARTICLES */
+/* ─── PARTICLES ─── */
 const cvBg=document.getElementById('cvBg'),ctxBg=cvBg.getContext('2d');
-const cvFx=document.getElementById('cvFx'),ctxFx=cvFx.getContext('2d');
 let W=0,H=0;
-function resizeCanvases(){W=cvBg.width=cvFx.width=window.innerWidth;H=cvBg.height=cvFx.height=window.innerHeight;}
-resizeCanvases();
-window.addEventListener('resize',resizeCanvases);
+function resizeCv(){W=cvBg.width=window.innerWidth;H=cvBg.height=window.innerHeight}
+resizeCv();window.addEventListener('resize',resizeCv);
 const dots=Array.from({length:55},()=>({x:Math.random()*1920,y:Math.random()*1080,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.4+.4,a:Math.random()*.2+.04}));
-function drawBg(){
-  ctxBg.clearRect(0,0,W,H);
-  dots.forEach(d=>{d.x+=d.vx;d.y+=d.vy;if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;ctxBg.beginPath();ctxBg.arc(d.x,d.y,d.r,0,Math.PI*2);ctxBg.fillStyle=`rgba(27,255,140,${d.a})`;ctxBg.fill();});
-  requestAnimationFrame(drawBg);
-}
+function drawBg(){ctxBg.clearRect(0,0,W,H);dots.forEach(d=>{d.x+=d.vx;d.y+=d.vy;if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;ctxBg.beginPath();ctxBg.arc(d.x,d.y,d.r,0,Math.PI*2);ctxBg.fillStyle=`rgba(27,255,140,${d.a})`;ctxBg.fill()});requestAnimationFrame(drawBg)}
 drawBg();
 
-/* FX */
-let fxPieces=[],fxRunning=false;
-function fxLoop(){
-  ctxFx.clearRect(0,0,W,H);
-  fxPieces=fxPieces.filter(p=>p.life>0);
-  fxPieces.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.life-=p.decay;if(p.life<=0)return;ctxFx.save();ctxFx.globalAlpha=Math.max(0,p.life);ctxFx.beginPath();ctxFx.arc(p.x,p.y,p.r,0,Math.PI*2);ctxFx.fillStyle=p.color;ctxFx.fill();ctxFx.restore();});
-  if(fxPieces.length>0)requestAnimationFrame(fxLoop);else fxRunning=false;
-}
-function fxStart(){if(!fxRunning){fxRunning=true;fxLoop();}}
+/* ─── FX ─── */
 function spawnConfetti(cx,cy){
   cx=cx||W/2;cy=cy||(H*.45);
-  for(let i=0;i<70;i++)fxPieces.push({x:cx+(Math.random()-.5)*160,y:cy,vx:(Math.random()-.5)*7,vy:-Math.random()*9-1,g:.18,r:Math.random()*4+2,color:Math.random()>.45?'rgba(27,255,140,.9)':'rgba(220,255,235,.7)',life:1,decay:.013});
-  fxStart();
+  const frag=[];
+  for(let i=0;i<70;i++)frag.push({el:null,x:cx+(Math.random()-.5)*160,y:cy,vx:(Math.random()-.5)*7,vy:-Math.random()*9-1,g:.18,r:Math.random()*4+2,color:Math.random()>.45?'rgba(27,255,140,.9)':'rgba(220,255,235,.7)',life:1,decay:.013});
+  const cv2=document.createElement('canvas');cv2.style.cssText='position:fixed;inset:0;z-index:600;pointer-events:none';document.body.appendChild(cv2);
+  const c=cv2.getContext('2d');cv2.width=W;cv2.height=H;
+  (function loop(){c.clearRect(0,0,W,H);let alive=false;frag.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.life-=p.decay;if(p.life>0){alive=true;c.save();c.globalAlpha=Math.max(0,p.life);c.beginPath();c.arc(p.x,p.y,p.r,0,Math.PI*2);c.fillStyle=p.color;c.fill();c.restore()}});if(alive)requestAnimationFrame(loop);else cv2.remove()})();
 }
-function spawnRipple(x,y){
-  for(let i=0;i<3;i++){const el=document.createElement('div');el.className='ripring';el.style.left=(x-20)+'px';el.style.top=(y-20)+'px';document.body.appendChild(el);gsap.set(el,{opacity:.7});gsap.to(el,{width:80+i*28,height:80+i*28,left:(x-40-i*14)+'px',top:(y-40-i*14)+'px',opacity:0,duration:.75,delay:i*.1,ease:'power2.out',onComplete:()=>el.remove()});}
-}
-function spawnPoints(x,y,txt){
-  const el=document.createElement('div');el.className='ptsbdg';el.textContent=txt;el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);
-  gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})});
-}
+function spawnRipple(x,y){for(let i=0;i<3;i++){const el=document.createElement('div');el.className='ripring';el.style.left=(x-20)+'px';el.style.top=(y-20)+'px';document.body.appendChild(el);gsap.set(el,{opacity:.7});gsap.to(el,{width:80+i*28,height:80+i*28,left:(x-40-i*14)+'px',top:(y-40-i*14)+'px',opacity:0,duration:.75,delay:i*.1,ease:'power2.out',onComplete:()=>el.remove()})}}
+function spawnPoints(x,y,txt){const el=document.createElement('div');el.className='ptsbdg';el.textContent=txt;el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})})}
 
-/* RADAR */
+/* ─── RADAR ─── */
 function drawRadar(){
   const svg=document.getElementById('radarsvg');
   const cats=[{l:'Hastighet',v:.87},{l:'Möte',v:.72},{l:'Miljö',v:.90},{l:'Mörker',v:.55},{l:'Väglag',v:.52},{l:'Trafikregler',v:.80}];
   const cx=100,cy=100,r=68,n=cats.length;let h='';
-  [.25,.5,.75,1].forEach(f=>{const pts=cats.map((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*f,cy+Math.sin(a)*r*f];});h+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="none" stroke="rgba(27,255,140,.12)" stroke-width="1"/>`;});
-  cats.forEach((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;h+=`<line x1="${cx}" y1="${cy}" x2="${(cx+Math.cos(a)*r).toFixed(1)}" y2="${(cy+Math.sin(a)*r).toFixed(1)}" stroke="rgba(27,255,140,.14)" stroke-width="1"/>`;});
-  const dp=cats.map((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*c.v,cy+Math.sin(a)*r*c.v];});
-  h+=`<path d="${dp.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="rgba(27,255,140,.14)" stroke="#1bff8c" stroke-width="2"/>`;
-  cats.forEach((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;const lx=cx+Math.cos(a)*(r+16),ly=cy+Math.sin(a)*(r+16);const col=c.v<.6?'#ff6b6b':'rgba(168,196,180,.8)';h+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${col}">${c.l}</text>`;});
+  [.25,.5,.75,1].forEach(f=>{const pts=cats.map((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*f,cy+Math.sin(a)*r*f]});h+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="none" stroke="rgba(27,255,140,.12)" stroke-width="1"/>`});
+  cats.forEach((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;h+=`<line x1="${cx}" y1="${cy}" x2="${(cx+Math.cos(a)*r).toFixed(1)}" y2="${(cy+Math.sin(a)*r).toFixed(1)}" stroke="rgba(27,255,140,.14)" stroke-width="1"/>`});
+  const dp2=cats.map((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*c.v,cy+Math.sin(a)*r*c.v]});
+  h+=`<path d="${dp2.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="rgba(27,255,140,.14)" stroke="#1bff8c" stroke-width="2"/>`;
+  cats.forEach((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;const lx=cx+Math.cos(a)*(r+16),ly=cy+Math.sin(a)*(r+16);const col=c.v<.6?'#ff6b6b':'rgba(168,196,180,.8)';h+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${col}">${c.l}</text>`});
   svg.innerHTML=h;
 }
 
-/* CATEGORY DATA */
+/* ─── CATEGORY DATA ─── */
 const CATS=[
-  {e:'⚡',n:'Hastighet',p:87,done:true},
-  {e:'↔',n:'Möte & Omkörning',p:72,done:true},
-  {e:'🌿',n:'Miljö & Ekonomi',p:90,done:true},
-  {e:'🚫',n:'Alkohol & Droger',p:95,done:true},
-  {e:'🌙',n:'Mörker & Sikt',p:68,done:true},
-  {e:'⚠️',n:'Väglag & Broms',p:52,done:true,weak:true},
-  {e:'🚦',n:'Trafikregler',p:80,done:true},
-  {e:'🛑',n:'Vägmärken',p:75,done:true},
-  {e:'🚗',n:'Fordon & Utr.',p:83,done:true},
-  {e:'🔄',n:'Korsningar',p:77,done:true},
-  {e:'👁️',n:'Riskuppfattning',p:65,done:true},
-  {e:'🏥',n:'Olyckor & Säk.',p:71,done:true},
-  {e:'🚧',n:'Vägarbete',p:88,done:true},
-  {e:'🎯',n:'Koncentration',p:60,done:true},
-  {e:'🌍',n:'Internationellt',p:0,done:false},
-  {e:'🔧',n:'Motorkunskap',p:0,done:false},
+  {e:'⚡',n:'Hastighet',p:87,done:true},{e:'↔',n:'Möte & Omkörning',p:72,done:true},
+  {e:'🌿',n:'Miljö & Ekonomi',p:90,done:true},{e:'🚫',n:'Alkohol & Droger',p:95,done:true},
+  {e:'🌙',n:'Mörker & Sikt',p:68,done:true},{e:'⚠',n:'Väglag & Broms',p:52,done:true,weak:true},
+  {e:'🚦',n:'Trafikregler',p:80,done:true},{e:'🛑',n:'Vägmärken',p:75,done:true},
+  {e:'🚗',n:'Fordon & Utr.',p:83,done:true},{e:'🔄',n:'Korsningar',p:77,done:true},
+  {e:'👁',n:'Riskuppfattning',p:65,done:true},{e:'🏥',n:'Olyckor & Säk.',p:71,done:true},
+  {e:'🚧',n:'Vägarbete',p:88,done:true},{e:'🎯',n:'Koncentration',p:60,done:true},
+  {e:'🌍',n:'Internationellt',p:0,done:false},{e:'🔧',n:'Motorkunskap',p:0,done:false},
 ];
 function buildCatGrid(){
   document.getElementById('catgrid').innerHTML=CATS.map((c,i)=>`
     <div class="catCard${c.weak?' weak':''}${!c.done?' nd':''}" id="cc${i}">
-      <div class="catEmi">${c.e}</div>
-      <div class="catName">${c.n}</div>
+      <div class="catEmi">${c.e}</div><div class="catName">${c.n}</div>
       <div class="catCount">${c.done?c.p+'%':'–'}</div>
       <div class="catProg"><div class="catProgFill" id="cbf${i}" style="width:0%"></div></div>
       ${c.done?'<div class="catDone">✓</div>':''}
     </div>`).join('');
 }
 
-/* NARRATOR */
+/* ─── NARRATOR ─── */
 const NData={
-  1:[
-    {s:'Material',t:'Per klistrar in Matte 2b — vilket ämne som helst'},
-    {s:'AI-generering',t:'Sekunder senare: 6 skräddarsydda frågor'},
-    {s:'Träning',t:'Direkt feedback & AI-förklaring — Per lär sig, inte bara gissar'},
-    {s:'Resultat',t:'83% och bättre än 74% av alla elever'},
-  ],
-  2:[
-    {s:'Kategorier',t:'368 frågor, 16 kategorier — som riktiga Transportstyrelsen'},
-    {s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},
-    {s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — exakt som verkligheten'},
-    {s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar träning automatiskt'},
-    {s:'Priser',t:'Gratis att starta, Basic 29 kr/mån, Premium 79 kr/mån obegränsat'},
-  ]
+  1:[{s:'Material',t:'Per klistrar in Matte 2b — vilket ämne som helst'},{s:'AI-generering',t:'Sekunder senare: 4 skräddarsydda frågor med pq-formeln'},{s:'Träning',t:'Välj svar, sen rätta hela provet på en gång — precis som riktigt prov'},{s:'Resultat',t:'75% och P.E.R identifierar exakt vad Per behöver träna på'}],
+  2:[{s:'Kategorier',t:'368 frågor, 16 kategorier — som riktiga Transportstyrelsen'},{s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},{s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — exakt som verkligheten'},{s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar träning'}],
+  3:[{s:'P.E.R',t:'Precis, Effektiv, Relevant — Provias inbyggda AI-komp'},{s:'Chat',t:'Ger steg-för-steg förklaringar och navigerar dig i appen'},{s:'Förbättring',t:'Analyserar dina mönster och pekar ut exakt vad som behöver tränas'},{s:'Kom igång',t:'Gratis att starta — Basic 29 kr/mån för obegränsade AI-prov'}],
 };
-function setNarrator(mode,idx){
-  document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>
-    `<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('');
-}
+function setNarrator(mode,idx){document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>`<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('')}
 
-/* PROGRESS DOTS */
-const STEP_N={1:4,2:5};
-function buildDots(mode){
-  document.getElementById('pdots').innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('');
-}
-function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'');}
+/* ─── DOTS ─── */
+const STEP_N={1:4,2:4,3:4};
+function buildDots(mode){document.getElementById('pdots').innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('')}
+function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'')}
 
-/* COUNTDOWN */
+/* ─── COUNTDOWN ─── */
 let cdTween=null;
-function startCountdown(dur){if(cdTween)cdTween.kill();gsap.set('#cfill',{width:'0%'});cdTween=gsap.to('#cfill',{width:'100%',duration:dur,ease:'none'});}
+function startCountdown(dur){if(cdTween)cdTween.kill();gsap.set('#cfill',{width:'0%'});cdTween=gsap.to('#cfill',{width:'100%',duration:dur,ease:'none'})}
 
-/* STREAK */
-let strkCnt=0;
-function showStreak(n){
-  strkCnt=n;const el=document.getElementById('streak');el.textContent='🔥 '+n;
-  gsap.killTweensOf(el);gsap.fromTo(el,{opacity:0,scale:.65},{opacity:1,scale:1,duration:.35,ease:'back.out(2)'});
-  gsap.to(el,{opacity:0,duration:.4,delay:1.8});
-}
+/* ─── TYPEWRITER ─── */
+const MAT_TEXT=`Andragradsekvationer är ekvationer av formen x² + px + q = 0.
 
-/* TYPEWRITER */
-const MAT_TEXT=`Andragradsekvationer är ekvationer av formen ax² + bx + c = 0 där a ≠ 0.
+Lösningar ges av pq-formeln:
+x = −p/2 ± √((p/2)²−q)
 
-Lösningar ges av ABC-formeln:
-x = (−b ± √(b²−4ac)) / 2a
-
-Diskriminanten D = b²−4ac:
+Diskriminant D = (p/2)²−q:
 • D > 0 → två reella lösningar
 • D = 0 → en reell lösning
 • D < 0 → inga reella lösningar
 
 Exempel: x² − 5x + 6 = 0
-a=1, b=−5, c=6 → D = 25−24 = 1
-x = (5 ± 1)/2 → x = 3 eller x = 2`;
-
+p=−5, q=6 → (5/2)²−6 = 1/4
+x = 5/2 ± 1/2 → x = 3 eller x = 2`;
 let twInterval=null;
-function startTypewriter(){
-  const el=document.getElementById('m1mat'),cnt=document.getElementById('m1cnt');
-  el.textContent='';let i=0;clearInterval(twInterval);
-  twInterval=setInterval(()=>{if(i>=MAT_TEXT.length){clearInterval(twInterval);return;}el.textContent+=MAT_TEXT[i++];cnt.textContent=i+' tecken';},16);
-}
-function stopTypewriter(){clearInterval(twInterval);}
+function startTypewriter(){const el=document.getElementById('m1mat'),cnt=document.getElementById('m1cnt');el.textContent='';let i=0;clearInterval(twInterval);twInterval=setInterval(()=>{if(i>=MAT_TEXT.length){clearInterval(twInterval);return}el.textContent+=MAT_TEXT[i++];cnt.textContent=i+' tecken'},16)}
+function stopTypewriter(){clearInterval(twInterval)}
 
-/* SCORE */
+/* ─── CHAT TYPEWRITER ─── */
+function chatType(elId,curId,text,speed,done){
+  const el=document.getElementById(elId),cur=document.getElementById(curId);
+  cur.style.display='inline-block';el.textContent='';let i=0;
+  const t=setInterval(()=>{if(i>=text.length){clearInterval(t);cur.style.display='none';if(done)done();return}el.textContent+=text[i++]},speed||25);
+  return t;
+}
+
+/* ─── SCORE ─── */
+let scoreCountTimer=null,scoreFillTimer=null;
 function animScore(){
   let v=0;const el=document.getElementById('scorenum');
-  scoreCountTimer=setInterval(()=>{v=Math.min(v+2,83);el.textContent=v+'%';if(v>=83)clearInterval(scoreCountTimer);},17);
-  scoreFillTimer=setTimeout(()=>{document.getElementById('sfill').style.width='83%';},80);
+  scoreCountTimer=setInterval(()=>{v=Math.min(v+2,75);el.textContent=v+'%';if(v>=75)clearInterval(scoreCountTimer)},17);
+  scoreFillTimer=setTimeout(()=>{document.getElementById('sfill').style.width='75%'},80);
 }
 
-/* SIM EXAM */
+/* ─── SIM ─── */
 let simTick=null;
-let aiCountTimer=null,aiGoTimer=null,q3TwTimer=null,scoreCountTimer=null,scoreFillTimer=null;
-let catTimers=[];
-
-function clearAllTimers(){
-  clearInterval(aiCountTimer);clearTimeout(aiGoTimer);
-  clearInterval(q3TwTimer);clearInterval(scoreCountTimer);clearTimeout(scoreFillTimer);
-  catTimers.forEach(clearTimeout);catTimers=[];
-  aiCountTimer=aiGoTimer=q3TwTimer=scoreCountTimer=scoreFillTimer=null;
-}
-
 function startSimTick(){
   let sec=49*60+12,q=23,right=38;
   const tEl=document.getElementById('simtimer'),qEl=document.getElementById('simqcnt');
   const rEl=document.getElementById('simr'),pEl=document.getElementById('simpf');
   clearInterval(simTick);
-  simTick=setInterval(()=>{
-    sec-=3;q=Math.min(q+1,65);if(Math.random()>.3&&right<53)right++;
-    const mm=Math.floor(sec/60),ss=sec%60;
-    tEl.textContent=mm+':'+(ss<10?'0':'')+ss;
+  simTick=setInterval(()=>{sec-=3;q=Math.min(q+1,65);if(Math.random()>.3&&right<53)right++;
+    const mm=Math.floor(sec/60),ss=sec%60;tEl.textContent=mm+':'+(ss<10?'0':'')+ss;
     qEl.textContent='Fråga '+q+' av 65';rEl.textContent=right;pEl.style.width=(q/65*100)+'%';
-    if(q>=65||sec<=0)clearInterval(simTick);
-  },280);
+    if(q>=65||sec<=0)clearInterval(simTick)},280);
 }
-function stopSimTick(){clearInterval(simTick);}
+function stopSimTick(){clearInterval(simTick)}
 
-/* SHOW/HIDE */
+/* ─── TIMERS ─── */
+let aiCountTimer=null,aiGoTimer=null,q3TwTimer=null,chatTimer1=null,chatTimer2=null;
+let catTimers=[];
+function clearAllTimers(){
+  clearInterval(aiCountTimer);clearTimeout(aiGoTimer);
+  clearInterval(q3TwTimer);clearInterval(scoreCountTimer);clearTimeout(scoreFillTimer);
+  clearInterval(chatTimer1);clearInterval(chatTimer2);
+  catTimers.forEach(clearTimeout);catTimers=[];
+  aiCountTimer=aiGoTimer=q3TwTimer=scoreCountTimer=scoreFillTimer=chatTimer1=chatTimer2=null;
+}
+
+/* ─── GRADING OVERLAY ─── */
+function showGrading(done){
+  const ov=document.getElementById('gradingOverlay');
+  const labels=[['P.E.R rättar ditt prov...','Analyserar dina svar'],['Kontrollerar pq-formeln...','Fråga 3 av 4'],['Skapar feedback...','Personlig analys klar']];
+  ov.classList.add('vis');
+  let li=0;
+  const tick=setInterval(()=>{
+    li++;if(li>=labels.length){clearInterval(tick);
+      setTimeout(()=>{ov.classList.remove('vis');if(done)done()},500);return}
+    document.getElementById('gradingLabel').textContent=labels[li][0];
+    document.getElementById('gradingSub').textContent=labels[li][1];
+  },900);
+}
+
+/* ─── FLOATING GRADE BAR ─── */
+function showGradeBar(){document.getElementById('floatingGradeBar').classList.add('vis')}
+function hideGradeBar(){document.getElementById('floatingGradeBar').classList.remove('vis')}
+
+/* ─── SHOW/HIDE ─── */
 const M1SEC=['m1intro','m1matw','m1aiw','m1qw','m1res'];
-const M2SEC=['m2intro','m2catw','m2signw','m2simw','m2statsw','m2pricew'];
-function hideAll(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
-function show(id){const e=document.getElementById(id);if(e)e.style.display='';}
+const M2SEC=['m2intro','m2catw','m2signw','m2simw','m2statsw'];
+const M3SEC=['m3intro','m3chat','m3improve','m3cta'];
+function hideAll(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'})}
+function show(id){const e=document.getElementById(id);if(e)e.style.display=''}
 
 function resetQ(){
-  clearAllTimers();
-  ['q1a','q1b','q1c','q1d','q2a','q2b','q2c','q2d','q4a','q4b','q4c','q4d','sa','sb','sc','sd'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.className='ansBtn';
-  });
+  clearAllTimers();hideGradeBar();
+  ['q1a','q1b','q1c','q1d','q2a','q2b','q2c','q2d','q4a','q4b','q4c','q4d','sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn'});
   document.getElementById('q1').style.display='';
-  document.getElementById('q2').style.display='none';
-  document.getElementById('q3').style.display='none';
-  document.getElementById('q4').style.display='none';
+  ['q2','q3','q4'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('q3f').textContent='';
   document.getElementById('q3f').className='wfield';
   document.getElementById('q3fb').style.display='none';
-  gsap.set('#q3fb',{opacity:0,y:6});
+  gsap.set('#q3fb',{opacity:0});
   gsap.set(['#q1','#q2','#q3','#q4'],{opacity:0,y:10});
 }
 
-/* TABS */
+/* ─── TABS ─── */
 function updateTabs(n){
-  document.getElementById('tab1').className='mTab'+(n===1?' on':'');
-  document.getElementById('tab2').className='mTab'+(n===2?' on':'');
+  [1,2,3].forEach(i=>document.getElementById('tab'+i).className='mTab'+(n===i?' on':''));
 }
 
-/* TIMELINE 1 — MOCKPROV (60s) → auto-advance to mode 2 */
-let tl1=null,tl2=null,curMode=1,paused=false;
+/* ─────────────── TIMELINE 1 — MOCKPROV AI ─────────────── */
+let tl1=null,tl2=null,tl3=null,curMode=1,paused=false;
 
 function buildTL1(){
-  if(tl1){tl1.kill();tl1=null;}
-  stopTypewriter();strkCnt=0;
+  if(tl1){tl1.kill();tl1=null}
+  stopTypewriter();clearAllTimers();
   hideAll(M1SEC);resetQ();
   document.getElementById('scorenum').textContent='0%';
   document.getElementById('sfill').style.width='0%';
   document.getElementById('xpfill').style.width='0%';
-  gsap.set(['#rankp','#lvlbdg'],{opacity:0});
+  gsap.set(['#rankp','#lvlbdg','#improveBanner'],{opacity:0});
   document.getElementById('aistatus').textContent='Analyserar material...';
   document.getElementById('aibig').textContent='0';
   document.getElementById('aisub').textContent='ord analyserade';
   document.getElementById('m1mat').textContent='';
   buildDots(1);
 
-  tl1=gsap.timeline({onComplete:()=>{ switchMode(2); }});
+  tl1=gsap.timeline({onComplete:()=>switchMode(2)});
 
   /* 0–5s INTRO */
   tl1
-    .call(()=>{hideAll(M1SEC);show('m1intro');setDot(0,'on');setNarrator(1,0);startCountdown(60);})
+    .call(()=>{hideAll(M1SEC);show('m1intro');setDot(0,'on');setNarrator(1,0);startCountdown(62)})
     .from('#m1intro',{opacity:0,duration:.01})
     .from('#m1logo',{opacity:0,scale:.7,duration:.8,ease:'back.out(1.8)'})
-    .from('#m1htitle',{opacity:0,y:14,duration:.7},'-=.3')
+    .from('#m1htitle',{opacity:0,y:14,duration:.7},'+=0')
     .from('#m1hpill',{opacity:0,y:8,duration:.5},'-=.2')
-    .from('#m1hsub',{opacity:0,duration:.5},'-=.15')
 
   /* 5–16s MATERIAL */
   tl1
-    .call(()=>{hideAll(M1SEC);show('m1matw');setDot(0,'dn');setDot(1,'on');setNarrator(1,0);startTypewriter();},[],5)
-    .from('#m1cpill',{opacity:0,duration:.5})
-    .from('#m1crd',{opacity:0,y:10,duration:.6})
+    .call(()=>{hideAll(M1SEC);show('m1matw');setDot(0,'dn');setDot(1,'on');setNarrator(1,0);startTypewriter()},[],5)
+    .from('#m1matw > .pill',{opacity:0,duration:.5},'+=0')
+    .from('#m1matw > .card',{opacity:0,y:10,duration:.6})
 
-  /* 16–27s AI GEN */
+  /* 16–26s AI GEN */
   tl1
     .call(()=>{
       hideAll(M1SEC);show('m1aiw');stopTypewriter();
       setDot(1,'dn');setDot(2,'on');setNarrator(1,1);
-      gsap.set('#m1aicrd',{opacity:0,y:10});
+      gsap.set('#m1aiw > .card',{opacity:0,y:10});
     },[],16)
-    .to('#m1aicrd',{opacity:1,y:0,duration:.6},16.2)
+    .to('#m1aiw > .card',{opacity:1,y:0,duration:.6},16.2)
     .call(()=>{
-      const seq=[
-        ['Analyserar 1 247 ord...','1247','ord analyserade'],
-        ['Identifierar nyckelbegrepp...','8','nyckelbegrepp hittade'],
-        ['Genererar 6 anpassade frågor...','6','frågor skapade'],
-      ];
+      const seq=[['Analyserar 1 247 ord...','1247','ord analyserade'],['Identifierar nyckelbegrepp...','6','nyckelbegrepp hittade'],['Genererar 4 anpassade frågor...','4','frågor skapade']];
       let si=0;
-      const go=()=>{
-        if(si>=seq.length)return;
-        const[s,n,sub]=seq[si++];
-        document.getElementById('aistatus').textContent=s;
-        document.getElementById('aisub').textContent=sub;
-        let v=0;const target=parseInt(n);
-        aiCountTimer=setInterval(()=>{v=Math.min(v+Math.max(1,Math.ceil(target/22)),target);document.getElementById('aibig').textContent=v;if(v>=target){clearInterval(aiCountTimer);aiGoTimer=setTimeout(go,550);}},38);
-      };
-      go();
+      const go=()=>{if(si>=seq.length)return;const[s,n,sub]=seq[si++];document.getElementById('aistatus').textContent=s;document.getElementById('aisub').textContent=sub;let v=0;const target=parseInt(n);aiCountTimer=setInterval(()=>{v=Math.min(v+Math.max(1,Math.ceil(target/22)),target);document.getElementById('aibig').textContent=v;if(v>=target){clearInterval(aiCountTimer);aiGoTimer=setTimeout(go,550)}},38)};go();
     },[],17)
 
-  /* 27–50s QUESTIONS */
+  /* 26–48s QUESTIONS (select only, no immediate grading) */
   tl1
     .call(()=>{
       hideAll(M1SEC);show('m1qw');
       setDot(2,'dn');setDot(3,'on');setNarrator(1,2);
-      document.getElementById('q2').style.display='none';
-      document.getElementById('q3').style.display='none';
-      document.getElementById('q4').style.display='none';
-    },[],27)
-    .to('#q1',{opacity:1,y:0,duration:.5},27.4)
-    .call(()=>{ document.getElementById('q1a').className='ansBtn sel'; },[],29.2)
-    .call(()=>{
-      document.getElementById('q1a').className='ansBtn ok';
-      const r=document.getElementById('q1').getBoundingClientRect();
-      spawnRipple(r.left+r.width/2,r.top+r.height/2);
-      spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
-      showStreak(1);
-    },[],29.65)
+      ['q2','q3','q4'].forEach(id=>document.getElementById(id).style.display='none');
+    },[],26)
+    .to('#q1',{opacity:1,y:0,duration:.5},26.4)
+    .call(()=>document.getElementById('q1a').className='ansBtn sel',[],28.2)
     .call(()=>{
       document.getElementById('q1').style.display='none';
       document.getElementById('q2').style.display='';
       gsap.to('#q2',{opacity:1,y:0,duration:.4,ease:'power3.out'});
-    },[],30.45)
-    .call(()=>{ document.getElementById('q2b').className='ansBtn sel'; },[],32.2)
-    .call(()=>{
-      document.getElementById('q2b').className='ansBtn ok';
-      const r=document.getElementById('q2').getBoundingClientRect();
-      spawnRipple(r.left+r.width/2,r.top+r.height/2);
-      spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
-      showStreak(2);
-    },[],32.62)
+    },[],29.2)
+    .call(()=>document.getElementById('q2b').className='ansBtn sel',[],31)
     .call(()=>{
       document.getElementById('q2').style.display='none';
       document.getElementById('q3').style.display='';
       gsap.to('#q3',{opacity:1,y:0,duration:.45});
       document.getElementById('q3f').className='wfield active';
-      const wrong='x = 4 eller x = −8';let ti=0;
-      q3TwTimer=setInterval(()=>{if(ti>=wrong.length){clearInterval(q3TwTimer);return;}document.getElementById('q3f').textContent=wrong.slice(0,++ti);},55);
-    },[],35.5)
-    .call(()=>{
-      document.getElementById('q3f').className='wfield bad';
-      gsap.to('#q3',{keyframes:[{x:-7,duration:.07},{x:7,duration:.07},{x:-5,duration:.07},{x:5,duration:.07},{x:0,duration:.07}]});
-      document.getElementById('q3fb').style.display='';
-      gsap.to('#q3fb',{opacity:1,y:0,duration:.6});
-      strkCnt=0;
-    },[],38.5)
+      const txt='x = 4 eller x = −3';let ti=0;
+      q3TwTimer=setInterval(()=>{if(ti>=txt.length){clearInterval(q3TwTimer);return}document.getElementById('q3f').textContent=txt.slice(0,++ti)},55);
+    },[],33)
     .call(()=>{
       document.getElementById('q3').style.display='none';
       document.getElementById('q4').style.display='';
       gsap.to('#q4',{opacity:1,y:0,duration:.45});
-    },[],43)
-    .call(()=>{ document.getElementById('q4a').className='ansBtn sel'; },[],44.8)
-    .call(()=>{
-      document.getElementById('q4a').className='ansBtn ok';
-      const r=document.getElementById('q4').getBoundingClientRect();
-      spawnRipple(r.left+r.width/2,r.top+r.height/2);
-      spawnPoints(r.left+r.width/2-30,r.top+50,'+15p Exakt!');
-      showStreak(1);
-    },[],45.2)
+    },[],38.5)
+    .call(()=>document.getElementById('q4a').className='ansBtn sel',[],40.5)
+    .call(()=>showGradeBar(),[],42)
 
-  /* 50–58s RESULTS */
+  /* 44s GRADE */
+  tl1
+    .call(()=>{
+      hideGradeBar();
+      showGrading(()=>{
+        /* reveal graded results */
+        document.getElementById('q1a').className='ansBtn ok';
+        document.getElementById('q2b').className='ansBtn ok';
+        document.getElementById('q3f').className='wfield bad';
+        document.getElementById('q4a').className='ansBtn ok';
+        /* show feedback on q3 */
+        document.getElementById('q3').style.display='';
+        document.getElementById('q3fb').style.display='';
+        gsap.to('#q3fb',{opacity:1,duration:.5});
+        /* show all answered questions */
+        ['q1','q2','q3','q4'].forEach(id=>{document.getElementById(id).style.display='';document.getElementById(id).style.opacity='1'});
+      });
+    },[],44)
+
+  /* 50–60s RESULTS */
   tl1
     .call(()=>{
       hideAll(M1SEC);show('m1res');
-      setDot(3,'dn');setNarrator(1,3);
+      setNarrator(1,3);
       gsap.set('#m1res',{opacity:0,y:14});
     },[],50)
     .to('#m1res',{opacity:1,y:0,duration:.7},50.3)
     .call(animScore,[],51)
-    .to('#rankp',{opacity:1,y:0,duration:.6},52.8)
-    .call(()=>{ spawnConfetti(); },[],53.2)
-    .call(()=>{ gsap.to('#xpfill',{width:'72%',duration:1.2,ease:'power2.out'}); },[],53.5)
+    .to('#rankp',{opacity:1,duration:.6},52.8)
+    .call(()=>spawnConfetti(),[],53.2)
+    .call(()=>gsap.to('#xpfill',{width:'72%',duration:1.2,ease:'power2.out'}),[],53.5)
     .to('#lvlbdg',{opacity:1,duration:.5},55)
+    .to('#improveBanner',{opacity:1,y:0,duration:.6},56.2)
 
-  /* 58–60s fade */
-  tl1.to('#mode1',{opacity:0,duration:1.4},58.2).set('#mode1',{opacity:1},60);
+  tl1.to('#mode1',{opacity:0,duration:1.4},60.2).set('#mode1',{opacity:1},62);
   return tl1;
 }
 
-/* TIMELINE 2 — KÖRKORTSTEORIN (60s) → auto-advance to mode 1 */
+/* ─────────────── TIMELINE 2 — KÖRKORTSTEORIN ─────────────── */
 function buildTL2(){
-  if(tl2){tl2.kill();tl2=null;}
+  if(tl2){tl2.kill();tl2=null}
   stopSimTick();clearAllTimers();
   hideAll(M2SEC);
-  document.getElementById('pc2').className='pc';
-  gsap.set('#sigcard',{opacity:0});
-  gsap.set('#signsvg',{scale:.4,opacity:0});
-  gsap.set('#catprog',{opacity:0});
-  gsap.set('#m2simw',{opacity:0});
-  gsap.set('#simres',{opacity:0,scale:.92});
-  gsap.set('#m2statsw',{opacity:0});
-  gsap.set('#wkalert',{opacity:0});
-  gsap.set('#m2pricew',{opacity:0});
-  gsap.set('.pc',{opacity:0,y:12});
-  gsap.set('#pupgr',{opacity:0});
-  ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn';});
+  gsap.set('#sigcard',{opacity:0});gsap.set('#signsvg',{scale:.4,opacity:0});
+  gsap.set(['#catprog','#m2simw','#simres','#m2statsw','#wkalert'],{opacity:0});
+  gsap.set('#simres',{scale:.92});
+  ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn'});
   document.getElementById('simtimer').textContent='49:12';
   document.getElementById('simqcnt').textContent='Fråga 23 av 65';
   document.getElementById('simr').textContent='38';
   document.getElementById('simpf').style.width='35%';
   buildCatGrid();drawRadar();buildDots(2);
 
-  tl2=gsap.timeline({onComplete:()=>{ switchMode(1); }});
+  tl2=gsap.timeline({onComplete:()=>switchMode(3)});
 
   /* 0–5s INTRO */
   tl2
-    .call(()=>{hideAll(M2SEC);show('m2intro');setDot(0,'on');setNarrator(2,0);startCountdown(60);})
-    .from('#m2pill',{opacity:0,y:8,duration:.6})
-    .from('#m2title',{opacity:0,y:12,duration:.7},'-=.2')
-    .from('#m2sub',{opacity:0,duration:.5},'-=.15')
+    .call(()=>{hideAll(M2SEC);show('m2intro');setDot(0,'on');setNarrator(2,0);startCountdown(58)})
+    .from('#m2intro > .pill',{opacity:0,y:8,duration:.6})
+    .from('#m2intro > div:nth-child(3)',{opacity:0,y:12,duration:.7},'-=.2')
+    .from('#m2intro > div:nth-child(4)',{opacity:0,duration:.5},'-=.15')
 
-  /* 5–14s CATEGORY GRID */
+  /* 5–14s CATEGORIES */
   tl2
-    .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0);},[],5)
+    .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0)},[],5)
     .call(()=>{
       catTimers.forEach(clearTimeout);catTimers=[];
       CATS.forEach((c,i)=>{
         gsap.to('#cc'+i,{opacity:c.done?1:.35,y:0,duration:.4,delay:i*.065,ease:'power2.out'});
-        if(c.done){catTimers.push(setTimeout(()=>{const f=document.getElementById('cbf'+i);if(f)f.style.width=c.p+'%';},600+i*65));}
-        if(i===0)catTimers.push(setTimeout(()=>{document.getElementById('cc0').classList.add('active');},900));
+        if(c.done)catTimers.push(setTimeout(()=>{const f=document.getElementById('cbf'+i);if(f)f.style.width=c.p+'%'},600+i*65));
+        if(i===0)catTimers.push(setTimeout(()=>document.getElementById('cc0').classList.add('active'),900));
       });
     },[],5.5)
 
   /* 14–26s SIGN */
   tl2
     .call(()=>{
-      hideAll(M2SEC);show('m2signw');
-      setDot(1,'dn');setDot(2,'on');setNarrator(2,1);
-      gsap.set('#sigcard',{opacity:0,y:10});
-      gsap.set('#signsvg',{scale:.4,opacity:0});
-      gsap.set('#catprog',{opacity:0});
-      ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn';});
+      hideAll(M2SEC);show('m2signw');setDot(1,'dn');setDot(2,'on');setNarrator(2,1);
+      gsap.set('#sigcard',{opacity:0,y:10});gsap.set('#signsvg',{scale:.4,opacity:0});gsap.set('#catprog',{opacity:0});
+      ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn'});
     },[],14)
     .to('#sigcard',{opacity:1,y:0,duration:.6},14.2)
     .to('#signsvg',{scale:1,opacity:1,duration:1,ease:'back.out(1.4)'},14.6)
-    .call(()=>{ document.getElementById('sb').className='ansBtn sel'; },[],18)
+    .call(()=>document.getElementById('sb').className='ansBtn sel',[],18)
     .call(()=>{
       document.getElementById('sb').className='ansBtn ok';
       const rect=document.getElementById('signsvg').getBoundingClientRect();
@@ -939,13 +1019,11 @@ function buildTL2(){
     },[],19)
     .to('#catprog',{opacity:1,duration:.6},20)
 
-  /* 26–42s SIM EXAM */
+  /* 26–40s SIM EXAM */
   tl2
     .call(()=>{
-      hideAll(M2SEC);show('m2simw');
-      setDot(2,'dn');setDot(3,'on');setNarrator(2,2);
-      gsap.set('#m2simw',{opacity:0,y:10});
-      gsap.set('#simres',{opacity:0,scale:.92});
+      hideAll(M2SEC);show('m2simw');setDot(2,'dn');setDot(3,'on');setNarrator(2,2);
+      gsap.set('#m2simw',{opacity:0,y:10});gsap.set('#simres',{opacity:0,scale:.92});
     },[],26)
     .to('#m2simw',{opacity:1,y:0,duration:.7},26.3)
     .call(startSimTick,[],27)
@@ -959,74 +1037,154 @@ function buildTL2(){
       spawnConfetti();
     },[],38)
 
-  /* 42–52s STATS */
+  /* 40–55s STATS */
   tl2
     .call(()=>{
-      hideAll(M2SEC);show('m2statsw');
-      setDot(3,'dn');setDot(4,'on');setNarrator(2,3);
-      gsap.set('#m2statsw',{opacity:0,y:10});
-      gsap.set('#wkalert',{opacity:0});
-    },[],42)
-    .to('#m2statsw',{opacity:1,y:0,duration:.7},42.3)
-    .to('#wkalert',{opacity:1,duration:.6},44.2)
+      hideAll(M2SEC);show('m2statsw');setDot(3,'dn');setNarrator(2,3);
+      gsap.set('#m2statsw',{opacity:0,y:10});gsap.set('#wkalert',{opacity:0});
+    },[],40)
+    .to('#m2statsw',{opacity:1,y:0,duration:.7},40.3)
+    .to('#wkalert',{opacity:1,duration:.6},42.5)
 
-  /* 52–58s PRICING */
-  tl2
-    .call(()=>{
-      hideAll(M2SEC);show('m2pricew');
-      gsap.set('#m2pricew',{opacity:0});
-      gsap.set('.pc',{opacity:0,y:12});
-      gsap.set('#pupgr',{opacity:0});
-      document.getElementById('pc2').className='pc';
-    },[],52)
-    .to('#m2pricew',{opacity:1,duration:.5},52.2)
-    .to('#pc1',{opacity:1,y:0,duration:.5},52.5)
-    .to('#pc2',{opacity:1,y:0,duration:.5},52.75)
-    .to('#pc3',{opacity:1,y:0,duration:.5},53)
-    .call(()=>{
-      document.getElementById('pc2').className='pc hl';
-      gsap.to('#pupgr',{opacity:1,duration:.5});
-    },[],54.8)
-
-  /* 58–60s fade */
-  tl2.to('#mode2',{opacity:0,duration:1.4},58.2).set('#mode2',{opacity:1},60);
+  tl2.to('#mode2',{opacity:0,duration:1.4},55.2).set('#mode2',{opacity:1},58);
   return tl2;
 }
 
-/* MODE SWITCH */
+/* ─────────────── TIMELINE 3 — P.E.R ─────────────── */
+function buildTL3(){
+  if(tl3){tl3.kill();tl3=null}
+  clearAllTimers();
+  hideAll(M3SEC);
+  gsap.set('.perCap',{opacity:0});
+  gsap.set(['#chat1','#chat2','#chat3','#chat4'],{opacity:0});
+  document.getElementById('chat3').style.display='none';
+  document.getElementById('chat4').style.display='none';
+  document.getElementById('gotoChip').style.display='none';
+  document.getElementById('chat2txt').textContent='';
+  document.getElementById('chat4txt').textContent='';
+  gsap.set(['#wf1','#wf2','#wf3'],{});
+  document.getElementById('wf1').style.width='0%';
+  document.getElementById('wf2').style.width='0%';
+  document.getElementById('wf3').style.width='0%';
+  gsap.set('#howToBox',{opacity:0});
+  gsap.set(['.planCard','#ctaBtn'],{opacity:0,y:12});
+  buildDots(3);
+
+  tl3=gsap.timeline({onComplete:()=>switchMode(1)});
+
+  /* 0–10s P.E.R INTRO */
+  tl3
+    .call(()=>{hideAll(M3SEC);show('m3intro');setDot(0,'on');setNarrator(3,0);startCountdown(68)})
+    .from('#m3intro > .perHex',{opacity:0,scale:.6,duration:.9,ease:'back.out(1.8)'})
+    .from('#perTitle',{opacity:0,y:12,duration:.7},'-=.2')
+    .from('#m3intro > div:nth-child(3)',{opacity:0,duration:.5},'-=.1')
+    .from('.perTagline',{opacity:0,duration:.5},'-=.1')
+    .call(()=>{
+      document.querySelectorAll('.perCap').forEach((el,i)=>{
+        gsap.to(el,{opacity:1,y:0,duration:.4,delay:i*.12,ease:'power2.out'});
+      });
+    },[],5)
+
+  /* 10–30s CHAT */
+  tl3
+    .call(()=>{
+      hideAll(M3SEC);show('m3chat');setDot(0,'dn');setDot(1,'on');setNarrator(3,1);
+      gsap.set('#chatbox',{opacity:0,y:10});
+    },[],10)
+    .to('#chatbox',{opacity:1,y:0,duration:.5},10.3)
+    .to('#chat1',{opacity:1,duration:.4},10.6)
+    .call(()=>{
+      gsap.to('#chat2',{opacity:1,duration:.3});
+      chatTimer1=chatType('chat2txt','chat2cur','Absolut Per! pq-formeln löser x² + px + q = 0. Du sätter p och q direkt från ekvationen — inget a att dela med. x = −p/2 ± √((p/2)²−q). Vill du att jag visar ett steg-för-steg-exempel?',18);
+    },[],12)
+    .call(()=>{
+      document.getElementById('chat3').style.display='';
+      gsap.to('#chat3',{opacity:1,duration:.4});
+    },[],20)
+    .call(()=>{
+      document.getElementById('chat4').style.display='';
+      gsap.to('#chat4',{opacity:1,duration:.3});
+      chatTimer2=chatType('chat4txt','chat4cur','Klart! x² − 2x − 8 = 0 → p=−2, q=−8. Steg 1: x = −(−2)/2 ± √((−1)²−(−8)) = 1 ± √9 = 1 ± 3. Svar: x=4 eller x=−2. Öppnar ett övningspass för dig →',20,()=>{
+        document.getElementById('gotoChip').style.display='flex';
+        gsap.from('#gotoChip',{opacity:0,scale:.8,duration:.5,ease:'back.out(1.8)'});
+        let gi=0;const gLabels=['Navigerar till app.html','Laddar Feynman-pass...','Redo!'];
+        const gt=setInterval(()=>{gi++;if(gi>=gLabels.length){clearInterval(gt);return}document.getElementById('gotoLabel').textContent=gLabels[gi]},900);
+      });
+    },[],22)
+
+  /* 30–50s FÖRBÄTTRING */
+  tl3
+    .call(()=>{
+      hideAll(M3SEC);show('m3improve');setDot(1,'dn');setDot(2,'on');setNarrator(3,2);
+      gsap.set('#improveCard',{opacity:0,y:10});
+    },[],30)
+    .to('#improveCard',{opacity:1,y:0,duration:.7},30.3)
+    .call(()=>{
+      gsap.to('#wf1',{width:'52%',duration:1.2,ease:'power2.out'});
+      setTimeout(()=>gsap.to('#wf2',{width:'68%',duration:1,ease:'power2.out'}),250);
+      setTimeout(()=>gsap.to('#wf3',{width:'60%',duration:1,ease:'power2.out'}),450);
+    },[],32)
+    .to('#howToBox',{opacity:1,y:0,duration:.7},35)
+
+  /* 50–65s PRICING CTA */
+  tl3
+    .call(()=>{
+      hideAll(M3SEC);show('m3cta');setDot(2,'dn');setDot(3,'on');setNarrator(3,3);
+      gsap.set('#ctaWrap',{opacity:0});gsap.set('.planCard',{opacity:0,y:12});gsap.set('#ctaBtn',{opacity:0,y:8});
+    },[],50)
+    .to('#ctaWrap',{opacity:1,duration:.5},50.2)
+    .to('#plan1',{opacity:1,y:0,duration:.5},51)
+    .to('#plan2',{opacity:1,y:0,duration:.5},51.25)
+    .to('#plan3',{opacity:1,y:0,duration:.5},51.5)
+    .to('#ctaBtn',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)'},53)
+    .call(()=>spawnConfetti(),[],54)
+
+  tl3.to('#mode3',{opacity:0,duration:1.4},65.5).set('#mode3',{opacity:1},68);
+  return tl3;
+}
+
+/* ─── MODE SWITCH ─── */
 function switchMode(n){
   if(n===curMode)return;
   const from=document.getElementById('mode'+curMode);
   const to=document.getElementById('mode'+n);
-  if(tl1){tl1.kill();tl1=null;}
-  if(tl2){tl2.kill();tl2=null;}
-  stopTypewriter();stopSimTick();strkCnt=0;clearAllTimers();
-  gsap.killTweensOf('#signsvg,#simres,#pupgr,#wkalert,#xpfill,#m2statsw,#m2simw');
+  if(tl1){tl1.kill();tl1=null}
+  if(tl2){tl2.kill();tl2=null}
+  if(tl3){tl3.kill();tl3=null}
+  stopTypewriter();stopSimTick();clearAllTimers();hideGradeBar();
+  gsap.killTweensOf(from);
   updateTabs(n);
   gsap.to(from,{opacity:0,duration:.4,onComplete:()=>{
     from.classList.remove('act');
     to.classList.add('act');
     gsap.set(to,{opacity:0});
     curMode=n;
-    gsap.to(to,{opacity:1,duration:.4,onComplete:()=>{ if(n===1)buildTL1();else buildTL2(); }});
+    gsap.to(to,{opacity:1,duration:.4,onComplete:()=>{
+      if(n===1)buildTL1();
+      else if(n===2)buildTL2();
+      else buildTL3();
+    }});
   }});
 }
 
-/* KEYBOARD */
+/* ─── KEYBOARD ─── */
 document.addEventListener('keydown',e=>{
   if(e.key==='1')switchMode(1);
   if(e.key==='2')switchMode(2);
+  if(e.key==='3')switchMode(3);
   if(e.key.toLowerCase()==='n')document.getElementById('narrator').classList.toggle('open');
   if(e.key==='Escape'){
     paused=!paused;
-    if(paused){if(tl1)tl1.pause();if(tl2)tl2.pause();if(cdTween)cdTween.pause();}
-    else{if(tl1)tl1.resume();if(tl2)tl2.resume();if(cdTween)cdTween.resume();}
+    const tl=curMode===1?tl1:curMode===2?tl2:tl3;
+    if(paused){if(tl)tl.pause();if(cdTween)cdTween.pause()}
+    else{if(tl)tl.resume();if(cdTween)cdTween.resume()}
   }
 });
 
-/* INIT */
+/* ─── INIT ─── */
 window.addEventListener('load',()=>{
   document.getElementById('mode2').classList.remove('act');
+  document.getElementById('mode3').classList.remove('act');
   updateTabs(1);
   buildTL1();
 });
