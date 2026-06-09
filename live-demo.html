@@ -15,7 +15,6 @@
       --ad:  rgba(27,255,140,.08);
       --s:   #111a15;
       --s2:  #162019;
-      --s3:  #1c2820;
       --t:   #e8f5ee;
       --t2:  #a8c4b4;
       --t3:  #6b8f7c;
@@ -24,26 +23,62 @@
       --ok:  #1bff8c;
       --err: #ff6b6b;
       --r:   5px;
+      --r2:  4px;
       --f:   'DM Sans', sans-serif;
       --m:   'DM Mono', monospace;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; background: var(--bg); color: var(--t); font-family: var(--f); overflow: hidden; }
 
-    /* ── CANVAS LAYERS ── */
-    #cvBg   { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-    #cvFx   { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
-
-    /* ── UI CHROME ── */
-    #modeInd {
-      position: fixed; top: 14px; right: 18px; z-index: 400;
-      display: flex; align-items: center; gap: 8px;
-      font: 600 11px var(--m); color: var(--a);
-      background: rgba(8,16,13,.88); backdrop-filter: blur(10px);
-      border: 1px solid var(--l2); border-radius: 20px; padding: 5px 13px;
+    /* BG */
+    .bgGrid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(27,255,140,.03) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(27,255,140,.03) 1px,transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
+      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
     }
-    #modeInd .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--a); animation: dp 1.8s ease-in-out infinite; }
-    @keyframes dp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.25;transform:scale(1.5)} }
+    .bgG1 {
+      position: fixed; z-index: 0; pointer-events: none;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle,rgba(27,255,140,.10),transparent 65%);
+      top: -200px; left: calc(50% - 300px); filter: blur(60px);
+      animation: gf1 9s ease-in-out infinite;
+    }
+    .bgG2 {
+      position: fixed; z-index: 0; pointer-events: none;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle,rgba(27,255,140,.06),transparent 65%);
+      bottom: -80px; right: -60px; filter: blur(50px);
+      animation: gf1 12s ease-in-out infinite; animation-delay: -4s;
+    }
+    @keyframes gf1 { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-24px) scale(1.05)} }
+
+    #cvBg { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+    #cvFx { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+
+    /* MODE TABS */
+    #modeTabs {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 400; display: flex; gap: 4px;
+      background: rgba(8,16,13,.92); backdrop-filter: blur(12px);
+      border: 1px solid var(--l2); border-radius: 24px; padding: 4px;
+    }
+    .mTab {
+      font: 600 11px var(--m); color: var(--t3);
+      padding: 6px 16px; border-radius: 20px; cursor: pointer;
+      transition: all .25s; display: flex; align-items: center; gap: 7px;
+      letter-spacing: .04em; user-select: none;
+    }
+    .mTab.on { color: #08100d; background: var(--a); }
+    .mTab:not(.on):hover { color: var(--t2); }
+    .mTab .dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: currentColor; flex-shrink: 0;
+    }
+    .mTab.on .dot { animation: dp 1.8s ease-in-out infinite; }
 
     #keyhints {
       position: fixed; bottom: 14px; right: 18px; z-index: 400;
@@ -76,21 +111,19 @@
     #cfill { height: 100%; width: 0%; background: var(--a); box-shadow: 0 0 6px rgba(27,255,140,.6); }
 
     #streak {
-      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-      z-index: 400; font: 700 14px var(--f); color: var(--t);
+      position: fixed; top: 14px; right: 18px; z-index: 400;
+      font: 700 14px var(--f); color: var(--t);
       background: rgba(8,16,13,.9); border: 1px solid var(--l2);
       border-radius: 20px; padding: 5px 14px; opacity: 0;
     }
 
-    /* ── MODE SCREENS ── */
     .ms {
       position: fixed; inset: 0; z-index: 10;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 56px 20px 52px; opacity: 0; pointer-events: none;
+      padding: 64px 20px 52px; opacity: 0; pointer-events: none;
     }
     .ms.act { opacity: 1; pointer-events: auto; }
 
-    /* ── SHARED COMPONENTS ── */
     .card {
       background: var(--s); border: 1px solid var(--l);
       border-radius: var(--r); padding: 20px;
@@ -112,28 +145,44 @@
     .pname { font: 600 14px var(--f); color: var(--t); }
     .psub  { font: 400 11px var(--m); color: var(--t3); }
 
-    /* ── ANIM UTILITIES ── */
+    @keyframes dp     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.25;transform:scale(1.5)} }
     @keyframes blink  { 50%{opacity:0} }
-    @keyframes shake  { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-7px)} 30%{transform:translateX(7px)} 45%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 75%{transform:translateX(-2px)} }
     @keyframes hexspin{ to{transform:rotate(360deg)} }
     @keyframes scan   { 0%{left:-100%} 100%{left:100%} }
-    @keyframes logogl { 0%,100%{filter:drop-shadow(0 0 16px rgba(27,255,140,.4))} 50%{filter:drop-shadow(0 0 32px rgba(27,255,140,.7))} }
+    @keyframes logoF  { 0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))} 50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.65))} }
 
-    /* ────────────────────────────────────────
-       MODE 1 — MOCKPROV AI
-    ──────────────────────────────────────── */
-    /* intro */
-    #m1logo { width: 64px; height: 64px; margin-bottom: 14px; animation: logogl 4s ease-in-out infinite; }
-    .logoSvg { display: block; }
-    #m1htitle { font: 700 34px/1.2 var(--f); color: var(--t); margin-bottom: 10px; }
-    #m1hsub   { font: 400 15px var(--f); color: var(--t2); }
+    /* ANSWER BUTTONS — matching real Provia */
+    .ansGrid { display: flex; flex-direction: column; gap: 8px; }
+    .ansBtn {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: var(--r);
+      border: 1px solid var(--l); background: var(--s2);
+      font: 500 14px var(--f); color: var(--t2);
+      text-align: left; width: 100%; cursor: default;
+      transition: border-color .15s, background .15s;
+      min-height: 48px;
+    }
+    .ansLetter {
+      width: 26px; height: 26px; border-radius: var(--r2);
+      display: grid; place-items: center; flex-shrink: 0;
+      font: 500 11px var(--m); background: var(--s);
+      border: 1px solid var(--l); color: var(--t3);
+      transition: all .15s;
+    }
+    .ansBtn.sel  { border-color: var(--a); background: var(--ad); color: var(--t); }
+    .ansBtn.sel .ansLetter { background: rgba(27,255,140,.15); border-color: var(--a); color: var(--a); }
+    .ansBtn.ok   { border-color: var(--ok); background: rgba(27,255,140,.10); color: var(--t); animation: correctPulse .55s ease; }
+    .ansBtn.ok  .ansLetter { background: var(--a); border-color: var(--a); color: #000; }
+    .ansBtn.bad  { border-color: var(--err); background: rgba(255,107,107,.09); color: var(--t); animation: wrongShake .4s ease; }
+    .ansBtn.bad .ansLetter { background: rgba(255,107,107,.2); border-color: var(--err); color: #ff8484; }
+    @keyframes correctPulse { 0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)} 60%{box-shadow:0 0 0 14px rgba(27,255,140,0)} 100%{box-shadow:none} }
+    @keyframes wrongShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(3px)} }
 
-    /* material */
+    /* MODE 1 */
+    #m1logo { width: 72px; height: 72px; margin-bottom: 20px; animation: logoF 4.5s ease-in-out infinite; }
     #m1mat { font: 400 13px/1.85 var(--m); color: var(--t2); min-height: 120px; word-break: break-word; }
     #m1cur { display: inline-block; width: 2px; height: 14px; background: var(--a); margin-left:1px; vertical-align: middle; animation: blink 1s step-end infinite; }
     #m1cnt { font: 400 11px var(--m); color: var(--t3); text-align: right; margin-top: 6px; }
-
-    /* ai gen */
     .hexwrap { display: flex; justify-content: center; margin-bottom: 10px; }
     .hexsvg  { animation: hexspin 1.8s linear infinite; }
     #aistatus { font: 500 14px var(--f); color: var(--t2); text-align: center; }
@@ -142,15 +191,12 @@
     .aicard { overflow: hidden; position: relative; }
     .aicard::before { content:''; position:absolute; top:0; left:-100%; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--a),transparent); animation: scan 2.4s linear infinite; }
 
-    /* questions */
     .qcard { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 18px; width: 100%; max-width: 540px; }
-    .qnum  { font: 600 10px var(--m); color: var(--t3); letter-spacing:.05em; text-transform:uppercase; margin-bottom: 6px; }
-    .qtxt  { font: 500 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
-    .alist { display: flex; flex-direction: column; gap: 7px; }
-    .aopt  { background: transparent; border: 1px solid var(--l); border-radius: var(--r); padding: 9px 13px; font: 400 14px var(--f); color: var(--t2); text-align: left; width: 100%; cursor: default; transition: all .2s; }
-    .aopt.sel { border-color: var(--a);  background: var(--ad); color: var(--a); }
-    .aopt.ok  { border-color: var(--ok); background: rgba(27,255,140,.09); color: var(--ok); }
-    .aopt.bad { border-color: var(--err); background: rgba(255,107,107,.09); color: var(--err); }
+    .qmeta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .qnum  { font: 600 10px var(--m); color: var(--t3); letter-spacing:.05em; text-transform:uppercase; }
+    .qcat  { font: 600 9.5px var(--m); color: var(--a); border: 1px solid var(--l2); border-radius: var(--r2); padding: 1px 7px; }
+    .qtxt  { font: 600 16px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
+
     .wfield {
       min-height: 60px; border: 1px solid var(--l); border-radius: var(--r);
       padding: 10px 13px; font: 500 13px var(--m); color: var(--t2);
@@ -168,7 +214,6 @@
     .aifb .fml { font: 500 13px var(--m); color: var(--a); display: block; margin: 5px 0; }
     .aifb strong { color: var(--t); }
 
-    /* results */
     .sbox { background: var(--s); border: 1px solid var(--l2); border-radius: var(--r); padding: 30px; text-align: center; width: 100%; max-width: 540px; }
     .sbig { font: 700 64px/1 var(--f); color: var(--a); font-variant-numeric: tabular-nums; }
     .slbl { font: 400 13px var(--f); color: var(--t2); margin: 6px 0 16px; }
@@ -179,41 +224,36 @@
     .xpfill{ height: 100%; width: 0%; background: var(--a); border-radius: 3px; }
     .lvlbdg{ font: 700 12px var(--m); color: var(--a); text-align: center; margin-top: 8px; }
 
-    /* floating elements */
     .ptsbdg { position: fixed; z-index: 600; pointer-events: none; font: 700 16px var(--f); color: var(--a); text-shadow: 0 0 12px rgba(27,255,140,.6); opacity: 0; }
     .ripring{ position: fixed; z-index: 500; pointer-events: none; border: 2px solid rgba(27,255,140,.6); border-radius: 50%; width: 40px; height: 40px; opacity: 0; }
 
-    /* ────────────────────────────────────────
-       MODE 2 — KÖRKORTSTEORIN
-    ──────────────────────────────────────── */
-    /* category grid */
-    #catgrid {
-      display: grid; grid-template-columns: repeat(4,1fr); gap: 7px;
-      width: 100%; max-width: 560px;
-    }
-    .catc {
-      background: var(--s); border: 1px solid var(--l);
-      border-radius: var(--r); padding: 9px 7px; text-align: center;
+    /* MODE 2 */
+    #catgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; width: 100%; max-width: 560px; }
+    .catCard {
+      padding: 10px; border-radius: var(--r); border: 1px solid var(--l);
+      background: var(--s2); text-align: left;
       opacity: 0; transform: translateY(8px);
+      position: relative; overflow: hidden;
     }
-    .catc.hl  { border-color: var(--a); background: var(--ad); box-shadow: 0 0 12px rgba(27,255,140,.18); }
-    .catc.wk  { border-color: rgba(255,107,107,.4); background: rgba(255,107,107,.05); }
-    .catc.nd  { opacity: .4; }
-    .catemi   { font-size: 17px; margin-bottom: 3px; }
-    .catnm    { font: 500 9px var(--f); color: var(--t2); margin-bottom: 4px; line-height: 1.3; }
-    .catbr    { height: 3px; background: var(--l); border-radius: 2px; overflow: hidden; }
-    .catbf    { height: 100%; width: 0%; background: var(--a); border-radius: 2px; transition: width .8s ease; }
-    .catc.wk .catbf { background: var(--err); }
-    .catpct   { font: 600 9px var(--m); color: var(--t3); margin-top: 3px; }
+    .catCard.active { border-color: var(--a); background: rgba(27,255,140,.07); }
+    .catCard.active::before { content:""; position:absolute; top:0; left:0; right:0; height:2px; background:var(--a); }
+    .catCard.weak { border-color: rgba(255,107,107,.3); background: rgba(255,107,107,.04); }
+    .catCard.nd { opacity: .35!important; transform: none!important; }
+    .catEmi   { font-size: 15px; margin-bottom: 3px; }
+    .catName  { font: 600 10px var(--f); color: var(--t); line-height: 1.3; margin-bottom: 2px; }
+    .catCount { font: 400 10px var(--m); color: var(--t3); }
+    .catCard.active .catCount { color: var(--a); }
+    .catProg  { margin-top: 5px; height: 3px; border-radius: 999px; background: var(--l); overflow: hidden; }
+    .catProgFill { height: 100%; border-radius: 999px; background: var(--a); transition: width .8s ease; }
+    .catCard.weak .catProgFill { background: var(--err); }
+    .catDone  { position: absolute; top: 6px; right: 7px; font: 700 10px var(--m); color: var(--a); }
 
-    /* sign */
     #sigcard { width: 100%; max-width: 480px; }
     .sgnwrap { display: flex; justify-content: center; margin-bottom: 18px; }
     #signsvg { transform: scale(.4); opacity: 0; }
-    .sgnq  { font: 500 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
+    .sgnq  { font: 600 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
     #catprog { font: 600 12px var(--m); color: var(--a); margin-top: 14px; display: flex; align-items: center; gap: 8px; opacity: 0; }
 
-    /* simulated exam */
     .simhdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .simmode { font: 600 11px var(--m); color: var(--a); letter-spacing: .06em; text-transform: uppercase; }
     #simtimer{ font: 700 28px var(--m); color: var(--t); font-variant-numeric: tabular-nums; }
@@ -224,29 +264,19 @@
     .sstt.ok strong { color: var(--a); }
     .simpb   { height: 5px; background: var(--l); border-radius: 3px; overflow: hidden; }
     .simpf   { height: 100%; width: 0%; background: var(--a); border-radius: 3px; transition: width .4s ease; }
-    #simres  {
-      background: var(--ad); border: 1px solid var(--a); border-radius: var(--r);
-      padding: 18px; text-align: center; margin-top: 12px;
-      opacity: 0; transform: scale(.92);
-    }
+    #simres  { background: var(--ad); border: 1px solid var(--a); border-radius: var(--r); padding: 18px; text-align: center; margin-top: 12px; opacity: 0; transform: scale(.92); }
     #simres .rb { font: 700 32px var(--f); color: var(--a); }
     #simres .rs { font: 400 13px var(--f); color: var(--t2); margin-top: 4px; }
 
-    /* stats */
     .stshdr { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
     .stsavg { font: 700 36px var(--f); color: var(--a); }
     .stslbl { font: 400 12px var(--f); color: var(--t2); }
     #radarwrap { display: flex; justify-content: center; margin-bottom: 14px; }
-    .wkalert {
-      background: rgba(255,107,107,.07); border: 1px solid rgba(255,107,107,.28);
-      border-radius: var(--r); padding: 12px 13px;
-      display: flex; align-items: center; gap: 10px;
-    }
+    .wkalert { background: rgba(255,107,107,.07); border: 1px solid rgba(255,107,107,.28); border-radius: var(--r); padding: 12px 13px; display: flex; align-items: center; gap: 10px; }
     .wkico { font-size: 16px; }
     .wktxt { font: 400 12px/1.5 var(--f); color: var(--t2); }
     .wkbtn { font: 600 11px var(--m); color: var(--a); margin-left: auto; flex-shrink: 0; background: var(--ad); border: 1px solid var(--l2); border-radius: var(--r); padding: 4px 10px; }
 
-    /* pricing */
     #pgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%; max-width: 540px; }
     .pc { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 16px; opacity: 0; transform: translateY(12px); }
     .pc.hl { border-color: var(--a); background: var(--ad); box-shadow: 0 0 16px rgba(27,255,140,.18); }
@@ -259,11 +289,23 @@
 </head>
 <body>
 
+<div class="bgGrid"></div>
+<div class="bgG1"></div>
+<div class="bgG2"></div>
 <canvas id="cvBg"></canvas>
 <canvas id="cvFx"></canvas>
 
 <div id="cbar"><div id="cfill"></div></div>
-<div id="modeInd"><div class="dot"></div><span id="mlbl">MOCKPROV AI</span></div>
+
+<div id="modeTabs">
+  <div class="mTab on" id="tab1" onclick="switchMode(1)">
+    <div class="dot"></div>Mockprov AI
+  </div>
+  <div class="mTab" id="tab2" onclick="switchMode(2)">
+    <div class="dot"></div>Körkortsteorin
+  </div>
+</div>
+
 <div id="streak"></div>
 
 <div id="narrator">
@@ -274,33 +316,22 @@
 <div id="pdots"></div>
 
 <div id="keyhints">
-  <div class="kh"><b>1</b> Mockprov</div>
-  <div class="kh"><b>2</b> Körkortet</div>
   <div class="kh"><b>N</b> Narrator</div>
   <div class="kh"><b>ESC</b> Pausa</div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     MODE 1 — MOCKPROV AI
-══════════════════════════════════════════ -->
+<!-- MODE 1 — MOCKPROV AI -->
 <div id="mode1" class="ms act">
 
-  <!-- INTRO -->
   <div id="m1intro" style="text-align:center;display:none">
-    <div id="m1logo">
-      <svg class="logoSvg" viewBox="0 0 64 64" width="64" height="64">
-        <circle cx="32" cy="32" r="30" fill="#111a15" stroke="#1bff8c" stroke-width="2"/>
-        <text x="32" y="43" font-family="DM Sans" font-weight="700" font-size="28" fill="#1bff8c" text-anchor="middle">P</text>
-      </svg>
-    </div>
-    <div id="m1htitle">ProviaAi</div>
-    <div style="margin:10px auto 0;display:inline-flex" class="pill" id="m1hpill">📚 AI-prov på ditt eget material</div>
-    <div id="m1hsub" style="margin-top:10px">Klistra in material → AI genererar → Träna smart</div>
+    <img id="m1logo" src="image/proviaai-logo.png" width="72" height="72" alt="ProviaAi">
+    <div style="font:700 34px/1.2 var(--f);color:var(--t);margin:0 0 10px" id="m1htitle">ProviaAi</div>
+    <div class="pill" id="m1hpill">📚 AI-prov på ditt eget material</div>
+    <div id="m1hsub" style="font:400 15px var(--f);color:var(--t2);margin-top:10px">Klistra in material → AI genererar → Träna smart</div>
   </div>
 
-  <!-- MATERIAL -->
   <div id="m1matw" style="display:none;width:100%;max-width:540px">
-    <div class="pill" id="m1cpill" style="margin-bottom:13px;display:inline-flex">📐 Matematik 2b — Andragradsekvationer</div>
+    <div class="pill" id="m1cpill" style="margin-bottom:13px">📐 Matematik 2b — Andragradsekvationer</div>
     <div class="card" id="m1crd">
       <div class="prow">
         <div class="av">PL</div>
@@ -312,7 +343,6 @@
     </div>
   </div>
 
-  <!-- AI GEN -->
   <div id="m1aiw" style="display:none;width:100%;max-width:540px">
     <div class="card aicard" id="m1aicrd">
       <div class="hexwrap">
@@ -328,33 +358,29 @@
     </div>
   </div>
 
-  <!-- SINGLE QUESTION STAGE -->
   <div id="m1qw" style="display:none;width:100%;max-width:540px">
-    <!-- Q1 -->
     <div class="qcard" id="q1">
-      <div class="qnum">Fråga 1 av 6 · Flerval</div>
+      <div class="qmeta"><span class="qnum">Fråga 1 av 6</span><span class="qcat">Flerval</span></div>
       <div class="qtxt">Vilka är lösningarna till x² − 5x + 6 = 0?</div>
-      <div class="alist">
-        <button class="aopt" id="q1a">x = 2 och x = 3</button>
-        <button class="aopt" id="q1b">x = 1 och x = 6</button>
-        <button class="aopt" id="q1c">x = −2 och x = −3</button>
-        <button class="aopt" id="q1d">x = 2 och x = −3</button>
+      <div class="ansGrid">
+        <button class="ansBtn" id="q1a"><span class="ansLetter">A</span>x = 2 och x = 3</button>
+        <button class="ansBtn" id="q1b"><span class="ansLetter">B</span>x = 1 och x = 6</button>
+        <button class="ansBtn" id="q1c"><span class="ansLetter">C</span>x = −2 och x = −3</button>
+        <button class="ansBtn" id="q1d"><span class="ansLetter">D</span>x = 2 och x = −3</button>
       </div>
     </div>
-    <!-- Q2 -->
     <div class="qcard" id="q2" style="display:none">
-      <div class="qnum">Fråga 2 av 6 · Flerval</div>
+      <div class="qmeta"><span class="qnum">Fråga 2 av 6</span><span class="qcat">Flerval</span></div>
       <div class="qtxt">Vad kallas en ekvation av formen ax² + bx + c = 0 (a ≠ 0)?</div>
-      <div class="alist">
-        <button class="aopt" id="q2a">Linjär ekvation</button>
-        <button class="aopt" id="q2b">Andragradsekvation</button>
-        <button class="aopt" id="q2c">Kubisk ekvation</button>
-        <button class="aopt" id="q2d">Exponentialekvation</button>
+      <div class="ansGrid">
+        <button class="ansBtn" id="q2a"><span class="ansLetter">A</span>Linjär ekvation</button>
+        <button class="ansBtn" id="q2b"><span class="ansLetter">B</span>Andragradsekvation</button>
+        <button class="ansBtn" id="q2c"><span class="ansLetter">C</span>Kubisk ekvation</button>
+        <button class="ansBtn" id="q2d"><span class="ansLetter">D</span>Exponentialekvation</button>
       </div>
     </div>
-    <!-- Q3 written / FEL -->
     <div class="qcard" id="q3" style="display:none">
-      <div class="qnum">Fråga 3 av 6 · Skriven</div>
+      <div class="qmeta"><span class="qnum">Fråga 3 av 6</span><span class="qcat">Skriven</span></div>
       <div class="qtxt">Lös ekvationen x² + 4x − 12 = 0 med ABC-formeln.</div>
       <div class="wfield" id="q3f"></div>
       <div class="aifb" id="q3fb" style="display:none">
@@ -364,20 +390,18 @@
         x = (−4 ± 8) / 2 → <strong>x = 2 eller x = −6</strong> ✓
       </div>
     </div>
-    <!-- Q4 -->
     <div class="qcard" id="q4" style="display:none">
-      <div class="qnum">Fråga 4 av 6 · Flerval</div>
+      <div class="qmeta"><span class="qnum">Fråga 4 av 6</span><span class="qcat">Flerval</span></div>
       <div class="qtxt">Hur många reella lösningar har x² + 2x + 5 = 0?</div>
-      <div class="alist">
-        <button class="aopt" id="q4a">Inga reella lösningar</button>
-        <button class="aopt" id="q4b">Exakt en lösning</button>
-        <button class="aopt" id="q4c">Två lösningar</button>
-        <button class="aopt" id="q4d">Oändligt många</button>
+      <div class="ansGrid">
+        <button class="ansBtn" id="q4a"><span class="ansLetter">A</span>Inga reella lösningar</button>
+        <button class="ansBtn" id="q4b"><span class="ansLetter">B</span>Exakt en lösning</button>
+        <button class="ansBtn" id="q4c"><span class="ansLetter">C</span>Två lösningar</button>
+        <button class="ansBtn" id="q4d"><span class="ansLetter">D</span>Oändligt många</button>
       </div>
     </div>
   </div>
 
-  <!-- RESULTS -->
   <div id="m1res" style="display:none">
     <div class="sbox">
       <div class="prow" style="justify-content:center;margin-bottom:14px">
@@ -393,21 +417,19 @@
     </div>
   </div>
 
-</div><!-- /mode1 -->
+</div>
 
-<!-- ══════════════════════════════════════════
-     MODE 2 — KÖRKORTSTEORIN
-══════════════════════════════════════════ -->
+<!-- MODE 2 — KÖRKORTSTEORIN -->
 <div id="mode2" class="ms">
 
-  <!-- INTRO -->
   <div id="m2intro" style="display:none;text-align:center">
-    <div class="pill" id="m2pill" style="margin-bottom:14px;display:inline-flex">🚗 368 frågor · 16 kategorier</div>
+    <img src="image/proviaai-logo.png" width="60" height="60" alt="ProviaAi"
+         style="margin-bottom:16px;animation:logoF 4.5s ease-in-out infinite">
+    <div class="pill" id="m2pill" style="margin-bottom:14px">🚗 368 frågor · 16 kategorier</div>
     <div id="m2title" style="font:700 30px/1.2 var(--f);color:var(--t);margin-bottom:8px">Körkortsteorin</div>
     <div id="m2sub" style="font:400 14px var(--f);color:var(--t2)">Exakt som Transportstyrelsens teoriprov</div>
   </div>
 
-  <!-- CATEGORY GRID -->
   <div id="m2catw" style="display:none;width:100%;max-width:560px">
     <div class="prow" style="margin-bottom:12px">
       <div class="av">PL</div>
@@ -416,7 +438,6 @@
     <div id="catgrid"></div>
   </div>
 
-  <!-- SIGN -->
   <div id="m2signw" style="display:none">
     <div class="card" id="sigcard">
       <div class="prow">
@@ -430,17 +451,16 @@
         </svg>
       </div>
       <div class="sgnq">Vad innebär detta vägmärke?</div>
-      <div class="alist">
-        <button class="aopt" id="sa">Rekommenderad hastighet 50 km/h</button>
-        <button class="aopt" id="sb">Maxhastighet 50 km/h</button>
-        <button class="aopt" id="sc">Minsta tillåtna hastighet 50 km/h</button>
-        <button class="aopt" id="sd">Hastighetszon upphör vid märket</button>
+      <div class="ansGrid">
+        <button class="ansBtn" id="sa"><span class="ansLetter">A</span>Rekommenderad hastighet 50 km/h</button>
+        <button class="ansBtn" id="sb"><span class="ansLetter">B</span>Maxhastighet 50 km/h</button>
+        <button class="ansBtn" id="sc"><span class="ansLetter">C</span>Minsta tillåtna hastighet 50 km/h</button>
+        <button class="ansBtn" id="sd"><span class="ansLetter">D</span>Hastighetszon upphör vid märket</button>
       </div>
       <div id="catprog">✓ Hastighet — 8/8 klara! Kategori klar.</div>
     </div>
   </div>
 
-  <!-- SIMULATED EXAM -->
   <div id="m2simw" style="display:none;width:100%;max-width:540px">
     <div class="card">
       <div class="simhdr">
@@ -465,7 +485,6 @@
     </div>
   </div>
 
-  <!-- STATS -->
   <div id="m2statsw" style="display:none;width:100%;max-width:540px">
     <div class="card">
       <div class="stshdr">
@@ -486,7 +505,6 @@
     </div>
   </div>
 
-  <!-- PRICING -->
   <div id="m2pricew" style="display:none">
     <div style="font:700 18px var(--f);color:var(--t);text-align:center;margin-bottom:14px">Välj din plan</div>
     <div id="pgrid">
@@ -509,175 +527,90 @@
     </div>
   </div>
 
-</div><!-- /mode2 -->
+</div>
 
 <script>
-/* ════════════════════════════════════════════
-   PARTICLES
-════════════════════════════════════════════ */
-const cvBg = document.getElementById('cvBg');
-const ctxBg = cvBg.getContext('2d');
-const cvFx = document.getElementById('cvFx');
-const ctxFx = cvFx.getContext('2d');
-let W=0, H=0;
-
-function resizeCanvases(){
-  W = cvBg.width = cvFx.width = window.innerWidth;
-  H = cvBg.height = cvFx.height = window.innerHeight;
-}
+/* PARTICLES */
+const cvBg=document.getElementById('cvBg'),ctxBg=cvBg.getContext('2d');
+const cvFx=document.getElementById('cvFx'),ctxFx=cvFx.getContext('2d');
+let W=0,H=0;
+function resizeCanvases(){W=cvBg.width=cvFx.width=window.innerWidth;H=cvBg.height=cvFx.height=window.innerHeight;}
 resizeCanvases();
-window.addEventListener('resize', resizeCanvases);
-
-const dots = Array.from({length:55},()=>({
-  x:Math.random()*1920, y:Math.random()*1080,
-  vx:(Math.random()-.5)*.28, vy:(Math.random()-.5)*.28,
-  r:Math.random()*1.4+.4,
-  a:Math.random()*.2+.04
-}));
-
+window.addEventListener('resize',resizeCanvases);
+const dots=Array.from({length:55},()=>({x:Math.random()*1920,y:Math.random()*1080,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.4+.4,a:Math.random()*.2+.04}));
 function drawBg(){
   ctxBg.clearRect(0,0,W,H);
-  dots.forEach(d=>{
-    d.x+=d.vx; d.y+=d.vy;
-    if(d.x<0)d.x=W; if(d.x>W)d.x=0;
-    if(d.y<0)d.y=H; if(d.y>H)d.y=0;
-    ctxBg.beginPath();
-    ctxBg.arc(d.x,d.y,d.r,0,Math.PI*2);
-    ctxBg.fillStyle=`rgba(27,255,140,${d.a})`;
-    ctxBg.fill();
-  });
+  dots.forEach(d=>{d.x+=d.vx;d.y+=d.vy;if(d.x<0)d.x=W;if(d.x>W)d.x=0;if(d.y<0)d.y=H;if(d.y>H)d.y=0;ctxBg.beginPath();ctxBg.arc(d.x,d.y,d.r,0,Math.PI*2);ctxBg.fillStyle=`rgba(27,255,140,${d.a})`;ctxBg.fill();});
   requestAnimationFrame(drawBg);
 }
 drawBg();
 
-/* ════════════════════════════════════════════
-   FX: CONFETTI + RIPPLE + POINTS
-════════════════════════════════════════════ */
-let fxPieces = [];
-let fxRunning = false;
-
+/* FX */
+let fxPieces=[],fxRunning=false;
 function fxLoop(){
   ctxFx.clearRect(0,0,W,H);
-  fxPieces = fxPieces.filter(p=>p.life>0);
-  fxPieces.forEach(p=>{
-    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=p.decay;
-    if(p.life<=0) return;
-    ctxFx.save();
-    ctxFx.globalAlpha=Math.max(0,p.life);
-    ctxFx.beginPath(); ctxFx.arc(p.x,p.y,p.r,0,Math.PI*2);
-    ctxFx.fillStyle=p.color; ctxFx.fill();
-    ctxFx.restore();
-  });
-  if(fxPieces.length>0) requestAnimationFrame(fxLoop);
-  else fxRunning=false;
+  fxPieces=fxPieces.filter(p=>p.life>0);
+  fxPieces.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.life-=p.decay;if(p.life<=0)return;ctxFx.save();ctxFx.globalAlpha=Math.max(0,p.life);ctxFx.beginPath();ctxFx.arc(p.x,p.y,p.r,0,Math.PI*2);ctxFx.fillStyle=p.color;ctxFx.fill();ctxFx.restore();});
+  if(fxPieces.length>0)requestAnimationFrame(fxLoop);else fxRunning=false;
 }
-function fxStart(){
-  if(!fxRunning){ fxRunning=true; fxLoop(); }
-}
-
+function fxStart(){if(!fxRunning){fxRunning=true;fxLoop();}}
 function spawnConfetti(cx,cy){
-  cx=cx||W/2; cy=cy||(H*0.45);
-  for(let i=0;i<70;i++){
-    fxPieces.push({
-      x:cx+(Math.random()-.5)*160, y:cy,
-      vx:(Math.random()-.5)*7, vy:-Math.random()*9-1,
-      g:.18, r:Math.random()*4+2,
-      color:Math.random()>.45?'rgba(27,255,140,.9)':'rgba(220,255,235,.7)',
-      life:1, decay:.013
-    });
-  }
+  cx=cx||W/2;cy=cy||(H*.45);
+  for(let i=0;i<70;i++)fxPieces.push({x:cx+(Math.random()-.5)*160,y:cy,vx:(Math.random()-.5)*7,vy:-Math.random()*9-1,g:.18,r:Math.random()*4+2,color:Math.random()>.45?'rgba(27,255,140,.9)':'rgba(220,255,235,.7)',life:1,decay:.013});
   fxStart();
 }
-
 function spawnRipple(x,y){
-  for(let i=0;i<3;i++){
-    const el=document.createElement('div');
-    el.className='ripring';
-    el.style.left=(x-20)+'px'; el.style.top=(y-20)+'px';
-    document.body.appendChild(el);
-    gsap.set(el,{opacity:.7});
-    gsap.to(el,{
-      width:80+i*28, height:80+i*28,
-      left:(x-40-i*14)+'px', top:(y-40-i*14)+'px',
-      opacity:0, duration:.75, delay:i*.1,
-      ease:'power2.out', onComplete:()=>el.remove()
-    });
-  }
+  for(let i=0;i<3;i++){const el=document.createElement('div');el.className='ripring';el.style.left=(x-20)+'px';el.style.top=(y-20)+'px';document.body.appendChild(el);gsap.set(el,{opacity:.7});gsap.to(el,{width:80+i*28,height:80+i*28,left:(x-40-i*14)+'px',top:(y-40-i*14)+'px',opacity:0,duration:.75,delay:i*.1,ease:'power2.out',onComplete:()=>el.remove()});}
 }
-
 function spawnPoints(x,y,txt){
-  const el=document.createElement('div');
-  el.className='ptsbdg'; el.textContent=txt;
-  el.style.left=x+'px'; el.style.top=y+'px';
-  document.body.appendChild(el);
-  gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',
-    onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})
-  });
+  const el=document.createElement('div');el.className='ptsbdg';el.textContent=txt;el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);
+  gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})});
 }
 
-/* ════════════════════════════════════════════
-   RADAR CHART
-════════════════════════════════════════════ */
+/* RADAR */
 function drawRadar(){
-  const svg = document.getElementById('radarsvg');
-  const cats=[
-    {l:'Hastighet',v:.87},{l:'Möte',v:.72},
-    {l:'Miljö',v:.90},{l:'Mörker',v:.55},
-    {l:'Väglag',v:.52},{l:'Trafikregler',v:.80}
-  ];
-  const cx=100,cy=100,r=68,n=cats.length;
-  let h='';
-  [.25,.5,.75,1].forEach(f=>{
-    const pts=cats.map((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*f,cy+Math.sin(a)*r*f];});
-    h+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="none" stroke="rgba(27,255,140,.12)" stroke-width="1"/>`;
-  });
+  const svg=document.getElementById('radarsvg');
+  const cats=[{l:'Hastighet',v:.87},{l:'Möte',v:.72},{l:'Miljö',v:.90},{l:'Mörker',v:.55},{l:'Väglag',v:.52},{l:'Trafikregler',v:.80}];
+  const cx=100,cy=100,r=68,n=cats.length;let h='';
+  [.25,.5,.75,1].forEach(f=>{const pts=cats.map((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*f,cy+Math.sin(a)*r*f];});h+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="none" stroke="rgba(27,255,140,.12)" stroke-width="1"/>`;});
   cats.forEach((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;h+=`<line x1="${cx}" y1="${cy}" x2="${(cx+Math.cos(a)*r).toFixed(1)}" y2="${(cy+Math.sin(a)*r).toFixed(1)}" stroke="rgba(27,255,140,.14)" stroke-width="1"/>`;});
   const dp=cats.map((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*c.v,cy+Math.sin(a)*r*c.v];});
   h+=`<path d="${dp.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="rgba(27,255,140,.14)" stroke="#1bff8c" stroke-width="2"/>`;
-  cats.forEach((c,i)=>{
-    const a=i/n*Math.PI*2-Math.PI/2;
-    const lx=cx+Math.cos(a)*(r+16),ly=cy+Math.sin(a)*(r+16);
-    const col=c.v<.6?'#ff6b6b':'rgba(168,196,180,.8)';
-    h+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${col}">${c.l}</text>`;
-  });
+  cats.forEach((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;const lx=cx+Math.cos(a)*(r+16),ly=cy+Math.sin(a)*(r+16);const col=c.v<.6?'#ff6b6b':'rgba(168,196,180,.8)';h+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${col}">${c.l}</text>`;});
   svg.innerHTML=h;
 }
 
-/* ════════════════════════════════════════════
-   CATEGORY GRID DATA
-════════════════════════════════════════════ */
+/* CATEGORY DATA */
 const CATS=[
   {e:'⚡',n:'Hastighet',p:87,done:true},
   {e:'↔',n:'Möte & Omkörning',p:72,done:true},
   {e:'🌿',n:'Miljö & Ekonomi',p:90,done:true},
   {e:'🚫',n:'Alkohol & Droger',p:95,done:true},
   {e:'🌙',n:'Mörker & Sikt',p:68,done:true},
-  {e:'⚠️',n:'Väglag & Bromssträcka',p:52,done:true,weak:true},
+  {e:'⚠️',n:'Väglag & Broms',p:52,done:true,weak:true},
   {e:'🚦',n:'Trafikregler',p:80,done:true},
   {e:'🛑',n:'Vägmärken',p:75,done:true},
-  {e:'🚗',n:'Fordon & Utrustning',p:83,done:true},
+  {e:'🚗',n:'Fordon & Utr.',p:83,done:true},
   {e:'🔄',n:'Korsningar',p:77,done:true},
   {e:'👁️',n:'Riskuppfattning',p:65,done:true},
-  {e:'🏥',n:'Olyckor & Säkerhet',p:71,done:true},
+  {e:'🏥',n:'Olyckor & Säk.',p:71,done:true},
   {e:'🚧',n:'Vägarbete',p:88,done:true},
   {e:'🎯',n:'Koncentration',p:60,done:true},
   {e:'🌍',n:'Internationellt',p:0,done:false},
   {e:'🔧',n:'Motorkunskap',p:0,done:false},
 ];
-
 function buildCatGrid(){
   document.getElementById('catgrid').innerHTML=CATS.map((c,i)=>`
-    <div class="catc${c.weak?' wk':''}${!c.done?' nd':''}" id="cc${i}">
-      <div class="catemi">${c.e}</div>
-      <div class="catnm">${c.n}</div>
-      <div class="catbr"><div class="catbf" id="cbf${i}"></div></div>
-      <div class="catpct">${c.done?c.p+'%':'–'}</div>
+    <div class="catCard${c.weak?' weak':''}${!c.done?' nd':''}" id="cc${i}">
+      <div class="catEmi">${c.e}</div>
+      <div class="catName">${c.n}</div>
+      <div class="catCount">${c.done?c.p+'%':'–'}</div>
+      <div class="catProg"><div class="catProgFill" id="cbf${i}" style="width:0%"></div></div>
+      ${c.done?'<div class="catDone">✓</div>':''}
     </div>`).join('');
 }
 
-/* ════════════════════════════════════════════
-   NARRATOR
-════════════════════════════════════════════ */
+/* NARRATOR */
 const NData={
   1:[
     {s:'Material',t:'Per klistrar in Matte 2b — vilket ämne som helst'},
@@ -693,48 +626,31 @@ const NData={
     {s:'Priser',t:'Gratis att starta, Basic 29 kr/mån, Premium 79 kr/mån obegränsat'},
   ]
 };
-function setNarrator(mode,activeIdx){
+function setNarrator(mode,idx){
   document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>
-    `<div class="nst" style="opacity:${i===activeIdx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`
-  ).join('');
+    `<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('');
 }
 
-/* ════════════════════════════════════════════
-   PROGRESS DOTS
-════════════════════════════════════════════ */
+/* PROGRESS DOTS */
 const STEP_N={1:4,2:5};
 function buildDots(mode){
-  document.getElementById('pdots').innerHTML=
-    Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('');
+  document.getElementById('pdots').innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('');
 }
 function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'');}
 
-/* ════════════════════════════════════════════
-   COUNTDOWN BAR
-════════════════════════════════════════════ */
+/* COUNTDOWN */
 let cdTween=null;
-function startCountdown(dur){
-  if(cdTween)cdTween.kill();
-  gsap.set('#cfill',{width:'0%'});
-  cdTween=gsap.to('#cfill',{width:'100%',duration:dur,ease:'none'});
-}
+function startCountdown(dur){if(cdTween)cdTween.kill();gsap.set('#cfill',{width:'0%'});cdTween=gsap.to('#cfill',{width:'100%',duration:dur,ease:'none'});}
 
-/* ════════════════════════════════════════════
-   STREAK
-════════════════════════════════════════════ */
+/* STREAK */
 let strkCnt=0;
 function showStreak(n){
-  strkCnt=n;
-  const el=document.getElementById('streak');
-  el.textContent='🔥 '+n;
-  gsap.killTweensOf(el);
-  gsap.fromTo(el,{opacity:0,scale:.65},{opacity:1,scale:1,duration:.35,ease:'back.out(2)'});
+  strkCnt=n;const el=document.getElementById('streak');el.textContent='🔥 '+n;
+  gsap.killTweensOf(el);gsap.fromTo(el,{opacity:0,scale:.65},{opacity:1,scale:1,duration:.35,ease:'back.out(2)'});
   gsap.to(el,{opacity:0,duration:.4,delay:1.8});
 }
 
-/* ════════════════════════════════════════════
-   TYPEWRITER
-════════════════════════════════════════════ */
+/* TYPEWRITER */
 const MAT_TEXT=`Andragradsekvationer är ekvationer av formen ax² + bx + c = 0 där a ≠ 0.
 
 Lösningar ges av ABC-formeln:
@@ -751,75 +667,56 @@ x = (5 ± 1)/2 → x = 3 eller x = 2`;
 
 let twInterval=null;
 function startTypewriter(){
-  const el=document.getElementById('m1mat');
-  const cnt=document.getElementById('m1cnt');
-  el.textContent=''; let i=0;
-  clearInterval(twInterval);
-  twInterval=setInterval(()=>{
-    if(i>=MAT_TEXT.length){clearInterval(twInterval);return;}
-    el.textContent+=MAT_TEXT[i++];
-    cnt.textContent=i+' tecken';
-  },16);
+  const el=document.getElementById('m1mat'),cnt=document.getElementById('m1cnt');
+  el.textContent='';let i=0;clearInterval(twInterval);
+  twInterval=setInterval(()=>{if(i>=MAT_TEXT.length){clearInterval(twInterval);return;}el.textContent+=MAT_TEXT[i++];cnt.textContent=i+' tecken';},16);
 }
 function stopTypewriter(){clearInterval(twInterval);}
 
-/* ════════════════════════════════════════════
-   SCORE COUNTER
-════════════════════════════════════════════ */
+/* SCORE */
 function animScore(){
   let v=0;const el=document.getElementById('scorenum');
   scoreCountTimer=setInterval(()=>{v=Math.min(v+2,83);el.textContent=v+'%';if(v>=83)clearInterval(scoreCountTimer);},17);
   scoreFillTimer=setTimeout(()=>{document.getElementById('sfill').style.width='83%';},80);
 }
 
-/* ════════════════════════════════════════════
-   SIM EXAM TICK
-════════════════════════════════════════════ */
+/* SIM EXAM */
 let simTick=null;
 let aiCountTimer=null,aiGoTimer=null,q3TwTimer=null,scoreCountTimer=null,scoreFillTimer=null;
 let catTimers=[];
 
 function clearAllTimers(){
-  clearInterval(aiCountTimer); clearTimeout(aiGoTimer);
-  clearInterval(q3TwTimer);
-  clearInterval(scoreCountTimer); clearTimeout(scoreFillTimer);
-  catTimers.forEach(clearTimeout); catTimers=[];
+  clearInterval(aiCountTimer);clearTimeout(aiGoTimer);
+  clearInterval(q3TwTimer);clearInterval(scoreCountTimer);clearTimeout(scoreFillTimer);
+  catTimers.forEach(clearTimeout);catTimers=[];
   aiCountTimer=aiGoTimer=q3TwTimer=scoreCountTimer=scoreFillTimer=null;
 }
 
 function startSimTick(){
   let sec=49*60+12,q=23,right=38;
-  const tEl=document.getElementById('simtimer');
-  const qEl=document.getElementById('simqcnt');
-  const rEl=document.getElementById('simr');
-  const pEl=document.getElementById('simpf');
+  const tEl=document.getElementById('simtimer'),qEl=document.getElementById('simqcnt');
+  const rEl=document.getElementById('simr'),pEl=document.getElementById('simpf');
   clearInterval(simTick);
   simTick=setInterval(()=>{
-    sec-=3; q=Math.min(q+1,65);
-    if(Math.random()>.3&&right<53)right++;
+    sec-=3;q=Math.min(q+1,65);if(Math.random()>.3&&right<53)right++;
     const mm=Math.floor(sec/60),ss=sec%60;
     tEl.textContent=mm+':'+(ss<10?'0':'')+ss;
-    qEl.textContent='Fråga '+q+' av 65';
-    rEl.textContent=right;
-    pEl.style.width=(q/65*100)+'%';
+    qEl.textContent='Fråga '+q+' av 65';rEl.textContent=right;pEl.style.width=(q/65*100)+'%';
     if(q>=65||sec<=0)clearInterval(simTick);
   },280);
 }
 function stopSimTick(){clearInterval(simTick);}
 
-/* ════════════════════════════════════════════
-   SHOW/HIDE HELPERS
-════════════════════════════════════════════ */
+/* SHOW/HIDE */
 const M1SEC=['m1intro','m1matw','m1aiw','m1qw','m1res'];
 const M2SEC=['m2intro','m2catw','m2signw','m2simw','m2statsw','m2pricew'];
-
 function hideAll(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
 function show(id){const e=document.getElementById(id);if(e)e.style.display='';}
 
 function resetQ(){
   clearAllTimers();
   ['q1a','q1b','q1c','q1d','q2a','q2b','q2c','q2d','q4a','q4b','q4c','q4d','sa','sb','sc','sd'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.className='aopt';
+    const el=document.getElementById(id);if(el)el.className='ansBtn';
   });
   document.getElementById('q1').style.display='';
   document.getElementById('q2').style.display='none';
@@ -832,28 +729,30 @@ function resetQ(){
   gsap.set(['#q1','#q2','#q3','#q4'],{opacity:0,y:10});
 }
 
-/* ════════════════════════════════════════════
-   TIMELINE 1 — MOCKPROV (60 s)
-════════════════════════════════════════════ */
+/* TABS */
+function updateTabs(n){
+  document.getElementById('tab1').className='mTab'+(n===1?' on':'');
+  document.getElementById('tab2').className='mTab'+(n===2?' on':'');
+}
+
+/* TIMELINE 1 — MOCKPROV (60s) → auto-advance to mode 2 */
 let tl1=null,tl2=null,curMode=1,paused=false;
 
 function buildTL1(){
   if(tl1){tl1.kill();tl1=null;}
-  stopTypewriter(); strkCnt=0;
-  hideAll(M1SEC);
-  resetQ();
+  stopTypewriter();strkCnt=0;
+  hideAll(M1SEC);resetQ();
   document.getElementById('scorenum').textContent='0%';
   document.getElementById('sfill').style.width='0%';
   document.getElementById('xpfill').style.width='0%';
   gsap.set(['#rankp','#lvlbdg'],{opacity:0});
-  gsap.set('#aistatus',{});
   document.getElementById('aistatus').textContent='Analyserar material...';
   document.getElementById('aibig').textContent='0';
   document.getElementById('aisub').textContent='ord analyserade';
   document.getElementById('m1mat').textContent='';
   buildDots(1);
 
-  tl1=gsap.timeline({onComplete:()=>{if(curMode===1)buildTL1();}});
+  tl1=gsap.timeline({onComplete:()=>{ switchMode(2); }});
 
   /* 0–5s INTRO */
   tl1
@@ -866,7 +765,7 @@ function buildTL1(){
 
   /* 5–16s MATERIAL */
   tl1
-    .call(()=>{hideAll(M1SEC);show('m1matw');setDot(0,'dn');setDot(1,'on');setNarrator(1,0);startTypewriter();},[], 5)
+    .call(()=>{hideAll(M1SEC);show('m1matw');setDot(0,'dn');setDot(1,'on');setNarrator(1,0);startTypewriter();},[],5)
     .from('#m1cpill',{opacity:0,duration:.5})
     .from('#m1crd',{opacity:0,y:10,duration:.6})
 
@@ -891,11 +790,7 @@ function buildTL1(){
         document.getElementById('aistatus').textContent=s;
         document.getElementById('aisub').textContent=sub;
         let v=0;const target=parseInt(n);
-        aiCountTimer=setInterval(()=>{
-          v=Math.min(v+Math.max(1,Math.ceil(target/22)),target);
-          document.getElementById('aibig').textContent=v;
-          if(v>=target){clearInterval(aiCountTimer);aiGoTimer=setTimeout(go,550);}
-        },38);
+        aiCountTimer=setInterval(()=>{v=Math.min(v+Math.max(1,Math.ceil(target/22)),target);document.getElementById('aibig').textContent=v;if(v>=target){clearInterval(aiCountTimer);aiGoTimer=setTimeout(go,550);}},38);
       };
       go();
     },[],17)
@@ -910,64 +805,50 @@ function buildTL1(){
       document.getElementById('q4').style.display='none';
     },[],27)
     .to('#q1',{opacity:1,y:0,duration:.5},27.4)
-
-    /* Q1 — rätt */
-    .call(()=>{ document.getElementById('q1a').className='aopt sel'; },[],29.2)
+    .call(()=>{ document.getElementById('q1a').className='ansBtn sel'; },[],29.2)
     .call(()=>{
-      document.getElementById('q1a').className='aopt ok';
+      document.getElementById('q1a').className='ansBtn ok';
       const r=document.getElementById('q1').getBoundingClientRect();
       spawnRipple(r.left+r.width/2,r.top+r.height/2);
       spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
       showStreak(1);
     },[],29.65)
-
-    /* Q2 appear — rätt */
     .call(()=>{
       document.getElementById('q1').style.display='none';
       document.getElementById('q2').style.display='';
       gsap.to('#q2',{opacity:1,y:0,duration:.4,ease:'power3.out'});
     },[],30.45)
-    .call(()=>{ document.getElementById('q2b').className='aopt sel'; },[],32.2)
+    .call(()=>{ document.getElementById('q2b').className='ansBtn sel'; },[],32.2)
     .call(()=>{
-      document.getElementById('q2b').className='aopt ok';
+      document.getElementById('q2b').className='ansBtn ok';
       const r=document.getElementById('q2').getBoundingClientRect();
       spawnRipple(r.left+r.width/2,r.top+r.height/2);
       spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
       showStreak(2);
     },[],32.62)
-
-    /* Q3 appear — FEL */
     .call(()=>{
       document.getElementById('q2').style.display='none';
       document.getElementById('q3').style.display='';
       gsap.to('#q3',{opacity:1,y:0,duration:.45});
       document.getElementById('q3f').className='wfield active';
-      const wrong='x = 4 eller x = −8'; let ti=0;
-      q3TwTimer=setInterval(()=>{
-        if(ti>=wrong.length){clearInterval(q3TwTimer);return;}
-        document.getElementById('q3f').textContent=wrong.slice(0,++ti);
-      },55);
+      const wrong='x = 4 eller x = −8';let ti=0;
+      q3TwTimer=setInterval(()=>{if(ti>=wrong.length){clearInterval(q3TwTimer);return;}document.getElementById('q3f').textContent=wrong.slice(0,++ti);},55);
     },[],35.5)
     .call(()=>{
       document.getElementById('q3f').className='wfield bad';
-      gsap.to('#q3',{keyframes:[
-        {x:-7,duration:.07},{x:7,duration:.07},{x:-5,duration:.07},
-        {x:5,duration:.07},{x:0,duration:.07}
-      ]});
+      gsap.to('#q3',{keyframes:[{x:-7,duration:.07},{x:7,duration:.07},{x:-5,duration:.07},{x:5,duration:.07},{x:0,duration:.07}]});
       document.getElementById('q3fb').style.display='';
       gsap.to('#q3fb',{opacity:1,y:0,duration:.6});
       strkCnt=0;
     },[],38.5)
-
-    /* Q4 appear — rätt */
     .call(()=>{
       document.getElementById('q3').style.display='none';
       document.getElementById('q4').style.display='';
       gsap.to('#q4',{opacity:1,y:0,duration:.45});
     },[],43)
-    .call(()=>{ document.getElementById('q4a').className='aopt sel'; },[],44.8)
+    .call(()=>{ document.getElementById('q4a').className='ansBtn sel'; },[],44.8)
     .call(()=>{
-      document.getElementById('q4a').className='aopt ok';
+      document.getElementById('q4a').className='ansBtn ok';
       const r=document.getElementById('q4').getBoundingClientRect();
       spawnRipple(r.left+r.width/2,r.top+r.height/2);
       spawnPoints(r.left+r.width/2-30,r.top+50,'+15p Exakt!');
@@ -989,23 +870,16 @@ function buildTL1(){
     .to('#lvlbdg',{opacity:1,duration:.5},55)
 
   /* 58–60s fade */
-  tl1
-    .to('#mode1',{opacity:0,duration:1.4},58.2)
-    .set('#mode1',{opacity:1},60)
-  ;
-
+  tl1.to('#mode1',{opacity:0,duration:1.4},58.2).set('#mode1',{opacity:1},60);
   return tl1;
 }
 
-/* ════════════════════════════════════════════
-   TIMELINE 2 — KÖRKORTSTEORIN (60 s)
-════════════════════════════════════════════ */
+/* TIMELINE 2 — KÖRKORTSTEORIN (60s) → auto-advance to mode 1 */
 function buildTL2(){
   if(tl2){tl2.kill();tl2=null;}
-  stopSimTick(); clearAllTimers();
+  stopSimTick();clearAllTimers();
   hideAll(M2SEC);
   document.getElementById('pc2').className='pc';
-  gsap.set(['#m2pill','#m2title','#m2sub'],{clearProps:'all'});
   gsap.set('#sigcard',{opacity:0});
   gsap.set('#signsvg',{scale:.4,opacity:0});
   gsap.set('#catprog',{opacity:0});
@@ -1016,16 +890,14 @@ function buildTL2(){
   gsap.set('#m2pricew',{opacity:0});
   gsap.set('.pc',{opacity:0,y:12});
   gsap.set('#pupgr',{opacity:0});
-  ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='aopt';});
+  ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn';});
   document.getElementById('simtimer').textContent='49:12';
   document.getElementById('simqcnt').textContent='Fråga 23 av 65';
   document.getElementById('simr').textContent='38';
   document.getElementById('simpf').style.width='35%';
-  document.getElementById('simres').style.opacity='0';
-  gsap.set('#simres',{scale:.92});
-  buildCatGrid(); drawRadar(); buildDots(2);
+  buildCatGrid();drawRadar();buildDots(2);
 
-  tl2=gsap.timeline({onComplete:()=>{if(curMode===2)buildTL2();}});
+  tl2=gsap.timeline({onComplete:()=>{ switchMode(1); }});
 
   /* 0–5s INTRO */
   tl2
@@ -1038,16 +910,11 @@ function buildTL2(){
   tl2
     .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0);},[],5)
     .call(()=>{
-      catTimers.forEach(clearTimeout); catTimers=[];
+      catTimers.forEach(clearTimeout);catTimers=[];
       CATS.forEach((c,i)=>{
-        gsap.to('#cc'+i,{opacity:c.done?1:.4,y:0,duration:.4,delay:i*.065,ease:'power2.out'});
-        if(c.done){
-          catTimers.push(setTimeout(()=>{
-            const f=document.getElementById('cbf'+i);
-            if(f)f.style.width=c.p+'%';
-          },600+i*65));
-        }
-        if(i===0) catTimers.push(setTimeout(()=>{ document.getElementById('cc0').classList.add('hl'); },900));
+        gsap.to('#cc'+i,{opacity:c.done?1:.35,y:0,duration:.4,delay:i*.065,ease:'power2.out'});
+        if(c.done){catTimers.push(setTimeout(()=>{const f=document.getElementById('cbf'+i);if(f)f.style.width=c.p+'%';},600+i*65));}
+        if(i===0)catTimers.push(setTimeout(()=>{document.getElementById('cc0').classList.add('active');},900));
       });
     },[],5.5)
 
@@ -1059,13 +926,13 @@ function buildTL2(){
       gsap.set('#sigcard',{opacity:0,y:10});
       gsap.set('#signsvg',{scale:.4,opacity:0});
       gsap.set('#catprog',{opacity:0});
-      ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='aopt';});
+      ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn';});
     },[],14)
     .to('#sigcard',{opacity:1,y:0,duration:.6},14.2)
     .to('#signsvg',{scale:1,opacity:1,duration:1,ease:'back.out(1.4)'},14.6)
-    .call(()=>{ document.getElementById('sb').className='aopt sel'; },[],18)
+    .call(()=>{ document.getElementById('sb').className='ansBtn sel'; },[],18)
     .call(()=>{
-      document.getElementById('sb').className='aopt ok';
+      document.getElementById('sb').className='ansBtn ok';
       const rect=document.getElementById('signsvg').getBoundingClientRect();
       spawnRipple(rect.left+rect.width/2,rect.top+rect.height/2);
       gsap.to('#signsvg',{filter:'drop-shadow(0 0 22px rgba(27,255,140,.55))',duration:.5});
@@ -1122,55 +989,45 @@ function buildTL2(){
     },[],54.8)
 
   /* 58–60s fade */
-  tl2
-    .to('#mode2',{opacity:0,duration:1.4},58.2)
-    .set('#mode2',{opacity:1},60)
-  ;
-
+  tl2.to('#mode2',{opacity:0,duration:1.4},58.2).set('#mode2',{opacity:1},60);
   return tl2;
 }
 
-/* ════════════════════════════════════════════
-   MODE SWITCH
-════════════════════════════════════════════ */
+/* MODE SWITCH */
 function switchMode(n){
-  if(n===curMode) return;
+  if(n===curMode)return;
   const from=document.getElementById('mode'+curMode);
   const to=document.getElementById('mode'+n);
-  if(n===1&&tl2){tl2.kill();tl2=null;}
-  if(n===2&&tl1){tl1.kill();tl1=null;}
-  stopTypewriter(); stopSimTick(); strkCnt=0;
-  clearAllTimers();
+  if(tl1){tl1.kill();tl1=null;}
+  if(tl2){tl2.kill();tl2=null;}
+  stopTypewriter();stopSimTick();strkCnt=0;clearAllTimers();
   gsap.killTweensOf('#signsvg,#simres,#pupgr,#wkalert,#xpfill,#m2statsw,#m2simw');
-  gsap.to(from,{opacity:0,duration:.35,onComplete:()=>{
+  updateTabs(n);
+  gsap.to(from,{opacity:0,duration:.4,onComplete:()=>{
     from.classList.remove('act');
     to.classList.add('act');
     gsap.set(to,{opacity:0});
     curMode=n;
-    document.getElementById('mlbl').textContent=n===1?'MOCKPROV AI':'KÖRKORTSTEORIN';
-    gsap.to(to,{opacity:1,duration:.4,onComplete:()=>{ if(n===1)buildTL1(); else buildTL2(); }});
+    gsap.to(to,{opacity:1,duration:.4,onComplete:()=>{ if(n===1)buildTL1();else buildTL2(); }});
   }});
 }
 
-/* ════════════════════════════════════════════
-   KEYBOARD
-════════════════════════════════════════════ */
+/* KEYBOARD */
 document.addEventListener('keydown',e=>{
-  if(e.key==='1') switchMode(1);
-  if(e.key==='2') switchMode(2);
-  if(e.key.toLowerCase()==='n') document.getElementById('narrator').classList.toggle('open');
+  if(e.key==='1')switchMode(1);
+  if(e.key==='2')switchMode(2);
+  if(e.key.toLowerCase()==='n')document.getElementById('narrator').classList.toggle('open');
   if(e.key==='Escape'){
     paused=!paused;
-    if(paused){ if(tl1)tl1.pause(); if(tl2)tl2.pause(); if(cdTween)cdTween.pause(); }
-    else       { if(tl1)tl1.resume(); if(tl2)tl2.resume(); if(cdTween)cdTween.resume(); }
+    if(paused){if(tl1)tl1.pause();if(tl2)tl2.pause();if(cdTween)cdTween.pause();}
+    else{if(tl1)tl1.resume();if(tl2)tl2.resume();if(cdTween)cdTween.resume();}
   }
 });
 
-/* ════════════════════════════════════════════
-   INIT
-════════════════════════════════════════════ */
+/* INIT */
 window.addEventListener('load',()=>{
   document.getElementById('mode2').classList.remove('act');
+  updateTabs(1);
   buildTL1();
 });
 </script>
