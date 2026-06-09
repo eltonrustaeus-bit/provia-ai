@@ -296,7 +296,7 @@ module.exports = async function handler(req, res) {
   const level = asEnum(parsed.level, ["E", "C", "A"], "C");
   const qType = asEnum(parsed.qType, ["mix", "mc", "short"], "mix");
   const course = safeString(parsed.course, 200);
-  const pastedText = safeString(parsed.pastedText, 40000);
+  const pastedText = safeString(parsed.pastedText, 3000);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 12);
   const numQuestions = Math.min(20, Math.max(3, numQuestionsRaw));

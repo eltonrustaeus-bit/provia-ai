@@ -31,12 +31,13 @@ Vercel serverless exam platform for Swedish students. No framework, no build ste
 - State bug + fix. Stop. No suggestions beyond scope.
 - No guessing about bugs — read the code first.
 
-## körkortsteorin — driving_questions table (2026-05-29)
-- 416 questions, 16 categories (all normalized — no more "och" vs "&" variants)
-- Categories: Vägmärken(81), Säkerhet&Utrustning(41), Alkohol&Droger(41), Miljö&Ekonomi(39),
-  Väglag&Bromssträcka(37), Mörker&Sikt(35), Trafikregler(33), Korsningar(24),
-  Möte&Omkörning(19), Trafikmiljö&Planering(15), Hastighet(15), Nödsituationer(9),
-  Vägtunnlar(8), Fordon&Besiktning(7), Bogsering&Lastsäkring(7), Körning med Släp(5)
+## körkortsteorin — driving_questions table (2026-06-09)
+- 352 questions, 16 categories (all normalized)
+- Categories: Vägmärken(60), Trafikregler(44), Korsningar(28), Hastighet(36), Parkering(30),
+  Möte&Omkörning(19), Mörker&Sikt(15), Väglag&Bromssträcka(16), Vägtunnlar(12),
+  Bogsering&Lastsäkring(11), Fordon&Besiktning(8), Körning med Släp(12),
+  Nödsituationer(17), Alkohol&Droger(14), Säkerhet&Utrustning(17), Miljö&Ekonomi(13)
+- 89 with image_url (all Wikimedia — E8-50/E8-70/E10-30 fixed to C31 format 2026-06-09)
 - Fields: id, category, question, option_a-d, correct, explanation, difficulty, image_url, image_description
 - TEORI_DIST: category weights for 65-question teoriprov (matches Trafikverket distribution)
 - Adaptive learning: wrong-answer questions boosted up to 40% of exam pool
