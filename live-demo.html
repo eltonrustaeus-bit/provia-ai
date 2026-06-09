@@ -3,1788 +3,1175 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ProviaAI — Live Demo</title>
-  <link rel="icon" href="/image/favicon-32.png" sizes="32x32" type="image/png" />
-  <link rel="icon" href="/image/favicon-64.png" sizes="64x64" type="image/png" />
-  <link rel="icon" href="/image/favicon-512.png" sizes="512x512" type="image/png" />
-  <link rel="apple-touch-icon" href="/image/favicon-180.png" />
+  <title>ProviaAi — Investor Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <style>
-    /* ── CHAPTER NAV ── */
-    .dNav{position:sticky;top:0;z-index:200;background:rgba(8,16,13,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--l);padding:10px 0}
-    .dNavI{max-width:var(--max);margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .chap{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;border:1px solid var(--l);background:transparent;color:var(--t2);font:500 12px var(--font);cursor:pointer;transition:all .2s}
-    .chap:hover{border-color:var(--l2);color:var(--t)}
-    .chap.on{background:var(--a-dim);border-color:var(--a);color:var(--a)}
-    .chapN{font:500 11px var(--mono);opacity:.65}
-    .dCtrl{margin-left:auto;display:flex;align-items:center;gap:8px}
-    .stepBadge{font:600 11px var(--mono);color:var(--t3);padding:3px 8px;border:1px solid var(--l);border-radius:10px}
-    .stepBadge.on{color:var(--a);border-color:var(--a)}
-
-    /* ── ACTS ── */
-    .act{padding:72px 0 56px;border-bottom:1px solid var(--l);scroll-margin-top:54px}
-    .act:last-of-type{border-bottom:none}
-    .aI{max-width:var(--max);margin:0 auto;padding:0 20px}
-    .aTag{display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:20px;border:1px solid var(--l2);background:var(--a-dim);color:var(--a);font:600 11px var(--mono);letter-spacing:.06em;margin-bottom:22px}
-    .aTitle{font:700 26px/1.2 var(--font);color:var(--t);margin-bottom:8px}
-    .aSub{font:400 15px/1.55 var(--font);color:var(--t2);margin-bottom:28px;max-width:600px}
-
-    /* ── SCROLL REVEAL ── */
-    .reveal{opacity:0;transform:translateY(18px);transition:opacity .65s cubic-bezier(.4,0,.2,1),transform .65s cubic-bezier(.4,0,.2,1)}
-    .reveal.revealed{opacity:1;transform:translateY(0)}
-    .reveal.d1{transition-delay:.1s}.reveal.d2{transition-delay:.2s}.reveal.d3{transition-delay:.3s}
-
-    /* ── HERO ── */
-    .dHero{padding:72px 0 48px;text-align:center}
-    .dHI{max-width:580px;margin:0 auto;padding:0 20px}
-    .dEye{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;border:1px solid var(--l2);background:var(--a-dim);font:600 11px var(--mono);color:var(--a);letter-spacing:.07em;margin-bottom:20px}
-    .dHT{font:700 40px/1.15 var(--font);color:var(--t);margin-bottom:14px}
-    .dHS{font:400 16px/1.6 var(--font);color:var(--t2);margin-bottom:28px}
-    .btnRow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-
-    /* ── WIZARD ── */
-    .wRail{display:flex;align-items:center;gap:0;margin-bottom:32px;overflow-x:auto;padding-bottom:2px}
-    .wSt{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:var(--r);border:1px solid transparent;color:var(--t3);font:500 13px var(--font);white-space:nowrap;transition:all .3s}
-    .wSt.on{border-color:var(--l2);background:var(--a-dim);color:var(--a)}
-    .wSt.dn{color:var(--t2)}
-    .wDot{width:20px;height:20px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font:500 10px var(--mono);flex-shrink:0;transition:all .3s}
-    .wSt.on .wDot{border-color:var(--a);background:var(--a);color:#000}
-    .wSt.dn .wDot{border-color:var(--a);background:var(--a);color:#000}
-    .wC{width:22px;height:2px;background:var(--l);flex-shrink:0;transition:background .5s}
-    .wC.dn{background:var(--a)}
-
-    /* ── MATERIAL ── */
-    .matArea{background:var(--s);border:2px solid var(--l);border-radius:var(--r);padding:16px;min-height:200px;font:400 13px/1.8 var(--mono);color:var(--t);white-space:pre-wrap;word-break:break-word;transition:border-color .3s}
-    .matArea::after{content:'|';color:var(--a);animation:blink 1s step-end infinite}
-    .matArea.dn::after{display:none}
-    @keyframes blink{50%{opacity:0}}
-    .matCnt{margin-top:6px;font:400 12px var(--mono);color:var(--t3);text-align:right}
-    .courseTag{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;background:var(--s);border:1px solid var(--l2);border-radius:var(--r);font:500 14px var(--font);color:var(--a);margin-bottom:14px}
-
-    /* ── SETTINGS ── */
-    .setGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
-    .sCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;transition:all .3s;cursor:pointer}
-    .sCard:hover{border-color:var(--l2)}
-    .sCard.flash{border-color:var(--a);background:var(--a-dim);transform:scale(1.02)}
-    .sLbl{font:500 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-    .sVal{font:600 20px var(--font);color:var(--t)}
-    .sCard.flash .sVal{color:var(--a)}
-
-    /* ── SKELETON ── */
-    .skelL{display:flex;flex-direction:column;gap:14px}
-    .skelC{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px}
-    .sLine{height:11px;border-radius:5px;background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);background-size:200% 100%;animation:shim 1.4s infinite;margin-bottom:9px}
-    .sLine.w80{width:80%}.sLine.w60{width:60%}.sLine.w40{width:40%}
-    @keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-    /* ── QUESTIONS ── */
-    .qList{display:flex;flex-direction:column;gap:14px}
-    .qCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:18px;opacity:0;transform:translateY(8px);transition:opacity .5s,transform .5s}
-    .qCard.vis{opacity:1;transform:translateY(0)}
-    .qN{font:600 11px var(--mono);color:var(--t3);margin-bottom:7px}
-    .qT{font:500 15px/1.5 var(--font);color:var(--t);margin-bottom:14px}
-    .qMath{font:400 14px var(--mono);background:var(--s2);padding:7px 11px;border-radius:var(--r2);color:var(--a);display:inline-block;margin-bottom:10px}
-    .aGrid{display:flex;flex-direction:column;gap:7px}
-    .aBtn{background:transparent;border:1px solid var(--l);border-radius:var(--r);padding:10px 14px;font:400 14px var(--font);color:var(--t2);text-align:left;transition:all .25s;width:100%;cursor:pointer}
-    .aBtn:hover{border-color:var(--l2);color:var(--t)}
-    .aBtn.sel{border-color:var(--a);background:var(--a-dim);color:var(--a)}
-    .aBtn.ok{border-color:#1bff8c;background:rgba(27,255,140,.09);color:#1bff8c}
-    .aBtn.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b}
-
-    /* ── WRITTEN ANSWER FIELD ── */
-    .aTextField{
-      min-height:80px;
-      border:1px solid var(--l);border-radius:var(--r);
-      padding:11px 14px;
-      font:500 13px/1.8 var(--mono);color:var(--t2);
-      background:var(--bg);
-      white-space:pre-line;
-      transition:border-color .2s,box-shadow .2s;
-      word-break:break-all;
+    :root {
+      --bg:  #08100d;
+      --a:   #1bff8c;
+      --ad:  rgba(27,255,140,.08);
+      --s:   #111a15;
+      --s2:  #162019;
+      --s3:  #1c2820;
+      --t:   #e8f5ee;
+      --t2:  #a8c4b4;
+      --t3:  #6b8f7c;
+      --l:   rgba(27,255,140,.10);
+      --l2:  rgba(27,255,140,.22);
+      --ok:  #1bff8c;
+      --err: #ff6b6b;
+      --r:   5px;
+      --f:   'DM Sans', sans-serif;
+      --m:   'DM Mono', monospace;
     }
-    .aTextField.active{border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
-    .aTextField.bad{border-color:#ff6b6b;background:rgba(255,107,107,.06);color:#ff6b6b}
-    .aFieldCursor{display:inline-block;width:2px;height:14px;background:var(--a);margin-left:2px;vertical-align:middle;animation:blink 1s step-end infinite}
-    .aTextField.bad .aFieldCursor{display:none}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: var(--bg); color: var(--t); font-family: var(--f); overflow: hidden; }
 
-    /* ── SHAKE ── */
-    @keyframes shake{
-      0%,100%{transform:translateX(0)}
-      15%{transform:translateX(-7px)}
-      30%{transform:translateX(7px)}
-      45%{transform:translateX(-5px)}
-      60%{transform:translateX(5px)}
-      75%{transform:translateX(-2px)}
+    /* ── CANVAS LAYERS ── */
+    #cvBg   { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    #cvFx   { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+
+    /* ── UI CHROME ── */
+    #modeInd {
+      position: fixed; top: 14px; right: 18px; z-index: 400;
+      display: flex; align-items: center; gap: 8px;
+      font: 600 11px var(--m); color: var(--a);
+      background: rgba(8,16,13,.88); backdrop-filter: blur(10px);
+      border: 1px solid var(--l2); border-radius: 20px; padding: 5px 13px;
     }
-    .shake{animation:shake .45s ease-out}
+    #modeInd .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--a); animation: dp 1.8s ease-in-out infinite; }
+    @keyframes dp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.25;transform:scale(1.5)} }
 
-    /* ── GRADING ── */
-    .gradOv{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:16px}
-    .gradSpin{width:44px;height:44px;border:3px solid var(--l);border-top-color:var(--a);border-radius:50%;animation:spin .75s linear infinite;margin:0 auto 14px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .gradLbl{font:500 14px var(--font);color:var(--t2)}
-    .gradSt{font:400 12px var(--mono);color:var(--t3);margin-top:7px}
+    #keyhints {
+      position: fixed; bottom: 14px; right: 18px; z-index: 400;
+      display: flex; gap: 6px;
+    }
+    .kh { font: 500 10px var(--m); color: var(--t3); border: 1px solid var(--l); border-radius: 4px; padding: 3px 8px; background: rgba(8,16,13,.7); }
+    .kh b { color: var(--a); }
 
-    /* ── SCORE ── */
-    .scoreBox{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:36px;text-align:center;margin-bottom:20px}
-    .scoreBig{font:700 64px/1 var(--font);color:var(--a);margin-bottom:4px;font-variant-numeric:tabular-nums;transition:color .3s}
-    .scoreLbl{font:400 14px var(--font);color:var(--t2);margin-bottom:20px}
-    .scoreBar{height:7px;background:var(--s2);border-radius:4px;max-width:280px;margin:0 auto 22px;overflow:hidden}
-    .scoreBarF{
-      height:100%;
-      background:linear-gradient(90deg,var(--a),rgba(27,255,140,.6));
-      border-radius:4px;width:0;
-      transition:width 1.4s cubic-bezier(.4,0,.2,1);
-      box-shadow:0 0 8px rgba(27,255,140,.5);
+    #narrator {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+      background: rgba(8,16,13,.96); backdrop-filter: blur(14px);
+      border-top: 1px solid var(--l2); padding: 14px 28px 18px;
+      transform: translateY(100%); transition: transform .35s cubic-bezier(.4,0,.2,1);
+    }
+    #narrator.open { transform: translateY(0); }
+    .nLbl { font: 600 10px var(--m); color: var(--a); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 9px; }
+    #nSteps { display: flex; gap: 22px; flex-wrap: wrap; }
+    .nst  { font: 400 12px/1.5 var(--f); color: var(--t2); }
+    .nst b { color: var(--t); font-weight: 600; }
+
+    #pdots {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 300; display: flex; gap: 8px; align-items: center;
+    }
+    .pd { width: 7px; height: 7px; border-radius: 50%; background: var(--l2); transition: all .3s; }
+    .pd.on { width: 22px; border-radius: 4px; background: var(--a); box-shadow: 0 0 8px rgba(27,255,140,.5); }
+    .pd.dn { background: rgba(27,255,140,.35); }
+
+    #cbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: var(--l); z-index: 500; }
+    #cfill { height: 100%; width: 0%; background: var(--a); box-shadow: 0 0 6px rgba(27,255,140,.6); }
+
+    #streak {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      z-index: 400; font: 700 14px var(--f); color: var(--t);
+      background: rgba(8,16,13,.9); border: 1px solid var(--l2);
+      border-radius: 20px; padding: 5px 14px; opacity: 0;
     }
 
-    /* ── FEEDBACK ── */
-    .feedGrid{display:flex;flex-direction:column;gap:11px}
-    .feedCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:15px;display:flex;gap:11px;opacity:0;transform:translateY(7px);transition:opacity .5s,transform .5s}
-    .feedCard.vis{opacity:1;transform:translateY(0)}
-    .feedIco{font-size:17px;flex-shrink:0;margin-top:1px}
-    .feedBody{flex:1;min-width:0}
-    .feedQ{font:500 13px/1.4 var(--font);color:var(--t2);margin-bottom:3px}
-    .feedMod{font:400 13px/1.5 var(--font);color:var(--t3)}
-    .feedMod strong{color:var(--a);font-weight:600}
-    .feedPts{font:600 12px var(--mono);margin-top:5px}
-    .feedPts.ok{color:var(--ok)}.feedPts.bad{color:var(--danger)}
-
-    /* ── AI SMART TIP (förbättringsförslag) ── */
-    .smartTipWrap{margin-top:18px;opacity:0;transform:translateY(10px);transition:opacity .6s,transform .6s}
-    .smartTipWrap.vis{opacity:1;transform:translateY(0)}
-    .smartTipCard{
-      background:linear-gradient(135deg,rgba(27,255,140,.06) 0%,var(--s) 70%);
-      border:1px solid var(--a);
-      border-radius:var(--r);
-      padding:20px;
-      position:relative;overflow:hidden;
+    /* ── MODE SCREENS ── */
+    .ms {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 56px 20px 52px; opacity: 0; pointer-events: none;
     }
-    .smartTipCard::before{
-      content:'';position:absolute;top:0;left:-100%;right:0;height:2px;
-      background:linear-gradient(90deg,transparent,var(--a),transparent);
-      animation:scanLine 2.4s linear infinite;
+    .ms.act { opacity: 1; pointer-events: auto; }
+
+    /* ── SHARED COMPONENTS ── */
+    .card {
+      background: var(--s); border: 1px solid var(--l);
+      border-radius: var(--r); padding: 20px;
+      width: 100%; max-width: 540px;
     }
-    @keyframes scanLine{0%{left:-100%}100%{left:100%}}
-    .stHeader{display:flex;align-items:center;gap:8px;margin-bottom:13px;flex-wrap:wrap}
-    .stIco{color:var(--a);font-size:16px;animation:pulse 2s ease-in-out infinite}
-    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(1.15)}}
-    .stTitle{font:600 13px var(--font);color:var(--a)}
-    .stSub{font:400 11px var(--mono);color:var(--t3);margin-left:auto}
-    .stBadge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--a-dim);border:1px solid var(--a);border-radius:20px;font:600 10px var(--mono);color:var(--a);letter-spacing:.04em}
-    .stBody{
-      font:400 13px/1.75 var(--font);color:var(--t);
-      white-space:pre-line;
-      min-height:40px;
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px;
+      border: 1px solid var(--l2); background: var(--ad);
+      font: 600 11px var(--m); color: var(--a); letter-spacing: .06em;
     }
-    .stBody.glow{text-shadow:0 0 14px rgba(27,255,140,.18)}
-    .stFooter{margin-top:13px;padding-top:11px;border-top:1px solid var(--l);font:400 12px var(--font);color:var(--t3);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .stFooter strong{color:var(--a)}
-    .stFooterLink{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border:1px solid var(--a);border-radius:20px;font:500 11px var(--font);color:var(--a);cursor:pointer;transition:background .2s}
-    .stFooterLink:hover{background:var(--a-dim)}
-
-    /* ── COACH BANNER ── */
-    .coachBanner{background:var(--a-dim);border:1px solid var(--a);border-radius:var(--r);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:22px;opacity:0;transition:opacity .6s}
-    .coachBanner.vis{opacity:1}
-    .cBTitle{font:600 14px var(--font);color:var(--a);margin-bottom:3px}
-    .cBSub{font:400 13px var(--font);color:var(--t2)}
-
-    /* ── IMPROVE SECTIONS ── */
-    .iSec{background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:11px;overflow:hidden}
-    .iHead{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;user-select:none;transition:background .15s}
-    .iHead:hover{background:var(--a-dim)}
-    .iHL{display:flex;align-items:center;gap:11px}
-    .iNum{font:600 13px var(--mono);color:var(--a);opacity:.8}
-    .iTitle{font:600 14px var(--font);color:var(--t)}
-    .iSub{font:400 12px var(--font);color:var(--t3)}
-    .iBody{padding:0 18px 18px}
-    .iSec.open .iHead{background:var(--a-dim)}
-
-    /* ── STATS + CHART ── */
-    .statRow{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px}
-    .statBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:14px}
-    .statLbl{font:500 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
-    .statVal{font:600 22px var(--font);color:var(--t)}
-    .coachBox2{background:var(--s2);border:1px solid var(--l2);border-radius:var(--r);padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
-    .coachBox2.typing{border-color:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.08)}
-    .coachBox2.typing::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--a);animation:scanBottom 1.8s linear infinite}
-    @keyframes scanBottom{0%{transform:scaleX(0);transform-origin:left}50%{transform:scaleX(1);transform-origin:left}50.01%{transform-origin:right}100%{transform:scaleX(0);transform-origin:right}}
-    .coachLbl{font:600 11px var(--mono);color:var(--a);text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px}
-    .coachTxt{font:400 13px/1.75 var(--font);color:var(--t);white-space:pre-wrap}
-    .chartWrap2{background:var(--s2);border-radius:var(--r);padding:14px;margin-top:14px}
-    .chartLbl{font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
-    .chartBars{display:flex;align-items:flex-end;gap:8px;height:90px}
-    .cBar{flex:1;border-radius:3px 3px 0 0;background:var(--a);opacity:.5;min-height:4px;transition:height .8s cubic-bezier(.4,0,.2,1)}
-    .cBar:last-child{opacity:1}
-    .cBarLbl{font:400 10px var(--mono);color:var(--t3);text-align:center;margin-top:5px}
-    .cBarWrap{flex:1;display:flex;flex-direction:column;justify-content:flex-end}
-
-    /* ── MISTAKE CARDS ── */
-    .mGrid{display:flex;flex-direction:column;gap:11px}
-    .mCard{background:var(--s2);border:1px solid var(--l);border-left:3px solid var(--danger);border-radius:var(--r);padding:15px;opacity:0;transform:translateX(-8px);transition:opacity .5s,transform .5s}
-    .mCard.vis{opacity:1;transform:translateX(0)}
-    .mHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
-    .mMeta{font:500 11px var(--mono);color:var(--t3)}
-    .mScore{font:600 12px var(--mono);color:var(--danger)}
-    .mQ{font:500 14px/1.4 var(--font);color:var(--t);margin-bottom:9px}
-    .mDiv{height:1px;background:var(--l);margin:9px 0}
-    .mFL{font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;margin-bottom:3px}
-    .mFV{font:400 13px/1.4 var(--font);color:var(--a)}
-    .mFV.bad{color:var(--danger)}
-    .mActs{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
-
-    /* ── REPORT / TRAIN ── */
-    .repBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:16px;font:400 13px/1.7 var(--font);color:var(--t2);white-space:pre-wrap;min-height:60px}
-    .trainRow2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-    .selPill2{display:inline-flex;align-items:center;padding:4px 10px;background:var(--a-dim);border:1px solid var(--a);border-radius:20px;font:500 12px var(--mono);color:var(--a)}
-    .trainCard{background:var(--a-dim);border:1px solid var(--a);border-radius:var(--r);padding:15px}
-    .trainCardT{font:500 13px var(--font);color:var(--a);margin-bottom:5px}
-    .trainCardS{font:400 12px var(--font);color:var(--t2)}
-
-    /* ── HIST TABLE ── */
-    .histTable{width:100%;border-collapse:collapse;font:400 13px var(--font)}
-    .histTable th{text-align:left;padding:8px 0;font:600 11px var(--mono);color:var(--t3);text-transform:uppercase;border-bottom:1px solid var(--l)}
-    .histTable td{padding:10px 0;color:var(--t2);border-bottom:1px solid var(--l)}
-    .histTable tr:last-child td{border-bottom:none}
-    .histTable .acc{color:var(--a);font-weight:600}
-
-    /* ── CTA ── */
-    .ctaBox{text-align:center;padding:56px 20px;background:var(--s);border:1px solid var(--l2);border-radius:var(--r)}
-    .ctaT{font:700 28px/1.2 var(--font);color:var(--t);margin-bottom:11px}
-    .ctaS{font:400 15px/1.55 var(--font);color:var(--t2);margin-bottom:26px;max-width:440px;margin-left:auto;margin-right:auto}
-
-    /* ════════════════════════════════════════
-       GHOST CURSOR
-    ════════════════════════════════════════ */
-    #gc{
-      position:fixed;top:0;left:0;z-index:9999;
-      pointer-events:none;
-      opacity:0;
-      transition:opacity .4s, transform .9s cubic-bezier(.4,0,.2,1);
-      will-change:transform;
+    .av {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg,#1bff8c,#0aaa5e);
+      display: flex; align-items: center; justify-content: center;
+      font: 700 13px var(--f); color: #000;
     }
-    #gc.vis{opacity:1}
-    #gcBody{position:relative;display:inline-block}
-    #gcArrow{filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))}
-    #gcLabel{
-      position:absolute;left:22px;top:-2px;
-      display:inline-flex;align-items:center;gap:5px;
-      padding:4px 9px;
-      background:var(--a);color:#000;
-      font:600 11px var(--font);
-      border-radius:12px;
-      white-space:nowrap;
-      box-shadow:0 2px 10px rgba(27,255,140,.4);
-    }
-    /* Click ripple */
-    #gcRipple{
-      position:absolute;top:50%;left:50%;
-      width:40px;height:40px;
-      border-radius:50%;
-      background:rgba(27,255,140,.35);
-      transform:translate(-50%,-50%) scale(0);
-      pointer-events:none;
-    }
-    #gcRipple.pop{animation:ripplePop .45s ease-out forwards}
-    @keyframes ripplePop{
-      0%{transform:translate(-50%,-50%) scale(0);opacity:1}
-      100%{transform:translate(-50%,-50%) scale(2.5);opacity:0}
-    }
-    #gcBody.pressing{transform:scale(.82);transition:transform .1s}
-    #gcBody{transition:transform .15s}
+    .prow { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .pname { font: 600 14px var(--f); color: var(--t); }
+    .psub  { font: 400 11px var(--m); color: var(--t3); }
 
-    /* ════════════════════════════════════════
-       DEMO TIP (bottom strip)
-    ════════════════════════════════════════ */
-    #demoTip{
-      position:fixed;bottom:0;left:0;right:0;
-      z-index:9998;pointer-events:none;
-      padding:13px 32px;
-      background:rgba(17,26,21,.97);
-      border-top:1px solid var(--l2);
-      font:400 13px/1.5 var(--font);color:var(--t2);
-      transform:translateY(100%);
-      transition:transform .35s cubic-bezier(.4,0,.2,1);
-      display:flex;align-items:center;gap:10px;
-    }
-    #demoTip.vis{transform:translateY(0)}
-    #demoTip strong{color:var(--a);font-weight:600}
-    #tipIcon{font-size:15px;flex-shrink:0;opacity:.7}
+    /* ── ANIM UTILITIES ── */
+    @keyframes blink  { 50%{opacity:0} }
+    @keyframes shake  { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-7px)} 30%{transform:translateX(7px)} 45%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 75%{transform:translateX(-2px)} }
+    @keyframes hexspin{ to{transform:rotate(360deg)} }
+    @keyframes scan   { 0%{left:-100%} 100%{left:100%} }
+    @keyframes logogl { 0%,100%{filter:drop-shadow(0 0 16px rgba(27,255,140,.4))} 50%{filter:drop-shadow(0 0 32px rgba(27,255,140,.7))} }
 
-    /* ════════════════════════════════════════
-       HIGHLIGHT RING
-    ════════════════════════════════════════ */
-    .dHL{
-      box-shadow:0 0 0 3px var(--a), 0 0 0 7px rgba(27,255,140,.18) !important;
-      border-color:var(--a) !important;
-      transition:box-shadow .3s, border-color .3s !important;
-    }
+    /* ────────────────────────────────────────
+       MODE 1 — MOCKPROV AI
+    ──────────────────────────────────────── */
+    /* intro */
+    #m1logo { width: 64px; height: 64px; margin-bottom: 14px; animation: logogl 4s ease-in-out infinite; }
+    .logoSvg { display: block; }
+    #m1htitle { font: 700 34px/1.2 var(--f); color: var(--t); margin-bottom: 10px; }
+    #m1hsub   { font: 400 15px var(--f); color: var(--t2); }
 
-    /* ════════════════════════════════════════
-       PAUSE OVERLAY
-    ════════════════════════════════════════ */
-    #pauseOv{
-      position:fixed;inset:0;z-index:9990;
-      background:rgba(8,16,13,.5);
-      backdrop-filter:blur(3px);
-      display:none;
-      align-items:center;justify-content:center;
-      flex-direction:column;gap:12px;
-    }
-    #pauseOv.on{display:flex}
-    .pauseCard{
-      background:var(--s);border:1px solid var(--a);
-      border-radius:var(--r);padding:28px 36px;
-      text-align:center;
-    }
-    .pauseIco{font-size:36px;margin-bottom:8px}
-    .pauseLbl{font:700 18px var(--font);color:var(--t);margin-bottom:6px}
-    .pauseSub{font:400 13px var(--font);color:var(--t2)}
+    /* material */
+    #m1mat { font: 400 13px/1.85 var(--m); color: var(--t2); min-height: 120px; word-break: break-word; }
+    #m1cur { display: inline-block; width: 2px; height: 14px; background: var(--a); margin-left:1px; vertical-align: middle; animation: blink 1s step-end infinite; }
+    #m1cnt { font: 400 11px var(--m); color: var(--t3); text-align: right; margin-top: 6px; }
 
-    /* ── ACCORDION FIX — start collapsed ── */
-    .iBody { display: none; }
-    .iSec.open .iBody { display: block; }
+    /* ai gen */
+    .hexwrap { display: flex; justify-content: center; margin-bottom: 10px; }
+    .hexsvg  { animation: hexspin 1.8s linear infinite; }
+    #aistatus { font: 500 14px var(--f); color: var(--t2); text-align: center; }
+    #aibig    { font: 700 28px var(--f); color: var(--a); text-align: center; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    #aisub    { font: 400 11px var(--m); color: var(--t3); text-align: center; margin-top: 2px; }
+    .aicard { overflow: hidden; position: relative; }
+    .aicard::before { content:''; position:absolute; top:0; left:-100%; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--a),transparent); animation: scan 2.4s linear infinite; }
 
-    /* ── CUSTOM CURSOR ── */
-    @media (pointer: fine) {
-      * { cursor: none !important }
-      #cursorDot {
-        position:fixed;top:0;left:0;z-index:99999;
-        width:6px;height:6px;border-radius:50%;background:#1bff8c;
-        pointer-events:none;opacity:0;
-        transition:transform .08s ease,opacity .15s;
-        will-change:transform;
-      }
-      #cursorRing {
-        position:fixed;top:0;left:0;z-index:99998;
-        width:28px;height:28px;pointer-events:none;opacity:0;
-        transition:opacity .15s;will-change:transform;
-      }
-      #cursorRing > div {
-        width:100%;height:100%;border-radius:50%;
-        border:1.5px solid rgba(27,255,140,.5);
-        transform-origin:center center;
-        transition:transform .18s cubic-bezier(.22,.61,.36,1),opacity .2s ease;
-      }
-      #cursorRing.rHov > div { transform:scale(1.57);opacity:.3 }
-      #cursorRing.rDown > div { transform:scale(.64);opacity:.8 }
+    /* questions */
+    .qcard { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 18px; width: 100%; max-width: 540px; }
+    .qnum  { font: 600 10px var(--m); color: var(--t3); letter-spacing:.05em; text-transform:uppercase; margin-bottom: 6px; }
+    .qtxt  { font: 500 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
+    .alist { display: flex; flex-direction: column; gap: 7px; }
+    .aopt  { background: transparent; border: 1px solid var(--l); border-radius: var(--r); padding: 9px 13px; font: 400 14px var(--f); color: var(--t2); text-align: left; width: 100%; cursor: default; transition: all .2s; }
+    .aopt.sel { border-color: var(--a);  background: var(--ad); color: var(--a); }
+    .aopt.ok  { border-color: var(--ok); background: rgba(27,255,140,.09); color: var(--ok); }
+    .aopt.bad { border-color: var(--err); background: rgba(255,107,107,.09); color: var(--err); }
+    .wfield {
+      min-height: 60px; border: 1px solid var(--l); border-radius: var(--r);
+      padding: 10px 13px; font: 500 13px var(--m); color: var(--t2);
+      background: var(--bg); word-break: break-word; line-height: 1.8;
+      transition: border-color .2s, box-shadow .2s;
     }
-
-    /* ── GLASS EFFECTS ── */
-    .smartTipCard {
-      backdrop-filter:blur(12px);
-      -webkit-backdrop-filter:blur(12px);
+    .wfield.active { border-color: var(--a); box-shadow: 0 0 0 3px rgba(27,255,140,.08); }
+    .wfield.bad    { border-color: var(--err); background: rgba(255,107,107,.06); color: var(--err); }
+    .aifb {
+      margin-top: 10px; padding: 12px 14px;
+      background: var(--s2); border-left: 3px solid var(--a);
+      border-radius: 0 var(--r) var(--r) 0;
+      font: 400 12px/1.65 var(--f); color: var(--t2);
     }
-    .scoreBox, .gradOv {
-      backdrop-filter:blur(8px);
-      -webkit-backdrop-filter:blur(8px);
+    .aifb .fml { font: 500 13px var(--m); color: var(--a); display: block; margin: 5px 0; }
+    .aifb strong { color: var(--t); }
+
+    /* results */
+    .sbox { background: var(--s); border: 1px solid var(--l2); border-radius: var(--r); padding: 30px; text-align: center; width: 100%; max-width: 540px; }
+    .sbig { font: 700 64px/1 var(--f); color: var(--a); font-variant-numeric: tabular-nums; }
+    .slbl { font: 400 13px var(--f); color: var(--t2); margin: 6px 0 16px; }
+    .sbar { height: 6px; background: var(--s2); border-radius: 3px; max-width: 240px; margin: 0 auto 16px; overflow: hidden; }
+    .sfill{ height: 100%; width: 0%; background: linear-gradient(90deg,var(--a),rgba(27,255,140,.5)); box-shadow: 0 0 8px rgba(27,255,140,.4); border-radius: 3px; transition: width 1.4s cubic-bezier(.4,0,.2,1); }
+    .rankp{ display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: var(--ad); border: 1px solid var(--a); border-radius: 20px; font: 600 12px var(--m); color: var(--a); }
+    .xpbar{ height: 5px; background: var(--l); border-radius: 3px; margin: 12px auto 0; max-width: 240px; overflow: hidden; }
+    .xpfill{ height: 100%; width: 0%; background: var(--a); border-radius: 3px; }
+    .lvlbdg{ font: 700 12px var(--m); color: var(--a); text-align: center; margin-top: 8px; }
+
+    /* floating elements */
+    .ptsbdg { position: fixed; z-index: 600; pointer-events: none; font: 700 16px var(--f); color: var(--a); text-shadow: 0 0 12px rgba(27,255,140,.6); opacity: 0; }
+    .ripring{ position: fixed; z-index: 500; pointer-events: none; border: 2px solid rgba(27,255,140,.6); border-radius: 50%; width: 40px; height: 40px; opacity: 0; }
+
+    /* ────────────────────────────────────────
+       MODE 2 — KÖRKORTSTEORIN
+    ──────────────────────────────────────── */
+    /* category grid */
+    #catgrid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 7px;
+      width: 100%; max-width: 560px;
     }
-    .demoCta-glass {
-      backdrop-filter:blur(14px);
-      -webkit-backdrop-filter:blur(14px);
+    .catc {
+      background: var(--s); border: 1px solid var(--l);
+      border-radius: var(--r); padding: 9px 7px; text-align: center;
+      opacity: 0; transform: translateY(8px);
     }
+    .catc.hl  { border-color: var(--a); background: var(--ad); box-shadow: 0 0 12px rgba(27,255,140,.18); }
+    .catc.wk  { border-color: rgba(255,107,107,.4); background: rgba(255,107,107,.05); }
+    .catc.nd  { opacity: .4; }
+    .catemi   { font-size: 17px; margin-bottom: 3px; }
+    .catnm    { font: 500 9px var(--f); color: var(--t2); margin-bottom: 4px; line-height: 1.3; }
+    .catbr    { height: 3px; background: var(--l); border-radius: 2px; overflow: hidden; }
+    .catbf    { height: 100%; width: 0%; background: var(--a); border-radius: 2px; transition: width .8s ease; }
+    .catc.wk .catbf { background: var(--err); }
+    .catpct   { font: 600 9px var(--m); color: var(--t3); margin-top: 3px; }
 
-    /* ── WILL-CHANGE ── */
-    .btn { will-change:transform }
-    .qCard,.feedCard,.mCard { will-change:opacity,transform }
-    .scoreBarF { will-change:width }
+    /* sign */
+    #sigcard { width: 100%; max-width: 480px; }
+    .sgnwrap { display: flex; justify-content: center; margin-bottom: 18px; }
+    #signsvg { transform: scale(.4); opacity: 0; }
+    .sgnq  { font: 500 15px/1.5 var(--f); color: var(--t); margin-bottom: 14px; }
+    #catprog { font: 600 12px var(--m); color: var(--a); margin-top: 14px; display: flex; align-items: center; gap: 8px; opacity: 0; }
 
-    /* ── P.E.R MOCK ── */
-    .perMock{background:var(--s);border:1px solid rgba(27,255,140,.22);border-radius:12px;overflow:hidden;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.55)}
-    .perMockHdr{display:flex;align-items:center;gap:9px;padding:12px 14px;background:var(--s2);border-bottom:1px solid var(--l)}
-    .perMockAv{width:32px;height:32px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;font-size:16px;flex-shrink:0}
-    .perMockNm{font:700 13px var(--font);color:var(--t)}
-    .perMockRl{font:500 10px var(--mono);color:var(--t3);letter-spacing:.04em}
-    .perMockCtx{margin-left:auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid rgba(27,255,140,.3);border-radius:20px;font:500 10px var(--mono);color:var(--a);background:rgba(27,255,140,.06)}
-    .perMockCtx::before{content:'●';font-size:7px;animation:pulse 2s ease-in-out infinite}
-    .perMockMsgs{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:180px;max-height:280px;overflow-y:auto}
-    .perMockMsg{font:400 13px/1.65 var(--font);padding:9px 12px;border-radius:8px;max-width:88%;word-break:break-word;opacity:0;transform:translateY(6px);transition:opacity .35s ease,transform .35s ease}
-    .perMockMsg.vis{opacity:1;transform:translateY(0)}
-    .perMockMsg.teacher{background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.15);color:var(--t2);border-radius:8px 8px 8px 3px}
-    .perMockMsg.user{background:var(--s2);border:1px solid var(--l);color:var(--t);border-radius:8px 8px 3px 8px;margin-left:auto}
-    .perMockMsg.typing{color:var(--t3);font-style:italic}
-    .perMockInp{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--l);background:var(--s2)}
-    .perMockInputField{flex:1;background:var(--s);border:1px solid var(--l);border-radius:6px;padding:8px 10px;font:400 13px var(--mono);color:var(--t2);min-height:34px;white-space:pre-wrap}
-    .perMockInputField.active{border-color:rgba(27,255,140,.35)}
-    .perMockSend{background:var(--a);color:#08100d;border:none;border-radius:6px;padding:0 14px;font:700 12px var(--font);cursor:pointer}
-
-    /* ── KÖRKORTET MOCK ── */
-    .korMock{background:var(--s);border:1px solid var(--l);border-radius:var(--r);overflow:hidden;max-width:520px}
-    .korProgressBar{height:5px;background:var(--s2)}
-    .korProgressFill{height:100%;background:var(--a);transition:width 1s cubic-bezier(.4,0,.2,1);border-radius:0 3px 3px 0}
-    .korMeta{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--l);font:500 12px var(--mono);color:var(--t3)}
-    .korXP{margin-left:auto;font:700 13px var(--mono);color:var(--a);opacity:0;transform:translateY(-6px);transition:all .5s cubic-bezier(.22,.61,.36,1)}
-    .korXP.vis{opacity:1;transform:translateY(0)}
-    .korStreak{color:var(--a)}
-    .korQuestionCard{padding:22px 18px}
-    .korQ{font:500 16px/1.55 var(--font);color:var(--t);margin-bottom:18px}
-    .korOpts{display:flex;flex-direction:column;gap:8px}
-    .korOpt{background:transparent;border:1px solid var(--l);border-radius:var(--r);padding:11px 14px;font:400 14px var(--font);color:var(--t2);text-align:left;cursor:pointer;transition:all .22s ease;opacity:0;transform:translateY(5px)}
-    .korOpt.vis{opacity:1;transform:translateY(0)}
-    .korOpt.sel{border-color:rgba(27,255,140,.5);background:rgba(27,255,140,.06);color:var(--t)}
-    .korOpt.ok{border-color:#1bff8c;background:rgba(27,255,140,.09);color:#1bff8c}
-    .korOpt.bad{border-color:#ff6b6b;background:rgba(255,107,107,.09);color:#ff6b6b;animation:shake .4s ease-out}
-    .korExpl{margin-top:14px;padding:13px;border-left:2px solid var(--a);background:rgba(27,255,140,.05);border-radius:0 var(--r) var(--r) 0;font:400 13px/1.6 var(--font);color:var(--t2);opacity:0;transition:opacity .4s ease}
-    .korExpl.vis{opacity:1}
-
-    /* ── P.E.R MINI BAR (alltid synlig efter act-per) ── */
-    #perMiniBar{
-      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-      display:none;align-items:center;gap:8px;
-      background:var(--s);border:1px solid rgba(27,255,140,.3);
-      border-radius:20px;padding:7px 16px;
-      font:600 12px var(--font);color:var(--a);
-      z-index:998;box-shadow:0 4px 16px rgba(0,0,0,.5);
-      white-space:nowrap;animation:perUp .3s ease;
+    /* simulated exam */
+    .simhdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .simmode { font: 600 11px var(--m); color: var(--a); letter-spacing: .06em; text-transform: uppercase; }
+    #simtimer{ font: 700 28px var(--m); color: var(--t); font-variant-numeric: tabular-nums; }
+    #simqcnt { font: 500 13px var(--f); color: var(--t2); margin-bottom: 10px; }
+    .simsbr  { background: var(--s2); border-radius: var(--r); padding: 11px 13px; display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 10px; }
+    .sstt    { font: 400 12px var(--f); color: var(--t3); }
+    .sstt strong { color: var(--t); font-weight: 600; }
+    .sstt.ok strong { color: var(--a); }
+    .simpb   { height: 5px; background: var(--l); border-radius: 3px; overflow: hidden; }
+    .simpf   { height: 100%; width: 0%; background: var(--a); border-radius: 3px; transition: width .4s ease; }
+    #simres  {
+      background: var(--ad); border: 1px solid var(--a); border-radius: var(--r);
+      padding: 18px; text-align: center; margin-top: 12px;
+      opacity: 0; transform: scale(.92);
     }
-    #perMiniBar.on{display:flex}
-    #perMiniBar .pDot{width:7px;height:7px;border-radius:50%;background:var(--a);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+    #simres .rb { font: 700 32px var(--f); color: var(--a); }
+    #simres .rs { font: 400 13px var(--f); color: var(--t2); margin-top: 4px; }
 
-    /* ── REDUCED MOTION ── */
-    @media (prefers-reduced-motion: reduce) {
-      * { cursor:auto !important }
-      #cursorDot,#cursorRing { display:none !important }
-      .reveal { transition:none !important }
-      .qCard,.feedCard,.mCard { transition:none !important }
+    /* stats */
+    .stshdr { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .stsavg { font: 700 36px var(--f); color: var(--a); }
+    .stslbl { font: 400 12px var(--f); color: var(--t2); }
+    #radarwrap { display: flex; justify-content: center; margin-bottom: 14px; }
+    .wkalert {
+      background: rgba(255,107,107,.07); border: 1px solid rgba(255,107,107,.28);
+      border-radius: var(--r); padding: 12px 13px;
+      display: flex; align-items: center; gap: 10px;
     }
+    .wkico { font-size: 16px; }
+    .wktxt { font: 400 12px/1.5 var(--f); color: var(--t2); }
+    .wkbtn { font: 600 11px var(--m); color: var(--a); margin-left: auto; flex-shrink: 0; background: var(--ad); border: 1px solid var(--l2); border-radius: var(--r); padding: 4px 10px; }
 
-    /* ════════════════════════════════════════
-       RESPONSIVE
-    ════════════════════════════════════════ */
-    @media(max-width:600px){
-      .dHT{font-size:26px}
-      .aTitle{font-size:21px}
-      .scoreBig{font-size:46px}
-      .statRow{grid-template-columns:1fr}
-      .setGrid{grid-template-columns:1fr 1fr}
-      .ctaT{font-size:22px}
-      /* Cursor scaled down on mobile — still visible */
-      #gc{transform-origin:top left}
-      #gcLabel{font-size:10px;padding:3px 7px}
-    }
+    /* pricing */
+    #pgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%; max-width: 540px; }
+    .pc { background: var(--s); border: 1px solid var(--l); border-radius: var(--r); padding: 16px; opacity: 0; transform: translateY(12px); }
+    .pc.hl { border-color: var(--a); background: var(--ad); box-shadow: 0 0 16px rgba(27,255,140,.18); }
+    .ptier { font: 700 11px var(--m); color: var(--t3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; }
+    .ptier.acc { color: var(--a); }
+    .pprice { font: 700 22px var(--f); color: var(--t); margin-bottom: 4px; }
+    .pdesc  { font: 400 11px var(--f); color: var(--t3); line-height: 1.5; }
+    #pupgr  { font: 600 11px var(--m); color: var(--a); margin-top: 8px; opacity: 0; }
   </style>
 </head>
 <body>
 
-<!-- LOADER -->
-<div class="pageLoader" id="pgLoader"><div class="loaderOrb"></div></div>
+<canvas id="cvBg"></canvas>
+<canvas id="cvFx"></canvas>
 
-<!-- HEADER -->
-<header class="hdr">
-  <div class="hWrap">
-    <a href="index.html" class="brand">
-      <span class="brandName">ProviaAI</span>
-      <span class="brandTag">LIVE DEMO</span>
-    </a>
-    <div class="hRight">
-      <a href="app.html" class="btn btnP" style="font-size:13px">Testa på riktigt →</a>
-      <a href="index.html" class="btn" style="font-size:13px">Tillbaka</a>
+<div id="cbar"><div id="cfill"></div></div>
+<div id="modeInd"><div class="dot"></div><span id="mlbl">MOCKPROV AI</span></div>
+<div id="streak"></div>
+
+<div id="narrator">
+  <div class="nLbl">Talarpunkter — <kbd style="font:inherit;opacity:.6">N</kbd> döljer</div>
+  <div id="nSteps"></div>
+</div>
+
+<div id="pdots"></div>
+
+<div id="keyhints">
+  <div class="kh"><b>1</b> Mockprov</div>
+  <div class="kh"><b>2</b> Körkortet</div>
+  <div class="kh"><b>N</b> Narrator</div>
+  <div class="kh"><b>ESC</b> Pausa</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODE 1 — MOCKPROV AI
+══════════════════════════════════════════ -->
+<div id="mode1" class="ms act">
+
+  <!-- INTRO -->
+  <div id="m1intro" style="text-align:center;display:none">
+    <div id="m1logo">
+      <svg class="logoSvg" viewBox="0 0 64 64" width="64" height="64">
+        <circle cx="32" cy="32" r="30" fill="#111a15" stroke="#1bff8c" stroke-width="2"/>
+        <text x="32" y="43" font-family="DM Sans" font-weight="700" font-size="28" fill="#1bff8c" text-anchor="middle">P</text>
+      </svg>
+    </div>
+    <div id="m1htitle">ProviaAi</div>
+    <div style="margin:10px auto 0;display:inline-flex" class="pill" id="m1hpill">📚 AI-prov på ditt eget material</div>
+    <div id="m1hsub" style="margin-top:10px">Klistra in material → AI genererar → Träna smart</div>
+  </div>
+
+  <!-- MATERIAL -->
+  <div id="m1matw" style="display:none;width:100%;max-width:540px">
+    <div class="pill" id="m1cpill" style="margin-bottom:13px;display:inline-flex">📐 Matematik 2b — Andragradsekvationer</div>
+    <div class="card" id="m1crd">
+      <div class="prow">
+        <div class="av">PL</div>
+        <div><div class="pname">Per Lindström</div><div class="psub">Gymnasiet åk 2</div></div>
+        <div class="pill" style="margin-left:auto;font-size:10px">📷 OCR</div>
+      </div>
+      <div id="m1mat"></div><span id="m1cur"></span>
+      <div id="m1cnt">0 tecken</div>
     </div>
   </div>
-</header>
 
-<!-- HERO -->
-<section class="dHero">
-  <div class="dHI">
-    <div class="dEye">▶&nbsp; Live-demonstration</div>
-    <h1 class="dHT">Se ProviaAI i verkligheten</h1>
-    <p class="dHS">En animerad genomgång — från studiematerial till AI-coachning. Pausa när du vill.</p>
-    <div class="btnRow">
-      <button class="btn btnP" id="autoBtn" onclick="startAuto()" style="font-size:14px;padding:0 22px;height:42px">
-        ▶&nbsp; Starta demo
-      </button>
-      <button class="btn" id="pauseBtn" onclick="togglePause()" style="display:none;height:42px;padding:0 20px">
-        ⏸&nbsp; Pausa
-      </button>
-      <button class="btn" onclick="resetDemo()" style="height:42px;padding:0 18px">⟳&nbsp; Starta om</button>
-      <a href="app.html" class="btn" style="height:42px;padding:0 18px">Testa på riktigt →</a>
-    </div>
-    <p style="margin-top:14px;font:400 12px var(--mono);color:var(--t3)">Mellanslag = pausa / fortsätta</p>
-  </div>
-</section>
-
-<!-- CHAPTER NAV -->
-<nav class="dNav" id="dNav">
-  <div class="dNavI">
-    <button class="chap on" id="c1" onclick="go('act1',1)"><span class="chapN">01</span>Material</button>
-    <button class="chap" id="c2" onclick="go('act2',2)"><span class="chapN">02</span>Prov</button>
-    <button class="chap" id="c3" onclick="go('act3b',3)"><span class="chapN">03</span>Rättning</button>
-    <button class="chap" id="c4" onclick="go('act-per',4)"><span class="chapN">04</span>P.E.R</button>
-    <button class="chap" id="c5" onclick="go('act-kor',5)"><span class="chapN">05</span>Körkortet</button>
-    <button class="chap" id="c6" onclick="go('act4',6)"><span class="chapN">06</span>Förbättring</button>
-    <div class="dCtrl">
-      <span class="stepBadge" id="stepBadge">Steg 1 / 7</span>
+  <!-- AI GEN -->
+  <div id="m1aiw" style="display:none;width:100%;max-width:540px">
+    <div class="card aicard" id="m1aicrd">
+      <div class="hexwrap">
+        <svg class="hexsvg" viewBox="0 0 60 60" width="62" height="62" fill="none">
+          <polygon points="30,3 53,16.5 53,43.5 30,57 7,43.5 7,16.5" stroke="rgba(27,255,140,.2)" stroke-width="1.5"/>
+          <polygon points="30,11 47,21 47,39 30,49 13,39 13,21" stroke="rgba(27,255,140,.45)" stroke-width="1.5"/>
+          <polygon points="30,19 41,25.5 41,38.5 30,45 19,38.5 19,25.5" stroke="#1bff8c" stroke-width="2" fill="rgba(27,255,140,.06)"/>
+        </svg>
+      </div>
+      <div id="aistatus">Analyserar material...</div>
+      <div id="aibig">0</div>
+      <div id="aisub">ord analyserade</div>
     </div>
   </div>
-</nav>
 
-<!-- ════════════════════════════════════════════
-     AKT 1 – MATERIAL
-════════════════════════════════════════════ -->
-<section class="act" id="act1">
-  <div class="aI">
-    <div class="aTag reveal">AKT 01 — MATERIAL</div>
-    <h2 class="aTitle reveal d1">Ladda upp ditt studiematerial</h2>
-    <p class="aSub reveal d2">Klistra in kompendium, anteckningar eller kapitel. AI:n läser av och bygger ett prov anpassat till din kurs och betygsnivå.</p>
-
-    <div class="wRail" id="wRail">
-      <div class="wSt on" id="ws1"><div class="wDot" id="wd1">1</div>Material</div>
-      <div class="wC" id="wc1"></div>
-      <div class="wSt" id="ws2"><div class="wDot" id="wd2">2</div>Inställningar</div>
-      <div class="wC" id="wc2"></div>
-      <div class="wSt" id="ws3"><div class="wDot" id="wd3">3</div>Mockprov</div>
-      <div class="wC" id="wc3"></div>
-      <div class="wSt" id="ws4"><div class="wDot" id="wd4">4</div>Rättning</div>
-    </div>
-
-    <div class="courseTag">Matematik 1b — Procenträkning</div>
-    <div class="matArea" id="matArea"></div>
-    <div class="matCnt" id="matCnt">0 tecken</div>
-
-    <div style="margin-top:20px">
-      <button class="btn btnP" id="nextBtn" style="opacity:0;transition:opacity .6s;pointer-events:none" onclick="go('act2',2)">
-        Fortsätt till inställningar →
-      </button>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════
-     AKT 2 – INSTÄLLNINGAR
-════════════════════════════════════════════ -->
-<section class="act" id="act2">
-  <div class="aI">
-    <div class="aTag reveal">AKT 02 — INSTÄLLNINGAR</div>
-    <h2 class="aTitle reveal d1">Välj provtyp och svårighetsgrad</h2>
-    <p class="aSub reveal d2">Anpassa efter kurs, betygsnivå och frågetyp. AI:n genererar ett prov exakt anpassat till din nivå och ditt material.</p>
-
-    <div class="setGrid">
-      <div class="sCard" id="sck">
-        <div class="sLbl">Kurs</div>
-        <div class="sVal">Matematik C</div>
-      </div>
-      <div class="sCard" id="scn">
-        <div class="sLbl">Betygsnivå</div>
-        <div class="sVal" id="svn">—</div>
-      </div>
-      <div class="sCard" id="sct">
-        <div class="sLbl">Frågetyp</div>
-        <div class="sVal" id="svt">—</div>
-      </div>
-      <div class="sCard" id="sca">
-        <div class="sLbl">Antal frågor</div>
-        <div class="sVal" id="sva">—</div>
+  <!-- SINGLE QUESTION STAGE -->
+  <div id="m1qw" style="display:none;width:100%;max-width:540px">
+    <!-- Q1 -->
+    <div class="qcard" id="q1">
+      <div class="qnum">Fråga 1 av 6 · Flerval</div>
+      <div class="qtxt">Vilka är lösningarna till x² − 5x + 6 = 0?</div>
+      <div class="alist">
+        <button class="aopt" id="q1a">x = 2 och x = 3</button>
+        <button class="aopt" id="q1b">x = 1 och x = 6</button>
+        <button class="aopt" id="q1c">x = −2 och x = −3</button>
+        <button class="aopt" id="q1d">x = 2 och x = −3</button>
       </div>
     </div>
-
-    <button class="btn btnP" id="genBtn" disabled style="opacity:.35;cursor:default">
-      <span id="genLbl">Väljer inställningar…</span>
-    </button>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════
-     AKT 3 – MOCKPROV
-════════════════════════════════════════════ -->
-<section class="act" id="act3">
-  <div class="aI">
-    <div class="aTag reveal">AKT 03 — MOCKPROV</div>
-    <h2 class="aTitle reveal d1">AI-genererat prov</h2>
-    <p class="aSub reveal d2">Frågorna är baserade på ditt material och din nivå. Den skrivna frågan besvaras medvetet ofullständigt — AI:n fångar upp det.</p>
-
-    <div class="skelL" id="skelL">
-      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
-      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
-      <div class="skelC"><div class="sLine w80"></div><div class="sLine w60"></div><div class="sLine w40"></div></div>
-    </div>
-
-    <div class="qList" id="qList" style="display:none"></div>
-
-    <div style="margin-top:20px">
-      <button class="btn btnP" id="gradeBtn" disabled style="opacity:0;transition:opacity .6s;pointer-events:none">
-        Rätta prov →
-      </button>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════
-     AKT 4 – RÄTTNING
-════════════════════════════════════════════ -->
-<section class="act" id="act3b">
-  <div class="aI">
-    <div class="aTag reveal">AKT 04 — AI-RÄTTNING</div>
-    <h2 class="aTitle reveal d1">Omedelbar feedback på varje svar</h2>
-    <p class="aSub reveal d2">AI:n analyserar varje svar mot modellsvaret och ger pedagogisk feedback — även på det du missade.</p>
-
-    <div class="gradOv" id="gradOv" style="display:none">
-      <div class="gradSpin"></div>
-      <div class="gradLbl">Rättar prov…</div>
-      <div class="gradSt" id="gradSt">Analyserar svar 1 av 2…</div>
-    </div>
-
-    <div class="scoreBox" id="scoreBox" style="display:none">
-      <div class="scoreBig" id="scoreBig">0%</div>
-      <div class="scoreLbl">1.5 / 2 p · Betyg C · Matematik C</div>
-      <div class="scoreBar"><div class="scoreBarF" id="scoreF"></div></div>
-      <div class="btnRow">
-        <button class="btn btnP" onclick="document.getElementById('feedWrap').scrollIntoView({behavior:'smooth'})">Visa detaljerad feedback →</button>
+    <!-- Q2 -->
+    <div class="qcard" id="q2" style="display:none">
+      <div class="qnum">Fråga 2 av 6 · Flerval</div>
+      <div class="qtxt">Vad kallas en ekvation av formen ax² + bx + c = 0 (a ≠ 0)?</div>
+      <div class="alist">
+        <button class="aopt" id="q2a">Linjär ekvation</button>
+        <button class="aopt" id="q2b">Andragradsekvation</button>
+        <button class="aopt" id="q2c">Kubisk ekvation</button>
+        <button class="aopt" id="q2d">Exponentialekvation</button>
       </div>
     </div>
-
-    <div id="feedWrap" style="margin-top:20px;scroll-margin-top:70px">
-      <div class="feedGrid" id="feedGrid"></div>
-    </div>
-
-    <!-- AI FÖRBÄTTRINGSFÖRSLAG (visas efter rättning) -->
-    <div class="smartTipWrap" id="smartTipWrap">
-      <div class="smartTipCard">
-        <div class="stHeader">
-          <span class="stIco">✦</span>
-          <span class="stTitle">AI Förbättringsförslag</span>
-          <span class="stBadge">PREMIUM</span>
-          <span class="stSub">Genereras automatiskt av din coach</span>
-        </div>
-        <div class="stBody" id="smartTipTxt"></div>
-        <div class="stFooter">
-          <span>Fler analyser och träningsuppgifter på</span>
-          <span class="stFooterLink" onclick="go('act4',4)">Förbättringsidan →</span>
-        </div>
+    <!-- Q3 written / FEL -->
+    <div class="qcard" id="q3" style="display:none">
+      <div class="qnum">Fråga 3 av 6 · Skriven</div>
+      <div class="qtxt">Lös ekvationen x² + 4x − 12 = 0 med ABC-formeln.</div>
+      <div class="wfield" id="q3f"></div>
+      <div class="aifb" id="q3fb" style="display:none">
+        <strong>AI-förklaring:</strong> Använd ABC-formeln:
+        <span class="fml">x = (−b ± √(b²−4ac)) / 2a</span>
+        a = 1, b = 4, c = −12 → diskriminant = 16 + 48 = 64<br>
+        x = (−4 ± 8) / 2 → <strong>x = 2 eller x = −6</strong> ✓
       </div>
     </div>
-
-    <div class="coachBanner" id="coachBanner">
-      <div>
-        <div class="cBTitle">Klar för djupare analys?</div>
-        <div class="cBSub">Din AI-coach har identifierat mönster i dina misstag.</div>
-      </div>
-      <button class="btn btnP" id="openCoachBtn">Öppna coach →</button>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════
-     AKT 04 — P.E.R AI-ASSISTENT
-════════════════════════════════════════════ -->
-<section class="act" id="act-per">
-  <div class="aI">
-    <div class="aTag reveal">AKT 04 — P.E.R AI-ASSISTENT</div>
-    <h2 class="aTitle reveal d1">P.E.R — Provias Egna AI-Resource</h2>
-    <p class="aSub reveal d2">P.E.R ser vad du jobbar med och svarar direkt. Fråga om specifika uppgifter, be om en ledtråd eller en fullständig förklaring.</p>
-
-    <div class="perMock reveal d3" id="perMock">
-      <div class="perMockHdr">
-        <div class="perMockAv">👨‍🏫</div>
-        <div><div class="perMockNm">P.E.R</div><div class="perMockRl">PROVIAS EGNA AI-RESOURCE</div></div>
-        <div class="perMockCtx" id="perCtxBadge">ser din skärm</div>
-      </div>
-      <div class="perMockMsgs" id="perMockMsgs"></div>
-      <div class="perMockInp">
-        <div class="perMockInputField" id="perDemoInput"></div>
-        <button class="perMockSend">Skicka</button>
+    <!-- Q4 -->
+    <div class="qcard" id="q4" style="display:none">
+      <div class="qnum">Fråga 4 av 6 · Flerval</div>
+      <div class="qtxt">Hur många reella lösningar har x² + 2x + 5 = 0?</div>
+      <div class="alist">
+        <button class="aopt" id="q4a">Inga reella lösningar</button>
+        <button class="aopt" id="q4b">Exakt en lösning</button>
+        <button class="aopt" id="q4c">Två lösningar</button>
+        <button class="aopt" id="q4d">Oändligt många</button>
       </div>
     </div>
   </div>
-</section>
 
-<!-- ════════════════════════════════════════════
-     AKT 05 — KÖRKORTSTEORIN
-════════════════════════════════════════════ -->
-<section class="act" id="act-kor">
-  <div class="aI">
-    <div class="aTag reveal">AKT 05 — KÖRKORTSTEORIN</div>
-    <h2 class="aTitle reveal d1">368 teorifrågor · 16 kategorier</h2>
-    <p class="aSub reveal d2">Träna körkortsteorin med adaptivt lärande — systemet fokuserar automatiskt på dina svagaste kategorier och bostar dem i nästa omgång.</p>
-
-    <div class="korMock reveal d3" id="korMock">
-      <div class="korProgressBar"><div class="korProgressFill" id="korProgressFill" style="width:35%"></div></div>
-      <div class="korMeta">
-        <span>Fråga 9 / 25</span>
-        <span>🚦 Trafikregler</span>
-        <span class="korStreak">🔥 5 rätt i rad</span>
-        <div class="korXP" id="korXP">+10 XP</div>
+  <!-- RESULTS -->
+  <div id="m1res" style="display:none">
+    <div class="sbox">
+      <div class="prow" style="justify-content:center;margin-bottom:14px">
+        <div class="av">PL</div>
+        <div><div class="pname">Per Lindström</div><div class="psub">Matematik 2b</div></div>
       </div>
-      <div class="korQuestionCard">
-        <div class="korQ" id="korQ">Vilket märke innebär att du har väjningsplikt mot mötande trafik?</div>
-        <div class="korOpts" id="korOpts">
-          <button class="korOpt" id="ko0">A. Stoppmärke</button>
-          <button class="korOpt" id="ko1">B. Väjningsplikt</button>
-          <button class="korOpt" id="ko2">C. Parkering förbjuden</button>
-          <button class="korOpt" id="ko3">D. Huvudled upphör</button>
+      <div class="sbig" id="scorenum">0%</div>
+      <div class="slbl">5 av 6 rätt · 4 min 12 sek</div>
+      <div class="sbar"><div class="sfill" id="sfill"></div></div>
+      <div class="rankp" id="rankp" style="opacity:0">🏆 Bättre än 74% av alla elever</div>
+      <div class="xpbar"><div class="xpfill" id="xpfill"></div></div>
+      <div class="lvlbdg" id="lvlbdg" style="opacity:0">⬆ Matematik 2b — Nivå 3 uppnådd!</div>
+    </div>
+  </div>
+
+</div><!-- /mode1 -->
+
+<!-- ══════════════════════════════════════════
+     MODE 2 — KÖRKORTSTEORIN
+══════════════════════════════════════════ -->
+<div id="mode2" class="ms">
+
+  <!-- INTRO -->
+  <div id="m2intro" style="display:none;text-align:center">
+    <div class="pill" id="m2pill" style="margin-bottom:14px;display:inline-flex">🚗 368 frågor · 16 kategorier</div>
+    <div id="m2title" style="font:700 30px/1.2 var(--f);color:var(--t);margin-bottom:8px">Körkortsteorin</div>
+    <div id="m2sub" style="font:400 14px var(--f);color:var(--t2)">Exakt som Transportstyrelsens teoriprov</div>
+  </div>
+
+  <!-- CATEGORY GRID -->
+  <div id="m2catw" style="display:none;width:100%;max-width:560px">
+    <div class="prow" style="margin-bottom:12px">
+      <div class="av">PL</div>
+      <div><div class="pname">Per Lindström</div><div class="psub">14/16 kategorier startade · 78% genomsnitt</div></div>
+    </div>
+    <div id="catgrid"></div>
+  </div>
+
+  <!-- SIGN -->
+  <div id="m2signw" style="display:none">
+    <div class="card" id="sigcard">
+      <div class="prow">
+        <div class="av">PL</div>
+        <div><div class="pname">Per Lindström</div><div class="psub">Hastighet — Fråga 8 av 8</div></div>
+      </div>
+      <div class="sgnwrap">
+        <svg id="signsvg" viewBox="0 0 120 120" width="140" height="140">
+          <circle cx="60" cy="60" r="55" fill="white" stroke="#cc0000" stroke-width="10"/>
+          <text x="60" y="77" font-family="DM Sans" font-weight="800" font-size="44" fill="#111" text-anchor="middle">50</text>
+        </svg>
+      </div>
+      <div class="sgnq">Vad innebär detta vägmärke?</div>
+      <div class="alist">
+        <button class="aopt" id="sa">Rekommenderad hastighet 50 km/h</button>
+        <button class="aopt" id="sb">Maxhastighet 50 km/h</button>
+        <button class="aopt" id="sc">Minsta tillåtna hastighet 50 km/h</button>
+        <button class="aopt" id="sd">Hastighetszon upphör vid märket</button>
+      </div>
+      <div id="catprog">✓ Hastighet — 8/8 klara! Kategori klar.</div>
+    </div>
+  </div>
+
+  <!-- SIMULATED EXAM -->
+  <div id="m2simw" style="display:none;width:100%;max-width:540px">
+    <div class="card">
+      <div class="simhdr">
+        <div>
+          <div class="simmode">● Simulerat teoriprov</div>
+          <div style="font:400 11px var(--f);color:var(--t3);margin-top:2px">65 frågor · 52 rätt = godkänt</div>
         </div>
-        <div class="korExpl" id="korExpl">
-          <strong>B är rätt.</strong> Väjningspliktsmärket (inverterad triangel) innebär att du ska lämna företräde till korsande trafik. Stoppmärket kräver fullständigt stopp, vilket är skillnaden.
-        </div>
+        <div id="simtimer">49:12</div>
+      </div>
+      <div id="simqcnt">Fråga 23 av 65</div>
+      <div class="simpb"><div class="simpf" id="simpf"></div></div>
+      <div class="simsbr">
+        <div class="sstt ok">Rätt: <strong id="simr">38</strong></div>
+        <div class="sstt">Fel: <strong id="simw" style="color:var(--err)">5</strong></div>
+        <div class="sstt">Kvar: <strong id="siml">22</strong></div>
+        <div class="sstt">Behöver: <strong>52</strong></div>
+      </div>
+      <div id="simres">
+        <div class="rb">53 / 65</div>
+        <div class="rs">✓ GODKÄNT — Bra jobbat, Per!</div>
       </div>
     </div>
   </div>
-</section>
 
-<!-- ════════════════════════════════════════════
-     AKT 06 – FÖRBÄTTRING / COACH
-════════════════════════════════════════════ -->
-<section class="act" id="act4">
-  <div class="aI">
-    <div class="aTag reveal">AKT 05 — AI-COACH &amp; FÖRBÄTTRING</div>
-    <h2 class="aTitle reveal d1">Din personliga studiecoach</h2>
-    <p class="aSub reveal d2">AI:n analyserar mönster i dina misstag och sätter ihop en konkret träningsplan — baserad på just din historik.</p>
-
-    <!-- 01 – Historik -->
-    <div class="iSec">
-      <div class="iHead" onclick="toggleSec(this)">
-        <div class="iHL"><span class="iNum">01</span><div><div class="iTitle">Provhistorik</div><div class="iSub">3 genomförda prov · Matematik C</div></div></div>
-        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <div class="iBody">
-        <table class="histTable">
-          <thead><tr><th>Datum</th><th>Kurs</th><th style="text-align:right">Resultat</th></tr></thead>
-          <tbody>
-            <tr><td>2026-05-10</td><td>Matematik C</td><td style="text-align:right">3/5 · 60%</td></tr>
-            <tr><td>2026-05-17</td><td>Matematik C</td><td style="text-align:right">4/5 · 70%</td></tr>
-            <tr><td>2026-05-23</td><td>Matematik C</td><td style="text-align:right" class="acc">1.5/2 · 75% ← idag</td></tr>
-          </tbody>
-        </table>
-        <div class="chartWrap2">
-          <div class="chartLbl">Resultatutveckling</div>
-          <div class="chartBars">
-            <div class="cBarWrap"><div class="cBar" style="height:60%"></div><div class="cBarLbl">maj 10</div></div>
-            <div class="cBarWrap"><div class="cBar" style="height:70%"></div><div class="cBarLbl">maj 17</div></div>
-            <div class="cBarWrap"><div class="cBar" style="height:80%"></div><div class="cBarLbl">maj 23</div></div>
-          </div>
+  <!-- STATS -->
+  <div id="m2statsw" style="display:none;width:100%;max-width:540px">
+    <div class="card">
+      <div class="stshdr">
+        <div class="av" style="width:44px;height:44px;font-size:16px">PL</div>
+        <div><div class="pname">Per Lindström</div><div class="stslbl">Körkortsstatistik</div></div>
+        <div style="margin-left:auto;text-align:right">
+          <div class="stsavg">78%</div><div class="stslbl">genomsnitt</div>
         </div>
       </div>
-    </div>
-
-    <!-- 02 – Coach -->
-    <div class="iSec" id="coachSec">
-      <div class="iHead" onclick="toggleSec(this)">
-        <div class="iHL"><span class="iNum">02</span><div><div class="iTitle">AI-Coach</div><div class="iSub">Personlig analys baserad på din historik och felbank</div></div></div>
-        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div id="radarwrap">
+        <svg id="radarsvg" viewBox="0 0 200 200" width="180" height="180"></svg>
       </div>
-      <div class="iBody" id="coachBody">
-        <div class="coachBox2" id="coachBox2">
-          <div class="coachLbl">Rekommendation</div>
-          <div class="coachTxt" id="coachTxt"></div>
-        </div>
-        <div class="statRow">
-          <div class="statBox"><div class="statLbl">Senaste</div><div class="statVal" style="color:var(--a)">75%</div></div>
-          <div class="statBox"><div class="statLbl">Trend</div><div class="statVal" style="color:var(--a)">+20 p.p.</div></div>
-          <div class="statBox"><div class="statLbl">Fokus</div><div class="statVal" style="font-size:16px">Faktorer</div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 03 – Rapport -->
-    <div class="iSec">
-      <div class="iHead" onclick="toggleSec(this)">
-        <div class="iHL"><span class="iNum">03</span><div><div class="iTitle">Lärarrapport</div><div class="iSub">Exportera en sammanfattning för din lärare</div></div></div>
-        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <div class="iBody">
-        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-          <button class="btn btnP" onclick="genReport()">Skapa rapport</button>
-          <button class="btn" disabled id="copyRepBtn">Kopiera</button>
-        </div>
-        <div class="repBox" id="repBox">Klicka "Skapa rapport" för att generera en sammanfattning för din lärare.</div>
-      </div>
-    </div>
-
-    <!-- 04 – Träna -->
-    <div class="iSec">
-      <div class="iHead" onclick="toggleSec(this)">
-        <div class="iHL"><span class="iNum">04</span><div><div class="iTitle">Träna misstag</div><div class="iSub">Markera i felbanken, träna exakt det du behöver</div></div></div>
-        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <div class="iBody">
-        <div class="trainRow2">
-          <button class="btn btnP" onclick="doTrain()">Träna markerade</button>
-          <button class="btn" onclick="$('selPill').textContent='0 valda'">Rensa val</button>
-          <span class="selPill2" id="selPill">1 vald</span>
-        </div>
-        <div class="trainCard">
-          <div class="trainCardT">Träna nu: Faktorisering av andragradsekvationer</div>
-          <div class="trainCardS">3 liknande frågor genereras baserat på ditt markerade misstag.</div>
-          <button class="btn btnP" style="margin-top:12px;font-size:12px" onclick="doTrain()">Starta träning →</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 05 – Felbank -->
-    <div class="iSec">
-      <div class="iHead" onclick="toggleSec(this)">
-        <div class="iHL"><span class="iNum">05</span><div><div class="iTitle">Felbank</div><div class="iSub">Frågor du tappat poäng på · med modellsvar</div></div></div>
-        <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-      <div class="iBody">
-        <div class="mGrid">
-          <div class="mCard" id="mc1">
-            <div class="mHead"><div class="mMeta">Matematik C · 2026-05-23</div><div class="mScore">1/2 p</div></div>
-            <div class="mQ">Lös ekvationen x² − 5x + 6 = 0 och ange alla lösningar.</div>
-            <div class="mDiv"></div>
-            <div class="mFL">Ditt svar</div>
-            <div class="mFV bad" style="font:400 12px var(--mono);white-space:pre-line">x² − 5x + 6 = 0
-(x−2)(x−3) = 0
-x = 2 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(ofullständigt — en rot saknas)</span></div>
-            <div class="mFL" style="margin-top:10px">Modellsvar</div>
-            <div class="mFV">x = 2 och x = 3 &nbsp;<span style="font:400 11px var(--mono);color:var(--t3)">(x²−5x+6 = (x−2)(x−3) = 0)</span></div>
-            <div class="mActs">
-              <button class="btn" style="font-size:12px;padding:5px 11px" id="markBtn1" onclick="toggleMark('markBtn1')">Markera för träning</button>
-              <button class="btn" style="font-size:12px;padding:5px 11px;color:var(--danger);border-color:rgba(255,107,107,.3)" onclick="removeCard('mc1')">Ta bort</button>
-            </div>
-          </div>
-          <div class="mCard" id="mc2">
-            <div class="mHead"><div class="mMeta">Matematik C · 2026-05-17</div><div class="mScore">0/2 p</div></div>
-            <div class="mQ">Visa med pq-formeln att x² − 4x + 3 = 0 har lösningarna x = 1 och x = 3.</div>
-            <div class="mDiv"></div>
-            <div class="mFL">Ditt svar</div>
-            <div class="mFV bad">x = 1</div>
-            <div class="mFL" style="margin-top:10px">Modellsvar</div>
-            <div class="mFV">p = −4, q = 3. &nbsp;x = 4/2 ± √((4/2)² − 3) = 2 ± 1. &nbsp;Alltså x = 1 och x = 3.</div>
-            <div class="mActs">
-              <button class="btn" style="font-size:12px;padding:5px 11px" id="markBtn2" onclick="toggleMark('markBtn2')">Markera för träning</button>
-              <button class="btn" style="font-size:12px;padding:5px 11px;color:var(--danger);border-color:rgba(255,107,107,.3)" onclick="removeCard('mc2')">Ta bort</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="act">
-  <div class="aI">
-    <div class="ctaBox">
-      <div class="dEye" style="margin:0 auto 18px">Redo att börja?</div>
-      <div class="ctaT">Prova ProviaAI på riktigt</div>
-      <p class="ctaS">Allt du såg är riktiga funktioner. Skapa ett konto och testa direkt — inga kreditkort, ingen bindningstid.</p>
-      <div class="btnRow">
-        <a href="app.html" class="btn btnP">Kom igång gratis →</a>
-        <a href="pricing.html" class="btn">Se priser</a>
+      <div class="wkalert" id="wkalert" style="opacity:0">
+        <div class="wkico">⚠️</div>
+        <div class="wktxt"><strong>Väglag & Bromssträcka — 52%</strong><br>AI rekommenderar: träna denna kategori idag</div>
+        <div class="wkbtn">Träna →</div>
       </div>
     </div>
   </div>
-</section>
 
-<footer style="text-align:center;padding:24px 20px;font:400 13px var(--font);color:var(--t3)">
-  ProviaAI är studiestöd och ger ingen officiell betygssättning.
-</footer>
+  <!-- PRICING -->
+  <div id="m2pricew" style="display:none">
+    <div style="font:700 18px var(--f);color:var(--t);text-align:center;margin-bottom:14px">Välj din plan</div>
+    <div id="pgrid">
+      <div class="pc" id="pc1">
+        <div class="ptier">Gratis</div>
+        <div class="pprice">0 kr</div>
+        <div class="pdesc">Körkortsträning<br>2 AI-prov/vecka</div>
+      </div>
+      <div class="pc" id="pc2">
+        <div class="ptier acc">Basic ✦</div>
+        <div class="pprice">29 kr/mån</div>
+        <div class="pdesc">30 AI-prov/månad<br>Obegränsad körkortsträning</div>
+        <div id="pupgr">✓ Per uppgraderade!</div>
+      </div>
+      <div class="pc" id="pc3">
+        <div class="ptier">Premium</div>
+        <div class="pprice">79 kr/mån</div>
+        <div class="pdesc">Obegränsat<br>AI-coach ingår</div>
+      </div>
+    </div>
+  </div>
 
-<!-- GSAP + ScrollTrigger -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+</div><!-- /mode2 -->
+
 <script>
-(function(){
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduced) {
-    document.querySelectorAll(".reveal").forEach(el=>{el.style.opacity="1";el.style.transform="none";});
-    return;
-  }
+/* ════════════════════════════════════════════
+   PARTICLES
+════════════════════════════════════════════ */
+const cvBg = document.getElementById('cvBg');
+const ctxBg = cvBg.getContext('2d');
+const cvFx = document.getElementById('cvFx');
+const ctxFx = cvFx.getContext('2d');
+let W=0, H=0;
 
-  gsap.registerPlugin(ScrollTrigger);
+function resizeCanvases(){
+  W = cvBg.width = cvFx.width = window.innerWidth;
+  H = cvBg.height = cvFx.height = window.innerHeight;
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
 
-  /* Hero entrance */
-  window.addEventListener("load", () => {
-    setTimeout(() => {
-      gsap.from(".dHI > *", {
-        opacity:0, y:22, duration:0.52, stagger:0.09, ease:"power3.out",
-        clearProps:"all"
-      });
-    }, 200);
+const dots = Array.from({length:55},()=>({
+  x:Math.random()*1920, y:Math.random()*1080,
+  vx:(Math.random()-.5)*.28, vy:(Math.random()-.5)*.28,
+  r:Math.random()*1.4+.4,
+  a:Math.random()*.2+.04
+}));
+
+function drawBg(){
+  ctxBg.clearRect(0,0,W,H);
+  dots.forEach(d=>{
+    d.x+=d.vx; d.y+=d.vy;
+    if(d.x<0)d.x=W; if(d.x>W)d.x=0;
+    if(d.y<0)d.y=H; if(d.y>H)d.y=0;
+    ctxBg.beginPath();
+    ctxBg.arc(d.x,d.y,d.r,0,Math.PI*2);
+    ctxBg.fillStyle=`rgba(27,255,140,${d.a})`;
+    ctxBg.fill();
   });
+  requestAnimationFrame(drawBg);
+}
+drawBg();
 
-  /* Act section headers + subs — reveal on scroll */
-  gsap.utils.toArray(".act").forEach(act => {
-    const els = [
-      act.querySelector(".aTag"),
-      act.querySelector(".aTitle"),
-      act.querySelector(".aSub")
-    ].filter(Boolean);
-    if (!els.length) return;
-    gsap.from(els, {
-      opacity:0, y:16, duration:0.48, stagger:0.07, ease:"power2.out",
-      scrollTrigger:{ trigger:act, start:"top 86%", once:true }
+/* ════════════════════════════════════════════
+   FX: CONFETTI + RIPPLE + POINTS
+════════════════════════════════════════════ */
+let fxPieces = [];
+let fxRunning = false;
+
+function fxLoop(){
+  ctxFx.clearRect(0,0,W,H);
+  fxPieces = fxPieces.filter(p=>p.life>0);
+  fxPieces.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life-=p.decay;
+    if(p.life<=0) return;
+    ctxFx.save();
+    ctxFx.globalAlpha=Math.max(0,p.life);
+    ctxFx.beginPath(); ctxFx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctxFx.fillStyle=p.color; ctxFx.fill();
+    ctxFx.restore();
+  });
+  if(fxPieces.length>0) requestAnimationFrame(fxLoop);
+  else fxRunning=false;
+}
+function fxStart(){
+  if(!fxRunning){ fxRunning=true; fxLoop(); }
+}
+
+function spawnConfetti(cx,cy){
+  cx=cx||W/2; cy=cy||(H*0.45);
+  for(let i=0;i<70;i++){
+    fxPieces.push({
+      x:cx+(Math.random()-.5)*160, y:cy,
+      vx:(Math.random()-.5)*7, vy:-Math.random()*9-1,
+      g:.18, r:Math.random()*4+2,
+      color:Math.random()>.45?'rgba(27,255,140,.9)':'rgba(220,255,235,.7)',
+      life:1, decay:.013
     });
-  });
-
-  /* CTA section */
-  gsap.from(".ctaBox", {
-    opacity:0, y:24, duration:0.6, ease:"power3.out",
-    scrollTrigger:{ trigger:".ctaBox", start:"top 88%", once:true }
-  });
-
-  /* Wizard rail */
-  gsap.from(".wRail", {
-    opacity:0, y:10, duration:0.4, ease:"power2.out",
-    scrollTrigger:{ trigger:".wRail", start:"top 88%", once:true }
-  });
-})();
-</script>
-
-<!-- CUSTOM CURSOR -->
-<div id="cursorDot" aria-hidden="true"></div>
-<div id="cursorRing" aria-hidden="true"><div></div></div>
-<script>
-(function(){
-  if (window.matchMedia("(pointer: coarse)").matches || ("ontouchstart" in window)) return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const dot=document.getElementById("cursorDot");
-  const ring=document.getElementById("cursorRing");
-  if(!dot||!ring) return;
-  let mx=-200,my=-200,rx=-200,ry=-200,visible=false;
-  (function raf(){
-    rx+=(mx-rx)*.12; ry+=(my-ry)*.12;
-    ring.style.transform=`translate(${rx-14}px,${ry-14}px)`;
-    requestAnimationFrame(raf);
-  })();
-  const HOVER="a,button,.chap,.iHead,.aBtn,.sCard,.stFooterLink,.abn";
-  let lastEl=null;
-  function applyHover(el){
-    if(el===lastEl) return; lastEl=el;
-    ring.classList.toggle("rHov",!!el);
-    dot.style.transform=`translate(${mx-3}px,${my-3}px)${el?" scale(.5)":""}`;
   }
-  document.addEventListener("mousemove",e=>{
-    mx=e.clientX; my=e.clientY;
-    if(!visible){visible=true;dot.style.opacity="1";ring.style.opacity="1";}
-    dot.style.transform=`translate(${mx-3}px,${my-3}px)${lastEl?" scale(.5)":""}`;
-    applyHover(e.target?.closest?e.target.closest(HOVER):null);
-  });
-  document.addEventListener("mousedown",()=>{
-    ring.classList.remove("rHov"); ring.classList.add("rDown");
-    dot.style.transform=`translate(${mx-3}px,${my-3}px) scale(1.5)`;
-  });
-  document.addEventListener("mouseup",()=>{ ring.classList.remove("rDown"); applyHover(lastEl); });
-  document.addEventListener("mouseleave",()=>{ dot.style.opacity="0"; ring.style.opacity="0"; visible=false; });
-  document.addEventListener("mouseenter",()=>{ if(visible){dot.style.opacity="1";ring.style.opacity="1";} });
-})();
-</script>
-
-<!-- ════════════════════════════════════════
-     GHOST CURSOR
-════════════════════════════════════════ -->
-<div id="gc">
-  <div id="gcBody">
-    <svg id="gcArrow" width="20" height="24" viewBox="0 0 20 24" fill="none">
-      <path d="M2 1 L2 19 L6.5 14 L10 21.5 L12.5 20.5 L9 13 L15.5 13 Z"
-        fill="white" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>
-    </svg>
-    <div id="gcLabel">Vilgot R 👤</div>
-    <div id="gcRipple"></div>
-  </div>
-</div>
-
-<!-- DEMO TIP (bottom strip) -->
-<div id="demoTip">
-  <span id="tipIcon">💡</span>
-  <span id="tipText"></span>
-</div>
-
-<!-- P.E.R MINI BAR -->
-<div id="perMiniBar">
-  <div class="pDot"></div>
-  👨‍🏫 P.E.R är aktiv
-</div>
-
-<!-- PAUSE OVERLAY -->
-<div id="pauseOv">
-  <div class="pauseCard">
-    <div class="pauseIco">⏸</div>
-    <div class="pauseLbl">Demo pausad</div>
-    <div class="pauseSub">Tryck mellanslag eller ⏸ för att fortsätta</div>
-  </div>
-</div>
-
-<script>
-/* ═══════════════════════════════════════════════
-   DEMO DATA
-═══════════════════════════════════════════════ */
-const MAT = `Procenträkning — Matte 1b
-
-Del = Procent × Helhet
-  40% av 350 = 0,4 × 350 = 140
-
-Rabatt baklänges:
-  480 kr = 80% av originalet
-  → 480 ÷ 0,8 = 600 kr`;
-
-const QS = [
-  { t:'Vad är 40% av 350?',
-    opts:['100', '140', '160', '175'], ok:1, demo:1 },
-  { t:'En vara kostar 480 kr efter 20% rabatt. Vad var originalpriset?',
-    math:true, mathTex:'480 kr = 80% av originalet',
-    type:'written',
-    answer:'600 kr',
-    demoAnswer:'80% = 480 kr\n480 ÷ 0,8 = 600' },
-];
-
-const FEED = [
-  { q:'Vad är 40% av 350?', ico:'✓', ok:true, r:'Rätt — 1/1 p',
-    m:'0,4 × 350 = 140. Kom ihåg: procent × helhet = del.' },
-  { q:'Originalpriset — 20% rabatt → 480 kr', ico:'△', ok:false, r:'Delvis rätt — 1/2 p',
-    m:'Rätt metod (÷ 0,8 = 600) men enheten kr saknades i slutsvaret. Skriv alltid enhet.' },
-];
-
-const SMART_TIP = `Du hittade rätt metod (480 ÷ 0,8 = 600) — bra!
-
-Problemet: slutsvaret saknade enheten "kr". Alltid ange enhet.
-
-Metod:
-• Skriv: 480 ÷ 0,8 = 600 kr
-• Kontrollräkna: 600 × 0,8 = 480 ✓
-• Tydligt slutsvar: "Svar: 600 kr"
-
-Nästa steg: träna rabatt/påslag-uppgifter → markera nedan.`;
-
-const COACH = `Hej Vilgot!
-
-Data: 3 prov · Snitt: 72% · Misstag (30d): 2
-Trend: +18 p.p. — tydlig förbättring! 📈
-
-Prioritet:
-• Matte 1b — procenträkning (2 misstag, liknande mönster)
-
-Metod att öva:
-• Rabatt baklänges: del ÷ (1 − procent) = helhet
-• Ange alltid enhet i slutsvar (kr, %, m...)
-• Kontrollräkna: helhet × procent = del ✓
-
-Nästa pass (15 min):
-• Markera 2 felbanksuppgifter om rabatt.
-• Träna markerade misstag.
-• Skriv modellsvaret med egna ord.
-
-Senaste prov: 75% — bra jobbat, fortsätt!`;
-
-const REPORT = `LÄRARRAPPORT — ProviaAI
-Elev: Vilgot R  ·  Kurs: Matematik 1b
-Datum: 2026-05-23  ·  Baserad på: 3 prov
-
-SAMMANFATTNING
-Eleven visar positiv trend (+18 p.p.) med snitt 72%
-de senaste proven: 58% → 70% → 75%.
-
-STYRKOR
-• God förståelse för grundläggande procenträkning
-• Rätt metod vid rabatt baklänges (÷ 0,8)
-• Stabil förbättring mellan prov
-
-FÖRBÄTTRINGSOMRÅDEN
-• Saknar enheter i slutsvar (kr, %)
-• Behöver öva rabatt och påslag baklänges
-
-REKOMMENDATION
-Ge eleven strukturerade övningar med explicit krav på att
-ange alla lösningar. Fokus: faktoriseringsuppgifter.`;
-
-const PER_GREETING = 'Hej! Jag ser att du precis rättat ditt Matte 1b-prov. Vad undrar du?';
-const PER_USER     = 'Hjälp mig med fråga 2 — varför inte full poäng?';
-const PER_RESPONSE = 'Du hittade rätt metod: 480 ÷ 0,8 = 600 ✓\n\nProblemet: "kr" saknades i slutsvaret. Skriv alltid enhet.\n\nSvar: 600 kr\nKontroll: 600 × 0,8 = 480 ✓\n\nVill du träna liknande rabatt-uppgifter?';
-
-/* ═══════════════════════════════════════════════
-   PAUSE SYSTEM
-═══════════════════════════════════════════════ */
-let isPaused = false;
-let isRunning = false;
-
-async function wait(ms) {
-  const chunk = 80;
-  let remaining = ms;
-  while (remaining > 0) {
-    await new Promise(r => setTimeout(r, Math.min(chunk, remaining)));
-    remaining -= chunk;
-    while (isPaused) await new Promise(r => setTimeout(r, 80));
-  }
+  fxStart();
 }
 
-function togglePause() {
-  isPaused = !isPaused;
-  const btn = $('pauseBtn');
-  const ov = $('pauseOv');
-  if (btn) btn.textContent = isPaused ? '▶ Fortsätt' : '⏸ Pausa';
-  if (ov) ov.classList.toggle('on', isPaused);
-}
-
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && isRunning) { e.preventDefault(); togglePause(); }
-});
-
-/* ═══════════════════════════════════════════════
-   UTILS
-═══════════════════════════════════════════════ */
-const $ = id => document.getElementById(id);
-function setChap(n){ [1,2,3,4,5,6].forEach(i => $('c'+i)?.classList.toggle('on', i===n)); }
-function setStep(n, total=7){ const b=$('stepBadge'); if(b){b.textContent=`Steg ${n} / ${total}`;b.className='stepBadge on';} }
-
-function wDone(n){
-  const s=$('ws'+n),d=$('wd'+n),c=$('wc'+n);
-  if(s){s.classList.remove('on');s.classList.add('dn');}
-  if(d) d.textContent='✓';
-  if(c) c.classList.add('dn');
-}
-function wOn(n){ const s=$('ws'+n); if(s){s.classList.add('on');s.classList.remove('dn');} }
-
-function go(id, ch){
-  const el=$(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
-  if(ch) setChap(ch);
-}
-
-function toggleSec(head){
-  const sec=head.parentElement;
-  const wasOpen=sec.classList.contains('open');
-  sec.classList.toggle('open');
-  // Animate chart bars when opening
-  if(!wasOpen){
-    sec.querySelectorAll('.cBar').forEach(b=>{
-      if(!b.dataset.h) b.dataset.h=b.style.height||'0%';
-      b.style.height='0%';
-      requestAnimationFrame(()=>{ b.style.height=b.dataset.h; });
+function spawnRipple(x,y){
+  for(let i=0;i<3;i++){
+    const el=document.createElement('div');
+    el.className='ripring';
+    el.style.left=(x-20)+'px'; el.style.top=(y-20)+'px';
+    document.body.appendChild(el);
+    gsap.set(el,{opacity:.7});
+    gsap.to(el,{
+      width:80+i*28, height:80+i*28,
+      left:(x-40-i*14)+'px', top:(y-40-i*14)+'px',
+      opacity:0, duration:.75, delay:i*.1,
+      ease:'power2.out', onComplete:()=>el.remove()
     });
   }
 }
 
-/* ═══════════════════════════════════════════════
-   SCORE COUNTER ANIMATION
-═══════════════════════════════════════════════ */
-async function animateScore(from, to, durationMs=1300){
-  const el=$('scoreBig');
-  if(!el) return;
-  const start = performance.now();
-  await new Promise(resolve=>{
-    function step(now){
-      const t = Math.min(1,(now-start)/durationMs);
-      const ease = t<0.5 ? 2*t*t : (4-2*t)*t-1;
-      el.textContent = Math.round(from+(to-from)*ease)+'%';
-      if(t<1) requestAnimationFrame(step);
-      else { el.textContent = to+'%'; resolve(); }
-    }
-    requestAnimationFrame(step);
+function spawnPoints(x,y,txt){
+  const el=document.createElement('div');
+  el.className='ptsbdg'; el.textContent=txt;
+  el.style.left=x+'px'; el.style.top=y+'px';
+  document.body.appendChild(el);
+  gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',
+    onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})
   });
 }
 
-/* ═══════════════════════════════════════════════
-   GHOST CURSOR CONTROLLER
-═══════════════════════════════════════════════ */
-const cursor = {
-  el:null, body:null, ripple:null, cx:0, cy:0,
-  isMobile: window.innerWidth < 600,
+/* ════════════════════════════════════════════
+   RADAR CHART
+════════════════════════════════════════════ */
+function drawRadar(){
+  const svg = document.getElementById('radarsvg');
+  const cats=[
+    {l:'Hastighet',v:.87},{l:'Möte',v:.72},
+    {l:'Miljö',v:.90},{l:'Mörker',v:.55},
+    {l:'Väglag',v:.52},{l:'Trafikregler',v:.80}
+  ];
+  const cx=100,cy=100,r=68,n=cats.length;
+  let h='';
+  [.25,.5,.75,1].forEach(f=>{
+    const pts=cats.map((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*f,cy+Math.sin(a)*r*f];});
+    h+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="none" stroke="rgba(27,255,140,.12)" stroke-width="1"/>`;
+  });
+  cats.forEach((_,i)=>{const a=i/n*Math.PI*2-Math.PI/2;h+=`<line x1="${cx}" y1="${cy}" x2="${(cx+Math.cos(a)*r).toFixed(1)}" y2="${(cy+Math.sin(a)*r).toFixed(1)}" stroke="rgba(27,255,140,.14)" stroke-width="1"/>`;});
+  const dp=cats.map((c,i)=>{const a=i/n*Math.PI*2-Math.PI/2;return[cx+Math.cos(a)*r*c.v,cy+Math.sin(a)*r*c.v];});
+  h+=`<path d="${dp.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}Z" fill="rgba(27,255,140,.14)" stroke="#1bff8c" stroke-width="2"/>`;
+  cats.forEach((c,i)=>{
+    const a=i/n*Math.PI*2-Math.PI/2;
+    const lx=cx+Math.cos(a)*(r+16),ly=cy+Math.sin(a)*(r+16);
+    const col=c.v<.6?'#ff6b6b':'rgba(168,196,180,.8)';
+    h+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${col}">${c.l}</text>`;
+  });
+  svg.innerHTML=h;
+}
 
-  init(){
-    this.el=$('gc'); this.body=$('gcBody'); this.ripple=$('gcRipple');
-    this.isMobile = window.innerWidth < 600;
-    if(this.isMobile && this.el){
-      // Scale down cursor on mobile
-      this.el.style.transformOrigin = 'top left';
-    }
-    this.setPos(80, window.innerHeight*0.55);
-  },
+/* ════════════════════════════════════════════
+   CATEGORY GRID DATA
+════════════════════════════════════════════ */
+const CATS=[
+  {e:'⚡',n:'Hastighet',p:87,done:true},
+  {e:'↔',n:'Möte & Omkörning',p:72,done:true},
+  {e:'🌿',n:'Miljö & Ekonomi',p:90,done:true},
+  {e:'🚫',n:'Alkohol & Droger',p:95,done:true},
+  {e:'🌙',n:'Mörker & Sikt',p:68,done:true},
+  {e:'⚠️',n:'Väglag & Bromssträcka',p:52,done:true,weak:true},
+  {e:'🚦',n:'Trafikregler',p:80,done:true},
+  {e:'🛑',n:'Vägmärken',p:75,done:true},
+  {e:'🚗',n:'Fordon & Utrustning',p:83,done:true},
+  {e:'🔄',n:'Korsningar',p:77,done:true},
+  {e:'👁️',n:'Riskuppfattning',p:65,done:true},
+  {e:'🏥',n:'Olyckor & Säkerhet',p:71,done:true},
+  {e:'🚧',n:'Vägarbete',p:88,done:true},
+  {e:'🎯',n:'Koncentration',p:60,done:true},
+  {e:'🌍',n:'Internationellt',p:0,done:false},
+  {e:'🔧',n:'Motorkunskap',p:0,done:false},
+];
 
-  setPos(x,y){
-    this.cx=x; this.cy=y;
-    if(!this.el) return;
-    const scale = this.isMobile ? ' scale(0.7)' : '';
-    this.el.style.transform=`translate(${x}px,${y}px)${scale}`;
-  },
+function buildCatGrid(){
+  document.getElementById('catgrid').innerHTML=CATS.map((c,i)=>`
+    <div class="catc${c.weak?' wk':''}${!c.done?' nd':''}" id="cc${i}">
+      <div class="catemi">${c.e}</div>
+      <div class="catnm">${c.n}</div>
+      <div class="catbr"><div class="catbf" id="cbf${i}"></div></div>
+      <div class="catpct">${c.done?c.p+'%':'–'}</div>
+    </div>`).join('');
+}
 
-  show(){ if(this.el) this.el.classList.add('vis'); },
-  hide(){ if(this.el) this.el.classList.remove('vis'); },
-
-  async moveTo(el, offX=0, offY=0){
-    if(!el||!this.el) return;
-    el.scrollIntoView({behavior:'smooth',block:'center'});
-    await wait(700);
-    const r=el.getBoundingClientRect();
-    const tx=r.left+r.width*0.5+offX;
-    const ty=r.top+r.height*0.5+offY;
-    this.cx=tx; this.cy=ty;
-    const scale = this.isMobile ? ' scale(0.7)' : '';
-    this.el.style.transform=`translate(${tx}px,${ty}px)${scale}`;
-    await wait(950);
-  },
-
-  async click(el){
-    await this.moveTo(el);
-    await wait(350);
-    if(this.body){this.body.classList.add('pressing');}
-    if(this.ripple){this.ripple.classList.remove('pop');void this.ripple.offsetWidth;this.ripple.classList.add('pop');}
-    await wait(130);
-    if(this.body){this.body.classList.remove('pressing');}
-    await wait(200);
-  },
-
-  async highlight(el){
-    if(!el) return;
-    el.classList.add('dHL');
-    await wait(900);
-    el.classList.remove('dHL');
-  }
+/* ════════════════════════════════════════════
+   NARRATOR
+════════════════════════════════════════════ */
+const NData={
+  1:[
+    {s:'Material',t:'Per klistrar in Matte 2b — vilket ämne som helst'},
+    {s:'AI-generering',t:'Sekunder senare: 6 skräddarsydda frågor'},
+    {s:'Träning',t:'Direkt feedback & AI-förklaring — Per lär sig, inte bara gissar'},
+    {s:'Resultat',t:'83% och bättre än 74% av alla elever'},
+  ],
+  2:[
+    {s:'Kategorier',t:'368 frågor, 16 kategorier — som riktiga Transportstyrelsen'},
+    {s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},
+    {s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — exakt som verkligheten'},
+    {s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar träning automatiskt'},
+    {s:'Priser',t:'Gratis att starta, Basic 29 kr/mån, Premium 79 kr/mån obegränsat'},
+  ]
 };
-
-/* ═══════════════════════════════════════════════
-   TIP BUBBLE
-═══════════════════════════════════════════════ */
-let tipTimer=null;
-
-async function showTip(html, durationMs=4500){
-  const tip=$('demoTip'),txt=$('tipText');
-  if(!tip||!txt) return;
-  txt.innerHTML=html;
-  tip.classList.add('vis');
-  clearTimeout(tipTimer);
-  tipTimer=setTimeout(()=>tip.classList.remove('vis'),durationMs);
+function setNarrator(mode,activeIdx){
+  document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>
+    `<div class="nst" style="opacity:${i===activeIdx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`
+  ).join('');
 }
 
-function hideTip(){ $('demoTip')?.classList.remove('vis'); }
+/* ════════════════════════════════════════════
+   PROGRESS DOTS
+════════════════════════════════════════════ */
+const STEP_N={1:4,2:5};
+function buildDots(mode){
+  document.getElementById('pdots').innerHTML=
+    Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('');
+}
+function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'');}
 
-/* Multi-line typewriter (handles \n) */
-async function typeIntoField(fieldId, text, speed=46){
-  const field=$(fieldId);
-  if(!field) return;
-  field.classList.add('active');
-  let typed='';
-  for(const ch of text){
-    typed+=ch;
-    // Render newlines as <br>, cursor at end
-    const html=typed.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-    field.innerHTML=`${html}<span class="aFieldCursor"></span>`;
-    await wait(ch==='\n'? speed*4 : speed);
-  }
+/* ════════════════════════════════════════════
+   COUNTDOWN BAR
+════════════════════════════════════════════ */
+let cdTween=null;
+function startCountdown(dur){
+  if(cdTween)cdTween.kill();
+  gsap.set('#cfill',{width:'0%'});
+  cdTween=gsap.to('#cfill',{width:'100%',duration:dur,ease:'none'});
 }
 
-/* Typewriter for smart tip */
-async function typeSmartTip(text, speed=14){
-  const el=$('smartTipTxt');
-  if(!el) return;
-  el.classList.add('glow');
-  let typed='';
-  for(let i=0;i<=text.length;i++){
-    typed=text.slice(0,i);
-    el.textContent=typed;
-    await wait(speed);
-  }
-  el.classList.remove('glow');
+/* ════════════════════════════════════════════
+   STREAK
+════════════════════════════════════════════ */
+let strkCnt=0;
+function showStreak(n){
+  strkCnt=n;
+  const el=document.getElementById('streak');
+  el.textContent='🔥 '+n;
+  gsap.killTweensOf(el);
+  gsap.fromTo(el,{opacity:0,scale:.65},{opacity:1,scale:1,duration:.35,ease:'back.out(2)'});
+  gsap.to(el,{opacity:0,duration:.4,delay:1.8});
 }
 
-/* ═══════════════════════════════════════════════
-   ACT TRIGGERS
-═══════════════════════════════════════════════ */
-const S={a1:false,a2:false,a3:false,a4:false,a5:false,aper:false,akor:false};
+/* ════════════════════════════════════════════
+   TYPEWRITER
+════════════════════════════════════════════ */
+const MAT_TEXT=`Andragradsekvationer är ekvationer av formen ax² + bx + c = 0 där a ≠ 0.
 
-/* ═══════════════════════════════════════════════
-   P.E.R ACT
-═══════════════════════════════════════════════ */
-function addPerMsg(text, type){
-  const msgs=$('perMockMsgs'); if(!msgs) return null;
-  const d=document.createElement('div');
-  d.className='perMockMsg '+type;
-  d.textContent=text;
-  msgs.appendChild(d);
-  msgs.scrollTop=msgs.scrollHeight;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>d.classList.add('vis')));
-  return d;
+Lösningar ges av ABC-formeln:
+x = (−b ± √(b²−4ac)) / 2a
+
+Diskriminanten D = b²−4ac:
+• D > 0 → två reella lösningar
+• D = 0 → en reell lösning
+• D < 0 → inga reella lösningar
+
+Exempel: x² − 5x + 6 = 0
+a=1, b=−5, c=6 → D = 25−24 = 1
+x = (5 ± 1)/2 → x = 3 eller x = 2`;
+
+let twInterval=null;
+function startTypewriter(){
+  const el=document.getElementById('m1mat');
+  const cnt=document.getElementById('m1cnt');
+  el.textContent=''; let i=0;
+  clearInterval(twInterval);
+  twInterval=setInterval(()=>{
+    if(i>=MAT_TEXT.length){clearInterval(twInterval);return;}
+    el.textContent+=MAT_TEXT[i++];
+    cnt.textContent=i+' tecken';
+  },16);
+}
+function stopTypewriter(){clearInterval(twInterval);}
+
+/* ════════════════════════════════════════════
+   SCORE COUNTER
+════════════════════════════════════════════ */
+function animScore(){
+  let v=0;const el=document.getElementById('scorenum');
+  scoreCountTimer=setInterval(()=>{v=Math.min(v+2,83);el.textContent=v+'%';if(v>=83)clearInterval(scoreCountTimer);},17);
+  scoreFillTimer=setTimeout(()=>{document.getElementById('sfill').style.width='83%';},80);
 }
 
-async function typePerInput(text, speed=40){
-  const field=$('perDemoInput'); if(!field) return;
-  field.classList.add('active');
-  let typed='';
-  for(const ch of text){ typed+=ch; field.textContent=typed; await wait(speed); }
-  await wait(300);
-  field.classList.remove('active');
-  field.textContent='';
+/* ════════════════════════════════════════════
+   SIM EXAM TICK
+════════════════════════════════════════════ */
+let simTick=null;
+let aiCountTimer=null,aiGoTimer=null,q3TwTimer=null,scoreCountTimer=null,scoreFillTimer=null;
+let catTimers=[];
+
+function clearAllTimers(){
+  clearInterval(aiCountTimer); clearTimeout(aiGoTimer);
+  clearInterval(q3TwTimer);
+  clearInterval(scoreCountTimer); clearTimeout(scoreFillTimer);
+  catTimers.forEach(clearTimeout); catTimers=[];
+  aiCountTimer=aiGoTimer=q3TwTimer=scoreCountTimer=scoreFillTimer=null;
 }
 
-async function typePerMsg(el, text, speed=16){
-  if(!el) return;
-  let typed='';
-  for(const ch of text){ typed+=ch; el.textContent=typed; await wait(speed); }
+function startSimTick(){
+  let sec=49*60+12,q=23,right=38;
+  const tEl=document.getElementById('simtimer');
+  const qEl=document.getElementById('simqcnt');
+  const rEl=document.getElementById('simr');
+  const pEl=document.getElementById('simpf');
+  clearInterval(simTick);
+  simTick=setInterval(()=>{
+    sec-=3; q=Math.min(q+1,65);
+    if(Math.random()>.3&&right<53)right++;
+    const mm=Math.floor(sec/60),ss=sec%60;
+    tEl.textContent=mm+':'+(ss<10?'0':'')+ss;
+    qEl.textContent='Fråga '+q+' av 65';
+    rEl.textContent=right;
+    pEl.style.width=(q/65*100)+'%';
+    if(q>=65||sec<=0)clearInterval(simTick);
+  },280);
 }
+function stopSimTick(){clearInterval(simTick);}
 
-async function triggerActPer(){
-  if(S.aper) return; S.aper=true;
-  await wait(600);
-  // Greeting
-  const g=addPerMsg(PER_GREETING,'teacher');
-  await wait(1800);
-  // User types
-  await typePerInput(PER_USER, 42);
-  const u=addPerMsg(PER_USER,'user');
-  await wait(500);
-  // Typing indicator
-  const typing=addPerMsg('P.E.R skriver…','teacher typing');
-  await wait(1600);
-  if(typing){ typing.className='perMockMsg teacher'; typing.textContent=''; await typePerMsg(typing, PER_RESPONSE, 14); }
-}
+/* ════════════════════════════════════════════
+   SHOW/HIDE HELPERS
+════════════════════════════════════════════ */
+const M1SEC=['m1intro','m1matw','m1aiw','m1qw','m1res'];
+const M2SEC=['m2intro','m2catw','m2signw','m2simw','m2statsw','m2pricew'];
 
-/* ═══════════════════════════════════════════════
-   KÖRKORTET ACT
-═══════════════════════════════════════════════ */
-async function triggerActKor(){
-  if(S.akor) return; S.akor=true;
-  // Reveal answer options
-  for(let i=0;i<4;i++){
-    await wait(220);
-    const opt=$('ko'+i); if(opt) opt.classList.add('vis');
-  }
-  await wait(1200);
-  // Ghost selects wrong answer (A)
-  const ko0=$('ko0');
-  await cursor.moveTo(ko0);
-  await cursor.click(ko0);
-  ko0.classList.add('bad');
-  await wait(900);
-  ko0.classList.remove('bad');
-  await wait(500);
-  // Correct answer (B)
-  const ko1=$('ko1');
-  await cursor.moveTo(ko1);
-  await cursor.click(ko1);
-  ko1.classList.add('ok');
-  await wait(800);
-  // XP + progress
-  const xp=$('korXP'); if(xp) xp.classList.add('vis');
-  const pf=$('korProgressFill'); if(pf) pf.style.width='39%';
-  await wait(700);
-  // Show explanation
-  const expl=$('korExpl'); if(expl) expl.classList.add('vis');
-  await wait(1500);
-}
+function hideAll(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
+function show(id){const e=document.getElementById(id);if(e)e.style.display='';}
 
-
-async function runTypewriter(){
-  const area=$('matArea'),cnt=$('matCnt'),btn=$('nextBtn');
-  if(!area) return;
-  area.textContent='';
-  area.classList.remove('dn');
-  for(let i=0;i<=MAT.length;i++){
-    area.textContent=MAT.slice(0,i);
-    if(cnt) cnt.textContent=i+' tecken';
-    await wait(12);
-  }
-  area.classList.add('dn');
-  S.a1=true;
-  if(btn){btn.style.opacity='1';btn.style.pointerEvents='auto';}
-}
-
-async function triggerA3(){
-  if(S.a3) return; S.a3=true;
-  wDone(2); wOn(3);
-  const skel=$('skelL'),ql=$('qList');
-  if(!skel||!ql) return;
-  skel.style.display='flex';
-  ql.style.display='none';
-  await wait(700);
-  ql.innerHTML='';
-  QS.forEach((q,i)=>{
-    const card=document.createElement('div');
-    card.className='qCard'; card.id='qc'+i;
-    const mathLine=q.math?`<div class="qMath">${q.mathTex||''}</div>`:'';
-    let ansHtml;
-    if(q.type==='written'){
-      ansHtml=`<div class="aTextField" id="ansField${i}"><span class="aFieldCursor"></span></div>`;
-    } else {
-      const opts=q.opts.map((o,j)=>
-        `<button class="aBtn" id="ab${i}_${j}" onclick="selAns(${i},${j})">${'ABCD'[j]}. ${o}</button>`
-      ).join('');
-      ansHtml=`<div class="aGrid">${opts}</div>`;
-    }
-    card.innerHTML=`<div class="qN">Fråga ${i+1} / ${QS.length}</div><div class="qT">${q.t}</div>${mathLine}${ansHtml}`;
-    ql.appendChild(card);
+function resetQ(){
+  clearAllTimers();
+  ['q1a','q1b','q1c','q1d','q2a','q2b','q2c','q2d','q4a','q4b','q4c','q4d','sa','sb','sc','sd'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.className='aopt';
   });
-  skel.style.display='none';
-  ql.style.display='flex';
-  for(let i=0;i<QS.length;i++){await wait(i===0?100:280);$('qc'+i)?.classList.add('vis');}
+  document.getElementById('q1').style.display='';
+  document.getElementById('q2').style.display='none';
+  document.getElementById('q3').style.display='none';
+  document.getElementById('q4').style.display='none';
+  document.getElementById('q3f').textContent='';
+  document.getElementById('q3f').className='wfield';
+  document.getElementById('q3fb').style.display='none';
+  gsap.set('#q3fb',{opacity:0,y:6});
+  gsap.set(['#q1','#q2','#q3','#q4'],{opacity:0,y:10});
 }
 
-function selAns(qi,oi){
-  QS[qi]._chosen=oi;
-  for(let j=0;j<QS[qi].opts.length;j++){
-    const b=$(`ab${qi}_${j}`);
-    if(b){b.classList.remove('sel','ok','bad');if(j===oi)b.classList.add('sel');}
+/* ════════════════════════════════════════════
+   TIMELINE 1 — MOCKPROV (60 s)
+════════════════════════════════════════════ */
+let tl1=null,tl2=null,curMode=1,paused=false;
+
+function buildTL1(){
+  if(tl1){tl1.kill();tl1=null;}
+  stopTypewriter(); strkCnt=0;
+  hideAll(M1SEC);
+  resetQ();
+  document.getElementById('scorenum').textContent='0%';
+  document.getElementById('sfill').style.width='0%';
+  document.getElementById('xpfill').style.width='0%';
+  gsap.set(['#rankp','#lvlbdg'],{opacity:0});
+  gsap.set('#aistatus',{});
+  document.getElementById('aistatus').textContent='Analyserar material...';
+  document.getElementById('aibig').textContent='0';
+  document.getElementById('aisub').textContent='ord analyserade';
+  document.getElementById('m1mat').textContent='';
+  buildDots(1);
+
+  tl1=gsap.timeline({onComplete:()=>{if(curMode===1)buildTL1();}});
+
+  /* 0–5s INTRO */
+  tl1
+    .call(()=>{hideAll(M1SEC);show('m1intro');setDot(0,'on');setNarrator(1,0);startCountdown(60);})
+    .from('#m1intro',{opacity:0,duration:.01})
+    .from('#m1logo',{opacity:0,scale:.7,duration:.8,ease:'back.out(1.8)'})
+    .from('#m1htitle',{opacity:0,y:14,duration:.7},'-=.3')
+    .from('#m1hpill',{opacity:0,y:8,duration:.5},'-=.2')
+    .from('#m1hsub',{opacity:0,duration:.5},'-=.15')
+
+  /* 5–16s MATERIAL */
+  tl1
+    .call(()=>{hideAll(M1SEC);show('m1matw');setDot(0,'dn');setDot(1,'on');setNarrator(1,0);startTypewriter();},[], 5)
+    .from('#m1cpill',{opacity:0,duration:.5})
+    .from('#m1crd',{opacity:0,y:10,duration:.6})
+
+  /* 16–27s AI GEN */
+  tl1
+    .call(()=>{
+      hideAll(M1SEC);show('m1aiw');stopTypewriter();
+      setDot(1,'dn');setDot(2,'on');setNarrator(1,1);
+      gsap.set('#m1aicrd',{opacity:0,y:10});
+    },[],16)
+    .to('#m1aicrd',{opacity:1,y:0,duration:.6},16.2)
+    .call(()=>{
+      const seq=[
+        ['Analyserar 1 247 ord...','1247','ord analyserade'],
+        ['Identifierar nyckelbegrepp...','8','nyckelbegrepp hittade'],
+        ['Genererar 6 anpassade frågor...','6','frågor skapade'],
+      ];
+      let si=0;
+      const go=()=>{
+        if(si>=seq.length)return;
+        const[s,n,sub]=seq[si++];
+        document.getElementById('aistatus').textContent=s;
+        document.getElementById('aisub').textContent=sub;
+        let v=0;const target=parseInt(n);
+        aiCountTimer=setInterval(()=>{
+          v=Math.min(v+Math.max(1,Math.ceil(target/22)),target);
+          document.getElementById('aibig').textContent=v;
+          if(v>=target){clearInterval(aiCountTimer);aiGoTimer=setTimeout(go,550);}
+        },38);
+      };
+      go();
+    },[],17)
+
+  /* 27–50s QUESTIONS */
+  tl1
+    .call(()=>{
+      hideAll(M1SEC);show('m1qw');
+      setDot(2,'dn');setDot(3,'on');setNarrator(1,2);
+      document.getElementById('q2').style.display='none';
+      document.getElementById('q3').style.display='none';
+      document.getElementById('q4').style.display='none';
+    },[],27)
+    .to('#q1',{opacity:1,y:0,duration:.5},27.4)
+
+    /* Q1 — rätt */
+    .call(()=>{ document.getElementById('q1a').className='aopt sel'; },[],29.2)
+    .call(()=>{
+      document.getElementById('q1a').className='aopt ok';
+      const r=document.getElementById('q1').getBoundingClientRect();
+      spawnRipple(r.left+r.width/2,r.top+r.height/2);
+      spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
+      showStreak(1);
+    },[],29.65)
+
+    /* Q2 appear — rätt */
+    .call(()=>{
+      document.getElementById('q1').style.display='none';
+      document.getElementById('q2').style.display='';
+      gsap.to('#q2',{opacity:1,y:0,duration:.4,ease:'power3.out'});
+    },[],30.45)
+    .call(()=>{ document.getElementById('q2b').className='aopt sel'; },[],32.2)
+    .call(()=>{
+      document.getElementById('q2b').className='aopt ok';
+      const r=document.getElementById('q2').getBoundingClientRect();
+      spawnRipple(r.left+r.width/2,r.top+r.height/2);
+      spawnPoints(r.left+r.width/2-24,r.top+50,'+10p ✓');
+      showStreak(2);
+    },[],32.62)
+
+    /* Q3 appear — FEL */
+    .call(()=>{
+      document.getElementById('q2').style.display='none';
+      document.getElementById('q3').style.display='';
+      gsap.to('#q3',{opacity:1,y:0,duration:.45});
+      document.getElementById('q3f').className='wfield active';
+      const wrong='x = 4 eller x = −8'; let ti=0;
+      q3TwTimer=setInterval(()=>{
+        if(ti>=wrong.length){clearInterval(q3TwTimer);return;}
+        document.getElementById('q3f').textContent=wrong.slice(0,++ti);
+      },55);
+    },[],35.5)
+    .call(()=>{
+      document.getElementById('q3f').className='wfield bad';
+      gsap.to('#q3',{keyframes:[
+        {x:-7,duration:.07},{x:7,duration:.07},{x:-5,duration:.07},
+        {x:5,duration:.07},{x:0,duration:.07}
+      ]});
+      document.getElementById('q3fb').style.display='';
+      gsap.to('#q3fb',{opacity:1,y:0,duration:.6});
+      strkCnt=0;
+    },[],38.5)
+
+    /* Q4 appear — rätt */
+    .call(()=>{
+      document.getElementById('q3').style.display='none';
+      document.getElementById('q4').style.display='';
+      gsap.to('#q4',{opacity:1,y:0,duration:.45});
+    },[],43)
+    .call(()=>{ document.getElementById('q4a').className='aopt sel'; },[],44.8)
+    .call(()=>{
+      document.getElementById('q4a').className='aopt ok';
+      const r=document.getElementById('q4').getBoundingClientRect();
+      spawnRipple(r.left+r.width/2,r.top+r.height/2);
+      spawnPoints(r.left+r.width/2-30,r.top+50,'+15p Exakt!');
+      showStreak(1);
+    },[],45.2)
+
+  /* 50–58s RESULTS */
+  tl1
+    .call(()=>{
+      hideAll(M1SEC);show('m1res');
+      setDot(3,'dn');setNarrator(1,3);
+      gsap.set('#m1res',{opacity:0,y:14});
+    },[],50)
+    .to('#m1res',{opacity:1,y:0,duration:.7},50.3)
+    .call(animScore,[],51)
+    .to('#rankp',{opacity:1,y:0,duration:.6},52.8)
+    .call(()=>{ spawnConfetti(); },[],53.2)
+    .call(()=>{ gsap.to('#xpfill',{width:'72%',duration:1.2,ease:'power2.out'}); },[],53.5)
+    .to('#lvlbdg',{opacity:1,duration:.5},55)
+
+  /* 58–60s fade */
+  tl1
+    .to('#mode1',{opacity:0,duration:1.4},58.2)
+    .set('#mode1',{opacity:1},60)
+  ;
+
+  return tl1;
+}
+
+/* ════════════════════════════════════════════
+   TIMELINE 2 — KÖRKORTSTEORIN (60 s)
+════════════════════════════════════════════ */
+function buildTL2(){
+  if(tl2){tl2.kill();tl2=null;}
+  stopSimTick(); clearAllTimers();
+  hideAll(M2SEC);
+  document.getElementById('pc2').className='pc';
+  gsap.set(['#m2pill','#m2title','#m2sub'],{clearProps:'all'});
+  gsap.set('#sigcard',{opacity:0});
+  gsap.set('#signsvg',{scale:.4,opacity:0});
+  gsap.set('#catprog',{opacity:0});
+  gsap.set('#m2simw',{opacity:0});
+  gsap.set('#simres',{opacity:0,scale:.92});
+  gsap.set('#m2statsw',{opacity:0});
+  gsap.set('#wkalert',{opacity:0});
+  gsap.set('#m2pricew',{opacity:0});
+  gsap.set('.pc',{opacity:0,y:12});
+  gsap.set('#pupgr',{opacity:0});
+  ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='aopt';});
+  document.getElementById('simtimer').textContent='49:12';
+  document.getElementById('simqcnt').textContent='Fråga 23 av 65';
+  document.getElementById('simr').textContent='38';
+  document.getElementById('simpf').style.width='35%';
+  document.getElementById('simres').style.opacity='0';
+  gsap.set('#simres',{scale:.92});
+  buildCatGrid(); drawRadar(); buildDots(2);
+
+  tl2=gsap.timeline({onComplete:()=>{if(curMode===2)buildTL2();}});
+
+  /* 0–5s INTRO */
+  tl2
+    .call(()=>{hideAll(M2SEC);show('m2intro');setDot(0,'on');setNarrator(2,0);startCountdown(60);})
+    .from('#m2pill',{opacity:0,y:8,duration:.6})
+    .from('#m2title',{opacity:0,y:12,duration:.7},'-=.2')
+    .from('#m2sub',{opacity:0,duration:.5},'-=.15')
+
+  /* 5–14s CATEGORY GRID */
+  tl2
+    .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0);},[],5)
+    .call(()=>{
+      catTimers.forEach(clearTimeout); catTimers=[];
+      CATS.forEach((c,i)=>{
+        gsap.to('#cc'+i,{opacity:c.done?1:.4,y:0,duration:.4,delay:i*.065,ease:'power2.out'});
+        if(c.done){
+          catTimers.push(setTimeout(()=>{
+            const f=document.getElementById('cbf'+i);
+            if(f)f.style.width=c.p+'%';
+          },600+i*65));
+        }
+        if(i===0) catTimers.push(setTimeout(()=>{ document.getElementById('cc0').classList.add('hl'); },900));
+      });
+    },[],5.5)
+
+  /* 14–26s SIGN */
+  tl2
+    .call(()=>{
+      hideAll(M2SEC);show('m2signw');
+      setDot(1,'dn');setDot(2,'on');setNarrator(2,1);
+      gsap.set('#sigcard',{opacity:0,y:10});
+      gsap.set('#signsvg',{scale:.4,opacity:0});
+      gsap.set('#catprog',{opacity:0});
+      ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='aopt';});
+    },[],14)
+    .to('#sigcard',{opacity:1,y:0,duration:.6},14.2)
+    .to('#signsvg',{scale:1,opacity:1,duration:1,ease:'back.out(1.4)'},14.6)
+    .call(()=>{ document.getElementById('sb').className='aopt sel'; },[],18)
+    .call(()=>{
+      document.getElementById('sb').className='aopt ok';
+      const rect=document.getElementById('signsvg').getBoundingClientRect();
+      spawnRipple(rect.left+rect.width/2,rect.top+rect.height/2);
+      gsap.to('#signsvg',{filter:'drop-shadow(0 0 22px rgba(27,255,140,.55))',duration:.5});
+    },[],19)
+    .to('#catprog',{opacity:1,duration:.6},20)
+
+  /* 26–42s SIM EXAM */
+  tl2
+    .call(()=>{
+      hideAll(M2SEC);show('m2simw');
+      setDot(2,'dn');setDot(3,'on');setNarrator(2,2);
+      gsap.set('#m2simw',{opacity:0,y:10});
+      gsap.set('#simres',{opacity:0,scale:.92});
+    },[],26)
+    .to('#m2simw',{opacity:1,y:0,duration:.7},26.3)
+    .call(startSimTick,[],27)
+    .call(()=>{
+      stopSimTick();
+      document.getElementById('simtimer').textContent='44:07';
+      document.getElementById('simqcnt').textContent='Fråga 65 av 65';
+      document.getElementById('simr').textContent='53';
+      document.getElementById('simpf').style.width='100%';
+      gsap.to('#simres',{opacity:1,scale:1,duration:.75,ease:'back.out(1.4)'});
+      spawnConfetti();
+    },[],38)
+
+  /* 42–52s STATS */
+  tl2
+    .call(()=>{
+      hideAll(M2SEC);show('m2statsw');
+      setDot(3,'dn');setDot(4,'on');setNarrator(2,3);
+      gsap.set('#m2statsw',{opacity:0,y:10});
+      gsap.set('#wkalert',{opacity:0});
+    },[],42)
+    .to('#m2statsw',{opacity:1,y:0,duration:.7},42.3)
+    .to('#wkalert',{opacity:1,duration:.6},44.2)
+
+  /* 52–58s PRICING */
+  tl2
+    .call(()=>{
+      hideAll(M2SEC);show('m2pricew');
+      gsap.set('#m2pricew',{opacity:0});
+      gsap.set('.pc',{opacity:0,y:12});
+      gsap.set('#pupgr',{opacity:0});
+      document.getElementById('pc2').className='pc';
+    },[],52)
+    .to('#m2pricew',{opacity:1,duration:.5},52.2)
+    .to('#pc1',{opacity:1,y:0,duration:.5},52.5)
+    .to('#pc2',{opacity:1,y:0,duration:.5},52.75)
+    .to('#pc3',{opacity:1,y:0,duration:.5},53)
+    .call(()=>{
+      document.getElementById('pc2').className='pc hl';
+      gsap.to('#pupgr',{opacity:1,duration:.5});
+    },[],54.8)
+
+  /* 58–60s fade */
+  tl2
+    .to('#mode2',{opacity:0,duration:1.4},58.2)
+    .set('#mode2',{opacity:1},60)
+  ;
+
+  return tl2;
+}
+
+/* ════════════════════════════════════════════
+   MODE SWITCH
+════════════════════════════════════════════ */
+function switchMode(n){
+  if(n===curMode) return;
+  const from=document.getElementById('mode'+curMode);
+  const to=document.getElementById('mode'+n);
+  if(n===1&&tl2){tl2.kill();tl2=null;}
+  if(n===2&&tl1){tl1.kill();tl1=null;}
+  stopTypewriter(); stopSimTick(); strkCnt=0;
+  clearAllTimers();
+  gsap.killTweensOf('#signsvg,#simres,#pupgr,#wkalert,#xpfill,#m2statsw,#m2simw');
+  gsap.to(from,{opacity:0,duration:.35,onComplete:()=>{
+    from.classList.remove('act');
+    to.classList.add('act');
+    gsap.set(to,{opacity:0});
+    curMode=n;
+    document.getElementById('mlbl').textContent=n===1?'MOCKPROV AI':'KÖRKORTSTEORIN';
+    gsap.to(to,{opacity:1,duration:.4,onComplete:()=>{ if(n===1)buildTL1(); else buildTL2(); }});
+  }});
+}
+
+/* ════════════════════════════════════════════
+   KEYBOARD
+════════════════════════════════════════════ */
+document.addEventListener('keydown',e=>{
+  if(e.key==='1') switchMode(1);
+  if(e.key==='2') switchMode(2);
+  if(e.key.toLowerCase()==='n') document.getElementById('narrator').classList.toggle('open');
+  if(e.key==='Escape'){
+    paused=!paused;
+    if(paused){ if(tl1)tl1.pause(); if(tl2)tl2.pause(); if(cdTween)cdTween.pause(); }
+    else       { if(tl1)tl1.resume(); if(tl2)tl2.resume(); if(cdTween)cdTween.resume(); }
   }
-}
-
-function markAnswers(){
-  QS.forEach((q,i)=>{
-    if(q.type==='written'){
-      const field=$('ansField'+i);
-      if(field){
-        field.classList.add('bad');
-        field.classList.add('shake');
-        setTimeout(()=>field.classList.remove('shake'),500);
-      }
-    } else {
-      for(let j=0;j<q.opts.length;j++){
-        const b=$(`ab${i}_${j}`);
-        if(!b) continue;
-        b.classList.remove('sel');
-        if(j===q.ok) b.classList.add('ok');
-        if(j===q.demo&&j!==q.ok) b.classList.add('bad');
-      }
-    }
-  });
-}
-
-async function triggerAct4(){
-  if(S.a4) return; S.a4=true;
-  wDone(3); wOn(4);
-  const ov=$('gradOv'),st=$('gradSt');
-  if(ov) ov.style.display='block';
-  const steps=['Analyserar svar 1 av 2…','Analyserar svar 2 av 2…',
-    'Beräknar totalpoäng…','Genererar feedback…'];
-  for(const s of steps){if(st) st.textContent=s; await wait(700);}
-  if(ov) ov.style.display='none';
-  const sb=$('scoreBox'); if(sb) sb.style.display='block';
-  await wait(300);
-
-  // Animate score counter + progress bar
-  const sf=$('scoreF'); if(sf) sf.style.width='75%';
-  animateScore(0,75,1300); // non-awaited — runs in parallel with bar
-  await wait(1400);
-
-  markAnswers();
-  await wait(900);
-
-  const fg=$('feedGrid');
-  if(fg){
-    fg.innerHTML='';
-    FEED.forEach((f,i)=>{
-      const c=document.createElement('div');
-      c.className='feedCard';
-      c.innerHTML=`<div class="feedIco">${f.ico}</div><div class="feedBody"><div class="feedQ">${f.q}</div><div class="feedMod">AI-feedback: <strong>${f.m}</strong></div><div class="feedPts ${f.ok?'ok':'bad'}">${f.r}</div></div>`;
-      fg.appendChild(c);
-    });
-    const cards=fg.querySelectorAll('.feedCard');
-    for(let i=0;i<cards.length;i++){await wait(380);cards[i].classList.add('vis');}
-  }
-  wDone(4);
-}
-
-async function triggerAct5(){
-  if(S.a5) return; S.a5=true;
-
-  // Auto-open coach section
-  const coachSec=$('coachSec');
-  if(coachSec) coachSec.classList.add('open');
-
-  // Glow while typing
-  const box=$('coachBox2');
-  if(box) box.classList.add('typing');
-
-  const el=$('coachTxt');
-  if(el){
-    el.textContent='';
-    for(let i=0;i<=COACH.length;i++){el.textContent=COACH.slice(0,i);await wait(11);}
-  }
-  if(box) box.classList.remove('typing');
-}
-
-/* ═══════════════════════════════════════════════
-   AUTO PLAY (cursor-driven)
-═══════════════════════════════════════════════ */
-async function startAuto(){
-  if(isRunning) return;
-  isRunning=true;
-
-  const autoBtn=$('autoBtn'),pauseBtn=$('pauseBtn');
-  if(autoBtn){autoBtn.textContent='▶ Demo pågår…';autoBtn.disabled=true;}
-  if(pauseBtn) pauseBtn.style.display='inline-flex';
-
-  cursor.init();
-  cursor.show();
-
-  // ─── STEG 1: MATERIAL ───────────────────────
-  setStep(1); setChap(1);
-  $('act1')?.scrollIntoView({behavior:'smooth'});
-  await wait(600);
-
-  await showTip('<strong>Steg 1:</strong> Eleven klistrar in studiematerial — anteckningar, kompendium, vad som helst.', 4000);
-  await cursor.moveTo($('matArea'));
-  await wait(400);
-
-  showTip('AI:n läser materialet och förstår kursinnehållet direkt', 3500);
-  runTypewriter();
-  await wait(MAT.length*12+300);
-
-  await wait(500);
-  await showTip('<strong>Fortsätt</strong> — materialet är inläst', 2500);
-  await cursor.highlight($('nextBtn'));
-  await cursor.click($('nextBtn'));
-  go('act2',2);
-  await wait(500);
-
-  // ─── STEG 2: INSTÄLLNINGAR ──────────────────
-  setStep(2);
-  await wait(400);
-
-  await showTip('<strong>Steg 2:</strong> Välj betygsnivå E, C eller A — AI:n anpassar svårigheten.', 4000);
-  await cursor.highlight($('scn'));
-  await cursor.click($('scn'));
-  $('svn').textContent='C';
-  $('scn').classList.add('flash'); await wait(400); $('scn').classList.remove('flash');
-  await wait(600);
-
-  await cursor.highlight($('sct'));
-  await cursor.click($('sct'));
-  $('svt').textContent='Mix';
-  $('sct').classList.add('flash'); await wait(400); $('sct').classList.remove('flash');
-  await wait(600);
-
-  await cursor.highlight($('sca'));
-  await cursor.click($('sca'));
-  $('sva').textContent='2 frågor';
-  $('sca').classList.add('flash'); await wait(400); $('sca').classList.remove('flash');
-  await wait(700);
-
-  S.a2=true; wDone(1); wOn(2);
-  const gb=$('genBtn'),gl=$('genLbl');
-  if(gl) gl.textContent='Skapa prov';
-  if(gb){gb.removeAttribute('disabled');gb.style.opacity='1';gb.style.cursor='pointer';}
-  await wait(400);
-
-  await showTip('<strong>Skapa prov</strong> — AI:n genererar frågor baserat på materialet', 4000);
-  await cursor.highlight(gb);
-  await cursor.click(gb);
-  go('act3',2);
-  await wait(400);
-
-  // ─── STEG 3: MOCKPROV ───────────────────────
-  setStep(3);
-  wDone(2); wOn(3);
-
-  await showTip('<strong>Steg 3:</strong> AI:n genererar skräddarsydda frågor på sekunder', 4000);
-  await triggerA3();
-  await wait(600);
-
-  await showTip('Fråga 1 — flervalsfråga om procenträkning', 3000);
-  const btnEl=$(`ab0_1`);
-  if(btnEl){
-    await cursor.moveTo(btnEl,-8,0);
-    await wait(300);
-    await cursor.click(btnEl);
-    selAns(0,1);
-  }
-  await wait(600);
-
-  await showTip('<strong>Fråga 2:</strong> eleven hittar rätt metod men glömmer enheten kr — AI:n fångar det.', 5000);
-  const field=$('ansField1');
-  if(field){
-    await cursor.moveTo(field,0,0);
-    await wait(300);
-    await cursor.highlight(field);
-    await typeIntoField('ansField1', QS[1].demoAnswer, 30);
-  }
-  await wait(800);
-
-  const gradeBtn=$('gradeBtn');
-  if(gradeBtn){gradeBtn.style.opacity='1';gradeBtn.style.pointerEvents='auto';gradeBtn.removeAttribute('disabled');}
-
-  await showTip('<strong>Rätta prov</strong> — AI:n analyserar varje svar', 3500);
-  await cursor.highlight(gradeBtn);
-  await cursor.click(gradeBtn);
-  go('act3b',3);
-  await wait(600);
-
-  // ─── STEG 4: RÄTTNING ───────────────────────
-  setStep(4); setChap(3);
-  await wait(300);
-
-  await showTip('<strong>Steg 4:</strong> AI:n rättar — poängräknaren startar…', 3500);
-  await triggerAct4();
-  await wait(700);
-
-  await showTip('Fråga 2 — <strong>halvt rätt (1/2 p):</strong> rätt metod men enhet saknas — AI:n fångar det direkt', 5000);
-  const badFeed=$('feedGrid')?.querySelectorAll('.feedCard')[1];
-  if(badFeed) await cursor.moveTo(badFeed);
-  await wait(1200);
-
-  await showTip('AI-förbättringsförslag genereras automatiskt för varje misstag', 4500);
-  const stw=$('smartTipWrap');
-  if(stw) stw.classList.add('vis');
-  await wait(400);
-  typeSmartTip(SMART_TIP, 10);
-  await wait(SMART_TIP.length*10+300);
-
-  const stFooter=$('smartTipWrap')?.querySelector('.stFooterLink');
-  if(stFooter) await cursor.highlight(stFooter);
-  await wait(800);
-
-  await showTip('Varje svar: feedback + förbättringsförslag — eleven vet exakt vad som ska tränas', 5000);
-  await wait(1500);
-
-  // ─── STEG 5: P.E.R ──────────────────────────
-  setStep(5); setChap(4);
-  go('act-per', 4);
-  await wait(600);
-
-  await showTip('<strong>Steg 5:</strong> P.E.R ser vad du jobbar med — fråga direkt om vilken uppgift som helst', 5000);
-  await triggerActPer();
-  showPerMini();
-  await wait(1000);
-
-  const perMsgEl = $('perMockMsgs')?.lastElementChild;
-  if(perMsgEl) await cursor.moveTo(perMsgEl);
-  await wait(1000);
-
-  // ─── STEG 6: KÖRKORTSTEORIN ─────────────────
-  setStep(6); setChap(5);
-  go('act-kor', 5);
-  await wait(600);
-
-  await showTip('<strong>Steg 6:</strong> Körkortsteorin — 368 frågor, 16 kategorier. Adaptivt lärande fokuserar svaga kategorier.', 5000);
-  await triggerActKor();
-  await wait(800);
-
-  await showTip('Rätt svar → XP och framsteg. Fel svar → fråga P.E.R direkt', 4000);
-  await wait(1500);
-
-  // ─── STEG 7: FÖRBÄTTRING ────────────────────
-  const coachBtn=$('openCoachBtn');
-  await showTip('<strong>Steg 7:</strong> Förbättring — AI-coach, felbank och lärarrapport på ett ställe', 4500);
-  const cb=$('coachBanner'); if(cb) cb.classList.add('vis');
-  await wait(600);
-  await cursor.highlight(coachBtn);
-  await cursor.click(coachBtn);
-  go('act4',6);
-  await wait(600);
-
-  setStep(7); setChap(6);
-  await wait(500);
-
-  await showTip('<strong>Steg 7:</strong> Förbättringsidan — historik, AI-coach, felbank och träningsläge', 5000);
-  await triggerAct5();
-  await wait(800);
-
-  await showTip('P.E.R-coachen skriver en konkret plan: exakt vad som tränas och hur', 4000);
-  const coachEl=$('coachTxt');
-  if(coachEl) await cursor.moveTo(coachEl);
-  await wait(1200);
-
-  const mb=$('mc1'),mb2=$('mc2');
-  await showTip('<strong>Felbank:</strong> varje tappat poäng sparas med ditt svar, modellsvar och P.E.R-tips', 5000);
-  if(mb){
-    await cursor.moveTo(mb);
-    mb.classList.add('vis');
-    await wait(300);
-    if(mb2) mb2.classList.add('vis');
-  }
-  await wait(800);
-
-  const markBtn=$('markBtn1');
-  await showTip('Markera misstag → appen skapar ett nytt prov med liknande frågor', 4000);
-  await cursor.highlight(markBtn);
-  await cursor.click(markBtn);
-  if(markBtn){markBtn.textContent='Markerad ✓';markBtn.style.borderColor='var(--a)';markBtn.style.color='var(--a)';}
-  await wait(1200);
-
-  cursor.hide();
-  hideTip();
-  hidePerMini();
-
-  if(autoBtn){autoBtn.textContent='✓ Demo klar';autoBtn.disabled=false;}
-  if(pauseBtn) pauseBtn.style.display='none';
-  isRunning=false;
-  isPaused=false;
-
-  doToast('Demo genomförd — alla funktioner visade ✓');
-}
-
-function showPerMini(){ const b=$('perMiniBar'); if(b) b.classList.add('on'); }
-function hidePerMini(){ const b=$('perMiniBar'); if(b) b.classList.remove('on'); }
-
-function doToast(msg){
-  const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--s);border:1px solid var(--a);color:var(--a);font:500 13px var(--font);padding:13px 22px;border-radius:var(--r);z-index:9999;box-shadow:var(--sh);white-space:nowrap';
-  t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400);},4000);
-}
-
-/* ═══════════════════════════════════════════════
-   INTERACTIVE (felbank etc.)
-═══════════════════════════════════════════════ */
-function resetDemo(){ location.reload(); }
-
-function genReport(){
-  const box=$('repBox'),btn=$('copyRepBtn');
-  if(!box) return;
-  const steps=['Analyserar historik…','Identifierar mönster…','Skriver rapport…'];
-  let i=0; box.textContent=steps[0];
-  const t=setInterval(()=>{
-    i++;
-    if(i<steps.length) box.textContent=steps[i];
-    else{clearInterval(t);box.textContent=REPORT;if(btn)btn.removeAttribute('disabled');}
-  },900);
-}
-
-function toggleMark(btnId){
-  const btn=$(btnId),was=btn?.textContent==='Markerad ✓';
-  if(btn){btn.textContent=was?'Markera för träning':'Markerad ✓';btn.style.borderColor=was?'':'var(--a)';btn.style.color=was?'':'var(--a)';}
-}
-
-function removeCard(id){
-  const c=$(id); if(!c) return;
-  c.style.opacity='0';c.style.transition='opacity .3s';setTimeout(()=>c.remove(),300);
-}
-
-function doTrain(){
-  doToast('Demo: I appen startar ett träningsprov med liknande andragradsekvationer.');
-}
-
-/* ═══════════════════════════════════════════════
-   SCROLL SPY + REVEAL
-═══════════════════════════════════════════════ */
-function setupObs(){
-  // Chapter spy
-  const chapObs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting||isRunning) return;
-      const id=e.target.id;
-      if(id==='act1') setChap(1);
-      if(id==='act2') setChap(2);
-      if(id==='act3') setChap(2);
-      if(id==='act3b') setChap(3);
-      if(id==='act-per') setChap(4);
-      if(id==='act-kor') setChap(5);
-      if(id==='act4') setChap(6);
-    });
-  },{threshold:.18});
-  ['act1','act2','act3','act3b','act-per','act-kor','act4'].forEach(id=>{const el=$(id);if(el)chapObs.observe(el);});
-
-  // Reveal animation
-  const revealObs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting) e.target.classList.add('revealed');
-    });
-  },{threshold:.15});
-  document.querySelectorAll('.reveal').forEach(el=>revealObs.observe(el));
-
-  // Felbank card reveal on scroll
-  const cardObs=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting) e.target.classList.add('vis');
-    });
-  },{threshold:.2});
-  ['mc1','mc2'].forEach(id=>{const el=$(id);if(el)cardObs.observe(el);});
-}
-
-/* Coach open button wiring */
-$('openCoachBtn')?.addEventListener('click',()=>{
-  if(!isRunning){ go('act4',6); triggerAct5(); }
 });
 
-/* ═══════════════════════════════════════════════
+/* ════════════════════════════════════════════
    INIT
-═══════════════════════════════════════════════ */
-window.addEventListener('load',async()=>{
-  await new Promise(r=>setTimeout(r,500));
-  const ldr=$('pgLoader');
-  if(ldr){ldr.style.opacity='0';ldr.style.transition='opacity .4s';setTimeout(()=>ldr.remove(),400);}
-  setupObs();
+════════════════════════════════════════════ */
+window.addEventListener('load',()=>{
+  document.getElementById('mode2').classList.remove('act');
+  buildTL1();
 });
 </script>
 </body>
