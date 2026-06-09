@@ -451,16 +451,20 @@ body.light .aiSendBtn{color:#fff}
 .adminSaveBtn:disabled{opacity:.4;cursor:default;transform:none}
 body.light .adminSaveBtn{color:#fff}
 .adminImgSection{border:1px solid var(--l);border-radius:var(--r);overflow:hidden}
-.adminImgCurrent{padding:12px;display:flex;gap:10px;align-items:flex-start}
-.adminImgThumb{width:72px;height:72px;object-fit:contain;border:1px solid var(--l);border-radius:var(--r);background:var(--s2);flex-shrink:0;display:none}
-.adminImgNone{width:72px;height:72px;border:1px dashed var(--l);border-radius:var(--r);background:var(--s2);flex-shrink:0;display:grid;place-items:center;font-size:9.5px;color:var(--t3);font-family:'DM Mono',monospace;text-align:center;line-height:1.35}
+.adminImgCurrent{padding:12px;display:flex;flex-direction:column;gap:10px}
+.adminImgPreviewBox{border:1px solid var(--l);border-radius:var(--r);background:var(--s2);min-height:140px;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:default}
+.adminImgThumb{width:100%;max-height:220px;object-fit:contain;border-radius:var(--r);display:none}
+.adminImgNone{padding:30px 0;font-size:9.5px;color:var(--t3);font-family:'DM Mono',monospace;text-align:center;line-height:1.55}
+.adminImgMeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .adminImgInfo{flex:1;min-width:0}
-.adminImgUrl{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);word-break:break-all;line-height:1.4;margin-bottom:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.adminImgDescText{font-size:12px;color:var(--t2);line-height:1.4;margin-bottom:6px}
-.adminImgClearBtn{height:26px;padding:0 10px;font-size:11px;background:transparent;border:1px solid rgba(255,107,107,.3);color:#ff8484;border-radius:var(--r2);cursor:pointer;transition:background .13s;font-family:'DM Mono',monospace}
+.adminImgUrl{font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);word-break:break-all;line-height:1.4;margin-bottom:3px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.adminImgDescText{font-size:12px;color:var(--t2);line-height:1.4;margin-bottom:6px;font-weight:600}
+.adminImgClearBtn{height:26px;padding:0 10px;font-size:11px;background:transparent;border:1px solid rgba(255,107,107,.3);color:#ff8484;border-radius:var(--r2);cursor:pointer;transition:background .13s;font-family:'DM Mono',monospace;white-space:nowrap}
 .adminImgClearBtn:hover{background:rgba(255,107,107,.1)}
 .adminWikiSection{border-top:1px solid var(--l);padding:12px}
-.adminWikiHdr{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.adminWikiHdr{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.adminWikiAutoBtn{height:22px;padding:0 9px;font-size:10px;background:var(--a-dim);border:1px solid var(--l2);color:var(--a2);border-radius:var(--r2);cursor:pointer;transition:background .13s,color .13s;font-family:'DM Mono',monospace;font-weight:500;text-transform:none;letter-spacing:0}
+.adminWikiAutoBtn:hover{background:rgba(27,255,140,.16);color:var(--t)}
 .adminWikiRow{display:flex;gap:6px;margin-bottom:8px}
 .adminWikiInput{flex:1;padding:7px 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:'DM Sans',sans-serif;font-size:12.5px;outline:none;transition:border-color .15s}
 .adminWikiInput::placeholder{color:var(--t3)}
@@ -468,11 +472,12 @@ body.light .adminSaveBtn{color:#fff}
 .adminWikiSearchBtn{height:34px;padding:0 12px;font-size:12px;background:var(--s2);border:1px solid var(--l2);color:var(--t2);border-radius:var(--r);cursor:pointer;transition:border-color .13s,color .13s,background .13s;white-space:nowrap;font-weight:600}
 .adminWikiSearchBtn:hover{border-color:var(--a);color:var(--a);background:rgba(27,255,140,.06)}
 .adminWikiStatus{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);padding:4px 0;text-align:center}
-.adminWikiGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:7px;max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--l) transparent}
-.adminWikiItem{border:1px solid var(--l);border-radius:var(--r);padding:6px;cursor:pointer;text-align:center;transition:border-color .13s,background .13s;background:var(--s2)}
-.adminWikiItem:hover,.adminWikiItem.sel{border-color:var(--a);background:rgba(27,255,140,.07)}
-.adminWikiItem img{width:50px;height:50px;object-fit:contain;display:block;margin:0 auto 4px}
-.adminWikiItemName{font-family:'DM Mono',monospace;font-size:8px;color:var(--t3);word-break:break-all;line-height:1.3}
+.adminWikiGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:270px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--l) transparent}
+.adminWikiItem{border:1px solid var(--l);border-radius:var(--r);padding:8px 6px;cursor:pointer;text-align:center;transition:border-color .13s,background .13s;background:var(--s2)}
+.adminWikiItem:hover,.adminWikiItem.sel{border-color:var(--a);background:rgba(27,255,140,.08)}
+.adminWikiItem.sel{box-shadow:0 0 0 2px rgba(27,255,140,.25)}
+.adminWikiItem img{width:64px;height:64px;object-fit:contain;display:block;margin:0 auto 5px}
+.adminWikiItemName{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--t3);word-break:break-all;line-height:1.3}
 
 </style>
 </head>
@@ -946,20 +951,25 @@ body.light .adminSaveBtn{color:#fff}
               <label class="adminLabel">Bild</label>
               <div class="adminImgSection">
                 <div class="adminImgCurrent">
-                  <div style="position:relative;flex-shrink:0">
+                  <div class="adminImgPreviewBox">
                     <div class="adminImgNone" id="adminImgNone">Ingen<br>bild</div>
-                    <img class="adminImgThumb" id="adminImgThumb" src="" alt="" onerror="this.style.opacity='.25'" />
+                    <img class="adminImgThumb" id="adminImgThumb" src="" alt="" onerror="this.style.opacity='.3'" />
                   </div>
-                  <div class="adminImgInfo">
-                    <div class="adminImgUrl" id="adminImgUrlTxt">—</div>
-                    <div class="adminImgDescText" id="adminImgDescTxt"></div>
-                    <button class="adminImgClearBtn" onclick="adminClearImage()" type="button">Ta bort bild</button>
+                  <div class="adminImgMeta">
+                    <div class="adminImgInfo">
+                      <div class="adminImgUrl" id="adminImgUrlTxt">—</div>
+                      <div class="adminImgDescText" id="adminImgDescTxt"></div>
+                    </div>
+                    <button class="adminImgClearBtn" onclick="adminClearImage()" type="button">✕ Ta bort</button>
                   </div>
                 </div>
                 <input type="hidden" id="adminImgUrl" />
                 <input type="hidden" id="adminImgDesc" />
                 <div class="adminWikiSection">
-                  <div class="adminWikiHdr">Sök Wikimedia Commons — Sweden road signs</div>
+                  <div class="adminWikiHdr">
+                    <span>Sök vägmärken — Wikimedia</span>
+                    <button class="adminWikiAutoBtn" id="adminWikiAutoBtn" onclick="adminWikiAutoSearch()" type="button" style="display:none">↻ Auto-sök</button>
+                  </div>
                   <div class="adminWikiRow">
                     <input class="adminWikiInput" id="adminWikiQ" type="text" placeholder="t.ex. B1 eller E11-1" onkeydown="if(event.key==='Enter')adminWikiSearch()" />
                     <button class="adminWikiSearchBtn" onclick="adminWikiSearch()" type="button">Sök</button>
@@ -3187,9 +3197,9 @@ function adminUpdateImgPreview() {
   if (!thumb) return;
   if (url) {
     thumb.src = url;
-    thumb.style.display = "";
+    thumb.style.display = "block";
     none.style.display = "none";
-    urlTxt.textContent = url.length > 55 ? url.slice(0, 10) + "…" + url.slice(-42) : url;
+    urlTxt.textContent = url.length > 60 ? url.slice(0, 14) + "…" + url.slice(-44) : url;
     descTxt.textContent = desc || "";
   } else {
     thumb.src = "";
@@ -3278,8 +3288,19 @@ function adminSelectQuestion(id) {
   adminUpdateImgPreview();
   $("adminWikiGrid").innerHTML = "";
   $("adminWikiStatus").textContent = "";
-  $("adminWikiQ").value = "";
   adminMsg("", "");
+  // Auto-populate wiki search for road sign questions
+  const signCode = adminExtractSignCode(q.image_url);
+  const autoBtn = $("adminWikiAutoBtn");
+  if (q.category === "Vägmärken") {
+    const code = signCode || "";
+    $("adminWikiQ").value = code;
+    if (autoBtn) autoBtn.style.display = code ? "" : "none";
+    if (code) adminWikiSearch();
+  } else {
+    $("adminWikiQ").value = "";
+    if (autoBtn) autoBtn.style.display = "none";
+  }
   if (window.innerWidth < 860) $("adminEdit").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -3383,6 +3404,19 @@ async function adminSave() {
   }
 }
 
+function adminExtractSignCode(imageUrl) {
+  if (!imageUrl) return null;
+  const m = String(imageUrl).match(/Sweden(?:_| )road(?:_| )sign(?:_| )([A-Za-z0-9][A-Za-z0-9\-]*)\.(?:svg|png)/i);
+  return m ? m[1].replace(/_/g, "-") : null;
+}
+
+function adminWikiAutoSearch() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const code = adminExtractSignCode(q.image_url);
+  if (code) { $("adminWikiQ").value = code; adminWikiSearch(); }
+}
+
 async function adminInit() {
   if (role !== "admin") return;
   if (!_adminLoaded) {
@@ -3402,6 +3436,17 @@ async function adminInit() {
   }
   await adminLoadQuestions();
 }
+
+// Admin Ctrl+S / Cmd+S shortcut
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    const av = $("adminView");
+    if (av && av.style.display !== "none" && _adminSelectedQ) {
+      e.preventDefault();
+      adminSave();
+    }
+  }
+});
 
 init();
 </script>
