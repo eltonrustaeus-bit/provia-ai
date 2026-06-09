@@ -20,6 +20,7 @@
   <link rel="icon" href="/image/favicon-512.png" sizes="512x512" type="image/png" />
   <link rel="apple-touch-icon" href="/image/favicon-180.png" />
   <link rel="canonical" href="https://proviaai.se/" />
+  <link rel="preload" href="/image/proviaai-logo.png" as="image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -537,7 +538,7 @@
     </div>
 
     <div class="heroContent">
-      <img src="image/proviaai-logo.png" class="heroLogo" alt="" aria-hidden="true" width="72" height="72">
+      <img src="image/proviaai-logo.png" class="heroLogo" alt="" aria-hidden="true" width="72" height="72" loading="eager" fetchpriority="high">
 
       <div class="heroEye" id="heroEye">Körkortsteorin med AI</div>
 
