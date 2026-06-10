@@ -275,7 +275,7 @@
     .m3source{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:var(--s2);border:1px solid var(--l);font:400 10px var(--m);color:var(--t3);letter-spacing:.03em}
     #m3sources{display:flex;gap:4px;flex-wrap:wrap;padding:6px 12px 8px;border-top:1px dashed rgba(27,255,140,.15)}
     #m3memCount{margin-left:auto;font:500 10px var(--m);color:var(--t3);white-space:nowrap}
-    #m3notif{position:fixed;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--s);border:1px solid var(--l2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.65);font:500 12px var(--f);color:var(--t);white-space:nowrap;max-width:90vw;pointer-events:none}
+    #m3notif{position:fixed;top:-64px;opacity:0;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--s);border:1px solid var(--l2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.65);font:500 12px var(--f);color:var(--t);white-space:nowrap;max-width:90vw;pointer-events:none}
     #m3notif strong{color:var(--a)}
     #m3bub{width:52px;height:52px;border-radius:50%;background:var(--a);display:grid;place-items:center;font:700 9px var(--m);letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.45);cursor:pointer}
     @keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.45)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 8px rgba(27,255,140,.12)}}
@@ -661,7 +661,7 @@
     </div>
   </div>
 
-  <div id="m3perDemo" style="display:none;width:100%;max-width:420px;position:relative;padding-bottom:70px;min-height:480px">
+  <div id="m3perDemo" style="display:none;width:100%;max-width:420px;position:relative">
 
     <!-- P.E.R context — what P.E.R sees about this student -->
     <div id="m3ctx" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;overflow:hidden">
@@ -670,15 +670,16 @@
       <div class="m3chip m3chipWarn">⚡ Svag: tecknet på q</div>
       <div id="m3scanLine"></div>
     </div>
-    <!-- P.E.R live awareness badge -->
-    <div id="m3liveBadge" style="opacity:0">👁 Ser dina svar live</div>
-
     <!-- Mock exam question (math Q3) -->
     <div class="qcard" id="m3examCard" style="opacity:0">
       <div class="qmeta"><span class="qnum">Fråga 3 av 4</span><span class="qcat">Skriven</span></div>
       <div class="qtxt">Lös ekvationen x² − 2x − 8 = 0 med pq-formeln.</div>
       <div class="wfield" id="m3wf" style="min-height:38px;color:var(--t2);font:400 13px var(--m)"></div>
     </div>
+
+    <!-- P.E.R widget area — all floating elements live below exam card, never overlap -->
+    <div id="m3widgetArea" style="position:relative;height:340px;margin-top:8px">
+    <div id="m3liveBadge" style="opacity:0">👁 Ser dina svar live</div>
 
     <!-- P.E.R nudge tooltip -->
     <div id="m3nudge" style="opacity:0;position:absolute;bottom:62px;right:60px;
@@ -702,7 +703,7 @@
         </div>
         <div id="m3memCount">Minns <span id="m3memN">0</span> svar</div>
       </div>
-      <div id="m3msgs" style="padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:80px;max-height:180px;overflow-y:auto;scroll-behavior:smooth">
+      <div id="m3msgs" style="padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:80px;max-height:120px;overflow-y:auto;scroll-behavior:smooth">
         <div id="m3msg0" class="m3msg-per" style="opacity:0">
           Hallå! Jag ser att du är på <strong>Fråga 3</strong>. Fastnat? Fråga på!
         </div>
@@ -716,7 +717,7 @@
         <div id="m3typing2" class="m3msg-per" style="opacity:0;display:none"><div class="perDots"><span></span><span></span><span></span></div></div>
         <div id="m3msg2" class="m3msg-per" style="opacity:0;display:none">Förresten — jag ser att du missade <strong>samma mönster</strong> på Fråga 1 oxå. Vill att jag visar det?</div>
       </div>
-      <div id="m3sources" style="opacity:0">
+      <div id="m3sources" style="display:none;opacity:0">
         <div class="m3source">📚 Matte 2b kursplan</div>
         <div class="m3source">📊 47 svar</div>
         <div class="m3source">🎯 Fokusanalys</div>
@@ -732,6 +733,7 @@
     <!-- P.E.R floating bubble -->
     <div id="m3bub" style="opacity:0;position:absolute;bottom:0;right:0">P·E·R</div>
 
+    </div><!-- end m3widgetArea -->
   </div>
 
 </div>
@@ -1351,6 +1353,7 @@ function buildTL3(){
   /* additional resets for new elements */
   gsap.set('#m3scanLine',{x:'-100%',opacity:1});
   gsap.set('#m3liveBadge',{opacity:0,y:8});
+  const _src=document.getElementById('m3sources');if(_src)_src.style.display='none';
   gsap.set('#m3sources',{opacity:0});
   gsap.set('.m3source',{opacity:0});
   gsap.set('#m3notif',{top:-64,opacity:0});
@@ -1368,7 +1371,7 @@ function buildTL3(){
         gsap.from(el,{opacity:0,scale:.5,duration:.4,delay:i*.2,ease:'back.out(1.8)',transformOrigin:'50% 50%'});
       });
     },[],0)
-    .from('#perTitle',{opacity:0,y:10,filter:'blur(10px)',duration:.6,ease:'power3.out'},1.2)
+    .from('#perTitle',{opacity:0,y:10,duration:.6,ease:'power3.out'},1.2)
     .from('#m3intro > div:nth-child(3)',{opacity:0,duration:.4},1.8)
     .from('.perTagline',{opacity:0,y:6,duration:.4},2.2)
     .call(()=>{
@@ -1463,6 +1466,7 @@ function buildTL3(){
     },[],18.5)
     /* source chips appear */
     .call(()=>{
+      const src=document.getElementById('m3sources');src.style.display='flex';
       gsap.to('#m3sources',{opacity:1,duration:.1});
       document.querySelectorAll('#m3sources .m3source').forEach((el,i)=>{
         gsap.to(el,{opacity:1,duration:.35,delay:i*.15,ease:'power2.out'});
