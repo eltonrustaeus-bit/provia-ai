@@ -356,7 +356,8 @@
     .m5engines{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .m5eng{display:flex;flex-direction:column;gap:3px;background:var(--s);border:1px solid var(--l);border-radius:7px;padding:10px 12px;font:600 11px var(--f);color:var(--t);will-change:transform,opacity,box-shadow}
     .m5eng span{font:400 10px var(--f);color:var(--t3)}
-    .m5mkRow{display:flex;align-items:flex-start;gap:14px;background:var(--s);border:1px solid var(--l);border-radius:8px;padding:13px 14px;font:400 12px var(--f);color:var(--t2);line-height:1.55}
+    .m5mkRow{display:flex;align-items:flex-start;gap:14px;background:var(--s);border:1px solid var(--l);border-left:2px solid rgba(27,255,140,0);border-radius:8px;padding:13px 14px 13px 12px;font:400 12px var(--f);color:var(--t2);line-height:1.55;transition:border-left-color .5s ease .2s}
+    .m5mkRow.lit{border-left-color:rgba(27,255,140,.55)}
     .m5mkIcon{font-size:17px;flex-shrink:0}
     .m5tiers{display:flex;gap:10px}
     .m5tier{flex:1;background:var(--s);border:1px solid var(--l);border-radius:9px;padding:14px 12px;display:flex;flex-direction:column;gap:5px}
@@ -368,26 +369,20 @@
     #m5margins{font:400 10px var(--m);color:var(--t3);text-align:center}
     #m5cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0;pointer-events:none}
     #m5ctaQ{font:400 12px var(--m);color:var(--t3);letter-spacing:.08em;text-align:center;max-width:400px}
-    #m5ctaUrl{font:700 28px var(--f);color:var(--a);letter-spacing:.04em}
+    @keyframes m5ctaGlow{0%,100%{text-shadow:none;color:var(--t3)}50%{text-shadow:0 0 22px rgba(27,255,140,.5);color:var(--t)}}
+    #m5ctaQ.glow{animation:m5ctaGlow 2.8s ease-in-out infinite}
+    #m5ctaUrl{font:700 28px var(--f);color:var(--a);letter-spacing:.04em;text-shadow:0 0 30px rgba(27,255,140,.4)}
     #m5hook{font:700 20px/1.35 var(--f);color:var(--t);text-align:center;max-width:460px}
     #m5hookCur{display:none;width:2px;height:.85em;background:var(--a);vertical-align:text-bottom;margin-left:2px;border-radius:1px;animation:m5blink .6s step-end infinite}
     @keyframes m5blink{0%,100%{opacity:1}50%{opacity:0}}
     #m5logoWrap{text-align:center;opacity:0}
     #m5traction{font:400 10px var(--m);color:var(--t3);letter-spacing:.07em;margin-top:8px;opacity:0}
     #m5story{font:400 11px/1.6 var(--f);color:var(--t3);font-style:italic;padding:10px 14px;background:rgba(27,255,140,.04);border-left:2px solid rgba(27,255,140,.25);border-radius:0 6px 6px 0;opacity:0}
-    #m5vsRow{display:flex;align-items:stretch;background:var(--s);border:1px solid var(--l);border-radius:8px;overflow:hidden;opacity:0;margin-top:4px}
-    .m5vsL{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--l)}
-    .m5vsR{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:rgba(27,255,140,.05)}
-    .m5vsTag{font:700 9px var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
-    .m5vsTag.bad{color:rgba(255,100,100,.6)}
-    .m5vsTag.good{color:var(--a)}
-    .m5vsLine{font:400 10px var(--f);color:var(--t3);line-height:1.45}
-    .m5vsLine.good{color:var(--t2)}
     #m5mktStat{text-align:center;padding:6px 0 10px;opacity:0}
     #m5mktNumVal{font:700 44px/1 var(--f);color:var(--a);letter-spacing:-.02em}
     #m5mktNumSub{font:400 11px var(--m);color:var(--t3);margin-top:5px;letter-spacing:.04em}
     #pdots.mode5{gap:6px}
-    #pdots.mode5 .pd{width:auto;height:auto;border-radius:10px;background:transparent;border:1px solid var(--l2);padding:2px 8px;line-height:1.8;box-shadow:none}
+    #pdots.mode5 .pd{width:auto;height:auto;border-radius:10px;background:transparent;border:1px solid var(--l2);padding:2px 8px;line-height:1.8;box-shadow:none;cursor:pointer;pointer-events:auto}
     #pdots.mode5 .pd::after{content:attr(data-l);font:400 9px var(--m);color:var(--t3);letter-spacing:.06em}
     #pdots.mode5 .pd.on{width:auto;background:rgba(27,255,140,.12);border-color:var(--a);border-radius:10px;box-shadow:none}
     #pdots.mode5 .pd.on::after{color:var(--a)}
@@ -1170,20 +1165,6 @@
         <div class="m5eng" id="m5e3">🎯 Recommendation Engine<span>Rätt övning, rätt tid</span></div>
         <div class="m5eng" id="m5e4">📝 Exam Engine<span>Genererar skräddarsydda prov från ditt material</span></div>
         <div class="m5eng" id="m5e5">💬 Coaching Engine<span>Förklarar på exakt rätt sätt</span></div>
-      </div>
-      <div id="m5vsRow">
-        <div class="m5vsL">
-          <div class="m5vsTag bad">ChatGPT / Generell AI</div>
-          <div class="m5vsLine">Vet inget om dina tidigare svar</div>
-          <div class="m5vsLine">Samma svar till alla</div>
-          <div class="m5vsLine">Ingen progression spåras</div>
-        </div>
-        <div class="m5vsR">
-          <div class="m5vsTag good">P.E.R</div>
-          <div class="m5vsLine good">Ser hela din studiehistorik</div>
-          <div class="m5vsLine good">Anpassar sig till din nivå</div>
-          <div class="m5vsLine good">Mönster + progression i realtid</div>
-        </div>
       </div>
     </div>
 
@@ -2009,8 +1990,8 @@ function addEngineSpot(tl,idx,at){
     document.getElementById('m5spotDesc').textContent=e.desc;
   },[],at);
   tl.to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},at+.05);
-  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+2.55);
-  tl.to('#m5e'+idx,{opacity:1,scale:1,duration:.3,ease:'power2.out'},at+2.6);
+  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+2.9);
+  tl.to('#m5e'+idx,{opacity:1,scale:1,duration:.3,ease:'power2.out'},at+2.95);
 }
 function addMktSpot(tl,idx,at){
   const r=MKT_ROWS[idx];
@@ -2040,17 +2021,17 @@ function addPlanSpot(tl,idx,at){
   },[],at);
   tl.to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},at+.05);
   for(let i=0;i<4;i++){
-    tl.call((j=>{return()=>{const feats=document.querySelectorAll('#m5spotFeatList .m5spotFeat');if(feats[j])gsap.to(feats[j],{opacity:1,y:0,duration:.32,ease:'power2.out'});}})(i),[],at+0.7+i*0.5);
+    tl.call((j=>{return()=>{const feats=document.querySelectorAll('#m5spotFeatList .m5spotFeat');if(feats[j])gsap.to(feats[j],{opacity:1,y:0,duration:.32,ease:'power2.out'});}})(i),[],at+0.8+i*0.55);
   }
-  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+3.15);
-  tl.to('#m5t'+idx,{opacity:1,y:0,duration:.4,ease:'power2.out'},at+3.2);
+  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+3.5);
+  tl.to('#m5t'+idx,{opacity:1,y:0,duration:.4,ease:'power2.out'},at+3.55);
 }
 
 /* ─── MODE SWITCH ─── */
 function buildTL5(){
   if(tl5){tl5.kill();tl5=null}
   clearAllTimers();
-  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,xPercent:0,scale:1});
+  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,y:0,scale:1});
   const ht=document.getElementById('m5hookTxt');if(ht)ht.textContent='';
   gsap.set('#m5logoWrap',{opacity:0,y:12});
   gsap.set(['#m5traction','#m5mission'],{opacity:0});
@@ -2059,16 +2040,19 @@ function buildTL5(){
   gsap.set('#m5pDesc',{opacity:0,y:8});
   gsap.set('#m5perSubline',{opacity:0});
   gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,scale:0.88,boxShadow:'none'});
-  gsap.set('#m5vsRow',{opacity:0,y:8});
   gsap.set('#m5spot',{opacity:0});
   gsap.set('#m5perBig',{opacity:0});
   gsap.set('#m5perBigTxt',{letterSpacing:'0.22em'});
   gsap.set('#m5perTagline',{opacity:0});
   gsap.set('#m5mktStat',{opacity:0,scale:0.82});
   gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:10});
+  document.querySelectorAll('.m5mkRow').forEach(el=>el.classList.remove('lit'));
   gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:12});
+  gsap.set('#m5ctaQ',{opacity:0});
+  gsap.set('#m5ctaUrl',{opacity:0});
+  const ctaQ=document.getElementById('m5ctaQ');if(ctaQ)ctaQ.classList.remove('glow');
   buildDots(5);
-  const DUR=82;
+  const DUR=81;
   tl5=gsap.timeline({onComplete:()=>switchMode(1)});
 
   /* INTRO (0–8.5s) */
@@ -2078,110 +2062,98 @@ function buildTL5(){
     .call(()=>{const t=chatType('m5hookTxt','m5hookCur','Varje år tappar tusentals elever poäng på prov — inte för att de inte kan, utan för att de tränat på fel saker.',30,null);catTimers.push(t);},[],0.4)
     .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},3.5)
     .to(['#m5traction','#m5mission'],{opacity:1,duration:.5,ease:'power2.out'},4.2)
-    .to('#m5s0',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},8.0);
+    .to('#m5s0',{opacity:0,y:-10,duration:.5,ease:'power3.in'},8.0);
 
-  /* PROBLEM (8.5–22.5s) */
+  /* PROBLEM (8.5–23s) */
   tl5
     .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],8.5)
-    .fromTo('#m5s1',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},8.5)
+    .fromTo('#m5s1',{opacity:0,y:10},{opacity:1,y:0,duration:.55,ease:'power3.out'},8.5)
     .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},9.2)
     .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},10.0)
-    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},11.6)
-    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},13.2)
-    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},14.8)
-    .to('#m5s1',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},22.0);
+    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},11.8)
+    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},13.6)
+    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},15.4)
+    .to('#m5s1',{opacity:0,y:-10,duration:.5,ease:'power3.in'},22.3);
 
-  /* P.E.R (22.5–54.5s) */
+  /* P.E.R (23–51.5s) */
   tl5
-    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],22.5)
-    .fromTo('#m5s2',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},22.5)
-    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},23.2)
-    .to('#m5perSubline',{opacity:1,duration:.4,ease:'power2.out'},24.0);
+    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],23.0)
+    .fromTo('#m5s2',{opacity:0,y:10},{opacity:1,y:0,duration:.55,ease:'power3.out'},23.0)
+    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},23.7)
+    .to('#m5perSubline',{opacity:1,duration:.4,ease:'power2.out'},24.5);
 
-  /* 6 engines spotlight one at a time — 3.2s intervals */
-  addEngineSpot(tl5,0,25.0);
-  addEngineSpot(tl5,1,28.2);
-  addEngineSpot(tl5,2,31.4);
-  addEngineSpot(tl5,3,34.6);
-  addEngineSpot(tl5,4,37.8);
-  addEngineSpot(tl5,5,41.0);
+  /* 6 engines spotlight — 3.5s intervals */
+  addEngineSpot(tl5,0,25.5);
+  addEngineSpot(tl5,1,29.0);
+  addEngineSpot(tl5,2,32.5);
+  addEngineSpot(tl5,3,36.0);
+  addEngineSpot(tl5,4,39.5);
+  addEngineSpot(tl5,5,43.0);
 
-  /* Glow sweep after last card (41.0+2.6=43.6) */
+  /* Glow sweep after last card (43.0+2.95=45.95) */
   tl5
-    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.08,duration:.35},44.2)
-    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.08,duration:.7,ease:'power2.out'},44.6);
+    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.08,duration:.35},46.5)
+    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.08,duration:.7,ease:'power2.out'},46.9);
 
-  /* VS comparison spotlight (45.3–49.8s) */
+  /* MERGE (47.8–51.5s) */
   tl5
-    .call(()=>{
-      gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
-      _spotHideAll();
-      _spotShowIds('m5spotVsWrap');
-      gsap.set(['#svl0','#svl1','#svl2','#svr0','#svr1','#svr2'],{opacity:0,y:5});
-    },[],45.3)
-    .to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},45.35)
-    .to(['#svl0','#svr0'],{opacity:1,y:0,duration:.35,ease:'power2.out'},46.1)
-    .to(['#svl1','#svr1'],{opacity:1,y:0,duration:.35,ease:'power2.out'},46.7)
-    .to(['#svl2','#svr2'],{opacity:1,y:0,duration:.35,ease:'power2.out'},47.3)
-    .to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},49.6)
-    .to('#m5vsRow',{opacity:1,y:0,duration:.45,ease:'power2.out'},49.7);
-
-  /* MERGE (50.8–54.2s) */
-  tl5
-    .to(['#m5pDesc','#m5perSubline','#m5vsRow'],{opacity:0,duration:.35,ease:'power2.in'},50.8)
-    .to('.m5eng',{scale:0.5,opacity:0,duration:.55,ease:'power4.in',transformOrigin:'center center',stagger:{each:.04,from:'center'}},50.8)
+    .to(['#m5pDesc','#m5perSubline'],{opacity:0,duration:.35,ease:'power2.in'},47.8)
+    .to('.m5eng',{scale:0.5,opacity:0,duration:.55,ease:'power4.in',transformOrigin:'center center',stagger:{each:.04,from:'center'}},47.8)
     .call(()=>{
       const ring=document.getElementById('m5perRing');
       if(ring){ring.style.animation='none';void ring.offsetWidth;ring.style.animation='m5ring 1.1s ease-out forwards';}
-    },[],51.3)
-    .to('#m5perBig',{opacity:1,duration:.5,ease:'power2.out'},51.4)
-    .to('#m5perBigTxt',{letterSpacing:'0.36em',duration:1.3,ease:'power2.inOut'},51.4)
-    .to('#m5perTagline',{opacity:1,duration:.4,ease:'power2.out'},52.5)
-    .to('#m5perBig',{opacity:0,duration:.5,ease:'power2.in'},53.5)
-    .to('#m5s2',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},53.8);
+    },[],48.3)
+    .to('#m5perBig',{opacity:1,duration:.5,ease:'power2.out'},48.4)
+    .to('#m5perBigTxt',{letterSpacing:'0.36em',duration:1.3,ease:'power2.inOut'},48.4)
+    .to('#m5perTagline',{opacity:1,duration:.4,ease:'power2.out'},49.5)
+    .to('#m5perBig',{opacity:0,duration:.5,ease:'power2.in'},50.5)
+    .to('#m5s2',{opacity:0,y:-10,duration:.5,ease:'power3.in'},50.8);
 
-  /* MARKET (54.5–68.5s) */
+  /* MARKET (52–63s) */
   tl5
-    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],54.5)
-    .fromTo('#m5s3',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},54.5)
-    .call(()=>{
-      gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
-      _spotHideAll();
-      _spotShowIds('m5spotStatVal','m5spotStatSub');
-      document.getElementById('m5spotStatVal').textContent='360 000+';
-      document.getElementById('m5spotStatSub').textContent='svenska gymnasieelever';
-    },[],55.0)
-    .to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},55.05)
-    .to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},58.2)
-    .to('#m5mktStat',{opacity:1,scale:1,duration:.5,ease:'power2.out'},58.3);
+    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],52.0)
+    .fromTo('#m5s3',{opacity:0,y:10},{opacity:1,y:0,duration:.55,ease:'power3.out'},52.0)
+    .to('#m5mktStat',{opacity:1,scale:1,duration:.55,ease:'power2.out'},53.0)
+    .fromTo('#m5mk0',{opacity:0,y:10},{opacity:1,y:0,duration:.4,ease:'power2.out'},54.8)
+    .call(()=>{document.getElementById('m5mk0').classList.add('lit')},[],55.2)
+    .fromTo('#m5mk1',{opacity:0,y:10},{opacity:1,y:0,duration:.4,ease:'power2.out'},56.6)
+    .call(()=>{document.getElementById('m5mk1').classList.add('lit')},[],57.0)
+    .fromTo('#m5mk2',{opacity:0,y:10},{opacity:1,y:0,duration:.4,ease:'power2.out'},58.4)
+    .call(()=>{document.getElementById('m5mk2').classList.add('lit')},[],58.8)
+    .to('#m5s3',{opacity:0,y:-10,duration:.5,ease:'power3.in'},62.5);
 
-  addMktSpot(tl5,0,59.0);
-  addMktSpot(tl5,1,62.2);
-  addMktSpot(tl5,2,65.4);
-
-  tl5.to('#m5s3',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},68.5);
-
-  /* BUSINESS MODEL (69.2–81.5s) */
+  /* BUSINESS MODEL (63.8–77s) */
   tl5
-    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],69.2)
-    .fromTo('#m5s4',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},69.2);
+    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],63.8)
+    .fromTo('#m5s4',{opacity:0,y:10},{opacity:1,y:0,duration:.55,ease:'power3.out'},63.8);
 
-  addPlanSpot(tl5,0,69.8);
-  addPlanSpot(tl5,1,73.5);
-  addPlanSpot(tl5,2,77.2);
+  addPlanSpot(tl5,0,64.5);
+  addPlanSpot(tl5,1,68.5);
+  addPlanSpot(tl5,2,72.5);
 
   tl5
-    .to('#m5margins',{opacity:1,duration:.4,ease:'power2.out'},80.8)
-    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},81.1);
+    .to('#m5margins',{opacity:1,duration:.4,ease:'power2.out'},76.5)
+    .to('#m5s4',{opacity:0,y:-10,duration:.5,ease:'power3.in'},77.0);
 
-  /* CTA (81.8–85s) */
+  /* CTA (77.3–81s) */
   tl5
-    .fromTo('#m5cta',{opacity:0,scale:0.92,y:12},{opacity:1,scale:1,y:0,duration:.65,ease:'power3.out'},81.8)
-    .to('#mode5',{opacity:0,duration:1.3},82.8)
-    .set('#mode5',{opacity:1},85.0);
+    .call(()=>{setDot(4,'dn')},[],77.3)
+    .to('#m5cta',{opacity:1,duration:.5,ease:'power2.out'},77.3)
+    .to('#m5ctaQ',{opacity:1,duration:.4,ease:'power2.out'},77.5)
+    .call(()=>{const el=document.getElementById('m5ctaQ');if(el)el.classList.add('glow')},[],78.3)
+    .to('#m5ctaUrl',{opacity:1,duration:.5,ease:'power2.out'},78.8)
+    .to('#mode5',{opacity:0,duration:1.3},80.5)
+    .set('#mode5',{opacity:1},82.0);
 
   return tl5;
 }
+
+const M5_TIMES=[0,8.5,23.0,52.0,63.8];
+document.querySelectorAll('#pdots .pd').forEach((dot,i)=>{
+  dot.addEventListener('click',()=>{
+    if(curMode===5&&tl5){const t=M5_TIMES[i];if(t!==undefined)tl5.seek(t);}
+  });
+});
 
 const STORY_TEXTS={1:'Dag 1 — Elton gör sitt första prov',2:'Dag 2 — Körkortsteorin med P.E.R',3:'Dag 3 — P.E.R coachar Elton i realtid',4:'Dag 7 — P.E.R spårar förbättringen',5:''};
 function switchMode(n){
