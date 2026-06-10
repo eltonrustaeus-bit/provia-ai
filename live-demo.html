@@ -4,6 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ProviaAi — Demo</title>
+  <style id="_ag">body{visibility:hidden}</style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+  (function(){
+    const SB_URL='https://mnmotdluigzeehdjbhbu.supabase.co';
+    const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
+    let _to=setTimeout(()=>location.replace('index.html'),4000);
+    document.addEventListener('DOMContentLoaded',async function(){
+      const splash=document.createElement('div');
+      splash.style.cssText='position:fixed;inset:0;background:#08100d;z-index:9999;display:flex;align-items:center;justify-content:center;font:13px/1 DM Sans,sans-serif;color:#a8c4b4;letter-spacing:.04em';
+      splash.textContent='Kontrollerar åtkomst…';
+      document.body.appendChild(splash);
+      const ag=document.getElementById('_ag');if(ag)ag.remove();
+      try{
+        const sb=window.supabase.createClient(SB_URL,SB_KEY);
+        const {data:{session}}=await sb.auth.getSession();
+        if(!session){clearTimeout(_to);location.replace('index.html');return;}
+        const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();
+        if(data?.role==='admin'){clearTimeout(_to);splash.remove();}
+        else{clearTimeout(_to);location.replace('index.html');}
+      }catch(e){clearTimeout(_to);location.replace('index.html');}
+    });
+  })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
