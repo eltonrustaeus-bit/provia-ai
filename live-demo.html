@@ -1220,51 +1220,51 @@ function buildTL2(){
 
   tl2=gsap.timeline({onComplete:()=>switchMode(3)});
 
-  /* 0–5s INTRO */
+  /* 0–4s INTRO */
   tl2
-    .call(()=>{hideAll(M2SEC);show('m2intro');setDot(0,'on');setNarrator(2,0);startCountdown(58)})
-    .from('#m2intro > .pill',{opacity:0,y:8,duration:.6})
-    .from('#m2intro > div:nth-child(3)',{opacity:0,y:12,duration:.7},'-=.2')
-    .from('#m2intro > div:nth-child(4)',{opacity:0,duration:.5},'-=.15')
+    .call(()=>{hideAll(M2SEC);show('m2intro');setDot(0,'on');setNarrator(2,0);startCountdown(40)})
+    .from('#m2intro > .pill',{opacity:0,y:8,duration:.5})
+    .from('#m2intro > div:nth-child(3)',{opacity:0,y:12,duration:.6},'-=.15')
+    .from('#m2intro > div:nth-child(4)',{opacity:0,duration:.4},'-=.1')
 
-  /* 5–14s CATEGORIES */
+  /* 4–10s CATEGORIES */
   tl2
-    .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0)},[],5)
+    .call(()=>{hideAll(M2SEC);show('m2catw');setDot(0,'dn');setDot(1,'on');setNarrator(2,0)},[],4)
     .call(()=>{
       catTimers.forEach(clearTimeout);catTimers=[];
       CATS.forEach((c,i)=>{
-        gsap.to('#cc'+i,{opacity:c.done?1:.35,y:0,duration:.4,delay:i*.065,ease:'power2.out'});
-        if(c.done)catTimers.push(setTimeout(()=>{const f=document.getElementById('cbf'+i);if(f)f.style.width=c.p+'%'},600+i*65));
-        if(i===0)catTimers.push(setTimeout(()=>document.getElementById('cc0').classList.add('active'),900));
+        gsap.to('#cc'+i,{opacity:c.done?1:.35,y:0,duration:.4,delay:i*.055,ease:'power2.out'});
+        if(c.done)catTimers.push(setTimeout(()=>{const f=document.getElementById('cbf'+i);if(f)f.style.width=c.p+'%'},500+i*55));
+        if(i===0)catTimers.push(setTimeout(()=>document.getElementById('cc0').classList.add('active'),750));
       });
-    },[],5.5)
+    },[],4.5)
 
-  /* 14–26s SIGN */
+  /* 10–18s SIGN */
   tl2
     .call(()=>{
       hideAll(M2SEC);show('m2signw');setDot(1,'dn');setDot(2,'on');setNarrator(2,1);
       gsap.set('#sigcard',{opacity:0,y:10});gsap.set('#signsvg',{scale:.4,opacity:0});gsap.set('#catprog',{opacity:0});
       ['sa','sb','sc','sd'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='ansBtn'});
-    },[],14)
-    .to('#sigcard',{opacity:1,y:0,duration:.6},14.2)
-    .to('#signsvg',{scale:1,opacity:1,duration:1,ease:'back.out(1.4)'},14.6)
-    .call(()=>document.getElementById('sb').className='ansBtn sel',[],18)
+    },[],10)
+    .to('#sigcard',{opacity:1,y:0,duration:.6},10.2)
+    .to('#signsvg',{scale:1,opacity:1,duration:.8,ease:'back.out(1.4)'},10.6)
+    .call(()=>document.getElementById('sb').className='ansBtn sel',[],14)
     .call(()=>{
       document.getElementById('sb').className='ansBtn ok';
       const rect=document.getElementById('signsvg').getBoundingClientRect();
       spawnRipple(rect.left+rect.width/2,rect.top+rect.height/2);
       gsap.to('#signsvg',{filter:'drop-shadow(0 0 22px rgba(27,255,140,.55))',duration:.5});
-    },[],19)
-    .to('#catprog',{opacity:1,duration:.6},20)
+    },[],15)
+    .to('#catprog',{opacity:1,duration:.6},16)
 
-  /* 26–40s SIM EXAM */
+  /* 18–29s SIM EXAM */
   tl2
     .call(()=>{
       hideAll(M2SEC);show('m2simw');setDot(2,'dn');setDot(3,'on');setNarrator(2,2);
       gsap.set('#m2simw',{opacity:0,y:10});gsap.set('#simres',{opacity:0,scale:.92});
-    },[],26)
-    .to('#m2simw',{opacity:1,y:0,duration:.7},26.3)
-    .call(startSimTick,[],27)
+    },[],18)
+    .to('#m2simw',{opacity:1,y:0,duration:.7},18.3)
+    .call(startSimTick,[],19)
     .call(()=>{
       stopSimTick();
       document.getElementById('simtimer').textContent='44:07';
@@ -1273,18 +1273,18 @@ function buildTL2(){
       document.getElementById('simpf').style.width='100%';
       gsap.to('#simres',{opacity:1,scale:1,duration:.75,ease:'back.out(1.4)'});
       spawnConfetti();
-    },[],38)
+    },[],27)
 
-  /* 40–55s STATS */
+  /* 29–37s STATS */
   tl2
     .call(()=>{
       hideAll(M2SEC);show('m2statsw');setDot(3,'dn');setNarrator(2,3);
       gsap.set('#m2statsw',{opacity:0,y:10});gsap.set('#wkalert',{opacity:0});
-    },[],40)
-    .to('#m2statsw',{opacity:1,y:0,duration:.7},40.3)
-    .to('#wkalert',{opacity:1,duration:.6},42.5)
+    },[],29)
+    .to('#m2statsw',{opacity:1,y:0,duration:.7},29.3)
+    .to('#wkalert',{opacity:1,duration:.6},31.5)
 
-  tl2.to('#mode2',{opacity:0,duration:1.4},55.2).set('#mode2',{opacity:1},58);
+  tl2.to('#mode2',{opacity:0,duration:1.4},37).set('#mode2',{opacity:1},40);
   return tl2;
 }
 
@@ -1414,7 +1414,7 @@ function buildTL4(){
 
   /* 0–22s FÖRBÄTTRING */
   tl4
-    .call(()=>{hideAll(M4SEC);show('m4improve');setDot(0,'on');setNarrator(4,0);startCountdown(52)})
+    .call(()=>{hideAll(M4SEC);show('m4improve');setDot(0,'on');setNarrator(4,0);startCountdown(35)})
     .to('#fbHero',{opacity:1,duration:.6},.4)
     .to('#fbNavRail',{opacity:1,y:0,duration:.5},1.3)
     .to('#fbProvSec',{opacity:1,duration:.5},1.6)
@@ -1442,20 +1442,20 @@ function buildTL4(){
     .to('#mc2',{opacity:1,y:0,duration:.4},12.7)
     .call(()=>setNarrator(4,2),[],12.2)
 
-  /* 25–50s PRICING CTA */
+  /* 16–33s PRICING CTA */
   tl4
     .call(()=>{
       hideAll(M4SEC);show('m4cta');setDot(2,'dn');setDot(3,'on');setNarrator(4,3);
       gsap.set('#ctaWrap',{opacity:0});gsap.set('.planCard',{opacity:0,y:12});gsap.set('#ctaBtn',{opacity:0,y:8});
-    },[],25)
-    .to('#ctaWrap',{opacity:1,duration:.5},25.2)
-    .to('#plan1',{opacity:1,y:0,duration:.5},26)
-    .to('#plan2',{opacity:1,y:0,duration:.5},26.3)
-    .to('#plan3',{opacity:1,y:0,duration:.5},26.6)
-    .to('#ctaBtn',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)'},28)
-    .call(()=>spawnConfetti(),[],28.5)
+    },[],16)
+    .to('#ctaWrap',{opacity:1,duration:.5},16.2)
+    .to('#plan1',{opacity:1,y:0,duration:.5},17)
+    .to('#plan2',{opacity:1,y:0,duration:.5},17.3)
+    .to('#plan3',{opacity:1,y:0,duration:.5},17.6)
+    .to('#ctaBtn',{opacity:1,y:0,duration:.6,ease:'back.out(1.4)'},19)
+    .call(()=>spawnConfetti(),[],19.5)
 
-  tl4.to('#mode4',{opacity:0,duration:1.4},49).set('#mode4',{opacity:1},52);
+  tl4.to('#mode4',{opacity:0,duration:1.4},33).set('#mode4',{opacity:1},35);
   return tl4;
 }
 
