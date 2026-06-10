@@ -390,6 +390,36 @@
     #pdots.mode5 .pd.on::after{color:var(--a)}
     #pdots.mode5 .pd.dn{width:auto;background:transparent;border-color:rgba(27,255,140,.35);border-radius:10px;box-shadow:none}
     #pdots.mode5 .pd.dn::after{color:rgba(27,255,140,.45)}
+    /* SPOTLIGHT OVERLAY */
+    #m5spot{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;background:rgba(8,16,13,.9);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+    #m5spotCard{background:var(--s);border:1px solid var(--l2);border-radius:12px;padding:20px 24px;max-width:400px;width:90%;box-shadow:0 0 40px rgba(27,255,140,.12)}
+    #m5spotIcon{font-size:30px;margin-bottom:8px}
+    #m5spotTitle{font:700 18px/1.2 var(--f);color:var(--t);margin-bottom:6px}
+    #m5spotDesc{font:400 13px var(--f);color:var(--t2);line-height:1.65}
+    #m5spotPlanBadge{font:700 9px var(--m);letter-spacing:.1em;text-transform:uppercase;color:var(--a);border:1px solid rgba(27,255,140,.3);border-radius:20px;padding:2px 9px;display:inline-block;margin-bottom:8px}
+    #m5spotPlanName{font:700 22px/1.1 var(--f);color:var(--t);margin-bottom:4px}
+    #m5spotPlanPrice{font:700 36px/1 var(--f);color:var(--a);letter-spacing:-.02em;margin-bottom:14px}
+    #m5spotPlanPrice span{font:400 12px var(--f);color:var(--t3);margin-left:3px}
+    .m5spotFeat{font:400 12.5px var(--f);color:var(--t2);line-height:1.5;padding:6px 0;border-bottom:1px solid var(--l);opacity:0;display:flex;align-items:flex-start;gap:8px}
+    .m5spotFeat:last-child{border-bottom:none}
+    .m5spotFeat::before{content:"✓";color:var(--a);font:600 10px var(--m);flex-shrink:0;margin-top:2px}
+    #m5spotVsWrap{display:none}
+    #m5spotVsInner{display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--l)}
+    .m5spotVsL{flex:1;padding:12px 14px;background:rgba(255,255,255,.02);border-right:1px solid var(--l);display:flex;flex-direction:column;gap:5px}
+    .m5spotVsR{flex:1;padding:12px 14px;background:rgba(27,255,140,.05);display:flex;flex-direction:column;gap:5px}
+    .m5spotVsTag{font:700 9px var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+    .m5spotVsTag.bad{color:rgba(255,100,100,.65)}
+    .m5spotVsTag.good{color:var(--a)}
+    .m5spotVsLine{font:400 11.5px var(--f);line-height:1.45;opacity:0}
+    .m5spotVsLine.bad{color:var(--t3)}
+    .m5spotVsLine.good{color:var(--t2)}
+    #m5spotStatVal{font:700 60px/1 var(--f);color:var(--a);letter-spacing:-.03em;text-align:center;display:none}
+    #m5spotStatSub{font:400 13px var(--m);color:var(--t3);letter-spacing:.04em;text-align:center;margin-top:8px;display:none}
+    /* P.E.R MERGE */
+    #m5perBig{position:absolute;inset:0;z-index:11;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none}
+    #m5perBigTxt{font:700 52px var(--m);color:var(--a);letter-spacing:.22em;text-shadow:0 0 40px rgba(27,255,140,.7)}
+    #m5perRing{position:absolute;top:50%;left:50%;width:120px;height:120px;border-radius:50%;border:2px solid rgba(27,255,140,.5);transform:translate(-50%,-50%) scale(0);opacity:0;pointer-events:none;z-index:10}
+    @keyframes m5ring{0%{opacity:.9;transform:translate(-50%,-50%) scale(.35)}100%{opacity:0;transform:translate(-50%,-50%) scale(3.2)}}
     #m3bub{width:52px;height:52px;border-radius:50%;background:var(--a);display:grid;place-items:center;font:700 9px var(--m);letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.45);cursor:pointer}
     @keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.45)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 8px rgba(27,255,140,.12)}}
     #m3bub.pulse{animation:perPulse .9s ease-in-out 3}
@@ -1116,12 +1146,12 @@
     <!-- PROBLEM -->
     <div id="m5s1" class="m5sec">
       <div class="m5sHead"><span class="m5sNum">01</span><span class="m5sLabel">Problem</span></div>
-      <div id="m5story">Emma, 17 år. Provet om 3 dagar. Har läst allt — vet inte vad som är viktigast.</div>
+      <div id="m5story">Alex har 4 dagar kvar till matteprov. Har pluggat 6 timmar. Vet fortfarande inte vad som faktiskt frågas.</div>
       <div class="m5bullets">
-        <div class="m5b" id="m5b0"><span class="m5bi">🌊</span><span>Informationsöverflöd — vet inte vad som är viktigast</span></div>
-        <div class="m5b" id="m5b1"><span class="m5bi">🔄</span><span>Brist på återkoppling — samma misstag upprepas</span></div>
-        <div class="m5b" id="m5b2"><span class="m5bi">⏳</span><span>Ineffektiv repetition — allt studeras oavsett kunskapslucka</span></div>
-        <div class="m5b" id="m5b3"><span class="m5bi">👤</span><span>Ingen personlig coach — ingen tydlig progression</span></div>
+        <div class="m5b" id="m5b0"><span class="m5bi">🌊</span><span>Pluggar utan fokus — övar allt, inte det som faktiskt frågas</span></div>
+        <div class="m5b" id="m5b1"><span class="m5bi">🔄</span><span>Samma misstag — ingen som pekar ut mönstret</span></div>
+        <div class="m5b" id="m5b2"><span class="m5bi">⏳</span><span>Tidsbrist — de sista dagarna vet man inte var man ska börja</span></div>
+        <div class="m5b" id="m5b3"><span class="m5bi">👤</span><span>Ingen guide — ingen känner till just dina svagheter</span></div>
       </div>
     </div>
 
@@ -1134,7 +1164,7 @@
         <div class="m5eng" id="m5e1">📊 Performance Engine<span>Spårar mönster och luckor</span></div>
         <div class="m5eng" id="m5e2">🔮 Prediction Engine<span>Förutspår var du fastnar</span></div>
         <div class="m5eng" id="m5e3">🎯 Recommendation Engine<span>Rätt övning, rätt tid</span></div>
-        <div class="m5eng" id="m5e4">🕸 Knowledge Graph<span>Din unika kunskapsgraf</span></div>
+        <div class="m5eng" id="m5e4">📝 Exam Engine<span>Genererar skräddarsydda prov från ditt material</span></div>
         <div class="m5eng" id="m5e5">💬 Coaching Engine<span>Förklarar på exakt rätt sätt</span></div>
       </div>
       <div id="m5vsRow">
@@ -1193,6 +1223,41 @@
       <div id="m5ctaQ">Vi söker 100 000 kr för att nå 500 elever under tävlingsåret.</div>
       <div id="m5ctaUrl">proviaai.se</div>
     </div>
+
+    <!-- SPOTLIGHT OVERLAY -->
+    <div id="m5spot">
+      <div id="m5spotCard">
+        <div id="m5spotIcon"></div>
+        <div id="m5spotTitle"></div>
+        <div id="m5spotDesc"></div>
+        <div id="m5spotPlanBadge" style="display:none"></div>
+        <div id="m5spotPlanName" style="display:none"></div>
+        <div id="m5spotPlanPrice" style="display:none"></div>
+        <div id="m5spotFeatList" style="display:none"></div>
+        <div id="m5spotVsWrap">
+          <div id="m5spotVsInner">
+            <div class="m5spotVsL">
+              <div class="m5spotVsTag bad">ChatGPT / Generell AI</div>
+              <div class="m5spotVsLine bad" id="svl0">Vet inget om dina tidigare svar</div>
+              <div class="m5spotVsLine bad" id="svl1">Samma svar till alla</div>
+              <div class="m5spotVsLine bad" id="svl2">Ingen progression spåras</div>
+            </div>
+            <div class="m5spotVsR">
+              <div class="m5spotVsTag good">P.E.R</div>
+              <div class="m5spotVsLine good" id="svr0">Ser hela din studiehistorik</div>
+              <div class="m5spotVsLine good" id="svr1">Anpassar sig till din nivå</div>
+              <div class="m5spotVsLine good" id="svr2">Mönster + progression i realtid</div>
+            </div>
+          </div>
+        </div>
+        <div id="m5spotStatVal"></div>
+        <div id="m5spotStatSub"></div>
+      </div>
+    </div>
+
+    <!-- P.E.R MERGE -->
+    <div id="m5perBig"><div id="m5perBigTxt">P·E·R</div></div>
+    <div id="m5perRing"></div>
 
   </div>
 </div>
@@ -1259,7 +1324,7 @@ const NData={
   2:[{s:'Kategorier',t:'368 frågor, 16 kategorier — uppbyggt efter Transportstyrelsens upplägg'},{s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},{s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — samma format som teoriprovets'},{s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar fokusträning'}],
   3:[{s:'P.E.R',t:'Provias Egna AI-Resource — alltid med dig, ser vilken fråga du sitter på'},{s:'Fråga',t:'Elton fastnar på Fråga 3 — P.E.R ser kontexten automatiskt'},{s:'Svar',t:'P.E.R förklarar pq-formeln steg för steg — inget annat studieverktyg gör detta'}],
   4:[{s:'Förbättring',t:'Din kompletta lärvyn — coach, statistik och felbank samlat'},{s:'Coach',t:'P.E.R identifierar svagaste kategorin och rekommenderar fokusträning'},{s:'Felbank',t:'Alla misstag samlade — repetera exakt rätt frågor'},{s:'Kom igång',t:'Gratis att starta — Basic 29 kr/mån för obegränsade AI-prov'}],
-  5:[{s:'Intro',t:'ProviaAi — AI-driven provträningsplattform för varje elev'},{s:'Problem',t:'4 verkliga problem: informationsöverflöd, brist på återkoppling, ineffektiv repetition, ingen personlig coach'},{s:'P.E.R',t:'Inte en chatbot — Provias centrala intelligenslager med 6 motorer som samverkar'},{s:'Marknad',t:'Många elever kämpar utan hjälp — de flesta vet inte hur man använder AI på rätt sätt'},{s:'Affärsmodell',t:'Freemium SaaS: Gratis → 29kr → 79kr/mån · Marginaler 88–94% · Break-even 50–100 användare'}],
+  5:[{s:'Intro',t:'Hook: varför elever tappar poäng — inte kunskap utan träningsstrategi'},{s:'Problem',t:'Alex: 4 dagar kvar, 6 timmars plug — vet fortfarande inte vad som faktiskt frågas'},{s:'P.E.R',t:'6 motorer visas en i taget — sedan alla konvergerar till P.E.R merge'},{s:'Marknad',t:'360 000+ gymnasieelever — generella AI-verktyg löser inte deras faktiska problem'},{s:'Affärsmodell',t:'Gratis / Basic 29 kr / Premium 79 kr — top 4 features per plan'}],
 };
 function setNarrator(mode,idx){document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>`<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('')}
 
@@ -1905,77 +1970,203 @@ function buildTL4(){
   return tl4;
 }
 
+/* ─── MODE 5 DATA ─── */
+const ENGINES=[
+  {icon:'🧠',title:'Context Engine',desc:'Förstår varje fråga i relation till din hela studiehistorik'},
+  {icon:'📊',title:'Performance Engine',desc:'Spårar mönster i dina svar och identifierar exakta kunskapsluckor'},
+  {icon:'🔮',title:'Prediction Engine',desc:'Förutspår exakt var du kommer att fastna — innan provet börjar'},
+  {icon:'🎯',title:'Recommendation Engine',desc:'Rätt övning, rätt tid — alltid baserat på just dina data'},
+  {icon:'📝',title:'Exam Engine',desc:'Genererar skräddarsydda prov direkt från ditt eget material'},
+  {icon:'💬',title:'Coaching Engine',desc:'Förklarar varje fråga på exakt rätt sätt — för dig, inte för alla'},
+];
+const MKT_ROWS=[
+  {icon:'📚',text:'Många elever pluggar utan fokus — generella AI-verktyg vet inte vad som faktiskt frågas på just deras prov.'},
+  {icon:'🤖',text:'ChatGPT och liknande saknar din studiehistorik. De ger samma svar till alla — P.E.R ger rätt svar till dig.'},
+  {icon:'⚡',text:'Provia löser det direkt — ladda upp ditt material, generera ett prov, börja träna smart.'},
+];
+const PLANS=[
+  {badge:'Gratis',name:'Gratis',price:'0 kr',note:'',feats:['2 AI-mockprov per vecka','Körkortsteorin — 2 test / vecka','P.E.R AI-assistent — 5 frågor / vecka','Resultat & poängöversikt']},
+  {badge:'Basic',name:'Basic',price:'29',note:'kr/mån',feats:['30 AI-mockprov per månad','P.E.R AI-assistent — 5 frågor / dag','Historik — följ din utveckling','Körkortsteorin — 30 test / månad']},
+  {badge:'Premium',name:'Premium',price:'79',note:'kr/mån',feats:['Obegränsade AI-mockprov','P.E.R — obegränsat, ser din skärm','P.E.R Coach — personlig studieplan','Felbank + Träningsläge']},
+];
+function _spotHideAll(){
+  ['m5spotIcon','m5spotTitle','m5spotDesc','m5spotPlanBadge','m5spotPlanName','m5spotPlanPrice','m5spotFeatList','m5spotVsWrap','m5spotStatVal','m5spotStatSub'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+}
+function _spotShowIds(...ids){ids.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';})}
+function addEngineSpot(tl,idx,at){
+  const e=ENGINES[idx];
+  tl.call(()=>{
+    gsap.set('#m5spot',{scale:0.88});_spotHideAll();_spotShowIds('m5spotIcon','m5spotTitle','m5spotDesc');
+    document.getElementById('m5spotIcon').textContent=e.icon;
+    document.getElementById('m5spotTitle').textContent=e.title;
+    document.getElementById('m5spotDesc').textContent=e.desc;
+  },[],at);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
+  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.05);
+  tl.to('#m5e'+idx,{opacity:1,y:0,scale:1,duration:.38,ease:'back.out(1.5)'},at+2.1);
+}
+function addMktSpot(tl,idx,at){
+  const r=MKT_ROWS[idx];
+  tl.call(()=>{
+    gsap.set('#m5spot',{scale:0.88});_spotHideAll();_spotShowIds('m5spotIcon','m5spotDesc');
+    document.getElementById('m5spotIcon').textContent=r.icon;
+    document.getElementById('m5spotTitle').textContent='';
+    document.getElementById('m5spotDesc').textContent=r.text;
+  },[],at);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
+  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.2);
+  tl.to('#m5mk'+idx,{opacity:1,y:0,duration:.38,ease:'power2.out'},at+2.2);
+}
+function addPlanSpot(tl,idx,at){
+  const p=PLANS[idx];
+  tl.call(()=>{
+    gsap.set('#m5spot',{scale:0.88});_spotHideAll();
+    _spotShowIds('m5spotPlanBadge','m5spotPlanName','m5spotPlanPrice','m5spotFeatList');
+    document.getElementById('m5spotPlanBadge').textContent=p.badge;
+    document.getElementById('m5spotPlanName').textContent=p.name;
+    document.getElementById('m5spotPlanPrice').innerHTML=p.note?`${p.price}<span>${p.note}</span>`:p.price;
+    const fl=document.getElementById('m5spotFeatList');
+    fl.innerHTML=p.feats.map(f=>`<div class="m5spotFeat">${f}</div>`).join('');
+    fl.querySelectorAll('.m5spotFeat').forEach(el=>gsap.set(el,{opacity:0,y:6}));
+  },[],at);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
+  for(let i=0;i<4;i++){
+    tl.call((j=>{return()=>{const feats=document.querySelectorAll('#m5spotFeatList .m5spotFeat');if(feats[j])gsap.to(feats[j],{opacity:1,y:0,duration:.3,ease:'power2.out'});}})(i),[],at+0.65+i*0.42);
+  }
+  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.65);
+  tl.to('#m5t'+idx,{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},at+2.7);
+}
+
 /* ─── MODE SWITCH ─── */
 function buildTL5(){
   if(tl5){tl5.kill();tl5=null}
   clearAllTimers();
-  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,x:0});
+  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,x:0,scale:1});
   const ht=document.getElementById('m5hookTxt');if(ht)ht.textContent='';
   gsap.set('#m5logoWrap',{opacity:0,y:12});
-  gsap.set('#m5traction',{opacity:0});
-  gsap.set('#m5mission',{opacity:0});
+  gsap.set(['#m5traction','#m5mission'],{opacity:0});
   gsap.set('#m5story',{opacity:0,y:6});
   gsap.set(['#m5b0','#m5b1','#m5b2','#m5b3'],{opacity:0,x:24});
-  gsap.set('#m5pDesc',{opacity:0,y:8});
+  gsap.set('#m5pDesc',{opacity:0,y:8,scale:1});
   gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,y:16,scale:0.92,boxShadow:'none'});
-  gsap.set('#m5vsRow',{opacity:0,y:8});
+  gsap.set('#m5vsRow',{opacity:0,y:8,scale:1});
+  gsap.set('#m5spot',{opacity:0});
+  gsap.set('#m5perBig',{opacity:0});
+  gsap.set('#m5perBigTxt',{scale:1});
   gsap.set('#m5mktStat',{opacity:0,scale:0.82});
   gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:12});
   gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:14});
   buildDots(5);
-  const DUR=43;
+  const DUR=67;
   tl5=gsap.timeline({onComplete:()=>switchMode(1)});
+
+  /* INTRO (0–7.5s) */
   tl5
-    // INTRO (0–6s) — hook typewriter, then logo + traction
     .call(()=>{setNarrator(5,0);startCountdown(DUR);setDot(0,'on')},[],0)
     .to('#m5s0',{opacity:1,duration:.55,ease:'power2.out'},0.25)
-    .call(()=>{const t=chatType('m5hookTxt','m5hookCur','Varje år stryker tusentals svenska elever på prov de borde klarat.',32,null);catTimers.push(t);},[],0.4)
-    .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},2.7)
-    .to(['#m5traction','#m5mission'],{opacity:1,duration:.45,ease:'power2.out'},3.4)
-    // PROBLEM (6–14s)
-    .to('#m5s0',{opacity:0,x:-50,duration:.5,ease:'power3.in'},5.5)
-    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],6.0)
-    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},6.0)
-    .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},6.5)
-    .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},7.2)
-    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},7.9)
-    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},8.6)
-    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},9.3)
-    // P.E.R (14–26s) — engines + vsRow comparison
-    .to('#m5s1',{opacity:0,x:-50,duration:.5,ease:'power3.in'},13.5)
-    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],14.0)
-    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},14.0)
-    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},14.7)
-    .to('#m5e0',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},15.3)
-    .to('#m5e1',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},15.8)
-    .to('#m5e2',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},16.3)
-    .to('#m5e3',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},16.8)
-    .to('#m5e4',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},17.3)
-    .to('#m5e5',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},17.8)
-    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.07,duration:.3,ease:'power2.in'},19.0)
-    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.07,duration:.65,ease:'power2.out'},19.3)
-    .to('#m5vsRow',{opacity:1,y:0,duration:.55,ease:'power2.out'},20.3)
-    // MARKET (26–33s) — big stat + rows
-    .to('#m5s2',{opacity:0,x:-50,duration:.5,ease:'power3.in'},25.5)
-    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],26.0)
-    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},26.0)
-    .to('#m5mktStat',{opacity:1,scale:1,duration:.6,ease:'back.out(1.5)'},26.3)
-    .to('#m5mk0',{opacity:1,y:0,duration:.4,ease:'power2.out'},27.2)
-    .to('#m5mk1',{opacity:1,y:0,duration:.4,ease:'power2.out'},28.0)
-    .to('#m5mk2',{opacity:1,y:0,duration:.4,ease:'power2.out'},28.8)
-    // BUSINESS MODEL (33–40s)
-    .to('#m5s3',{opacity:0,x:-50,duration:.5,ease:'power3.in'},32.5)
-    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],33.0)
-    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},33.0)
-    .to('#m5t0',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},33.5)
-    .to('#m5t1',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},34.1)
-    .to('#m5t2',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},34.7)
-    .to('#m5margins',{opacity:1,duration:.35,ease:'power2.out'},35.5)
-    // CTA (40–43s)
-    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},38.5)
-    .to('#m5cta',{opacity:1,duration:.65,ease:'power2.out'},39.2)
-    .to('#mode5',{opacity:0,duration:1.2},41.0)
-    .set('#mode5',{opacity:1},43.0);
+    .call(()=>{const t=chatType('m5hookTxt','m5hookCur','Varje år tappar tusentals elever poäng på prov — inte för att de inte kan, utan för att de tränat på fel saker.',30,null);catTimers.push(t);},[],0.4)
+    .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},3.2)
+    .to(['#m5traction','#m5mission'],{opacity:1,duration:.45,ease:'power2.out'},3.9)
+    .to('#m5s0',{opacity:0,x:-50,duration:.5,ease:'power3.in'},7.0);
+
+  /* PROBLEM (7.5–18.5s) */
+  tl5
+    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],7.5)
+    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},7.5)
+    .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},8.2)
+    .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},9.0)
+    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},10.3)
+    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},11.6)
+    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},12.9)
+    .to('#m5s1',{opacity:0,x:-50,duration:.5,ease:'power3.in'},18.0);
+
+  /* P.E.R (18.5–43.0s) */
+  tl5
+    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],18.5)
+    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},18.5)
+    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},19.2);
+
+  addEngineSpot(tl5,0,20.3);
+  addEngineSpot(tl5,1,22.8);
+  addEngineSpot(tl5,2,25.3);
+  addEngineSpot(tl5,3,27.8);
+  addEngineSpot(tl5,4,30.3);
+  addEngineSpot(tl5,5,32.8);
+
+  // Glow sweep after all 6 engines visible (last card at 34.9)
+  tl5
+    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.07,duration:.3},35.3)
+    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.07,duration:.65,ease:'power2.out'},35.6);
+
+  // VS comparison spotlight (36.2–38.8s)
+  tl5
+    .call(()=>{
+      gsap.set('#m5spot',{scale:0.88});
+      _spotHideAll();
+      _spotShowIds('m5spotVsWrap');
+      gsap.set(['#svl0','#svl1','#svl2','#svr0','#svr1','#svr2'],{opacity:0,y:5});
+    },[],36.2)
+    .to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},36.25)
+    .to(['#svl0','#svr0'],{opacity:1,y:0,duration:.3,ease:'power2.out'},36.8)
+    .to(['#svl1','#svr1'],{opacity:1,y:0,duration:.3,ease:'power2.out'},37.2)
+    .to(['#svl2','#svr2'],{opacity:1,y:0,duration:.3,ease:'power2.out'},37.6)
+    .to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},38.6)
+    .to('#m5vsRow',{opacity:1,y:0,duration:.4,ease:'power2.out'},38.7);
+
+  // MERGE (39.5–42.5s)
+  tl5
+    .to(['.m5eng','#m5vsRow','#m5pDesc'],{scale:0.08,opacity:0,duration:.6,ease:'power3.in'},39.5)
+    .call(()=>{
+      const ring=document.getElementById('m5perRing');
+      if(ring){ring.style.animation='none';void ring.offsetWidth;ring.style.animation='m5ring 0.9s ease-out forwards';}
+    },[],39.9)
+    .to('#m5perBig',{opacity:1,duration:.4,ease:'power2.out'},40.0)
+    .to('#m5perBigTxt',{scale:1.2,duration:.8,ease:'power2.inOut'},40.3)
+    .to('#m5perBig',{opacity:0,duration:.45,ease:'power2.in'},41.3)
+    .to('#m5s2',{opacity:0,x:-50,duration:.5,ease:'power3.in'},41.5);
+
+  /* MARKET (42.5–54.0s) */
+  tl5
+    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],42.5)
+    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},42.5)
+    .call(()=>{
+      gsap.set('#m5spot',{scale:0.88});
+      _spotHideAll();
+      _spotShowIds('m5spotStatVal','m5spotStatSub');
+      document.getElementById('m5spotStatVal').textContent='360 000+';
+      document.getElementById('m5spotStatSub').textContent='svenska gymnasieelever';
+    },[],43.0)
+    .to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},43.05)
+    .to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},45.3)
+    .to('#m5mktStat',{opacity:1,scale:1,duration:.5,ease:'back.out(1.5)'},45.4);
+
+  addMktSpot(tl5,0,46.2);
+  addMktSpot(tl5,1,48.7);
+  addMktSpot(tl5,2,51.2);
+
+  tl5.to('#m5s3',{opacity:0,x:-50,duration:.5,ease:'power3.in'},54.0);
+
+  /* BUSINESS MODEL (54.5–63.8s) */
+  tl5
+    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],54.5)
+    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},54.5);
+
+  addPlanSpot(tl5,0,55.0);
+  addPlanSpot(tl5,1,57.8);
+  addPlanSpot(tl5,2,60.6);
+
+  tl5
+    .to('#m5margins',{opacity:1,duration:.35,ease:'power2.out'},63.5)
+    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},63.8);
+
+  /* CTA (64.5–67s) */
+  tl5
+    .fromTo('#m5cta',{opacity:0,scale:0.88},{opacity:1,scale:1,duration:.6,ease:'back.out(1.4)'},64.5)
+    .to('#mode5',{opacity:0,duration:1.2},65.5)
+    .set('#mode5',{opacity:1},67.5);
+
   return tl5;
 }
 
