@@ -360,6 +360,13 @@
     @keyframes logoF{0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))}50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.65))}}
 
     /* MOBILE */
+    .tShort{display:none}
+    @media(max-width:480px){
+      .tFull{display:none}
+      .tShort{display:inline}
+      #modeTabs{overflow-x:auto;scrollbar-width:none}
+      #modeTabs::-webkit-scrollbar{display:none}
+    }
     @media(max-width:620px){
       #hdrLogo span{display:none}
       .mTab{padding:5px 9px;font-size:9.5px}
@@ -395,10 +402,10 @@
     <span>ProviaAi</span>
   </a>
   <div id="modeTabs">
-    <div class="mTab on" id="tab1" onclick="switchMode(1)"><div class="dot"></div>Mockprov AI</div>
-    <div class="mTab"    id="tab2" onclick="switchMode(2)"><div class="dot"></div>Körkortsteorin</div>
-    <div class="mTab"    id="tab3" onclick="switchMode(3)"><div class="dot"></div>P.E.R</div>
-    <div class="mTab"    id="tab4" onclick="switchMode(4)"><div class="dot"></div>Förbättring</div>
+    <div class="mTab on" id="tab1" onclick="switchMode(1)"><div class="dot"></div><span class="tFull">Mockprov AI</span><span class="tShort">Prov</span></div>
+    <div class="mTab"    id="tab2" onclick="switchMode(2)"><div class="dot"></div><span class="tFull">Körkortsteorin</span><span class="tShort">Körkort</span></div>
+    <div class="mTab"    id="tab3" onclick="switchMode(3)"><div class="dot"></div><span class="tFull">P.E.R</span><span class="tShort">P.E.R</span></div>
+    <div class="mTab"    id="tab4" onclick="switchMode(4)"><div class="dot"></div><span class="tFull">Förbättring</span><span class="tShort">Analys</span></div>
   </div>
   <div id="hdrRight">
     <div class="kh"><b>N</b> Narrator</div>
