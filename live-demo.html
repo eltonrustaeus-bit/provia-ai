@@ -923,7 +923,7 @@ function spawnConfetti(cx,cy){
   const c=cv2.getContext('2d');cv2.width=W;cv2.height=H;
   (function loop(){c.clearRect(0,0,W,H);let alive=false;frag.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=p.g;p.life-=p.decay;if(p.life>0){alive=true;c.save();c.globalAlpha=Math.max(0,p.life);c.beginPath();c.arc(p.x,p.y,p.r,0,Math.PI*2);c.fillStyle=p.color;c.fill();c.restore()}});if(alive)requestAnimationFrame(loop);else cv2.remove()})();
 }
-function spawnRipple(x,y){for(let i=0;i<3;i++){const el=document.createElement('div');el.className='ripring';el.style.left=(x-20)+'px';el.style.top=(y-20)+'px';document.body.appendChild(el);gsap.set(el,{opacity:.7});gsap.to(el,{width:80+i*28,height:80+i*28,left:(x-40-i*14)+'px',top:(y-40-i*14)+'px',opacity:0,duration:.75,delay:i*.1,ease:'power2.out',onComplete:()=>el.remove()})}}
+function spawnRipple(x,y){for(let i=0;i<3;i++){const el=document.createElement('div');el.className='ripring';el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);gsap.set(el,{opacity:.7,scale:1,xPercent:-50,yPercent:-50});gsap.to(el,{scale:2+i*.7,opacity:0,duration:.75,delay:i*.1,ease:'power2.out',onComplete:()=>el.remove()})}}
 function spawnPoints(x,y,txt){const el=document.createElement('div');el.className='ptsbdg';el.textContent=txt;el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);gsap.fromTo(el,{opacity:0,y:0},{opacity:1,y:-50,duration:.9,ease:'power2.out',onComplete:()=>gsap.to(el,{opacity:0,duration:.3,onComplete:()=>el.remove()})})}
 
 /* ─── RADAR ─── */
