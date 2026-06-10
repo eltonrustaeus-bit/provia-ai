@@ -364,8 +364,32 @@
     .m5tDesc{font:400 11px var(--f);color:var(--t3)}
     #m5margins{font:400 10px var(--m);color:var(--t3);text-align:center}
     #m5cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0;pointer-events:none}
-    #m5ctaQ{font:400 12px var(--m);color:var(--t3);letter-spacing:.08em;text-align:center}
+    #m5ctaQ{font:400 12px var(--m);color:var(--t3);letter-spacing:.08em;text-align:center;max-width:400px}
     #m5ctaUrl{font:700 28px var(--f);color:var(--a);letter-spacing:.04em}
+    #m5hook{font:700 20px/1.35 var(--f);color:var(--t);text-align:center;max-width:460px}
+    #m5hookCur{display:none;width:2px;height:.85em;background:var(--a);vertical-align:text-bottom;margin-left:2px;border-radius:1px;animation:m5blink .6s step-end infinite}
+    @keyframes m5blink{0%,100%{opacity:1}50%{opacity:0}}
+    #m5logoWrap{text-align:center;opacity:0}
+    #m5traction{font:400 10px var(--m);color:var(--t3);letter-spacing:.07em;margin-top:8px;opacity:0}
+    #m5story{font:400 11px/1.6 var(--f);color:var(--t3);font-style:italic;padding:10px 14px;background:rgba(27,255,140,.04);border-left:2px solid rgba(27,255,140,.25);border-radius:0 6px 6px 0;opacity:0}
+    #m5vsRow{display:flex;align-items:stretch;background:var(--s);border:1px solid var(--l);border-radius:8px;overflow:hidden;opacity:0;margin-top:4px}
+    .m5vsL{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--l)}
+    .m5vsR{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:rgba(27,255,140,.05)}
+    .m5vsTag{font:700 9px var(--m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+    .m5vsTag.bad{color:rgba(255,100,100,.6)}
+    .m5vsTag.good{color:var(--a)}
+    .m5vsLine{font:400 10px var(--f);color:var(--t3);line-height:1.45}
+    .m5vsLine.good{color:var(--t2)}
+    #m5mktStat{text-align:center;padding:6px 0 10px;opacity:0}
+    #m5mktNumVal{font:700 44px/1 var(--f);color:var(--a);letter-spacing:-.02em}
+    #m5mktNumSub{font:400 11px var(--m);color:var(--t3);margin-top:5px;letter-spacing:.04em}
+    #pdots.mode5{gap:6px}
+    #pdots.mode5 .pd{width:auto;height:auto;border-radius:10px;background:transparent;border:1px solid var(--l2);padding:2px 8px;line-height:1.8;box-shadow:none}
+    #pdots.mode5 .pd::after{content:attr(data-l);font:400 9px var(--m);color:var(--t3);letter-spacing:.06em}
+    #pdots.mode5 .pd.on{width:auto;background:rgba(27,255,140,.12);border-color:var(--a);border-radius:10px;box-shadow:none}
+    #pdots.mode5 .pd.on::after{color:var(--a)}
+    #pdots.mode5 .pd.dn{width:auto;background:transparent;border-color:rgba(27,255,140,.35);border-radius:10px;box-shadow:none}
+    #pdots.mode5 .pd.dn::after{color:rgba(27,255,140,.45)}
     #m3bub{width:52px;height:52px;border-radius:50%;background:var(--a);display:grid;place-items:center;font:700 9px var(--m);letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.45);cursor:pointer}
     @keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.45)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 8px rgba(27,255,140,.12)}}
     #m3bub.pulse{animation:perPulse .9s ease-in-out 3}
@@ -1080,9 +1104,11 @@
 
     <!-- INTRO -->
     <div id="m5s0" class="m5sec">
-      <div>
+      <div id="m5hook"><span id="m5hookTxt"></span><span id="m5hookCur">|</span></div>
+      <div id="m5logoWrap">
         <div class="m5logoMark">P·R·O·V·I·A</div>
         <div class="m5logoSub">AI-driven provträningsplattform</div>
+        <div id="m5traction">Aktiv beta · körkortsteorin live · proviaai.se</div>
       </div>
       <div id="m5mission">Omvandlar elevens eget material till strukturerade, personliga mockprov — med P.E.R som ser varje elev och vet exakt vad de behöver träna på.</div>
     </div>
@@ -1090,6 +1116,7 @@
     <!-- PROBLEM -->
     <div id="m5s1" class="m5sec">
       <div class="m5sHead"><span class="m5sNum">01</span><span class="m5sLabel">Problem</span></div>
+      <div id="m5story">Emma, 17 år. Provet om 3 dagar. Har läst allt — vet inte vad som är viktigast.</div>
       <div class="m5bullets">
         <div class="m5b" id="m5b0"><span class="m5bi">🌊</span><span>Informationsöverflöd — vet inte vad som är viktigast</span></div>
         <div class="m5b" id="m5b1"><span class="m5bi">🔄</span><span>Brist på återkoppling — samma misstag upprepas</span></div>
@@ -1110,11 +1137,29 @@
         <div class="m5eng" id="m5e4">🕸 Knowledge Graph<span>Din unika kunskapsgraf</span></div>
         <div class="m5eng" id="m5e5">💬 Coaching Engine<span>Förklarar på exakt rätt sätt</span></div>
       </div>
+      <div id="m5vsRow">
+        <div class="m5vsL">
+          <div class="m5vsTag bad">ChatGPT / Generell AI</div>
+          <div class="m5vsLine">Vet inget om dina tidigare svar</div>
+          <div class="m5vsLine">Samma svar till alla</div>
+          <div class="m5vsLine">Ingen progression spåras</div>
+        </div>
+        <div class="m5vsR">
+          <div class="m5vsTag good">P.E.R</div>
+          <div class="m5vsLine good">Ser hela din studiehistorik</div>
+          <div class="m5vsLine good">Anpassar sig till din nivå</div>
+          <div class="m5vsLine good">Mönster + progression i realtid</div>
+        </div>
+      </div>
     </div>
 
     <!-- MARKET -->
     <div id="m5s3" class="m5sec">
       <div class="m5sHead"><span class="m5sNum">03</span><span class="m5sLabel">Marknad</span></div>
+      <div id="m5mktStat">
+        <div id="m5mktNumVal">360 000+</div>
+        <div id="m5mktNumSub">gymnasieelever i Sverige varje år</div>
+      </div>
       <div class="m5mkRow" id="m5mk0"><span class="m5mkIcon">📚</span><span>Många elever kämpar ensamma inför varje prov — utan återkoppling eller personlig vägledning.</span></div>
       <div class="m5mkRow" id="m5mk1"><span class="m5mkIcon">🤖</span><span>Generella AI-verktyg saknar studiehistorik och progression. De flesta vet inte hur de ska använda AI på rätt sätt.</span></div>
       <div class="m5mkRow" id="m5mk2"><span class="m5mkIcon">⚡</span><span>Provia löser det direkt ur lådan — ingen konfiguration, bara smart studiehjälp.</span></div>
@@ -1145,7 +1190,7 @@
 
     <!-- CTA -->
     <div id="m5cta">
-      <div id="m5ctaQ">Redo att investera i framtidens lärande?</div>
+      <div id="m5ctaQ">Vi söker 100 000 kr för att nå 500 elever under tävlingsåret.</div>
       <div id="m5ctaUrl">proviaai.se</div>
     </div>
 
@@ -1220,7 +1265,17 @@ function setNarrator(mode,idx){document.getElementById('nSteps').innerHTML=(NDat
 
 /* ─── DOTS ─── */
 const STEP_N={1:4,2:4,3:3,4:4,5:5};
-function buildDots(mode){document.getElementById('pdots').innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('')}
+function buildDots(mode){
+  const pdots=document.getElementById('pdots');
+  if(mode===5){
+    pdots.className='mode5';
+    const labels=['Intro','Problem','P.E.R','Marknad','Affärsmodell'];
+    pdots.innerHTML=labels.map((l,i)=>`<div class="pd" id="pd${i}" data-l="${l}"></div>`).join('');
+    return;
+  }
+  pdots.className='';
+  pdots.innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('');
+}
 function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'')}
 
 /* ─── COUNTDOWN ─── */
@@ -1855,61 +1910,72 @@ function buildTL5(){
   if(tl5){tl5.kill();tl5=null}
   clearAllTimers();
   gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,x:0});
+  const ht=document.getElementById('m5hookTxt');if(ht)ht.textContent='';
+  gsap.set('#m5logoWrap',{opacity:0,y:12});
+  gsap.set('#m5traction',{opacity:0});
+  gsap.set('#m5mission',{opacity:0});
+  gsap.set('#m5story',{opacity:0,y:6});
   gsap.set(['#m5b0','#m5b1','#m5b2','#m5b3'],{opacity:0,x:24});
   gsap.set('#m5pDesc',{opacity:0,y:8});
   gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,y:16,scale:0.92,boxShadow:'none'});
+  gsap.set('#m5vsRow',{opacity:0,y:8});
+  gsap.set('#m5mktStat',{opacity:0,scale:0.82});
   gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:12});
   gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:14});
   buildDots(5);
   const DUR=43;
   tl5=gsap.timeline({onComplete:()=>switchMode(1)});
   tl5
-    // INTRO (0–5s)
+    // INTRO (0–6s) — hook typewriter, then logo + traction
     .call(()=>{setNarrator(5,0);startCountdown(DUR);setDot(0,'on')},[],0)
-    .to('#m5s0',{opacity:1,duration:.7,ease:'power2.out'},0.3)
-    // PROBLEM (5–13s)
-    .to('#m5s0',{opacity:0,x:-50,duration:.55,ease:'power3.in'},4.5)
-    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],5.0)
-    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},5.0)
-    .to('#m5b0',{opacity:1,x:0,duration:.45,ease:'power2.out'},5.5)
-    .to('#m5b1',{opacity:1,x:0,duration:.45,ease:'power2.out'},6.3)
-    .to('#m5b2',{opacity:1,x:0,duration:.45,ease:'power2.out'},7.1)
-    .to('#m5b3',{opacity:1,x:0,duration:.45,ease:'power2.out'},7.9)
-    // P.E.R (13–26s) — longer, more developed
-    .to('#m5s1',{opacity:0,x:-50,duration:.55,ease:'power3.in'},12.5)
-    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],13.0)
-    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},13.0)
-    .to('#m5pDesc',{opacity:1,y:0,duration:.55,ease:'power2.out'},13.7)
-    // engines spring in with scale — stagger 0.6s each
-    .to('#m5e0',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},14.5)
-    .to('#m5e1',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},15.1)
-    .to('#m5e2',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},15.7)
-    .to('#m5e3',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},16.3)
-    .to('#m5e4',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},16.9)
-    .to('#m5e5',{opacity:1,y:0,scale:1,duration:.5,ease:'back.out(1.7)'},17.5)
-    // "system online" — all engines glow sweep
-    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.08,duration:.3,ease:'power2.in'},19.2)
-    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.08,duration:.7,ease:'power2.out'},19.5)
-    // MARKET (26–32s)
-    .to('#m5s2',{opacity:0,x:-50,duration:.55,ease:'power3.in'},25.5)
+    .to('#m5s0',{opacity:1,duration:.55,ease:'power2.out'},0.25)
+    .call(()=>{const t=chatType('m5hookTxt','m5hookCur','Varje år stryker tusentals svenska elever på prov de borde klarat.',32,null);catTimers.push(t);},[],0.4)
+    .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},2.7)
+    .to(['#m5traction','#m5mission'],{opacity:1,duration:.45,ease:'power2.out'},3.4)
+    // PROBLEM (6–14s)
+    .to('#m5s0',{opacity:0,x:-50,duration:.5,ease:'power3.in'},5.5)
+    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],6.0)
+    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},6.0)
+    .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},6.5)
+    .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},7.2)
+    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},7.9)
+    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},8.6)
+    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},9.3)
+    // P.E.R (14–26s) — engines + vsRow comparison
+    .to('#m5s1',{opacity:0,x:-50,duration:.5,ease:'power3.in'},13.5)
+    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],14.0)
+    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},14.0)
+    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},14.7)
+    .to('#m5e0',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},15.3)
+    .to('#m5e1',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},15.8)
+    .to('#m5e2',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},16.3)
+    .to('#m5e3',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},16.8)
+    .to('#m5e4',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},17.3)
+    .to('#m5e5',{opacity:1,y:0,scale:1,duration:.45,ease:'back.out(1.7)'},17.8)
+    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.07,duration:.3,ease:'power2.in'},19.0)
+    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.07,duration:.65,ease:'power2.out'},19.3)
+    .to('#m5vsRow',{opacity:1,y:0,duration:.55,ease:'power2.out'},20.3)
+    // MARKET (26–33s) — big stat + rows
+    .to('#m5s2',{opacity:0,x:-50,duration:.5,ease:'power3.in'},25.5)
     .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],26.0)
-    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},26.0)
-    .to('#m5mk0',{opacity:1,y:0,duration:.45,ease:'power2.out'},26.5)
-    .to('#m5mk1',{opacity:1,y:0,duration:.45,ease:'power2.out'},27.5)
-    .to('#m5mk2',{opacity:1,y:0,duration:.45,ease:'power2.out'},28.5)
-    // BUSINESS MODEL (32–39s)
-    .to('#m5s3',{opacity:0,x:-50,duration:.55,ease:'power3.in'},31.5)
-    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],32.0)
-    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},32.0)
-    .to('#m5t0',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},32.5)
-    .to('#m5t1',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},33.1)
-    .to('#m5t2',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},33.7)
-    .to('#m5margins',{opacity:1,duration:.4,ease:'power2.out'},34.5)
-    // CTA (39–43s)
-    .to('#m5s4',{opacity:0,duration:.6,ease:'power2.in'},38.5)
-    .to('#m5cta',{opacity:1,duration:.7,ease:'power2.out'},39.2)
-    .to('#mode5',{opacity:0,duration:1.2},41)
-    .set('#mode5',{opacity:1},43);
+    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},26.0)
+    .to('#m5mktStat',{opacity:1,scale:1,duration:.6,ease:'back.out(1.5)'},26.3)
+    .to('#m5mk0',{opacity:1,y:0,duration:.4,ease:'power2.out'},27.2)
+    .to('#m5mk1',{opacity:1,y:0,duration:.4,ease:'power2.out'},28.0)
+    .to('#m5mk2',{opacity:1,y:0,duration:.4,ease:'power2.out'},28.8)
+    // BUSINESS MODEL (33–40s)
+    .to('#m5s3',{opacity:0,x:-50,duration:.5,ease:'power3.in'},32.5)
+    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],33.0)
+    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},33.0)
+    .to('#m5t0',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},33.5)
+    .to('#m5t1',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},34.1)
+    .to('#m5t2',{opacity:1,y:0,duration:.45,ease:'back.out(1.4)'},34.7)
+    .to('#m5margins',{opacity:1,duration:.35,ease:'power2.out'},35.5)
+    // CTA (40–43s)
+    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},38.5)
+    .to('#m5cta',{opacity:1,duration:.65,ease:'power2.out'},39.2)
+    .to('#mode5',{opacity:0,duration:1.2},41.0)
+    .set('#mode5',{opacity:1},43.0);
   return tl5;
 }
 
