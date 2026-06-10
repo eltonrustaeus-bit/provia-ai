@@ -270,6 +270,13 @@
     .m3nav-cta{display:inline-block;margin-top:8px;padding:6px 10px;background:var(--a);border-radius:6px;font:600 11px var(--m);color:#08100d;text-decoration:none;letter-spacing:.04em}
     .m3chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;background:var(--ad);border:1px solid var(--l2);font:500 11px var(--m);color:var(--a);letter-spacing:.04em}
     .m3chipWarn{background:rgba(255,160,60,.09);border-color:rgba(255,160,60,.3);color:#ffab3a}
+    #m3scanLine{position:absolute;top:0;left:0;width:70px;height:100%;background:linear-gradient(90deg,transparent,rgba(27,255,140,.5),transparent);pointer-events:none;border-radius:20px;z-index:2}
+    #m3liveBadge{position:absolute;bottom:68px;right:62px;display:flex;align-items:center;gap:5px;padding:5px 11px;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.3);border-radius:20px;font:600 11px var(--m);color:var(--a);letter-spacing:.04em;white-space:nowrap;box-shadow:0 2px 12px rgba(27,255,140,.18)}
+    .m3source{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;background:var(--s2);border:1px solid var(--l);font:400 10px var(--m);color:var(--t3);letter-spacing:.03em}
+    #m3sources{display:flex;gap:4px;flex-wrap:wrap;padding:6px 12px 8px;border-top:1px dashed rgba(27,255,140,.15)}
+    #m3memCount{margin-left:auto;font:500 10px var(--m);color:var(--t3);white-space:nowrap}
+    #m3notif{position:fixed;left:50%;transform:translateX(-50%);z-index:600;display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--s);border:1px solid var(--l2);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.65);font:500 12px var(--f);color:var(--t);white-space:nowrap;max-width:90vw;pointer-events:none}
+    #m3notif strong{color:var(--a)}
     #m3bub{width:52px;height:52px;border-radius:50%;background:var(--a);display:grid;place-items:center;font:700 9px var(--m);letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.45);cursor:pointer}
     @keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.45)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 8px rgba(27,255,140,.12)}}
     #m3bub.pulse{animation:perPulse .9s ease-in-out 3}
@@ -649,17 +656,22 @@
       <div class="perCap"><span class="ci">💬</span>AI-coach</div>
       <div class="perCap"><span class="ci">🔄</span>Kursmaterial</div>
       <div class="perCap"><span class="ci">🧭</span>Navigering</div>
+      <div class="perCap"><span class="ci">🔬</span>Ser dina svar live</div>
+      <div class="perCap"><span class="ci">🧬</span>Minns din historik</div>
     </div>
   </div>
 
   <div id="m3perDemo" style="display:none;width:100%;max-width:420px;position:relative;padding-bottom:70px;min-height:480px">
 
     <!-- P.E.R context — what P.E.R sees about this student -->
-    <div id="m3ctx" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <div id="m3ctx" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;overflow:hidden">
       <div class="m3chip">📘 Matematik 2b</div>
       <div class="m3chip">🔢 Fråga 3 av 4</div>
       <div class="m3chip m3chipWarn">⚡ Svag: tecknet på q</div>
+      <div id="m3scanLine"></div>
     </div>
+    <!-- P.E.R live awareness badge -->
+    <div id="m3liveBadge" style="opacity:0">👁 Ser dina svar live</div>
 
     <!-- Mock exam question (math Q3) -->
     <div class="qcard" id="m3examCard" style="opacity:0">
@@ -688,8 +700,9 @@
           <div style="font:600 13px var(--f);color:var(--t)">P.E.R</div>
           <div style="font:400 10px var(--m);color:var(--a);letter-spacing:.06em">PROVIAS AI</div>
         </div>
+        <div id="m3memCount">Minns <span id="m3memN">0</span> svar</div>
       </div>
-      <div id="m3msgs" style="padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:80px">
+      <div id="m3msgs" style="padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:80px;max-height:180px;overflow-y:auto;scroll-behavior:smooth">
         <div id="m3msg0" class="m3msg-per" style="opacity:0">
           Hallå! Jag ser att du är på <strong>Fråga 3</strong>. Fastnat? Fråga på!
         </div>
@@ -702,6 +715,11 @@
         <div id="m3resp" class="m3msg-per" style="opacity:0;display:none"></div>
         <div id="m3typing2" class="m3msg-per" style="opacity:0;display:none"><div class="perDots"><span></span><span></span><span></span></div></div>
         <div id="m3msg2" class="m3msg-per" style="opacity:0;display:none">Förresten — jag ser att du missade <strong>samma mönster</strong> på Fråga 1 oxå. Vill att jag visar det?</div>
+      </div>
+      <div id="m3sources" style="opacity:0">
+        <div class="m3source">📚 Matte 2b kursplan</div>
+        <div class="m3source">📊 47 svar</div>
+        <div class="m3source">🎯 Fokusanalys</div>
       </div>
       <div style="padding:7px 10px;border-top:1px solid var(--l);display:flex;gap:6px;align-items:center">
         <div id="m3inp" style="flex:1;background:var(--s2);border:1px solid var(--l);
@@ -1330,38 +1348,70 @@ function buildTL3(){
   const _bub=document.getElementById('m3bub');if(_bub)_bub.classList.remove('pulse');
   buildDots(3);
 
+  /* additional resets for new elements */
+  gsap.set('#m3scanLine',{x:'-100%',opacity:1});
+  gsap.set('#m3liveBadge',{opacity:0,y:8});
+  gsap.set('#m3sources',{opacity:0});
+  gsap.set('.m3source',{opacity:0});
+  gsap.set('#m3notif',{top:-64,opacity:0});
+  gsap.set('.perCap',{scale:.85});
+  const _mn=document.getElementById('m3memN');if(_mn)_mn.textContent='0';
+
   tl3=gsap.timeline({onComplete:()=>switchMode(4)});
 
-  /* 0–5s P.E.R INTRO */
+  /* 0–5s P.E.R INTRO — boot sequence */
   tl3
-    .call(()=>{hideAll(M3SEC);show('m3intro');setDot(0,'on');setNarrator(3,0);startCountdown(38)})
-    .from('#m3intro > .perHex',{opacity:0,scale:.6,duration:.9,ease:'back.out(1.8)'})
-    .from('#perTitle',{opacity:0,y:12,duration:.7},'-=.2')
-    .from('#m3intro > div:nth-child(3)',{opacity:0,duration:.5},'-=.1')
-    .from('.perTagline',{opacity:0,duration:.5},'-=.1')
+    .call(()=>{hideAll(M3SEC);show('m3intro');setDot(0,'on');setNarrator(3,0);startCountdown(44)},[],0)
+    .from('#m3intro > .perHex',{opacity:0,scale:.5,filter:'blur(6px)',rotation:30,duration:.9,ease:'back.out(1.8)'},0)
+    .call(()=>{
+      document.querySelectorAll('.perHexSpin polygon').forEach((el,i)=>{
+        gsap.from(el,{opacity:0,scale:.5,duration:.4,delay:i*.2,ease:'back.out(1.8)',transformOrigin:'50% 50%'});
+      });
+    },[],0)
+    .from('#perTitle',{opacity:0,y:10,filter:'blur(10px)',duration:.6,ease:'power3.out'},1.2)
+    .from('#m3intro > div:nth-child(3)',{opacity:0,duration:.4},1.8)
+    .from('.perTagline',{opacity:0,y:6,duration:.4},2.2)
     .call(()=>{
       document.querySelectorAll('.perCap').forEach((el,i)=>{
-        gsap.to(el,{opacity:1,y:0,duration:.4,delay:i*.12,ease:'power2.out'});
+        gsap.to(el,{opacity:1,y:0,scale:1,duration:.35,delay:i*.11,ease:'power2.out'});
       });
-    },[],3)
+    },[],2.8)
 
-  /* 5–42s P.E.R WIDGET DEMO */
+  /* 5–44s P.E.R WIDGET DEMO */
   tl3
-    .call(()=>{hideAll(M3SEC);show('m3perDemo');setDot(0,'dn');setDot(1,'on');setNarrator(3,1);startCountdown(44)},[],5)
-    /* context chips — vad P.E.R ser om eleven */
+    .call(()=>{hideAll(M3SEC);show('m3perDemo');setDot(0,'dn');setDot(1,'on');setNarrator(3,1)},[],5)
+    /* context chips */
     .call(()=>{
       document.querySelectorAll('.m3chip').forEach((el,i)=>{
         gsap.to(el,{opacity:1,y:0,duration:.4,delay:i*.18,ease:'power2.out'});
       });
     },[],5.3)
-    .to('#m3examCard',{opacity:1,duration:.5},5.8)
+    /* scan line sweep */
+    .fromTo('#m3scanLine',{x:'-100%',opacity:1},{x:'130%',opacity:1,duration:.9,ease:'power2.inOut'},5.5)
+    .to('#m3examCard',{opacity:1,duration:.5},5.9)
     .to('#m3bub',{opacity:1,duration:.4},7.5)
     .call(()=>{const b=document.getElementById('m3bub');if(b)b.classList.add('pulse')},[],8.5)
+    /* live badge */
+    .to('#m3liveBadge',{opacity:1,y:0,duration:.4,ease:'power2.out'},8.8)
     .to('#m3nudge',{opacity:1,duration:.3},9)
     .to('#m3nudge',{opacity:0,duration:.3},11)
+    .to('#m3liveBadge',{opacity:0,duration:.3},11.5)
     /* panel opens */
     .to('#m3panel',{opacity:1,y:0,duration:.45,ease:'power3.out'},11.5)
+    /* memory counter 0→47 over 0.8s */
+    .call(()=>{
+      const mn=document.getElementById('m3memN');
+      if(mn){
+        let count=0;const target=47;
+        const countTimer=setInterval(()=>{
+          count++;mn.textContent=count;
+          if(count>=target)clearInterval(countTimer);
+        },Math.floor(800/target));
+        catTimers.push(countTimer);
+      }
+    },[],11.5)
     .to('#m3msg0',{opacity:1,duration:.4},12.3)
+    .call(()=>{const msgs=document.getElementById('m3msgs');if(msgs)msgs.scrollTop=999;},[],12.3)
     /* user types in input */
     .call(()=>{
       const inp=document.getElementById('m3inp');
@@ -1376,6 +1426,7 @@ function buildTL3(){
       const m=document.getElementById('m3msg1');m.style.display='';
       gsap.to(m,{opacity:1,duration:.3});
       setNarrator(3,2);
+      const msgs=document.getElementById('m3msgs');if(msgs)msgs.scrollTop=999;
     },[],16)
     /* typing indicator */
     .call(()=>{const t=document.getElementById('m3typing');t.style.display='';gsap.to(t,{opacity:1,duration:.3})},[],17)
@@ -1402,6 +1453,7 @@ function buildTL3(){
           chip.href='app.html';chip.className='m3nav-cta';
           chip.textContent='Starta fokuspass →';
           resp.appendChild(chip);
+          const msgs=document.getElementById('m3msgs');if(msgs)msgs.scrollTop=999;
           return;
         }
         ti+=2;resp.textContent=plain.slice(0,ti)+'…';
@@ -1409,12 +1461,23 @@ function buildTL3(){
       catTimers.push(t);
       gsap.to(resp,{opacity:1,duration:.3});
     },[],18.5)
+    /* source chips appear */
+    .call(()=>{
+      gsap.to('#m3sources',{opacity:1,duration:.1});
+      document.querySelectorAll('#m3sources .m3source').forEach((el,i)=>{
+        gsap.to(el,{opacity:1,duration:.35,delay:i*.15,ease:'power2.out'});
+      });
+    },[],21)
     /* P.E.R proaktivt — ser mönster från Fråga 1 oxå */
-    .call(()=>{const t=document.getElementById('m3typing2');t.style.display='';gsap.to(t,{opacity:1,duration:.3})},[],21.5)
+    .call(()=>{
+      const t=document.getElementById('m3typing2');t.style.display='';gsap.to(t,{opacity:1,duration:.3});
+      const msgs=document.getElementById('m3msgs');if(msgs)msgs.scrollTop=999;
+    },[],21.5)
     .call(()=>{
       document.getElementById('m3typing2').style.display='none';
       const m=document.getElementById('m3msg2');m.style.display='';
       gsap.to(m,{opacity:1,duration:.35});
+      const msgs=document.getElementById('m3msgs');if(msgs)msgs.scrollTop=999;
     },[],23)
     /* wfield gets typed answer after P.E.R explains */
     .call(()=>{
@@ -1424,6 +1487,9 @@ function buildTL3(){
       catTimers.push(t);
     },[],27)
     .call(()=>{const wf=document.getElementById('m3wf');if(wf)wf.className='wfield ok';},[],30)
+    /* notification banner */
+    .to('#m3notif',{top:70,opacity:1,duration:.5,ease:'back.out(1.4)'},34)
+    .to('#m3notif',{top:-64,opacity:0,duration:.4},36.5)
 
   tl3.to('#mode3',{opacity:0,duration:1.2},41).set('#mode3',{opacity:1},44);
   return tl3;
@@ -1555,5 +1621,6 @@ window.addEventListener('load',()=>{
   buildTL1();
 });
 </script>
+<div id="m3notif"><strong>🔔 P.E.R:</strong> Fokuspass redo! Baserat på dina misstag från idag →</div>
 </body>
 </html>
