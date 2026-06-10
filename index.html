@@ -558,7 +558,7 @@
           <span>Starta ProviaAI</span>
           <span class="ctaShimmer" aria-hidden="true"></span>
         </button>
-        <a class="demoBtn" href="live-demo.html">Se demo →</a>
+        <a class="demoBtn" id="demoBtnLink" href="live-demo.html" style="display:none">Se demo →</a>
       </div>
 
       <div class="heroStats" id="heroStats" aria-label="Nyckeltal">
@@ -763,7 +763,7 @@
       </div>
       <svg class="sArr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="6 3 11 8 6 13"/></svg>
     </a>
-    <a class="sOpt" href="live-demo.html">
+    <a class="sOpt" id="demoSheetOpt" href="live-demo.html" style="display:none">
       <div class="sIco" aria-hidden="true">🎬</div>
       <div class="sBody">
         <div class="sT">Live-demo</div>
@@ -978,6 +978,27 @@ window._statsReady = (async function() {
   document.addEventListener("mouseup",()=>{ring.classList.remove("rD");applyH(lastEl)});
   document.addEventListener("mouseleave",()=>{dot.style.opacity="0";ring.style.opacity="0";vis=false});
   document.addEventListener("mouseenter",()=>{if(vis){dot.style.opacity="1";ring.style.opacity="1"}});
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  const SB_URL='https://mnmotdluigzeehdjbhbu.supabase.co';
+  const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
+  document.addEventListener('DOMContentLoaded',async function(){
+    try{
+      const sb=window.supabase.createClient(SB_URL,SB_KEY);
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)return;
+      const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();
+      if(data?.role==='admin'){
+        const btn=document.getElementById('demoBtnLink');
+        const opt=document.getElementById('demoSheetOpt');
+        if(btn)btn.style.display='';
+        if(opt)opt.style.display='';
+      }
+    }catch(e){}
+  });
 })();
 </script>
 </body>
