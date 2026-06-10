@@ -312,11 +312,36 @@
     #storyBanner{position:fixed;top:54px;left:0;right:0;z-index:488;text-align:center;padding:2px 16px;font:400 10px var(--m);color:var(--t3);letter-spacing:.06em;background:rgba(8,16,13,.85)}
     /* MODE 5 — INVESTOR PITCH */
     #mode5{align-items:center;justify-content:center}
-    #m5wrap{max-width:560px;width:100%}
-    .m5card{background:var(--s);border:1px solid var(--l2);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px}
-    .m5cIcon{font-size:18px}
-    .m5cLabel{font:700 9px var(--m);color:var(--a);letter-spacing:.12em;text-transform:uppercase}
-    .m5cBody{font:400 12px var(--f);color:var(--t2);line-height:1.52}
+    #m5wrap{max-width:560px;width:100%;position:relative;height:400px}
+    .m5sec{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;gap:14px;opacity:0;pointer-events:none}
+    #m5s0.m5sec{align-items:center;justify-content:center;height:100%}
+    .m5logoMark{font:700 22px var(--m);letter-spacing:.18em;color:var(--a);text-align:center}
+    .m5logoSub{font:400 12px var(--f);color:var(--t3);text-align:center;margin-top:5px}
+    #m5mission{font:400 13px var(--f);color:var(--t2);line-height:1.65;text-align:center;max-width:420px;padding:16px 0;border-top:1px solid var(--l);border-bottom:1px solid var(--l)}
+    .m5sHead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+    .m5sNum{font:700 30px var(--m);color:rgba(27,255,140,.18);line-height:1;letter-spacing:-.02em}
+    .m5sLabel{font:700 11px var(--m);color:var(--a);letter-spacing:.14em;text-transform:uppercase}
+    .m5bullets{display:flex;flex-direction:column;gap:9px}
+    .m5b{display:flex;align-items:flex-start;gap:12px;background:var(--s);border:1px solid var(--l);border-radius:8px;padding:11px 14px;font:400 12px var(--f);color:var(--t2);line-height:1.5}
+    .m5bi{font-size:15px;flex-shrink:0;margin-top:1px}
+    #m5pDesc{font:400 12px var(--f);color:var(--t2);line-height:1.6;border-left:2px solid var(--a);padding-left:12px}
+    #m5pDesc em{color:var(--a);font-style:normal;font-weight:600}
+    .m5engines{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .m5eng{display:flex;flex-direction:column;gap:3px;background:var(--s);border:1px solid var(--l);border-radius:7px;padding:10px 12px;font:600 11px var(--f);color:var(--t)}
+    .m5eng span{font:400 10px var(--f);color:var(--t3)}
+    .m5mkRow{display:flex;align-items:flex-start;gap:14px;background:var(--s);border:1px solid var(--l);border-radius:8px;padding:13px 14px;font:400 12px var(--f);color:var(--t2);line-height:1.55}
+    .m5mkIcon{font-size:17px;flex-shrink:0}
+    .m5tiers{display:flex;gap:10px}
+    .m5tier{flex:1;background:var(--s);border:1px solid var(--l);border-radius:9px;padding:14px 12px;display:flex;flex-direction:column;gap:5px}
+    .m5tierHL{border-color:var(--a);background:rgba(27,255,140,.07);box-shadow:0 0 20px rgba(27,255,140,.12)}
+    .m5tName{font:700 9px var(--m);color:var(--a);letter-spacing:.1em;text-transform:uppercase}
+    .m5tPrice{font:700 20px var(--f);color:var(--t)}
+    .m5tPrice span{font:400 10px var(--f);color:var(--t3);margin-left:2px}
+    .m5tDesc{font:400 11px var(--f);color:var(--t3)}
+    #m5margins{font:400 10px var(--m);color:var(--t3);text-align:center}
+    #m5cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0;pointer-events:none}
+    #m5ctaQ{font:400 12px var(--m);color:var(--t3);letter-spacing:.08em;text-align:center}
+    #m5ctaUrl{font:700 28px var(--f);color:var(--a);letter-spacing:.04em}
     #m3bub{width:52px;height:52px;border-radius:50%;background:var(--a);display:grid;place-items:center;font:700 9px var(--m);letter-spacing:1.5px;color:#08100d;box-shadow:0 4px 20px rgba(27,255,140,.45);cursor:pointer}
     @keyframes perPulse{0%,100%{box-shadow:0 4px 20px rgba(27,255,140,.45)}50%{box-shadow:0 4px 32px rgba(27,255,140,.85),0 0 0 8px rgba(27,255,140,.12)}}
     #m3bub.pulse{animation:perPulse .9s ease-in-out 3}
@@ -1028,36 +1053,78 @@
 <!-- ═══════════════════════════════ MODE 5 — INVESTOR PITCH ════════════════════════════════ -->
 <div id="mode5" class="ms">
   <div id="m5wrap">
-    <div id="m5logo" style="opacity:0;text-align:center;margin-bottom:28px">
-      <div style="font:700 20px var(--m);letter-spacing:.14em;color:var(--a)">PROVIA AI</div>
-      <div style="font:400 12px var(--f);color:var(--t3);margin-top:5px">Nästa generations lärplattform</div>
+
+    <!-- INTRO -->
+    <div id="m5s0" class="m5sec">
+      <div>
+        <div class="m5logoMark">P·R·O·V·I·A</div>
+        <div class="m5logoSub">AI-driven provträningsplattform</div>
+      </div>
+      <div id="m5mission">Omvandlar elevens eget material till strukturerade, personliga mockprov — med P.E.R som ser varje elev och vet exakt vad de behöver träna på.</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="m5card" id="m5c0" style="opacity:0">
-        <div class="m5cIcon">🎯</div>
-        <div class="m5cLabel">Problem</div>
-        <div class="m5cBody">Miljontals elever kämpar ensamma inför prov — utan feedback, utan vägledning, utan en AI som faktiskt känner dem.</div>
-      </div>
-      <div class="m5card" id="m5c1" style="opacity:0">
-        <div class="m5cIcon">🤖</div>
-        <div class="m5cLabel">Lösning</div>
-        <div class="m5cBody">P.E.R — Provias Egna AI-Resource. Ser elevens historik, hittar mönstren, och förklarar på exakt rätt sätt.</div>
-      </div>
-      <div class="m5card" id="m5c2" style="opacity:0">
-        <div class="m5cIcon">📈</div>
-        <div class="m5cLabel">Marknad</div>
-        <div class="m5cBody">375 000 gymnasieelever i Sverige. Varje elev har prov — ingen har ett verktyg som faktiskt känner dem och vet vad de fastnar på.</div>
-      </div>
-      <div class="m5card" id="m5c3" style="opacity:0">
-        <div class="m5cIcon">💰</div>
-        <div class="m5cLabel">Affärsmodell</div>
-        <div class="m5cBody">Freemium → Basic 29 kr/mån · Premium 79 kr/mån. Skollicenser → 15 kr/elev/mån. B2B2C.</div>
+
+    <!-- PROBLEM -->
+    <div id="m5s1" class="m5sec">
+      <div class="m5sHead"><span class="m5sNum">01</span><span class="m5sLabel">Problem</span></div>
+      <div class="m5bullets">
+        <div class="m5b" id="m5b0"><span class="m5bi">🌊</span><span>Informationsöverflöd — elever vet inte vad som är viktigast inför proven</span></div>
+        <div class="m5b" id="m5b1"><span class="m5bi">🔄</span><span>Brist på återkoppling — samma misstag upprepas gång på gång</span></div>
+        <div class="m5b" id="m5b2"><span class="m5bi">⏳</span><span>Ineffektiv repetition — allt studeras lika mycket, oavsett kunskapslucka</span></div>
+        <div class="m5b" id="m5b3"><span class="m5bi">👤</span><span>Ingen personlig studiecoach — otydlig progression och svårt att förbättras</span></div>
       </div>
     </div>
-    <div id="m5cta" style="opacity:0;text-align:center;margin-top:24px">
-      <div style="font:400 10px var(--m);color:var(--t3);letter-spacing:.1em">REDO ATT INVESTERA I FRAMTIDENS LÄRANDE?</div>
-      <div style="font:600 18px var(--f);color:var(--a);margin-top:6px">proviaai.se</div>
+
+    <!-- SOLUTION: P.E.R -->
+    <div id="m5s2" class="m5sec">
+      <div class="m5sHead"><span class="m5sNum">02</span><span class="m5sLabel">Lösning — P.E.R</span></div>
+      <div id="m5pDesc">P.E.R är <em>inte en chatbot</em> — det är Provias centrala intelligenslager. Sex motorer som samverkar för att ge varje elev exakt rätt hjälp, vid exakt rätt tillfälle.</div>
+      <div class="m5engines">
+        <div class="m5eng" id="m5e0">🧠 Context Engine<span>Förstår frågan, ämnet och elevens historia</span></div>
+        <div class="m5eng" id="m5e1">📊 Performance Engine<span>Spårar mönster och kunskapsluckor</span></div>
+        <div class="m5eng" id="m5e2">🔮 Prediction Engine<span>Förutspår var du fastnar härnäst</span></div>
+        <div class="m5eng" id="m5e3">🎯 Recommendation Engine<span>Rätt övning vid rätt tillfälle</span></div>
+        <div class="m5eng" id="m5e4">🕸 Knowledge Graph<span>Bygger din unika kunskapsgraf</span></div>
+        <div class="m5eng" id="m5e5">💬 Coaching Engine<span>Förklarar på exakt rätt sätt</span></div>
+      </div>
     </div>
+
+    <!-- MARKET -->
+    <div id="m5s3" class="m5sec">
+      <div class="m5sHead"><span class="m5sNum">03</span><span class="m5sLabel">Marknad</span></div>
+      <div class="m5mkRow" id="m5mk0"><span class="m5mkIcon">📚</span><span>Många elever kämpar ensamma inför varje prov — utan effektiv återkoppling eller personlig vägledning.</span></div>
+      <div class="m5mkRow" id="m5mk1"><span class="m5mkIcon">🤖</span><span>Generella AI-verktyg som ChatGPT saknar studiehistorik, felbank och progression. De flesta elever vet inte hur de ska använda AI på rätt sätt — det kräver prompt-kompetens som inte är självklar.</span></div>
+      <div class="m5mkRow" id="m5mk2"><span class="m5mkIcon">⚡</span><span>Provia löser det direkt ur lådan. Ingen konfiguration — bara smart, personlig studiehjälp som faktiskt känner eleven.</span></div>
+    </div>
+
+    <!-- BUSINESS MODEL -->
+    <div id="m5s4" class="m5sec">
+      <div class="m5sHead"><span class="m5sNum">04</span><span class="m5sLabel">Affärsmodell</span></div>
+      <div class="m5tiers">
+        <div class="m5tier" id="m5t0">
+          <div class="m5tName">Gratis</div>
+          <div class="m5tPrice">0 kr</div>
+          <div class="m5tDesc">Kom igång utan kostnad</div>
+        </div>
+        <div class="m5tier m5tierHL" id="m5t1">
+          <div class="m5tName">Basic</div>
+          <div class="m5tPrice">29<span>kr/mån</span></div>
+          <div class="m5tDesc">Obegränsade AI-prov</div>
+        </div>
+        <div class="m5tier" id="m5t2">
+          <div class="m5tName">Premium</div>
+          <div class="m5tPrice">79<span>kr/mån</span></div>
+          <div class="m5tDesc">Full P.E.R-coaching</div>
+        </div>
+      </div>
+      <div id="m5margins">Marginaler ~88–94% · Break-even vid 50–100 betalande användare · Freemium SaaS</div>
+    </div>
+
+    <!-- CTA -->
+    <div id="m5cta">
+      <div id="m5ctaQ">Redo att investera i framtidens lärande?</div>
+      <div id="m5ctaUrl">proviaai.se</div>
+    </div>
+
   </div>
 </div>
 
@@ -1123,12 +1190,12 @@ const NData={
   2:[{s:'Kategorier',t:'368 frågor, 16 kategorier — uppbyggt efter Transportstyrelsens upplägg'},{s:'Vägmärken',t:'Bildidentifiering med förklaring på varje svar'},{s:'Simulerat prov',t:'65 frågor, 50 min, 52 rätt = godkänt — samma format som teoriprovets'},{s:'AI-coach',t:'Identifierar svaga kategorier och rekommenderar fokusträning'}],
   3:[{s:'P.E.R',t:'Provias Egna AI-Resource — alltid med dig, ser vilken fråga du sitter på'},{s:'Fråga',t:'Elton fastnar på Fråga 3 — P.E.R ser kontexten automatiskt'},{s:'Svar',t:'P.E.R förklarar pq-formeln steg för steg — inget annat studieverktyg gör detta'}],
   4:[{s:'Förbättring',t:'Din kompletta lärvyn — coach, statistik och felbank samlat'},{s:'Coach',t:'P.E.R identifierar svagaste kategorin och rekommenderar fokusträning'},{s:'Felbank',t:'Alla misstag samlade — repetera exakt rätt frågor'},{s:'Kom igång',t:'Gratis att starta — Basic 29 kr/mån för obegränsade AI-prov'}],
-  5:[{s:'Pitch',t:'Problem · Lösning · Marknad · Affärsmodell — ProviaAi i 20 sekunder'}],
+  5:[{s:'Intro',t:'ProviaAi — AI-driven provträningsplattform för varje elev'},{s:'Problem',t:'4 verkliga problem: informationsöverflöd, brist på återkoppling, ineffektiv repetition, ingen personlig coach'},{s:'P.E.R',t:'Inte en chatbot — Provias centrala intelligenslager med 6 motorer som samverkar'},{s:'Marknad',t:'Många elever kämpar utan hjälp — de flesta vet inte hur man använder AI på rätt sätt'},{s:'Affärsmodell',t:'Freemium SaaS: Gratis → 29kr → 79kr/mån · Marginaler 88–94% · Break-even 50–100 användare'}],
 };
 function setNarrator(mode,idx){document.getElementById('nSteps').innerHTML=(NData[mode]||[]).map((d,i)=>`<div class="nst" style="opacity:${i===idx?1:.4}"><b>${d.s}:</b> ${d.t}</div>`).join('')}
 
 /* ─── DOTS ─── */
-const STEP_N={1:4,2:4,3:3,4:4,5:1};
+const STEP_N={1:4,2:4,3:3,4:4,5:5};
 function buildDots(mode){document.getElementById('pdots').innerHTML=Array.from({length:STEP_N[mode]||4},(_,i)=>`<div class="pd" id="pd${i}"></div>`).join('')}
 function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd'+(s?' '+s:'')}
 
@@ -1763,19 +1830,58 @@ function buildTL4(){
 function buildTL5(){
   if(tl5){tl5.kill();tl5=null}
   clearAllTimers();
-  gsap.set(['#m5logo','#m5c0','#m5c1','#m5c2','#m5c3','#m5cta'],{opacity:0,y:16});
+  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,x:0});
+  gsap.set(['#m5b0','#m5b1','#m5b2','#m5b3'],{opacity:0,x:24});
+  gsap.set('#m5pDesc',{opacity:0});
+  gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,y:14});
+  gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:12});
+  gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:14});
   buildDots(5);
+  const DUR=40;
   tl5=gsap.timeline({onComplete:()=>switchMode(1)});
   tl5
-    .call(()=>{setNarrator(5,0);startCountdown(22)},[],0)
-    .to('#m5logo',{opacity:1,y:0,duration:.6,ease:'power3.out'},0.3)
-    .to('#m5c0',{opacity:1,y:0,duration:.5,ease:'power2.out'},1.2)
-    .to('#m5c1',{opacity:1,y:0,duration:.5,ease:'power2.out'},2.0)
-    .to('#m5c2',{opacity:1,y:0,duration:.5,ease:'power2.out'},2.8)
-    .to('#m5c3',{opacity:1,y:0,duration:.5,ease:'power2.out'},3.6)
-    .to('#m5cta',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},5.0)
-    .to('#mode5',{opacity:0,duration:1.2},19)
-    .set('#mode5',{opacity:1},22);
+    // INTRO (0–5s)
+    .call(()=>{setNarrator(5,0);startCountdown(DUR);setDot(0,'on')},[],0)
+    .to('#m5s0',{opacity:1,duration:.7,ease:'power2.out'},0.3)
+    // PROBLEM (5–13s)
+    .to('#m5s0',{opacity:0,x:-50,duration:.55,ease:'power3.in'},4.5)
+    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],5.0)
+    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},5.0)
+    .to('#m5b0',{opacity:1,x:0,duration:.45,ease:'power2.out'},5.5)
+    .to('#m5b1',{opacity:1,x:0,duration:.45,ease:'power2.out'},6.3)
+    .to('#m5b2',{opacity:1,x:0,duration:.45,ease:'power2.out'},7.1)
+    .to('#m5b3',{opacity:1,x:0,duration:.45,ease:'power2.out'},7.9)
+    // P.E.R (13–22s)
+    .to('#m5s1',{opacity:0,x:-50,duration:.55,ease:'power3.in'},12.5)
+    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],13.0)
+    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},13.0)
+    .to('#m5pDesc',{opacity:1,duration:.6,ease:'power2.out'},13.7)
+    .to('#m5e0',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},14.5)
+    .to('#m5e1',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},15.0)
+    .to('#m5e2',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},15.5)
+    .to('#m5e3',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},16.0)
+    .to('#m5e4',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},16.5)
+    .to('#m5e5',{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},17.0)
+    // MARKET (22–28s)
+    .to('#m5s2',{opacity:0,x:-50,duration:.55,ease:'power3.in'},21.5)
+    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],22.0)
+    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},22.0)
+    .to('#m5mk0',{opacity:1,y:0,duration:.45,ease:'power2.out'},22.5)
+    .to('#m5mk1',{opacity:1,y:0,duration:.45,ease:'power2.out'},23.5)
+    .to('#m5mk2',{opacity:1,y:0,duration:.45,ease:'power2.out'},24.5)
+    // BUSINESS MODEL (28–36s)
+    .to('#m5s3',{opacity:0,x:-50,duration:.55,ease:'power3.in'},27.5)
+    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],28.0)
+    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.6,ease:'power3.out'},28.0)
+    .to('#m5t0',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},28.5)
+    .to('#m5t1',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},29.1)
+    .to('#m5t2',{opacity:1,y:0,duration:.5,ease:'back.out(1.4)'},29.7)
+    .to('#m5margins',{opacity:1,duration:.4,ease:'power2.out'},30.5)
+    // CTA (36–40s)
+    .to('#m5s4',{opacity:0,duration:.6,ease:'power2.in'},35.5)
+    .to('#m5cta',{opacity:1,duration:.7,ease:'power2.out'},36.2)
+    .to('#mode5',{opacity:0,duration:1.2},38)
+    .set('#mode5',{opacity:1},40);
   return tl5;
 }
 
