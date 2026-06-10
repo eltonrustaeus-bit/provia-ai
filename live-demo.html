@@ -350,6 +350,9 @@
     .m5bi{font-size:15px;flex-shrink:0;margin-top:1px}
     #m5pDesc{font:400 12px var(--f);color:var(--t2);line-height:1.6;border-left:2px solid var(--a);padding-left:12px}
     #m5pDesc em{color:var(--a);font-style:normal;font-weight:600}
+    #m5perSubline{font:500 11px var(--m);color:var(--t3);letter-spacing:.05em;margin-top:-6px;opacity:0}
+    #m5perTagline{font:400 11.5px var(--m);color:var(--t3);letter-spacing:.07em;margin-top:12px;text-align:center;opacity:0}
+    #m5perBig{flex-direction:column;gap:0}
     .m5engines{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .m5eng{display:flex;flex-direction:column;gap:3px;background:var(--s);border:1px solid var(--l);border-radius:7px;padding:10px 12px;font:600 11px var(--f);color:var(--t);will-change:transform,opacity,box-shadow}
     .m5eng span{font:400 10px var(--f);color:var(--t3)}
@@ -1158,7 +1161,8 @@
     <!-- SOLUTION: P.E.R -->
     <div id="m5s2" class="m5sec">
       <div class="m5sHead"><span class="m5sNum">02</span><span class="m5sLabel">Lösning — P.E.R</span></div>
-      <div id="m5pDesc">P.E.R är <em>inte en chatbot</em> — det är Provias centrala intelligenslager. Sex motorer som samverkar för att ge varje elev rätt hjälp, vid rätt tillfälle.</div>
+      <div id="m5pDesc">P.E.R är <em>inte en chatbot</em> — det är Provias intelligensmotor, byggd för att känna varje elev.</div>
+      <div id="m5perSubline">P.E.R består av 6 motorer som samverkar:</div>
       <div class="m5engines">
         <div class="m5eng" id="m5e0">🧠 Context Engine<span>Förstår frågan och elevens historia</span></div>
         <div class="m5eng" id="m5e1">📊 Performance Engine<span>Spårar mönster och luckor</span></div>
@@ -1220,7 +1224,7 @@
 
     <!-- CTA -->
     <div id="m5cta">
-      <div id="m5ctaQ">Vi söker 100 000 kr för att nå 500 elever under tävlingsåret.</div>
+      <div id="m5ctaQ">Med Ungdrive vid vår sida når vi varenda elev som pluggar på fel sätt — och förändrar hur Sverige studerar.</div>
       <div id="m5ctaUrl">proviaai.se</div>
     </div>
 
@@ -1256,7 +1260,7 @@
     </div>
 
     <!-- P.E.R MERGE -->
-    <div id="m5perBig"><div id="m5perBigTxt">P·E·R</div></div>
+    <div id="m5perBig"><div id="m5perBigTxt">P·E·R</div><div id="m5perTagline">Intelligent nog att känna dig. Snabb nog att hjälpa dig nu.</div></div>
     <div id="m5perRing"></div>
 
   </div>
@@ -1998,31 +2002,34 @@ function _spotShowIds(...ids){ids.forEach(id=>{const el=document.getElementById(
 function addEngineSpot(tl,idx,at){
   const e=ENGINES[idx];
   tl.call(()=>{
-    gsap.set('#m5spot',{scale:0.88});_spotHideAll();_spotShowIds('m5spotIcon','m5spotTitle','m5spotDesc');
+    gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
+    _spotHideAll();_spotShowIds('m5spotIcon','m5spotTitle','m5spotDesc');
     document.getElementById('m5spotIcon').textContent=e.icon;
     document.getElementById('m5spotTitle').textContent=e.title;
     document.getElementById('m5spotDesc').textContent=e.desc;
   },[],at);
-  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
-  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.05);
-  tl.to('#m5e'+idx,{opacity:1,y:0,scale:1,duration:.38,ease:'back.out(1.5)'},at+2.1);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},at+.05);
+  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+2.55);
+  tl.to('#m5e'+idx,{opacity:1,scale:1,duration:.3,ease:'power2.out'},at+2.6);
 }
 function addMktSpot(tl,idx,at){
   const r=MKT_ROWS[idx];
   tl.call(()=>{
-    gsap.set('#m5spot',{scale:0.88});_spotHideAll();_spotShowIds('m5spotIcon','m5spotDesc');
+    gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
+    _spotHideAll();_spotShowIds('m5spotIcon','m5spotDesc');
     document.getElementById('m5spotIcon').textContent=r.icon;
     document.getElementById('m5spotTitle').textContent='';
     document.getElementById('m5spotDesc').textContent=r.text;
   },[],at);
-  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
-  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.2);
-  tl.to('#m5mk'+idx,{opacity:1,y:0,duration:.38,ease:'power2.out'},at+2.2);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},at+.05);
+  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+2.6);
+  tl.to('#m5mk'+idx,{opacity:1,y:0,duration:.38,ease:'power2.out'},at+2.65);
 }
 function addPlanSpot(tl,idx,at){
   const p=PLANS[idx];
   tl.call(()=>{
-    gsap.set('#m5spot',{scale:0.88});_spotHideAll();
+    gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
+    _spotHideAll();
     _spotShowIds('m5spotPlanBadge','m5spotPlanName','m5spotPlanPrice','m5spotFeatList');
     document.getElementById('m5spotPlanBadge').textContent=p.badge;
     document.getElementById('m5spotPlanName').textContent=p.name;
@@ -2031,141 +2038,147 @@ function addPlanSpot(tl,idx,at){
     fl.innerHTML=p.feats.map(f=>`<div class="m5spotFeat">${f}</div>`).join('');
     fl.querySelectorAll('.m5spotFeat').forEach(el=>gsap.set(el,{opacity:0,y:6}));
   },[],at);
-  tl.to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},at+.05);
+  tl.to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},at+.05);
   for(let i=0;i<4;i++){
-    tl.call((j=>{return()=>{const feats=document.querySelectorAll('#m5spotFeatList .m5spotFeat');if(feats[j])gsap.to(feats[j],{opacity:1,y:0,duration:.3,ease:'power2.out'});}})(i),[],at+0.65+i*0.42);
+    tl.call((j=>{return()=>{const feats=document.querySelectorAll('#m5spotFeatList .m5spotFeat');if(feats[j])gsap.to(feats[j],{opacity:1,y:0,duration:.32,ease:'power2.out'});}})(i),[],at+0.7+i*0.5);
   }
-  tl.to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},at+2.65);
-  tl.to('#m5t'+idx,{opacity:1,y:0,duration:.4,ease:'back.out(1.3)'},at+2.7);
+  tl.to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},at+3.15);
+  tl.to('#m5t'+idx,{opacity:1,y:0,duration:.4,ease:'power2.out'},at+3.2);
 }
 
 /* ─── MODE SWITCH ─── */
 function buildTL5(){
   if(tl5){tl5.kill();tl5=null}
   clearAllTimers();
-  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,x:0,scale:1});
+  gsap.set(['#m5s0','#m5s1','#m5s2','#m5s3','#m5s4','#m5cta'],{opacity:0,xPercent:0,scale:1});
   const ht=document.getElementById('m5hookTxt');if(ht)ht.textContent='';
   gsap.set('#m5logoWrap',{opacity:0,y:12});
   gsap.set(['#m5traction','#m5mission'],{opacity:0});
   gsap.set('#m5story',{opacity:0,y:6});
-  gsap.set(['#m5b0','#m5b1','#m5b2','#m5b3'],{opacity:0,x:24});
-  gsap.set('#m5pDesc',{opacity:0,y:8,scale:1});
-  gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,y:16,scale:0.92,boxShadow:'none'});
-  gsap.set('#m5vsRow',{opacity:0,y:8,scale:1});
+  gsap.set(['#m5b0','#m5b1','#m5b2','#m5b3'],{opacity:0,x:20});
+  gsap.set('#m5pDesc',{opacity:0,y:8});
+  gsap.set('#m5perSubline',{opacity:0});
+  gsap.set(['#m5e0','#m5e1','#m5e2','#m5e3','#m5e4','#m5e5'],{opacity:0,scale:0.88,boxShadow:'none'});
+  gsap.set('#m5vsRow',{opacity:0,y:8});
   gsap.set('#m5spot',{opacity:0});
   gsap.set('#m5perBig',{opacity:0});
-  gsap.set('#m5perBigTxt',{scale:1});
+  gsap.set('#m5perBigTxt',{letterSpacing:'0.22em'});
+  gsap.set('#m5perTagline',{opacity:0});
   gsap.set('#m5mktStat',{opacity:0,scale:0.82});
-  gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:12});
-  gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:14});
+  gsap.set(['#m5mk0','#m5mk1','#m5mk2'],{opacity:0,y:10});
+  gsap.set(['#m5t0','#m5t1','#m5t2','#m5margins'],{opacity:0,y:12});
   buildDots(5);
-  const DUR=67;
+  const DUR=82;
   tl5=gsap.timeline({onComplete:()=>switchMode(1)});
 
-  /* INTRO (0–7.5s) */
+  /* INTRO (0–8.5s) */
   tl5
     .call(()=>{setNarrator(5,0);startCountdown(DUR);setDot(0,'on')},[],0)
-    .to('#m5s0',{opacity:1,duration:.55,ease:'power2.out'},0.25)
+    .to('#m5s0',{opacity:1,duration:.6,ease:'power2.out'},0.25)
     .call(()=>{const t=chatType('m5hookTxt','m5hookCur','Varje år tappar tusentals elever poäng på prov — inte för att de inte kan, utan för att de tränat på fel saker.',30,null);catTimers.push(t);},[],0.4)
-    .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},3.2)
-    .to(['#m5traction','#m5mission'],{opacity:1,duration:.45,ease:'power2.out'},3.9)
-    .to('#m5s0',{opacity:0,x:-50,duration:.5,ease:'power3.in'},7.0);
+    .to('#m5logoWrap',{opacity:1,y:0,duration:.55,ease:'power2.out'},3.5)
+    .to(['#m5traction','#m5mission'],{opacity:1,duration:.5,ease:'power2.out'},4.2)
+    .to('#m5s0',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},8.0);
 
-  /* PROBLEM (7.5–18.5s) */
+  /* PROBLEM (8.5–22.5s) */
   tl5
-    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],7.5)
-    .fromTo('#m5s1',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},7.5)
-    .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},8.2)
-    .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},9.0)
-    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},10.3)
-    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},11.6)
-    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},12.9)
-    .to('#m5s1',{opacity:0,x:-50,duration:.5,ease:'power3.in'},18.0);
+    .call(()=>{setNarrator(5,1);setDot(0,'dn');setDot(1,'on')},[],8.5)
+    .fromTo('#m5s1',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},8.5)
+    .to('#m5story',{opacity:1,y:0,duration:.4,ease:'power2.out'},9.2)
+    .to('#m5b0',{opacity:1,x:0,duration:.4,ease:'power2.out'},10.0)
+    .to('#m5b1',{opacity:1,x:0,duration:.4,ease:'power2.out'},11.6)
+    .to('#m5b2',{opacity:1,x:0,duration:.4,ease:'power2.out'},13.2)
+    .to('#m5b3',{opacity:1,x:0,duration:.4,ease:'power2.out'},14.8)
+    .to('#m5s1',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},22.0);
 
-  /* P.E.R (18.5–43.0s) */
+  /* P.E.R (22.5–54.5s) */
   tl5
-    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],18.5)
-    .fromTo('#m5s2',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},18.5)
-    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},19.2);
+    .call(()=>{setNarrator(5,2);setDot(1,'dn');setDot(2,'on')},[],22.5)
+    .fromTo('#m5s2',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},22.5)
+    .to('#m5pDesc',{opacity:1,y:0,duration:.5,ease:'power2.out'},23.2)
+    .to('#m5perSubline',{opacity:1,duration:.4,ease:'power2.out'},24.0);
 
-  addEngineSpot(tl5,0,20.3);
-  addEngineSpot(tl5,1,22.8);
-  addEngineSpot(tl5,2,25.3);
-  addEngineSpot(tl5,3,27.8);
-  addEngineSpot(tl5,4,30.3);
-  addEngineSpot(tl5,5,32.8);
+  /* 6 engines spotlight one at a time — 3.2s intervals */
+  addEngineSpot(tl5,0,25.0);
+  addEngineSpot(tl5,1,28.2);
+  addEngineSpot(tl5,2,31.4);
+  addEngineSpot(tl5,3,34.6);
+  addEngineSpot(tl5,4,37.8);
+  addEngineSpot(tl5,5,41.0);
 
-  // Glow sweep after all 6 engines visible (last card at 34.9)
+  /* Glow sweep after last card (41.0+2.6=43.6) */
   tl5
-    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.07,duration:.3},35.3)
-    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.07,duration:.65,ease:'power2.out'},35.6);
+    .to('.m5eng',{boxShadow:'0 0 18px rgba(27,255,140,.5),inset 0 0 0 1px rgba(27,255,140,.28)',stagger:.08,duration:.35},44.2)
+    .to('.m5eng',{boxShadow:'0 0 0px rgba(27,255,140,0)',stagger:.08,duration:.7,ease:'power2.out'},44.6);
 
-  // VS comparison spotlight (36.2–38.8s)
+  /* VS comparison spotlight (45.3–49.8s) */
   tl5
     .call(()=>{
-      gsap.set('#m5spot',{scale:0.88});
+      gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
       _spotHideAll();
       _spotShowIds('m5spotVsWrap');
       gsap.set(['#svl0','#svl1','#svl2','#svr0','#svr1','#svr2'],{opacity:0,y:5});
-    },[],36.2)
-    .to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},36.25)
-    .to(['#svl0','#svr0'],{opacity:1,y:0,duration:.3,ease:'power2.out'},36.8)
-    .to(['#svl1','#svr1'],{opacity:1,y:0,duration:.3,ease:'power2.out'},37.2)
-    .to(['#svl2','#svr2'],{opacity:1,y:0,duration:.3,ease:'power2.out'},37.6)
-    .to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},38.6)
-    .to('#m5vsRow',{opacity:1,y:0,duration:.4,ease:'power2.out'},38.7);
+    },[],45.3)
+    .to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},45.35)
+    .to(['#svl0','#svr0'],{opacity:1,y:0,duration:.35,ease:'power2.out'},46.1)
+    .to(['#svl1','#svr1'],{opacity:1,y:0,duration:.35,ease:'power2.out'},46.7)
+    .to(['#svl2','#svr2'],{opacity:1,y:0,duration:.35,ease:'power2.out'},47.3)
+    .to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},49.6)
+    .to('#m5vsRow',{opacity:1,y:0,duration:.45,ease:'power2.out'},49.7);
 
-  // MERGE (39.5–42.5s)
+  /* MERGE (50.8–54.2s) */
   tl5
-    .to(['.m5eng','#m5vsRow','#m5pDesc'],{scale:0.08,opacity:0,duration:.6,ease:'power3.in'},39.5)
+    .to(['#m5pDesc','#m5perSubline','#m5vsRow'],{opacity:0,duration:.35,ease:'power2.in'},50.8)
+    .to('.m5eng',{scale:0.5,opacity:0,duration:.55,ease:'power4.in',transformOrigin:'center center',stagger:{each:.04,from:'center'}},50.8)
     .call(()=>{
       const ring=document.getElementById('m5perRing');
-      if(ring){ring.style.animation='none';void ring.offsetWidth;ring.style.animation='m5ring 0.9s ease-out forwards';}
-    },[],39.9)
-    .to('#m5perBig',{opacity:1,duration:.4,ease:'power2.out'},40.0)
-    .to('#m5perBigTxt',{scale:1.2,duration:.8,ease:'power2.inOut'},40.3)
-    .to('#m5perBig',{opacity:0,duration:.45,ease:'power2.in'},41.3)
-    .to('#m5s2',{opacity:0,x:-50,duration:.5,ease:'power3.in'},41.5);
+      if(ring){ring.style.animation='none';void ring.offsetWidth;ring.style.animation='m5ring 1.1s ease-out forwards';}
+    },[],51.3)
+    .to('#m5perBig',{opacity:1,duration:.5,ease:'power2.out'},51.4)
+    .to('#m5perBigTxt',{letterSpacing:'0.36em',duration:1.3,ease:'power2.inOut'},51.4)
+    .to('#m5perTagline',{opacity:1,duration:.4,ease:'power2.out'},52.5)
+    .to('#m5perBig',{opacity:0,duration:.5,ease:'power2.in'},53.5)
+    .to('#m5s2',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},53.8);
 
-  /* MARKET (42.5–54.0s) */
+  /* MARKET (54.5–68.5s) */
   tl5
-    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],42.5)
-    .fromTo('#m5s3',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},42.5)
+    .call(()=>{setNarrator(5,3);setDot(2,'dn');setDot(3,'on')},[],54.5)
+    .fromTo('#m5s3',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},54.5)
     .call(()=>{
-      gsap.set('#m5spot',{scale:0.88});
+      gsap.set('#m5spot',{scale:0.94,transformOrigin:'center center'});
       _spotHideAll();
       _spotShowIds('m5spotStatVal','m5spotStatSub');
       document.getElementById('m5spotStatVal').textContent='360 000+';
       document.getElementById('m5spotStatSub').textContent='svenska gymnasieelever';
-    },[],43.0)
-    .to('#m5spot',{opacity:1,scale:1,duration:.35,ease:'back.out(1.5)'},43.05)
-    .to('#m5spot',{opacity:0,scale:0.93,duration:.28,ease:'power2.in'},45.3)
-    .to('#m5mktStat',{opacity:1,scale:1,duration:.5,ease:'back.out(1.5)'},45.4);
+    },[],55.0)
+    .to('#m5spot',{opacity:1,scale:1,duration:.38,ease:'power3.out'},55.05)
+    .to('#m5spot',{opacity:0,scale:0.97,duration:.2,ease:'power3.in'},58.2)
+    .to('#m5mktStat',{opacity:1,scale:1,duration:.5,ease:'power2.out'},58.3);
 
-  addMktSpot(tl5,0,46.2);
-  addMktSpot(tl5,1,48.7);
-  addMktSpot(tl5,2,51.2);
+  addMktSpot(tl5,0,59.0);
+  addMktSpot(tl5,1,62.2);
+  addMktSpot(tl5,2,65.4);
 
-  tl5.to('#m5s3',{opacity:0,x:-50,duration:.5,ease:'power3.in'},54.0);
+  tl5.to('#m5s3',{opacity:0,xPercent:-5,duration:.5,ease:'power3.in'},68.5);
 
-  /* BUSINESS MODEL (54.5–63.8s) */
+  /* BUSINESS MODEL (69.2–81.5s) */
   tl5
-    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],54.5)
-    .fromTo('#m5s4',{opacity:0,x:60},{opacity:1,x:0,duration:.55,ease:'power3.out'},54.5);
+    .call(()=>{setNarrator(5,4);setDot(3,'dn');setDot(4,'on')},[],69.2)
+    .fromTo('#m5s4',{opacity:0,xPercent:5},{opacity:1,xPercent:0,duration:.55,ease:'power3.out'},69.2);
 
-  addPlanSpot(tl5,0,55.0);
-  addPlanSpot(tl5,1,57.8);
-  addPlanSpot(tl5,2,60.6);
+  addPlanSpot(tl5,0,69.8);
+  addPlanSpot(tl5,1,73.5);
+  addPlanSpot(tl5,2,77.2);
 
   tl5
-    .to('#m5margins',{opacity:1,duration:.35,ease:'power2.out'},63.5)
-    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},63.8);
+    .to('#m5margins',{opacity:1,duration:.4,ease:'power2.out'},80.8)
+    .to('#m5s4',{opacity:0,duration:.55,ease:'power2.in'},81.1);
 
-  /* CTA (64.5–67s) */
+  /* CTA (81.8–85s) */
   tl5
-    .fromTo('#m5cta',{opacity:0,scale:0.88},{opacity:1,scale:1,duration:.6,ease:'back.out(1.4)'},64.5)
-    .to('#mode5',{opacity:0,duration:1.2},65.5)
-    .set('#mode5',{opacity:1},67.5);
+    .fromTo('#m5cta',{opacity:0,scale:0.92,y:12},{opacity:1,scale:1,y:0,duration:.65,ease:'power3.out'},81.8)
+    .to('#mode5',{opacity:0,duration:1.3},82.8)
+    .set('#mode5',{opacity:1},85.0);
 
   return tl5;
 }
