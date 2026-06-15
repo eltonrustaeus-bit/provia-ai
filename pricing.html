@@ -165,8 +165,10 @@
     </a>
     <div class="hR">
       <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink" href="index.html">Hem</a>
         <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
         <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink" href="förbättring.html">Förbättring</a>
         <a class="hNavLink active" href="pricing.html">Priser</a>
       </nav>
       <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
@@ -417,7 +419,7 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
     if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
   }
   const saved=localStorage.getItem(LS);
-  const preferred=window.matchMedia("(prefers-color-scheme:light)").matches?"light":"dark";
+  const preferred='light';
   applyTheme(saved||preferred);
   const btn=document.getElementById("themeToggleBtn");
   if(btn)btn.addEventListener("click",()=>applyTheme(document.body.classList.contains("light")?"dark":"light"));

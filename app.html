@@ -529,7 +529,9 @@ white-space:nowrap;
 </a>
 <div class="hRight">
 <nav class="hNav" aria-label="Huvudnavigation">
+  <a class="hNavLink" href="index.html">Hem</a>
   <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
+  <a class="hNavLink active" href="app.html">Mockprov</a>
   <a class="hNavLink" href="förbättring.html">Förbättring</a>
   <a class="hNavLink" href="pricing.html">Priser</a>
 </nav>
@@ -1018,8 +1020,8 @@ function applyTheme(theme){
 }
 function initTheme(){
   const saved = localStorage.getItem(LS_THEME);
-  const preferred = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  applyTheme(saved || preferred);
+  const preferred='light';
+  applyTheme(saved||preferred);
   const btn = $("themeToggleBtn");
   if(btn) btn.addEventListener("click", () => {
     applyTheme(document.body.classList.contains("light") ? "dark" : "light");

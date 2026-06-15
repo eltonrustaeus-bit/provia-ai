@@ -40,7 +40,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    padding: 100px 24px 80px;
+    padding: 80px 24px 60px;
   }
 
   /* Background */
@@ -213,7 +213,7 @@
   }
   .heroMoreLink:hover{color:var(--a)}
 
-  .heroCtas{margin-bottom:32px}
+  .heroCtas{margin-bottom:24px}
 
   @media(max-width:460px){
     .ctaBtn,.demoBtn{width:100%;justify-content:center}
@@ -274,7 +274,7 @@
   @keyframes fadeUp{to{opacity:1}}
 
   /* ── FEATURES ── */
-  .feats{padding:72px 0 48px}
+  .feats{padding:56px 0 48px}
   .secEye {
     font-family:var(--mono);font-size:11px;color:var(--a);
     letter-spacing:.12em;text-transform:uppercase;
@@ -513,8 +513,10 @@
     </a>
     <div class="hR">
       <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink active" href="index.html">Hem</a>
         <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
         <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink" href="förbättring.html">Förbättring</a>
         <a class="hNavLink" href="pricing.html">Priser</a>
       </nav>
       <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
@@ -821,7 +823,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
   }
   const saved=localStorage.getItem(LS);
-  const preferred=window.matchMedia("(prefers-color-scheme:light)").matches?"light":"dark";
+  const preferred='light';
   applyTheme(saved||preferred);
   const btn=document.getElementById("themeToggleBtn");
   if(btn)btn.addEventListener("click",()=>applyTheme(document.body.classList.contains("light")?"dark":"light"));
