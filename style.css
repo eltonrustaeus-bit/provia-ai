@@ -592,3 +592,69 @@ body.light .welcomeOrb { box-shadow: 0 0 24px rgba(13,148,96,.16), inset 0 0 16p
   .aiDot, .aiStatus { display: none; }
   .hWrap { padding: 0 14px; }
 }
+
+/* ── GRADIENT TEXT ── */
+.gradient-text {
+  background: linear-gradient(135deg, #1bff8c 0%, #00d4ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── DESKTOP hNAV UNDERLINE HOVER ── */
+.hNavLink { position: relative; }
+.hNavLink::after {
+  content: '';
+  position: absolute;
+  bottom: 4px; left: 14px; right: 14px;
+  height: 2px;
+  background: var(--a);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .22s cubic-bezier(.22,.61,.36,1);
+}
+.hNavLink:hover::after, .hNavLink.active::after { transform: scaleX(1); }
+
+/* ── HEADER SCROLL COMPRESS ── */
+header { transition: box-shadow .2s ease; }
+header.scrolled {
+  box-shadow: 0 2px 24px rgba(0,0,0,.35);
+}
+header.scrolled .hWrap { height: 48px; }
+
+/* ── SECTION DIVIDER ── */
+.sec-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(27,255,140,.18), transparent);
+  margin: 4rem 0;
+}
+
+/* ── SCROLL REVEAL ── */
+.rev, .reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+.rev.rev-visible, .reveal.rev-visible { opacity: 1; transform: none; }
+/* Stagger delays */
+.rev.d1, .reveal.d1 { transition-delay: .07s; }
+.rev.d2, .reveal.d2 { transition-delay: .14s; }
+.rev.d3, .reveal.d3 { transition-delay: .21s; }
+.rev.d4, .reveal.d4 { transition-delay: .28s; }
+.rev.d5, .reveal.d5 { transition-delay: .35s; }
+
+/* ── VISITOR NAV: ICON-ONLY ON TINY SCREENS ── */
+@media (max-width: 360px) {
+  .vNavLink span:not(.vNavIco) { display: none; }
+  .vNavLink { padding: 8px 0; }
+}
+
+/* ── CARD HOVER GLOW (enhanced) ── */
+.feat, .sCard, .featureCard {
+  transition: border-color .22s ease, transform .22s cubic-bezier(.22,.61,.36,1), box-shadow .22s ease;
+}
+.feat:hover, .sCard:hover, .featureCard:hover {
+  box-shadow: 0 0 40px rgba(27,255,140,.08);
+}

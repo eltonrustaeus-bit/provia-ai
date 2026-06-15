@@ -21,6 +21,11 @@
     setTimeout(function () { window.location.href = href; }, 210);
   }, true);
 
+  /* ── iOS BFCache fix: remove pg-leaving when page is restored from cache ── */
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) document.body.classList.remove('pg-leaving');
+  });
+
   /* ── WELCOME ANIMATION ── */
   var SS_KEY = 'provia_welcome_name';
 
@@ -1168,6 +1173,53 @@
     document.addEventListener('DOMContentLoaded', initCookieConsent);
   } else {
     initCookieConsent();
+  }
+
+  /* ── SCROLL REVEAL ── */
+  function initScrollReveal() {
+    if (!window.IntersectionObserver) {
+      /* Fallback: just show everything */
+      document.querySelectorAll('.rev, .reveal').forEach(function(el) {
+        el.style.opacity = '1';
+        el.style.transform = 'none';
+      });
+      return;
+    }
+    var obs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('rev-visible');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+    document.querySelectorAll('.rev, .reveal').forEach(function(el) { obs.observe(el); });
+  }
+
+  /* ── HEADER SCROLL COMPRESS ── */
+  function initHeaderCompress() {
+    var header = document.querySelector('header');
+    if (!header) return;
+    var ticking = false;
+    window.addEventListener('scroll', function() {
+      if (!ticking) {
+        requestAnimationFrame(function() {
+          header.classList.toggle('scrolled', window.scrollY > 72);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initScrollReveal();
+      initHeaderCompress();
+    });
+  } else {
+    initScrollReveal();
+    initHeaderCompress();
   }
 
 })();
