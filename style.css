@@ -177,8 +177,8 @@ body.light header { background: rgba(243,248,245,.92); }
 /* ── BUTTONS ── */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  padding: 0 15px; height: 36px;
-  font-family: var(--font); font-weight: 600; font-size: 13px;
+  padding: 0 15px; height: 38px;
+  font-family: var(--font); font-weight: 600; font-size: 14px;
   border: 1px solid var(--l); border-radius: var(--r);
   background: var(--s2); color: var(--t);
   cursor: pointer; white-space: nowrap;
@@ -467,7 +467,7 @@ footer {
 .visitorNav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 2900;
   display: flex; align-items: stretch;
-  background: rgba(13,26,18,.96);
+  background: rgba(14,33,24,.97);
   backdrop-filter: blur(16px) saturate(140%);
   border-top: 1px solid rgba(27,255,140,.20);
   padding-bottom: env(safe-area-inset-bottom);
@@ -476,14 +476,14 @@ footer {
 .vNavLink {
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 3px; padding: 10px 4px;
-  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
   color: var(--t3); letter-spacing: .04em; text-decoration: none;
   transition: color .15s ease, background .15s ease;
   min-height: 56px;
 }
 .vNavLink:hover, .vNavLink.active { color: var(--a); }
 .vNavLink.active { background: rgba(27,255,140,.06); }
-.vNavIco { font-size: 18px; line-height: 1; }
+.vNavIco { font-size: 20px; line-height: 1; }
 @media (min-width: 721px) { .visitorNav { display: none; } }
 @media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 68px; } }
 body.light .visitorNav { background: rgba(240,248,243,.96); border-color: rgba(13,148,96,.20); }
