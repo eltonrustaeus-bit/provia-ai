@@ -91,18 +91,6 @@
     align-items:center;text-align:center;
   }
 
-  /* Logo */
-  .heroLogo {
-    width:72px;height:72px;
-    margin-bottom:28px;
-    filter:drop-shadow(0 0 20px rgba(27,255,140,.4));
-    transition:filter .3s ease,transform .3s ease;
-  }
-  .heroLogo:hover {
-    filter:drop-shadow(0 0 34px rgba(27,255,140,.65));
-    transform:translateY(-4px);
-  }
-
   /* Eyebrow pill */
   .heroEye {
     display:inline-flex;align-items:center;gap:7px;
@@ -142,14 +130,6 @@
   .w { display:inline-block;overflow:hidden;vertical-align:bottom }
   .wi { display:inline-block;transform:translateY(110%) }
 
-  /* Sub */
-  .heroSub {
-    font-size:clamp(14px,1.4vw,16px);
-    color:var(--t2);line-height:1.7;
-    max-width:44ch;margin-bottom:36px;
-    opacity:0;
-  }
-
   /* CTA */
   .ctaBtn {
     position:relative;display:inline-flex;
@@ -172,23 +152,6 @@
     transition:transform .5s ease;
   }
   .ctaBtn:hover .ctaShimmer { transform:translateX(220%); }
-
-  /* Stats */
-  .heroStats {
-    display:flex;align-items:center;gap:0;
-    margin-bottom:18px;opacity:0;
-  }
-  .stat{display:flex;flex-direction:column;align-items:center;padding:0 22px}
-  .statN{
-    font-weight:700;font-size:clamp(24px,3vw,32px);
-    color:var(--t);letter-spacing:-.035em;line-height:1;
-  }
-  .statL{
-    font-family:var(--mono);font-size:10px;
-    color:var(--t3);letter-spacing:.06em;
-    text-transform:uppercase;margin-top:4px;
-  }
-  .statSep{width:1px;height:34px;background:var(--l);flex-shrink:0}
 
   .demoBtn{
     display:inline-flex;align-items:center;gap:8px;
@@ -227,16 +190,6 @@
   @media(max-width:460px){
     .ctaBtn,.demoBtn{width:100%;justify-content:center}
     .heroCtas>div{flex-direction:column;width:100%;max-width:280px}
-  }
-
-  .heroFree{
-    font-family:var(--mono);font-size:11px;
-    color:var(--t2);letter-spacing:.05em;opacity:0;
-  }
-
-  @media(max-width:600px){
-    #perWidget{bottom:88px!important}
-    .heroStats{justify-content:center}
   }
 
   /* MOCKPROV STRIP */
@@ -493,8 +446,8 @@
   @media(prefers-reduced-motion:reduce){
     *{cursor:auto !important}
     #cDot,#cRing{display:none !important}
-    .bgG1,.bgG2,.heroLogo,.ctaBtn,.ctaShimmer{animation:none !important}
-    .heroSub,.heroCtas,.heroStats,.heroFree{opacity:1 !important}
+    .bgG1,.bgG2,.ctaBtn,.ctaShimmer{animation:none !important}
+    .heroCtas{opacity:1 !important}
     .wi{transform:none !important}
     .rev{opacity:1 !important;transform:none !important}
     .scrollHint{opacity:1 !important;animation:none !important}
@@ -518,10 +471,8 @@
       gap:72px;
     }
     .heroContent{align-items:flex-start;text-align:left}
-    .heroLogo{display:none}
     #heroCtas{align-items:flex-start !important}
     #heroCtas>div{justify-content:flex-start !important}
-    .heroSub{max-width:42ch}
   }
 
   /* ── PRODUCT VISUAL (right side) ── */
@@ -599,6 +550,101 @@
     width:6px;height:6px;border-radius:50%;background:var(--a);flex-shrink:0;
     animation:eyeBlink 1.8s 3s ease-in-out infinite;
   }
+
+  /* ── STATS ROW ── */
+  .statsRow { padding: 0; }
+  .statsRowInner {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; flex-wrap: wrap;
+    padding: 24px 0;
+    border-top: 1px solid var(--l);
+    border-bottom: 1px solid var(--l);
+  }
+  .statChip {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 28px;
+  }
+  .statBig {
+    font-size: clamp(20px,2.8vw,28px); font-weight: 700;
+    color: var(--t); letter-spacing: -.04em; line-height: 1;
+  }
+  .statLbl {
+    font-family: var(--mono); font-size: 10px; color: var(--t3);
+    letter-spacing: .08em; text-transform: uppercase; margin-top: 5px;
+  }
+  .statDivider { width: 1px; height: 32px; background: var(--l); flex-shrink: 0; }
+  @media(max-width:580px){
+    .statChip { padding: 6px 14px; }
+    .statDivider { height: 22px; }
+  }
+  @media(max-width:400px){
+    .statsRowInner { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .statDivider { display: none; }
+    .statChip { border-bottom: 1px solid var(--l); }
+    .statChip:nth-child(odd) { border-right: 1px solid var(--l); }
+  }
+
+  /* ── PRODUCT SHOWCASE ── */
+  .productShowcase { padding: 56px 0 48px; }
+  .showcaseOuter {
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    max-width: 480px; margin: 28px auto 0;
+  }
+  .showcaseCard {
+    width: 100%;
+    background: var(--s); border: 1px solid var(--l2);
+    border-radius: 16px; padding: 22px 24px;
+    box-shadow: 0 0 60px rgba(43,255,151,.10), 0 16px 48px rgba(0,0,0,.30);
+    animation: showcaseFloat 6s 1.5s ease-in-out infinite;
+  }
+  body.light .showcaseCard { box-shadow: 0 4px 24px rgba(0,0,0,.09); }
+  @keyframes showcaseFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @media(prefers-reduced-motion:reduce){ .showcaseCard { animation: none; } }
+  .showcaseBadge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 10px;
+    border: 1px solid var(--l); background: var(--s);
+    font-family: var(--mono); font-size: 11px; color: var(--t3); letter-spacing: .04em;
+  }
+
+  /* ── JOIN CTA STICKY BAR ── */
+  .joinCta {
+    position: fixed; bottom: 72px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    width: calc(100% - 24px); max-width: 400px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: rgba(13,33,24,.96); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(43,255,151,.22); border-radius: 14px;
+    padding: 12px 14px 12px 18px; z-index: 8000;
+    opacity: 0; pointer-events: none;
+    transition: opacity .28s ease, transform .28s cubic-bezier(.22,.61,.36,1);
+  }
+  .joinCta.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .joinCtaTxt {
+    font-family: var(--mono); font-size: 11px; color: var(--t3);
+    letter-spacing: .04em; line-height: 1.45;
+  }
+  .joinCtaBtn {
+    flex-shrink: 0; height: 36px; padding: 0 20px;
+    background: var(--a); color: #091a10; border: none; border-radius: 8px;
+    font-family: var(--font); font-weight: 700; font-size: 13px; cursor: pointer;
+    transition: background .15s ease, transform .12s ease;
+    white-space: nowrap;
+  }
+  .joinCtaBtn:hover { background: var(--a2); transform: translateY(-1px); }
+  .joinCtaBtn:active { transform: scale(.97); }
+  body.light .joinCta { background: rgba(238,248,242,.97); border-color: rgba(7,168,99,.3); }
+  body.light .joinCtaTxt { color: #5e8a72; }
+  body.light .joinCtaBtn { background: #07a863; color: #fff; }
+  body.light .joinCtaBtn:hover { background: #068c52; }
+  @media(min-width:721px){ .joinCta { bottom: 20px; } }
+  @media(max-width:380px){
+    .joinCtaTxt { font-size: 10px; }
+    .joinCtaBtn { padding: 0 14px; font-size: 12px; }
+  }
   </style>
 </head>
 <body>
@@ -669,19 +715,12 @@
 
     <div class="heroInner">
       <div class="heroContent">
-        <img src="image/proviaai-logo.png" class="heroLogo" alt="" aria-hidden="true" width="72" height="72" loading="eager" fetchpriority="high">
-
         <div class="heroEye" id="heroEye">AI-studieapp för svenska elever</div>
 
         <h1 class="heroTitle" aria-label="Klara teoriprovet. Träna på eget material.">
           <span class="w"><span class="wi">Klara&nbsp;</span></span><span class="w"><span class="wi"><em>teoriprovet</em>.&nbsp;</span></span><br>
           <span class="w"><span class="wi">Träna&nbsp;</span></span><span class="w"><span class="wi">på&nbsp;</span></span><span class="w"><span class="wi">eget&nbsp;</span></span><span class="w"><span class="wi">material.</span></span>
         </h1>
-
-        <p class="heroSub" id="heroSub">
-          368 verifierade körkortssfrågor med AI-förklaring.<br>
-          Eller generera mockprov på ditt eget studiematerial.
-        </p>
 
         <div class="heroCtas" id="heroCtas" style="display:flex;flex-direction:column;gap:10px;align-items:center;opacity:0">
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
@@ -701,44 +740,6 @@
           </div>
         </div>
 
-        <div class="heroStats" id="heroStats" aria-label="Nyckeltal">
-          <div class="stat">
-            <span class="statN" data-target="368">0</span>
-            <span class="statL">frågor</span>
-          </div>
-          <div class="statSep" aria-hidden="true"></div>
-          <div class="stat">
-            <span class="statN" data-target="16">0</span>
-            <span class="statL">kategorier</span>
-          </div>
-          <div class="statSep" aria-hidden="true"></div>
-          <div class="stat">
-            <span class="statN" data-target="52">0</span>
-            <span class="statL">rätt = godkänt</span>
-          </div>
-        </div>
-
-        <p class="heroFree" id="heroFree">Gratis att starta · inget kort krävs</p>
-
-        <!-- Mobile product preview — hidden on desktop (≥920px shows heroVisual instead) -->
-        <div class="mobileHeroPreview" aria-hidden="true">
-          <div class="mhpCard">
-            <div class="mhpTop">
-              <div class="mhpBar"><div class="mhpFill"></div></div>
-              <span class="mhpLbl">Fråga 36 / 65</span>
-            </div>
-            <p class="mhpQ">Vilket märke anger att korsande väg har väjningsplikt mot dig?</p>
-            <div class="mhpOpts">
-              <div class="mhpOpt mhpOk"><span class="mhpLetter">A</span><span>Väjningspliktsmärke (B1)</span></div>
-              <div class="mhpOpt"><span class="mhpLetter">B</span><span>Stopplikt (B2)</span></div>
-              <div class="mhpOpt"><span class="mhpLetter">C</span><span>Varning för vägkorsning</span></div>
-            </div>
-            <div class="mhpExpl">
-              <span class="mhpExplTag">✓ Rätt — AI-förklaring</span>
-              B1 ger dig företräde. Förare på korsande väg måste väja för dig.
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Product visual — desktop only, aria-hidden -->
@@ -782,6 +783,61 @@
     <div class="scrollHint" aria-hidden="true">
       <div class="scrollMouse"></div>
       <span>Scrolla</span>
+    </div>
+  </section>
+
+  <!-- ═══ STATS ROW ═══ -->
+  <section class="statsRow" aria-label="Nyckeltal">
+    <div class="wrap statsRowInner rev">
+      <div class="statChip">
+        <span class="statBig counter" data-target="368">368</span>
+        <span class="statLbl">verifierade frågor</span>
+      </div>
+      <div class="statDivider" aria-hidden="true"></div>
+      <div class="statChip">
+        <span class="statBig">16</span>
+        <span class="statLbl">ämnesområden</span>
+      </div>
+      <div class="statDivider" aria-hidden="true"></div>
+      <div class="statChip">
+        <span class="statBig">52</span>
+        <span class="statLbl">rätt av 65 = godkänt</span>
+      </div>
+      <div class="statDivider" aria-hidden="true"></div>
+      <div class="statChip">
+        <span class="statBig">50 min</span>
+        <span class="statLbl">provtid</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PRODUCT SHOWCASE ═══ -->
+  <section class="productShowcase" aria-label="Produktvisning">
+    <div class="wrap">
+      <p class="secEye rev">Så här ser det ut</p>
+      <h2 class="secTitle rev">Träna som på riktiga provet</h2>
+      <div class="showcaseOuter rev d1">
+        <div class="showcaseCard">
+          <div class="mhpTop">
+            <div class="mhpBar"><div class="mhpFill"></div></div>
+            <span class="mhpLbl">Fråga 36 / 65</span>
+          </div>
+          <p class="mhpQ">Vilket märke anger att korsande väg har väjningsplikt mot dig?</p>
+          <div class="mhpOpts">
+            <div class="mhpOpt mhpOk"><span class="mhpLetter">A</span><span>Väjningspliktsmärke (B1)</span></div>
+            <div class="mhpOpt"><span class="mhpLetter">B</span><span>Stopplikt (B2)</span></div>
+            <div class="mhpOpt"><span class="mhpLetter">C</span><span>Varning för vägkorsning</span></div>
+          </div>
+          <div class="mhpExpl">
+            <span class="mhpExplTag">✓ Rätt — AI-förklaring</span>
+            B1 ger dig företräde. Förare på korsande väg måste väja för dig.
+          </div>
+        </div>
+        <div class="showcaseBadge">
+          <span class="pvBadgeDot" aria-hidden="true"></span>
+          <span>AI förklarar varje svar direkt</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1088,9 +1144,9 @@ window._statsReady = (async function() {
 (function(){
   const reduced=window.matchMedia("(prefers-reduced-motion:reduce)").matches;
   if(reduced){
-    document.querySelectorAll(".rev,.heroSub,.ctaBtn,.heroStats,.heroFree").forEach(el=>{el.style.opacity="1";el.style.transform="none"});
+    document.querySelectorAll(".rev,.ctaBtn").forEach(el=>{el.style.opacity="1";el.style.transform="none"});
     document.querySelectorAll(".wi").forEach(el=>el.style.transform="none");
-    document.querySelectorAll(".statN,.counter").forEach(el=>el.textContent=el.dataset.target||el.textContent);
+    document.querySelectorAll(".counter").forEach(el=>el.textContent=el.dataset.target||el.textContent);
     return;
   }
 
@@ -1102,32 +1158,13 @@ window._statsReady = (async function() {
 
     tl.from("#heroEye",{opacity:0,y:12,duration:.4});
     tl.to(".wi",{y:"0%",duration:.55,stagger:.065,ease:"power3.out"},"-=.2");
-    tl.to("#heroSub",{opacity:1,duration:.4},"-=.25");
     tl.to("#heroCtas",{opacity:1,duration:.38,ease:"back.out(1.5)"},"-=.2");
-
-    /* stats count-up — waits for Supabase data but doesn't block CTAs */
-    tl.to("#heroStats",{opacity:1,duration:.3},"-=.1");
-    const runCountUp=()=>{
-      document.querySelectorAll(".statN[data-target]").forEach((el,i)=>{
-        const target=+el.dataset.target;
-        gsap.to(el,{
-          textContent:target,duration:.9,ease:"power2.out",
-          snap:{textContent:1},delay:i*.12,
-          onUpdate(){el.textContent=Math.round(+el.textContent)}
-        });
-      });
-    };
-    window._statsReady.then(()=>setTimeout(runCountUp,80)).catch(()=>runCountUp());
-
-    tl.to("#heroFree",{opacity:1,duration:.3},"-=.2");
   });
 
   /* fallback: force CTAs visible if GSAP stalls */
   setTimeout(()=>{
     const el=document.getElementById("heroCtas");
     if(el&&parseFloat(el.style.opacity||"1")<1){el.style.opacity="1";el.style.transition="opacity .3s ease"}
-    const sub=document.getElementById("heroSub");
-    if(sub&&parseFloat(sub.style.opacity||"1")<1)sub.style.opacity="1";
   },1800);
 
   /* — SCROLL REVEALS — */
@@ -1261,6 +1298,41 @@ window._statsReady = (async function() {
   setTimeout(() => {
     if (document.getElementById('proviaGlobalNav')) hide();
   }, 1200);
+})();
+</script>
+<!-- JOIN CTA — appears after scrolling past hero -->
+<div id="joinCta" class="joinCta" aria-hidden="true" role="complementary">
+  <span class="joinCtaTxt">Gratis att starta<br>Inget kort krävs</span>
+  <button class="joinCtaBtn" id="joinCtaBtn" type="button">Skapa konto</button>
+</div>
+<script>
+(function(){
+  'use strict';
+  var jc = document.getElementById('joinCta');
+  if (!jc) return;
+  var shown = false;
+  function checkScroll() {
+    var past = window.scrollY > window.innerHeight * 0.6;
+    if (past !== shown) {
+      shown = past;
+      jc.classList.toggle('show', shown);
+      jc.setAttribute('aria-hidden', shown ? 'false' : 'true');
+    }
+  }
+  window.addEventListener('scroll', checkScroll, { passive: true });
+  document.getElementById('joinCtaBtn').addEventListener('click', function() {
+    // Try to find and click the existing visitor nav login button
+    var loginBtn = document.getElementById('vLoginBtn') ||
+                   document.getElementById('loginBtn') ||
+                   document.querySelector('.vNavLink[data-action="login"]') ||
+                   document.querySelector('[id*="Login"],[id*="login"],[id*="signup"]');
+    if (loginBtn) { loginBtn.click(); }
+    else { document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: 'register' } })); }
+  });
+  // Hide once logged in (gnav replaces visitor nav)
+  document.addEventListener('proviaNavReady', function() {
+    jc.style.display = 'none';
+  });
 })();
 </script>
 </body>
