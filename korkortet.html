@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script>if(location.hostname.includes("vercel.app")&&!location.hostname.includes("provia-ai-uf")){location.replace("https://provia-ai-uf.vercel.app"+location.pathname+location.search)}</script>
 <title>Körkortsteorin – ProviaAi</title>
-<meta name="description" content="Träna körkortsteorin med AI från ProviaAi. Öva på alla kategorier, simulera riktiga teoriprovet och få AI-förklaring på varje svar. En del av ProviaAi – AI-driven studieapp för svenska elever." />
+<meta name="description" content="Träna körkortsteorin med AI från ProviaAi. Öva på alla kategorier, simulera riktiga teoriprovet och få AI-förklaring på varje svar. En del av ProviaAi – AI-driven studieapp för elever och studenter." />
 <meta property="og:title" content="Körkortsteorin – ProviaAi" />
 <meta property="og:description" content="Öva körkortsteorin med AI-förklaring. Alla kategorier, simulerat teoriprov – del av ProviaAi, AI-driven studieapp." />
 <meta property="og:image" content="https://proviaai.se/image/proviaai-hero.png" />
@@ -113,6 +113,7 @@ body.light .startBtn{color:#fff}
 
 /* QUESTION CARD */
 .qCard{background:var(--s);border:1px solid var(--l);border-radius:10px;padding:20px;position:relative}
+@media(max-width:480px){.qCard{padding:14px 14px 16px}}
 .qMeta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .qNum{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)}
 .diffDot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -123,12 +124,14 @@ body.light .startBtn{color:#fff}
 .bookmarkBtn{position:absolute;top:14px;right:14px;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--l);border-radius:var(--r2);background:var(--s2);cursor:pointer;color:var(--t3);transition:color .15s,border-color .15s;padding:0}
 .bookmarkBtn:hover,.bookmarkBtn.saved{color:#f4c842;border-color:rgba(244,200,66,.4)}
 .qText{font-weight:600;font-size:16px;color:var(--t);line-height:1.55;margin-bottom:16px}
-@media(max-width:600px){.qText{font-size:18px;line-height:1.6}}
+@media(max-width:600px){.qText{font-size:16px;line-height:1.6}}
+@media(max-width:380px){.qText{font-size:15px}}
 .qImg{width:100%;max-width:420px;border-radius:var(--r);border:1px solid var(--l);display:block;margin:0 auto 14px}
 
 /* ANSWER BUTTONS */
 .ansGrid{display:grid;gap:8px}
 .ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:8px;border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .15s,background .15s,color .15s,transform .15s;min-height:52px}
+@media(max-width:480px){.ansBtn{gap:10px;padding:12px 13px;font-size:13.5px;min-height:48px}}
 .ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
 .ansBtn:disabled{cursor:default;transform:none}
 .ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t);animation:correctPulse .55s ease}
@@ -155,6 +158,7 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 .nextWrap{display:none;margin-top:14px}
 .nextWrap.show{display:block;animation:fadeIn .25s ease}
 .nextBigBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:10px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s}
+@media(max-width:480px){.nextBigBtn{height:50px;font-size:15px;border-radius:9px}}
 body.light .nextBigBtn{color:#fff}
 .nextBigBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
 .nextBigBtn:active{transform:scale(.97)}
@@ -165,7 +169,8 @@ body.light .nextBigBtn{color:#fff}
 /* MINIBAR */
 .miniBar{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:none}
 .miniBar.show{display:block}
-.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 20px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,0,0,.5)}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,0,0,.5)}
+@media(min-width:480px){.miniBarInner{padding:12px 20px calc(12px + env(safe-area-inset-bottom));gap:12px}}
 body.light .miniBarInner{background:rgba(243,248,245,.98)}
 @media(min-width:720px){.miniBar{max-width:620px;left:50%;right:auto;transform:translateX(-50%);border-radius:14px 14px 0 0;border:1px solid var(--l2);border-bottom:none}}
 .miniBarTxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2)}
@@ -178,6 +183,7 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 #resultView{display:none}
 #resultView.active{display:block}
 .resultHero{text-align:center;padding:32px 20px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:12px}
+@media(max-width:480px){.resultHero{padding:22px 14px}}
 .resultScore{font-family:'DM Mono',monospace;font-size:clamp(40px,8vw,72px);color:var(--t);line-height:1;margin-bottom:6px}
 .resultScore span{color:var(--a)}
 .resultPct{font-family:'DM Mono',monospace;font-size:14px;color:var(--t3);margin-bottom:18px}
@@ -187,6 +193,7 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .resultActions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .resultActions .btn{height:42px;font-size:14px}
 .brkGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+@media(max-width:480px){.brkGrid{grid-template-columns:1fr 1fr;gap:6px}}
 .brkCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px}
 .brkLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:4px}
 .brkScore{font-size:13px;font-weight:600;color:var(--t)}
@@ -251,7 +258,9 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .teoriCardTitle{font-size:18px;font-weight:700;color:var(--t);margin-bottom:6px;letter-spacing:-.025em}
 .teoriCardSub{font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;max-width:40ch;margin-left:auto;margin-right:auto}
 .teoriStats{display:flex;gap:0;justify-content:center;margin-bottom:18px}
+@media(max-width:380px){.teoriStats{margin-bottom:14px}}
 .teoriStat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 16px;border-right:1px solid var(--l)}
+@media(max-width:380px){.teoriStat{padding:0 10px}}
 .teoriStat:last-child{border-right:none}
 .teoriStatVal{font-weight:700;font-size:22px;color:var(--t);letter-spacing:-.03em}
 .teoriStatLabel{font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:.06em}
@@ -435,6 +444,12 @@ body.light .aiSendBtn{color:#fff}
 /* Timer pulsing red when time is low */
 .timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.4);animation:timerPulse 1s ease-in-out infinite}
 @keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.55}}
+/* Focus lock: hide all nav/controls during teoriprov */
+body.teori-lock .hNav{visibility:hidden;pointer-events:none}
+body.teori-lock .menuWrap{visibility:hidden;pointer-events:none}
+body.teori-lock .themeTgl{visibility:hidden;pointer-events:none}
+body.teori-lock #teoriView{display:none!important}
+body.teori-lock #modeTabs{display:none!important}
 
 /* broken image fallback */
 .imgError{font-size:11px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);padding:8px 12px;background:var(--s2);font-family:var(--mono);margin-bottom:10px}
@@ -2588,6 +2603,7 @@ $("numQSel").onchange = updateHint;
 // ── VIEWS ──
 function showConfig() {
   miniQuizMode = false; isLockedExam = false;
+  document.body.classList.remove("teori-lock");
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
   $("modeTabs").style.display = "";
@@ -2613,6 +2629,7 @@ function showExam() {
   history.pushState({view:"exam"}, "");
   $("miniBar").classList.add("show");
   $("abortBtn").style.display = "";
+  if(isLockedExam) document.body.classList.add("teori-lock");
   document.getElementById("visitorNav")?.classList.add("hidden");
   document.getElementById("proviaGlobalNav")?.style.setProperty("display","none");
   document.getElementById("howSteps")?.style.setProperty("display","none");
@@ -2926,8 +2943,18 @@ function goNext() {
 $("nextBigBtn").onclick = goNext;
 $("miniNextBtn").onclick = goNext;
 $("abortBtn").onclick = () => {
-  if(!confirm("Avbryt provet? Resultatet sparas inte.")) return;
+  const locked = isLockedExam;
+  if(locked) document.body.classList.remove("teori-lock");
+  const msg = locked
+    ? "Avbryta teoriprov? Ditt resultat sparas inte och provet räknas som ej genomfört."
+    : "Avbryt provet? Resultatet sparas inte.";
+  if(!confirm(msg)) {
+    if(locked) document.body.classList.add("teori-lock");
+    return;
+  }
   miniQuizMode = false;
+  isLockedExam = false;
+  document.body.classList.remove("teori-lock");
   if(activeCourse && currentMode === "kurser") {
     if(timer){clearInterval(timer);timer=null;}
     $("examView").classList.remove("active");
@@ -2935,7 +2962,7 @@ $("abortBtn").onclick = () => {
     $("abortBtn").style.display = "none";
     $("modeTabs").style.display = "";
     $("courseStageView").style.display = "";
-    renderStage("study"); // go back to study stage
+    renderStage("study");
   } else {
     showConfig();
   }
@@ -3004,6 +3031,7 @@ async function showResults() {
 
   // Animated score count-up for locked exam
   if(isLockedExam) {
+    document.body.classList.remove("teori-lock");
     isLockedExam = false;
     let displayed = 0;
     $("resultScore").innerHTML = `<span id="rvCount">0</span> / ${total}`;
