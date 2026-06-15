@@ -474,8 +474,9 @@
   }
   .sOpt:hover .sArr{transform:translateX(3px);color:var(--a)}
 
-  /* ── REVEAL ── */
-  .rev{opacity:0;transform:translateY(26px)}
+  /* ── REVEAL — transition defined in style.css ── */
+  .rev{opacity:0;transform:translateY(24px);transition:opacity .5s ease,transform .5s ease}
+  .rev.rev-visible{opacity:1;transform:none}
 
   /* ── CURSOR ── */
   @media(pointer:fine){
@@ -626,6 +627,7 @@
         <a class="hNavLink" href="app.html">Mockprov</a>
         <a class="hNavLink" href="förbättring.html">Förbättring</a>
         <a class="hNavLink" href="pricing.html">Priser</a>
+        <a class="hNavLink" href="konto.html">Konto</a>
       </nav>
       <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
         <span class="tglIcon" id="tglIcon">☀️</span>
@@ -776,14 +778,14 @@
           <div class="featD">Alla 368 frågor fördelade på 16 ämnesområden — exakt som Transportstyrelsens teoriprov.</div>
         </div>
 
-        <div class="feat rev" style="--d:.09s">
+        <div class="feat rev d1">
           <span class="featIcon">🤖</span>
           <div class="featLabel">AI-förklaring</div>
           <div class="featT">Förstå varje svar</div>
           <div class="featD">AI förklarar rätt och fel direkt efter varje fråga. Lär dig riktigt — inte bara memorera.</div>
         </div>
 
-        <div class="feat rev" style="--d:.18s">
+        <div class="feat rev d2">
           <span class="featIcon">🎯</span>
           <div class="featLabel">Simulerat prov</div>
           <div class="featT">Som riktiga provet</div>
