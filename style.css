@@ -463,6 +463,31 @@ footer {
 .fLink { color: var(--t2); transition: color .15s ease; }
 .fLink:hover { color: var(--a); }
 
+/* ── VISITOR BOTTOM NAV ── */
+.visitorNav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 2900;
+  display: flex; align-items: stretch;
+  background: rgba(13,26,18,.96);
+  backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid rgba(27,255,140,.20);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.visitorNav.hidden { display: none; }
+.vNavLink {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; padding: 10px 4px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--t3); letter-spacing: .04em; text-decoration: none;
+  transition: color .15s ease, background .15s ease;
+  min-height: 56px;
+}
+.vNavLink:hover, .vNavLink.active { color: var(--a); }
+.vNavLink.active { background: rgba(27,255,140,.06); }
+.vNavIco { font-size: 18px; line-height: 1; }
+@media (min-width: 721px) { .visitorNav { display: none; } }
+@media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 68px; } }
+body.light .visitorNav { background: rgba(240,248,243,.96); border-color: rgba(13,148,96,.20); }
+
 /* ── REDUCED MOTION ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
