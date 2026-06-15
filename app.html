@@ -19,6 +19,8 @@
 
 /* LAYOUT */
 .wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
+/* Override has-gnav padding during exam steps */
+body.exam-mode{padding-bottom:0!important}
 
 /* HERO */
 .hero{padding:40px 0 24px}
@@ -1180,7 +1182,7 @@ function setWizardStep(step,opts={}){
   const gn=document.getElementById("proviaGlobalNav");
   if(vn){vn.style.display=hideNav?"none":"";}
   if(gn){gn.style.display=hideNav?"none":"";}
-  document.body.style.paddingBottom=hideNav?"0":"";
+  document.body.classList.toggle("exam-mode",hideNav);
 }
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
