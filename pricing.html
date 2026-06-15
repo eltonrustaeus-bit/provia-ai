@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
@@ -87,9 +87,9 @@
 
   .planCta{
     display:flex;align-items:center;justify-content:center;gap:6px;
-    width:100%;min-height:44px;
-    font-family:var(--font);font-weight:700;font-size:13.5px;
-    border-radius:var(--r);cursor:pointer;
+    width:100%;min-height:48px;
+    font-family:var(--font);font-weight:700;font-size:15px;
+    border-radius:10px;cursor:pointer;
     border:1px solid var(--a);background:var(--a);color:#0c1f14;
     transition:box-shadow .15s ease,background .15s ease;
     margin-top:auto;
@@ -99,6 +99,7 @@
   .planCta:active{transform:scale(.98)}
   .planCta.outline{background:transparent;color:var(--t);border-color:rgba(27,255,140,.28)}
   .planCta.outline:hover{background:var(--a-dim);border-color:var(--l2);box-shadow:var(--sh)}
+  body.light .planCta { color: #fff; }
 
   /* COMPARE TABLE */
   .compareWrap{margin-bottom:28px}
