@@ -431,6 +431,11 @@ body.light .aiSendBtn{color:#fff}
 .rTxt{width:100%;padding:9px 12px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:var(--font);font-size:12.5px;resize:none;outline:none;transition:border-color .15s;margin-bottom:12px;box-sizing:border-box}
 .rTxt:focus{border-color:var(--l2)}
 .rRow{display:flex;gap:8px;justify-content:flex-end}
+/* ── LOCKED EXAM (teoriprov) ── */
+/* Timer pulsing red when time is low */
+.timerBadge.bad{color:var(--danger);border-color:rgba(255,107,107,.4);animation:timerPulse 1s ease-in-out infinite}
+@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.55}}
+
 /* broken image fallback */
 .imgError{font-size:11px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r);padding:8px 12px;background:var(--s2);font-family:var(--mono);margin-bottom:10px}
 
@@ -1295,6 +1300,7 @@ let activeCourse = null;
 let courseStage = "intro"; // "intro"|"study"|"quiz"|"test"|"done"
 let miniQuizMode = false;  // true = quiz within course (no quota bump, always show expl)
 let answerStartTime = 0;   // for SRS quality scoring
+let isLockedExam = false;  // true during teoriprov (no mid-exam feedback)
 
 // ── COURSE PROGRESS ──
 const getCatProg = () => safeJSON(localStorage.getItem(LS_CAT_PROG), {});
@@ -2581,7 +2587,7 @@ $("numQSel").onchange = updateHint;
 
 // ── VIEWS ──
 function showConfig() {
-  miniQuizMode = false;
+  miniQuizMode = false; isLockedExam = false;
   $("examView").classList.remove("active");
   $("resultView").classList.remove("active");
   $("modeTabs").style.display = "";
@@ -2642,6 +2648,7 @@ function buildTeoriExam() {
 async function runExam(cat, n, diff) {
   // Teoriprov: category-distributed 65-question exam
   if(cat === "Alla kategorier" && n === 65) {
+    isLockedExam = true;
     exam = buildTeoriExam();
     idx = 0; ans = new Array(exam.length).fill(null);
     streak = 0; updateStreak();
@@ -2650,6 +2657,7 @@ async function runExam(cat, n, diff) {
     return;
   }
 
+  isLockedExam = false;
   let pool = [...questions];
   if(cat === "⭐ Bokmärkta") {
     const bm = getBM(); pool = pool.filter(q => bm.includes(q.id));
@@ -2690,9 +2698,9 @@ function renderQ(i) {
   $("progressFill").style.width = ((i+1)/total*100)+"%";
   $("progressLabel").textContent = `Fråga ${i+1} av ${total}`;
 
-  // Live score (only after first answer)
+  // Live score — hidden during locked exam (teoriprov)
   const answered = ans.filter(a => a !== null).length;
-  if(answered > 0) {
+  if(!isLockedExam && answered > 0) {
     const correct = ans.filter((a,j) => hit(a, exam[j])).length;
     const pct = Math.round(correct/answered*100);
     const ls = $("liveScore");
@@ -2796,6 +2804,24 @@ function handleAns(chosen, q) {
   const ok = ch === correct;
   ans[idx] = ch;
   if (ok) markMastered(q.category, q.id);
+
+  // Locked exam (teoriprov): no feedback, just mark selected and advance
+  if(isLockedExam) {
+    document.querySelectorAll("#ansGrid .ansBtn").forEach((b, i) => {
+      b.disabled = true;
+      const l = ["A","B","C","D"][i];
+      if(l === ch) b.style.cssText = "border-color:rgba(27,255,140,.45);background:rgba(27,255,140,.08);color:var(--t)";
+    });
+    updateBar();
+    const isLast = idx === exam.length-1;
+    const icon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>`;
+    const lbl = isLast ? "Visa resultat" : "Nästa";
+    $("nextBigBtn").innerHTML = `${lbl} ${icon}`;
+    $("nextWrap").classList.add("show");
+    $("miniNextBtn").innerHTML = `${lbl} ${icon}`;
+    $("miniNextBtn").style.display = "";
+    return;
+  }
 
   document.querySelectorAll("#ansGrid .ansBtn").forEach((b, i) => {
     b.disabled = true;
@@ -2933,8 +2959,12 @@ document.addEventListener("keydown", e => {
 const hit = (a, q) => a != null && a.toUpperCase() === (q?.correct||"").trim().toUpperCase();
 
 function updateBar() {
-  const correct = ans.filter((a,i) => hit(a,exam[i])).length;
   const answered = ans.filter(a => a!==null).length;
+  if(isLockedExam) {
+    $("miniBarTxt").innerHTML = `<strong>${answered} / ${exam.length}</strong> besvarade`;
+    return;
+  }
+  const correct = ans.filter((a,i) => hit(a,exam[i])).length;
   $("miniBarTxt").innerHTML = `<strong>${correct}/${answered}</strong> rätt · ${exam.length-answered} kvar`;
 }
 
@@ -2972,11 +3002,30 @@ async function showResults() {
   const pct = Math.round(right/total*100);
   const passed = total===65 ? right>=52 : pct>=75;
 
-  $("resultScore").innerHTML = `<span>${right}</span> / ${total}`;
-  $("resultPct").textContent = `${pct}% rätt`;
-  $("passBadgeWrap").innerHTML = passed
-    ? `<span class="statusBadge pass">✓ GODKÄNT</span>`
-    : `<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
+  // Animated score count-up for locked exam
+  if(isLockedExam) {
+    isLockedExam = false;
+    let displayed = 0;
+    $("resultScore").innerHTML = `<span id="rvCount">0</span> / ${total}`;
+    $("resultPct").textContent = "0% rätt";
+    const tick = setInterval(() => {
+      displayed = Math.min(displayed + 1, right);
+      const el = document.getElementById("rvCount"); if(el) el.textContent = displayed;
+      $("resultPct").textContent = `${Math.round(displayed/total*100)}% rätt`;
+      if(displayed >= right) {
+        clearInterval(tick);
+        $("passBadgeWrap").innerHTML = passed
+          ? `<span class="statusBadge pass" style="animation:correctPulse .6s ease">✓ GODKÄNT</span>`
+          : `<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
+      }
+    }, right > 0 ? Math.min(40, 1800/right) : 40);
+  } else {
+    $("resultScore").innerHTML = `<span>${right}</span> / ${total}`;
+    $("resultPct").textContent = `${pct}% rätt`;
+    $("passBadgeWrap").innerHTML = passed
+      ? `<span class="statusBadge pass">✓ GODKÄNT</span>`
+      : `<span class="statusBadge fail">✗ UNDERKÄNT</span>`;
+  }
 
   // Breakdown
   const catMap = {};
