@@ -32,11 +32,17 @@
 .wrap{max-width:var(--max);margin:0 auto;padding:28px 20px}
 
 /* HERO */
-.hero{padding:40px 0 24px}
+.hero{padding:40px 0 28px;display:flex;flex-direction:column}
+@media(min-width:860px){.hero{flex-direction:row;align-items:center;justify-content:space-between;gap:40px;padding:48px 0 32px}}
+.heroLeft{flex:1;min-width:0}
 .heroTitle{font-size:clamp(32px,5vw,56px);font-weight:700;letter-spacing:-.04em;line-height:1.1;margin-bottom:14px;color:var(--t)}
 .heroTitle em{font-style:normal;color:var(--a)}
 .heroSub{font-size:clamp(15px,1.6vw,17px);color:var(--t2);max-width:540px;line-height:1.7}
 .statusRow{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.heroRight{display:none}
+@media(min-width:860px){.heroRight{display:flex;flex-direction:column;gap:8px;flex-shrink:0;min-width:200px;align-items:flex-end}}
+.heroStatPill{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;border:1px solid var(--l);background:var(--s);font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.04em}
+.heroStatVal{font-size:17px;font-weight:700;color:var(--t);font-family:'DM Sans',sans-serif;letter-spacing:-.02em}
 .sDot{width:6px;height:6px;border-radius:50%;background:var(--t3)}
 .sDot.ok{background:var(--a);box-shadow:0 0 0 3px rgba(27,255,140,.18);animation:kk-pulse 2s ease-in-out infinite}
 @keyframes kk-pulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
@@ -51,6 +57,7 @@
 
 /* CATEGORY GRID */
 .catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+@media(min-width:960px){.catGrid{grid-template-columns:repeat(5,1fr)}}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
 .catCard{padding:14px;border-radius:8px;border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
 .catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-2px)}
@@ -135,10 +142,13 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 /* GO NEXT */
 .nextWrap{display:none;margin-top:14px}
 .nextWrap.show{display:block;animation:fadeIn .25s ease}
-.nextBigBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s}
+.nextBigBtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:56px;font-weight:700;font-size:16px;background:var(--a);color:#08100d;border:none;border-radius:10px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s}
 body.light .nextBigBtn{color:#fff}
 .nextBigBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
 .nextBigBtn:active{transform:scale(.97)}
+.nextAiRow{margin-top:8px;display:flex;align-items:center;justify-content:center}
+.askPerBtn{display:inline-flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:6px;transition:color .15s,background .15s;letter-spacing:.03em}
+.askPerBtn:hover{color:var(--a);background:var(--a-dim)}
 
 /* MINIBAR */
 .miniBar{position:fixed;bottom:0;left:0;right:0;z-index:200;display:none}
@@ -650,12 +660,19 @@ body.light .adminSaveBtn{color:#fff}
 
   <!-- HERO -->
   <div class="hero">
-    <div class="eyebrow">Körkortsteorin</div>
-    <h1 class="heroTitle">Klara teorin på <em>första försöket</em></h1>
-    <p class="heroSub">Träna på riktiga teorifrågor kategoriserade efter Transportstyrelsens ämnesområden. AI förklarar varje svar.</p>
-    <div class="statusRow">
-      <div class="sDot" id="statusDot"></div>
-      <span class="statusLabel" id="quotaLabel">LADDAR…</span>
+    <div class="heroLeft">
+      <div class="eyebrow">Körkortsteorin</div>
+      <h1 class="heroTitle">Klara teorin på <em>första försöket</em></h1>
+      <p class="heroSub">Träna på riktiga teorifrågor kategoriserade efter Transportstyrelsens ämnesområden. AI förklarar varje svar.</p>
+      <div class="statusRow">
+        <div class="sDot" id="statusDot"></div>
+        <span class="statusLabel" id="quotaLabel">LADDAR…</span>
+      </div>
+    </div>
+    <div class="heroRight" aria-hidden="true">
+      <div class="heroStatPill"><span class="heroStatVal">368</span><span>frågor</span></div>
+      <div class="heroStatPill"><span class="heroStatVal">16</span><span>kategorier</span></div>
+      <div class="heroStatPill"><span class="heroStatVal">65</span><span>frågor på riktigt prov</span></div>
     </div>
   </div>
 
@@ -891,6 +908,9 @@ body.light .adminSaveBtn{color:#fff}
           Gå vidare
           <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
         </button>
+        <div class="nextAiRow">
+          <button class="askPerBtn" type="button" onclick="document.getElementById('perBubble')?.click()">✦ Fråga P.E.R om denna fråga</button>
+        </div>
         <button class="reportQuestionBtn" id="reportQuestionBtn" type="button">⚑ Rapportera fel i frågan</button>
       </div>
     </div>
@@ -2536,6 +2556,7 @@ function showExam() {
   $("configView").style.display = "none";
   $("resultView").classList.remove("active");
   $("examView").classList.add("active");
+  history.pushState({view:"exam"}, "");
   $("miniBar").classList.add("show");
   $("abortBtn").style.display = "";
   window.scrollTo({top:0,behavior:"smooth"});
@@ -2892,6 +2913,7 @@ async function showResults() {
   $("abortBtn").style.display = "none";
   $("configView").style.display = "none";
   $("resultView").classList.add("active");
+  history.pushState({view:"result"}, "");
   window.scrollTo({top:0,behavior:"smooth"});
 
   const total = exam.length;
@@ -3075,6 +3097,7 @@ function raceTimeout(promise, ms, label) {
 }
 
 async function init() {
+  history.replaceState({view:"setup"}, "");
   const loader = $("pageLoader"), loaderTxt = $("loaderText");
   const step = t => { loaderTxt.textContent = t; };
 
@@ -3873,6 +3896,24 @@ document.addEventListener("keydown", e => {
   if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); adminNavQuestion(1); }
   if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); adminNavQuestion(-1); }
   if (e.key === "p") { adminOpenPreview(); }
+});
+
+window.addEventListener("popstate", function(e) {
+  const view = e.state?.view || "setup";
+  if (view === "setup") {
+    $("examView").classList.remove("active");
+    if ($("resultView")) $("resultView").classList.remove("active");
+    if ($("miniBar")) $("miniBar").classList.remove("show");
+    $("configView").style.display = "";
+    if ($("abortBtn")) $("abortBtn").style.display = "none";
+    if ($("timerBadge")) $("timerBadge").style.display = "none";
+    if (typeof timerInterval !== "undefined") clearInterval(timerInterval);
+    if (typeof timer !== "undefined" && timer) { clearInterval(timer); timer = null; }
+    if (typeof stopTimer === "function") stopTimer();
+  } else if (view === "exam") {
+    if ($("resultView")) $("resultView").classList.remove("active");
+    $("examView").classList.add("active");
+  }
 });
 
 init();
