@@ -4,18 +4,18 @@
 :root {
   --a: #1bff8c;
   --a2: #16d475;
-  --a-dim: rgba(27,255,140,.07);
-  --a-glow: rgba(27,255,140,.18);
-  --bg: #0d1a12;
-  --s: #152019;
-  --s2: #1a2620;
-  --s3: #1e2c24;
-  --t: #e8f5ee;
-  --t2: #a8c4b4;
+  --a-dim: rgba(27,255,140,.11);
+  --a-glow: rgba(27,255,140,.24);
+  --bg: #0c1f14;
+  --s: #132219;
+  --s2: #192a1f;
+  --s3: #1e3226;
+  --t: #edfaf3;
+  --t2: #b0d4c0;
   --t3: #91b8a3;
   --l: rgba(27,255,140,.13);
   --l2: rgba(27,255,140,.28);
-  --l3: rgba(27,255,140,.38);
+  --l3: rgba(27,255,140,.42);
   --sh: 0 8px 32px rgba(0,0,0,.35);
   --sh2: 0 16px 48px rgba(0,0,0,.40);
   --sh3: 0 24px 64px rgba(0,0,0,.50);
@@ -118,7 +118,7 @@ header {
   height: 56px; position: sticky; top: 0; z-index: 3000;
   background: rgba(13,26,18,.80);
   backdrop-filter: blur(18px) saturate(160%);
-  border-bottom: 1px solid var(--l);
+  border-bottom: 1px solid var(--l2);
   display: flex; align-items: center;
   transition: background .28s ease, border-color .28s ease;
 }
@@ -213,6 +213,9 @@ body.light .btnP { color: #fff; }
 .themeTgl:hover .tglIcon { transform: rotate(18deg) scale(1.2); }
 @media (max-width: 768px) { .themeTgl { min-height: 44px; } }
 
+/* Hide brand tag on small screens to save header space */
+@media (max-width: 640px) { .bTag, .brandTag { display: none; } }
+
 /* ── MENU ── */
 /* supports: .mWrap (index/pricing) and .menuWrap (app/korkortet) */
 .mWrap, .menuWrap { position: relative; z-index: 4000; }
@@ -249,7 +252,7 @@ body.light .btnP { color: #fff; }
 /* supports: .ddi (index/pricing) and .ddItem (app/korkortet) */
 .ddi, .ddItem {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 8px 10px; border-radius: var(--r2); border: 1px solid transparent;
+  padding: 10px 12px; min-height: 44px; border-radius: var(--r2); border: 1px solid transparent;
   background: transparent; cursor: pointer;
   font-family: var(--font); font-weight: 500; font-size: 13px;
   color: var(--t2); text-align: left;
@@ -277,7 +280,7 @@ main.wrap { padding-top: 32px; padding-bottom: 32px; }
   color: var(--a); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px;
 }
 .eyebrow::before {
-  content: ""; width: 18px; height: 1.5px;
+  content: ""; width: 24px; height: 1.5px;
   background: var(--a); border-radius: 1px; flex-shrink: 0;
 }
 
