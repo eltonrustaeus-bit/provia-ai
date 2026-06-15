@@ -29,6 +29,10 @@
   --ok: #1bff8c;
 }
 
+/* Anti-FOUC: applied in <head> before body renders */
+html.light { background: #f6fbf8; color: #091810; }
+html.light body { background: #f6fbf8; color: #091810; }
+
 body.light {
   --a: #07a863;
   --a2: #068c52;
@@ -238,9 +242,9 @@ body.light .btnP { color: #fff; }
 .bars span, .barsIcon span { display: block; height: 1.5px; background: currentColor; border-radius: 1px; }
 /* supports: .drop (index/pricing) and .dropdown (app/korkortet) */
 .drop, .dropdown {
-  position: absolute; right: 0; top: calc(100% + 8px); min-width: 224px;
-  background: var(--s); border: 1px solid var(--l); border-radius: var(--r);
-  box-shadow: var(--sh3); padding: 6px;
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 240px;
+  background: var(--s); border: 1px solid var(--l2); border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.5); padding: 6px;
   display: none; opacity: 0; transform: translateY(-5px) scale(.99); z-index: 5000;
 }
 .drop.on, .dropdown.is-open {
@@ -254,8 +258,8 @@ body.light .btnP { color: #fff; }
 .dropdown.open { display: block; opacity: 1; transform: none; animation: fadeIn .15s ease; }
 /* supports: .ddi (index/pricing) and .ddItem (app/korkortet) */
 .ddi, .ddItem {
-  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 10px 12px; min-height: 44px; border-radius: var(--r2); border: 1px solid transparent;
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 14px; min-height: 46px; border-radius: 8px; border: 1px solid transparent;
   background: transparent; cursor: pointer;
   font-family: var(--font); font-weight: 500; font-size: 13px;
   color: var(--t2); text-align: left;
@@ -263,6 +267,14 @@ body.light .btnP { color: #fff; }
 }
 .ddi:hover, .ddItem:hover { background: var(--a-dim); border-color: var(--l); color: var(--t); }
 .ddi:focus-visible, .ddItem:focus-visible { outline: 2px solid var(--a); outline-offset: 1px; }
+/* Drop item icon */
+.ddi-ico { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; line-height: 1; }
+/* Hamburger active state */
+.mBtn.open, .menuBtn.open { border-color: var(--a); background: var(--a-dim); color: var(--a); }
+/* Mobile page title in header */
+.mPageTitle { font-family: var(--mono); font-size: 10px; color: var(--t3); letter-spacing: .08em; text-transform: uppercase; display: none; }
+@media (max-width: 720px) { .mPageTitle { display: block; } }
+
 /* supports: .dpill (index/pricing) and .ddPill (app/korkortet) */
 .dpill, .ddPill {
   font-family: var(--mono); font-size: 10px; font-weight: 500;
@@ -650,6 +662,58 @@ header.scrolled .hWrap { height: 48px; }
   .vNavLink span:not(.vNavIco) { display: none; }
   .vNavLink { padding: 8px 0; }
 }
+
+/* ── MOBILE HERO PREVIEW ── */
+.mobileHeroPreview {
+  display: none;
+  width: 100%; max-width: 340px;
+  margin: 28px auto 0;
+}
+@media (max-width: 919px) { .mobileHeroPreview { display: block; } }
+.mhpCard {
+  background: var(--s);
+  border: 1px solid var(--l2);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.35);
+}
+body.light .mhpCard { box-shadow: 0 4px 16px rgba(0,0,0,.09); }
+.mhpTop {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.mhpBar { flex: 1; height: 3px; border-radius: 999px; background: var(--l); overflow: hidden; }
+.mhpFill { height: 100%; width: 55%; background: var(--a); border-radius: 999px; }
+.mhpLbl { font-family: var(--mono); font-size: 10px; color: var(--t3); white-space: nowrap; }
+.mhpQ { font-size: 12.5px; font-weight: 600; color: var(--t); line-height: 1.5; margin-bottom: 10px; }
+.mhpOpts { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.mhpOpt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 7px;
+  border: 1px solid var(--l); background: var(--s2);
+  font-size: 11.5px; color: var(--t2);
+}
+.mhpOpt.mhpOk {
+  border-color: var(--a); background: rgba(43,255,151,.09); color: var(--t);
+}
+body.light .mhpOpt.mhpOk { background: rgba(7,168,99,.09); }
+.mhpLetter {
+  width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  background: var(--s); border: 1px solid var(--l); color: var(--t3);
+}
+.mhpOpt.mhpOk .mhpLetter { background: var(--a); border-color: var(--a); color: #08100d; }
+.mhpExpl {
+  font-size: 11px; color: var(--t2); line-height: 1.55;
+  border: 1px solid rgba(43,255,151,.18); background: rgba(43,255,151,.05);
+  border-radius: 7px; padding: 8px 10px;
+}
+.mhpExplTag {
+  font-family: var(--mono); font-size: 9px; color: var(--a);
+  text-transform: uppercase; letter-spacing: .06em; display: block; margin-bottom: 3px;
+}
+body.light .mhpExpl { border-color: rgba(7,168,99,.16); background: rgba(7,168,99,.05); }
 
 /* ── CARD HOVER GLOW (enhanced) ── */
 .feat, .sCard, .featureCard {

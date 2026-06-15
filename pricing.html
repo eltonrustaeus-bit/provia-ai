@@ -14,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <script>(function(){try{if(localStorage.getItem('proviaai_theme')==='light')document.documentElement.classList.add('light');}catch(e){}})()</script>
   <script src="shared.js" defer></script>
   <style>
   /* ── PRICING-SPECIFIC ── */
@@ -182,11 +183,12 @@
           <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
         </button>
         <div class="drop" id="drop">
-          <a class="ddi" href="index.html"><span>Hem</span><span class="dpill">Start</span></a>
-          <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
-          <a class="ddi" href="app.html"><span>Mockprov</span><span class="dpill">AI</span></a>
-          <a class="ddi active" href="pricing.html"><span>Priser</span><span class="dpill" style="color:var(--a)">29/79</span></a>
-          <a class="ddi" href="förbättring.html"><span>Förbättring</span><span class="dpill">Coach</span></a>
+          <a class="ddi" href="index.html"><span class="ddi-ico">🏠</span><span>Hem</span><span class="dpill">Start</span></a>
+          <a class="ddi" href="korkortet.html"><span class="ddi-ico">🚗</span><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
+          <a class="ddi" href="app.html"><span class="ddi-ico">📝</span><span>Mockprov</span><span class="dpill">AI</span></a>
+          <a class="ddi active" href="pricing.html"><span class="ddi-ico">💳</span><span>Priser</span><span class="dpill" style="color:var(--a)">29/79</span></a>
+          <a class="ddi" href="förbättring.html"><span class="ddi-ico">📈</span><span>Förbättring</span><span class="dpill">Coach</span></a>
+          <a class="ddi" href="konto.html"><span class="ddi-ico">👤</span><span>Konto</span></a>
         </div>
       </div>
     </div>
@@ -421,7 +423,7 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
     if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
   }
   const saved=localStorage.getItem(LS);
-  const preferred='light';
+  const preferred='dark';
   applyTheme(saved||preferred);
   const btn=document.getElementById("themeToggleBtn");
   if(btn)btn.addEventListener("click",()=>applyTheme(document.body.classList.contains("light")?"dark":"light"));

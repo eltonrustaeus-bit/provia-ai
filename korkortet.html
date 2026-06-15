@@ -23,6 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<script>(function(){try{if(localStorage.getItem('proviaai_theme')==='light')document.documentElement.classList.add('light');}catch(e){}})()</script>
 <script src="shared.js" defer></script>
 <script src="korkortet-srs.js" defer></script>
 <style>
@@ -650,11 +651,12 @@ body.light .adminSaveBtn{color:#fff}
           <div class="barsIcon"><span></span><span></span><span></span></div>
         </button>
         <div class="dropdown" id="menu">
-          <a class="ddItem" href="app.html"><span>Mockprov</span><span class="ddPill">AI</span></a>
-          <a class="ddItem" href="förbättring.html"><span>Förbättring</span><span class="ddPill">Coach</span></a>
-          <a class="ddItem" href="korkortet.html"><span>Körkortsteorin</span><span class="ddPill hi">Nytt</span></a>
+          <a class="ddItem" href="app.html"><span class="ddi-ico">📝</span><span>Mockprov</span><span class="ddPill">AI</span></a>
+          <a class="ddItem" href="förbättring.html"><span class="ddi-ico">📈</span><span>Förbättring</span><span class="ddPill">Coach</span></a>
+          <a class="ddItem active" href="korkortet.html"><span class="ddi-ico">🚗</span><span>Körkortsteorin</span><span class="ddPill hi">Nytt</span></a>
+          <a class="ddItem" href="konto.html"><span class="ddi-ico">👤</span><span>Konto</span></a>
           <div class="ddSep"></div>
-          <a class="ddItem" href="pricing.html"><span>Uppgradera</span><span class="ddPill" id="rolePill">Gratis</span></a>
+          <a class="ddItem" href="pricing.html"><span class="ddi-ico">💳</span><span>Uppgradera</span><span class="ddPill" id="rolePill">Gratis</span></a>
           <button class="ddItem" id="logoutBtn"><span>Logga ut</span></button>
         </div>
       </div>
@@ -2454,7 +2456,7 @@ $("themeBtn").onclick = () => {
   const n = document.body.classList.contains("light") ? "dark" : "light";
   localStorage.setItem(LS_THEME, n); applyTheme(n);
 };
-applyTheme(localStorage.getItem(LS_THEME) || "light");
+applyTheme(localStorage.getItem(LS_THEME) || "dark");
 
 // ── MENU ──
 (function() {
