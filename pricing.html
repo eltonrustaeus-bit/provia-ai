@@ -87,19 +87,17 @@
 
   .planCta{
     display:flex;align-items:center;justify-content:center;gap:6px;
-    width:100%;height:40px;
+    width:100%;min-height:44px;
     font-family:var(--font);font-weight:700;font-size:13.5px;
     border-radius:var(--r);cursor:pointer;
-    border:1px solid var(--a);background:var(--a);color:#061009;
-    position:relative;overflow:hidden;
-    transition:transform .15s cubic-bezier(.22,.61,.36,1),box-shadow .15s ease,background .15s ease;
+    border:1px solid var(--a);background:var(--a);color:#0c1f14;
+    transition:box-shadow .15s ease,background .15s ease;
     margin-top:auto;
   }
-  .planCta::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent 55%);opacity:0;transition:opacity .15s ease}
-  .planCta:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(27,255,140,.28);background:var(--a2)}
-  .planCta:hover::after{opacity:1}
+  @media(max-width:480px){.planCta{min-height:48px}}
+  .planCta:hover{box-shadow:0 8px 24px rgba(27,255,140,.28);background:var(--a2)}
   .planCta:active{transform:scale(.98)}
-  .planCta.outline{background:transparent;color:var(--t);border-color:var(--l)}
+  .planCta.outline{background:transparent;color:var(--t);border-color:rgba(27,255,140,.28)}
   .planCta.outline:hover{background:var(--a-dim);border-color:var(--l2);box-shadow:var(--sh)}
 
   /* COMPARE TABLE */
@@ -390,7 +388,19 @@
 </main>
 
 
-<footer>ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
+<footer>
+  <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
+    <span>© 2025 ProviaAi</span>
+    <span style="color:var(--l2)">·</span>
+    <a href="index.html" class="fLink">Hem</a>
+    <span style="color:var(--l2)">·</span>
+    <a href="app.html" class="fLink">Mockprov</a>
+    <span style="color:var(--l2)">·</span>
+    <a href="korkortet.html" class="fLink">Körkortsteorin</a>
+    <span style="color:var(--l2)">·</span>
+    <span>Studiestöd — ingen officiell betygssättning</span>
+  </div>
+</footer>
 
 <script>
 /* LOADER */
