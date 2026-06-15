@@ -52,11 +52,11 @@
 /* CATEGORY GRID */
 .catGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr)}}
-.catCard{padding:12px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
+.catCard{padding:14px;border-radius:8px;border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
 .catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-2px)}
 .catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
 .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
-.catName{font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:2px}
+.catName{font-weight:600;font-size:13.5px;color:var(--t);line-height:1.3;margin-bottom:3px}
 .catCount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3)}
 .catCard.active .catCount{color:var(--a)}
 .catProg{margin-top:5px;height:3px;border-radius:999px;background:var(--l);overflow:hidden}
@@ -70,7 +70,7 @@
 .configRow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
 @media(max-width:480px){.configRow{grid-template-columns:1fr}}
 .startArea{text-align:center}
-.startBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 32px;height:52px;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:var(--r);cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;width:100%;max-width:340px}
+.startBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 32px;height:52px;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:10px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;width:100%;max-width:340px}
 .startBtn:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(27,255,140,.3)}
 .startBtn:active{transform:scale(.97)}
 .startBtn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
@@ -93,7 +93,7 @@ body.light .startBtn{color:#fff}
 .timerBadge.warn{color:var(--warn)}.timerBadge.bad{color:var(--danger)}
 
 /* QUESTION CARD */
-.qCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;position:relative}
+.qCard{background:var(--s);border:1px solid var(--l);border-radius:10px;padding:20px;position:relative}
 .qMeta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .qNum{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)}
 .diffDot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -109,7 +109,7 @@ body.light .startBtn{color:#fff}
 
 /* ANSWER BUTTONS */
 .ansGrid{display:grid;gap:8px}
-.ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r);border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .15s,background .15s,color .15s,transform .15s;min-height:52px}
+.ansBtn{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:8px;border:1px solid var(--l);background:var(--s2);cursor:pointer;font-weight:500;font-size:14px;color:var(--t2);text-align:left;width:100%;transition:border-color .15s,background .15s,color .15s,transform .15s;min-height:52px}
 .ansBtn:hover:not(:disabled){border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
 .ansBtn:disabled{cursor:default;transform:none}
 .ansBtn.correct{border-color:var(--a);background:rgba(27,255,140,.12);color:var(--t);animation:correctPulse .55s ease}
@@ -122,7 +122,7 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 @keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
 
 /* EXPLANATION */
-.explBox{display:none;margin-top:14px;border-radius:var(--r);padding:13px 15px;border:1px solid var(--l)}
+.explBox{display:none;margin-top:14px;border-radius:8px;padding:13px 15px;border:1px solid var(--l)}
 .explBox.show{display:block;animation:fadeIn .2s ease}
 .explBox.correct{border-color:rgba(27,255,140,.35);background:rgba(27,255,140,.07)}
 .explBox.wrong{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.07)}
