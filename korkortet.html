@@ -48,6 +48,16 @@
 @keyframes kk-pulse{0%,100%{box-shadow:0 0 0 3px rgba(27,255,140,.18)}50%{box-shadow:0 0 0 6px rgba(27,255,140,0)}}
 .statusLabel{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:.06em}
 
+/* HOW IT WORKS — step guide */
+.howSteps{display:flex;flex-direction:column;gap:0;margin-bottom:20px;border:1px solid var(--l);border-radius:12px;overflow:hidden}
+@media(min-width:640px){.howSteps{flex-direction:row}}
+.howStep{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--l);flex:1;position:relative}
+@media(min-width:640px){.howStep{border-bottom:none;border-right:1px solid var(--l)}}
+.howStep:last-child{border-bottom:none;border-right:none}
+.howNum{width:26px;height:26px;border-radius:50%;background:var(--a-dim);border:1px solid rgba(43,255,151,.3);display:grid;place-items:center;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--a);flex-shrink:0}
+.howBody strong{display:block;font-size:13px;font-weight:600;color:var(--t);margin-bottom:3px}
+.howBody span{font-size:12px;color:var(--t3);line-height:1.5}
+
 .btnDanger{background:transparent;border-color:rgba(255,107,107,.3);color:#ff8484}
 .btnDanger:hover{background:rgba(255,107,107,.08)}
 
@@ -151,10 +161,11 @@ body.light .nextBigBtn{color:#fff}
 .askPerBtn:hover{color:var(--a);background:var(--a-dim)}
 
 /* MINIBAR */
-.miniBar{position:fixed;bottom:0;left:0;right:0;z-index:200;display:none}
+.miniBar{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:none}
 .miniBar.show{display:block}
-.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 20px;box-shadow:0 -4px 24px rgba(0,0,0,.5)}
+.miniBarInner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(8,16,13,.97);backdrop-filter:blur(20px);border-top:1px solid var(--l2);padding:12px 20px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 24px rgba(0,0,0,.5)}
 body.light .miniBarInner{background:rgba(243,248,245,.98)}
+@media(min-width:720px){.miniBar{max-width:620px;left:50%;right:auto;transform:translateX(-50%);border-radius:14px 14px 0 0;border:1px solid var(--l2);border-bottom:none}}
 .miniBarTxt{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t2)}
 .miniBarTxt strong{color:var(--a)}
 .miniBarActions{display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -673,6 +684,31 @@ body.light .adminSaveBtn{color:#fff}
       <div class="heroStatPill"><span class="heroStatVal">368</span><span>frågor</span></div>
       <div class="heroStatPill"><span class="heroStatVal">16</span><span>kategorier</span></div>
       <div class="heroStatPill"><span class="heroStatVal">65</span><span>frågor på riktigt prov</span></div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="howSteps" id="howSteps">
+    <div class="howStep">
+      <div class="howNum">1</div>
+      <div class="howBody">
+        <strong>Välj kategori</strong>
+        <span>Välj ett ämne nedanför eller starta ett Teoriprov direkt</span>
+      </div>
+    </div>
+    <div class="howStep">
+      <div class="howNum">2</div>
+      <div class="howBody">
+        <strong>Svara på frågor</strong>
+        <span>Tryck på ett alternativ — AI förklarar rätt svar direkt</span>
+      </div>
+    </div>
+    <div class="howStep">
+      <div class="howNum">3</div>
+      <div class="howBody">
+        <strong>Se resultat &amp; förbättra</strong>
+        <span>Din progress sparas — fokusera på svaga områden</span>
+      </div>
     </div>
   </div>
 
@@ -2545,6 +2581,9 @@ function showConfig() {
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
   if(timer) { clearInterval(timer); timer = null; $("timerBadge").style.display="none"; }
+  document.getElementById("visitorNav")?.classList.remove("hidden");
+  document.getElementById("proviaGlobalNav")?.style.removeProperty("display");
+  document.getElementById("howSteps")?.style.removeProperty("display");
   setMode(currentMode);
   refreshQuotaUI();
   loadHistory();
@@ -2559,6 +2598,9 @@ function showExam() {
   history.pushState({view:"exam"}, "");
   $("miniBar").classList.add("show");
   $("abortBtn").style.display = "";
+  document.getElementById("visitorNav")?.classList.add("hidden");
+  document.getElementById("proviaGlobalNav")?.style.setProperty("display","none");
+  document.getElementById("howSteps")?.style.setProperty("display","none");
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -3910,9 +3952,13 @@ window.addEventListener("popstate", function(e) {
     if (typeof timerInterval !== "undefined") clearInterval(timerInterval);
     if (typeof timer !== "undefined" && timer) { clearInterval(timer); timer = null; }
     if (typeof stopTimer === "function") stopTimer();
+    document.getElementById("visitorNav")?.classList.remove("hidden");
+    document.getElementById("proviaGlobalNav")?.style.removeProperty("display");
   } else if (view === "exam") {
     if ($("resultView")) $("resultView").classList.remove("active");
     $("examView").classList.add("active");
+    document.getElementById("visitorNav")?.classList.add("hidden");
+    document.getElementById("proviaGlobalNav")?.style.setProperty("display","none");
   }
 });
 
