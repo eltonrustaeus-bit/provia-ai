@@ -621,7 +621,7 @@
       LS_THEME='proviaai_theme';
 
     /* ── THEME ── */
-    let THEME=localStorage.getItem(LS_THEME)||'dark';
+    let THEME=localStorage.getItem(LS_THEME)||'light';
     function applyTheme(t){
       THEME=t; document.body.classList.toggle('light',t==='light');
       const icon=document.getElementById('themeIcon'),lbl=document.getElementById('themeLabel');
