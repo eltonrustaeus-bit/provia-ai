@@ -475,7 +475,7 @@ footer {
   to { opacity: 0; transform: translateX(-50%) translateY(16px); }
 }
 .visitorNav {
-  position: fixed; bottom: 0; left: 50%; right: auto; z-index: 2900;
+  position: fixed; bottom: 0; left: 50%; right: auto; z-index: 10000;
   transform: translateX(-50%);
   width: calc(100% - 20px); max-width: 460px;
   display: flex; align-items: stretch;
