@@ -206,6 +206,11 @@
 
   .heroCtas{margin-bottom:32px}
 
+  @media(max-width:460px){
+    .ctaBtn,.demoBtn{width:100%;justify-content:center}
+    .heroCtas>div{flex-direction:column;width:100%;max-width:280px}
+  }
+
   .heroFree{
     font-family:var(--mono);font-size:10.5px;
     color:var(--t3);letter-spacing:.05em;opacity:0;
