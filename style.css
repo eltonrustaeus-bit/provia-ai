@@ -466,30 +466,44 @@ footer {
 .fLink { color: var(--t2); transition: color .15s ease; }
 .fLink:hover { color: var(--a); }
 
-/* ── VISITOR BOTTOM NAV ── */
+/* ── VISITOR BOTTOM NAV — compact floating pill ── */
+@keyframes navSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes navSlideDown {
+  to { opacity: 0; transform: translateX(-50%) translateY(16px); }
+}
 .visitorNav {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 2900;
+  position: fixed; bottom: 0; left: 50%; right: auto; z-index: 2900;
+  transform: translateX(-50%);
+  width: calc(100% - 20px); max-width: 460px;
   display: flex; align-items: stretch;
-  background: rgba(14,33,24,.97);
-  backdrop-filter: blur(16px) saturate(140%);
-  border-top: 1px solid rgba(43,255,151,.20);
+  background: rgba(10,24,17,.96);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(43,255,151,.18);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
   padding-bottom: env(safe-area-inset-bottom);
+  animation: navSlideUp .32s cubic-bezier(.22,.61,.36,1) both;
+  box-shadow: 0 -4px 24px rgba(0,0,0,.35);
 }
 .visitorNav.hidden { display: none; }
+body.pg-leaving .visitorNav { animation: navSlideDown .18s ease forwards; }
 .vNavLink {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 2px; padding: 8px 4px;
-  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  justify-content: center; gap: 2px; padding: 7px 4px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
   color: var(--t3); letter-spacing: .04em; text-decoration: none;
   transition: color .15s ease, background .15s ease;
-  min-height: 50px;
+  min-height: 44px; border-radius: 8px; margin: 4px 2px;
 }
 .vNavLink:hover, .vNavLink.active { color: var(--a); }
-.vNavLink.active { background: rgba(43,255,151,.06); }
-.vNavIco { font-size: 18px; line-height: 1; }
+.vNavLink.active { background: rgba(43,255,151,.07); }
+.vNavIco { font-size: 16px; line-height: 1; }
 @media (min-width: 721px) { .visitorNav { display: none; } }
-@media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 58px; } }
-body.light .visitorNav { background: rgba(246,251,248,.97); border-color: rgba(7,168,99,.22); }
+@media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 64px; } }
+body.light .visitorNav { background: rgba(243,248,245,.97); border-color: rgba(7,168,99,.25); }
 body.light .vNavLink { color: #5e8a72; }
 body.light .vNavLink:hover, body.light .vNavLink.active { color: #07a863; }
 body.light .vNavLink.active { background: rgba(7,168,99,.08); }
