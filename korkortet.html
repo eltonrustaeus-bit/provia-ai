@@ -3958,6 +3958,7 @@ window.addEventListener("popstate", function(e) {
     if (typeof timerInterval !== "undefined") clearInterval(timerInterval);
     if (typeof timer !== "undefined" && timer) { clearInterval(timer); timer = null; }
     if (typeof stopTimer === "function") stopTimer();
+    document.getElementById("howSteps")?.style.removeProperty("display");
     document.getElementById("visitorNav")?.classList.remove("hidden");
     document.getElementById("proviaGlobalNav")?.style.removeProperty("display");
   } else if (view === "exam") {

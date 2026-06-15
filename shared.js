@@ -11,6 +11,11 @@
     if (href.charAt(0) === '#') return;
     if (/^(https?:|mailto:|tel:|javascript:)/.test(href)) return;
     if (a.target && a.target !== '_self') return;
+    /* skip navigation if link points to the current page — prevents reload */
+    try {
+      var resolved = new URL(href, window.location.href);
+      if (resolved.pathname === window.location.pathname && !resolved.search && !resolved.hash) return;
+    } catch (_) {}
     e.preventDefault();
     document.body.classList.add('pg-leaving');
     setTimeout(function () { window.location.href = href; }, 210);
@@ -1040,23 +1045,24 @@
         'width:calc(100% - 20px);max-width:460px;'+
         'background:rgba(10,24,17,.96);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px);'+
         'border:1px solid rgba(27,255,140,.18);border-bottom:none;'+
-        'border-radius:14px 14px 0 0;'+
+        'border-radius:12px 12px 0 0;'+
         'display:flex;align-items:center;justify-content:space-around;'+
-        'padding:4px 4px max(8px,env(safe-area-inset-bottom));'+
+        'padding:2px 4px max(6px,env(safe-area-inset-bottom));'+
         'box-shadow:0 -4px 24px rgba(0,0,0,.35);'+
         'animation:gnSlideUp .32s cubic-bezier(.22,.61,.36,1) both;'+
         'font-family:"DM Sans",sans-serif}'+
       'body.pg-leaving #proviaGlobalNav{animation:gnSlideDown .18s ease forwards}'+
       'body.light #proviaGlobalNav{background:rgba(243,248,245,.97);border-color:rgba(7,168,99,.25)}'+
-      '.gnLink{display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;padding:5px 10px;border-radius:8px;transition:background .15s;min-width:48px;margin:0 1px}'+
+      '.gnLink{display:flex;flex-direction:column;align-items:center;gap:1px;text-decoration:none;padding:4px 8px;border-radius:8px;transition:background .15s;min-width:44px;margin:0 1px}'+
       '.gnLink:hover{background:rgba(27,255,140,.07)}'+
       '.gnLink.gna{background:rgba(27,255,140,.08)}'+
-      '.gnIcon{font-size:17px;line-height:1}'+
+      '.gnIcon{font-size:16px;line-height:1}'+
       '.gnLabel{font-size:9px;font-weight:600;color:#6b8f7c;letter-spacing:.04em;text-transform:uppercase}'+
       '.gnLink.gna .gnLabel{color:#1bff8c}'+
       'body.light .gnLabel{color:#5e8a72}body.light .gnLink.gna .gnLabel{color:#07a863}'+
-      'body.has-gnav{padding-bottom:64px!important}'+
-      '#perWidget{bottom:76px!important}';
+      'body.has-gnav{padding-bottom:56px!important}'+
+      '@media(min-width:721px){body.has-gnav{padding-bottom:0!important}#proviaGlobalNav{display:none}}'+
+      '#perWidget{bottom:68px!important}';
     document.head.appendChild(s);
 
     var nav = document.createElement('nav');
@@ -1071,6 +1077,8 @@
 
     document.body.appendChild(nav);
     document.body.classList.add('has-gnav');
+    /* Signal pages to hide their static visitorNav immediately */
+    document.dispatchEvent(new CustomEvent('proviaNavReady'));
 
     window.addEventListener('storage', function(e) {
       if (e.key !== 'sb-mnmotdluigzeehdjbhbu-auth-token') return;
@@ -1098,7 +1106,7 @@
 
     var s = document.createElement('style');
     s.textContent =
-      '#proviaCookieBanner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9500;' +
+      '#proviaCookieBanner{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:9500;' +
       'width:calc(100% - 24px);max-width:560px;' +
       'background:rgba(10,26,18,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);' +
       'border:1px solid rgba(43,255,151,.22);border-radius:14px;' +
