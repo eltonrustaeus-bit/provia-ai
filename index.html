@@ -91,12 +91,11 @@
     width:72px;height:72px;
     margin-bottom:28px;
     filter:drop-shadow(0 0 20px rgba(27,255,140,.4));
-    animation:logoF 4.5s ease-in-out infinite;
-    will-change:transform,filter;
+    transition:filter .3s ease,transform .3s ease;
   }
-  @keyframes logoF {
-    0%,100%{transform:translateY(0);filter:drop-shadow(0 0 20px rgba(27,255,140,.4))}
-    50%{transform:translateY(-9px);filter:drop-shadow(0 0 34px rgba(27,255,140,.6))}
+  .heroLogo:hover {
+    filter:drop-shadow(0 0 34px rgba(27,255,140,.65));
+    transform:translateY(-4px);
   }
 
   /* Eyebrow pill */
@@ -175,9 +174,9 @@
     position:absolute;inset:0;
     background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.38) 50%,transparent 60%);
     transform:translateX(-100%);
-    animation:shimmer 2.8s 1.6s ease-in-out infinite;
+    transition:transform .5s ease;
   }
-  @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
+  .ctaBtn:hover .ctaShimmer { transform:translateX(220%); }
 
   /* Stats */
   .heroStats {
@@ -197,9 +196,9 @@
   .statSep{width:1px;height:34px;background:var(--l);flex-shrink:0}
 
   .demoBtn{
-    display:inline-flex;align-items:center;
+    display:inline-flex;align-items:center;gap:8px;
     height:58px;padding:0 28px;
-    font-family:var(--sans);font-size:15px;font-weight:600;
+    font-family:var(--font);font-size:15px;font-weight:600;
     color:var(--t);letter-spacing:-.01em;
     background:transparent;
     border:1.5px solid rgba(27,255,140,.25);
@@ -207,6 +206,15 @@
     transition:border-color .18s,color .18s,background .18s;
   }
   .demoBtn:hover{border-color:rgba(27,255,140,.55);color:var(--a);background:rgba(27,255,140,.05)}
+
+  /* "Vad kan ProviaAI?" small trigger */
+  .heroMoreLink{
+    background:none;border:none;padding:0;
+    font-family:var(--mono);font-size:11.5px;font-weight:500;
+    color:var(--t3);letter-spacing:.04em;cursor:pointer;
+    transition:color .15s;
+  }
+  .heroMoreLink:hover{color:var(--a)}
 
   .heroCtas{margin-bottom:32px}
 
@@ -502,10 +510,15 @@
       </div>
     </a>
     <div class="hR">
-      <span class="aiDot" aria-label="AI-status">
-        <span class="dot" aria-hidden="true"></span>
-        <span>AI aktiv</span>
-      </span>
+      <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
+        <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink" href="pricing.html">Priser</a>
+      </nav>
+      <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
+        <span class="tglIcon" id="tglIcon">☀️</span>
+        <span id="tglLabel">Light</span>
+      </button>
       <div class="mWrap">
         <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false">
           <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -514,6 +527,7 @@
           <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
           <a class="ddi" href="app.html"><span>Mockprov</span><span class="dpill">AI</span></a>
           <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">29/79</span></a>
+          <a class="ddi" href="förbättring.html"><span>Förbättring</span><span class="dpill">Coach</span></a>
         </div>
       </div>
     </div>
@@ -540,24 +554,31 @@
     <div class="heroContent">
       <img src="image/proviaai-logo.png" class="heroLogo" alt="" aria-hidden="true" width="72" height="72" loading="eager" fetchpriority="high">
 
-      <div class="heroEye" id="heroEye">Körkortsteorin med AI</div>
+      <div class="heroEye" id="heroEye">AI-studieapp för svenska elever</div>
 
-      <h1 class="heroTitle" aria-label="Klara teoriprovet på första försöket">
-        <span class="w"><span class="wi">Klara&nbsp;</span></span><span class="w"><span class="wi">teoriprovet</span></span><br>
-        <span class="w"><span class="wi">på&nbsp;</span></span><span class="w"><span class="wi"><em>första</em>&nbsp;</span></span><span class="w"><span class="wi">försöket</span></span>
+      <h1 class="heroTitle" aria-label="Klara teoriprovet. Träna på eget material.">
+        <span class="w"><span class="wi">Klara&nbsp;</span></span><span class="w"><span class="wi"><em>teoriprovet</em>.&nbsp;</span></span><br>
+        <span class="w"><span class="wi">Träna&nbsp;</span></span><span class="w"><span class="wi">på&nbsp;</span></span><span class="w"><span class="wi">eget&nbsp;</span></span><span class="w"><span class="wi">material.</span></span>
       </h1>
 
       <p class="heroSub" id="heroSub">
-        368 frågor · 16 kategorier · AI-förklaring varje svar.<br>
-        Simulerat prov som Transportstyrelsens riktiga.
+        368 verifierade körkortssfrågor med AI-förklaring.<br>
+        Eller generera mockprov på ditt eget studiematerial.
       </p>
 
-      <div class="heroCtas" id="heroCtas" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center;opacity:0">
-        <button class="ctaBtn" id="ctaBtn" aria-haspopup="dialog">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><polygon points="3,1 15,8 3,15"/></svg>
-          <span>Starta ProviaAI</span>
-          <span class="ctaShimmer" aria-hidden="true"></span>
-        </button>
+      <div class="heroCtas" id="heroCtas" style="display:flex;flex-direction:column;gap:10px;align-items:center;opacity:0">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+          <a class="ctaBtn" href="korkortet.html">
+            <span aria-hidden="true">🚗</span>
+            <span>Körkortsteorin</span>
+            <span class="ctaShimmer" aria-hidden="true"></span>
+          </a>
+          <a class="demoBtn" href="app.html">
+            <span aria-hidden="true">📝</span>
+            <span>Mockprov med AI</span>
+          </a>
+        </div>
+        <button class="heroMoreLink" id="ctaBtn" aria-haspopup="dialog">Vad kan ProviaAI? →</button>
         <a class="demoBtn" id="demoBtnLink" href="live-demo.html" style="display:none">Se demo →</a>
       </div>
 
@@ -784,6 +805,23 @@ window.addEventListener("load",()=>setTimeout(()=>document.getElementById("ldr")
 
 /* YEAR */
 document.getElementById("yr").textContent=new Date().getFullYear();
+
+/* THEME */
+(function(){
+  const LS="proviaai_theme";
+  function applyTheme(t){
+    document.body.classList.toggle("light",t==="light");
+    localStorage.setItem(LS,t);
+    const ico=document.getElementById("tglIcon"),lbl=document.getElementById("tglLabel");
+    if(ico)ico.textContent=t==="light"?"🌙":"☀️";
+    if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
+  }
+  const saved=localStorage.getItem(LS);
+  const preferred=window.matchMedia("(prefers-color-scheme:light)").matches?"light":"dark";
+  applyTheme(saved||preferred);
+  const btn=document.getElementById("themeToggleBtn");
+  if(btn)btn.addEventListener("click",()=>applyTheme(document.body.classList.contains("light")?"dark":"light"));
+})();
 
 /* MENU */
 const mBtn=document.getElementById("mBtn"),drop=document.getElementById("drop");

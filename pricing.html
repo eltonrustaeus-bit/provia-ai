@@ -121,6 +121,7 @@
   .faqItem:hover{border-color:var(--l2)}
   .faqQ{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;cursor:pointer;user-select:none;transition:background .14s}
   .faqQ:hover{background:var(--a-dim)}
+  .faqQ:focus-visible{outline:2px solid var(--a);outline-offset:-2px;background:var(--a-dim)}
   .faqQTxt{font-weight:600;font-size:13.5px;color:var(--t)}
   .faqChev{width:14px;height:14px;color:var(--t3);flex-shrink:0;transition:transform .2s cubic-bezier(.22,.61,.36,1),color .14s}
   .faqItem:not(.faqCol) .faqChev{transform:rotate(90deg);color:var(--a)}
@@ -165,18 +166,24 @@
       </div>
     </a>
     <div class="hR">
-      <span class="aiStatus" aria-label="AI-status">
-        <span class="aiDot" aria-hidden="true"></span>
-        <span>AI aktiv</span>
-      </span>
+      <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
+        <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink active" href="pricing.html">Priser</a>
+      </nav>
+      <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
+        <span class="tglIcon" id="tglIcon">☀️</span>
+        <span id="tglLabel">Light</span>
+      </button>
       <div class="mWrap">
         <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false">
           <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
         </button>
         <div class="drop" id="drop">
-          <a class="ddi" href="index.html"><span>Startsidan</span><span class="dpill">Hem</span></a>
-          <a class="ddi" href="app.html"><span>Starta ProviaAi</span><span class="dpill">App</span></a>
-          <a class="ddi" href="pricing.html"><span>Priser</span><span class="dpill">29/79</span></a>
+          <a class="ddi" href="index.html"><span>Hem</span><span class="dpill">Start</span></a>
+          <a class="ddi" href="korkortet.html"><span>Körkortsteorin</span><span class="dpill" style="color:var(--a)">Träna</span></a>
+          <a class="ddi" href="app.html"><span>Mockprov</span><span class="dpill">AI</span></a>
+          <a class="ddi active" href="pricing.html"><span>Priser</span><span class="dpill" style="color:var(--a)">29/79</span></a>
           <a class="ddi" href="förbättring.html"><span>Förbättring</span><span class="dpill">Coach</span></a>
         </div>
       </div>
@@ -219,18 +226,12 @@
       <div class="planInclLabel">Ingår i Gratis</div>
 
       <ul class="featureList">
-        <li>Körkortsteorin — 2 test / vecka med verifierade teorifrågor</li>
-        <li>Bokmärken, XP &amp; statistik per kategori</li>
+        <li>Körkortsteorin — 2 test / vecka</li>
         <li>2 AI-mockprov per vecka</li>
         <li>Välj nivå (E/C/A), frågetyp och antal frågor</li>
-        <li>Besvara provet direkt i appen</li>
         <li>Resultat och poängöversikt</li>
-        <li>P.E.R AI-assistent — 5 frågor / vecka (ser aktuell fråga)</li>
-        <li class="dim">Adaptivt lärande (körkortsteorin)</li>
-        <li class="dim">Historik och utveckling</li>
-        <li class="dim">AI-coach och felbank</li>
-        <li class="dim">Träning från misstag</li>
-        <li class="dim">Lärarrapport</li>
+        <li>Bokmärken, XP &amp; statistik per kategori</li>
+        <li>P.E.R AI-assistent — 5 frågor / vecka</li>
       </ul>
 
       <div class="planNote2">Perfekt för att prova. Uppgradera till Premium för obegränsad körkortsträning och P.E.R utan gräns.</div>
@@ -253,18 +254,12 @@
       <div class="planInclLabel">Ingår i Basic</div>
 
       <ul class="featureList">
-        <li>Körkortsteorin — 30 test / månad med verifierade teorifrågor</li>
-        <li>Bokmärken, XP &amp; statistik per kategori</li>
+        <li>Körkortsteorin — 30 test / månad</li>
         <li>Upp till 30 AI-mockprov per månad</li>
         <li>Välj nivå (E/C/A), frågetyp och antal frågor</li>
-        <li>Besvara provet direkt i appen</li>
-        <li>Resultat och poängöversikt</li>
         <li>Historik — följ din utveckling över tid</li>
-        <li>P.E.R AI-assistent — 5 frågor / dag (ser aktuell fråga)</li>
-        <li class="dim">Adaptivt lärande (körkortsteorin)</li>
-        <li class="dim">AI-coach och felbank</li>
-        <li class="dim">Träning från misstag</li>
-        <li class="dim">Lärarrapport</li>
+        <li>Bokmärken, XP &amp; statistik per kategori</li>
+        <li>P.E.R AI-assistent — 5 frågor / dag</li>
       </ul>
 
       <div class="planNote2">Basic ger dig provrutin och daglig P.E.R-hjälp. Uppgradera till Premium för obegränsad AI-coaching och felbank.</div>
@@ -287,18 +282,13 @@
       <div class="planInclLabel">Allt i Basic, plus</div>
 
       <ul class="featureList">
-        <li>Körkortsteorin — obegränsad träning med verifierade teorifrågor</li>
-        <li>Adaptivt lärande — fokuserar automatiskt dina svagaste kategorier</li>
-        <li>Bokmärken, XP &amp; detaljerad statistik per kategori</li>
+        <li>Körkortsteorin — obegränsad träning</li>
+        <li>Adaptivt lärande — fokuserar dina svagheter automatiskt</li>
         <li>Obegränsade AI-mockprov</li>
-        <li>P.E.R AI-assistent — obegränsat (ser din skärm, förklarar frågor)</li>
-        <li>Förbättringssida — din progress samlad på ett ställe</li>
-        <li>P.E.R Coach: personlig studieplan baserad på dina misstag</li>
-        <li>Felbank med P.E.R-tips för varje misstag</li>
-        <li>Träningsläge: prov som fokuserar på dina svagheter</li>
-        <li>Lärarrapport — professionell summering av din utveckling</li>
-        <li>Synk mellan enheter via konto</li>
-        <li>Prioriterad support</li>
+        <li>P.E.R AI-assistent — obegränsat (ser din skärm)</li>
+        <li>P.E.R Coach: personlig studieplan från dina misstag</li>
+        <li>Felbank + träningsläge för svagheter</li>
+        <li>Lärarrapport &amp; historik</li>
       </ul>
 
       <div class="planNote2">Premium ger dig P.E.R utan gräns — din personliga AI-Resource som ser exakt vad du jobbar med och hjälper dig klara provet snabbare.</div>
@@ -405,6 +395,23 @@
 <script>
 /* LOADER */
 window.addEventListener("load", () => setTimeout(() => document.getElementById("ldr").classList.add("out"), 160));
+
+/* THEME */
+(function(){
+  const LS="proviaai_theme";
+  function applyTheme(t){
+    document.body.classList.toggle("light",t==="light");
+    localStorage.setItem(LS,t);
+    const ico=document.getElementById("tglIcon"),lbl=document.getElementById("tglLabel");
+    if(ico)ico.textContent=t==="light"?"🌙":"☀️";
+    if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
+  }
+  const saved=localStorage.getItem(LS);
+  const preferred=window.matchMedia("(prefers-color-scheme:light)").matches?"light":"dark";
+  applyTheme(saved||preferred);
+  const btn=document.getElementById("themeToggleBtn");
+  if(btn)btn.addEventListener("click",()=>applyTheme(document.body.classList.contains("light")?"dark":"light"));
+})();
 
 /* MENU */
 const mBtn = document.getElementById("mBtn");

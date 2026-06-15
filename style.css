@@ -12,7 +12,7 @@
   --s3: #1a2820;
   --t: #e8f5ee;
   --t2: #a8c4b4;
-  --t3: #6b8f7c;
+  --t3: #7ea090;
   --l: rgba(27,255,140,.10);
   --l2: rgba(27,255,140,.22);
   --l3: rgba(27,255,140,.32);
@@ -437,6 +437,28 @@ body.light .spinner { border-color: rgba(13,148,96,.15); border-top-color: var(-
 .rev.d1, .reveal.d1 { transition-delay: .07s; }
 .rev.d2, .reveal.d2 { transition-delay: .14s; }
 .rev.d3, .reveal.d3 { transition-delay: .21s; }
+
+/* ── DESKTOP NAV LINKS ── */
+.hNav { display: flex; align-items: center; gap: 2px; }
+@media (max-width: 680px) { .hNav { display: none; } }
+.hNavLink {
+  padding: 0 13px; height: 36px;
+  display: inline-flex; align-items: center;
+  font-size: 13px; font-weight: 500; color: var(--t2);
+  border-radius: var(--r);
+  transition: color .15s ease, background .15s ease;
+  white-space: nowrap;
+}
+.hNavLink:hover { color: var(--t); background: var(--a-dim); }
+.hNavLink.active { color: var(--a); font-weight: 600; }
+.hNavLink:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+
+/* ── ACTIVE DROPDOWN ITEM ── */
+.ddi.active, .ddItem.active {
+  background: var(--a-dim);
+  color: var(--a);
+  border-color: var(--l2);
+}
 
 /* ── FOOTER ── */
 footer {
