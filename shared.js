@@ -1222,4 +1222,214 @@
     initHeaderCompress();
   }
 
+  /* ── SHARED LOGIN MODAL ── */
+  (function() {
+    var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
+    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
+    var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+    var _view     = 'welcome';
+    var _open     = false;
+
+    function isLoggedIn() {
+      try { var s = JSON.parse(localStorage.getItem(SUPA_LS)||'{}'); return !!(s&&s.access_token); } catch(_) { return false; }
+    }
+    function saveSession(d) {
+      try { localStorage.setItem(SUPA_LS, JSON.stringify(d)); } catch(_) {}
+    }
+
+    function injectStyles() {
+      if (document.getElementById('pvStyles')) return;
+      var s = document.createElement('style');
+      s.id = 'pvStyles';
+      s.textContent = [
+        '#pvModal{position:fixed;inset:0;z-index:10000;background:rgba(4,10,7,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:none;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .2s ease}',
+        '#pvModal.pv-on{opacity:1}',
+        '#pvCard{background:var(--s,#111a15);border:1px solid rgba(27,255,140,.22);border-radius:14px;width:min(400px,100%);overflow:hidden;transform:translateY(14px) scale(.97);transition:transform .24s cubic-bezier(.22,.61,.36,1)}',
+        '#pvModal.pv-on #pvCard{transform:none}',
+        '.pv-hd{padding:24px 22px 16px;border-bottom:1px solid rgba(255,255,255,.07);text-align:center;position:relative}',
+        '.pv-cl{position:absolute;top:13px;right:13px;width:28px;height:28px;border:1px solid rgba(255,255,255,.1);border-radius:50%;background:none;cursor:pointer;font-size:14px;color:var(--t3,#5a7a6a);display:grid;place-items:center;transition:border-color .15s,color .15s;line-height:1}',
+        '.pv-cl:hover{border-color:rgba(255,255,255,.28);color:var(--t,#e8f5ee)}',
+        '.pv-lg{height:26px;width:auto;display:block;margin:0 auto 12px}',
+        '.pv-ti{font-weight:700;font-size:19px;color:var(--t,#e8f5ee);letter-spacing:-.03em;margin-bottom:3px}',
+        '.pv-sb{font-family:"DM Mono",monospace;font-size:10.5px;color:var(--t3,#5a7a6a);letter-spacing:.06em;min-height:16px}',
+        '.pv-bd{padding:22px}',
+        '.pv-vw{display:none;animation:pvIn .16s ease}',
+        '.pv-vw.pv-vx{display:block}',
+        '@keyframes pvIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}',
+        '.pv-fl{margin-bottom:13px}',
+        '.pv-la{font-family:"DM Mono",monospace;font-size:10px;color:var(--t3,#5a7a6a);letter-spacing:.07em;text-transform:uppercase;display:block;margin-bottom:5px}',
+        '.pv-in{width:100%;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:14px;color:var(--t,#e8f5ee);font-family:"DM Sans",sans-serif;outline:none;transition:border-color .15s;box-sizing:border-box}',
+        '.pv-in:focus{border-color:rgba(27,255,140,.5)}',
+        '.pv-in::placeholder{color:rgba(255,255,255,.2)}',
+        'body.light .pv-in{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.12);color:#091810}',
+        'body.light .pv-in:focus{border-color:rgba(7,168,99,.5)}',
+        'body.light .pv-in::placeholder{color:rgba(0,0,0,.22)}',
+        '.pv-pm{width:100%;height:48px;background:var(--a,#1bff8c);color:#08100d;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:background .15s,transform .12s;margin-bottom:10px;display:flex;align-items:center;justify-content:center}',
+        '.pv-pm:hover{background:var(--a2,#00e67a);transform:translateY(-1px)}',
+        '.pv-pm:active{transform:scale(.98)}',
+        '.pv-pm:disabled{opacity:.4;cursor:not-allowed;transform:none}',
+        'body.light .pv-pm{color:#fff}',
+        '.pv-se{width:100%;height:46px;background:none;border:1px solid rgba(255,255,255,.13);color:var(--t,#e8f5ee);border-radius:10px;font-weight:600;font-size:15px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:border-color .15s,background .15s,transform .12s;margin-bottom:10px;display:flex;align-items:center;justify-content:center}',
+        '.pv-se:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.04);transform:translateY(-1px)}',
+        'body.light .pv-se{border-color:rgba(0,0,0,.14);color:#091810}',
+        '.pv-dv{display:flex;align-items:center;gap:10px;margin:4px 0 14px;font-family:"DM Mono",monospace;font-size:10px;color:var(--t3,#5a7a6a)}',
+        '.pv-dv::before,.pv-dv::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.07)}',
+        'body.light .pv-dv::before,body.light .pv-dv::after{background:rgba(0,0,0,.1)}',
+        '.pv-hn{font-family:"DM Mono",monospace;font-size:11px;color:var(--t3,#5a7a6a);text-align:center;margin-top:8px}',
+        '.pv-er{font-family:"DM Mono",monospace;font-size:11.5px;color:var(--danger,#ff6b6b);margin-top:8px;min-height:16px;font-weight:500}',
+        '.pv-bk{background:none;border:none;cursor:pointer;font-family:"DM Mono",monospace;font-size:11px;color:var(--t3,#5a7a6a);display:flex;align-items:center;gap:4px;padding:0;margin-bottom:16px;transition:color .15s}',
+        '.pv-bk:hover{color:var(--t,#e8f5ee)}',
+        'body.light #pvCard{background:var(--bg-light,#f6fbf8)}',
+      ].join('');
+      document.head.appendChild(s);
+    }
+
+    function buildModal() {
+      if (document.getElementById('pvModal')) return;
+      injectStyles();
+      var el = document.createElement('div');
+      el.id = 'pvModal';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'true');
+      el.setAttribute('aria-label', 'Logga in eller skapa konto');
+      el.innerHTML = '<div id="pvCard">'
+        + '<div class="pv-hd">'
+          + '<button class="pv-cl" id="pvCl" aria-label="Stäng">✕</button>'
+          + '<img class="pv-lg" src="image/proviaai-logo.png" alt="ProviaAi">'
+          + '<div class="pv-ti" id="pvTi">Välkommen!</div>'
+          + '<div class="pv-sb" id="pvSb">GRATIS ATT STARTA · INGET KORT KRÄVS</div>'
+        + '</div>'
+        + '<div class="pv-bd">'
+          + '<div id="pvVW" class="pv-vw pv-vx">'
+            + '<button class="pv-pm" id="pvToReg" type="button">Skapa gratis konto</button>'
+            + '<div class="pv-dv">eller</div>'
+            + '<button class="pv-se" id="pvToLog" type="button">Logga in</button>'
+          + '</div>'
+          + '<div id="pvVR" class="pv-vw">'
+            + '<button class="pv-bk" id="pvRBk" type="button">← Tillbaka</button>'
+            + '<div class="pv-fl"><label class="pv-la" for="pvRE">E-post</label><input class="pv-in" id="pvRE" type="email" placeholder="du@exempel.se" autocomplete="email"></div>'
+            + '<div class="pv-fl"><label class="pv-la" for="pvRP">Lösenord</label><input class="pv-in" id="pvRP" type="password" placeholder="Minst 8 tecken" autocomplete="new-password"></div>'
+            + '<button class="pv-pm" id="pvRBtn" type="button">Skapa konto</button>'
+            + '<div class="pv-er" id="pvRE2"></div>'
+            + '<div class="pv-hn">Gratis konto — inget kort krävs.</div>'
+          + '</div>'
+          + '<div id="pvVL" class="pv-vw">'
+            + '<button class="pv-bk" id="pvLBk" type="button">← Tillbaka</button>'
+            + '<div class="pv-fl"><label class="pv-la" for="pvLE">E-post</label><input class="pv-in" id="pvLE" type="email" placeholder="du@exempel.se" autocomplete="email"></div>'
+            + '<div class="pv-fl"><label class="pv-la" for="pvLP">Lösenord</label><input class="pv-in" id="pvLP" type="password" placeholder="Ditt lösenord" autocomplete="current-password"></div>'
+            + '<button class="pv-pm" id="pvLBtn" type="button">Logga in</button>'
+            + '<div class="pv-er" id="pvLE2"></div>'
+          + '</div>'
+        + '</div>'
+      + '</div>';
+      document.body.appendChild(el);
+
+      el.addEventListener('click', function(e) { if (e.target === el) closeModal(); });
+      document.getElementById('pvCl').onclick = closeModal;
+      document.addEventListener('keydown', function(e) { if (_open && e.key === 'Escape') closeModal(); });
+      document.getElementById('pvToReg').onclick = function() { switchView('register'); };
+      document.getElementById('pvToLog').onclick = function() { switchView('login'); };
+      document.getElementById('pvRBk').onclick = function() { switchView('welcome'); };
+      document.getElementById('pvLBk').onclick = function() { switchView('welcome'); };
+      document.getElementById('pvRBtn').onclick = doRegister;
+      document.getElementById('pvLBtn').onclick = doLogin;
+      document.getElementById('pvRP').addEventListener('keydown', function(e) { if (e.key === 'Enter') doRegister(); });
+      document.getElementById('pvLP').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
+    }
+
+    function switchView(view) {
+      _view = view;
+      var map = { welcome:'pvVW', register:'pvVR', login:'pvVL' };
+      Object.keys(map).forEach(function(k) {
+        var el = document.getElementById(map[k]);
+        if (el) el.classList.toggle('pv-vx', k === view);
+      });
+      var titles = { welcome:'Välkommen!', register:'Skapa konto', login:'Logga in' };
+      var ti = document.getElementById('pvTi'); if (ti) ti.textContent = titles[view] || '';
+      var sb = document.getElementById('pvSb'); if (sb) sb.textContent = view === 'welcome' ? 'GRATIS ATT STARTA · INGET KORT KRÄVS' : '';
+      var focusMap = { register:'pvRE', login:'pvLE' };
+      if (focusMap[view]) setTimeout(function() { var inp = document.getElementById(focusMap[view]); if (inp) inp.focus(); }, 60);
+      ['pvRE2','pvLE2'].forEach(function(id) { var e = document.getElementById(id); if (e) e.textContent = ''; });
+    }
+
+    function openModal(view) {
+      if (isLoggedIn()) return;
+      buildModal();
+      _open = true;
+      var el = document.getElementById('pvModal');
+      if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
+      switchView(view || 'welcome');
+    }
+
+    function closeModal() {
+      _open = false;
+      var el = document.getElementById('pvModal');
+      if (el) { el.classList.remove('pv-on'); setTimeout(function() { el.style.display = 'none'; }, 220); }
+      document.body.style.overflow = '';
+    }
+
+    function supaPost(path, body) {
+      return fetch(SUPA_URL + '/auth/v1/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPA_ANON },
+        body: JSON.stringify(body)
+      }).then(function(r) {
+        return r.json().then(function(d) {
+          if (!r.ok) throw new Error(d.error_description || d.msg || d.message || 'Serverfel');
+          return d;
+        });
+      });
+    }
+
+    function doRegister() {
+      var email = (document.getElementById('pvRE').value || '').trim();
+      var pass  = (document.getElementById('pvRP').value || '').trim();
+      var errEl = document.getElementById('pvRE2');
+      var btn   = document.getElementById('pvRBtn');
+      errEl.textContent = '';
+      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
+      if (pass.length < 8) { errEl.textContent = 'Lösenordet måste vara minst 8 tecken.'; return; }
+      btn.disabled = true; btn.textContent = 'Skapar konto…';
+      supaPost('signup', { email: email, password: pass }).then(function(d) {
+        if (d.access_token) {
+          saveSession(d); closeModal();
+          if (window.showWelcome) window.showWelcome(email);
+          setTimeout(function() { location.reload(); }, 2600);
+        } else {
+          errEl.style.color = 'var(--a,#1bff8c)';
+          errEl.textContent = 'Bekräfta din e-post och logga sedan in!';
+          btn.disabled = false; btn.textContent = 'Skapa konto';
+        }
+      }).catch(function(e) {
+        errEl.style.color = ''; errEl.textContent = e.message || 'Fel — försök igen.';
+        btn.disabled = false; btn.textContent = 'Skapa konto';
+      });
+    }
+
+    function doLogin() {
+      var email = (document.getElementById('pvLE').value || '').trim();
+      var pass  = (document.getElementById('pvLP').value || '').trim();
+      var errEl = document.getElementById('pvLE2');
+      var btn   = document.getElementById('pvLBtn');
+      errEl.textContent = '';
+      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
+      btn.disabled = true; btn.textContent = 'Loggar in…';
+      supaPost('token?grant_type=password', { email: email, password: pass }).then(function(d) {
+        saveSession(d); closeModal();
+        if (window.showWelcome) window.showWelcome(email);
+        setTimeout(function() { location.reload(); }, 2600);
+      }).catch(function(e) {
+        errEl.textContent = e.message || 'Fel e-post eller lösenord.';
+        btn.disabled = false; btn.textContent = 'Logga in';
+      });
+    }
+
+    document.addEventListener('proviaOpenLogin', function(e) {
+      openModal((e.detail && e.detail.view) || 'welcome');
+    });
+
+    window.openProviaLogin  = openModal;
+    window.closeProviaLogin = closeModal;
+  })();
+
 })();
