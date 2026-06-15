@@ -77,12 +77,12 @@
     }
     .heroEye::before{content:'';width:18px;height:1px;background:var(--a2);display:block}
     .heroTitle{
-      font-size:clamp(26px,4.5vw,46px);font-weight:700;letter-spacing:-.035em;
-      line-height:1.07;color:var(--t);margin-bottom:12px;
+      font-size:clamp(32px,5.5vw,58px);font-weight:700;letter-spacing:-.04em;
+      line-height:1.07;color:var(--t);margin-bottom:14px;
     }
     .heroTitle em{font-style:normal;color:var(--a)}
     body.light .heroTitle em{color:var(--a)}
-    .heroSub{font-size:14px;color:var(--t2);max-width:460px;line-height:1.68;margin-bottom:22px}
+    .heroSub{font-size:clamp(15px,1.6vw,17px);color:var(--t2);max-width:460px;line-height:1.7;margin-bottom:22px}
     .heroMeta{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
     .heroStatusWrap{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--t3)}
     .sDot{width:6px;height:6px;border-radius:50%;background:var(--t3);flex-shrink:0;transition:background .28s ease}
@@ -374,6 +374,13 @@
           <div class="bTag" id="tagLine">Förbättring</div>
         </div>
       </a>
+      <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink" href="index.html">Hem</a>
+        <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
+        <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink active" href="förbättring.html">Förbättring</a>
+        <a class="hNavLink" href="pricing.html">Priser</a>
+      </nav>
       <div class="hRight">
         <button class="themeTgl" id="themeToggle" type="button" aria-label="Växla tema">
           <span class="tglIcon" id="themeIcon">🌙</span>
@@ -1396,5 +1403,21 @@
       document.addEventListener('mouseup',()=>ring.classList.remove('rDown'));
     })();
   </script>
+
+<!-- VISITOR BOTTOM NAV -->
+<nav class="visitorNav" id="visitorNav" aria-label="Snabbnavigation">
+  <a class="vNavLink" href="index.html"><span class="vNavIco">🏠</span><span>Hem</span></a>
+  <a class="vNavLink" href="korkortet.html"><span class="vNavIco">🚗</span><span>Körkortet</span></a>
+  <a class="vNavLink" href="app.html"><span class="vNavIco">📝</span><span>Mockprov</span></a>
+  <a class="vNavLink active" href="förbättring.html"><span class="vNavIco">📈</span><span>Förbättring</span></a>
+  <a class="vNavLink" href="pricing.html"><span class="vNavIco">💳</span><span>Priser</span></a>
+</nav>
+<script>
+(function(){
+  const hide=()=>{const vn=document.getElementById('visitorNav');if(vn)vn.classList.add('hidden')};
+  document.addEventListener('proviaNavReady',hide);
+  setTimeout(()=>{if(document.getElementById('proviaGlobalNav'))hide()},1200);
+})();
+</script>
 </body>
 </html>
