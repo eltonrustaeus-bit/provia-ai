@@ -48,10 +48,10 @@
 
   .bgG1 {
     position:absolute;
-    width:700px;height:700px;
-    background:radial-gradient(circle,rgba(27,255,140,.16),transparent 65%);
-    top:-250px;left:calc(50% - 350px);
-    filter:blur(55px);
+    width:800px;height:800px;
+    background:radial-gradient(circle,rgba(43,255,151,.22),transparent 65%);
+    top:-280px;left:calc(50% - 400px);
+    filter:blur(60px);
     animation:gf1 9s ease-in-out infinite;
     will-change:transform;
   }
@@ -72,8 +72,8 @@
   .bgGrid {
     position:absolute;inset:0;
     background-image:
-      linear-gradient(rgba(27,255,140,.055) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(27,255,140,.055) 1px,transparent 1px);
+      linear-gradient(rgba(43,255,151,.08) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(43,255,151,.08) 1px,transparent 1px);
     background-size:56px 56px;
     mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
     -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 40%,black,transparent);
@@ -116,8 +116,8 @@
 
   /* Title */
   .heroTitle {
-    font-size:clamp(38px,7vw,76px);
-    font-weight:700;letter-spacing:-.045em;line-height:1.07;
+    font-size:clamp(44px,8vw,88px);
+    font-weight:700;letter-spacing:-.05em;line-height:1.05;
     color:var(--t);margin-bottom:22px;
   }
   .heroTitle em {
@@ -139,9 +139,9 @@
 
   /* Sub */
   .heroSub {
-    font-size:clamp(14px,1.55vw,17px);
+    font-size:clamp(15px,1.8vw,19px);
     color:var(--t2);line-height:1.75;
-    max-width:40ch;margin-bottom:40px;
+    max-width:42ch;margin-bottom:44px;
     opacity:0;
   }
 
@@ -149,14 +149,14 @@
   .ctaBtn {
     position:relative;display:inline-flex;
     align-items:center;gap:10px;
-    height:52px;padding:0 38px;
-    font-family:var(--font);font-size:15px;font-weight:700;
-    letter-spacing:-.01em;color:#0d1a12;
+    height:54px;padding:0 40px;
+    font-family:var(--font);font-size:16px;font-weight:700;
+    letter-spacing:-.015em;color:#091a10;
     background:var(--a);border:none;border-radius:32px;
     cursor:pointer;overflow:hidden;
-    transition:box-shadow .2s ease,background .15s ease;
+    transition:box-shadow .2s ease,background .15s ease,transform .15s ease;
   }
-  .ctaBtn:hover { box-shadow:0 0 32px 8px rgba(27,255,140,.26); background:var(--a2); }
+  .ctaBtn:hover { box-shadow:0 0 40px 10px rgba(43,255,151,.30); background:var(--a2); }
   .ctaBtn:active{transform:scale(.97)}
   .ctaShimmer {
     position:absolute;inset:0;
@@ -185,21 +185,30 @@
 
   .demoBtn{
     display:inline-flex;align-items:center;gap:8px;
-    height:50px;padding:0 28px;
-    font-family:var(--font);font-size:15px;font-weight:600;
-    color:var(--t);letter-spacing:-.01em;
-    background:transparent;
-    border:1.5px solid rgba(27,255,140,.28);
+    height:54px;padding:0 30px;
+    font-family:var(--font);font-size:16px;font-weight:600;
+    color:var(--t);letter-spacing:-.015em;
+    background:rgba(43,255,151,.07);
+    border:1.5px solid rgba(43,255,151,.32);
     border-radius:32px;text-decoration:none;
     transition:border-color .18s,color .18s,background .18s;
   }
-  .demoBtn:hover{border-color:rgba(27,255,140,.55);color:var(--a);background:rgba(27,255,140,.05)}
+  .demoBtn:hover{border-color:rgba(43,255,151,.60);color:var(--a);background:rgba(43,255,151,.12)}
+
+  /* Small text-link style for secondary actions like "Se live-demo" */
+  .demoLink {
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:12px;font-weight:500;
+    color:var(--t3);letter-spacing:.04em;text-decoration:none;
+    transition:color .15s;
+  }
+  .demoLink:hover{color:var(--a)}
 
   /* "Vad kan ProviaAI?" small trigger */
   .heroMoreLink{
     background:none;border:none;padding:0;
-    font-family:var(--mono);font-size:11.5px;font-weight:500;
-    color:var(--t3);letter-spacing:.04em;cursor:pointer;
+    font-family:var(--mono);font-size:12px;font-weight:500;
+    color:var(--t2);letter-spacing:.04em;cursor:pointer;
     transition:color .15s;
   }
   .heroMoreLink:hover{color:var(--a)}
@@ -571,8 +580,10 @@
             <span>Mockprov med AI</span>
           </a>
         </div>
-        <button class="heroMoreLink" id="ctaBtn" aria-haspopup="dialog">Vad kan ProviaAI? →</button>
-        <a class="demoBtn" id="demoBtnLink" href="live-demo.html">Se live-demo →</a>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center">
+          <button class="heroMoreLink" id="ctaBtn" aria-haspopup="dialog">Vad kan ProviaAI? →</button>
+          <a class="demoLink" id="demoBtnLink" href="live-demo.html">▶ Se live-demo</a>
+        </div>
       </div>
 
       <div class="heroStats" id="heroStats" aria-label="Nyckeltal">
