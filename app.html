@@ -1174,6 +1174,13 @@ function setWizardStep(step,opts={}){
     setSectionOpen(document.getElementById(id),i===currentWizardStep);
   });
   if(scroll){const card=document.getElementById(WIZARD_STEP_IDS[currentWizardStep]);if(card)window.setTimeout(()=>card.scrollIntoView({behavior:"smooth",block:"start"}),60);}
+  /* hide bottom navbars during exam/result so floatingGradeBar isn't blocked */
+  const hideNav=currentWizardStep>=2;
+  const vn=document.getElementById("visitorNav");
+  const gn=document.getElementById("proviaGlobalNav");
+  if(vn){vn.style.display=hideNav?"none":"";}
+  if(gn){gn.style.display=hideNav?"none":"";}
+  document.body.style.paddingBottom=hideNav?"0":"";
 }
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
