@@ -2,17 +2,17 @@
 
 /* ── TOKENS ── */
 :root {
-  --a: #1bff8c;
-  --a2: #16d475;
-  --a-dim: rgba(27,255,140,.13);
-  --a-glow: rgba(27,255,140,.26);
-  --bg: #102516;
-  --s: #172d1f;
-  --s2: #1d3526;
-  --s3: #22402e;
-  --t: #edfaf3;
-  --t2: #b0d4c0;
-  --t3: #91b8a3;
+  --a: #2bff97;
+  --a2: #1ae080;
+  --a-dim: rgba(43,255,151,.14);
+  --a-glow: rgba(43,255,151,.30);
+  --bg: #0d2118;
+  --s: #162e20;
+  --s2: #1e3c2a;
+  --s3: #254836;
+  --t: #f2fcf6;
+  --t2: #c2dece;
+  --t3: #8bbca0;
   --l: rgba(27,255,140,.13);
   --l2: rgba(27,255,140,.28);
   --l3: rgba(27,255,140,.42);
@@ -30,10 +30,10 @@
 }
 
 body.light {
-  --a: #0d9460;
-  --a2: #0b7a50;
-  --a-dim: rgba(13,148,96,.07);
-  --bg: #f3f8f5;
+  --a: #0aad6e;
+  --a2: #088f5a;
+  --a-dim: rgba(10,173,110,.08);
+  --bg: #edf7f2;
   --s: #ffffff;
   --s2: #edf5f0;
   --t: #0c1e15;
@@ -115,8 +115,8 @@ input, select, textarea, button { font-family: var(--font); }
 
 /* ── HEADER ── */
 header {
-  height: 56px; position: sticky; top: 0; z-index: 3000;
-  background: rgba(13,26,18,.80);
+  height: 58px; position: sticky; top: 0; z-index: 3000;
+  background: rgba(10,26,18,.82);
   backdrop-filter: blur(18px) saturate(160%);
   border-bottom: 1px solid var(--l2);
   display: flex; align-items: center;
