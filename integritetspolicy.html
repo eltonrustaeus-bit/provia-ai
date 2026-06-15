@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Integritetspolicy – ProviaAi</title>
+<meta name="description" content="Läs om hur ProviaAi hanterar dina uppgifter och cookies." />
+<link rel="icon" href="/image/favicon-32.png" sizes="32x32" type="image/png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<script src="shared.js" defer></script>
+<style>
+.policyWrap{max-width:740px;margin:0 auto;padding:40px 20px 80px}
+.policyWrap h1{font-size:clamp(28px,4vw,44px);font-weight:700;letter-spacing:-.04em;color:var(--t);margin-bottom:8px}
+.policyWrap .lead{font-size:15px;color:var(--t3);font-family:'DM Mono',monospace;margin-bottom:40px;letter-spacing:.02em}
+.policyWrap h2{font-size:17px;font-weight:700;color:var(--t);margin:32px 0 10px;padding-top:32px;border-top:1px solid var(--l)}
+.policyWrap h2:first-of-type{border-top:none;padding-top:0;margin-top:0}
+.policyWrap p{font-size:14.5px;color:var(--t2);line-height:1.75;margin-bottom:12px}
+.policyWrap ul{padding-left:20px;margin-bottom:12px}
+.policyWrap li{font-size:14.5px;color:var(--t2);line-height:1.7;margin-bottom:6px}
+.policyWrap strong{color:var(--t);font-weight:600}
+.cookieTable{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+.cookieTable th{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border-bottom:1px solid var(--l)}
+.cookieTable td{padding:9px 10px;border-bottom:1px solid var(--l);color:var(--t2);vertical-align:top}
+.cookieTable tr:last-child td{border-bottom:none}
+.pill{display:inline-block;padding:2px 8px;border-radius:4px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.pill.nec{background:rgba(43,255,151,.1);color:var(--a);border:1px solid rgba(43,255,151,.25)}
+.pill.func{background:rgba(244,200,66,.08);color:#f4c842;border:1px solid rgba(244,200,66,.2)}
+.resetBtn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:none;border:1px solid var(--l2);border-radius:8px;color:var(--t2);font-size:13px;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;margin-top:4px}
+.resetBtn:hover{border-color:var(--a);color:var(--a)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hWrap">
+    <a class="brand" href="index.html">
+      <img src="image/proviaai-logo.png" alt="ProviaAi logga">
+      <div>
+        <div class="bName">ProviaAi</div>
+        <div class="bTag">Körkortsteorin · AI</div>
+      </div>
+    </a>
+    <div class="hR">
+      <nav class="hNav" aria-label="Huvudnavigation">
+        <a class="hNavLink" href="index.html">Hem</a>
+        <a class="hNavLink" href="korkortet.html">Körkortsteorin</a>
+        <a class="hNavLink" href="app.html">Mockprov</a>
+        <a class="hNavLink" href="förbättring.html">Förbättring</a>
+        <a class="hNavLink" href="pricing.html">Priser</a>
+      </nav>
+      <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
+        <span class="tglIcon" id="tglIcon">☀️</span>
+        <span id="tglLabel">Light</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="policyWrap">
+
+  <h1>Integritetspolicy</h1>
+  <p class="lead">Uppdaterad 15 juni 2026 · proviaai.se</p>
+
+  <h2>Vad vi samlar in</h2>
+  <p>ProviaAi samlar in minimal data för att kunna erbjuda tjänsten. Vi använder <strong>inga spårningscookies, inga annonsnätverk och inga tredjepartsanalysverktyg</strong>.</p>
+  <ul>
+    <li><strong>Kontoinformation</strong>: e-postadress och lösenord (hashad) vid registrering. Lagras i Supabase (EU-region).</li>
+    <li><strong>Studieprogress</strong>: dina provresultat, felbanken och kategoriframsteg. Lagras i Supabase kopplat till ditt konto.</li>
+    <li><strong>Lokalt på din enhet</strong>: inloggningssession, temainställning, cached AI-förklaringar. Se tabellen nedan.</li>
+  </ul>
+
+  <h2>Cookies &amp; lokal lagring</h2>
+  <p>Vi använder <code>localStorage</code> (webbläsarlagring, inte traditionella cookies) för att spara din session och inställningar. Inga data delas med tredje part för marknadsföring.</p>
+
+  <table class="cookieTable">
+    <thead>
+      <tr><th>Nyckel</th><th>Syfte</th><th>Typ</th><th>Varaktighet</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>sb-…-auth-token</code></td><td>Inloggningssession (Supabase Auth)</td><td><span class="pill nec">Nödvändig</span></td><td>Till utloggning</td></tr>
+      <tr><td><code>proviaai_theme</code></td><td>Ljust / mörkt tema</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
+      <tr><td><code>proviaai_kk_*</code></td><td>Lokalt cachad körkortsdata</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
+      <tr><td><code>proviaai_expl_cache</code></td><td>Cachade AI-förklaringar</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
+      <tr><td><code>proviaai_per_hist</code></td><td>P.E.R-chatthistorik (lokal)</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
+      <tr><td><code>proviaai_cookie_consent</code></td><td>Ditt val i cookie-bannern</td><td><span class="pill nec">Nödvändig</span></td><td>Permanent</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Tredjepartstjänster</h2>
+  <ul>
+    <li><strong>Supabase</strong> (databas &amp; auth) — EU-region (Frankfurt). <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase integritetspolicy</a></li>
+    <li><strong>OpenAI</strong> (AI-förklaringar) — dina svar skickas till OpenAI för att generera förklaringar. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI integritetspolicy</a></li>
+    <li><strong>Stripe</strong> (betalning) — om du uppgraderar. Kortuppgifter hanteras enbart av Stripe. <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe integritetspolicy</a></li>
+    <li><strong>Vercel</strong> (hosting) — serverloggar inkl. IP-adress (ingen spårning). <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel integritetspolicy</a></li>
+    <li><strong>Google Fonts</strong> — typsnitt laddas från Google. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google integritetspolicy</a></li>
+  </ul>
+
+  <h2>Dina rättigheter (GDPR)</h2>
+  <p>Du har rätt att begära ut, rätta eller radera dina uppgifter. Kontakta oss på <a href="mailto:elton.rustaeus@gmail.com">elton.rustaeus@gmail.com</a> så hjälper vi dig.</p>
+  <p>Du kan radera all lokal data direkt i din webbläsare via <em>Inställningar → Webbplatsdata → proviaai.se</em>.</p>
+
+  <h2>Återställ cookie-inställningar</h2>
+  <p>Klicka nedan för att återställa ditt cookie-val. Bannern visas igen vid nästa sidladdning.</p>
+  <button class="resetBtn" onclick="try{localStorage.removeItem('proviaai_cookie_consent')}catch(_){}this.textContent='✓ Återställt — ladda om sidan'">
+    🔄 Återställ cookie-val
+  </button>
+
+  <h2>Kontakt</h2>
+  <p>Ansvarig: Elton Rustaeus · <a href="mailto:elton.rustaeus@gmail.com">elton.rustaeus@gmail.com</a> · Sverige</p>
+
+</div>
+</main>
+
+<footer>
+  <a class="fLink" href="integritetspolicy.html">Integritetspolicy</a> ·
+  <a class="fLink" href="pricing.html">Priser</a> ·
+  © 2026 ProviaAi
+</footer>
+
+</body>
+</html>

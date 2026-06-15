@@ -289,6 +289,13 @@ color:var(--a);letter-spacing:.08em;text-transform:uppercase;
 margin-top:12px;padding-top:12px;border-top:1px solid var(--l);margin-bottom:6px;
 }
 .resultModelText{font-size:13.5px;color:var(--t);white-space:pre-wrap;line-height:1.55;font-weight:400}
+.askPerBtnApp{display:inline-flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:6px;transition:color .15s,background .15s;letter-spacing:.03em;margin-top:8px}
+.askPerBtnApp:hover{color:var(--a);background:rgba(27,255,140,.08)}
+@media(max-width:640px){
+  .qBox{padding:16px}
+  .mcOpt{min-height:54px;font-size:15px}
+  #examBody{padding-bottom:120px}
+}
 
 /* LOGIN */
 .loginOverlay{
@@ -370,7 +377,7 @@ content:"";animation:dots 1.4s steps(4,end) infinite;
 
 /* FLOATING GRADE BUTTON — sticky vid botten av exam-steget */
 .floatingGradeBar{
-position:sticky;bottom:16px;z-index:100;
+position:sticky;bottom:16px;z-index:9999;
 display:none;
 margin:16px 0 0;
 }
@@ -780,7 +787,7 @@ Rätta prov
 </div>
 
 </main>
-<footer id="footerText">ProviaAi är studiestöd och ger ingen officiell betygssättning.</footer>
+<footer id="footerText">ProviaAi är studiestöd och ger ingen officiell betygssättning. · <a href="integritetspolicy.html" class="fLink">Integritetspolicy</a></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1473,6 +1480,12 @@ function renderResult(r){
     const d=document.createElement("div"); d.className="resultItem";
     const model=String(item.model_answer||"").trim();
     d.innerHTML=`<div class="qMeta">ID: ${escapeHtml(item.id)} · ${item.points}/${item.max_points}</div><div class="resultFeedback">${escapeHtml(item.feedback||"")}</div><div class="resultModelLabel">${t.fullScore}</div><div class="resultModelText">${escapeHtml(model)}</div>`;
+    if(Number(item.points||0)<Number(item.max_points||0)){
+      const ask=document.createElement("button");
+      ask.type="button"; ask.className="askPerBtnApp"; ask.textContent="✦ Fråga P.E.R";
+      ask.onclick=()=>document.getElementById("perBubble")?.click();
+      d.appendChild(ask);
+    }
     wrap.appendChild(d);
   });
   if(rb){rb.innerHTML="";rb.appendChild(wrap);staggerIn(Array.from(rb.querySelectorAll(".resultItem")),60);}

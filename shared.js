@@ -1079,4 +1079,77 @@
     initGlobalNav();
   }
 
+  /* ── COOKIE CONSENT ── */
+  var CONSENT_KEY = 'proviaai_cookie_consent';
+
+  function initCookieConsent() {
+    try {
+      if (localStorage.getItem(CONSENT_KEY)) return;
+    } catch (_) { return; }
+
+    var s = document.createElement('style');
+    s.textContent =
+      '#proviaCookieBanner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9500;' +
+      'width:calc(100% - 32px);max-width:560px;' +
+      'background:rgba(10,26,18,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);' +
+      'border:1px solid rgba(43,255,151,.22);border-radius:14px;' +
+      'padding:18px 20px;box-shadow:0 8px 40px rgba(0,0,0,.6);' +
+      'font-family:"DM Sans",sans-serif;animation:cookieSlideUp .35s cubic-bezier(.22,.61,.36,1) forwards}' +
+      '@keyframes cookieSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}' +
+      '#proviaCookieBanner.dismiss{animation:cookieSlideDown .25s ease forwards}' +
+      '@keyframes cookieSlideDown{to{opacity:0;transform:translateX(-50%) translateY(20px)}}' +
+      '.ckRow{display:flex;align-items:flex-start;gap:14px}' +
+      '.ckIcon{font-size:22px;flex-shrink:0;line-height:1;padding-top:2px}' +
+      '.ckBody{flex:1;min-width:0}' +
+      '.ckTitle{font-weight:700;font-size:14px;color:#e8f5ee;margin-bottom:5px;letter-spacing:-.01em}' +
+      '.ckText{font-size:12.5px;color:#a8c4b4;line-height:1.6;margin-bottom:14px}' +
+      '.ckText a{color:#2bff97;text-decoration:underline;text-underline-offset:3px}' +
+      '.ckBtns{display:flex;gap:8px;flex-wrap:wrap}' +
+      '.ckAccept{padding:8px 20px;background:#2bff97;color:#08100d;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;transition:background .15s,transform .12s}' +
+      '.ckAccept:hover{background:#1ae080;transform:translateY(-1px)}' +
+      '.ckDecline{padding:8px 16px;background:none;color:#6b8f7c;border:1px solid rgba(107,143,124,.3);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s}' +
+      '.ckDecline:hover{color:#a8c4b4;border-color:rgba(107,143,124,.5)}' +
+      'body.light #proviaCookieBanner{background:rgba(243,248,245,.98);border-color:rgba(7,168,99,.3)}' +
+      'body.light .ckTitle{color:#1a2e23}body.light .ckText{color:#4a7060}' +
+      'body.light .ckAccept{background:#07a863;color:#fff}body.light .ckAccept:hover{background:#068c52}' +
+      'body.light .ckDecline{color:#5e8a72;border-color:rgba(7,168,99,.25)}' +
+      '@media(max-width:480px){.ckBtns{flex-direction:column}.ckAccept,.ckDecline{width:100%;text-align:center}}';
+    document.head.appendChild(s);
+
+    var banner = document.createElement('div');
+    banner.id = 'proviaCookieBanner';
+    banner.setAttribute('role', 'dialog');
+    banner.setAttribute('aria-label', 'Cookie-inställningar');
+    banner.innerHTML =
+      '<div class="ckRow">' +
+      '<span class="ckIcon" aria-hidden="true">🍪</span>' +
+      '<div class="ckBody">' +
+      '<div class="ckTitle">Vi använder cookies</div>' +
+      '<p class="ckText">ProviaAi sparar din inloggning, progress och inställningar lokalt på din enhet. ' +
+      'Vi använder inga spårningscookies eller annonsverktyg. ' +
+      '<a href="/integritetspolicy.html">Läs mer</a></p>' +
+      '<div class="ckBtns">' +
+      '<button class="ckAccept" id="ckAcceptBtn" type="button">Acceptera alla</button>' +
+      '<button class="ckDecline" id="ckDeclineBtn" type="button">Endast nödvändiga</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+
+    function dismiss(value) {
+      try { localStorage.setItem(CONSENT_KEY, value); } catch (_) {}
+      banner.classList.add('dismiss');
+      setTimeout(function () { banner.remove(); }, 280);
+    }
+
+    document.body.appendChild(banner);
+    document.getElementById('ckAcceptBtn').addEventListener('click', function () { dismiss('accepted'); });
+    document.getElementById('ckDeclineBtn').addEventListener('click', function () { dismiss('necessary'); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCookieConsent);
+  } else {
+    initCookieConsent();
+  }
+
 })();
