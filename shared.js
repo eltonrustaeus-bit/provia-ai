@@ -337,15 +337,28 @@
       if (hist.length < 3) return;
       try { localStorage.setItem(COACH_KEY, key); } catch (_) {}
       setTimeout(function() {
-        if (!_open) toggle();
-        var msgs = document.getElementById('perMessages');
-        if (msgs) {
-          var div = document.createElement('div');
-          div.className = 'per-msg teacher';
-          div.textContent = buildWeeklyMsg();
-          msgs.appendChild(div);
-          msgs.scrollTop = msgs.scrollHeight;
-        }
+        var bubble = document.getElementById('perBubble');
+        if (bubble) { bubble.classList.add('per-nudge'); setTimeout(function() { bubble.classList.remove('per-nudge'); }, 3000); }
+        var existing = document.getElementById('perNudge');
+        if (existing) existing.remove();
+        var nudge = document.createElement('div');
+        nudge.id = 'perNudge';
+        nudge.textContent = '📅 Veckans coach-tips';
+        nudge.onclick = function() {
+          hideNudge();
+          if (!_open) toggle();
+          var msgs = document.getElementById('perMessages');
+          if (msgs) {
+            var div = document.createElement('div');
+            div.className = 'per-msg teacher';
+            div.textContent = buildWeeklyMsg();
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+          }
+        };
+        var widget = document.getElementById('perWidget');
+        if (widget) widget.appendChild(nudge);
+        setTimeout(hideNudge, 6000);
       }, 3000);
     }
 
