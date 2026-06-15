@@ -17,23 +17,23 @@
   <style>
     /* ── TOKENS DARK ── */
     :root{
-      --a:#1bff8c; --a2:#16d475; --a-dim:rgba(27,255,140,.10); --a-border:rgba(27,255,140,.20); --a-border2:rgba(27,255,140,.42);
-      --bg:#08100d; --s:#111a15; --s2:#162019; --s3:#1c2920; --glass:rgba(12,20,15,.78);
-      --t:#e8f5ee; --t2:#a8c4b4; --t3:#6b8f7c;
-      --l:rgba(27,255,140,.10); --l2:rgba(27,255,140,.22);
-      --ok:#16d475; --warn:#d4a016; --danger:#d44016;
+      --a:#2bff97; --a2:#1ae080; --a-dim:rgba(43,255,151,.10); --a-border:rgba(43,255,151,.20); --a-border2:rgba(43,255,151,.42);
+      --bg:#0d2118; --s:#162e20; --s2:#1e3c2a; --s3:#254836; --glass:rgba(12,20,15,.78);
+      --t:#f2fcf6; --t2:#c2dece; --t3:#8bbca0;
+      --l:rgba(43,255,151,.13); --l2:rgba(43,255,151,.28);
+      --ok:#1bff8c; --warn:#d4a016; --danger:#d44016;
       --sh:0 2px 12px rgba(0,0,0,.5); --sh2:0 8px 32px rgba(0,0,0,.55); --sh3:0 20px 60px rgba(0,0,0,.65);
-      --r:5px; --r2:3px; --max:1060px;
+      --r:8px; --r2:4px; --max:1060px;
       --font:'DM Sans',system-ui,sans-serif; --mono:'DM Mono','SF Mono',monospace;
     }
     /* ── TOKENS LIGHT ── */
     body.light{
-      --a:#0d9460; --a2:#0a7a4f; --a-dim:rgba(13,148,96,.08); --a-border:rgba(13,148,96,.18); --a-border2:rgba(13,148,96,.42);
-      --bg:#f3f8f5; --s:#ffffff; --s2:#f3f8f5; --s3:#e9f2ed; --glass:rgba(255,255,255,.88);
-      --t:#0c1e15; --t2:#3a6050; --t3:#7aaa92;
-      --l:rgba(13,148,96,.11); --l2:rgba(13,148,96,.26);
-      --ok:#0d7a50; --warn:#8a6600; --danger:#a33010;
-      --sh:0 1px 6px rgba(0,30,15,.07); --sh2:0 4px 20px rgba(0,30,15,.09); --sh3:0 12px 48px rgba(0,30,15,.11);
+      --a:#07a863; --a2:#068c52; --a-dim:rgba(7,168,99,.08); --a-border:rgba(7,168,99,.18); --a-border2:rgba(7,168,99,.42);
+      --bg:#f6fbf8; --s:#ffffff; --s2:#eef8f2; --s3:#e4f3ea; --glass:rgba(255,255,255,.88);
+      --t:#091810; --t2:#2c4d3a; --t3:#5e8a72;
+      --l:rgba(7,168,99,.12); --l2:rgba(7,168,99,.26);
+      --ok:#07a863; --warn:#946c00; --danger:#c0392b;
+      --sh:0 2px 12px rgba(0,0,0,.07); --sh2:0 6px 24px rgba(0,0,0,.10); --sh3:0 12px 40px rgba(0,0,0,.13);
     }
 
     /* ── RESET ── */
@@ -47,8 +47,8 @@
     body::before{
       content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
       background:
-        radial-gradient(ellipse 70vw 50vh at 8% 0%, rgba(27,255,140,.065),transparent 65%),
-        radial-gradient(ellipse 55vw 35vh at 92% 15%, rgba(27,255,140,.045),transparent 65%);
+        radial-gradient(ellipse 70vw 50vh at 8% 0%, rgba(43,255,151,.065),transparent 65%),
+        radial-gradient(ellipse 55vw 35vh at 92% 15%, rgba(43,255,151,.045),transparent 65%);
       transition:opacity .28s ease;
     }
     body.light::before{
