@@ -478,17 +478,17 @@ footer {
 .visitorNav.hidden { display: none; }
 .vNavLink {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 3px; padding: 10px 4px;
-  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  justify-content: center; gap: 2px; padding: 8px 4px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
   color: var(--t3); letter-spacing: .04em; text-decoration: none;
   transition: color .15s ease, background .15s ease;
-  min-height: 56px;
+  min-height: 50px;
 }
 .vNavLink:hover, .vNavLink.active { color: var(--a); }
 .vNavLink.active { background: rgba(43,255,151,.06); }
-.vNavIco { font-size: 20px; line-height: 1; }
+.vNavIco { font-size: 18px; line-height: 1; }
 @media (min-width: 721px) { .visitorNav { display: none; } }
-@media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 68px; } }
+@media (max-width: 720px) { body:not(.has-gnav) { padding-bottom: 58px; } }
 body.light .visitorNav { background: rgba(246,251,248,.97); border-color: rgba(7,168,99,.22); }
 body.light .vNavLink { color: #5e8a72; }
 body.light .vNavLink:hover, body.light .vNavLink.active { color: #07a863; }
