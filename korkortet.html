@@ -85,15 +85,15 @@
 .loadingCat{grid-column:1/-1;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);padding:8px 0}
 
 /* CONFIG */
-.configRow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.configRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 @media(max-width:480px){.configRow{grid-template-columns:1fr}}
 .startArea{text-align:center}
-.startBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 32px;height:52px;font-weight:700;font-size:15px;background:var(--a);color:#08100d;border:none;border-radius:10px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;width:100%;max-width:340px}
+.startBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 28px;height:46px;font-weight:700;font-size:14px;background:var(--a);color:#08100d;border:none;border-radius:10px;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;width:100%;max-width:340px}
 .startBtn:hover{background:var(--a2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(27,255,140,.3)}
 .startBtn:active{transform:scale(.97)}
 .startBtn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
 body.light .startBtn{color:#fff}
-.startHint{font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);margin-top:8px;letter-spacing:.04em}
+.startHint{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);margin-top:6px;letter-spacing:.04em}
 
 /* EXAM */
 #examView{display:none}
@@ -209,12 +209,12 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .passBadge.f{background:rgba(255,107,107,.10);color:#ff8484;border:1px solid rgba(255,107,107,.25)}
 
 /* ── MODE TABS ── */
-.modeTabs{display:flex;gap:3px;padding:3px;background:var(--s);border:1px solid var(--l);border-radius:var(--r);margin-bottom:20px}
-.modeTab{flex:1;padding:9px 8px;border-radius:var(--r2);border:1px solid transparent;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:12.5px;color:var(--t3);text-align:center;transition:all .15s ease;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:5px}
+.modeTabs{display:flex;gap:2px;padding:3px;background:var(--s);border:1px solid var(--l);border-radius:10px;margin-bottom:16px}
+.modeTab{flex:1;padding:0 8px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;font-size:12px;color:var(--t3);text-align:center;transition:all .15s ease;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:4px}
 .modeTab:hover{background:var(--a-dim);color:var(--t);border-color:var(--l)}
 .modeTab.active{background:var(--a-dim);border-color:var(--l2);color:var(--t)}
 .modeTab svg{flex-shrink:0}
-@media(max-width:480px){.modeTab{font-size:11px;padding:9px 4px;gap:3px}}
+@media(max-width:480px){.modeTab{font-size:11px;padding:0 4px;gap:2px}}
 
 /* ── COURSE GRID ── */
 .courseGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
@@ -245,15 +245,15 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .theoryList li::before{content:"→";color:var(--a);font-family:'DM Mono',monospace;font-size:11px;flex-shrink:0;margin-top:3px}
 
 /* ── TEORIPROV VIEW ── */
-.teoriCard{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:28px;text-align:center;position:relative;overflow:hidden;margin-bottom:16px}
+.teoriCard{background:var(--s);border:1px solid var(--l2);border-radius:var(--r);padding:20px;text-align:center;position:relative;overflow:hidden;margin-bottom:14px}
 .teoriCard::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(27,255,140,.07),transparent 65%);pointer-events:none}
-.teoriCardTitle{font-size:21px;font-weight:700;color:var(--t);margin-bottom:8px;letter-spacing:-.025em}
-.teoriCardSub{font-size:13.5px;color:var(--t2);margin-bottom:20px;line-height:1.65;max-width:38ch;margin-left:auto;margin-right:auto}
-.teoriStats{display:flex;gap:0;justify-content:center;margin-bottom:24px}
-.teoriStat{display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 20px;border-right:1px solid var(--l)}
+.teoriCardTitle{font-size:18px;font-weight:700;color:var(--t);margin-bottom:6px;letter-spacing:-.025em}
+.teoriCardSub{font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6;max-width:40ch;margin-left:auto;margin-right:auto}
+.teoriStats{display:flex;gap:0;justify-content:center;margin-bottom:18px}
+.teoriStat{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 16px;border-right:1px solid var(--l)}
 .teoriStat:last-child{border-right:none}
-.teoriStatVal{font-weight:700;font-size:24px;color:var(--t);letter-spacing:-.03em}
-.teoriStatLabel{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);letter-spacing:.06em}
+.teoriStatVal{font-weight:700;font-size:22px;color:var(--t);letter-spacing:-.03em}
+.teoriStatLabel{font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:.06em}
 
 /* ── WEAK AREAS ── */
 .weakCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;margin-bottom:16px}
@@ -287,7 +287,7 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .focusGo{font-family:'DM Mono',monospace;font-size:10px;color:var(--a);flex-shrink:0}
 
 /* ── XP BAR ── */
-.xpBar{display:flex;align-items:center;gap:10px;padding:10px 0 16px;flex-wrap:wrap}
+.xpBar{display:flex;align-items:center;gap:8px;padding:8px 0 12px;flex-wrap:wrap}
 .xpLevel{font-family:'DM Mono',monospace;font-size:11px;color:var(--a);display:flex;align-items:center;gap:5px;flex-shrink:0}
 .xpTrack{flex:1;height:4px;background:var(--s2);border-radius:999px;overflow:hidden;min-width:60px}
 .xpFill{height:100%;background:var(--a);border-radius:999px;transition:width .6s ease}
@@ -384,7 +384,7 @@ body.light .aiSendBtn{color:#fff}
 .nextCourseName{font-weight:600;font-size:14px;color:var(--t)}
 
 /* REPETITION VIEW */
-.repHeader{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.repHeader{background:var(--s);border:1px solid var(--l);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .repHeaderTitle{font-weight:700;font-size:18px;color:var(--t);margin-bottom:4px}
 .repHeaderSub{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:14px}
 .repStats{display:flex;gap:16px;flex-wrap:wrap}
