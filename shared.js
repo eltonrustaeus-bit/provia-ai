@@ -708,8 +708,8 @@
         '.per-av{width:32px;height:32px;border-radius:50%;background:rgba(27,255,140,.12);border:1px solid rgba(27,255,140,.25);display:grid;place-items:center;flex-shrink:0;transition:background .2s,border-color .2s;overflow:hidden}',
         '.per-nm{font-weight:700;font-size:13px;color:var(--t,#e8f5ee)}',
         '.per-rl{font-size:10px;color:var(--t3,#5a7a6a);font-family:"DM Mono",monospace}',
-        '.per-clr{margin-left:auto;background:none;border:none;color:var(--t3,#5a7a6a);font-size:10px;cursor:pointer;font-family:"DM Mono",monospace;padding:2px 6px;border-radius:4px}',
-        '.per-clr:hover{color:var(--danger,#ff6b6b)}',
+        '.per-clr{background:none;border:none;color:var(--t3,#5a7a6a);cursor:pointer;padding:5px;border-radius:6px;display:flex;align-items:center;justify-content:center;line-height:0;transition:color .15s,background .15s}',
+        '.per-clr:hover{color:var(--t,#e8f5ee);background:rgba(255,255,255,.07)}',
         '#perMessages{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;min-height:100px}',
         '.per-msg{font-size:13px;line-height:1.65;padding:9px 12px;border-radius:8px;max-width:90%;word-break:break-word}',
         '.per-msg.teacher{background:rgba(27,255,140,.07);border:1px solid rgba(27,255,140,.15);color:var(--t2,#a8c4b4);border-radius:8px 8px 8px 3px}',
@@ -776,11 +776,11 @@
             '<div class="per-av"><span class="per-av-txt">PER</span><span class="per-av-bars"><span></span><span></span><span></span></span></div>' +
             '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS AI</div></div>' +
             '<div class="per-hdr-btns">' +
-              '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
-              '<button class="per-clr" id="perReadyBtn" title="Visa din körkortsredo-score">Redo?</button>' +
-              '<button class="per-clr" id="perCornerBtn" title="Flytta widget till vänster/höger">←</button>' +
-              '<button class="per-clr" id="perSizeBtn" title="Ändra storlek">⊞</button>' +
-              '<button class="per-clr" id="perClearBtn">Rensa</button>' +
+              '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
+              '<button class="per-clr" id="perReadyBtn" title="Din körkortsredo-score"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>' +
+              '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
+              '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
+              '<button class="per-clr" id="perClearBtn" title="Rensa konversation"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
             '</div>' +
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="korkortet.html">Skapa gratis konto →</a></div>' +
@@ -820,7 +820,7 @@
         if (save) try { localStorage.setItem(PER_CORNER_KEY, corner); } catch(_) {}
         w.classList.toggle('per-left', corner === 'bl');
         var btn = document.getElementById('perCornerBtn');
-        if (btn) btn.textContent = corner === 'bl' ? '→' : '←';
+        if (btn) btn.innerHTML = corner === 'bl' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
       }
       function applyPerSize(size, save) {
         var p = document.getElementById('perPanel');
@@ -828,7 +828,7 @@
         if (save) try { localStorage.setItem(PER_SIZE_KEY, size); } catch(_) {}
         p.style.width = size === 'large' ? '380px' : '';
         var btn = document.getElementById('perSizeBtn');
-        if (btn) btn.textContent = size === 'large' ? '⊟' : '⊞';
+        if (btn) btn.innerHTML = size === 'large' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
       }
 
       document.getElementById('perCornerBtn').onclick = function() {
