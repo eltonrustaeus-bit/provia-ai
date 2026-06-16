@@ -4053,40 +4053,6 @@ init();
 </script>
 
 <!-- VISITOR BOTTOM NAV -->
-<nav class="visitorNav" id="visitorNav" aria-label="Snabbnavigation">
-  <a class="vNavLink" href="index.html">
-    <span class="vNavIco">🏠</span>
-    <span>Hem</span>
-  </a>
-  <a class="vNavLink active" href="korkortet.html">
-    <span class="vNavIco">🚗</span>
-    <span>Körkortet</span>
-  </a>
-  <a class="vNavLink" href="app.html">
-    <span class="vNavIco">📝</span>
-    <span>Mockprov</span>
-  </a>
-  <a class="vNavLink" href="pricing.html">
-    <span class="vNavIco">💳</span>
-    <span>Priser</span>
-  </a>
-  <a class="vNavLink" href="konto.html">
-    <span class="vNavIco">👤</span>
-    <span>Konto</span>
-  </a>
-</nav>
-<script>
-(function(){
-  const hide = () => {
-    const vn = document.getElementById('visitorNav');
-    if (vn) vn.classList.add('hidden');
-  };
-  document.addEventListener('proviaNavReady', hide);
-  setTimeout(() => {
-    if (document.getElementById('proviaGlobalNav')) hide();
-  }, 1200);
-})();
-</script>
 
 </body>
 </html>
