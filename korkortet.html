@@ -605,6 +605,38 @@ body.light .adminSaveBtn{color:#fff}
 .adminCopyBtn{height:24px;padding:0 8px;font-size:10px;background:transparent;border:1px solid var(--l);color:var(--t3);border-radius:var(--r2);cursor:pointer;transition:all .12s;font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0}
 .adminCopyBtn:hover{border-color:var(--l2);color:var(--t)}
 
+/* ── UPGRADE MODAL ── */
+#kkUpgradeModal{
+  display:none;position:fixed;inset:0;z-index:20000;
+  background:rgba(8,16,13,.85);backdrop-filter:blur(6px);
+  align-items:center;justify-content:center;padding:20px;
+}
+#kkUpgradeModal.show{display:flex}
+.kkUpCard{
+  background:var(--s,#111a15);border:1px solid rgba(27,255,140,.15);
+  border-radius:12px;max-width:400px;width:100%;padding:28px 24px;
+  box-shadow:0 24px 64px rgba(0,0,0,.6);
+}
+.kkUpHead{font-size:17px;font-weight:700;color:var(--t,#e8f5ee);letter-spacing:-.02em;margin-bottom:6px}
+.kkUpSub{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--t3,#5a7a6a);margin-bottom:20px}
+.kkUpPlans{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.kkUpPlan{
+  border:1px solid var(--l,rgba(255,255,255,.08));border-radius:8px;
+  padding:12px 14px;display:flex;justify-content:space-between;align-items:center;
+}
+.kkUpPlan.current{border-color:rgba(27,255,140,.25);background:rgba(27,255,140,.04)}
+.kkUpPlan.highlight{border-color:rgba(27,255,140,.4);background:rgba(27,255,140,.07)}
+.kkUpPlanName{font-weight:600;font-size:13.5px;color:var(--t,#e8f5ee)}
+.kkUpPlanTag{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3,#5a7a6a);margin-top:2px}
+.kkUpPlanRight{text-align:right}
+.kkUpPlanPrice{font-size:13px;font-weight:700;color:var(--a,#1bff8c)}
+.kkUpPlanLimit{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3,#5a7a6a);margin-top:2px}
+.kkUpCurrent{font-family:'DM Mono',monospace;font-size:9px;color:var(--a,#1bff8c);letter-spacing:.06em;text-transform:uppercase;background:rgba(27,255,140,.1);border-radius:4px;padding:2px 6px}
+.kkUpActions{display:flex;gap:8px}
+.kkUpActions .btn{flex:1;height:40px;font-size:13.5px}
+.kkUpClose{background:none;border:1px solid var(--l,rgba(255,255,255,.08));color:var(--t3,#5a7a6a);border-radius:var(--r);height:40px;padding:0 16px;cursor:pointer;font-size:13px;transition:border-color .15s,color .15s;white-space:nowrap}
+.kkUpClose:hover{border-color:var(--l2);color:var(--t)}
+
 </style>
 </head>
 <body>
@@ -749,7 +781,33 @@ body.light .adminSaveBtn{color:#fff}
 
   <div class="quotaBanner" id="quotaBanner">
     <div class="quotaBannerTxt" id="quotaBannerTxt"></div>
-    <a class="btn btnP" href="pricing.html" style="height:30px;font-size:12px;padding:0 12px">Uppgradera →</a>
+    <button class="btn btnP" onclick="showUpgradeModal()" style="height:30px;font-size:12px;padding:0 12px;border:none;cursor:pointer">Uppgradera →</button>
+  </div>
+
+  <!-- UPGRADE MODAL -->
+  <div id="kkUpgradeModal" role="dialog" aria-modal="true" aria-label="Uppgradera plan">
+    <div class="kkUpCard">
+      <div class="kkUpHead">Gränsen för gratis nådd</div>
+      <div class="kkUpSub" id="kkUpSubTxt">Du har använt dina 2 gratis teoriprov den här veckan.</div>
+      <div class="kkUpPlans">
+        <div class="kkUpPlan current">
+          <div><div class="kkUpPlanName">Gratis</div><div class="kkUpPlanTag">Ditt nuvarande plan</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpCurrent">Aktiv</div><div class="kkUpPlanLimit">2 teoriprov/vecka</div></div>
+        </div>
+        <div class="kkUpPlan highlight">
+          <div><div class="kkUpPlanName">Basic</div><div class="kkUpPlanTag">Mest populärt</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">49 kr/mån</div><div class="kkUpPlanLimit">30 teoriprov/månad</div></div>
+        </div>
+        <div class="kkUpPlan">
+          <div><div class="kkUpPlanName">Premium</div><div class="kkUpPlanTag">Obegränsat</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">99 kr/mån</div><div class="kkUpPlanLimit">∞ teoriprov</div></div>
+        </div>
+      </div>
+      <div class="kkUpActions">
+        <button class="kkUpClose" onclick="closeUpgradeModal()">Stäng</button>
+        <a class="btn btnP" href="pricing.html">Uppgradera nu →</a>
+      </div>
+    </div>
   </div>
 
   <!-- XP BAR -->
@@ -2306,19 +2364,19 @@ async function startCourseQuiz(stage) {
           const tok = (await db.auth.getSession()).data.session?.access_token;
           if(tok) {
             const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
-            if(r.status===429){toast("Gränsen nådd — uppgradera för mer.","bad");window.location.href="pricing.html";return;}
+            if(r.status===429){showUpgradeModal("Du har nått gränsen för teoriprov. Uppgradera för fler.");return;}
             if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
             // Sync local quota display with server count
             const {count} = await r.json().catch(()=>({}));
             if(count != null) localStorage.setItem(qKey(), String(count));
           } else {
             // Not logged in — fallback localStorage
-            if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+            if(readQ()>=cfg.cap){showUpgradeModal();return;}
             bumpQ();
           }
-        } catch { if(readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;} bumpQ(); }
+        } catch { if(readQ()>=cfg.cap){showUpgradeModal();return;} bumpQ(); }
       } else {
-        if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+        if(readQ()>=cfg.cap){showUpgradeModal();return;}
         bumpQ();
       }
       refreshQuotaUI();
@@ -2409,17 +2467,17 @@ $("teoriStartBtn").onclick = async () => {
       const tok = (await db.auth.getSession()).data.session?.access_token;
       if(tok) {
         const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
-        if(r.status===429){toast("Gränsen nådd — uppgradera för fler test.","bad");window.location.href="pricing.html";return;}
+        if(r.status===429){showUpgradeModal("Du har nått gränsen för teoriprov. Uppgradera för fler.");return;}
         if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
         const {count,limit} = await r.json();
         // Sync local quota display with server count
         localStorage.setItem(qKey(), String(count));
         refreshQuotaUI();
       } else {
-        if(readQ()>=cfg.cap){toast("Gränsen nådd — uppgradera.","bad");return;}
+        if(readQ()>=cfg.cap){showUpgradeModal();return;}
         bumpQ();
       }
-    } catch { if(readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;} bumpQ(); }
+    } catch { if(readQ()>=cfg.cap){showUpgradeModal();return;} bumpQ(); }
   }
   $("modeTabs").style.display="none";
   runExam("Alla kategorier",65,"");
@@ -2498,6 +2556,19 @@ applyTheme(localStorage.getItem(LS_THEME) || "dark");
   document.addEventListener("click", e => { if(open && !menu.contains(e.target) && !btn.contains(e.target)) close() });
   $("logoutBtn").onclick = async () => { try { await db?.auth.signOut(); } catch(_){} location.reload() };
 })();
+
+// ── UPGRADE MODAL ──
+function showUpgradeModal(msg) {
+  const sub = $("kkUpSubTxt");
+  if(sub && msg) sub.textContent = msg;
+  $("kkUpgradeModal").classList.add("show");
+  document.body.style.overflow = "hidden";
+}
+function closeUpgradeModal() {
+  $("kkUpgradeModal").classList.remove("show");
+  document.body.style.overflow = "";
+}
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeUpgradeModal(); });
 
 // ── QUOTA UI ──
 function refreshQuotaUI() {
@@ -2652,7 +2723,7 @@ $("startBtn").onclick = async () => {
   if(!uid) { showLoginScreen(); return; }
   const cfg = LIMITS[role]||LIMITS.gratis;
   if(cfg.cap !== Infinity && readQ() >= cfg.cap) {
-    toast("Gränsen nådd — uppgradera för fler test.", "bad"); return;
+    showUpgradeModal(); return;
   }
   lastN = parseInt($("numQSel").value);
   lastDiff = $("diffSel").value;
