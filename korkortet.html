@@ -72,7 +72,7 @@
 @media(min-width:960px){.catGrid{grid-template-columns:repeat(5,1fr)}}
 @media(max-width:640px){.catGrid{grid-template-columns:repeat(2,1fr);gap:5px}}
 .catCard{padding:11px 12px;border-radius:8px;border:1px solid var(--l);background:var(--s2);cursor:pointer;text-align:left;transition:border-color .15s,background .15s,transform .15s;position:relative;overflow:hidden}
-.catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-2px)}
+.catCard:hover{border-color:var(--l2);background:var(--a-dim);transform:translateY(-2px);box-shadow:0 4px 16px rgba(27,255,140,.1)}
 .catCard.active{border-color:var(--a);background:rgba(27,255,140,.08)}
 .catCard.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--a)}
 .catName{font-weight:600;font-size:12.5px;color:var(--t);line-height:1.3;margin-bottom:2px}
@@ -114,6 +114,8 @@ body.light .startBtn{color:#fff}
 /* QUESTION CARD */
 .qCard{background:var(--s);border:1px solid var(--l);border-radius:10px;padding:20px;position:relative}
 @media(max-width:480px){.qCard{padding:14px 14px 16px}}
+.qCard.q-entering{animation:qEnter .22s ease both}
+@keyframes qEnter{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
 .qMeta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .qNum{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3)}
 .diffDot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -141,11 +143,13 @@ body.light .startBtn{color:#fff}
 .ansBtn.correct .ansLetter{background:var(--a);border-color:var(--a);color:#08100d}
 body.light .ansBtn.correct .ansLetter{color:#fff}
 .ansBtn.wrong .ansLetter{background:rgba(255,107,107,.2);border-color:var(--danger);color:#ff8484}
+.ansBtn.ans-pending{border-color:rgba(27,255,140,.55);background:rgba(27,255,140,.09);transform:scale(.99)}
 @keyframes correctPulse{0%{box-shadow:0 0 0 0 rgba(27,255,140,.45)}60%{box-shadow:0 0 0 14px rgba(27,255,140,0)}100%{box-shadow:none}}
 
 /* EXPLANATION */
 .explBox{display:none;margin-top:14px;border-radius:8px;padding:13px 15px;border:1px solid var(--l)}
-.explBox.show{display:block;animation:fadeIn .2s ease}
+.explBox.show{display:block;animation:explSlide .22s ease both}
+@keyframes explSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .explBox.correct{border-color:rgba(27,255,140,.35);background:rgba(27,255,140,.07)}
 .explBox.wrong{border-color:rgba(255,107,107,.35);background:rgba(255,107,107,.07)}
 .explLabel{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.05em;margin-bottom:7px;display:flex;align-items:center;gap:5px}
@@ -162,6 +166,8 @@ body.light .ansBtn.correct .ansLetter{color:#fff}
 body.light .nextBigBtn{color:#fff}
 .nextBigBtn:hover{transform:translateY(-2px);background:var(--a2);box-shadow:0 8px 28px rgba(27,255,140,.35)}
 .nextBigBtn:active{transform:scale(.97)}
+.nextBigBtn svg{transition:transform .18s ease}
+.nextBigBtn:hover svg{transform:translateX(4px)}
 .nextAiRow{margin-top:8px;display:flex;align-items:center;justify-content:center}
 .askPerBtn{display:inline-flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:11px;color:var(--t3);background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:6px;transition:color .15s,background .15s;letter-spacing:.03em}
 .askPerBtn:hover{color:var(--a);background:var(--a-dim)}
@@ -194,7 +200,12 @@ body.light .miniBarInner{background:rgba(243,248,245,.98)}
 .resultActions .btn{height:42px;font-size:14px}
 .brkGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 @media(max-width:480px){.brkGrid{grid-template-columns:1fr 1fr;gap:6px}}
-.brkCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px}
+.brkCard{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:12px;animation:fadeIn .3s ease both}
+.brkCard:nth-child(2){animation-delay:.06s}
+.brkCard:nth-child(3){animation-delay:.12s}
+.brkCard:nth-child(4){animation-delay:.18s}
+.brkCard:nth-child(5){animation-delay:.24s}
+.brkCard:nth-child(6){animation-delay:.30s}
 .brkLabel{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-bottom:4px}
 .brkScore{font-size:13px;font-weight:600;color:var(--t)}
 .brkBar{height:3px;border-radius:999px;background:var(--l);overflow:hidden;margin-top:5px}
@@ -2806,7 +2817,7 @@ function renderQ(i) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "ansBtn";
     b.innerHTML = `<span class="ansLetter">${opt.l}</span><span>${esc(opt.t)}</span>`;
-    b.onclick = () => handleAns(opt.l, q);
+    b.onclick = () => { b.classList.add("ans-pending"); setTimeout(() => handleAns(opt.l, q), 60); };
     grid.appendChild(b);
   });
 
@@ -2936,8 +2947,21 @@ function loadExpl(q) {
 
 // ── NAVIGATION ──
 function goNext() {
-  if(idx < exam.length-1) { idx++; renderQ(idx); }
-  else showResults();
+  if(idx < exam.length-1) {
+    idx++;
+    const card = $("qCard");
+    card.style.transition = "opacity .13s ease, transform .13s ease";
+    card.style.opacity = "0";
+    card.style.transform = "translateX(-10px)";
+    setTimeout(() => {
+      card.style.transition = "";
+      card.style.opacity = "";
+      card.style.transform = "";
+      renderQ(idx);
+      card.classList.add("q-entering");
+      card.addEventListener("animationend", () => card.classList.remove("q-entering"), {once:true});
+    }, 130);
+  } else showResults();
 }
 
 $("nextBigBtn").onclick = goNext;
