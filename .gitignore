@@ -1,4 +1,6 @@
 node_modules/
+*.png
+*.bak
 .env
 .env.local
 .env*.local
