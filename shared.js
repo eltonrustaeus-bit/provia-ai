@@ -1018,6 +1018,7 @@
 
   /* ── GLOBAL BOTTOM NAV (inloggad) ── */
   function initGlobalNav() {
+    return; // bottom nav removed
     if (document.getElementById('proviaGlobalNav')) return;
     var raw = null;
     try { raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
