@@ -20,11 +20,13 @@
 
 /* LAYOUT */
 .wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
+@media(max-width:480px){.wrap{padding:20px 16px}}
 /* Override has-gnav padding during exam steps */
 body.exam-mode{padding-bottom:0!important}
 
 /* HERO */
 .hero{padding:40px 0 24px}
+@media(max-width:600px){.hero{padding:24px 0 16px}}
 .heroTitle{font-size:clamp(32px,5vw,56px);font-weight:700;letter-spacing:-.04em;line-height:1.1;margin-bottom:14px;color:var(--t)}
 .heroTitle em{font-style:normal;color:var(--a)}
 .heroSub{font-size:clamp(15px,1.6vw,17px);color:var(--t2);font-weight:400;max-width:560px;line-height:1.7}
