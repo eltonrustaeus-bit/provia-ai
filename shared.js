@@ -89,6 +89,8 @@
   /* ── P.E.R FLOATING WIDGET ── */
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_MAX_HIST = 30;
+  var PER_CORNER_KEY = 'proviaai_per_corner';
+  var PER_SIZE_KEY = 'proviaai_per_size';
 
   function getPageContext() {
     try {
@@ -726,6 +728,10 @@
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
+        '#perWidget.per-left{right:auto!important;left:22px!important}',
+        '@media(max-width:480px){#perWidget.per-left{left:16px!important}}',
+        '#perWidget.per-left #perPanel{right:auto;left:0}',
+        '@media(max-width:480px){#perWidget.per-left #perPanel{right:auto!important;left:0!important}}',
         '#perMicBtn{background:none;border:1px solid var(--l,rgba(255,255,255,.08));border-radius:6px;padding:0 9px;cursor:pointer;font-size:14px;color:var(--t2,#a8c4b4);transition:border-color .2s,color .2s;flex-shrink:0}',
         '#perMicBtn:hover{border-color:var(--l2,rgba(255,255,255,.25))}',
         '#perMicBtn.listening{border-color:var(--a,#1bff8c);color:var(--a,#1bff8c);animation:perPulse .9s ease-in-out infinite}',
@@ -772,6 +778,8 @@
             '<div class="per-hdr-btns">' +
               '<button class="per-clr" id="perQuizBtn" title="P.E.R quizzar dig">Quiz</button>' +
               '<button class="per-clr" id="perReadyBtn" title="Visa din körkortsredo-score">Redo?</button>' +
+              '<button class="per-clr" id="perCornerBtn" title="Flytta widget till vänster/höger">←</button>' +
+              '<button class="per-clr" id="perSizeBtn" title="Ändra storlek">⊞</button>' +
               '<button class="per-clr" id="perClearBtn">Rensa</button>' +
             '</div>' +
           '</div>' +
@@ -804,6 +812,42 @@
         var msgs = document.getElementById('perMessages');
         if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Klart. Vad vill du veta?</div>';
       };
+
+      /* ── POSITION & SIZE PERSISTENCE ── */
+      function applyPerCorner(corner, save) {
+        var w = document.getElementById('perWidget');
+        if (!w) return;
+        if (save) try { localStorage.setItem(PER_CORNER_KEY, corner); } catch(_) {}
+        w.classList.toggle('per-left', corner === 'bl');
+        var btn = document.getElementById('perCornerBtn');
+        if (btn) btn.textContent = corner === 'bl' ? '→' : '←';
+      }
+      function applyPerSize(size, save) {
+        var p = document.getElementById('perPanel');
+        if (!p) return;
+        if (save) try { localStorage.setItem(PER_SIZE_KEY, size); } catch(_) {}
+        p.style.width = size === 'large' ? '380px' : '';
+        var btn = document.getElementById('perSizeBtn');
+        if (btn) btn.textContent = size === 'large' ? '⊟' : '⊞';
+      }
+
+      document.getElementById('perCornerBtn').onclick = function() {
+        var cur = 'br';
+        try { cur = localStorage.getItem(PER_CORNER_KEY) || 'br'; } catch(_) {}
+        applyPerCorner(cur === 'bl' ? 'br' : 'bl', true);
+      };
+      document.getElementById('perSizeBtn').onclick = function() {
+        var cur = 'normal';
+        try { cur = localStorage.getItem(PER_SIZE_KEY) || 'normal'; } catch(_) {}
+        applyPerSize(cur === 'normal' ? 'large' : 'normal', true);
+      };
+
+      var savedCorner = 'br';
+      var savedSize = 'normal';
+      try { savedCorner = localStorage.getItem(PER_CORNER_KEY) || 'br'; } catch(_) {}
+      try { savedSize = localStorage.getItem(PER_SIZE_KEY) || 'normal'; } catch(_) {}
+      applyPerCorner(savedCorner, false);
+      applyPerSize(savedSize, false);
 
       /* ── QUIZ MODE ── */
       document.getElementById('perQuizBtn').onclick = function () {
