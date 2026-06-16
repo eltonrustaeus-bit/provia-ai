@@ -45,6 +45,7 @@
   }
   @media(min-width:600px){.hero{padding:68px 24px 48px}}
   @media(max-width:599px){.hero{min-height:75svh}}
+  @media(max-width:390px){.heroTitle{font-size:30px;letter-spacing:-.03em}}
   body.light .bgG1 { opacity: .4; }
   body.light .bgG2 { opacity: .25; }
   body.light .bgGrid { opacity: .35; }
@@ -238,6 +239,7 @@
 
   /* ── FEATURES ── */
   .feats{padding:56px 0 48px}
+  @media(max-width:600px){.feats{padding:36px 0 28px}}
   .secEye {
     font-family:var(--mono);font-size:11px;color:var(--a);
     letter-spacing:.12em;text-transform:uppercase;
@@ -284,6 +286,7 @@
 
   /* ── STEPS ── */
   .steps{padding:56px 0;border-top:1px solid var(--l);border-bottom:1px solid var(--l)}
+  @media(max-width:600px){.steps{padding:36px 0}}
   .stepsRow{
     display:grid;grid-template-columns:repeat(3,1fr);
     gap:0;position:relative;margin-top:36px;
@@ -309,6 +312,7 @@
 
   /* ── FAQ ── */
   .faq{padding:56px 0}
+  @media(max-width:600px){.faq{padding:36px 0}}
   .faqItem{border-bottom:1px solid var(--l);overflow:hidden}
   .faqQ{
     display:flex;align-items:center;justify-content:space-between;gap:16px;
@@ -334,6 +338,7 @@
 
   /* ── PRICING STRIP ── */
   .pricingStrip{padding:32px 0 64px}
+  @media(max-width:600px){.pricingStrip{padding:24px 0 40px}}
   .pCard{
     background:var(--s);border:1px solid var(--l2);
     border-radius:14px;padding:28px 32px;
@@ -587,6 +592,7 @@
 
   /* ── PRODUCT SHOWCASE ── */
   .productShowcase { padding: 56px 0 48px; }
+  @media(max-width:600px){.productShowcase{padding:36px 0 28px}}
   .showcaseOuter {
     display: flex; flex-direction: column; align-items: center; gap: 14px;
     max-width: 480px; margin: 28px auto 0;

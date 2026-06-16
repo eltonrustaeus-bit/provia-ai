@@ -1157,7 +1157,7 @@
 
     var s = document.createElement('style');
     s.textContent =
-      '#proviaCookieBanner{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:9500;' +
+      '#proviaCookieBanner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9500;' +
       'width:calc(100% - 24px);max-width:560px;' +
       'background:rgba(10,26,18,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);' +
       'border:1px solid rgba(43,255,151,.22);border-radius:14px;' +
@@ -1182,7 +1182,7 @@
       'body.light .ckAccept{background:#07a863;color:#fff}body.light .ckAccept:hover{background:#068c52}' +
       'body.light .ckDecline{color:#5e8a72;border-color:rgba(7,168,99,.25)}' +
       '@media(max-width:480px){.ckBtns{flex-direction:column}.ckAccept,.ckDecline{width:100%;text-align:center}}' +
-      '@media(min-width:721px){#proviaCookieBanner{bottom:20px}}';
+      '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}}';
     document.head.appendChild(s);
 
     var banner = document.createElement('div');
