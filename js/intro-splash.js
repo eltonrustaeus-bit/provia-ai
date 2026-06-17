@@ -243,8 +243,8 @@
   }
 
   window.addEventListener('load', function () { pgLoaded = true; tryReveal(); });
-  setTimeout(function () { minDone = true; tryReveal(); }, 4500);   /* 4.5s minimum */
-  setTimeout(function () { if (splashEl) { reveal(splashEl); } blockSt.remove(); }, 7000); /* safety */
+  setTimeout(function () { minDone = true; tryReveal(); }, 3900);   /* 3.9s minimum */
+  setTimeout(function () { if (splashEl) { reveal(splashEl); } blockSt.remove(); }, 6500); /* safety */
 
   document.addEventListener('DOMContentLoaded', function () {
     splashEl = build();
