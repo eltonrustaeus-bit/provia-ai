@@ -44,7 +44,7 @@ body.light {
   --s3: #e4f3ea;
   --t: #091810;
   --t2: #2c4d3a;
-  --t3: #5e8a72;
+  --t3: #4a7560;
   --l: rgba(7,168,99,.12);
   --l2: rgba(7,168,99,.26);
   --l3: rgba(7,168,99,.40);
@@ -478,6 +478,18 @@ footer {
 }
 .fLink { color: var(--t2); transition: color .15s ease; }
 .fLink:hover { color: var(--a); }
+.fLink:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; border-radius: 2px; }
+
+/* ── SKIP LINK ── */
+.skip-link {
+  position: absolute; left: -9999px; top: 6px;
+  background: var(--a); color: #0d1a12;
+  padding: 8px 16px; border-radius: var(--r);
+  font-family: var(--font); font-weight: 700; font-size: 14px;
+  z-index: 99999; white-space: nowrap;
+  transition: none;
+}
+.skip-link:focus { left: 6px; }
 
 /* ── VISITOR BOTTOM NAV — compact floating pill ── */
 @keyframes navSlideUp {
