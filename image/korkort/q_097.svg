@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
 
       <!-- Two lanes merging to one -->
       <rect x="50" y="0" width="300" height="400" fill="#6b6b6b"/>
@@ -26,7 +26,6 @@
       <!-- Zipper arrow -->
       <line x1="235" y1="200" x2="175.3665631459995" y2="319.266873708001" stroke="#f4d35e" stroke-width="2.5" stroke-linecap="round"/>
 <polygon points="170,330 170,316.58359213500125 180.73312629199899,321.9501552810008" fill="#f4d35e"/>
-      <text x="165" y="320" font-family="Arial,sans-serif" font-size="12" fill="#f4d35e" text-anchor="middle" font-weight="bold">Blixtlås</text>
-      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Blixtlåsning: en bil i taget turas om att foga in</text>
+      <text x="165" y="320" font-family="Arial,sans-serif" font-size="12" fill="#f4d35e" text-anchor="middle" font-weight="bold">BlixtlÃ¥s</text>
     
 </svg>
