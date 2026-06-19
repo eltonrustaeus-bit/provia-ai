@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+
+      <!-- Main road (horizontal) -->
+      <rect x="0" y="200" width="400" height="100" fill="#6b6b6b"/>
+<line x1="0" y1="250" x2="400" y2="250" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+      <!-- Cross street (vertical, right side) -->
+      <rect x="280" y="0" width="100" height="200" fill="#6b6b6b"/>
+      <!-- Distance marker -->
+      <line x1="180" y1="200" x2="275" y2="200" stroke="#f4d35e" stroke-width="2.5" stroke-dasharray="5,3"/>
+      <line x1="180" y1="195" x2="180" y2="205" stroke="#f4d35e" stroke-width="2.5"/>
+      <line x1="275" y1="195" x2="275" y2="205" stroke="#f4d35e" stroke-width="2.5"/>
+      <text x="228" y="192" font-family="Arial,sans-serif" font-size="14" fill="#f4d35e" text-anchor="middle" font-weight="bold">10 m</text>
+      <!-- Parked car (too close) -->
+      <g transform="rotate(90,140,215)">
+  <rect x="129" y="197" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="132" y="201" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <!-- No parking sign -->
+      <circle cx="145" cy="170" r="16" fill="white" stroke="red" stroke-width="3"/>
+      <line x1="133" y1="158" x2="157" y2="182" stroke="red" stroke-width="3"/>
+      <rect x="135" y="170" width="20" height="8" rx="2" fill="#e63946"/>
+      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Parkering förbjuden inom 10 m från korsning</text>
+    
+</svg>

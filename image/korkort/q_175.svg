@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+
+      
+  <rect x="145" y="145" width="110" height="110" fill="#6b6b6b"/>
+  <rect x="0" y="145" width="400" height="110" fill="#6b6b6b"/>
+<line x1="0" y1="200" x2="400" y2="200" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+  <rect x="145" y="0" width="110" height="400" fill="#6b6b6b"/>
+<line x1="200" y1="0" x2="200" y2="400" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+  
+      <!-- Your car: going straight through (east) -->
+      <g transform="rotate(90,110,218)">
+  <rect x="99" y="200" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="102" y="204" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <line x1="130" y1="218" x2="278" y2="218" stroke="#e63946" stroke-width="2.5" stroke-linecap="round"/>
+<polygon points="290,218 278,224 278,212" fill="#e63946"/>
+      <!-- Oncoming: from east, turning left (going south) -->
+      <g transform="rotate(270,290,182)">
+  <rect x="279" y="164" width="22" height="36" rx="5" ry="5" fill="#1d7dc1" />
+  <rect x="282" y="168" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <line x1="270" y1="182" x2="216.26584631566237" y2="269.7657843510848" stroke="#1d7dc1" stroke-width="2.5" stroke-linecap="round"/>
+<polygon points="210,280 211.14873849120477,266.63286119325363 221.38295414011998,272.89870750891595" fill="#1d7dc1"/>
+      <circle cx="110" cy="185" r="14" fill="#f4d35e" opacity="0.9"/>
+      <text x="110" y="190" font-family="Arial,sans-serif" font-size="16" fill="#1a1a1a" text-anchor="middle" font-weight="bold">✓</text>
+      <text x="110" y="250" font-family="Arial,sans-serif" font-size="12" fill="#e63946" text-anchor="middle" font-weight="bold">DU</text>
+      <text x="290" y="160" font-family="Arial,sans-serif" font-size="10" fill="#1d7dc1" text-anchor="middle" font-weight="bold">Svänger vänster</text>
+      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Du kör rakt — har alltid företräde mot vänstersvängande</text>
+    
+</svg>
