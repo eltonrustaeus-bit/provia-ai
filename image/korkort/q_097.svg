@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+
+      <!-- Two lanes merging to one -->
+      <rect x="50" y="0" width="300" height="400" fill="#6b6b6b"/>
+      <!-- Left lane -->
+      <rect x="50" y="0" width="150" height="400" fill="#6b6b6b"/>
+      <rect x="200" y="0" width="150" height="400" fill="#6b6b6b"/>
+      <!-- Center dashes upper half -->
+      <line x1="200" y1="0" x2="200" y2="180" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+      <!-- Solid merge line lower half -->
+      <path d="M200,180 Q200,280 125,400" fill="none" stroke="#ffffff" stroke-width="3"/>
+      <!-- Cars in left lane -->
+      <g transform="rotate(0,165,280)">
+  <rect x="154" y="262" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="157" y="266" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <g transform="rotate(0,165,150)">
+  <rect x="154" y="132" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="157" y="136" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <!-- Cars in right lane (your lane?) -->
+      <g transform="rotate(0,235,220)">
+  <rect x="224" y="202" width="22" height="36" rx="5" ry="5" fill="#1d7dc1" />
+  <rect x="227" y="206" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <!-- Zipper arrow -->
+      <line x1="235" y1="200" x2="175.3665631459995" y2="319.266873708001" stroke="#f4d35e" stroke-width="2.5" stroke-linecap="round"/>
+<polygon points="170,330 170,316.58359213500125 180.73312629199899,321.9501552810008" fill="#f4d35e"/>
+      <text x="165" y="320" font-family="Arial,sans-serif" font-size="12" fill="#f4d35e" text-anchor="middle" font-weight="bold">Blixtlås</text>
+      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Blixtlåsning: en bil i taget turas om att foga in</text>
+    
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+
+      <!-- Road going north (top-down) -->
+      <rect x="100" y="0" width="200" height="400" fill="#6b6b6b"/>
+      <line x1="200" y1="0" x2="200" y2="400" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+      <!-- Solid line = no overtaking zone -->
+      <line x1="175" y1="150" x2="175" y2="400" stroke="#ffffff" stroke-width="3.5" stroke-dasharray="none"/>
+      <line x1="225" y1="150" x2="225" y2="400" stroke="#ffffff" stroke-width="3.5"/>
+      <!-- Hill / bend symbol -->
+      <path d="M130 200 Q200 100 270 200" fill="none" stroke="#f4d35e" stroke-width="3" stroke-dasharray="6,4"/>
+      <text x="200" y="130" font-family="Arial,sans-serif" font-size="28" fill="#1a1a1a" text-anchor="middle" font-weight="bold">⛰</text>
+      <text x="200" y="170" font-family="Arial,sans-serif" font-size="12" fill="#f4d35e" text-anchor="middle" font-weight="bold">Backkrön</text>
+      <!-- Car behind (you), car ahead -->
+      <g transform="rotate(0,185,330)">
+  <rect x="174" y="312" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="177" y="316" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <g transform="rotate(0,215,240)">
+  <rect x="204" y="222" width="22" height="36" rx="5" ry="5" fill="#888888" />
+  <rect x="207" y="226" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <!-- No overtaking sign -->
+      <circle cx="310" cy="300" r="22" fill="white" stroke="red" stroke-width="3"/>
+      <circle cx="300" cy="298" r="6" fill="red"/>
+      <circle cx="320" cy="298" r="6" fill="#1d7dc1"/>
+      <line x1="295" y1="306" x2="325" y2="290" stroke="red" stroke-width="2.5"/>
+      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Förbjudet: backkrön, kurva, korsning, övergångsställe…</text>
+    
+</svg>

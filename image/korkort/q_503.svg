@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" style="background:#f0f0f0">
+
+      <!-- Road -->
+      <rect x="50" y="150" width="300" height="100" fill="#6b6b6b"/>
+      <line x1="50" y1="200" x2="350" y2="200" stroke="#ffffff" stroke-width="2" stroke-dasharray="18,12"/>
+      <!-- Car stopping briefly (left) -->
+      <g transform="rotate(90,130,215)">
+  <rect x="119" y="197" width="22" height="36" rx="5" ry="5" fill="#1d7dc1" />
+  <rect x="122" y="201" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <rect x="95" y="260" width="70" height="28" rx="5" fill="#1d7dc1" opacity="0.85"/>
+      <text x="130" y="279" font-family="Arial,sans-serif" font-size="11" fill="white" text-anchor="middle" font-weight="bold">STANNA</text>
+      <text x="130" y="300" font-family="Arial,sans-serif" font-size="10" fill="#1a1a1a" text-anchor="middle" font-weight="bold">≤ kort tid / av/på</text>
+      <!-- Car parked (right) -->
+      <g transform="rotate(90,270,215)">
+  <rect x="259" y="197" width="22" height="36" rx="5" ry="5" fill="#e63946" />
+  <rect x="262" y="201" width="16" height="7" rx="2" fill="rgba(255,255,255,0.4)" />
+</g>
+      <rect x="235" y="260" width="70" height="28" rx="5" fill="#e63946" opacity="0.85"/>
+      <text x="270" y="279" font-family="Arial,sans-serif" font-size="11" fill="white" text-anchor="middle" font-weight="bold">PARKERA</text>
+      <text x="270" y="300" font-family="Arial,sans-serif" font-size="10" fill="#1a1a1a" text-anchor="middle" font-weight="bold">> kort tid / föraren borta</text>
+      <text x="200" y="390" font-family="Arial,sans-serif" font-size="11" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Stanna = kort uppehåll med föraren kvar. Parkera = längre.</text>
+    
+</svg>
