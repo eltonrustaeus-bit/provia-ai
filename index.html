@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="style.css" />
   <script>(function(){try{if(localStorage.getItem('proviaai_theme')==='light')document.documentElement.classList.add('light');}catch(e){}})()</script>
   <script src="shared.js" defer></script>
+  <noscript><style>.wi{transform:none!important}.heroCtas{opacity:1!important}.rev,.reveal{opacity:1!important;transform:none!important}</style></noscript>
   <style>
   /* ═══════════════════════════════════
      INDEX 2.0 — Körkortet-fokus
@@ -317,11 +318,13 @@
   .faqItem{border-bottom:1px solid var(--l);overflow:hidden}
   .faqQ{
     display:flex;align-items:center;justify-content:space-between;gap:16px;
-    padding:18px 0;cursor:pointer;
-    font-weight:600;font-size:14px;color:var(--t);user-select:none;
+    padding:18px 0;cursor:pointer;width:100%;
+    font-family:var(--font);font-weight:600;font-size:14px;color:var(--t);
+    background:none;border:none;text-align:left;
     transition:color .15s;
   }
   .faqQ:hover{color:var(--a)}
+  .faqQ:focus-visible{outline:2px solid var(--a);outline-offset:2px;border-radius:2px}
   .faqIco{
     width:22px;height:22px;border-radius:50%;
     border:1px solid var(--l2);flex-shrink:0;
@@ -335,7 +338,8 @@
     font-size:13.5px;color:var(--t2);line-height:1.72;
     transition:max-height .3s cubic-bezier(.22,.61,.36,1),padding .22s;
   }
-  .faqItem.open .faqA{max-height:400px;padding-bottom:20px}
+  .faqA[hidden]{display:block;max-height:0;padding-bottom:0}
+  .faqItem.open .faqA{max-height:600px;padding-bottom:20px}
 
   /* ── PRICING STRIP ── */
   .pricingStrip{padding:32px 0 64px}
@@ -637,7 +641,7 @@
     letter-spacing: .04em; line-height: 1.45;
   }
   .joinCtaBtn {
-    flex-shrink: 0; height: 36px; padding: 0 20px;
+    flex-shrink: 0; height: 44px; padding: 0 20px;
     background: var(--a); color: #091a10; border: none; border-radius: 8px;
     font-family: var(--font); font-weight: 700; font-size: 13px; cursor: pointer;
     transition: background .15s ease, transform .12s ease;
@@ -651,7 +655,7 @@
   body.light .joinCtaBtn:hover { background: #068c52; }
   @media(min-width:721px){ .joinCta { bottom: 20px; } }
   @media(max-width:480px){
-    .joinCta{left:12px;transform:translateY(20px);width:calc(100% - 92px);max-width:none}
+    .joinCta{left:12px;right:12px;width:auto;max-width:none;transform:translateY(20px)}
     .joinCta.show{transform:translateY(0)}
   }
   @media(max-width:380px){
@@ -662,6 +666,8 @@
 
 </head>
 <body>
+
+<a href="#main-content" class="skip-link">Hoppa till innehåll</a>
 
 <!-- LOADER -->
 <div id="ldr" class="loader" aria-hidden="true">
@@ -690,12 +696,12 @@
         <a class="hNavLink" href="pricing.html">Priser</a>
         <a class="hNavLink" href="konto.html">Konto</a>
       </nav>
-      <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla tema">
-        <span class="tglIcon" id="tglIcon">☀️</span>
-        <span id="tglLabel">Light</span>
+      <button class="themeTgl" id="themeToggleBtn" type="button" aria-label="Växla till mörkt tema">
+        <span class="tglIcon" id="tglIcon" aria-hidden="true">☀️</span>
+        <span id="tglLabel" aria-hidden="true">Light</span>
       </button>
       <div class="mWrap">
-        <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false">
+        <button class="mBtn" id="mBtn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="drop">
           <div class="bars" aria-hidden="true"><span></span><span></span><span></span></div>
         </button>
         <div class="drop" id="drop">
@@ -711,7 +717,7 @@
 </header>
 
 
-<main>
+<main id="main-content">
 
   <!-- ═══ HERO ═══ -->
   <section class="hero" aria-label="Startsida">
@@ -734,7 +740,7 @@
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <a class="ctaBtn" href="korkortet.html">
               <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M5 11 8.5 5h7L19 11"/><rect x="2" y="11" width="20" height="8" rx="2"/><circle cx="7.5" cy="19" r="2"/><circle cx="16.5" cy="19" r="2"/></svg>
-              <span>Körkortsteorin</span>
+              <span>Träna körkortsteorin gratis</span>
               <span class="ctaShimmer" aria-hidden="true"></span>
             </a>
             <a class="demoBtn" href="app.html">
@@ -743,7 +749,7 @@
             </a>
           </div>
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center">
-            <button class="heroMoreLink" id="ctaBtn" aria-haspopup="dialog">Vad kan ProviaAI? →</button>
+            <button class="heroMoreLink" id="ctaBtn" aria-haspopup="dialog" aria-controls="sheet">Vad kan ProviaAI? →</button>
             <a class="demoLink" id="demoBtnLink" href="live-demo.html">▶ Se live-demo</a>
           </div>
           <p style="font-family:var(--mono);font-size:10.5px;color:var(--t3);letter-spacing:.04em;margin-top:4px">Gratis att starta · inget kort krävs</p>
@@ -799,7 +805,7 @@
   <section class="statsRow" aria-label="Nyckeltal">
     <div class="wrap statsRowInner rev">
       <div class="statChip">
-        <span class="statBig counter" data-target="368">368</span>
+        <span class="statBig counter" data-target="368" aria-live="off">368</span>
         <span class="statLbl">verifierade frågor</span>
       </div>
       <div class="statDivider" aria-hidden="true"></div>
@@ -859,7 +865,7 @@
       <div class="featsGrid">
 
         <div class="feat rev">
-          <span class="featBig counter" data-target="368">0</span>
+          <span class="featBig counter" data-target="368" aria-live="off">0</span>
           <div class="featLabel">Frågor</div>
           <div class="featT">Komplett frågebank</div>
           <div class="featD">Alla 368 frågor fördelade på 16 ämnesområden — exakt som Transportstyrelsens teoriprov.</div>
@@ -923,27 +929,51 @@
       <h2 class="secTitle" style="text-align:left;margin-bottom:24px">Vanliga frågor</h2>
 
       <div class="faqItem">
-        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-1-answer">
           <span>Är det gratis att använda?</span>
           <div class="faqIco" aria-hidden="true">+</div>
-        </div>
-        <div class="faqA" role="region">2 träningspass i veckan är helt gratis — inget kort krävs. Premium (79 kr/mån) ger obegränsad träning och AI-coach.</div>
+        </button>
+        <div class="faqA" id="faq-1-answer" role="region" aria-labelledby="faq-1-answer" hidden>2 träningspass i veckan är helt gratis — inget kort krävs. Premium (79 kr/mån) ger obegränsad träning och AI-coach.</div>
       </div>
 
       <div class="faqItem">
-        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-2-answer">
           <span>Hur likt är det riktiga teoriprovet?</span>
           <div class="faqIco" aria-hidden="true">+</div>
-        </div>
-        <div class="faqA" role="region">Simulerat teoriprovläge kör 65 slumpade frågor på 50 minuter med 52 rätt för godkänt — exakt samma upplägg som Transportstyrelsens officiella prov.</div>
+        </button>
+        <div class="faqA" id="faq-2-answer" role="region" aria-labelledby="faq-2-answer" hidden>Simulerat teoriprovläge kör 65 slumpade frågor på 50 minuter med 52 rätt för godkänt — exakt samma upplägg som Transportstyrelsens officiella prov.</div>
       </div>
 
       <div class="faqItem">
-        <div class="faqQ" role="button" tabindex="0" aria-expanded="false">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-3-answer">
           <span>Vad ingår i körkortsteorin?</span>
           <div class="faqIco" aria-hidden="true">+</div>
-        </div>
-        <div class="faqA" role="region">368 frågor på 16 ämnesområden: vägmärken, trafikregler, korsningar, alkohol &amp; droger, mörker, nödsituationer, miljö och mer. AI-förklaring till varje svar.</div>
+        </button>
+        <div class="faqA" id="faq-3-answer" role="region" aria-labelledby="faq-3-answer" hidden>368 frågor på 16 ämnesområden: vägmärken, trafikregler, korsningar, alkohol &amp; droger, mörker, nödsituationer, miljö och mer. AI-förklaring till varje svar.</div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-4-answer">
+          <span>Kan jag avbryta prenumerationen när som helst?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
+        </button>
+        <div class="faqA" id="faq-4-answer" role="region" aria-labelledby="faq-4-answer" hidden>Ja, ingen bindningstid. Avbryt när du vill — direkt i kontoinställningarna.</div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-5-answer">
+          <span>Fungerar det på mobilen?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
+        </button>
+        <div class="faqA" id="faq-5-answer" role="region" aria-labelledby="faq-5-answer" hidden>Ja, optimerat för mobil. Träna var som helst — alla sidor fungerar på telefon och surfplatta.</div>
+      </div>
+
+      <div class="faqItem">
+        <button class="faqQ" type="button" aria-expanded="false" aria-controls="faq-6-answer">
+          <span>Vad händer när gratiskvoten tar slut?</span>
+          <div class="faqIco" aria-hidden="true">+</div>
+        </button>
+        <div class="faqA" id="faq-6-answer" role="region" aria-labelledby="faq-6-answer" hidden>Kvoten återställs automatiskt varje vecka. Du kan också uppgradera till Basic eller Premium när som helst för fler eller obegränsade träningspass.</div>
       </div>
 
     </section>
@@ -1069,6 +1099,8 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     const ico=document.getElementById("tglIcon"),lbl=document.getElementById("tglLabel");
     if(ico)ico.textContent=t==="light"?"🌙":"☀️";
     if(lbl)lbl.textContent=t==="light"?"Dark":"Light";
+    const btn=document.getElementById("themeToggleBtn");
+    if(btn)btn.setAttribute("aria-label",t==="light"?"Växla till mörkt tema":"Växla till ljust tema");
   }
   const saved=localStorage.getItem(LS);
   const preferred='dark';
@@ -1101,11 +1133,21 @@ document.querySelectorAll(".faqQ").forEach(q=>{
   const activate=()=>{
     const item=q.parentElement;
     const wasOpen=item.classList.contains("open");
-    document.querySelectorAll(".faqItem.open").forEach(i=>{i.classList.remove("open");i.querySelector(".faqQ").setAttribute("aria-expanded","false")});
-    if(!wasOpen){item.classList.add("open");q.setAttribute("aria-expanded","true")}
+    document.querySelectorAll(".faqItem.open").forEach(i=>{
+      i.classList.remove("open");
+      const btn=i.querySelector(".faqQ");
+      btn.setAttribute("aria-expanded","false");
+      const ans=document.getElementById(btn.getAttribute("aria-controls"));
+      if(ans)ans.hidden=true;
+    });
+    if(!wasOpen){
+      item.classList.add("open");
+      q.setAttribute("aria-expanded","true");
+      const ans=document.getElementById(q.getAttribute("aria-controls"));
+      if(ans)ans.hidden=false;
+    }
   };
   q.addEventListener("click",activate);
-  q.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate()}});
 });
 </script>
 
