@@ -74,6 +74,7 @@ export function buildPERSystemPrompt({
   recentMistakes = [],
   longMemory = null,
   studentName = null,
+  sessionContext = null,
 } = {}) {
   if (intent === 'support') return buildPERSupportPrompt({ role, quotaRemaining, pageContext, longMemory });
   if (intent === 'sales') return buildPERSalesPrompt({ role, quotaRemaining, pageContext, weakAreas, recentMistakes, longMemory, context });
@@ -144,6 +145,17 @@ export function buildPERSystemPrompt({
   }
 
   if (studentName) lines.push(`Elevens namn: ${studentName} — använd det ibland, naturligt, inte i varje svar.`);
+  if (sessionContext) {
+    const sc = sessionContext;
+    const parts = [];
+    if (sc.sessionCount > 0)      parts.push(`${sc.sessionCount} sessioner`);
+    if (sc.examCount > 0)         parts.push(`${sc.examCount} prov genomförda`);
+    if (sc.lastActiveModule && sc.lastActiveModule !== "unknown") parts.push(`senaste modul: ${sc.lastActiveModule}`);
+    if (sc.scoreImprovement !== null && sc.scoreImprovement !== undefined) {
+      parts.push(`poängtrend: ${sc.scoreImprovement >= 0 ? "+" : ""}${sc.scoreImprovement}%`);
+    }
+    if (parts.length) lines.push(`Elevhistorik: ${parts.join(" · ")}`);
+  }
   if (longMemory) lines.push(`## ELEVPROFIL (långtidsminne)\n${longMemory}`);
 
   // Account status — lets PER answer account questions accurately
@@ -165,13 +177,13 @@ export function buildPERSystemPrompt({
   const teachGuide = quiz
     ? `QUIZ-LÄGE: Välj EN fråga ${quizScope}. Skriv frågan tydligt med svarsalternativ A/B/C/D om det passar. Avsluta med "Vad väljer du?" Skriv INTE svaret — vänta på elevens svar.`
     : feynman
-    ? 'FEYNMAN-LÄGE: Eleven ska förklara ett koncept för dig. Lyssna, identifiera fel och luckor, ge konkret feedback om vad som stämmer och vad som saknas. Fråga uppföljningsfrågor om förklaringen är ytlig.'
+    ? 'FEYNMAN-LÄGE: Eleven förklarar ett koncept för dig. Lyssna aktivt. Identifiera exakt var förklaringen brister eller är ytlig — ge konkret feedback på vad som stämmer och vad som saknas. Ställ en uppföljningsfråga om förklaringen är för övergripande.'
     : celebrating
-    ? 'FRAMGÅNG: Eleven rapporterar ett bra resultat. Bekräfta det konkret i en mening — ingen överdrift. Ge sedan ett specifikt nästa steg för att behålla eller förbättra resultatet.'
-    : helpLevel <= 0 ? 'Ge ledtråd först, inte svar direkt — om möjligt. Ställ en motfråga som hjälper eleven tänka rätt.'
-    : helpLevel === 1 ? 'Förklara konceptet bakom frågan tydligt med ett konkret exempel.'
-    : helpLevel === 2 ? 'Gå igenom lösningen steg för steg.'
-    : 'Ge fullständig lösning med förklaring.';
+    ? 'FRAMGÅNG: Bekräfta resultatet i en mening — äkta, inte överdrivet. Ge direkt ett konkret nästa steg för att hålla trenden.'
+    : helpLevel <= 0 ? 'Ställ EN motfråga som tvingar eleven att tänka rätt. Ge INTE svaret. Om eleven redan är på rätt spår — bekräfta kortfattat och skjut dem ett steg vidare.'
+    : helpLevel === 1 ? 'Förklara KONCEPTET bakom — inte svaret. Obligatoriskt: ett konkret exempel. Avsluta med "Hur tänker du nu?"'
+    : helpLevel === 2 ? 'Steg-för-steg lösning. Varje steg på egen rad. Visa logiken, inte bara resultatet.'
+    : 'Fullständig lösning + 1 alternativ angreppsvinkel om det finns.';
 
   const wordCap = quiz || feynman
     ? '- Max 120 ord.'
@@ -193,8 +205,22 @@ export function buildPERSystemPrompt({
 
 ${PROVIA_OPERATING_MAP}
 
-## KARAKTÄR
-Den smarta studiekompisen som förstår hela Provia: skolarbete, skolämnen, eget material, OCR, mockprov, körkort, felbank, rapporter, konto och pricing. Provia är inte bara körkortsteori; körkortsteorin är en del av produkten. Svarar direkt — ingen intro, ingen utfyllnad. Märker mönster tyst: om eleven fastnar i samma ämne eller flöde flera gånger, nämner kopplingen naturligt när det tillför värde. Pratar som en människa, inte en AI-assistent. Börjar aldrig två svar i rad på samma sätt. Aldrig "Bra fråga!", "Absolut!", "Givetvis!" eller liknande fyllnadsfraser. Kortfattad som default — längre bara när det faktiskt hjälper.
+## RÖST
+P.E.R är skarp, direkt och aldrig flummig. Talar som en person som faktiskt kan ämnet — inte som en AI som förklarar att den kan det. Reagerar på det eleven faktiskt skrivit — inte på en generisk version av frågan. Förstår hela Provia: skolarbete, skolämnen, eget material, OCR, mockprov, körkort, felbank, rapporter, konto och pricing. Körkortsteorin är en del av produkten, inte hela.
+
+Tre obrytbara regler:
+1. Börja aldrig med elevens namn, "Bra!", "Självklart", "Absolut", "Givetvis", "Visst!", "Naturligtvis", "Exakt!", "Det stämmer!", "Bra fråga!" eller en omskrivning av frågan. Börja på innehållet direkt.
+2. Om svaret kan sägas på 20 ord — säg det på 20 ord. Längd = komplexitet, inte respekt.
+3. Aldrig samma struktur två svar i rad. Förra svaret var en lista → skriv nästa som löptext. Förra var en fråga → svara nästa med ett påstående.
+
+Läges-ton:
+- study: Lugn och precis. Inga uppmuntrande fyllnadsord.
+- quiz: Nyfiken och lite utmanande. Frågan är kärnan.
+- feynman: Lyssnande och analytisk. Feedback utan komplimanger.
+- celebrating: Äkta men knapp. En mening bekräftelse, sedan nästa steg.
+- sales: Ärlig och konkret. Pitchar för att du tror på produkten.
+
+Multi-turn: Om konversationshistorik finns — referera naturligt till vad eleven frågat eller gjort tidigare, max en gång per svar, bara när det tillför. Aldrig: "Som jag sa tidigare".
 ${lines.length ? '\n' + lines.join('\n') + '\n' : ''}${empathyBlock}${quotaNudge}
 ## UNDERVISNING
 ${teachGuide}
@@ -292,6 +318,18 @@ const SALES_APPROACHES_POOL = [
   'Avslutande direkt fråga: Avsluta med en enda enkel fråga utan press. "Är du nyfiken på att prova Premium en månad?" Inget mer. Låt eleven bestämma.',
 ];
 
+function selectSalesApproach({ role, quotaRemaining, pageContext, weakAreas }) {
+  if (quotaRemaining !== null && quotaRemaining <= 1)
+    return SALES_APPROACHES_POOL.find(a => a.startsWith('Kvot-notis')) || SALES_APPROACHES_POOL[15];
+  if (Array.isArray(weakAreas) && weakAreas.length >= 3)
+    return SALES_APPROACHES_POOL.find(a => a.startsWith('Specificitetsgap')) || SALES_APPROACHES_POOL[2];
+  if (typeof pageContext?.userScore === 'number' && pageContext.userScore < 0.6)
+    return SALES_APPROACHES_POOL.find(a => a.startsWith('Direkt utmaning')) || SALES_APPROACHES_POOL[6];
+  if (role === 'basic')
+    return SALES_APPROACHES_POOL.find(a => a.startsWith('Micro-commitment')) || SALES_APPROACHES_POOL[4];
+  return SALES_APPROACHES_POOL[Math.floor(Math.random() * SALES_APPROACHES_POOL.length)];
+}
+
 export function buildPERSalesPrompt({
   role = 'gratis',
   quotaRemaining = null,
@@ -301,7 +339,7 @@ export function buildPERSalesPrompt({
   longMemory = null,
   context = '',
 } = {}) {
-  const approach = SALES_APPROACHES_POOL[Math.floor(Math.random() * SALES_APPROACHES_POOL.length)];
+  const approach = selectSalesApproach({ role, quotaRemaining, pageContext, weakAreas });
 
   const roleAdvice =
     role === 'premium'

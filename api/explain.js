@@ -165,9 +165,10 @@ export default async function handler(req, res) {
     });
     const pageContext = contextPack.pageContext;
     const learningSignals = buildLearningSignals({
-      weakAreas: contextPack.weakAreas,
+      weakAreas:      contextPack.weakAreas,
       recentMistakes: contextPack.recentMistakes,
       pageContext,
+      structured:     structuredMemory,
     });
 
     // Intent, mood, mode detection
@@ -186,7 +187,18 @@ export default async function handler(req, res) {
     if (context) ctxParts.push(context);
     if (contextPack.summary) ctxParts.push(`Prioriterad sidkontext:\n${contextPack.summary}`);
 
-    const longMemory = await loadLongMemory(supabase, user.id);
+    const { summary: longMemory, structured: structuredMemory } = await loadLongMemory(supabase, user.id);
+
+    const sessionContext = structuredMemory ? {
+      sessionCount:      structuredMemory.sessions_total ?? 0,
+      lastActiveModule:  structuredMemory.last_module !== "unknown" ? structuredMemory.last_module : null,
+      examCount:         structuredMemory.exam_count ?? 0,
+      scoreImprovement:  (() => {
+        const traj = structuredMemory.score_trajectory;
+        if (!Array.isArray(traj) || traj.length < 2) return null;
+        return Math.round(traj[traj.length - 1] - traj[0]);
+      })(),
+    } : null;
 
     const rawNamePart = (user.email || '').split('@')[0].split(/[.\-_+]/)[0];
     const studentName = /^[a-zåäöA-ZÅÄÖ]{2,15}$/.test(rawNamePart)
@@ -208,6 +220,7 @@ export default async function handler(req, res) {
       recentMistakes: contextPack.recentMistakes,
       longMemory,
       studentName,
+      sessionContext,
     });
 
     const userMsg = userQuestion
