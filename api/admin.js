@@ -10,21 +10,17 @@ const supabase = createClient(
 );
 
 function buildScenarioDescription(q) {
-  const correctOption = {
+  const cat = q.category || "";
+  const question = q.question || "";
+  const correct = {
     A: q.option_a,
     B: q.option_b,
     C: q.option_c,
     D: q.option_d,
-  }[String(q.correct || "").toUpperCase()];
+  }[String(q.correct || "").toUpperCase()] || "";
+  const desc = `${String(question).replace(/\?/g, "").trim()}. Context: ${cat} situation. The correct answer is: ${correct}`.trim();
 
-  return [
-    String(q.question || "").replace(/\?/g, "").trim(),
-    q.category ? `Category: ${q.category}` : "",
-    correctOption ? `Correct answer: ${correctOption}` : "",
-  ]
-    .filter(Boolean)
-    .join(". ")
-    .slice(0, 400);
+  return desc.substring(0, 400);
 }
 
 function buildImagePrompt(q) {
@@ -116,8 +112,6 @@ export default async function handler(req, res) {
     const limit = 50;
     const offset = (Math.max(1, Number(page)) - 1) * limit;
 
-    const { imgFilter } = req.body || {};
-
     let query = supabase
       .from("driving_questions")
       .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description, image_status, image_priority, image_prompt, image_source, image_notes, reviewed_at, reviewed_by, report_count", { count: "exact" })
@@ -126,6 +120,8 @@ export default async function handler(req, res) {
 
     if (category) query = query.eq("category", category);
     if (search && String(search).trim()) query = query.ilike("question", `%${String(search).trim()}%`);
+
+    const { imgFilter } = req.body || {};
     if (imgFilter === "none") query = query.is("image_url", null);
     if (imgFilter === "has") query = query.not("image_url", "is", null);
     if (imgFilter === "report") query = query.gt("report_count", 0);
@@ -171,13 +167,15 @@ export default async function handler(req, res) {
     if (updates.difficulty  !== undefined) { if (!["easy","normal","hard"].includes(updates.difficulty)) return res.status(400).json({ ok: false, error: "difficulty invalid" }); safe.difficulty = updates.difficulty; }
     if (updates.category    !== undefined) { if (!VALID_CATS.includes(updates.category)) return res.status(400).json({ ok: false, error: "category invalid" }); safe.category = updates.category; }
     if ("image_url" in updates) {
-      if (!updates.image_url) { safe.image_url = null; }
-      else {
+      if (!updates.image_url) {
+        safe.image_url = null;
+      } else {
         const vs = String(updates.image_url).trim();
-        const isWikimedia = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i.test(vs) && vs.length <= 1000;
-        const isSupabaseStorage = /^https:\/\/mnmotdluigzeehdjbhbu\.supabase\.co\/storage\/v1\/object\/public\/question-images\//i.test(vs) && vs.length <= 500;
-        if (!isWikimedia && !isSupabaseStorage)
-          return res.status(400).json({ ok: false, error: "image_url must be Wikimedia commons URL, question-images storage URL, or null" });
+        const isWikimedia = vs.startsWith("https://upload.wikimedia.org/wikipedia/commons/") && vs.length <= 1000;
+        const isOwnStorage = vs.startsWith("https://mnmotdluigzeehdjbhbu.supabase.co/storage/v1/object/public/question-images/") && vs.length <= 500;
+        if (!isWikimedia && !isOwnStorage) {
+          return res.status(400).json({ ok: false, error: "image_url must be Wikimedia commons URL, Supabase Storage URL, or null" });
+        }
         safe.image_url = vs;
       }
     }
@@ -196,6 +194,17 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ ok: false, error: error.message });
     return res.status(200).json({ ok: true, question: data });
+  }
+
+  /* ── DELETE QUESTION ── */
+  if (action === "delete-question") {
+    if (!await requireAdmin(req, res)) return;
+    const { questionId } = req.body || {};
+    if (!Number.isInteger(questionId) || questionId < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+    const { error } = await supabase.from("driving_questions").delete().eq("id", questionId);
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, deletedId: questionId });
   }
 
   /* ── GENERATE IMAGE PROMPT ── */
@@ -238,33 +247,33 @@ export default async function handler(req, res) {
     const statuses = ["missing", "prompt_ready", "pending_upload", "uploaded", "approved", "rejected"];
     const sources = ["chatgpt_manual", "official_asset", "own_photo", "other", "none"];
     const priorities = ["high", "medium", "low", "none"];
-    const safe = {};
+    const updates = {};
 
     if (image_status !== undefined) {
       if (!statuses.includes(image_status))
         return res.status(400).json({ ok: false, error: "Invalid image_status" });
-      safe.image_status = image_status;
-      if (image_status === "approved" || image_status === "rejected") safe.reviewed_at = new Date().toISOString();
+      updates.image_status = image_status;
+      if (image_status === "approved" || image_status === "rejected") updates.reviewed_at = new Date().toISOString();
     }
     if (image_notes !== undefined) {
-      safe.image_notes = image_notes ? String(image_notes).trim().slice(0, 500) || null : null;
+      updates.image_notes = image_notes ? String(image_notes).trim().slice(0, 500) || null : null;
     }
     if (image_source !== undefined) {
       if (!sources.includes(image_source))
         return res.status(400).json({ ok: false, error: "Invalid image_source" });
-      safe.image_source = image_source;
+      updates.image_source = image_source;
     }
     if (image_priority !== undefined) {
       if (!priorities.includes(image_priority))
         return res.status(400).json({ ok: false, error: "Invalid image_priority" });
-      safe.image_priority = image_priority;
+      updates.image_priority = image_priority;
     }
 
-    if (!Object.keys(safe).length) return res.status(400).json({ ok: false, error: "No valid fields to update" });
+    if (!Object.keys(updates).length) return res.status(400).json({ ok: false, error: "No valid fields to update" });
 
     const { data, error } = await supabase
       .from("driving_questions")
-      .update(safe)
+      .update(updates)
       .eq("id", id)
       .select()
       .single();
@@ -326,15 +335,14 @@ export default async function handler(req, res) {
 
     const { category } = req.body || {};
     const rawLimit = req.body?.limit === undefined ? 10 : Number(req.body.limit);
-    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 50)
-      return res.status(400).json({ ok: false, error: "Invalid limit" });
+    const count = Math.min(50, Math.max(1, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 10));
 
     let query = supabase
       .from("driving_questions")
-      .select("id, category, question, option_a, option_b, option_c, option_d, correct, image_priority, image_prompt")
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, image_status, image_prompt, image_priority")
       .is("image_url", null)
       .order("image_priority", { ascending: true })
-      .limit(rawLimit);
+      .limit(count);
 
     if (category) query = query.eq("category", category);
 
@@ -345,22 +353,11 @@ export default async function handler(req, res) {
       id: q.id,
       category: q.category,
       question: q.question,
-      priority: q.image_priority,
+      priority: q.image_priority || "none",
       prompt: q.image_prompt || buildImagePrompt(q),
     }));
 
     return res.status(200).json({ ok: true, prompts, count: prompts.length });
-  }
-
-  /* ── DELETE QUESTION ── */
-  if (action === "delete-question") {
-    if (!await requireAdmin(req, res)) return;
-    const { questionId } = req.body || {};
-    if (!Number.isInteger(questionId) || questionId < 1)
-      return res.status(400).json({ ok: false, error: "Invalid questionId" });
-    const { error } = await supabase.from("driving_questions").delete().eq("id", questionId);
-    if (error) return res.status(500).json({ ok: false, error: error.message });
-    return res.status(200).json({ ok: true, deletedId: questionId });
   }
 
   return res.status(400).json({ ok: false, error: "Unknown action" });
