@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1080px;height:1080px;overflow:hidden;
+    background:#0d2118;
+    font-family:'DM Sans',sans-serif;
+    display:flex;flex-direction:column;
+    padding:72px 80px;
+    position:relative;
+  }
+  .bg-grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(43,255,151,.03) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(43,255,151,.03) 1px,transparent 1px);
+    background-size:54px 54px;pointer-events:none;
+  }
+  .glow{
+    position:absolute;top:-200px;right:-200px;
+    width:800px;height:800px;
+    background:radial-gradient(circle,rgba(43,255,151,.07) 0%,transparent 65%);
+    pointer-events:none;
+  }
+
+  .label{
+    font-family:'DM Mono',monospace;
+    font-size:18px;letter-spacing:.14em;color:#2bff97;
+    text-transform:uppercase;margin-bottom:52px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;background:#2bff97;
+    box-shadow:0 0 0 5px rgba(43,255,151,.2);}
+
+  h1{
+    font-size:96px;font-weight:900;line-height:.95;
+    letter-spacing:-.05em;color:#f2fcf6;margin-bottom:64px;
+  }
+  h1 em{color:#2bff97;font-style:normal;}
+
+  /* BIG result card */
+  .result-card{
+    background:#162e20;border:1px solid rgba(43,255,151,.2);
+    border-radius:12px;padding:48px 52px;
+    position:relative;overflow:hidden;margin-bottom:28px;
+  }
+  .result-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#2bff97,transparent 70%);
+  }
+  .result-row{display:flex;align-items:center;gap:0;}
+  .res-block{flex:1;text-align:center;}
+  .res-divider{width:1px;height:80px;background:rgba(43,255,151,.15);}
+  .res-num{
+    font-family:'DM Mono',monospace;
+    font-size:72px;font-weight:700;
+    color:#2bff97;letter-spacing:-.04em;line-height:1;
+  }
+  .res-num span{color:#f2fcf6;}
+  .res-sub{
+    font-family:'DM Mono',monospace;font-size:18px;
+    color:#8bbca0;letter-spacing:.06em;text-transform:uppercase;margin-top:6px;
+  }
+
+  /* Pass badge */
+  .pass-badge{
+    display:inline-flex;align-items:center;gap:10px;
+    padding:16px 32px;border-radius:8px;
+    background:rgba(43,255,151,.1);border:1px solid #2bff97;
+    font-family:'DM Mono',monospace;font-size:24px;
+    font-weight:600;color:#2bff97;letter-spacing:.1em;
+  }
+  .pass-dot{width:10px;height:10px;border-radius:50%;background:#2bff97;}
+
+  .req{
+    font-family:'DM Mono',monospace;font-size:18px;
+    color:#8bbca0;margin-top:20px;letter-spacing:.03em;
+  }
+
+  .bottom{
+    margin-top:auto;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .logo{font-family:'DM Mono',monospace;font-size:20px;color:#2bff97;letter-spacing:.06em;}
+  .url{font-family:'DM Mono',monospace;font-size:16px;color:#8bbca0;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow"></div>
+
+  <div class="label"><span class="dot"></span>Simulerat teoriprov</div>
+
+  <h1>65 frågor.<br><em>Riktigt prov.</em></h1>
+
+  <div class="result-card">
+    <div class="result-row">
+      <div class="res-block">
+        <div class="res-num"><span>58</span>/65</div>
+        <div class="res-sub">rätt svar</div>
+      </div>
+      <div class="res-divider"></div>
+      <div class="res-block">
+        <div class="res-num">89%</div>
+        <div class="res-sub">poäng</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pass-badge">
+    <div class="pass-dot"></div>
+    GODKÄNT
+  </div>
+  <div class="req">Godkänt kräver 52 rätt (80%)</div>
+
+  <div class="bottom">
+    <div class="logo">ProviaAi</div>
+    <div class="url">proviaai.se/korkortet</div>
+  </div>
+</body>
+</html>

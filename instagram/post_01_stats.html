@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1080px;height:1080px;overflow:hidden;
+    background:#0d2118;
+    font-family:'DM Sans',sans-serif;
+    display:flex;flex-direction:column;
+    padding:72px 80px;
+    position:relative;
+  }
+  .bg-grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(43,255,151,.03) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(43,255,151,.03) 1px,transparent 1px);
+    background-size:54px 54px;pointer-events:none;
+  }
+  .glow{
+    position:absolute;top:-300px;right:-300px;
+    width:900px;height:900px;
+    background:radial-gradient(circle,rgba(43,255,151,.07) 0%,transparent 65%);
+    pointer-events:none;
+  }
+
+  .label{
+    font-family:'DM Mono',monospace;
+    font-size:18px;letter-spacing:.14em;color:#2bff97;
+    text-transform:uppercase;margin-bottom:64px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;background:#2bff97;
+    box-shadow:0 0 0 5px rgba(43,255,151,.2);}
+
+  .hero{margin-bottom:auto;}
+  .big-num{
+    font-size:220px;font-weight:900;line-height:.85;
+    letter-spacing:-.06em;color:#2bff97;
+    display:block;
+  }
+  .big-word{
+    font-size:76px;font-weight:800;line-height:1;
+    letter-spacing:-.04em;color:#f2fcf6;
+    display:block;margin-top:8px;
+  }
+
+  .divider{
+    width:100%;height:1px;
+    background:linear-gradient(90deg,rgba(43,255,151,.4),transparent);
+    margin:56px 0;
+  }
+
+  .pills{display:flex;gap:16px;flex-wrap:wrap;}
+  .pill{
+    padding:16px 28px;border-radius:8px;
+    border:1px solid rgba(43,255,151,.2);background:#162e20;
+    font-family:'DM Mono',monospace;font-size:16px;color:#c2dece;
+    letter-spacing:.06em;text-transform:uppercase;
+    display:flex;align-items:center;gap:12px;
+  }
+  .pill-val{font-size:32px;font-weight:700;color:#f2fcf6;font-family:'DM Sans',sans-serif;letter-spacing:-.03em;}
+
+  .bottom{
+    margin-top:auto;padding-top:56px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .logo{font-family:'DM Mono',monospace;font-size:20px;color:#2bff97;letter-spacing:.06em;}
+  .url{font-family:'DM Mono',monospace;font-size:16px;color:#8bbca0;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow"></div>
+
+  <div class="label"><span class="dot"></span>Körkortsteorin · ProviaAi</div>
+
+  <div class="hero">
+    <span class="big-num">356</span>
+    <span class="big-word">körkortsfrågor.</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="pills">
+    <div class="pill"><span class="pill-val">17</span>kategorier</div>
+    <div class="pill"><span class="pill-val">AI</span>förklaring</div>
+    <div class="pill"><span class="pill-val">65q</span>teoriprov</div>
+  </div>
+
+  <div class="bottom">
+    <div class="logo">ProviaAi</div>
+    <div class="url">proviaai.se/korkortet</div>
+  </div>
+</body>
+</html>

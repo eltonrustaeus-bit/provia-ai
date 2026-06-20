@@ -9,6 +9,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function buildScenarioDescription(q) {
+  const correctOption = {
+    A: q.option_a,
+    B: q.option_b,
+    C: q.option_c,
+    D: q.option_d,
+  }[String(q.correct || "").toUpperCase()];
+
+  return [
+    String(q.question || "").replace(/\?/g, "").trim(),
+    q.category ? `Category: ${q.category}` : "",
+    correctOption ? `Correct answer: ${correctOption}` : "",
+  ]
+    .filter(Boolean)
+    .join(". ")
+    .slice(0, 400);
+}
+
+function buildImagePrompt(q) {
+  return `Create a realistic educational driving theory scenario image for a Swedish driving test app. The image should show: ${buildScenarioDescription(q)}. Use a driver perspective from inside or just behind the vehicle. Swedish road environment, daylight, clear visibility, pedagogical composition. Do not include readable license plates, brand logos, incorrect traffic signs, distorted vehicles, or text overlays. High quality, clean, realistic, 16:9 format.`;
+}
+
 async function requireAdmin(req, res) {
   const user = await requireAuth(req, res);
   if (!user) return null;
@@ -98,7 +120,7 @@ export default async function handler(req, res) {
 
     let query = supabase
       .from("driving_questions")
-      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description, report_count", { count: "exact" })
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description, image_status, image_priority, image_prompt, image_source, image_notes, reviewed_at, reviewed_by, report_count", { count: "exact" })
       .order("id", { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -107,6 +129,14 @@ export default async function handler(req, res) {
     if (imgFilter === "none") query = query.is("image_url", null);
     if (imgFilter === "has") query = query.not("image_url", "is", null);
     if (imgFilter === "report") query = query.gt("report_count", 0);
+    if (imgFilter === "missing") query = query.or("image_status.is.null,image_status.eq.missing");
+    if (imgFilter === "prompt_ready") query = query.eq("image_status", "prompt_ready");
+    if (imgFilter === "pending_upload") query = query.eq("image_status", "pending_upload");
+    if (imgFilter === "uploaded") query = query.eq("image_status", "uploaded");
+    if (imgFilter === "approved") query = query.eq("image_status", "approved");
+    if (imgFilter === "priority-high") query = query.eq("image_priority", "high");
+    if (imgFilter === "prompt-ready") query = query.eq("image_status", "prompt_ready");
+    if (imgFilter === "pending-review") query = query.in("image_status", ["uploaded"]);
 
     const { data, count, error } = await query;
     if (error) return res.status(500).json({ ok: false, error: error.message });
@@ -144,8 +174,10 @@ export default async function handler(req, res) {
       if (!updates.image_url) { safe.image_url = null; }
       else {
         const vs = String(updates.image_url).trim();
-        if (!/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i.test(vs) || vs.length > 1000)
-          return res.status(400).json({ ok: false, error: "image_url must be Wikimedia commons URL or null" });
+        const isWikimedia = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i.test(vs) && vs.length <= 1000;
+        const isSupabaseStorage = /^https:\/\/mnmotdluigzeehdjbhbu\.supabase\.co\/storage\/v1\/object\/public\/question-images\//i.test(vs) && vs.length <= 500;
+        if (!isWikimedia && !isSupabaseStorage)
+          return res.status(400).json({ ok: false, error: "image_url must be Wikimedia commons URL, question-images storage URL, or null" });
         safe.image_url = vs;
       }
     }
@@ -164,6 +196,160 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ ok: false, error: error.message });
     return res.status(200).json({ ok: true, question: data });
+  }
+
+  /* ── GENERATE IMAGE PROMPT ── */
+  if (action === "generate-prompt") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { questionId } = req.body || {};
+    const id = Number(questionId);
+    if (!Number.isInteger(id) || id < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+
+    const { data: question, error: fetchError } = await supabase
+      .from("driving_questions")
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError) return res.status(500).json({ ok: false, error: fetchError.message });
+    if (!question) return res.status(404).json({ ok: false, error: "Question not found" });
+
+    const prompt = buildImagePrompt(question);
+
+    const { error } = await supabase
+      .from("driving_questions")
+      .update({ image_prompt: prompt, image_status: "prompt_ready" })
+      .eq("id", id);
+
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, prompt, questionId: id });
+  }
+
+  if (action === "update-image-status") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { questionId, image_status, image_notes, image_source, image_priority } = req.body || {};
+    const id = Number(questionId);
+    if (!Number.isInteger(id) || id < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+
+    const statuses = ["missing", "prompt_ready", "pending_upload", "uploaded", "approved", "rejected"];
+    const sources = ["chatgpt_manual", "official_asset", "own_photo", "other", "none"];
+    const priorities = ["high", "medium", "low", "none"];
+    const safe = {};
+
+    if (image_status !== undefined) {
+      if (!statuses.includes(image_status))
+        return res.status(400).json({ ok: false, error: "Invalid image_status" });
+      safe.image_status = image_status;
+      if (image_status === "approved" || image_status === "rejected") safe.reviewed_at = new Date().toISOString();
+    }
+    if (image_notes !== undefined) {
+      safe.image_notes = image_notes ? String(image_notes).trim().slice(0, 500) || null : null;
+    }
+    if (image_source !== undefined) {
+      if (!sources.includes(image_source))
+        return res.status(400).json({ ok: false, error: "Invalid image_source" });
+      safe.image_source = image_source;
+    }
+    if (image_priority !== undefined) {
+      if (!priorities.includes(image_priority))
+        return res.status(400).json({ ok: false, error: "Invalid image_priority" });
+      safe.image_priority = image_priority;
+    }
+
+    if (!Object.keys(safe).length) return res.status(400).json({ ok: false, error: "No valid fields to update" });
+
+    const { data, error } = await supabase
+      .from("driving_questions")
+      .update(safe)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, question: data });
+  }
+
+  if (action === "upload-image") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { questionId, imageData, mimeType } = req.body || {};
+    const id = Number(questionId);
+    if (!Number.isInteger(id) || id < 1)
+      return res.status(400).json({ ok: false, error: "Invalid questionId" });
+
+    const extByMime = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+    };
+    const ext = extByMime[mimeType];
+    if (!ext) return res.status(400).json({ ok: false, error: "Invalid mimeType" });
+    if (!imageData || typeof imageData !== "string")
+      return res.status(400).json({ ok: false, error: "imageData required" });
+
+    let buffer;
+    try {
+      buffer = Buffer.from(imageData, "base64");
+    } catch {
+      return res.status(400).json({ ok: false, error: "Invalid imageData" });
+    }
+    if (buffer.length > 5 * 1024 * 1024)
+      return res.status(400).json({ ok: false, error: "Image too large" });
+
+    const filename = `q-${id}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("question-images")
+      .upload(filename, buffer, { contentType: mimeType, upsert: false });
+
+    if (uploadError) return res.status(500).json({ ok: false, error: uploadError.message });
+
+    const { data: publicData } = supabase.storage
+      .from("question-images")
+      .getPublicUrl(filename);
+    const publicUrl = publicData.publicUrl;
+
+    const { error } = await supabase
+      .from("driving_questions")
+      .update({ image_url: publicUrl, image_status: "uploaded", image_source: "chatgpt_manual" })
+      .eq("id", id);
+
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+    return res.status(200).json({ ok: true, url: publicUrl, filename });
+  }
+
+  if (action === "export-prompts") {
+    if (!await requireAdmin(req, res)) return;
+
+    const { category } = req.body || {};
+    const rawLimit = req.body?.limit === undefined ? 10 : Number(req.body.limit);
+    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 50)
+      return res.status(400).json({ ok: false, error: "Invalid limit" });
+
+    let query = supabase
+      .from("driving_questions")
+      .select("id, category, question, option_a, option_b, option_c, option_d, correct, image_priority, image_prompt")
+      .is("image_url", null)
+      .order("image_priority", { ascending: true })
+      .limit(rawLimit);
+
+    if (category) query = query.eq("category", category);
+
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ ok: false, error: error.message });
+
+    const prompts = (data || []).map(q => ({
+      id: q.id,
+      category: q.category,
+      question: q.question,
+      priority: q.image_priority,
+      prompt: q.image_prompt || buildImagePrompt(q),
+    }));
+
+    return res.status(200).json({ ok: true, prompts, count: prompts.length });
   }
 
   /* ── DELETE QUESTION ── */

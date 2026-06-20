@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap');
+
+  *{margin:0;padding:0;box-sizing:border-box}
+
+  body{
+    width:1080px;height:1920px;overflow:hidden;
+    background:#0d2118;
+    font-family:'DM Sans',sans-serif;
+    position:relative;
+  }
+
+  /* BG grid */
+  .bg-grid{
+    position:absolute;inset:0;z-index:0;
+    background-image:
+      linear-gradient(rgba(43,255,151,.025) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(43,255,151,.025) 1px,transparent 1px);
+    background-size:54px 54px;pointer-events:none;
+  }
+
+  /* ── SCENES ── */
+  .scene{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;
+    opacity:0;pointer-events:none;
+    will-change:opacity,transform;
+    z-index:1;
+  }
+
+  /* ── IMAGE PANEL (top 1080px) ── */
+  .img-panel{
+    width:1080px;height:1080px;flex-shrink:0;
+    position:relative;overflow:hidden;
+    background:#0d2118;
+  }
+  .img-panel img{
+    width:100%;height:100%;object-fit:cover;
+    transform:scale(1.06);
+    will-change:transform;
+  }
+  /* Ken Burns — starts on entering, runs for 5s */
+  .scene.active .img-panel img{
+    animation:kenBurns 5s ease forwards;
+  }
+  @keyframes kenBurns{
+    from{transform:scale(1.06)}
+    to{transform:scale(1.0)}
+  }
+  /* Bottom gradient from image into text area */
+  .img-panel::after{
+    content:'';position:absolute;
+    bottom:0;left:0;right:0;height:280px;
+    background:linear-gradient(transparent,#0d2118);
+    pointer-events:none;
+  }
+
+  /* ── TEXT PANEL (bottom 840px) ── */
+  .txt-panel{
+    flex:1;
+    padding:32px 72px 80px;
+    display:flex;flex-direction:column;
+    justify-content:center;
+  }
+
+  .scene-label{
+    font-family:'DM Mono',monospace;
+    font-size:21px;letter-spacing:.14em;color:#2bff97;
+    text-transform:uppercase;margin-bottom:28px;
+    display:flex;align-items:center;gap:12px;
+    opacity:0;transform:translateY(24px);
+    will-change:opacity,transform;
+  }
+  .ldot{
+    width:11px;height:11px;border-radius:50%;background:#2bff97;
+    box-shadow:0 0 0 5px rgba(43,255,151,.2);flex-shrink:0;
+  }
+  .scene-headline{
+    font-size:104px;font-weight:900;line-height:.95;
+    letter-spacing:-.05em;color:#f2fcf6;
+    margin-bottom:32px;
+    opacity:0;transform:translateY(40px);
+    will-change:opacity,transform;
+  }
+  .scene-headline em{color:#2bff97;font-style:normal;}
+  .scene-sub{
+    font-size:38px;color:#c2dece;line-height:1.45;font-weight:400;
+    opacity:0;transform:translateY(30px);
+    will-change:opacity,transform;
+  }
+  .scene-sub strong{color:#2bff97;font-weight:600;}
+
+  /* Text entrance animations — triggered when .active added */
+  .scene.active .scene-label{
+    animation:txtIn 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s forwards;
+  }
+  .scene.active .scene-headline{
+    animation:txtIn 0.6s cubic-bezier(0.22,1,0.36,1) 0.25s forwards;
+  }
+  .scene.active .scene-sub{
+    animation:txtIn 0.6s cubic-bezier(0.22,1,0.36,1) 0.42s forwards;
+  }
+  @keyframes txtIn{
+    to{opacity:1;transform:translateY(0)}
+  }
+
+  /* ── INTRO SCENE ── */
+  #intro{
+    background:#0d2118;
+    align-items:center;justify-content:center;
+    z-index:20;
+  }
+  .intro-center{
+    display:flex;flex-direction:column;
+    align-items:center;gap:28px;
+    text-align:center;
+  }
+  .intro-logo{
+    font-family:'DM Mono',monospace;font-size:72px;
+    color:#2bff97;letter-spacing:.06em;
+    opacity:0;transform:scale(.92);
+    will-change:opacity,transform;
+  }
+  .intro-tagline{
+    font-family:'DM Mono',monospace;font-size:24px;
+    color:#8bbca0;letter-spacing:.14em;text-transform:uppercase;
+    opacity:0;
+    will-change:opacity;
+  }
+  #intro.active .intro-logo{
+    animation:introLogo 0.7s cubic-bezier(0.22,1,0.36,1) 0.2s forwards;
+  }
+  #intro.active .intro-tagline{
+    animation:fadeInOnly 0.6s ease 0.65s forwards;
+  }
+  @keyframes introLogo{
+    to{opacity:1;transform:scale(1)}
+  }
+  @keyframes fadeInOnly{
+    to{opacity:1}
+  }
+
+  /* ── OUTRO SCENE ── */
+  #outro{
+    background:#0d2118;
+    align-items:center;justify-content:center;
+    z-index:20;
+  }
+  .outro-center{
+    display:flex;flex-direction:column;
+    align-items:center;gap:36px;text-align:center;
+  }
+  .outro-logo{
+    font-family:'DM Mono',monospace;font-size:64px;
+    color:#2bff97;letter-spacing:.06em;
+    opacity:0;transform:translateY(30px);
+    will-change:opacity,transform;
+  }
+  .outro-url{
+    font-family:'DM Mono',monospace;font-size:30px;
+    color:#8bbca0;letter-spacing:.06em;
+    opacity:0;will-change:opacity;
+  }
+  .outro-cta{
+    padding:28px 72px;border-radius:12px;
+    background:#2bff97;
+    font-size:44px;font-weight:800;color:#08100d;
+    letter-spacing:-.02em;
+    opacity:0;transform:translateY(24px);
+    will-change:opacity,transform;
+  }
+  #outro.active .outro-logo{
+    animation:txtIn 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s forwards;
+  }
+  #outro.active .outro-url{
+    animation:fadeInOnly 0.5s ease 0.35s forwards;
+  }
+  #outro.active .outro-cta{
+    animation:txtIn 0.6s cubic-bezier(0.22,1,0.36,1) 0.55s forwards;
+  }
+
+  /* ── PROGRESS DOTS ── */
+  .dots{
+    position:fixed;bottom:52px;left:0;right:0;
+    display:flex;justify-content:center;gap:10px;
+    z-index:100;
+  }
+  .pdot{
+    width:8px;height:8px;border-radius:999px;
+    background:rgba(43,255,151,.25);
+    transition:width .35s ease, background .35s ease;
+  }
+  .pdot.on{width:36px;background:#2bff97;}
+
+  /* ── SCENE FADE UTILITY ── */
+  .fade-in{animation:globalFadeIn 0.45s ease forwards;}
+  .fade-out{animation:globalFadeOut 0.4s ease forwards;}
+  @keyframes globalFadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes globalFadeOut{from{opacity:1}to{opacity:0}}
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+
+  <!-- INTRO -->
+  <div class="scene" id="intro">
+    <div class="intro-center">
+      <div class="intro-logo">ProviaAi</div>
+      <div class="intro-tagline">Körkortsteorin</div>
+    </div>
+  </div>
+
+  <!-- SCENE 1: Stats -->
+  <div class="scene" id="s1">
+    <div class="img-panel"><img src="post_01_stats.png" alt=""/></div>
+    <div class="txt-panel">
+      <div class="scene-label"><span class="ldot"></span>356 frågor</div>
+      <div class="scene-headline">Körkortsteorin<br><em>på riktigt.</em></div>
+      <div class="scene-sub">17 kategorier · AI-förklaring · <strong>65q teoriprov</strong></div>
+    </div>
+  </div>
+
+  <!-- SCENE 2: AI -->
+  <div class="scene" id="s2">
+    <div class="img-panel"><img src="post_02_ai.png" alt=""/></div>
+    <div class="txt-panel">
+      <div class="scene-label"><span class="ldot"></span>AI-förklaring · P.E.R</div>
+      <div class="scene-headline">Förstå <em>varför</em><br>du svarade fel.</div>
+      <div class="scene-sub">Ingen annan teoriapp förklarar — <strong>ProviaAi gör det.</strong></div>
+    </div>
+  </div>
+
+  <!-- SCENE 3: Adaptive -->
+  <div class="scene" id="s3">
+    <div class="img-panel"><img src="post_03_adaptive.png" alt=""/></div>
+    <div class="txt-panel">
+      <div class="scene-label"><span class="ldot"></span>Adaptivt lärande</div>
+      <div class="scene-headline">Lär dig av<br>dina <em>misstag.</em></div>
+      <div class="scene-sub">Svaga kategorier visas <strong>40% oftare</strong> — automatiskt.</div>
+    </div>
+  </div>
+
+  <!-- SCENE 4: Exam -->
+  <div class="scene" id="s4">
+    <div class="img-panel"><img src="post_04_exam.png" alt=""/></div>
+    <div class="txt-panel">
+      <div class="scene-label"><span class="ldot"></span>Simulerat teoriprov</div>
+      <div class="scene-headline">65 frågor.<br><em>Riktigt prov.</em></div>
+      <div class="scene-sub">Se hur du ligger till — <strong>innan du bokar.</strong></div>
+    </div>
+  </div>
+
+  <!-- OUTRO -->
+  <div class="scene" id="outro">
+    <div class="outro-center">
+      <div class="outro-logo">ProviaAi</div>
+      <div class="outro-url">proviaai.se/korkortet</div>
+      <div class="outro-cta">Börja träna nu →</div>
+    </div>
+  </div>
+
+  <!-- DOTS -->
+  <div class="dots">
+    <div class="pdot on" id="pd0"></div>
+    <div class="pdot" id="pd1"></div>
+    <div class="pdot" id="pd2"></div>
+    <div class="pdot" id="pd3"></div>
+    <div class="pdot" id="pd4"></div>
+    <div class="pdot" id="pd5"></div>
+  </div>
+
+<script>
+const IDS      = ['intro','s1','s2','s3','s4','outro'];
+const DURATIONS = [1600, 4000, 4000, 4000, 4000, 3200]; // ms each scene is shown
+const XFADE    = 420; // crossfade duration ms
+
+let cur = -1;
+
+function show(i) {
+  if (i >= IDS.length) return;
+
+  const next = document.getElementById(IDS[i]);
+  const dot  = document.getElementById('pd' + i);
+
+  // Fade in next scene
+  next.style.opacity = '0';
+  next.style.pointerEvents = 'auto';
+  next.classList.add('active');
+  next.classList.add('fade-in');
+
+  // Update dots
+  document.querySelectorAll('.pdot').forEach((d,j) => {
+    d.classList.toggle('on', j === i);
+  });
+
+  // After crossfade: hide previous
+  setTimeout(() => {
+    if (cur >= 0) {
+      const prev = document.getElementById(IDS[cur]);
+      prev.classList.remove('active','fade-in','fade-out');
+      prev.style.opacity = '0';
+      prev.style.pointerEvents = 'none';
+    }
+    next.classList.remove('fade-in');
+    next.style.opacity = '1';
+    cur = i;
+
+    // Schedule next
+    const hold = DURATIONS[i] - XFADE;
+    setTimeout(() => {
+      // Fade out current
+      next.classList.add('fade-out');
+      setTimeout(() => show(i + 1), XFADE);
+    }, hold);
+
+  }, XFADE);
+}
+
+// Expose startReel() so recorder can call it after fonts settle
+window.startReel = () => show(0);
+
+// Auto-start in browser preview
+window.addEventListener('load', () => {
+  setTimeout(() => show(0), 400);
+});
+</script>
+</body>
+</html>
