@@ -597,6 +597,50 @@ body.light .adminSaveBtn{color:#fff}
 .adminImgChip{height:22px;padding:0 9px;font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);border:1px solid var(--l);border-radius:var(--r2);background:transparent;cursor:pointer;transition:all .12s;white-space:nowrap}
 .adminImgChip:hover{border-color:var(--l2);color:var(--t)}
 .adminImgChip.active{background:var(--a-dim);border-color:var(--l2);color:var(--a2)}
+/* ── AI IMAGE WORKFLOW ── */
+.adminAiSection{border-top:1px solid var(--l);padding:12px;display:flex;flex-direction:column;gap:10px}
+.adminAiHdr{font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between}
+.adminImgStatusBadge{font-family:'DM Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:var(--r2);text-transform:uppercase;border:1px solid}
+.adminImgStatusBadge.missing{color:var(--t3);border-color:var(--l)}
+.adminImgStatusBadge.prompt_ready{color:#d4a016;border-color:rgba(212,160,22,.35);background:rgba(212,160,22,.07)}
+.adminImgStatusBadge.pending_upload{color:#7b8fff;border-color:rgba(123,143,255,.35);background:rgba(123,143,255,.07)}
+.adminImgStatusBadge.uploaded{color:#a78bfa;border-color:rgba(167,139,250,.35);background:rgba(167,139,250,.07)}
+.adminImgStatusBadge.approved{color:var(--a2);border-color:var(--l2);background:var(--a-dim)}
+.adminImgStatusBadge.rejected{color:#ff8484;border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.06)}
+.adminAiRow{display:flex;gap:6px;flex-wrap:wrap}
+.adminAiBtn{height:30px;padding:0 12px;font-size:11px;font-family:'DM Mono',monospace;font-weight:500;border-radius:var(--r2);border:1px solid var(--l);background:var(--s2);color:var(--t2);cursor:pointer;transition:all .13s;white-space:nowrap}
+.adminAiBtn:hover{border-color:var(--l2);color:var(--t)}
+.adminAiBtn.primary{background:var(--a);color:#08100d;border-color:var(--a);font-weight:700}
+.adminAiBtn.primary:hover{background:var(--a2)}
+.adminAiBtn.approve{background:rgba(27,255,140,.12);color:var(--a2);border-color:var(--l2)}
+.adminAiBtn.approve:hover{background:rgba(27,255,140,.2)}
+.adminAiBtn.reject{background:rgba(255,107,107,.06);color:#ff8484;border-color:rgba(255,107,107,.3)}
+.adminAiBtn.reject:hover{background:rgba(255,107,107,.12)}
+.adminAiPromptBox{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:10px 12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--t2);line-height:1.6;max-height:120px;overflow-y:auto;word-break:break-word;scrollbar-width:thin;display:none}
+.adminAiPromptBox.show{display:block}
+.adminPrioritySelect{height:28px;padding:0 8px;font-family:'DM Mono',monospace;font-size:10.5px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r2);color:var(--t2);outline:none;cursor:pointer}
+.adminPrioritySelect:focus{border-color:var(--l2)}
+.adminAiChecklist{display:none;flex-direction:column;gap:4px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:10px 12px}
+.adminAiChecklist.show{display:flex}
+.adminAiCheck{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--t2);cursor:pointer;user-select:none}
+.adminAiCheck input{accent-color:var(--a);width:13px;height:13px;cursor:pointer}
+.adminAiUploadArea{border:1px dashed var(--l2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:background .13s;background:transparent}
+.adminAiUploadArea:hover,.adminAiUploadArea.drag{background:rgba(27,255,140,.04);border-color:var(--a)}
+.adminAiUploadArea p{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin:0;pointer-events:none}
+.adminAiUploadArea span{color:var(--a2);font-weight:600}
+.adminAiUploadProgress{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);text-align:center;display:none}
+.adminAiUploadProgress.show{display:block}
+.adminAiNotes{width:100%;box-sizing:border-box;padding:7px 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r);color:var(--t);font-family:'DM Sans',sans-serif;font-size:12px;resize:vertical;min-height:48px;outline:none;transition:border-color .15s}
+.adminAiNotes:focus{border-color:var(--l2)}
+/* Export modal */
+.adminExportOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
+.adminExportOverlay.show{display:flex}
+.adminExportCard{background:var(--s);border:1px solid var(--l);border-radius:var(--r);width:100%;max-width:700px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
+.adminExportHead{padding:14px 18px;border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between}
+.adminExportTitle{font-family:'DM Mono',monospace;font-size:11px;color:var(--a);text-transform:uppercase;letter-spacing:.08em}
+.adminExportBody{padding:16px 18px;overflow-y:auto;flex:1}
+.adminExportPre{background:var(--s2);border:1px solid var(--l);border-radius:var(--r);padding:14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--t2);white-space:pre-wrap;word-break:break-word;line-height:1.7;max-height:55vh;overflow-y:auto}
+.adminExportFoot{padding:12px 18px;border-top:1px solid var(--l);display:flex;gap:8px;justify-content:flex-end}
 /* Action buttons */
 .adminActionBtn{height:24px;padding:0 9px;font-size:10px;background:transparent;border:1px solid var(--l);color:var(--t3);border-radius:var(--r2);cursor:pointer;transition:border-color .12s,color .12s;font-family:'DM Mono',monospace;white-space:nowrap}
 .adminActionBtn:hover{border-color:var(--l2);color:var(--t)}
@@ -1105,6 +1149,10 @@ body.light .adminSaveBtn{color:#fff}
           <button class="adminImgChip" data-imgf="has" onclick="adminSetImgFilter('has')">Med bild</button>
           <button class="adminImgChip" data-imgf="none" onclick="adminSetImgFilter('none')">Utan bild</button>
           <button class="adminImgChip" data-imgf="report" onclick="adminSetImgFilter('report')">Rapporterade</button>
+          <button class="adminImgChip" data-imgf="priority-high" onclick="adminSetImgFilter('priority-high')">🔴 Hög prio</button>
+          <button class="adminImgChip" data-imgf="prompt-ready" onclick="adminSetImgFilter('prompt-ready')">Prompt redo</button>
+          <button class="adminImgChip" data-imgf="pending-review" onclick="adminSetImgFilter('pending-review')">Väntar granskning</button>
+          <button class="adminAiBtn" onclick="adminOpenExport()" type="button" style="margin:0 12px 8px;height:24px;font-size:9.5px">↗ Exportera prompts</button>
         </div>
         <div class="adminQList" id="adminQList">
           <div class="adminWikiStatus">Laddar frågor…</div>
@@ -1235,8 +1283,107 @@ body.light .adminSaveBtn{color:#fff}
                   <div class="adminWikiStatus" id="adminWikiStatus"></div>
                   <div class="adminWikiGrid" id="adminWikiGrid"></div>
                 </div>
+
+                <!-- AI IMAGE WORKFLOW -->
+                <div class="adminAiSection">
+                  <div class="adminAiHdr">
+                    <span>AI-bildflöde</span>
+                    <span class="adminImgStatusBadge missing" id="adminAiStatusBadge">Saknar bild</span>
+                  </div>
+
+                  <!-- Priority -->
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Prioritet</span>
+                    <select class="adminPrioritySelect" id="adminImgPriority" onchange="adminSaveImagePriority()">
+                      <option value="none">— Ingen</option>
+                      <option value="high">🔴 Hög</option>
+                      <option value="medium">🟡 Medel</option>
+                      <option value="low">🟢 Låg</option>
+                    </select>
+                  </div>
+
+                  <!-- Action buttons -->
+                  <div class="adminAiRow">
+                    <button class="adminAiBtn primary" onclick="adminGeneratePrompt()" type="button" id="adminGenPromptBtn">✦ Skapa bildprompt</button>
+                    <button class="adminAiBtn" onclick="adminCopyPrompt()" type="button" id="adminCopyPromptBtn" style="display:none">⎘ Kopiera prompt</button>
+                    <button class="adminAiBtn approve" onclick="adminApproveImage()" type="button" id="adminApproveBtn" style="display:none">✓ Godkänn bild</button>
+                    <button class="adminAiBtn reject" onclick="adminRejectImage()" type="button" id="adminRejectBtn" style="display:none">✕ Avvisa</button>
+                  </div>
+
+                  <!-- Prompt display -->
+                  <div class="adminAiPromptBox" id="adminAiPromptBox"></div>
+
+                  <!-- Upload area (shown when status = prompt_ready) -->
+                  <div id="adminAiUploadWrap" style="display:none">
+                    <div class="adminAiUploadArea" id="adminAiDropZone"
+                      onclick="$('adminAiFileInput').click()"
+                      ondragover="event.preventDefault();this.classList.add('drag')"
+                      ondragleave="this.classList.remove('drag')"
+                      ondrop="event.preventDefault();this.classList.remove('drag');adminHandleFileDrop(event)">
+                      <p>Dra och släpp bild här, eller <span>klicka för att välja</span></p>
+                      <p style="margin-top:4px">JPEG · PNG · WebP · max 5 MB</p>
+                    </div>
+                    <input type="file" id="adminAiFileInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="adminHandleFileSelect(event)" />
+                    <div class="adminAiUploadProgress" id="adminAiUploadProgress"></div>
+                  </div>
+
+                  <!-- Review checklist (shown when status = uploaded) -->
+                  <div class="adminAiChecklist" id="adminAiChecklist">
+                    <div style="font-family:'DM Mono',monospace;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Granska bild</div>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Trafiksituationen stämmer</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Vägmärkena är korrekta</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Trafikreglerna stämmer</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Bilden är tydlig och pedagogisk</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Inga extra skyltar som förvirrar</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Inga felaktiga vägmarkeringar</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Bilden passar frågan</label>
+                    <label class="adminAiCheck"><input type="checkbox" class="aiCheck"> Bilden är rent AI-genererad (inget copyright)</label>
+                  </div>
+
+                  <!-- Notes -->
+                  <textarea class="adminAiNotes" id="adminAiNotes" placeholder="Anteckningar om bilden (valfritt)…" maxlength="500" rows="2"></textarea>
+                </div>
               </div>
             </div>
+
+<!-- EXPORT PROMPTS MODAL -->
+<div class="adminExportOverlay" id="adminExportOverlay" onclick="if(event.target===this)adminCloseExport()">
+  <div class="adminExportCard">
+    <div class="adminExportHead">
+      <span class="adminExportTitle">Exportera bildprompts</span>
+      <button class="adminImgClearBtn" onclick="adminCloseExport()" type="button">✕</button>
+    </div>
+    <div class="adminExportBody">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <select id="adminExportCat" style="height:30px;padding:0 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r2);color:var(--t2);font-family:'DM Mono',monospace;font-size:10.5px;outline:none">
+          <option value="">Alla kategorier</option>
+          <option value="Korsningar">Korsningar</option>
+          <option value="Möte &amp; Omkörning">Möte &amp; Omkörning</option>
+          <option value="Hastighet">Hastighet</option>
+          <option value="Mörker &amp; Sikt">Mörker &amp; Sikt</option>
+          <option value="Nödsituationer">Nödsituationer</option>
+          <option value="Parkering">Parkering</option>
+          <option value="Trafikregler">Trafikregler</option>
+          <option value="Väglag &amp; Bromssträcka">Väglag &amp; Bromssträcka</option>
+          <option value="Säkerhet &amp; Utrustning">Säkerhet &amp; Utrustning</option>
+        </select>
+        <select id="adminExportCount" style="height:30px;padding:0 10px;background:var(--s2);border:1px solid var(--l);border-radius:var(--r2);color:var(--t2);font-family:'DM Mono',monospace;font-size:10.5px;outline:none">
+          <option value="5">5 prompts</option>
+          <option value="10" selected>10 prompts</option>
+          <option value="20">20 prompts</option>
+          <option value="50">50 prompts</option>
+        </select>
+        <button class="adminAiBtn primary" onclick="adminFetchExport()" type="button">Hämta</button>
+        <button class="adminAiBtn" onclick="adminCopyExport()" type="button" id="adminExportCopyBtn" style="display:none">⎘ Kopiera allt</button>
+      </div>
+      <div class="adminAiUploadProgress show" id="adminExportStatus">Välj kategori och klicka Hämta.</div>
+      <pre class="adminExportPre" id="adminExportPre" style="display:none"></pre>
+    </div>
+    <div class="adminExportFoot">
+      <button class="adminAiBtn" onclick="adminCloseExport()" type="button">Stäng</button>
+    </div>
+  </div>
+</div>
 
             <div class="adminSaveRow">
               <span class="adminSaveMsg" id="adminSaveMsg"></span>
@@ -1313,7 +1460,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const safeJSON = (s, fb) => { try { return JSON.parse(s) ?? fb } catch { return fb } };
 const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]} return b };
-const BLOCKED_IMAGE_STATUSES = new Set(["ai_generated","irrelevant","broken","needs_verified_image"]);
+// Only show images in these statuses — whitelist approach
+const SHOW_IMAGE_STATUSES = new Set(["verified","approved"]);
 
 function isLocalGeneratedKorkortImage(url) {
   return /^\/?image\/korkort\/q_\d+\.svg$/i.test(String(url || ""));
@@ -1325,10 +1473,13 @@ function isWikimediaRoadSign(url) {
 }
 
 function normalizeQuestion(q) {
-  const imageStatus = q.imageStatus || q.image_status ||
-    (isLocalGeneratedKorkortImage(q.image_url) ? "needs_verified_image" :
-      (isWikimediaRoadSign(q.image_url) ? "verified" : (q.image_url ? "needs_verified_image" : "missing")));
-  const blockedImage = BLOCKED_IMAGE_STATUSES.has(imageStatus);
+  // DB image_status takes priority; fall back to URL-based derivation for legacy rows
+  const imageStatus = q.image_status ||
+    q.imageStatus ||
+    (isWikimediaRoadSign(q.image_url) ? "verified" :
+      (isLocalGeneratedKorkortImage(q.image_url) ? "approved" :
+        (q.image_url ? "missing" : "missing")));
+  const blockedImage = !SHOW_IMAGE_STATUSES.has(imageStatus);
   return {
     ...q,
     imageStatus,
@@ -1341,7 +1492,7 @@ function normalizeQuestion(q) {
 }
 
 function isQuestionSafeForPractice(q) {
-  return !BLOCKED_IMAGE_STATUSES.has(q.imageStatus);
+  return true; // All questions are safe; images are filtered by normalizeQuestion
 }
 
 const SUPA_URL  = "https://mnmotdluigzeehdjbhbu.supabase.co";
@@ -3406,14 +3557,14 @@ async function init() {
       step("Försöker Supabase…");
       try {
         const {data, error} = await raceTimeout(
-          db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description"),
+          db.from("driving_questions").select("id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description,image_status,image_priority,image_source"),
           12000, "supabase"
         );
         if(error) throw new Error(error.message);
         questions_raw = data;
       } catch(__) {
         const resp2 = await raceTimeout(
-          fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description`, {
+          fetch(`${SUPA_URL}/rest/v1/driving_questions?select=id,category,question,option_a,option_b,option_c,option_d,correct,explanation,difficulty,image_url,image_description,image_status,image_priority,image_source`, {
             headers: { apikey: SUPA_ANON, Authorization: `Bearer ${SUPA_ANON}` }
           }),
           12000, "direktfetch"
@@ -3685,6 +3836,7 @@ function adminSelectQuestion(id) {
     if (autoBtn) autoBtn.style.display = "none";
   }
   adminCheckImageQuality(q.image_url || "");
+  adminUpdateAiUI(q);
   // Dup check after short delay (avoids blocking render)
   setTimeout(() => adminCheckDuplicates($("adminQ")?.value || ""), 300);
   if (window.innerWidth < 860) $("adminEdit").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3798,6 +3950,244 @@ async function adminSave() {
   } finally {
     $("adminSaveBtn").disabled = false;
   }
+}
+
+// ── AI IMAGE WORKFLOW ──
+
+const AI_STATUS_LABELS = {
+  missing: "Saknar bild", prompt_ready: "Prompt redo", pending_upload: "Väntar uppladdning",
+  uploaded: "Uppladdad — granska", approved: "Godkänd", rejected: "Avslagen"
+};
+
+function adminUpdateAiUI(q) {
+  const status = q.image_status || (q.image_url ? "approved" : "missing");
+  const badge = $("adminAiStatusBadge");
+  if (badge) {
+    badge.textContent = AI_STATUS_LABELS[status] || status;
+    badge.className = "adminImgStatusBadge " + status;
+  }
+  // Priority
+  const priSel = $("adminImgPriority");
+  if (priSel) priSel.value = q.image_priority || "none";
+  // Prompt box
+  const promptBox = $("adminAiPromptBox");
+  if (promptBox && q.image_prompt) {
+    promptBox.textContent = q.image_prompt;
+    promptBox.classList.add("show");
+  } else if (promptBox) {
+    promptBox.textContent = "";
+    promptBox.classList.remove("show");
+  }
+  // Buttons
+  const genBtn = $("adminGenPromptBtn");
+  const copyBtn = $("adminCopyPromptBtn");
+  const approveBtn = $("adminApproveBtn");
+  const rejectBtn = $("adminRejectBtn");
+  const uploadWrap = $("adminAiUploadWrap");
+  const checklist = $("adminAiChecklist");
+  if (genBtn) genBtn.style.display = (status === "missing" || status === "rejected") ? "" : "none";
+  if (copyBtn) copyBtn.style.display = q.image_prompt ? "" : "none";
+  if (approveBtn) approveBtn.style.display = (status === "uploaded") ? "" : "none";
+  if (rejectBtn) rejectBtn.style.display = (status === "uploaded" || status === "approved") ? "" : "none";
+  if (uploadWrap) uploadWrap.style.display = (status === "prompt_ready" || status === "pending_upload") ? "" : "none";
+  if (checklist) checklist.classList.toggle("show", status === "uploaded");
+  // Notes
+  const notes = $("adminAiNotes");
+  if (notes) notes.value = q.image_notes || "";
+}
+
+async function adminGeneratePrompt() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  $("adminGenPromptBtn").disabled = true;
+  $("adminGenPromptBtn").textContent = "Genererar…";
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "generate-prompt", questionId: q.id })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    _adminSelectedQ = { ..._adminSelectedQ, image_status: "prompt_ready", image_prompt: json.prompt };
+    _adminQMap.set(q.id, _adminSelectedQ);
+    adminUpdateAiUI(_adminSelectedQ);
+    // Auto-copy
+    navigator.clipboard?.writeText(json.prompt).catch(() => {});
+    adminMsg("✓ Prompt skapad och kopierad till urklipp!", "ok");
+    setTimeout(() => adminMsg("", ""), 3000);
+  } catch(e) {
+    adminMsg("⚠ " + (e.message || "Serverfel"), "err");
+  } finally {
+    $("adminGenPromptBtn").disabled = false;
+    $("adminGenPromptBtn").textContent = "✦ Skapa bildprompt";
+  }
+}
+
+function adminCopyPrompt() {
+  const q = _adminSelectedQ;
+  if (!q?.image_prompt) return;
+  navigator.clipboard?.writeText(q.image_prompt).catch(() => {});
+  const btn = $("adminCopyPromptBtn");
+  if (btn) { btn.textContent = "✓ Kopierat!"; setTimeout(() => { btn.textContent = "⎘ Kopiera prompt"; }, 2000); }
+}
+
+async function adminSaveImagePriority() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const priority = $("adminImgPriority")?.value || "none";
+  try {
+    const tok = await getAuthToken();
+    await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "update-image-status", questionId: q.id, image_priority: priority })
+    });
+    _adminSelectedQ = { ..._adminSelectedQ, image_priority: priority };
+    _adminQMap.set(q.id, _adminSelectedQ);
+  } catch(_) {}
+}
+
+async function adminApproveImage() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const checks = document.querySelectorAll(".aiCheck");
+  const allChecked = [...checks].every(c => c.checked);
+  if (!allChecked && !confirm("Inte alla granskningspunkter är markerade. Godkänn ändå?")) return;
+  const notes = $("adminAiNotes")?.value?.trim() || null;
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "update-image-status", questionId: q.id, image_status: "approved", image_notes: notes })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error);
+    _adminSelectedQ = { ..._adminSelectedQ, image_status: "approved", image_notes: notes };
+    _adminQMap.set(q.id, _adminSelectedQ);
+    adminUpdateAiUI(_adminSelectedQ);
+    adminMsg("✓ Bild godkänd — visas nu för studenter", "ok");
+    setTimeout(() => adminMsg("", ""), 3000);
+  } catch(e) {
+    adminMsg("⚠ " + (e.message || "Serverfel"), "err");
+  }
+}
+
+async function adminRejectImage() {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const notes = $("adminAiNotes")?.value?.trim() || null;
+  if (!notes && !confirm("Avvisa bild utan notering?")) return;
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "update-image-status", questionId: q.id, image_status: "rejected", image_notes: notes, image_url: null })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error);
+    _adminSelectedQ = { ..._adminSelectedQ, image_status: "rejected", image_url: null, image_notes: notes };
+    _adminQMap.set(q.id, _adminSelectedQ);
+    adminUpdateAiUI(_adminSelectedQ);
+    adminUpdateImgPreview();
+    adminMsg("Bild avslagen.", "");
+    setTimeout(() => adminMsg("", ""), 2000);
+  } catch(e) {
+    adminMsg("⚠ " + (e.message || "Serverfel"), "err");
+  }
+}
+
+function adminHandleFileDrop(e) {
+  const file = e.dataTransfer?.files?.[0];
+  if (file) adminUploadFile(file);
+}
+function adminHandleFileSelect(e) {
+  const file = e.target?.files?.[0];
+  if (file) adminUploadFile(file);
+}
+
+async function adminUploadFile(file) {
+  const q = _adminSelectedQ;
+  if (!q) return;
+  const ALLOWED = { "image/jpeg": true, "image/png": true, "image/webp": true };
+  if (!ALLOWED[file.type]) { adminMsg("⚠ Bara JPEG, PNG eller WebP", "err"); return; }
+  if (file.size > 5 * 1024 * 1024) { adminMsg("⚠ Filen är för stor (max 5 MB)", "err"); return; }
+  const prog = $("adminAiUploadProgress");
+  if (prog) { prog.textContent = "Laddar upp…"; prog.classList.add("show"); }
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "upload-image", questionId: q.id, imageData: b64, mimeType: file.type })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    _adminSelectedQ = { ..._adminSelectedQ, image_url: json.url, image_status: "uploaded" };
+    _adminQMap.set(q.id, _adminSelectedQ);
+    $("adminImgUrl").value = json.url;
+    adminUpdateImgPreview();
+    adminUpdateAiUI(_adminSelectedQ);
+    // Update list dot
+    const item = $("adminQList").querySelector(`[data-id="${q.id}"]`);
+    if (item) item.querySelector(".adminQDot")?.classList.add("has");
+    if (prog) { prog.textContent = "✓ Uppladdad! Granska och godkänn."; }
+    adminMsg("✓ Bild uppladdad — granska checklistan", "ok");
+  } catch(e) {
+    if (prog) prog.textContent = "";
+    adminMsg("⚠ " + (e.message || "Nätverksfel"), "err");
+  } finally {
+    if (prog) { setTimeout(() => { prog.textContent = ""; prog.classList.remove("show"); }, 4000); }
+    const fi = $("adminAiFileInput");
+    if (fi) fi.value = "";
+  }
+}
+
+// ── EXPORT PROMPTS ──
+function adminOpenExport() { $("adminExportOverlay")?.classList.add("show"); }
+function adminCloseExport() { $("adminExportOverlay")?.classList.remove("show"); }
+
+async function adminFetchExport() {
+  const cat = $("adminExportCat")?.value || "";
+  const count = Number($("adminExportCount")?.value) || 10;
+  const status = $("adminExportStatus");
+  const pre = $("adminExportPre");
+  const copyBtn = $("adminExportCopyBtn");
+  if (status) status.textContent = "Hämtar…";
+  if (pre) pre.style.display = "none";
+  if (copyBtn) copyBtn.style.display = "none";
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ action: "export-prompts", category: cat || undefined, limit: count })
+    });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error || "Serverfel");
+    if (!json.prompts?.length) { if (status) status.textContent = "Inga frågor utan bild hittades."; return; }
+    const text = json.prompts.map(p =>
+      `QUESTION_ID: ${p.id}\nCATEGORY: ${p.category}\nPRIORITY: ${p.priority}\nQUESTION: ${p.question}\n\nIMAGE PROMPT:\n${p.prompt}\n${"─".repeat(60)}`
+    ).join("\n\n");
+    if (pre) { pre.textContent = text; pre.style.display = ""; }
+    if (status) status.textContent = `${json.count} prompts — kopiera och klistra in i ChatGPT Plus.`;
+    if (copyBtn) copyBtn.style.display = "";
+  } catch(e) {
+    if (status) status.textContent = "⚠ " + (e.message || "Serverfel");
+  }
+}
+
+function adminCopyExport() {
+  const pre = $("adminExportPre");
+  if (!pre?.textContent) return;
+  navigator.clipboard?.writeText(pre.textContent).catch(() => {});
+  const btn = $("adminExportCopyBtn");
+  if (btn) { btn.textContent = "✓ Kopierat!"; setTimeout(() => { btn.textContent = "⎘ Kopiera allt"; }, 2500); }
 }
 
 // ── CHECKED/REVIEWED STATE ──

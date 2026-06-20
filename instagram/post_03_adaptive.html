@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1080px;height:1080px;overflow:hidden;
+    background:#0d2118;
+    font-family:'DM Sans',sans-serif;
+    display:flex;flex-direction:column;
+    padding:72px 80px;
+    position:relative;
+  }
+  .bg-grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(43,255,151,.03) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(43,255,151,.03) 1px,transparent 1px);
+    background-size:54px 54px;pointer-events:none;
+  }
+  .glow{
+    position:absolute;bottom:-400px;left:-200px;
+    width:900px;height:900px;
+    background:radial-gradient(circle,rgba(43,255,151,.06) 0%,transparent 65%);
+    pointer-events:none;
+  }
+
+  .label{
+    font-family:'DM Mono',monospace;
+    font-size:18px;letter-spacing:.14em;color:#2bff97;
+    text-transform:uppercase;margin-bottom:52px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .dot{width:10px;height:10px;border-radius:50%;background:#2bff97;
+    box-shadow:0 0 0 5px rgba(43,255,151,.2);}
+
+  h1{
+    font-size:96px;font-weight:900;line-height:.95;
+    letter-spacing:-.05em;color:#f2fcf6;margin-bottom:60px;
+  }
+  h1 em{color:#2bff97;font-style:normal;}
+
+  /* Category bars */
+  .bars{display:flex;flex-direction:column;gap:22px;margin-bottom:52px;}
+  .bar-row{display:flex;align-items:center;gap:24px;}
+  .bar-name{
+    font-size:24px;font-weight:600;color:#c2dece;
+    width:280px;flex-shrink:0;
+  }
+  .bar-name.active{color:#f2fcf6;}
+  .bar-track{flex:1;height:10px;border-radius:999px;background:#1e3c2a;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:999px;background:#2bff97;}
+  .bar-pct{
+    font-family:'DM Mono',monospace;font-size:18px;
+    color:#8bbca0;width:56px;text-align:right;flex-shrink:0;
+  }
+  .bar-pct.done{color:#2bff97;}
+
+  /* Stat callout */
+  .callout{
+    padding:24px 28px;border-radius:8px;
+    border:1px solid rgba(244,200,66,.22);
+    background:rgba(244,200,66,.05);
+    display:flex;align-items:center;gap:24px;
+  }
+  .callout-num{
+    font-size:64px;font-weight:900;color:#f4c842;
+    letter-spacing:-.04em;line-height:1;flex-shrink:0;
+  }
+  .callout-text{font-size:24px;color:#c2dece;line-height:1.45;}
+  .callout-text strong{color:#f4c842;}
+
+  .bottom{
+    margin-top:auto;padding-top:40px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .logo{font-family:'DM Mono',monospace;font-size:20px;color:#2bff97;letter-spacing:.06em;}
+  .url{font-family:'DM Mono',monospace;font-size:16px;color:#8bbca0;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="glow"></div>
+
+  <div class="label"><span class="dot"></span>Adaptivt lärande</div>
+
+  <h1>Lär dig av<br>dina <em>misstag.</em></h1>
+
+  <div class="bars">
+    <div class="bar-row">
+      <span class="bar-name done">Vägmärken</span>
+      <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+      <span class="bar-pct done">100%</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-name active">Korsningar</span>
+      <div class="bar-track"><div class="bar-fill" style="width:61%"></div></div>
+      <span class="bar-pct">61%</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-name">Trafikregler</span>
+      <div class="bar-track"><div class="bar-fill" style="width:30%"></div></div>
+      <span class="bar-pct">30%</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-name">Parkering</span>
+      <div class="bar-track"><div class="bar-fill" style="width:8%"></div></div>
+      <span class="bar-pct">8%</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-num">40%</div>
+    <div class="callout-text">
+      Frågor du svarat fel på visas <strong>40% oftare</strong>
+      — tills du behärskar dem.
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="logo">ProviaAi</div>
+    <div class="url">proviaai.se/korkortet</div>
+  </div>
+</body>
+</html>
