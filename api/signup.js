@@ -77,7 +77,7 @@ function buildWelcomeHtml(email) {
                   </tr>
                   <tr>
                     <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
-                      2 teoriprov per vecka &nbsp;·&nbsp; 2 körkortstest per vecka
+                      10 kursfrågor/dag &nbsp;·&nbsp; 2 AI-mockprov/vecka &nbsp;·&nbsp; 5 P.E.R/vecka
                     </td>
                   </tr>
                 </table>
@@ -97,7 +97,7 @@ function buildWelcomeHtml(email) {
                   </tr>
                   <tr>
                     <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
-                      30 teoriprov per månad — träna ordentligt inför provet
+                      30 teoriprov/mån &nbsp;·&nbsp; 30 AI-mockprov/mån &nbsp;·&nbsp; Obegränsad körkortsträning &nbsp;·&nbsp; P.E.R 5/dag
                     </td>
                   </tr>
                 </table>
@@ -118,7 +118,7 @@ function buildWelcomeHtml(email) {
                   </tr>
                   <tr>
                     <td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">
-                      Obegränsad träning &nbsp;·&nbsp; Förbättringscoach &nbsp;·&nbsp; Full körkortstest
+                      Obegränsat allt &nbsp;·&nbsp; Förbättringscoach &nbsp;·&nbsp; P.E.R obegränsat
                     </td>
                   </tr>
                 </table>

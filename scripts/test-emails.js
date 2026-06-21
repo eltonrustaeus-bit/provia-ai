@@ -84,7 +84,7 @@ function welcomeHtml(email) {
                   <td><span style="font-size:13px;font-weight:700;color:#1bff8c">Gratis</span><span style="font-size:12px;color:#6b8f7c;margin-left:8px">— du är här nu</span></td>
                   <td align="right"><span style="font-size:14px;font-weight:700;color:#e8f5ee">0 kr</span></td>
                 </tr>
-                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">2 teoriprov per vecka &nbsp;·&nbsp; 2 körkortstest per vecka</td></tr>
+                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">10 kursfrågor/dag &nbsp;·&nbsp; 2 AI-mockprov/vecka &nbsp;·&nbsp; 5 P.E.R/vecka</td></tr>
               </table>
             </td></tr>
             <tr><td style="padding:12px 14px;background:#111a15;border:1px solid rgba(27,255,140,.12);border-bottom:none">
@@ -93,7 +93,7 @@ function welcomeHtml(email) {
                   <td><span style="font-size:13px;font-weight:700;color:#e8f5ee">Basic</span></td>
                   <td align="right"><span style="font-size:14px;font-weight:700;color:#e8f5ee">29 kr<span style="font-size:11px;font-weight:400;color:#6b8f7c">/mån</span></span></td>
                 </tr>
-                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">30 teoriprov per månad — träna ordentligt inför provet</td></tr>
+                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">30 teoriprov/mån &nbsp;·&nbsp; 30 AI-mockprov/mån &nbsp;·&nbsp; Obegränsad körkortsträning &nbsp;·&nbsp; P.E.R 5/dag</td></tr>
               </table>
             </td></tr>
             <tr><td style="padding:12px 14px;background:#0e1c12;border-radius:0 0 5px 5px;border:1px solid rgba(27,255,140,.35)">
@@ -105,7 +105,7 @@ function welcomeHtml(email) {
                   </td>
                   <td align="right"><span style="font-size:14px;font-weight:700;color:#e8f5ee">79 kr<span style="font-size:11px;font-weight:400;color:#6b8f7c">/mån</span></span></td>
                 </tr>
-                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">Obegränsad träning &nbsp;·&nbsp; Förbättringscoach &nbsp;·&nbsp; Full körkortstest</td></tr>
+                <tr><td colspan="2" style="padding-top:8px;font-size:13px;color:#a8c4b4;line-height:1.5">Obegränsat allt &nbsp;·&nbsp; Förbättringscoach &nbsp;·&nbsp; P.E.R obegränsat</td></tr>
               </table>
             </td></tr>
           </table>
