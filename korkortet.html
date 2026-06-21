@@ -835,20 +835,20 @@ body.light .adminSaveBtn{color:#fff}
   <!-- UPGRADE MODAL -->
   <div id="kkUpgradeModal" role="dialog" aria-modal="true" aria-label="Uppgradera plan">
     <div class="kkUpCard">
-      <div class="kkUpHead">Gränsen för gratis nådd</div>
-      <div class="kkUpSub" id="kkUpSubTxt">Du har använt dina 2 gratis teoriprov den här veckan.</div>
+      <div class="kkUpHead">Lås upp mer</div>
+      <div class="kkUpSub" id="kkUpSubTxt">Teoriprov kräver Basic. Uppgradera för att simulera riktiga teoriprovet.</div>
       <div class="kkUpPlans">
         <div class="kkUpPlan current">
           <div><div class="kkUpPlanName">Gratis</div><div class="kkUpPlanTag">Ditt nuvarande plan</div></div>
-          <div class="kkUpPlanRight"><div class="kkUpCurrent">Aktiv</div><div class="kkUpPlanLimit">2 teoriprov/vecka</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpCurrent">Aktiv</div><div class="kkUpPlanLimit">10 kursfrågor/dag · ingen teoriprov</div></div>
         </div>
         <div class="kkUpPlan highlight">
           <div><div class="kkUpPlanName">Basic</div><div class="kkUpPlanTag">Mest populärt</div></div>
-          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">49 kr/mån</div><div class="kkUpPlanLimit">30 teoriprov/månad</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">29 kr/mån</div><div class="kkUpPlanLimit">30 teoriprov/mån · obegränsade kursfrågor</div></div>
         </div>
         <div class="kkUpPlan">
           <div><div class="kkUpPlanName">Premium</div><div class="kkUpPlanTag">Obegränsat</div></div>
-          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">99 kr/mån</div><div class="kkUpPlanLimit">∞ teoriprov</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">79 kr/mån</div><div class="kkUpPlanLimit">∞ teoriprov · P.E.R obegränsat</div></div>
         </div>
       </div>
       <div class="kkUpActions">
@@ -1506,12 +1506,18 @@ const LS_CAT_PROG = "proviaai_kk_cat_progress";
 const LS_WRONG    = "proviaai_kk_wrong_ids";
 
 const LIMITS = {
-  gratis:  {period:"week",  cap:2},
+  gratis:  {period:"week",  cap:0},
   basic:   {period:"month", cap:30},
   premium: {period:"month", cap:Infinity},
   admin:   {period:"month", cap:Infinity},
   user:    {period:"month", cap:Infinity},
 };
+
+const PRACTICE_LIMIT = 10;
+function practiceDayKey() { return 'proviaai_kk_pq_' + (uid||'g') + '_' + new Date().toISOString().slice(0,10); }
+function readPracticeQ() { return Number(localStorage.getItem(practiceDayKey()) || 0); }
+function bumpPracticeQ() { const n = readPracticeQ() + 1; localStorage.setItem(practiceDayKey(), String(n)); return PRACTICE_LIMIT - n; }
+function isPracticeExhausted() { return role === 'gratis' && readPracticeQ() >= PRACTICE_LIMIT; }
 
 const CAT_ICONS = {
   "Alla kategorier":"📚","Vägmärken":"🚦","Trafikregler":"📋","Korsningar":"✖",
@@ -2511,30 +2517,38 @@ async function startCourseQuiz(stage) {
   $("courseStageView").style.display = "none";
   $("modeTabs").style.display = "none";
   if(isTest) {
-    const cfg=LIMITS[role]||LIMITS.gratis;
-    if(cfg.cap!==Infinity) {
-      // Server-side quota check for authenticated users
-      if(db && uid) {
-        try {
-          const tok = (await db.auth.getSession()).data.session?.access_token;
-          if(tok) {
-            const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
-            if(r.status===429){showUpgradeModal("Du har nått gränsen för teoriprov. Uppgradera för fler.");return;}
-            if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
-            // Sync local quota display with server count
-            const {count} = await r.json().catch(()=>({}));
-            if(count != null) localStorage.setItem(qKey(), String(count));
-          } else {
-            // Not logged in — fallback localStorage
-            if(readQ()>=cfg.cap){showUpgradeModal();return;}
-            bumpQ();
-          }
-        } catch { if(readQ()>=cfg.cap){showUpgradeModal();return;} bumpQ(); }
-      } else {
-        if(readQ()>=cfg.cap){showUpgradeModal();return;}
-        bumpQ();
+    // Gratis: category tests count against practice quota (not teoriprov quota)
+    if(role === "gratis") {
+      if(isPracticeExhausted()) {
+        showUpgradeModal("Du har använt dina 10 gratis kursfrågor för idag. Uppgradera till Basic för obegränsat.");
+        $("courseStageView").style.display = "";
+        $("modeTabs").style.display = "";
+        return;
       }
-      refreshQuotaUI();
+    } else {
+      const cfg=LIMITS[role]||LIMITS.gratis;
+      if(cfg.cap!==Infinity) {
+        // Server-side quota check for authenticated users (Basic+)
+        if(db && uid) {
+          try {
+            const tok = (await db.auth.getSession()).data.session?.access_token;
+            if(tok) {
+              const r = await fetch("/api/check-role",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+tok},body:JSON.stringify({action:"bump_kk"})});
+              if(r.status===429){showUpgradeModal("Du har nått gränsen för teoriprov. Uppgradera för fler.");return;}
+              if(!r.ok){toast("Serverfel — försök igen.","bad");return;}
+              const {count} = await r.json().catch(()=>({}));
+              if(count != null) localStorage.setItem(qKey(), String(count));
+            } else {
+              if(readQ()>=cfg.cap){showUpgradeModal();return;}
+              bumpQ();
+            }
+          } catch { if(readQ()>=cfg.cap){showUpgradeModal();return;} bumpQ(); }
+        } else {
+          if(readQ()>=cfg.cap){showUpgradeModal();return;}
+          bumpQ();
+        }
+        refreshQuotaUI();
+      }
     }
   }
   // Build exam pool
@@ -2616,6 +2630,7 @@ $("courseStartBtn") && ($("courseStartBtn").onclick = () => {});
 // ── TEORIPROV ──
 $("teoriStartBtn").onclick = async () => {
   if(!uid){showLoginScreen();return;}
+  if(role === 'gratis') { showUpgradeModal('Teoriprov kräver Basic. Uppgradera för 29 kr/mån och simulera riktiga teoriprovet.'); return; }
   const cfg=LIMITS[role]||LIMITS.gratis;
   if(cfg.cap!==Infinity) {
     try {
@@ -2731,6 +2746,22 @@ function refreshQuotaUI() {
   const rl = {gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
   const rp = $("rolePill"); if(rp) rp.textContent = rl[role] || role;
   const adminTab = $("tab-admin"); if(adminTab) adminTab.style.display = role === "admin" ? "" : "none";
+
+  if(role === 'gratis') {
+    const used = readPracticeQ(), left = Math.max(PRACTICE_LIMIT - used, 0);
+    $('quotaLabel').textContent = 'IDAG: ' + used + '/' + PRACTICE_LIMIT + ' KURSFRÅGOR · ' + left + ' KVAR';
+    $('statusDot').classList.toggle('ok', left > 0);
+    const banner = $('quotaBanner'), txt = $('quotaBannerTxt');
+    if(left === 0) {
+      txt.innerHTML = '<strong>Gränsen nådd.</strong> Nytt gratispaket imorgon eller uppgradera till Basic.';
+      banner.classList.add('show');
+      $('startBtn').disabled = true;
+    } else {
+      banner.classList.remove('show');
+      $('startBtn').disabled = false;
+    }
+    return;
+  }
 
   if(cfg.cap === Infinity) {
     $("quotaLabel").textContent = "OBEGRÄNSAT ANTAL TEST";
@@ -2876,9 +2907,14 @@ function showExam() {
 // ── START EXAM ──
 $("startBtn").onclick = async () => {
   if(!uid) { showLoginScreen(); return; }
-  const cfg = LIMITS[role]||LIMITS.gratis;
-  if(cfg.cap !== Infinity && readQ() >= cfg.cap) {
-    showUpgradeModal(); return;
+  if(role === "gratis") {
+    if(isPracticeExhausted()) {
+      showUpgradeModal("Du har använt dina 10 gratis kursfrågor för idag. Uppgradera till Basic för obegränsat.");
+      return;
+    }
+  } else {
+    const cfg = LIMITS[role]||LIMITS.gratis;
+    if(cfg.cap !== Infinity && readQ() >= cfg.cap) { showUpgradeModal(); return; }
   }
   lastN = parseInt($("numQSel").value);
   lastDiff = $("diffSel").value;
@@ -3102,6 +3138,14 @@ function handleAns(chosen, q) {
     // Memorization detection: show understanding check after fast correct streak
     if(ok && streak >= 3 && elapsed < 2500 && SRS.detectMemorization(q.id, elapsed)) {
       setTimeout(() => showUnderstandCheck(q), 300);
+    }
+  }
+
+  if (role === 'gratis' && !isLockedExam && currentMode !== 'repetition') {
+    const remaining = bumpPracticeQ();
+    refreshQuotaUI();
+    if (remaining <= 0) {
+      setTimeout(function() { showUpgradeModal('Du har använt dina 10 gratis kursfrågor för idag. Uppgradera till Basic för obegränsat.'); }, 1200);
     }
   }
 

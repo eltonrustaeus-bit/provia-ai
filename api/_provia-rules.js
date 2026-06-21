@@ -8,7 +8,8 @@ export const PLAN_RULES = Object.freeze({
     label: "Gratis",
     price: "0 kr",
     mockExam: Object.freeze({ cap: 2, period: "week" }),
-    drivingTest: Object.freeze({ cap: 2, period: "week" }),
+    drivingTest: Object.freeze({ cap: 0, period: "week" }),  // teoriprov kräver Basic
+    kkPractice: Object.freeze({ cap: 10, period: "day" }),   // 10 kursfrågor/dag
     perChat: Object.freeze({ cap: 5, period: "week" }),
   }),
   basic: Object.freeze({
@@ -16,6 +17,7 @@ export const PLAN_RULES = Object.freeze({
     price: "29 kr/månad",
     mockExam: Object.freeze({ cap: 30, period: "month" }),
     drivingTest: Object.freeze({ cap: 30, period: "month" }),
+    kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
     perChat: Object.freeze({ cap: 5, period: "day" }),
   }),
   premium: Object.freeze({
@@ -23,6 +25,7 @@ export const PLAN_RULES = Object.freeze({
     price: "79 kr/månad",
     mockExam: Object.freeze({ cap: Infinity, period: "month" }),
     drivingTest: Object.freeze({ cap: Infinity, period: "month" }),
+    kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
     perChat: Object.freeze({ cap: Infinity, period: "month" }),
   }),
   admin: Object.freeze({
@@ -30,6 +33,7 @@ export const PLAN_RULES = Object.freeze({
     price: "internal",
     mockExam: Object.freeze({ cap: Infinity, period: "month" }),
     drivingTest: Object.freeze({ cap: Infinity, period: "month" }),
+    kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
     perChat: Object.freeze({ cap: Infinity, period: "month" }),
   }),
   user: Object.freeze({
@@ -37,6 +41,7 @@ export const PLAN_RULES = Object.freeze({
     price: "79 kr/månad",
     mockExam: Object.freeze({ cap: Infinity, period: "month" }),
     drivingTest: Object.freeze({ cap: Infinity, period: "month" }),
+    kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
     perChat: Object.freeze({ cap: Infinity, period: "month" }),
   }),
 });
@@ -72,6 +77,7 @@ export function getEntitlementSnapshot(role) {
     features: {
       mockExam: serializeLimit(plan.mockExam),
       drivingTest: serializeLimit(plan.drivingTest),
+      kkPractice: serializeLimit(plan.kkPractice),
       perChat: serializeLimit(plan.perChat),
     },
   };
@@ -111,8 +117,8 @@ export function getDrivingQuestionCount() {
 
 export function buildPlanFacts() {
   return [
-    `Gratis: 0 kr, mockprov ${formatLimit(PLAN_RULES.gratis.mockExam)}, körkortstest ${formatLimit(PLAN_RULES.gratis.drivingTest)}, P.E.R ${formatLimit(PLAN_RULES.gratis.perChat)}.`,
-    `Basic: 29 kr/månad, mockprov ${formatLimit(PLAN_RULES.basic.mockExam)}, körkortstest ${formatLimit(PLAN_RULES.basic.drivingTest)}, P.E.R ${formatLimit(PLAN_RULES.basic.perChat)}.`,
+    `Gratis: 0 kr, mockprov ${formatLimit(PLAN_RULES.gratis.mockExam)}, körkortsteorin ${formatLimit(PLAN_RULES.gratis.kkPractice)} kursfrågor (ingen teoriprov), P.E.R ${formatLimit(PLAN_RULES.gratis.perChat)}.`,
+    `Basic: 29 kr/månad, mockprov ${formatLimit(PLAN_RULES.basic.mockExam)}, körkortstest ${formatLimit(PLAN_RULES.basic.drivingTest)} teoriprov + obegränsade kursfrågor, P.E.R ${formatLimit(PLAN_RULES.basic.perChat)}.`,
     "Premium: 79 kr/månad, obegränsade mockprov, obegränsade körkortstest, obegränsad P.E.R och premiumfunktioner.",
   ].join("\n");
 }
@@ -127,7 +133,7 @@ ProviaAI (proviaai.se) är en AI-driven studieapp för elever och studenter. Pro
 Sidor:
 - Startsida: översikt, demo och launcher.
 - Mockprov/skolarbete: eget skolmaterial eller OCR -> AI genererar prov -> rättning med feedback och modellsvar.
-- Körkortsteorin: ${questionCount} frågor, kategorier, adaptivt lärande, SRS/repetition och simulerat teoriprov.
+- Körkortsteorin: ${questionCount} frågor, kategorier, adaptivt lärande, SRS/repetition och simulerat teoriprov (teoriprov kräver Basic eller Premium).
 - Förbättring: historik, felbank, P.E.R-tips, lärarrapport, träningsläge och personlig studieplan.
 - Mitt konto: plan, uppgradering, Stripe-portal, avsluta abonnemang och logga ut.
 - Priser: jämför Gratis, Basic och Premium.
