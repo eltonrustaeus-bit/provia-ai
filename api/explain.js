@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import { callAI, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt } from "./_per-core.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
-import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory } from "./_per-memory.js";
+import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory, updateHelpLevelSignal } from "./_per-memory.js";
 import { getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { buildPERContextPack } from "./_per-context.js";
 
@@ -164,12 +164,6 @@ export default async function handler(req, res) {
       recentMistakes,
     });
     const pageContext = contextPack.pageContext;
-    const learningSignals = buildLearningSignals({
-      weakAreas:      contextPack.weakAreas,
-      recentMistakes: contextPack.recentMistakes,
-      pageContext,
-      structured:     structuredMemory,
-    });
 
     // Intent, mood, mode detection
     const intent      = SUPPORT_TRIGGER_REGEX.test(userQuestion)
@@ -187,7 +181,19 @@ export default async function handler(req, res) {
     if (context) ctxParts.push(context);
     if (contextPack.summary) ctxParts.push(`Prioriterad sidkontext:\n${contextPack.summary}`);
 
+    // Load long-term memory before buildLearningSignals so structuredMemory is in scope
     const { summary: longMemory, structured: structuredMemory } = await loadLongMemory(supabase, user.id);
+
+    // Merge DB exam weak categories into session weak areas for immediate P.E.R awareness
+    const dbWeakCats     = structuredMemory?.exam_weak_categories || [];
+    const mergedWeakAreas = [...new Set([...contextPack.weakAreas, ...dbWeakCats])].slice(0, 10);
+
+    const learningSignals = buildLearningSignals({
+      weakAreas:      mergedWeakAreas,
+      recentMistakes: contextPack.recentMistakes,
+      pageContext,
+      structured:     structuredMemory,
+    });
 
     const sessionContext = structuredMemory ? {
       sessionCount:      structuredMemory.sessions_total ?? 0,
@@ -207,7 +213,7 @@ export default async function handler(req, res) {
 
     const systemContent = buildPERSystemPrompt({
       context: ctxParts.join('\n'),
-      weakAreas: contextPack.weakAreas,
+      weakAreas: mergedWeakAreas,
       role,
       helpLevel,
       pageContext,
@@ -221,6 +227,7 @@ export default async function handler(req, res) {
       longMemory,
       studentName,
       sessionContext,
+      preferredHelpLevel: structuredMemory?.preferred_help_level ?? null,
     });
 
     const userMsg = userQuestion
@@ -280,6 +287,7 @@ export default async function handler(req, res) {
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
       maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
+      updateHelpLevelSignal(supabase, user.id, helpLevel).catch(() => {});
 
       res.write(`data: ${JSON.stringify({ done: true, history: newHistory })}\n\n`);
       return res.end();
@@ -296,6 +304,7 @@ export default async function handler(req, res) {
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
       maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
+      updateHelpLevelSignal(supabase, user.id, helpLevel).catch(() => {});
       return res.json({ answer, history: newHistory });
     } catch (err) {
       return res.status(500).json({ error: err.message || "AI error" });

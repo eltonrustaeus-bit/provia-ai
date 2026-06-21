@@ -47,6 +47,14 @@ Before reading any source file, query the graphify graph:
 `C:\Users\elton\Desktop\ProvKlarUF\graphify-out\graph.json`
 212 nodes, 211 edges, 36 communities. Only fall back to raw file reads if graph lacks detail.
 
+## körkortsteorin — modes (uppdaterad 2026-06-21)
+Övning-mode BORTTAGEN. Kvar: **kurser** (default), **teoriprov**, **repetition**, admin (hidden).
+- `currentMode = "kurser"` | `#tab-kurser` har `active` class
+- Init: `showConfig()` + hero stats uppdateras efter questions laddas (015a86f)
+- Quota: gratis=10 kursfrågor/dag (localStorage), Basic=30 teoriprov/mån (server)
+- `selCat` aldrig satt av kurser-flow → alltid `activeCourse||selCat` i DB-insert
+- Se fullständig state: `C:\Users\elton\.claude-account2\projects\C--Users-elton\memory\project_korkortet.md`
+
 ## P.E.R Core Architecture (uppdaterad 2026-05-30)
 - `api/_per-core.js` — Delat AI-lager: `callAI()`, `buildPERSystemPrompt()`, `buildPERCoachSystemPrompt()`
 - Alla ESM-endpoints importerar från `_per-core.js` (explain, smart-tips, teacher-report)

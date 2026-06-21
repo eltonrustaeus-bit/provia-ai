@@ -1,10 +1,10 @@
 // api/_per-memory.js - P.E.R long-term memory helpers
 // Stores a compact learning profile, not raw personal data.
 
-const REFRESH_DAYS   = 3;
-const MIN_MESSAGES   = 5;
-const MAX_HIST_CHARS = 3000;
+const REFRESH_DAYS    = 1;
+const MAX_HIST_CHARS  = 3000;
 const MEMORY_TTL_DAYS = 90;
+const MAX_HELP_LOG    = 20;
 
 const PRIVATE_OR_SECRET_REGEX = /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+?\d[\d\s().-]{7,}\d)|api[_ -]?key|secret|token|password|supabase_service_role|stripe_secret|openai_api_key|system prompt|developer message)\b/i;
 
@@ -68,38 +68,139 @@ export async function loadLongMemory(supabase, userId) {
   }
 }
 
-// Build rich learning signals — uses structured memory when available
+// Build rich learning signals — prefers real exam DB data over AI-inferred topics
 export function buildLearningSignals({ weakAreas = [], recentMistakes = [], pageContext = null, structured = null } = {}) {
   const signals = [];
 
   if (structured) {
-    if (structured.weak_topics?.length)   signals.push(`Svaga ämnen (historik): ${structured.weak_topics.slice(0, 5).join(", ")}`);
-    if (structured.strong_topics?.length) signals.push(`Starka ämnen: ${structured.strong_topics.slice(0, 3).join(", ")}`);
-    if (Array.isArray(structured.score_trajectory) && structured.score_trajectory.length >= 2) {
+    // Real exam data takes precedence over AI-inferred topics
+    const examWeakCats = structured.exam_weak_categories || [];
+    if (examWeakCats.length)
+      signals.push(`Svaga kategorier (faktiska provresultat): ${examWeakCats.slice(0, 5).join(", ")}`);
+    else if (structured.weak_topics?.length)
+      signals.push(`Svaga ämnen (konversationshistorik): ${structured.weak_topics.slice(0, 5).join(", ")}`);
+
+    if (structured.strong_topics?.length)
+      signals.push(`Starka ämnen: ${structured.strong_topics.slice(0, 3).join(", ")}`);
+
+    if (Array.isArray(structured.exam_recent_scores) && structured.exam_recent_scores.length >= 2) {
+      const scores = structured.exam_recent_scores;
+      const delta  = Math.round(scores[scores.length - 1] - scores[0]);
+      signals.push(`Senaste ${scores.length} provpoäng: ${scores.join("%, ")}% (trend: ${delta >= 0 ? "+" : ""}${delta}%)`);
+    } else if (Array.isArray(structured.score_trajectory) && structured.score_trajectory.length >= 2) {
       const first = structured.score_trajectory[0];
       const last  = structured.score_trajectory[structured.score_trajectory.length - 1];
       const delta = Math.round(last - first);
       signals.push(`Poängtrend: ${delta >= 0 ? "+" : ""}${delta}% (senaste ${structured.score_trajectory.length} proven)`);
     }
-    if (structured.exam_count > 0)    signals.push(`Antal prov totalt: ${structured.exam_count}`);
-    if (structured.last_module && structured.last_module !== "unknown") signals.push(`Senaste modul: ${structured.last_module}`);
-    if (structured.sessions_total > 0) signals.push(`Totalt sessioner: ${structured.sessions_total}`);
+
+    if (structured.exam_count > 0)                                              signals.push(`Antal prov totalt: ${structured.exam_count}`);
+    if (structured.last_module && structured.last_module !== "unknown")         signals.push(`Senaste modul: ${structured.last_module}`);
+    if (structured.sessions_total > 0)                                          signals.push(`Totalt sessioner: ${structured.sessions_total}`);
   }
 
+  // Frontend-sent weak areas — only add when not already covered by DB data
   const weak = uniqueList(weakAreas);
-  if (weak.length && !structured?.weak_topics?.length) signals.push(`Svaga områden: ${weak.join(", ")}`);
+  if (weak.length && !(structured?.exam_weak_categories?.length)) signals.push(`Svaga områden (session): ${weak.join(", ")}`);
 
   const mistakeCats = uniqueList((recentMistakes || []).map(m => m?.category || m?.course));
   if (mistakeCats.length) signals.push(`Återkommande felkategorier: ${mistakeCats.join(", ")}`);
 
-  if (pageContext?.page) signals.push(`Aktiv sida: ${cleanMemoryText(pageContext.page, 50)}`);
-  if (pageContext?.course) signals.push(`Kurs/ämne: ${cleanMemoryText(pageContext.course, 80)}`);
-  if (pageContext?.currentQuestion?.category) signals.push(`Frågekategori: ${cleanMemoryText(pageContext.currentQuestion.category, 80)}`);
-  if (typeof pageContext?.userScore === "number") {
-    signals.push(`Senaste snittnivå: ${Math.round(Math.max(0, Math.min(1, pageContext.userScore)) * 100)}%`);
-  }
+  if (pageContext?.page)                          signals.push(`Aktiv sida: ${cleanMemoryText(pageContext.page, 50)}`);
+  if (pageContext?.course)                        signals.push(`Kurs/ämne: ${cleanMemoryText(pageContext.course, 80)}`);
+  if (pageContext?.currentQuestion?.category)     signals.push(`Frågekategori: ${cleanMemoryText(pageContext.currentQuestion.category, 80)}`);
+  if (typeof pageContext?.userScore === "number") signals.push(`Senaste snittnivå: ${Math.round(Math.max(0, Math.min(1, pageContext.userScore)) * 100)}%`);
 
   return signals.slice(0, 10).join("\n");
+}
+
+// Fetch real exam signals from Supabase — driving_progress.cat_prog + driving_results
+export async function enrichMemoryFromExamData(supabase, userId) {
+  try {
+    const [resultsRes, progressRes] = await Promise.all([
+      supabase
+        .from("driving_results")
+        .select("category, percent, passed, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("driving_progress")
+        .select("cat_prog")
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ]);
+
+    const rows         = resultsRes.data || [];
+    const recentScores = rows.slice(0, 5).map(r => Math.round(r.percent || 0));
+
+    // Primary: cat_prog gives per-category mastery — sort by lowest best% score
+    let weakCategories = [];
+    const catProg = progressRes.data?.cat_prog;
+    if (catProg && typeof catProg === "object") {
+      weakCategories = Object.entries(catProg)
+        .filter(([, v]) => typeof v?.best === "number" && v.best < 75)
+        .sort(([, a], [, b]) => (a.best || 0) - (b.best || 0))
+        .slice(0, 8)
+        .map(([cat]) => cleanMemoryText(cat, 60));
+    }
+
+    // Fallback: failed driving_results rows (skip generic "Alla kategorier")
+    if (!weakCategories.length && rows.length) {
+      const failMap = {};
+      for (const r of rows) {
+        if (!r.passed && r.category && !String(r.category).toLowerCase().includes("alla")) {
+          failMap[r.category] = (failMap[r.category] || 0) + 1;
+        }
+      }
+      weakCategories = Object.entries(failMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([cat]) => cleanMemoryText(cat, 60));
+    }
+
+    return { recentScores, weakCategories };
+  } catch {
+    return { recentScores: [], weakCategories: [] };
+  }
+}
+
+// Track helpLevel signal — lightweight ring buffer upsert, never blocks request
+export async function updateHelpLevelSignal(supabase, userId, helpLevel) {
+  if (typeof helpLevel !== "number" || !Number.isFinite(helpLevel)) return;
+  const level = Math.min(3, Math.max(0, Math.floor(helpLevel)));
+  try {
+    const { data } = await supabase
+      .from("per_long_memory")
+      .select("structured")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const existing = data?.structured || {};
+    const log      = Array.isArray(existing.help_level_log) ? existing.help_level_log : [];
+    const newLog   = [...log, { level, ts: new Date().toISOString() }].slice(-MAX_HELP_LOG);
+
+    // Mode of last 10 entries = preferred level
+    const recent = newLog.slice(-10).map(e => e.level);
+    const freq   = {};
+    for (const l of recent) freq[l] = (freq[l] || 0) + 1;
+    const preferred = Number(Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0);
+
+    await supabase
+      .from("per_long_memory")
+      .upsert(
+        {
+          user_id:    userId,
+          structured: {
+            ...existing,
+            help_level_log:       newLog,
+            preferred_help_level: Number.isFinite(preferred) ? preferred : null,
+          },
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+  } catch { /* best-effort */ }
 }
 
 export async function clearLongMemory(supabase, userId) {
@@ -114,11 +215,15 @@ export async function clearLongMemory(supabase, userId) {
 
 export async function maybeRefreshLongMemory(supabase, userId, recentMessages, callAIFn, learningSignals = "") {
   try {
-    if (!Array.isArray(recentMessages) || recentMessages.length < MIN_MESSAGES) return;
+    // Fetch real exam data first — needed for both the guard and the prompts
+    const examData    = await enrichMemoryFromExamData(supabase, userId);
+    const hasExamData = examData.recentScores.length > 0 || examData.weakCategories.length > 0;
+    const hasMessages = Array.isArray(recentMessages) && recentMessages.length > 0;
+    if (!hasMessages && !hasExamData) return;
 
     const { data } = await supabase
       .from("per_long_memory")
-      .select("updated_at, sessions_total")
+      .select("updated_at, structured")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -126,14 +231,17 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const daysSince  = lastUpdate ? (Date.now() - lastUpdate.getTime()) / 86_400_000 : 999;
     if (daysSince < REFRESH_DAYS) return;
 
-    const histText   = recentMessages
+    const histText   = (Array.isArray(recentMessages) ? recentMessages : [])
       .slice(-30)
       .map(m => `${m.role === "user" ? "Elev" : "P.E.R"}: ${cleanMemoryText(m.content, 160)}`)
       .join("\n")
       .slice(0, MAX_HIST_CHARS);
     const signalText = cleanMemoryText(learningSignals, 700);
 
-    // Text summary (existing behavior)
+    const examSection = hasExamData
+      ? `\nProvdata (faktiska DB-resultat):\n- Svaga kategorier: ${examData.weakCategories.join(", ") || "inga"}\n- Senaste provpoäng: ${examData.recentScores.map(s => s + "%").join(", ") || "inga"}\n`
+      : "";
+
     const summaryPrompt = `Analysera P.E.R-konversationshistoriken och lärsignalerna nedan. Extrahera en elevprofil på svenska (max 130 ord).
 Skriv som strukturerade rader, inte löptext. Ta med bara sådant som syns i underlaget.
 
@@ -147,19 +255,18 @@ Dataminimering:
 - Föredragen hjälpstil:
 - Produktbehov i Provia (körkort, mockprov, felbank, rapport, konto, pricing):
 - Nästa bästa coachning:
-
+${examSection}
 Lärsignaler:
 ${signalText || "Inga extra lärsignaler."}
 
 Historik:
-${histText}
+${histText || "Ingen chathistorik tillgänglig."}
 
 Svara på svenska, max 130 ord. Hitta inte på data.`;
 
     const summary = await callAIFn([{ role: "user", content: summaryPrompt }], { timeout: 20_000 });
     if (!summary) return;
 
-    // Structured extraction — separate AI call with JSON schema
     const structuredPrompt = `Analysera konversationshistoriken och extrahera ett strukturerat lärmönster.
 Basera dig BARA på vad som faktiskt syns i historiken. Hitta inte på data.
 Svaga/starka ämnen: ämnesnamn på svenska (t.ex. "Korsningar", "Matematik", "Vägmärken").
@@ -167,11 +274,11 @@ score_trajectory: lista med procenttal 0-100 i kronologisk ordning (om inga prov
 last_module: vilken Provia-del eleven använde senast.
 sessions_total: antal distinkta sessioner som syns.
 exam_count: antal prov/teoriprov som nämns.
-
+${examSection}
 Historik:
-${histText}`;
+${histText || "Ingen chathistorik tillgänglig."}`;
 
-    let structured = null;
+    let aiStructured = null;
     try {
       const rawStructured = await callAIFn(
         [{ role: "user", content: structuredPrompt }],
@@ -179,8 +286,7 @@ ${histText}`;
       );
       if (rawStructured) {
         const parsed = typeof rawStructured === "string" ? JSON.parse(rawStructured) : rawStructured;
-        // Sanitize string fields
-        structured = {
+        aiStructured = {
           weak_topics:      (parsed.weak_topics || []).map(t => cleanMemoryText(t, 60)).slice(0, 6),
           strong_topics:    (parsed.strong_topics || []).map(t => cleanMemoryText(t, 60)).slice(0, 4),
           avg_score:        typeof parsed.avg_score === "number" ? Math.min(100, Math.max(0, parsed.avg_score)) : null,
@@ -195,11 +301,24 @@ ${histText}`;
       }
     } catch { /* structured extraction is best-effort */ }
 
+    // Preserve signal-tracked fields (help_level_log, preferred_help_level)
+    // — these are written by updateHelpLevelSignal, not by AI extraction
+    const existingStructured = data?.structured || {};
+    const mergedStructured   = aiStructured
+      ? {
+          ...aiStructured,
+          exam_weak_categories: examData.weakCategories,
+          exam_recent_scores:   examData.recentScores,
+          help_level_log:       existingStructured.help_level_log || [],
+          preferred_help_level: existingStructured.preferred_help_level ?? null,
+        }
+      : undefined;
+
     await supabase.from("per_long_memory").upsert(
       {
         user_id:    userId,
         summary:    cleanMemoryText(summary, 900),
-        structured: structured || undefined,
+        structured: mergedStructured,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
