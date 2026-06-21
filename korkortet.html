@@ -868,11 +868,7 @@ body.light .adminSaveBtn{color:#fff}
 
   <!-- MODE TABS -->
   <div class="modeTabs" id="modeTabs">
-    <button class="modeTab active" id="tab-ovning" onclick="setMode('ovning')" type="button">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><polyline points="8 4 8 8 11 10"/></svg>
-      Övning
-    </button>
-    <button class="modeTab" id="tab-kurser" onclick="setMode('kurser')" type="button">
+    <button class="modeTab active" id="tab-kurser" onclick="setMode('kurser')" type="button">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="12" height="10" rx="1"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="8" y2="10"/></svg>
       Kurser
     </button>
@@ -992,64 +988,6 @@ body.light .adminSaveBtn{color:#fff}
     <div id="stageContent"></div>
   </div>
 
-  <!-- ① CONFIG VIEW (Övning mode) -->
-  <div id="configView">
-
-    <div class="card" id="focusCard" style="display:none;border-color:rgba(244,200,66,.18)">
-      <div class="cardTitle" style="color:var(--warn)">Rekommenderat fokus</div>
-      <div id="focusBody"></div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">Välj kategori</div>
-      <div class="catGrid" id="catGrid">
-        <div class="loadingCat">Laddar kategorier…</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">Provkonfiguration</div>
-      <div class="configRow">
-        <div>
-          <label class="fieldLabel" for="numQSel">Antal frågor</label>
-          <select id="numQSel">
-            <option value="10">10 frågor</option>
-            <option value="20">20 frågor</option>
-            <option value="30">30 frågor</option>
-            <option value="45">45 frågor</option>
-            <option value="65">65 frågor (riktigt prov)</option>
-          </select>
-        </div>
-        <div>
-          <label class="fieldLabel" for="diffSel">Svårighetsgrad</label>
-          <select id="diffSel">
-            <option value="">Alla nivåer</option>
-            <option value="easy">Lätt</option>
-            <option value="normal">Normal</option>
-            <option value="hard">Svår</option>
-          </select>
-        </div>
-      </div>
-      <div class="startArea">
-        <button class="startBtn" id="startBtn" disabled>
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 13 8 5 13"/></svg>
-          Starta körkortstest
-        </button>
-        <div class="startHint" id="startHint">10 frågor · 8 rätt rekommenderas</div>
-      </div>
-    </div>
-
-    <div class="card" id="historySection" style="display:none">
-      <div class="cardTitle">Senaste resultat</div>
-      <div id="historyBody"></div>
-    </div>
-
-    <div style="text-align:center;padding:4px 0 8px">
-      <button onclick="resetMastered()" style="background:none;border:none;color:var(--t3);font-family:var(--mono);font-size:10.5px;cursor:pointer;padding:6px 10px;border-radius:var(--r);transition:color .15s" onmouseover="this.style.color='var(--warn)'" onmouseout="this.style.color='var(--t3)'">↺ Nollställ klarade frågor</button>
-    </div>
-
-  </div>
-
   <!-- ② EXAM VIEW -->
   <div id="examView">
 
@@ -1106,7 +1044,6 @@ body.light .adminSaveBtn{color:#fff}
 
     <div class="resultActions">
       <button class="btn btnP" id="retryBtn">Träna mina misstag</button>
-      <button class="btn btnG" id="sameBtn">Samma inställningar</button>
       <button class="btn btnG" id="newBtn">Nytt test</button>
     </div>
 
@@ -1538,9 +1475,9 @@ const TEORI_DIST = {
 // ── STATE ──
 let db, uid, role = localStorage.getItem(LS_ROLE) || "gratis";
 let questions = [], exam = [], idx = 0, ans = [];
-let selCat = "Alla kategorier", lastN = 10, lastDiff = "";
+let selCat = "Alla kategorier";
 let streak = 0, timer = null;
-let currentMode = "ovning"; // "ovning" | "kurser" | "teoriprov" | "repetition"
+let currentMode = "kurser"; // "kurser" | "teoriprov" | "repetition"
 let activeCourse = null;
 let courseStage = "intro"; // "intro"|"study"|"quiz"|"test"|"done"
 let miniQuizMode = false;  // true = quiz within course (no quota bump, always show expl)
@@ -2256,7 +2193,7 @@ function updateXpBar() {
 function setMode(mode) {
   currentMode = mode;
   const views = {
-    ovning:"configView", kurser:"kurserView", teoriprov:"teoriView",
+    kurser:"kurserView", teoriprov:"teoriView",
     repetition:"repetitionView", admin:"adminView"
   };
   Object.entries(views).forEach(([m, id]) => {
@@ -2755,10 +2692,8 @@ function refreshQuotaUI() {
     if(left === 0) {
       txt.innerHTML = '<strong>Gränsen nådd.</strong> Nytt gratispaket imorgon eller uppgradera till Basic.';
       banner.classList.add('show');
-      $('startBtn').disabled = true;
     } else {
       banner.classList.remove('show');
-      $('startBtn').disabled = false;
     }
     return;
   }
@@ -2777,96 +2712,10 @@ function refreshQuotaUI() {
   if(left === 0) {
     txt.innerHTML = `<strong>Gränsen nådd.</strong> ${cfg.period==="week"?"Nytt gratistest nästa vecka.":"Uppgradera för fler test."}`;
     banner.classList.add("show");
-    $("startBtn").disabled = true;
   } else {
     banner.classList.remove("show");
-    $("startBtn").disabled = false;
   }
 }
-
-// ── FOCUS RECOMMENDATIONS ──
-function buildFocusRecs() {
-  const wrap = $("focusCard");
-  if(!wrap || questions.length === 0) return;
-  const prog = getCatProg();
-  const wrongIds = getWrongIds();
-  const cats = Object.keys(CAT_ICONS).filter(c => c !== "Alla kategorier");
-
-  const recs = cats.map(cat => {
-    const p = prog[cat] || {};
-    const wrongInCat = wrongIds.filter(id => questions.find(q => q.id===id && q.category===cat)).length;
-    const score = (p.attempts>0 ? 100 - (p.best||0) : 0) + wrongInCat * 5;
-    return { cat, score, best:p.best||0, wrongInCat };
-  }).filter(r => r.score > 5).sort((a,b) => b.score - a.score).slice(0,3);
-
-  if(!recs.length) { wrap.style.display="none"; return; }
-  wrap.style.display="";
-  $("focusBody").innerHTML = recs.map(r =>
-    `<div class="focusRow" onclick="setFocusCat('${esc(r.cat)}')">
-      <span class="focusCat">${esc(r.cat)}</span>
-      <span class="focusStats">
-        ${r.wrongInCat>0?`<span class="focusBad">${r.wrongInCat} fel</span>`:""}
-        ${r.best>0?`<span class="focusPct">Bäst: ${r.best}%</span>`:""}
-      </span>
-      <span class="focusGo">Öva →</span>
-    </div>`
-  ).join("");
-}
-
-function setFocusCat(cat) {
-  selCat = cat;
-  document.querySelectorAll("#catGrid .catCard").forEach(c => {
-    c.classList.toggle("active", c.querySelector(".catName")?.textContent.includes(cat.replace("⭐ ","")));
-  });
-  updateHint();
-  $("catGrid").scrollIntoView({behavior:"smooth",block:"nearest"});
-}
-
-// ── BUILD CATEGORIES ──
-function buildCats() {
-  const grid = $("catGrid"); grid.innerHTML = "";
-  if(questions.length === 0) {
-    grid.innerHTML = `<div class="loadingCat" style="color:var(--danger)">Inga frågor hittades — kontrollera anslutningen.</div>`;
-    return;
-  }
-  const counts = {};
-  questions.forEach(q => { counts[q.category] = (counts[q.category]||0) + 1 });
-  const bm = getBM().filter(id => questions.some(q => q.id === id));
-  const cats = ["Alla kategorier", ...Object.keys(counts).sort()];
-  if(bm.length > 0) cats.push("⭐ Bokmärkta");
-  const catProgData = getCatProg();
-  cats.forEach(cat => {
-    const n = cat==="Alla kategorier" ? questions.length : cat==="⭐ Bokmärkta" ? bm.length : counts[cat]||0;
-    const icon = CAT_ICONS[cat] || "";
-    const prog = catProgData[cat] || {};
-    const best = prog.best || 0;
-    const done = prog.done || false;
-    const btn = document.createElement("button");
-    btn.type = "button"; btn.className = "catCard" + (cat===selCat?" active":"") + (done?" catCompleted":"");
-    btn.innerHTML = `<div class="catName">${icon ? icon+" " : ""}${esc(cat.replace("⭐ ",""))}</div><div class="catCount">${n} frågor${best?" · "+best+"%":""}</div><div class="catProg"><div class="catProgFill" style="width:${best}%"></div></div>${done?'<div class="catDone">✓</div>':""}`;
-    btn.onclick = () => {
-      grid.querySelectorAll(".catCard").forEach(c => c.classList.remove("active"));
-      btn.classList.add("active"); selCat = cat; updateHint();
-    };
-    grid.appendChild(btn);
-  });
-  $("startBtn").disabled = false;
-  updateHint();
-  buildFocusRecs();
-  // Update hero stat pills with live data
-  const statVals = document.querySelectorAll(".heroStatVal");
-  const allCatsReal = Object.keys(counts);
-  if(statVals[0]) statVals[0].textContent = questions.length;
-  if(statVals[1]) statVals[1].textContent = allCatsReal.length;
-}
-
-function updateHint() {
-  const n = parseInt($("numQSel").value);
-  $("startHint").textContent = n===65
-    ? "65 frågor · 52 rätt krävs · 50 min (som riktigt prov)"
-    : `${n} frågor · ${Math.ceil(n*.8)} rätt rekommenderas`;
-}
-$("numQSel").onchange = updateHint;
 
 // ── VIEWS ──
 function showConfig() {
@@ -2885,13 +2734,10 @@ function showConfig() {
   document.getElementById("howSteps")?.style.removeProperty("display");
   setMode(currentMode);
   refreshQuotaUI();
-  loadHistory();
-  buildFocusRecs();
   updateXpBar();
   window.scrollTo({top:0,behavior:"smooth"});
 }
 function showExam() {
-  $("configView").style.display = "none";
   $("resultView").classList.remove("active");
   $("examView").classList.add("active");
   history.pushState({view:"exam"}, "");
@@ -2903,23 +2749,6 @@ function showExam() {
   document.getElementById("howSteps")?.style.setProperty("display","none");
   window.scrollTo({top:0,behavior:"smooth"});
 }
-
-// ── START EXAM ──
-$("startBtn").onclick = async () => {
-  if(!uid) { showLoginScreen(); return; }
-  if(role === "gratis") {
-    if(isPracticeExhausted()) {
-      showUpgradeModal("Du har använt dina 10 gratis kursfrågor för idag. Uppgradera till Basic för obegränsat.");
-      return;
-    }
-  } else {
-    const cfg = LIMITS[role]||LIMITS.gratis;
-    if(cfg.cap !== Infinity && readQ() >= cfg.cap) { showUpgradeModal(); return; }
-  }
-  lastN = parseInt($("numQSel").value);
-  lastDiff = $("diffSel").value;
-  runExam(selCat, lastN, lastDiff);
-};
 
 function buildTeoriExam() {
   let result = [];
@@ -3313,7 +3142,6 @@ async function showResults() {
   $("examView").classList.remove("active");
   $("miniBar").classList.remove("show");
   $("abortBtn").style.display = "none";
-  $("configView").style.display = "none";
   $("resultView").classList.add("active");
   history.pushState({view:"result"}, "");
   window.scrollTo({top:0,behavior:"smooth"});
@@ -3385,7 +3213,7 @@ async function showResults() {
 
   // Course flow: adjust buttons based on stage
   if(activeCourse && currentMode === "kurser") {
-    const newBtn = $("newBtn"), sameBtn = $("sameBtn");
+    const newBtn = $("newBtn");
     if(miniQuizMode) {
       // Mini-quiz complete → advance to full area test
       newBtn.textContent = "Fortsätt till områdesprov →";
@@ -3395,7 +3223,6 @@ async function showResults() {
         $("courseStageView").style.display = "";
         renderStage("test");
       };
-      if(sameBtn) sameBtn.style.display = "none";
     } else {
       // Area test complete
       const isCoursePass = pct >= 75;
@@ -3406,13 +3233,11 @@ async function showResults() {
         $("courseStageView").style.display = "";
         renderStage(isCoursePass ? "done" : "test");
       };
-      if(sameBtn) sameBtn.style.display = "none";
     }
   } else {
     // Reset buttons for non-course mode
     $("newBtn").textContent = "Nytt test";
     $("newBtn").onclick = () => { activeCourse=null; miniQuizMode=false; showConfig(); };
-    const sameBtn = $("sameBtn"); if(sameBtn) sameBtn.style.display = "";
   }
 
   // Save course progress if in course mode
@@ -3445,7 +3270,7 @@ async function showResults() {
 
   // Save
   try {
-    if(uid) await db.from("driving_results").insert({user_id:uid,category:selCat,num_questions:total,num_correct:right,percent:pct,passed});
+    if(uid) await db.from("driving_results").insert({user_id:uid,category:activeCourse||selCat,num_questions:total,num_correct:right,percent:pct,passed});
   } catch(e) { console.warn("Sparfel:",e) }
 
   // Notify P.E.R widget — gentle redo-score nudge (non-blocking)
@@ -3473,11 +3298,6 @@ $("newBtn").onclick = () => {
     showConfig();
   }
 };
-$("sameBtn").onclick = () => {
-  const cfg=LIMITS[role]||LIMITS.gratis;
-  if(cfg.cap!==Infinity && readQ()>=cfg.cap){toast("Gränsen nådd.","bad");return;}
-  runExam(selCat,lastN,lastDiff);
-};
 $("retryBtn").onclick = () => {
   const mistakes = exam.filter((_,i)=>!hit(ans[i],exam[i]));
   if(!mistakes.length){toast("Inga misstag att träna!","ok");return;}
@@ -3487,23 +3307,6 @@ $("retryBtn").onclick = () => {
   streak=0; updateStreak(); showExam(); renderQ(0);
 };
 
-// ── HISTORY ──
-async function loadHistory() {
-  if(!uid) return;
-  try {
-    const {data} = await db.from("driving_results").select("*").eq("user_id",uid).order("created_at",{ascending:false}).limit(10);
-    if(!data||!data.length){$("historySection").style.display="none";return;}
-    $("historySection").style.display = "";
-    $("historyBody").innerHTML = `<table class="histTable">
-      <thead><tr><th>Datum</th><th>Kategori</th><th>Resultat</th><th>Status</th></tr></thead>
-      <tbody>${data.map(r=>`<tr>
-        <td>${new Date(r.created_at).toLocaleDateString("sv-SE",{month:"short",day:"numeric"})}</td>
-        <td>${esc(r.category||"—")}</td>
-        <td>${r.num_correct}/${r.num_questions} (${r.percent}%)</td>
-        <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
-      </tr>`).join("")}</tbody></table>`;
-  } catch(e){ $("historySection").style.display="none" }
-}
 
 // ── LOGIN ──
 function showLoginScreen() {
@@ -3648,12 +3451,6 @@ async function init() {
       updateXpBar();
     }
 
-    if(uid) await Promise.race([loadHistory(), new Promise(r => setTimeout(r, 8000))]);
-
-    try { buildCats(); } catch(e) {
-      console.error("[korkortet] buildCats:", e);
-      $("catGrid").innerHTML = `<div class="loadingCat" style="color:var(--danger)">⚠️ ${esc(e?.message||"Fel vid kategorier")} &nbsp;<button onclick="location.reload()" style="background:none;border:none;color:var(--a);cursor:pointer;font:inherit;text-decoration:underline">Ladda om</button></div>`;
-    }
     try { refreshQuotaUI(); } catch(_) {}
 
   } catch(err) {
@@ -4565,7 +4362,6 @@ window.addEventListener("popstate", function(e) {
     $("examView").classList.remove("active");
     if ($("resultView")) $("resultView").classList.remove("active");
     if ($("miniBar")) $("miniBar").classList.remove("show");
-    $("configView").style.display = "";
     if ($("abortBtn")) $("abortBtn").style.display = "none";
     if ($("timerBadge")) $("timerBadge").style.display = "none";
     if (typeof timerInterval !== "undefined") clearInterval(timerInterval);
