@@ -106,7 +106,7 @@ export default async function handler(req, res) {
   }
 
   // ── TEACH MODE: P.E.R multi-turn chat ──
-  if (body.topic || (Array.isArray(body.history) && body.history.length > 0)) {
+  if (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0)) {
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("role, per_quota_count, per_quota_period")
