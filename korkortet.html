@@ -965,7 +965,7 @@ body.light .adminSaveBtn{color:#fff}
     <div id="repEmptyBox" class="repEmpty" style="display:none">
       <div class="repEmptyIcon">✅</div>
       <div>Inga frågor att repetera idag!</div>
-      <div style="margin-top:6px;font-size:11px;color:var(--t3)">Fortsätt öva i Kurser eller Övning.</div>
+      <div style="margin-top:6px;font-size:11px;color:var(--t3)">Fortsätt öva i Kurser.</div>
     </div>
     <div class="startArea" id="repStartArea" style="display:none">
       <button class="startBtn" id="repStartBtn" type="button">
@@ -3452,6 +3452,17 @@ async function init() {
     }
 
     try { refreshQuotaUI(); } catch(_) {}
+
+    // Update hero stat pills with live question/category counts
+    try {
+      const statVals = document.querySelectorAll(".heroStatVal");
+      if(statVals[0]) statVals[0].textContent = questions.length;
+      const uniqueCats = [...new Set(questions.map(q => q.category))].filter(Boolean);
+      if(statVals[1]) statVals[1].textContent = uniqueCats.length;
+    } catch(_) {}
+
+    // Show default view (kurser)
+    try { showConfig(); } catch(_) {}
 
   } catch(err) {
     console.error("[korkortet] init-fel:", err);
