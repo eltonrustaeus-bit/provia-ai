@@ -163,9 +163,17 @@ export function buildPERSystemPrompt({
   const normalizedRole = normalizeRole(role);
   const plan = getPlan(normalizedRole);
   const planLabel = `${plan.label} (${plan.price})`;
-  const hasUnlimitedTraining = ['premium', 'admin', 'user'].includes(normalizedRole);
-  lines.push(`Plan: ${planLabel}${quotaRemaining !== null ? ` | P.E.R-frågor kvar denna period: ${quotaRemaining}` : ''}${hasUnlimitedTraining ? ' | Obegränsad träning' : ''}`);
-  if (hasUnlimitedTraining) lines.push('Premium-elev: ge detaljerade förklaringar när eleven vill ha det.');
+  const hasUnlimited = ['premium', 'admin', 'user'].includes(normalizedRole);
+  const PLAN_FEATURES = {
+    gratis:  "2 mockprov/vecka · ingen teoriprov · 10 kursfrågor/dag · 5 P.E.R-samtal/vecka",
+    basic:   "30 mockprov/mån · 30 teoriprov/mån · obegränsade kursfrågor · 5 P.E.R-samtal/dag",
+    premium: "Obegränsade mockprov · Obegränsade teoriprov · Obegränsade kursfrågor · Obegränsad P.E.R",
+    admin:   "Admin: allt obegränsat",
+    user:    "Obegränsade mockprov · Obegränsade teoriprov · Obegränsade kursfrågor · Obegränsad P.E.R",
+  };
+  const features = PLAN_FEATURES[normalizedRole] || PLAN_FEATURES.gratis;
+  lines.push(`## ELEVKONTO\nPlan: ${planLabel} | Inkluderat: ${features}${quotaRemaining !== null ? ` | P.E.R-samtal kvar denna period: ${quotaRemaining}` : ''}`);
+  if (hasUnlimited) lines.push('Premium-elev: ge detaljerade förklaringar när eleven vill ha det.');
 
   const quizScope = pageContext?.page === 'prov'
     ? 'från aktuellt prov eller material'
