@@ -133,6 +133,31 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
+function buildMockPayload(userId, course, per, total, maxTotal) {
+  const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
+  const conceptTags = [...new Set(
+    per.map(q => q.concept_tag).filter(c => c && c !== "Okänt" && c !== "Unknown")
+  )].slice(0, 20);
+  const errorTags = [...new Set(
+    per.flatMap(q => q.error_tags || []).filter(Boolean)
+  )].slice(0, 20);
+  return { user_id: userId, course: (course || "").slice(0, 100), percent: pct, num_questions: per.length, concept_tags: conceptTags, error_tags: errorTags };
+}
+
+function saveMockResult(payload) {
+  fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+      "Prefer": "return=minimal"
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(5000)
+  }).catch(() => {});
+}
+
 async function requireAuth(req) {
   const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
   if (!token) return null;
@@ -183,6 +208,7 @@ module.exports = async function handler(req, res) {
 
     const history = sanitizeHistory(p.history);
     const mistakesCtx = sanitizeMistakes(p.mistakes);
+    const course = safeString(p.course, 80) || history[history.length - 1]?.course || "";
 
     if (!questions.length) return json(res, 400, { ok: false, error: "Missing questions" });
 
@@ -262,6 +288,7 @@ module.exports = async function handler(req, res) {
     if (nonMcPack.length === 0) {
       // Output in original question order
       const per = questions.map((q) => perById.get(String(q.id ?? ""))).filter(Boolean);
+      saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
       return json(res, 200, {
         ok: true,
         result: { total_points: total, max_points: maxTotal, per_question: per }
@@ -406,6 +433,7 @@ module.exports = async function handler(req, res) {
         .map((q) => perById.get(String(q.id ?? "")) || null)
         .filter(Boolean);
 
+      saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
       return json(res, 200, {
         ok: true,
         result: {
