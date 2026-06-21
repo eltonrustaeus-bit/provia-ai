@@ -96,6 +96,16 @@
   .saveBtn.ok{color:var(--ok);border-color:var(--ok)}
   .saveBtn.err{color:#d44016;border-color:#d44016}
 
+  .pitchBtn{
+    padding:5px 10px;border-radius:var(--r2);border:1px solid rgba(212,160,22,.3);
+    background:rgba(212,160,22,.07);color:#d4a016;font-family:var(--mono);font-size:11px;font-weight:500;
+    cursor:pointer;transition:all .14s ease;white-space:nowrap;
+  }
+  .pitchBtn:hover{background:rgba(212,160,22,.15);border-color:#d4a016;color:#e8b020}
+  .pitchBtn:disabled{opacity:.4;cursor:not-allowed}
+  .pitchBtn.ok{color:var(--ok);border-color:var(--ok);background:rgba(27,255,140,.07)}
+  .pitchBtn.err{color:#d44016;border-color:#d44016}
+
   /* STATUS */
   .statusBar{
     display:flex;align-items:center;gap:8px;padding:10px 14px;
@@ -317,6 +327,7 @@ function renderTable() {
       <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <select class="roleSelect" data-uid="${esc(u.id)}" data-current="${esc(u.role)}">${roleOpts}</select>
         <button class="saveBtn" data-uid="${esc(u.id)}" onclick="saveRole('${esc(u.id)}',this)">Spara</button>
+        ${u.role === 'gratis' ? `<button class="pitchBtn" onclick="sendPitch('${esc(u.id)}',this)">✉ Pitch</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -362,6 +373,33 @@ async function saveRole(uid, btn) {
     btn.className = 'saveBtn err';
     showStatus('Fel: ' + e.message, 'err');
     setTimeout(() => { btn.textContent = 'Spara'; btn.className = 'saveBtn'; btn.disabled = false; }, 2000);
+  }
+}
+
+/* SEND PITCH */
+async function sendPitch(uid, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Inte inloggad');
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'send-pitch', targetId: uid })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Misslyckades');
+    btn.textContent = '✓ Skickat';
+    btn.className = 'pitchBtn ok';
+    showStatus(`Pitchmail skickat → ${data.to}`, 'ok');
+    setTimeout(() => { btn.textContent = '✉ Pitch'; btn.className = 'pitchBtn'; btn.disabled = false; }, 4000);
+  } catch (e) {
+    btn.textContent = 'Fel';
+    btn.className = 'pitchBtn err';
+    showStatus('Fel: ' + e.message, 'err');
+    setTimeout(() => { btn.textContent = '✉ Pitch'; btn.className = 'pitchBtn'; btn.disabled = false; }, 2000);
   }
 }
 

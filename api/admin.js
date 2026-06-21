@@ -1,6 +1,62 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 
+function buildPitchHtml(email) {
+  return `<!DOCTYPE html>
+<html lang="sv">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#08100d;font-family:'DM Sans',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#08100d;padding:40px 16px">
+  <tr><td align="center">
+    <table width="100%" style="max-width:520px;background:#0f1a13;border:1px solid rgba(27,255,140,.18);border-radius:8px;overflow:hidden">
+      <tr><td style="background:#0a130d;padding:24px 32px;border-bottom:1px solid rgba(27,255,140,.12)">
+        <span style="font-size:20px;font-weight:700;color:#1bff8c">ProviaAI</span>
+      </td></tr>
+      <tr><td style="padding:32px 32px 20px">
+        <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Du pluggar på gratisplanen. Här är vad du missar.</h1>
+        <p style="margin:0;font-size:15px;color:#a8c4b4;line-height:1.7">Gratisplanen ger dig 10 kursfrågor per dag och 2 AI-mockprov per vecka. Teoriprov — det som simulerar riktiga körkortsprovet — kräver Basic.</p>
+      </td></tr>
+      <tr><td style="padding:0 32px 24px">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#111a15;border:1px solid rgba(27,255,140,.2);border-radius:6px;overflow:hidden">
+          <tr><td style="padding:16px 20px;border-bottom:1px solid rgba(27,255,140,.1)">
+            <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#1bff8c;text-transform:uppercase;letter-spacing:0.6px">Basic — 29 kr/mån</p>
+            <p style="margin:0;font-size:14px;color:#e8f5ee;line-height:1.6">30 teoriprov/mån &nbsp;·&nbsp; 30 AI-mockprov/mån &nbsp;·&nbsp; Obegränsad körkortsträning &nbsp;·&nbsp; P.E.R 5/dag</p>
+          </td></tr>
+          <tr><td style="padding:14px 20px">
+            <p style="margin:0;font-size:13px;color:#a8c4b4;line-height:1.6">Det är 1 prov per dag i en månad. Forskning visar att spridd repetition är det effektivaste sättet att lära sig — men det kräver att du faktiskt kan öva varje dag.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 32px 28px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr><td style="padding:10px 0;border-bottom:1px solid rgba(27,255,140,.07)">
+            <span style="color:#1bff8c;font-size:14px;margin-right:10px">✓</span>
+            <span style="color:#e8f5ee;font-size:14px">AI väljer frågor baserat på dina svagheter</span>
+          </td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid rgba(27,255,140,.07)">
+            <span style="color:#1bff8c;font-size:14px;margin-right:10px">✓</span>
+            <span style="color:#e8f5ee;font-size:14px">P.E.R förklarar varför du svarade fel</span>
+          </td></tr>
+          <tr><td style="padding:10px 0">
+            <span style="color:#1bff8c;font-size:14px;margin-right:10px">✓</span>
+            <span style="color:#e8f5ee;font-size:14px">Ingen bindningstid — avsluta när du vill</span>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 32px 36px">
+        <a href="https://proviaai.se/pricing.html" style="display:inline-block;background:#1bff8c;color:#08100d;font-size:15px;font-weight:700;padding:14px 28px;border-radius:5px;text-decoration:none">Uppgradera till Basic — 29 kr/mån →</a>
+        <p style="margin:12px 0 0;font-size:13px;color:#6b8f7c">Inget kort krävs för att fortsätta på gratis om du ångrar dig.</p>
+      </td></tr>
+      <tr><td style="padding:18px 32px;border-top:1px solid rgba(27,255,140,.08)">
+        <p style="margin:0;font-size:12px;color:#6b8f7c;line-height:1.5">Du får det här mailet för att du har ett konto på ProviaAI med adressen <b style="color:#a8c4b4">${email}</b>.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
 const VALID_ROLES = ["gratis", "basic", "premium", "admin"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -358,6 +414,39 @@ export default async function handler(req, res) {
     }));
 
     return res.status(200).json({ ok: true, prompts, count: prompts.length });
+  }
+
+  /* ── SEND PITCH ── */
+  if (action === "send-pitch") {
+    if (!await requireAdmin(req, res)) return;
+
+    if (!targetId || !UUID_RE.test(String(targetId))) {
+      return res.status(400).json({ ok: false, error: "Invalid targetId" });
+    }
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ ok: false, error: "RESEND_API_KEY not configured" });
+    }
+
+    const { data: prof } = await supabase.from("profiles").select("role").eq("id", targetId).maybeSingle();
+    if (!prof) return res.status(404).json({ ok: false, error: "User not found" });
+    if (prof.role !== "gratis") return res.status(400).json({ ok: false, error: `User is ${prof.role}, not gratis` });
+
+    const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(targetId);
+    if (userErr || !user?.email) return res.status(404).json({ ok: false, error: "Email not found" });
+
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "ProviaAI <noreply@proviaai.se>",
+        to: user.email,
+        subject: "Du pluggar på gratis. Här är vad du missar.",
+        html: buildPitchHtml(user.email),
+      }),
+    });
+    const result = await r.json();
+    if (!result.id) return res.status(500).json({ ok: false, error: result.message || "Resend error" });
+    return res.status(200).json({ ok: true, emailId: result.id, to: user.email });
   }
 
   return res.status(400).json({ ok: false, error: "Unknown action" });
