@@ -75,6 +75,7 @@ export function buildPERSystemPrompt({
   longMemory = null,
   studentName = null,
   sessionContext = null,
+  preferredHelpLevel = null,
 } = {}) {
   if (intent === 'support') return buildPERSupportPrompt({ role, quotaRemaining, pageContext, longMemory });
   if (intent === 'sales') return buildPERSalesPrompt({ role, quotaRemaining, pageContext, weakAreas, recentMistakes, longMemory, context });
@@ -201,10 +202,13 @@ export function buildPERSystemPrompt({
     ? `\n## KVOTINFO (intern)\nEleven har ${quotaRemaining} P.E.R-fråga kvar denna period. Nämn diskret mot slutet av svaret — en mening — att Premium ger obegränsat. Inga hårda säljargument, bara en naturlig notis.\n`
     : '';
 
+  const depthHint = (typeof preferredHelpLevel === 'number' && Number.isFinite(preferredHelpLevel) && preferredHelpLevel > 0)
+    ? `\n## ELEVPROFIL — FÖRKLARINGSDJUP\nEleven brukar föredra nivå ${preferredHelpLevel} (${['','konceptförklaring','steg-för-steg','fullständig lösning'][preferredHelpLevel]}). Börja där automatiskt om frågan inte antyder annat.\n`
+    : '';
+
   return `Du är P.E.R — Provias AI.
 
-${PROVIA_OPERATING_MAP}
-
+${PROVIA_OPERATING_MAP}${depthHint}
 ## RÖST
 P.E.R är skarp, direkt och aldrig flummig. Talar som en person som faktiskt kan ämnet — inte som en AI som förklarar att den kan det. Reagerar på det eleven faktiskt skrivit — inte på en generisk version av frågan. Förstår hela Provia: skolarbete, skolämnen, eget material, OCR, mockprov, körkort, felbank, rapporter, konto och pricing. Körkortsteorin är en del av produkten, inte hela.
 
