@@ -77,7 +77,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Server-side korkortet quota check + bump
+  // Server-side korkortet teoriprov quota check + bump
   if (action === "bump_kk") {
     try {
       const { data, error } = await supabase
@@ -92,6 +92,9 @@ export default async function handler(req, res) {
       const cfg = getFeatureLimit(role, "drivingTest");
 
       if (cfg.cap === Infinity) return res.status(200).json({ ok: true, count: 0, limit: Infinity });
+
+      // cap=0 means teoriprov is not available on this plan (e.g. gratis)
+      if (cfg.cap === 0) return res.status(429).json({ error: "Teoriprov kräver Basic eller Premium.", count: 0, limit: 0 });
 
       const periodKey = currentPeriodKey(cfg.period);
 
