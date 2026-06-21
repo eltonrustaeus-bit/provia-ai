@@ -83,6 +83,15 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
     if (structured.strong_topics?.length)
       signals.push(`Starka ämnen: ${structured.strong_topics.slice(0, 3).join(", ")}`);
 
+    if (structured.mock_weak_concepts?.length)
+      signals.push(`Svaga mockprov-begrepp: ${structured.mock_weak_concepts.slice(0, 5).join(", ")}`);
+
+    if (Array.isArray(structured.mock_recent_scores) && structured.mock_recent_scores.length >= 2) {
+      const ms    = structured.mock_recent_scores;
+      const mdelta = Math.round(ms[ms.length - 1] - ms[0]);
+      signals.push(`Mockprov-poäng (senaste ${ms.length}): ${ms.join("%, ")}% (trend: ${mdelta >= 0 ? "+" : ""}${mdelta}%)`);
+    }
+
     if (Array.isArray(structured.exam_recent_scores) && structured.exam_recent_scores.length >= 2) {
       const scores = structured.exam_recent_scores;
       const delta  = Math.round(scores[scores.length - 1] - scores[0]);
@@ -114,10 +123,10 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
   return signals.slice(0, 10).join("\n");
 }
 
-// Fetch real exam signals from Supabase — driving_progress.cat_prog + driving_results
+// Fetch real exam signals from Supabase — driving_progress.cat_prog + driving_results + mock_results
 export async function enrichMemoryFromExamData(supabase, userId) {
   try {
-    const [resultsRes, progressRes] = await Promise.all([
+    const [resultsRes, progressRes, mockRes] = await Promise.all([
       supabase
         .from("driving_results")
         .select("category, percent, passed, created_at")
@@ -129,6 +138,12 @@ export async function enrichMemoryFromExamData(supabase, userId) {
         .select("cat_prog")
         .eq("user_id", userId)
         .maybeSingle(),
+      supabase
+        .from("mock_results")
+        .select("course, percent, concept_tags, error_tags")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
 
     const rows         = resultsRes.data || [];
@@ -159,9 +174,19 @@ export async function enrichMemoryFromExamData(supabase, userId) {
         .map(([cat]) => cleanMemoryText(cat, 60));
     }
 
-    return { recentScores, weakCategories };
+    // Mockprov signals — concept_tags from low-scoring exams
+    const mockRows         = mockRes.data || [];
+    const mockRecentScores = mockRows.slice(0, 5).map(r => r.percent);
+    const mockWeakConcepts = [...new Set(
+      mockRows
+        .filter(r => r.percent < 70)
+        .flatMap(r => (r.concept_tags || []).filter(Boolean))
+        .map(t => cleanMemoryText(t, 60))
+    )].slice(0, 8);
+
+    return { recentScores, weakCategories, mockRecentScores, mockWeakConcepts };
   } catch {
-    return { recentScores: [], weakCategories: [] };
+    return { recentScores: [], weakCategories: [], mockRecentScores: [], mockWeakConcepts: [] };
   }
 }
 
@@ -217,7 +242,8 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
   try {
     // Fetch real exam data first — needed for both the guard and the prompts
     const examData    = await enrichMemoryFromExamData(supabase, userId);
-    const hasExamData = examData.recentScores.length > 0 || examData.weakCategories.length > 0;
+    const hasExamData = examData.recentScores.length > 0 || examData.weakCategories.length > 0
+      || examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0;
     const hasMessages = Array.isArray(recentMessages) && recentMessages.length > 0;
     if (!hasMessages && !hasExamData) return;
 
@@ -238,9 +264,13 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
       .slice(0, MAX_HIST_CHARS);
     const signalText = cleanMemoryText(learningSignals, 700);
 
-    const examSection = hasExamData
-      ? `\nProvdata (faktiska DB-resultat):\n- Svaga kategorier: ${examData.weakCategories.join(", ") || "inga"}\n- Senaste provpoäng: ${examData.recentScores.map(s => s + "%").join(", ") || "inga"}\n`
+    const teoriprovSection = (examData.recentScores.length > 0 || examData.weakCategories.length > 0)
+      ? `\nKörkortsteorin (faktiska DB-resultat):\n- Svaga kategorier: ${examData.weakCategories.join(", ") || "inga"}\n- Senaste teoriprov-poäng: ${examData.recentScores.map(s => s + "%").join(", ") || "inga"}\n`
       : "";
+    const mockSection = (examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0)
+      ? `\nMockprov (faktiska DB-resultat):\n- Svaga begrepp: ${examData.mockWeakConcepts.join(", ") || "inga"}\n- Senaste mockprov-poäng: ${examData.mockRecentScores.map(s => s + "%").join(", ") || "inga"}\n`
+      : "";
+    const examSection = teoriprovSection + mockSection;
 
     const summaryPrompt = `Analysera P.E.R-konversationshistoriken och lärsignalerna nedan. Extrahera en elevprofil på svenska (max 130 ord).
 Skriv som strukturerade rader, inte löptext. Ta med bara sådant som syns i underlaget.
@@ -309,6 +339,8 @@ ${histText || "Ingen chathistorik tillgänglig."}`;
           ...aiStructured,
           exam_weak_categories: examData.weakCategories,
           exam_recent_scores:   examData.recentScores,
+          mock_weak_concepts:   examData.mockWeakConcepts,
+          mock_recent_scores:   examData.mockRecentScores,
           help_level_log:       existingStructured.help_level_log || [],
           preferred_help_level: existingStructured.preferred_help_level ?? null,
         }
