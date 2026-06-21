@@ -83,6 +83,11 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
     if (structured.strong_topics?.length)
       signals.push(`Starka ämnen: ${structured.strong_topics.slice(0, 3).join(", ")}`);
 
+    if (structured.felbank_weak_concepts?.length)
+      signals.push(`Felbank — svaga begrepp (faktiska felsvar): ${structured.felbank_weak_concepts.slice(0, 5).join(", ")}`);
+    if (structured.felbank_error_types?.length)
+      signals.push(`Felbank — vanliga feltyper: ${structured.felbank_error_types.join(", ")}`);
+
     if (structured.mock_weak_concepts?.length)
       signals.push(`Svaga mockprov-begrepp: ${structured.mock_weak_concepts.slice(0, 5).join(", ")}`);
 
@@ -126,7 +131,7 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
 // Fetch real exam signals from Supabase — driving_progress.cat_prog + driving_results + mock_results
 export async function enrichMemoryFromExamData(supabase, userId) {
   try {
-    const [resultsRes, progressRes, mockRes] = await Promise.all([
+    const [resultsRes, progressRes, mockRes, examRes] = await Promise.all([
       supabase
         .from("driving_results")
         .select("category, percent, passed, created_at")
@@ -141,6 +146,12 @@ export async function enrichMemoryFromExamData(supabase, userId) {
       supabase
         .from("mock_results")
         .select("course, percent, concept_tags, error_tags")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("user_exams")
+        .select("course, result")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(10),
@@ -184,9 +195,29 @@ export async function enrichMemoryFromExamData(supabase, userId) {
         .map(t => cleanMemoryText(t, 60))
     )].slice(0, 8);
 
-    return { recentScores, weakCategories, mockRecentScores, mockWeakConcepts };
+    // Felbank signals — per_question failures from user_exams (app.html mockprov)
+    const examRows = examRes.data || [];
+    const failedItems = examRows.flatMap(r =>
+      (r.result?.per_question || [])
+        .filter(q => Number(q.points || 0) < Number(q.max_points || 0))
+        .map(q => ({ concept_tag: q.concept_tag, error_tags: q.error_tags, course: r.course }))
+    );
+    const felBankWeakConcepts = [...new Set(
+      failedItems
+        .map(q => q.concept_tag)
+        .filter(c => c && c !== "Okänt" && c !== "Unknown")
+        .map(t => cleanMemoryText(t, 60))
+    )].slice(0, 8);
+    const felBankErrorTypes = [...new Set(
+      failedItems.flatMap(q => q.error_tags || []).filter(Boolean)
+    )].slice(0, 8);
+    const felBankCourses = [...new Set(
+      failedItems.map(q => q.course).filter(Boolean).map(c => cleanMemoryText(c, 80))
+    )].slice(0, 5);
+
+    return { recentScores, weakCategories, mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses };
   } catch {
-    return { recentScores: [], weakCategories: [], mockRecentScores: [], mockWeakConcepts: [] };
+    return { recentScores: [], weakCategories: [], mockRecentScores: [], mockWeakConcepts: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] };
   }
 }
 
@@ -243,7 +274,8 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     // Fetch real exam data first — needed for both the guard and the prompts
     const examData    = await enrichMemoryFromExamData(supabase, userId);
     const hasExamData = examData.recentScores.length > 0 || examData.weakCategories.length > 0
-      || examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0;
+      || examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0
+      || examData.felBankWeakConcepts.length > 0;
     const hasMessages = Array.isArray(recentMessages) && recentMessages.length > 0;
     if (!hasMessages && !hasExamData) return;
 
@@ -270,7 +302,10 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const mockSection = (examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0)
       ? `\nMockprov (faktiska DB-resultat):\n- Svaga begrepp: ${examData.mockWeakConcepts.join(", ") || "inga"}\n- Senaste mockprov-poäng: ${examData.mockRecentScores.map(s => s + "%").join(", ") || "inga"}\n`
       : "";
-    const examSection = teoriprovSection + mockSection;
+    const felBankSection = (examData.felBankWeakConcepts.length > 0 || examData.felBankErrorTypes.length > 0)
+      ? `\nFelbank (faktiska felsvar, senaste 10 prov):\n- Svaga begrepp: ${examData.felBankWeakConcepts.join(", ") || "inga"}\n- Vanliga feltyper: ${examData.felBankErrorTypes.join(", ") || "inga"}\n- Kurser med flest misstag: ${examData.felBankCourses.join(", ") || "inga"}\n`
+      : "";
+    const examSection = teoriprovSection + mockSection + felBankSection;
 
     const summaryPrompt = `Analysera P.E.R-konversationshistoriken och lärsignalerna nedan. Extrahera en elevprofil på svenska (max 130 ord).
 Skriv som strukturerade rader, inte löptext. Ta med bara sådant som syns i underlaget.
@@ -339,8 +374,11 @@ ${histText || "Ingen chathistorik tillgänglig."}`;
           ...aiStructured,
           exam_weak_categories: examData.weakCategories,
           exam_recent_scores:   examData.recentScores,
-          mock_weak_concepts:   examData.mockWeakConcepts,
-          mock_recent_scores:   examData.mockRecentScores,
+          mock_weak_concepts:      examData.mockWeakConcepts,
+          mock_recent_scores:      examData.mockRecentScores,
+          felbank_weak_concepts:   examData.felBankWeakConcepts,
+          felbank_error_types:     examData.felBankErrorTypes,
+          felbank_courses:         examData.felBankCourses,
           help_level_log:       existingStructured.help_level_log || [],
           preferred_help_level: existingStructured.preferred_help_level ?? null,
         }
