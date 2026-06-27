@@ -4,6 +4,14 @@
      Logo alltid synlig, 4.5s premium reveal
   ══════════════════════════════════════ */
 
+  /* Show the branded splash once per browser session — not on every internal
+     navigation. Returning before any DOM/style injection means repeat page
+     loads reveal content instantly with no hidden-content window. */
+  try {
+    if (sessionStorage.getItem('pi_splash_shown')) return;
+    sessionStorage.setItem('pi_splash_shown', '1');
+  } catch (_) { /* sessionStorage blocked → fall through and show splash */ }
+
   /* ── Block body, but NOT the splash ── */
   var blockSt = document.createElement('style');
   blockSt.textContent =
