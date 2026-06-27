@@ -273,6 +273,43 @@
       </div>
     </div>
 
+    <!-- TEACHER CARD — only for role=teacher/admin -->
+    <div class="kCard" id="teacherCard" style="display:none">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">🎓</div>
+        <div>
+          <div class="kCardLabel">Lärare</div>
+          <div class="kCardTitle">Lärar-dashboard</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <p class="kHelpText">Skapa klasser, dela klasskoder och följ dina elevers framsteg i körkortsteorin.</p>
+        <div class="kBtnRow">
+          <a class="kBtn kBtnOutline" href="larare.html">Öppna lärar-dashboard →</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY CLASSES CARD -->
+    <div class="kCard">
+      <div class="kCardHead">
+        <div class="kCardIcon" aria-hidden="true">🏫</div>
+        <div>
+          <div class="kCardLabel">Klasser</div>
+          <div class="kCardTitle">Mina klasser</div>
+        </div>
+      </div>
+      <div class="kCardBody">
+        <p class="kHelpText">Har du fått en klasskod av din lärare? Gå med här så kan läraren följa dina framsteg. Du kan lämna en klass när som helst.</p>
+        <div id="myClasses" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="joinCode" type="text" maxlength="12" placeholder="Klasskod (t.ex. K7P2QX)"
+            style="flex:1;min-width:160px;padding:10px 13px;border-radius:var(--r);border:1px solid var(--l);background:var(--s);color:var(--t);font-family:var(--font);font-size:14px;letter-spacing:.06em;text-transform:uppercase;outline:none" />
+          <button class="kBtn kBtnOutline" id="joinBtn">Gå med</button>
+        </div>
+      </div>
+    </div>
+
     <!-- NAVIGATION CARD -->
     <div class="kCard">
       <div class="kCardHead">
@@ -376,7 +413,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
   const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8";
   const sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
 
-  const ROLE_LABELS={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium"};
+  const ROLE_LABELS={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium",teacher:"Lärare"};
   const ROLE_DESCS={
     gratis:"2 körkortstest · 2 mockprov per vecka",
     basic:"30 prov per månad · historik · synk",
@@ -445,6 +482,74 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
 
   /* Show admin card */
   if(role==="admin") document.getElementById("adminCard").style.display="";
+
+  /* Show teacher card */
+  if(role==="teacher"||role==="admin") document.getElementById("teacherCard").style.display="";
+
+  /* ── MY CLASSES (student) ── */
+  async function callRole(action,body={}){
+    const r=await fetch("/api/check-role",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({action,...body})
+    });
+    const data=await r.json();
+    if(!r.ok)throw new Error(data?.error||"Något gick fel");
+    return data;
+  }
+
+  function renderMyClasses(classes){
+    const wrap=document.getElementById("myClasses");
+    wrap.innerHTML="";
+    if(!classes.length){
+      const p=document.createElement("p");
+      p.className="kPrivacyNote"; p.style.margin="0";
+      p.textContent="Du är inte med i någon klass än.";
+      wrap.appendChild(p); return;
+    }
+    for(const c of classes){
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border:1px solid var(--l);border-radius:var(--r);background:var(--s)";
+      const nm=document.createElement("span");
+      nm.style.cssText="font-size:13.5px;color:var(--t);font-weight:500";
+      nm.textContent=c.name;
+      const btn=document.createElement("button");
+      btn.className="kBtn kBtnDanger"; btn.style.cssText="padding:5px 12px;font-size:12px";
+      btn.textContent="Lämna";
+      btn.addEventListener("click",()=>leaveClass(c.id,c.name));
+      row.appendChild(nm); row.appendChild(btn); wrap.appendChild(row);
+    }
+  }
+
+  async function loadMyClasses(){
+    try{ const {classes}=await callRole("student_classes"); renderMyClasses(classes||[]); }
+    catch(e){ /* silent — card still usable for joining */ }
+  }
+
+  async function joinClass(){
+    const inp=document.getElementById("joinCode");
+    const code=inp.value.trim();
+    if(!code){ showMsg("Ange en klasskod.","err"); return; }
+    const btn=document.getElementById("joinBtn");
+    btn.disabled=true; btn.textContent="…";
+    try{
+      const {class:cls}=await callRole("student_join",{code});
+      inp.value="";
+      showMsg(`Du gick med i "${cls.name}".`,"ok");
+      await loadMyClasses();
+    }catch(e){ showMsg("Fel: "+e.message,"err"); }
+    finally{ btn.disabled=false; btn.textContent="Gå med"; }
+  }
+
+  async function leaveClass(id,name){
+    if(!confirm(`Lämna klassen "${name}"? Läraren ser då inte längre dina framsteg.`)) return;
+    try{ await callRole("student_leave",{classId:id}); showMsg("Du lämnade klassen.","ok"); await loadMyClasses(); }
+    catch(e){ showMsg("Fel: "+e.message,"err"); }
+  }
+
+  document.getElementById("joinBtn")?.addEventListener("click",joinClass);
+  document.getElementById("joinCode")?.addEventListener("keydown",e=>{ if(e.key==="Enter") joinClass(); });
+  loadMyClasses();
 
   /* Show upgrade or manage card */
   if(role==="gratis"){
