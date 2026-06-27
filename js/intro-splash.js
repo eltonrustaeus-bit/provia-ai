@@ -229,22 +229,30 @@
     var c = document.getElementById('piContent');
     if (c) c.classList.add('piOut');
     splashEl.classList.add('piOut');
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     setTimeout(function () {
       splashEl.remove();
       st.remove();
       blockSt.remove();
-    }, 950);
+    }, reduced ? 60 : 950);
   }
 
   var pgLoaded = false, minDone = false, splashEl = null;
+
+  /* Respect prefers-reduced-motion: skip the long branded splash so content
+     (which is hidden behind blockSt) is not withheld for ~4s from users who
+     opted out of motion. They get a near-instant reveal instead. */
+  var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var MIN_DELAY = REDUCED ? 100 : 3900;
+  var SAFETY_DELAY = REDUCED ? 600 : 6500;
 
   function tryReveal() {
     if (pgLoaded && minDone && splashEl) reveal(splashEl);
   }
 
   window.addEventListener('load', function () { pgLoaded = true; tryReveal(); });
-  setTimeout(function () { minDone = true; tryReveal(); }, 3900);   /* 3.9s minimum */
-  setTimeout(function () { if (splashEl) { reveal(splashEl); } blockSt.remove(); }, 6500); /* safety */
+  setTimeout(function () { minDone = true; tryReveal(); }, MIN_DELAY);   /* min splash time */
+  setTimeout(function () { if (splashEl) { reveal(splashEl); } blockSt.remove(); }, SAFETY_DELAY); /* safety */
 
   document.addEventListener('DOMContentLoaded', function () {
     splashEl = build();
