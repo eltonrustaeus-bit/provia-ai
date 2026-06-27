@@ -290,8 +290,8 @@
       </div>
     </div>
 
-    <!-- MY CLASSES CARD -->
-    <div class="kCard">
+    <!-- MY CLASSES CARD — private demo, owner only -->
+    <div class="kCard" id="myClassesCard" style="display:none">
       <div class="kCardHead">
         <div class="kCardIcon" aria-hidden="true">🏫</div>
         <div>
@@ -483,8 +483,13 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
   /* Show admin card */
   if(role==="admin") document.getElementById("adminCard").style.display="";
 
-  /* Show teacher card */
-  if(role==="teacher"||role==="admin") document.getElementById("teacherCard").style.display="";
+  /* ── CLASS FEATURE — PRIVATE DEMO, owner account only ── */
+  const OWNER_ID="4a2d4593-16d3-4f9f-bc6c-54c856c21553"; // elton.rustaeus@gmail.com
+  const isOwner = user.id===OWNER_ID;
+  if(isOwner){
+    document.getElementById("teacherCard").style.display="";
+    document.getElementById("myClassesCard").style.display="";
+  }
 
   /* ── MY CLASSES (student) ── */
   async function callRole(action,body={}){
@@ -549,7 +554,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrop()});
 
   document.getElementById("joinBtn")?.addEventListener("click",joinClass);
   document.getElementById("joinCode")?.addEventListener("keydown",e=>{ if(e.key==="Enter") joinClass(); });
-  loadMyClasses();
+  if(isOwner) loadMyClasses();
 
   /* Show upgrade or manage card */
   if(role==="gratis"){

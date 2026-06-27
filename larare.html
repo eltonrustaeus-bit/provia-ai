@@ -142,6 +142,9 @@ const SB_URL = 'https://mnmotdluigzeehdjbhbu.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
 const db = window.supabase.createClient(SB_URL, SB_KEY);
 
+// Private demo — only this account may view the dashboard.
+const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553'; // elton.rustaeus@gmail.com
+
 let CLASSES = [];
 let activeClassId = null;
 
@@ -290,24 +293,11 @@ document.getElementById('classGrid').addEventListener('keydown',e=>{
 async function init(){
   const who=document.getElementById('whoLabel');
   const { data:{ session } } = await db.auth.getSession();
-  if(!session){
-    who.textContent='Inte inloggad';
-    document.getElementById('main').style.opacity='.4';
-    document.getElementById('main').style.pointerEvents='none';
-    showStatus('Du måste vara inloggad som lärare för att se den här sidan.','warn');
-    return;
-  }
-  let role='okänd';
-  try{
-    const res=await fetch('/api/check-role',{ method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`} });
-    role=(await res.json())?.role || 'okänd';
-  }catch(e){}
-  if(role!=='teacher' && role!=='admin'){
-    who.textContent=`Ingen åtkomst (${role})`;
-    document.getElementById('main').style.opacity='.4';
-    document.getElementById('main').style.pointerEvents='none';
-    showStatus('Ingen åtkomst. Kontot saknar lärar-roll. Kontakta Provia för att aktivera B2B.','err');
+  // Private demo gate — block everyone except the owner account.
+  if(!session || session.user.id!==OWNER_ID){
+    who.textContent='Sidan finns inte';
+    document.getElementById('main').style.display='none';
+    showStatus('Den här sidan är inte tillgänglig.','warn');
     return;
   }
   who.textContent=`Lärare · ${session.user.email}`;
