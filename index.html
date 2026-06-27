@@ -1363,6 +1363,12 @@ window._statsReady = (async function() {
     cursor:pointer;padding:2px 4px}
   .authToggle button:hover{text-decoration:underline}
   .authNote{margin-top:14px;text-align:center;font:400 11px "DM Mono",monospace;color:var(--t3,#6b8f7c);letter-spacing:.03em}
+  /* Keep the floating P.E.R bubble clear of the sticky "Skapa konto" bar / auth modal.
+     Higher specificity than shared.js's #perWidget rule so these win without !important spam. */
+  #perWidget{transition:bottom .25s ease, opacity .2s ease}
+  body.joincta-on #perWidget{bottom:104px}
+  @media(max-width:480px){ body.joincta-on #perWidget{bottom:94px} }
+  body.auth-open #perWidget{opacity:0;pointer-events:none}
 </style>
 <div id="authOverlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="authCard" role="document">
@@ -1400,6 +1406,7 @@ window._statsReady = (async function() {
       shown = past;
       jc.classList.toggle('show', shown);
       jc.setAttribute('aria-hidden', shown ? 'false' : 'true');
+      document.body.classList.toggle('joincta-on', shown);  // lift P.E.R bubble clear of the bar
     }
   }
   if (jc) window.addEventListener('scroll', checkScroll, { passive: true });
@@ -1456,12 +1463,14 @@ window._statsReady = (async function() {
     lastFocus = document.activeElement;
     overlay.classList.add('show');
     overlay.setAttribute('aria-hidden','false');
+    document.body.classList.add('auth-open');     // hide P.E.R bubble behind/over the modal
     document.body.style.overflow = 'hidden';
     setTimeout(function(){ emailEl.focus(); }, 30);
   }
   function closeAuth(){
     overlay.classList.remove('show');
     overlay.setAttribute('aria-hidden','true');
+    document.body.classList.remove('auth-open');
     document.body.style.overflow = '';
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
@@ -1546,7 +1555,7 @@ window._statsReady = (async function() {
   // Expose for inline handlers if needed
   window.proviaOpenAuth = openAuth;
 
-  document.addEventListener('proviaNavReady', function(){ if (jc) jc.style.display = 'none'; });
+  document.addEventListener('proviaNavReady', function(){ if (jc) jc.style.display = 'none'; document.body.classList.remove('joincta-on'); });
 })();
 </script>
 </body>
