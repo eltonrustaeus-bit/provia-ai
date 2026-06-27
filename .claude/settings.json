@@ -1,4 +1,14 @@
 {
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--headless"],
+      "env": {
+        "PLAYWRIGHT_BROWSERS_PATH": "/opt/pw-browsers",
+        "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
+      }
+    }
+  },
   "statusLine": {
     "type": "command",
     "command": "node -e \"const fs=require('fs'),p=require('path');const d=process.env.CLAUDE_PROJECT_DIR||'.';const f=p.join(d,'.claude/helpers/statusline.cjs');const h=p.join(process.env.USERPROFILE||process.env.HOME||'.', '.claude/helpers/statusline.cjs');require(fs.existsSync(f)?f:h);\""
