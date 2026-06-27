@@ -12,6 +12,79 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Join codes: no ambiguous chars (0/O/1/I), 6 long
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function genJoinCode(len = 6) {
+  let out = "";
+  for (let i = 0; i < len; i++) out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return out;
+}
+
+async function getRole(userId) {
+  const { data } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+  return normalizeRole(data?.role);
+}
+
+// Top weak categories from driving_progress.cat_prog ({ cat: { best } })
+function weakFromCatProg(catProg, limit = 3) {
+  if (!catProg || typeof catProg !== "object") return [];
+  return Object.entries(catProg)
+    .filter(([, v]) => typeof v?.best === "number" && v.best < 75)
+    .sort(([, a], [, b]) => (a.best || 0) - (b.best || 0))
+    .slice(0, limit)
+    .map(([cat, v]) => ({ category: cat, best: Math.round(v.best) }));
+}
+
+// Aggregate per-student progress for a class. Bulk queries — no N+1.
+async function getStudentSummaries(classId) {
+  const { data: members } = await supabase
+    .from("class_members")
+    .select("student_id, joined_at")
+    .eq("class_id", classId);
+  const ids = (members || []).map((m) => m.student_id);
+  if (!ids.length) return [];
+
+  const [progressRes, resultsRes, usersRes] = await Promise.all([
+    supabase.from("driving_progress").select("user_id, cat_prog, xp").in("user_id", ids),
+    supabase
+      .from("driving_results")
+      .select("user_id, percent, passed, created_at")
+      .in("user_id", ids)
+      .order("created_at", { ascending: false }),
+    supabase.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
+
+  const progById = {};
+  for (const p of progressRes.data || []) progById[p.user_id] = p;
+
+  const resultsById = {};
+  for (const r of resultsRes.data || []) (resultsById[r.user_id] ||= []).push(r);
+
+  const emailById = {};
+  for (const u of usersRes.data?.users || []) emailById[u.id] = u.email;
+
+  return ids.map((id) => {
+    const prog = progById[id] || {};
+    const results = resultsById[id] || [];
+    const percents = results.map((r) => Math.round(r.percent || 0));
+    const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null;
+    const last = results[0] || null;
+    return {
+      student_id: id,
+      email: emailById[id] || "—",
+      xp: prog.xp || 0,
+      tests_taken: results.length,
+      avg_percent: avg,
+      last_percent: last ? Math.round(last.percent || 0) : null,
+      last_passed: last ? !!last.passed : null,
+      last_at: last?.created_at || null,
+      weak_categories: weakFromCatProg(prog.cat_prog),
+    };
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -162,6 +235,157 @@ export default async function handler(req, res) {
       if (!r.ok) return res.status(500).json({ error: "Stripe cancellation failed", details: result });
 
       await supabase.from("profiles").update({ role: "gratis", stripe_subscription_id: null }).eq("id", user.id);
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  // ── Teacher dashboard (B2B) ──
+  if (action && action.startsWith("teacher_")) {
+    const role = await getRole(user.id);
+    if (role !== "teacher" && role !== "admin") {
+      return res.status(403).json({ error: "Lärarbehörighet krävs." });
+    }
+
+    // Create a class with a unique join code
+    if (action === "teacher_create_class") {
+      const name = String(req.body?.name || "").trim().slice(0, 80);
+      if (!name) return res.status(400).json({ error: "Klassnamn krävs." });
+      try {
+        let cls = null;
+        for (let attempt = 0; attempt < 5 && !cls; attempt++) {
+          const code = genJoinCode();
+          const { data, error } = await supabase
+            .from("classes")
+            .insert({ teacher_id: user.id, name, join_code: code })
+            .select("id, name, join_code, created_at")
+            .maybeSingle();
+          if (!error) { cls = data; break; }
+          if (error.code !== "23505") return res.status(500).json({ error: "Kunde inte skapa klass." });
+        }
+        if (!cls) return res.status(500).json({ error: "Kunde inte generera unik kod." });
+        return res.status(200).json({ ok: true, class: { ...cls, member_count: 0 } });
+      } catch (e) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    // List teacher's classes with member counts
+    if (action === "teacher_classes") {
+      try {
+        const { data: classes, error } = await supabase
+          .from("classes")
+          .select("id, name, join_code, created_at")
+          .eq("teacher_id", user.id)
+          .order("created_at", { ascending: true });
+        if (error) return res.status(500).json({ error: "Kunde inte hämta klasser." });
+
+        const ids = (classes || []).map((c) => c.id);
+        const counts = {};
+        if (ids.length) {
+          const { data: members } = await supabase
+            .from("class_members")
+            .select("class_id")
+            .in("class_id", ids);
+          for (const m of members || []) counts[m.class_id] = (counts[m.class_id] || 0) + 1;
+        }
+        return res.status(200).json({
+          ok: true,
+          classes: (classes || []).map((c) => ({ ...c, member_count: counts[c.id] || 0 })),
+        });
+      } catch (e) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    // Aggregated student progress for one class (teacher must own it)
+    if (action === "teacher_students") {
+      const classId = String(req.body?.classId || "");
+      if (!UUID_RE.test(classId)) return res.status(400).json({ error: "Ogiltigt klass-id." });
+      try {
+        const { data: cls } = await supabase
+          .from("classes")
+          .select("id, name, teacher_id")
+          .eq("id", classId)
+          .maybeSingle();
+        if (!cls || cls.teacher_id !== user.id) {
+          return res.status(403).json({ error: "Åtkomst nekad." });
+        }
+        const students = await getStudentSummaries(classId);
+        return res.status(200).json({ ok: true, class: { id: cls.id, name: cls.name }, students });
+      } catch (e) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    // Delete a class (teacher must own it)
+    if (action === "teacher_delete_class") {
+      const classId = String(req.body?.classId || "");
+      if (!UUID_RE.test(classId)) return res.status(400).json({ error: "Ogiltigt klass-id." });
+      try {
+        const { error } = await supabase
+          .from("classes")
+          .delete()
+          .eq("id", classId)
+          .eq("teacher_id", user.id);
+        if (error) return res.status(500).json({ error: "Kunde inte radera klass." });
+        return res.status(200).json({ ok: true });
+      } catch (e) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    return res.status(400).json({ error: "Okänd åtgärd." });
+  }
+
+  // ── Student: join / leave / list classes (any authenticated user) ──
+  if (action === "student_classes") {
+    try {
+      const { data: rows } = await supabase
+        .from("class_members")
+        .select("class_id, classes(id, name)")
+        .eq("student_id", user.id);
+      const classes = (rows || [])
+        .map((r) => r.classes)
+        .filter(Boolean)
+        .map((c) => ({ id: c.id, name: c.name }));
+      return res.status(200).json({ ok: true, classes });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  if (action === "student_join") {
+    const code = String(req.body?.code || "").trim().toUpperCase().slice(0, 12);
+    if (!code) return res.status(400).json({ error: "Klasskod krävs." });
+    try {
+      const { data: cls } = await supabase
+        .from("classes")
+        .select("id, name")
+        .eq("join_code", code)
+        .maybeSingle();
+      if (!cls) return res.status(404).json({ error: "Ingen klass med den koden." });
+      const { error } = await supabase
+        .from("class_members")
+        .upsert({ class_id: cls.id, student_id: user.id }, { onConflict: "class_id,student_id" });
+      if (error) return res.status(500).json({ error: "Kunde inte gå med." });
+      return res.status(200).json({ ok: true, class: { id: cls.id, name: cls.name } });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  if (action === "student_leave") {
+    const classId = String(req.body?.classId || "");
+    if (!UUID_RE.test(classId)) return res.status(400).json({ error: "Ogiltigt klass-id." });
+    try {
+      const { error } = await supabase
+        .from("class_members")
+        .delete()
+        .eq("class_id", classId)
+        .eq("student_id", user.id);
+      if (error) return res.status(500).json({ error: "Kunde inte lämna klass." });
       return res.status(200).json({ ok: true });
     } catch (e) {
       return res.status(500).json({ error: "Internal server error" });
