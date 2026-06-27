@@ -944,12 +944,39 @@ body.light .adminSaveBtn{color:#fff}
       <div class="startHint" style="margin-top:10px">Alla kategorier blandade — exakt som Transportstyrelsens prov</div>
     </div>
     <div id="teoriHistSection" style="display:none">
+      <div id="readinessCard" class="card" style="display:none;margin-bottom:14px">
+        <div class="cardTitle">Din provberedskap</div>
+        <div id="rdnBody"></div>
+      </div>
       <div class="card">
         <div class="cardTitle">Dina teoriprov</div>
         <div id="teoriHistBody"></div>
       </div>
     </div>
   </div>
+
+  <style>
+    #readinessCard .rdnTop{display:flex;align-items:center;gap:18px;margin-bottom:12px}
+    .rdnGauge{flex-shrink:0;width:84px;height:84px;border-radius:50%;display:grid;place-items:center;
+      border:3px solid var(--l);position:relative}
+    .rdnGauge.rdn-ok{border-color:var(--a)}
+    .rdnGauge.rdn-mid{border-color:#ffb84d}
+    .rdnGauge.rdn-low{border-color:#ff8484}
+    .rdnPct{font:700 26px/1 'DM Sans',sans-serif;color:var(--t)}
+    .rdnPct small{font-size:13px;color:var(--t3);font-weight:500}
+    .rdnMeta{flex:1;min-width:0}
+    .rdnVerdict{font:700 18px/1.2 'DM Sans',sans-serif;letter-spacing:-.02em;margin-bottom:3px}
+    .rdnVerdict.rdn-ok{color:var(--a)}
+    .rdnVerdict.rdn-mid{color:#ffb84d}
+    .rdnVerdict.rdn-low{color:#ff8484}
+    .rdnTrend{font:400 12px 'DM Mono',monospace;color:var(--t3);letter-spacing:.02em}
+    .rdnChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+    .rdnChip{font:500 11px 'DM Sans',sans-serif;color:var(--t2);background:var(--s2);
+      border:1px solid var(--l);border-radius:999px;padding:3px 10px}
+    .rdnText{font:400 13px/1.65 'DM Sans',sans-serif;color:var(--t2);white-space:pre-wrap;
+      border-top:1px solid var(--l);padding-top:12px}
+    .rdnLoading{font:400 12.5px 'DM Mono',monospace;color:var(--t3);padding:6px 0}
+  </style>
 
   <!-- REPETITION VIEW -->
   <div id="repetitionView" style="display:none">
@@ -2605,7 +2632,68 @@ async function loadTeoriHist() {
         <td>${r.num_correct}/65 (${r.percent}%)</td>
         <td><span class="passBadge ${r.passed?"p":"f"}">${r.passed?"GODKÄNT":"UNDERKÄNT"}</span></td>
       </tr>`).join("")}</tbody></table>`;
+    renderReadiness(data);
   } catch(_){}
+}
+
+// ── PROVBEREDSKAP (exam readiness) — productizes the /api/explain scores endpoint ──
+async function renderReadiness(rows) {
+  const card = $("readinessCard"), body = $("rdnBody");
+  if (!card || !body) return;
+  if (!Array.isArray(rows) || rows.length < 3) { card.style.display = "none"; return; }
+
+  // Chronological 0–1 scores (rows arrive newest-first)
+  const scores = rows.slice().reverse()
+    .map(r => Math.min(1, Math.max(0, (Number(r.percent) || 0) / 100)));
+  const cp = getCatProg();
+  const weak = Object.entries(cp)
+    .filter(([, v]) => typeof v?.best === "number" && v.best < 75)
+    .sort((a, b) => (a[1].best || 0) - (b[1].best || 0))
+    .slice(0, 4).map(([c]) => c);
+
+  const sig = scores.map(s => Math.round(s * 100)).join("-") + "|" + weak.join(",");
+  const today = new Date().toISOString().slice(0, 10);
+  const CACHE = "proviaai_kk_readiness";
+
+  function paint(d) {
+    const rd = d.readiness;
+    const tone = rd >= 80 ? "ok" : rd >= 60 ? "mid" : "low";
+    const verdict = rd >= 80 ? "Redo" : rd >= 60 ? "Nästan redo" : "Inte redo än";
+    const trendTxt = d.trend === "improving" ? "↑ Förbättras" : d.trend === "declining" ? "↓ Försämras" : "→ Stabil";
+    card.style.display = "";
+    body.innerHTML =
+      `<div class="rdnTop">
+        <div class="rdnGauge rdn-${tone}"><span class="rdnPct">${rd}<small>%</small></span></div>
+        <div class="rdnMeta">
+          <div class="rdnVerdict rdn-${tone}">${verdict}</div>
+          <div class="rdnTrend">${trendTxt} · snitt ${d.avgRecent}% (senaste ${Math.min(5, scores.length)})</div>
+          ${weak.length ? `<div class="rdnChips">${weak.map(w => `<span class="rdnChip">${esc(w)}</span>`).join("")}</div>` : ""}
+        </div>
+      </div>
+      ${d.assessment ? `<div class="rdnText">${esc(d.assessment)}</div>` : ""}`;
+  }
+
+  // Serve from cache (same day + same data signature) to avoid repeat OpenAI calls
+  try {
+    const c = safeJSON(localStorage.getItem(CACHE), null);
+    if (c && c.day === today && c.sig === sig && typeof c.data?.readiness === "number") { paint(c.data); return; }
+  } catch (_) {}
+
+  card.style.display = "";
+  body.innerHTML = `<div class="rdnLoading">Analyserar din beredskap…</div>`;
+  try {
+    const tok = await getAuthToken();
+    const r = await fetch("/api/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ scores, weakAreas: weak, examsCount: rows.length }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const d = await r.json();
+    if (!r.ok || typeof d.readiness !== "number") { card.style.display = "none"; return; }
+    paint(d);
+    try { localStorage.setItem(CACHE, JSON.stringify({ day: today, sig, data: d })); } catch (_) {}
+  } catch (_) { card.style.display = "none"; }
 }
 
 // ── BOOKMARKS ──
