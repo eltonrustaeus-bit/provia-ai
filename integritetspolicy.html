@@ -22,7 +22,8 @@
 .policyWrap ul{padding-left:20px;margin-bottom:12px}
 .policyWrap li{font-size:14.5px;color:var(--t2);line-height:1.7;margin-bottom:6px}
 .policyWrap strong{color:var(--t);font-weight:600}
-.cookieTable{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+.tableScroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:16px 0}
+.cookieTable{width:100%;border-collapse:collapse;font-size:13px;min-width:440px}
 .cookieTable th{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;text-align:left;border-bottom:1px solid var(--l)}
 .cookieTable td{padding:9px 10px;border-bottom:1px solid var(--l);color:var(--t2);vertical-align:top}
 .cookieTable tr:last-child td{border-bottom:none}
@@ -79,6 +80,7 @@
   <h2>Cookies &amp; lokal lagring</h2>
   <p>Vi använder <code>localStorage</code> (webbläsarlagring, inte traditionella cookies) för att spara din session och inställningar. Inga data delas med tredje part för marknadsföring.</p>
 
+  <div class="tableScroll">
   <table class="cookieTable">
     <thead>
       <tr><th>Nyckel</th><th>Syfte</th><th>Typ</th><th>Varaktighet</th></tr>
@@ -92,6 +94,7 @@
       <tr><td><code>proviaai_cookie_consent</code></td><td>Ditt val i cookie-bannern</td><td><span class="pill nec">Nödvändig</span></td><td>Permanent</td></tr>
     </tbody>
   </table>
+  </div>
 
   <h2>Tredjepartstjänster</h2>
   <ul>
