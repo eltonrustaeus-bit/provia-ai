@@ -2,7 +2,7 @@
 // /api/generate-exam.js
 // Innehåll:
 // - Tillåter 3–20 frågor
-// - Inga limits / ingen inloggning krävs (borttagen requireUser + consumeDailyQuota)
+// - Kräver inloggning (requireAuth) + mockprovskvot (consumeMockExamQuota, atomär RPC)
 // - Tar bort essä helt (endast: mc, short)
 // - JSON-schema som aldrig tillåter "essay"
 

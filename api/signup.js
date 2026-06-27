@@ -154,9 +154,19 @@ export default async function handler(req, res) {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
+  // Input validation — fail fast at boundary
+  const emailStr = String(email).trim().toLowerCase();
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (emailStr.length > 254 || !EMAIL_RE.test(emailStr)) {
+    return res.status(400).json({ error: "Invalid email" });
+  }
+  if (typeof password !== "string" || password.length < 8 || password.length > 200) {
+    return res.status(400).json({ error: "Password must be 8–200 characters" });
+  }
+
   // Create user via admin API (auto-confirms email)
   const { data: userData, error } = await supabase.auth.admin.createUser({
-    email,
+    email: emailStr,
     password,
     email_confirm: true
   });
@@ -164,7 +174,7 @@ export default async function handler(req, res) {
   if (error) return res.status(400).json({ error: error.message });
 
   // Sign in to get session tokens
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: emailStr, password });
   if (signInError) return res.status(400).json({ error: signInError.message });
 
   // Send notification to admin (server-side, guaranteed)

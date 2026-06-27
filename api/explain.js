@@ -65,6 +65,22 @@ export default async function handler(req, res) {
   if (body.landingMode === true) {
     const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
     if (!question) return res.status(400).json({ error: 'No question' });
+
+    // Rate-limit anonymous callers to protect OpenAI spend (no auth on this path)
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+    const windowKey = new Date().toISOString().slice(0, 13); // hourly bucket (YYYY-MM-DDTHH)
+    const LANDING_HOURLY_LIMIT = 15;
+    try {
+      const { data: rl } = await supabase.rpc('consume_anon_rate', {
+        p_bucket: 'landing:' + ip,
+        p_window_key: windowKey,
+        p_limit: LANDING_HOURLY_LIMIT,
+      });
+      if (rl && rl.ok === false) {
+        return res.status(429).json({ error: 'För många frågor just nu. Skapa ett gratis konto för obegränsad P.E.R.' });
+      }
+    } catch (_) { /* fail-open: never block a legit visitor on limiter infra hiccup */ }
+
     const msgs = [
       { role: 'system', content: buildPERLandingPrompt() },
       { role: 'user', content: question },
@@ -121,19 +137,17 @@ export default async function handler(req, res) {
     const cfg = getFeatureLimit(role, "perChat");
     if (cfg.cap !== Infinity) {
       const key = currentPeriodKey(cfg.period);
-      const storedKey = prof?.per_quota_period || "";
-      const count = storedKey === key ? (prof?.per_quota_count || 0) : 0;
-
-      if (count >= cfg.cap) {
-        return res.status(429).json({ error: "Quota exceeded", count, limit: cfg.cap });
+      // Atomic check-and-increment — prevents quota bypass via concurrent requests
+      const { data: q, error: qErr } = await supabase.rpc("consume_per_chat_quota", {
+        p_user_id: user.id,
+        p_period_key: key,
+        p_limit: cfg.cap,
+      });
+      if (qErr) return res.status(500).json({ error: "Quota check failed" });
+      if (!q?.ok) {
+        return res.status(429).json({ error: "Quota exceeded", count: q?.count ?? cfg.cap, limit: cfg.cap });
       }
-
-      quotaRemaining = Math.max(0, cfg.cap - count - 1);
-
-      await supabase
-        .from("profiles")
-        .update({ per_quota_count: count + 1, per_quota_period: key })
-        .eq("id", user.id);
+      quotaRemaining = Math.max(0, cfg.cap - (q.count || 0));
     }
 
     const topic        = sanitize(body.topic, 150);

@@ -128,13 +128,13 @@ export default async function handler(req, res) {
 
     if (!ok) {
       console.error("Stripe session error:", JSON.stringify(session));
-      return res.status(500).json({ error: "Session creation failed", details: session });
+      return res.status(500).json({ error: "Session creation failed" });
     }
 
     return res.status(200).json({ url: session.url });
 
   } catch (e) {
     console.error("checkout-session error:", e?.message, e?.stack);
-    return res.status(500).json({ error: "Internal error", message: e?.message, stack: e?.stack?.split("\n")[0] });
+    return res.status(500).json({ error: "Internal error" });
   }
 }
