@@ -14,6 +14,10 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// Teacher dashboard is in private demo — locked to a single owner account.
+// Remove this gate (and the isClassAction check below) to open the B2B feature publicly.
+const OWNER_ID = "4a2d4593-16d3-4f9f-bc6c-54c856c21553"; // elton.rustaeus@gmail.com
+
 // Join codes: no ambiguous chars (0/O/1/I), 6 long
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function genJoinCode(len = 6) {
@@ -239,6 +243,17 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(500).json({ error: "Internal server error" });
     }
+  }
+
+  // ── Class feature (teacher dashboard + student join) — PRIVATE DEMO ──
+  // Locked to OWNER_ID while in development. 404 hides existence from everyone else.
+  const isClassAction =
+    (action && action.startsWith("teacher_")) ||
+    action === "student_join" ||
+    action === "student_leave" ||
+    action === "student_classes";
+  if (isClassAction && user.id !== OWNER_ID) {
+    return res.status(404).json({ error: "Not found" });
   }
 
   // ── Teacher dashboard (B2B) ──
