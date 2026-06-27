@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role, kk_quota_count, kk_quota_week")
+        .select("role")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -98,13 +98,16 @@ export default async function handler(req, res) {
 
       const periodKey = currentPeriodKey(cfg.period);
 
-      const storedKey = data?.kk_quota_week || "";
-      const count = storedKey === periodKey ? (data?.kk_quota_count || 0) : 0;
+      // Atomic check-and-increment — prevents quota bypass via concurrent requests
+      const { data: q, error: qErr } = await supabase.rpc("consume_kk_test_quota", {
+        p_user_id: user.id,
+        p_period_key: periodKey,
+        p_limit: cfg.cap,
+      });
+      if (qErr) return res.status(500).json({ error: "DB error" });
+      if (!q?.ok) return res.status(429).json({ error: "Quota exceeded", count: q?.count ?? cfg.cap, limit: cfg.cap });
 
-      if (count >= cfg.cap) return res.status(429).json({ error: "Quota exceeded", count, limit: cfg.cap });
-
-      await supabase.from("profiles").update({ kk_quota_count: count + 1, kk_quota_week: periodKey }).eq("id", user.id);
-      return res.status(200).json({ ok: true, count: count + 1, limit: cfg.cap });
+      return res.status(200).json({ ok: true, count: q.count, limit: cfg.cap });
     } catch (e) {
       return res.status(500).json({ error: "Internal server error" });
     }
