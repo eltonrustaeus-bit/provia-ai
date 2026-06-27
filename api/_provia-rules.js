@@ -44,6 +44,14 @@ export const PLAN_RULES = Object.freeze({
     kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
     perChat: Object.freeze({ cap: Infinity, period: "month" }),
   }),
+  teacher: Object.freeze({
+    label: "Lärare",
+    price: "B2B",
+    mockExam: Object.freeze({ cap: Infinity, period: "month" }),
+    drivingTest: Object.freeze({ cap: Infinity, period: "month" }),
+    kkPractice: Object.freeze({ cap: Infinity, period: "day" }),
+    perChat: Object.freeze({ cap: Infinity, period: "month" }),
+  }),
 });
 
 export function normalizeRole(role) {
