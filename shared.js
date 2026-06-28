@@ -1433,6 +1433,13 @@
       });
     }
 
+    // After successful auth: go to PROVIA_AUTH_REDIRECT if a page set one
+    // (e.g. landing → korkortet), otherwise reload so the page's gate re-runs.
+    function pvAfterAuth() {
+      var r = window.PROVIA_AUTH_REDIRECT;
+      if (r) { location.href = r; } else { location.reload(); }
+    }
+
     function doRegister() {
       var email = (document.getElementById('pvRE').value || '').trim();
       var pass  = (document.getElementById('pvRP').value || '').trim();
@@ -1446,7 +1453,7 @@
         if (d.access_token) {
           saveSession(d); closeModal();
           if (window.showWelcome) window.showWelcome(email);
-          setTimeout(function() { location.reload(); }, 2600);
+          setTimeout(pvAfterAuth, 2600);
         } else {
           errEl.style.color = 'var(--a,#1bff8c)';
           errEl.textContent = 'Bekräfta din e-post och logga sedan in!';
@@ -1478,6 +1485,15 @@
 
     document.addEventListener('proviaOpenLogin', function(e) {
       openModal((e.detail && e.detail.view) || 'register');
+    });
+
+    // Logged-out gate for any CTA: data-pv-auth="register"|"login".
+    // Logged-out → open the modal; logged-in → let the element do its thing (e.g. navigate).
+    document.addEventListener('click', function(e) {
+      var t = e.target.closest && e.target.closest('[data-pv-auth]');
+      if (!t || isLoggedIn()) return;
+      e.preventDefault();
+      openModal(t.getAttribute('data-pv-auth') || 'register');
     });
 
     window.openProviaLogin  = openModal;
