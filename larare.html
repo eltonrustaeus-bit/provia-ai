@@ -90,7 +90,64 @@
   .topNav{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
   .brand{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--t);letter-spacing:.1em;text-transform:uppercase}
   .brand b{color:var(--a)}
-  @media(max-width:560px){.pageHero h1{font-size:22px}}
+
+  /* STUDENTS HEADER + CLICKABLE ROWS */
+  .studentsTop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .studentsTop .secHead{margin-bottom:0}
+  .btn.per{display:inline-flex;align-items:center;gap:6px}
+  .stTable tbody tr.clickable{cursor:pointer}
+  .attn{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9a9a;margin-right:7px;vertical-align:middle}
+  .chev{color:var(--t3);font-family:var(--mono)}
+
+  /* SPARKLINE */
+  .spark{display:block}
+  .spark.empty{color:var(--t3);font-family:var(--mono);font-size:11px}
+
+  /* P.E.R INSIGHT BOX */
+  .insightBox{border:1px solid var(--l2);border-radius:var(--r);background:linear-gradient(180deg,var(--a-dim),transparent);
+    padding:16px 18px;margin-bottom:16px}
+  .insightHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .insightTitle{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--a2);font-weight:600}
+  .insightMeta{font-family:var(--mono);font-size:10.5px;color:var(--t3);display:flex;align-items:center;gap:8px}
+  .insightBody{font-size:13.5px;line-height:1.75;color:var(--t2);white-space:normal}
+  .insightBody b{color:var(--t);display:inline-block;margin-top:8px}
+  .insightLoading,.insightErr{font-size:13px;color:var(--t3);padding:6px 0}
+  .insightErr{color:#ff9a9a}
+  .linkBtn{background:none;border:none;color:var(--a2);font-family:var(--mono);font-size:10.5px;cursor:pointer;padding:0;text-decoration:underline}
+  .linkBtn:hover{color:var(--a)}
+
+  /* DRILLDOWN MODAL */
+  .ddOverlay{position:fixed;inset:0;background:rgba(4,8,6,.72);backdrop-filter:blur(3px);
+    display:none;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:50;overflow-y:auto}
+  .ddOverlay.open{display:flex}
+  .ddPanel{background:var(--bg);border:1px solid var(--l2);border-radius:var(--r);max-width:640px;width:100%;
+    padding:0;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .ddHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 22px 16px;border-bottom:1px solid var(--l)}
+  .ddEmail{font-size:17px;font-weight:600;color:var(--t);letter-spacing:-.02em;word-break:break-all}
+  .ddStats{display:flex;gap:18px;margin-top:8px;flex-wrap:wrap}
+  .ddStat{font-family:var(--mono);font-size:11px;color:var(--t3)}
+  .ddStat b{color:var(--a2);font-size:13px;font-weight:600;display:block}
+  .ddClose{background:transparent;border:1px solid var(--l);color:var(--t3);width:30px;height:30px;border-radius:var(--r2);
+    cursor:pointer;font-size:16px;line-height:1;flex-shrink:0}
+  .ddClose:hover{color:var(--t);border-color:var(--l2)}
+  .ddBody{padding:18px 22px 22px}
+  .ddSecHead{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin:18px 0 10px}
+  .ddSecHead:first-child{margin-top:0}
+  .ddTrendWrap{border:1px solid var(--l);border-radius:var(--r);padding:14px;background:var(--s)}
+  /* category bars */
+  .catRow{display:grid;grid-template-columns:1fr 120px 42px;align-items:center;gap:10px;padding:5px 0}
+  .catName{font-size:12.5px;color:var(--t2)}
+  .catTrack{height:7px;background:var(--s);border:1px solid var(--l);border-radius:99px;overflow:hidden}
+  .catFill{height:100%;background:var(--a);border-radius:99px}
+  .catFill.weak{background:#f4c842}
+  .catFill.bad{background:#ff9a9a}
+  .catPct{font-family:var(--mono);font-size:11px;color:var(--t3);text-align:right}
+  /* test list */
+  .testRow{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--l);font-size:12.5px;color:var(--t2)}
+  .testRow:last-child{border-bottom:none}
+  .testRow .tDate{font-family:var(--mono);font-size:11px;color:var(--t3)}
+
+  @media(max-width:560px){.pageHero h1{font-size:22px}.catRow{grid-template-columns:1fr 80px 38px}}
   </style>
 </head>
 <body>
@@ -123,17 +180,36 @@
       </section>
 
       <section class="sec" id="studentsSec" style="display:none">
-        <div class="secHead" id="studentsHead">Elever</div>
+        <div class="studentsTop">
+          <div class="secHead" id="studentsHead">Elever</div>
+          <button class="btn ghost per" id="insightBtn">✦ P.E.R klass-insikt</button>
+        </div>
+        <div class="insightBox" id="insightBox" style="display:none"></div>
         <div class="tableWrap">
           <table class="stTable">
             <thead><tr>
-              <th>Elev</th><th>XP</th><th>Prov</th><th>Snitt</th><th>Senaste</th><th>Svaga områden</th>
+              <th>Elev</th><th>XP</th><th>Prov</th><th>Snitt</th><th>Senaste</th><th>Trend</th><th>Svaga områden</th><th></th>
             </tr></thead>
             <tbody id="studentsBody"></tbody>
           </table>
         </div>
+        <div class="pageSub" style="margin-top:8px">Sorterat: elever som behöver stöd överst. Klicka på en elev för full historik.</div>
       </section>
     </main>
+  </div>
+
+  <!-- DRILLDOWN MODAL -->
+  <div class="ddOverlay" id="ddOverlay" role="dialog" aria-modal="true" aria-labelledby="ddEmail">
+    <div class="ddPanel">
+      <div class="ddHead">
+        <div>
+          <div class="ddEmail" id="ddEmail">—</div>
+          <div class="ddStats" id="ddStats"></div>
+        </div>
+        <button class="ddClose" id="ddClose" aria-label="Stäng">×</button>
+      </div>
+      <div class="ddBody" id="ddBody"></div>
+    </div>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -239,24 +315,140 @@ function resultBadge(st){
   return `<span class="resBadge ${cls}">${lbl} ${st.last_percent}%</span>`;
 }
 
+// Inline SVG sparkline of recent percents (oldest→newest). 80% = teoriprov pass line.
+function sparkline(trend,w=92,h=26){
+  if(!trend || !trend.length) return '<span class="spark empty">—</span>';
+  const pad=3;
+  const pts=trend.map((p,i)=>{
+    const x=pad+(trend.length===1?(w-2*pad)/2:(i/(trend.length-1))*(w-2*pad));
+    const y=pad+(1-Math.max(0,Math.min(100,p))/100)*(h-2*pad);
+    return [x,y];
+  });
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const last=trend[trend.length-1];
+  const col=last>=80?'var(--a)':last>=60?'#f4c842':'#ff9a9a';
+  const passY=(pad+(1-0.8)*(h-2*pad)).toFixed(1);
+  const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="1.8" fill="${col}"/>`).join('');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Resultattrend, senaste ${trend.length} prov">
+    <line x1="0" y1="${passY}" x2="${w}" y2="${passY}" stroke="var(--l2)" stroke-dasharray="3 3" stroke-width="1"/>
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>${dots}
+  </svg>`;
+}
+
+function needsAttention(st){
+  return st.last_passed===false || (st.avg_percent!==null && st.avg_percent<75);
+}
+
 function renderStudents(cls,students){
   document.getElementById('studentsSec').style.display='';
   document.getElementById('studentsHead').textContent=`Elever · ${cls.name} (${students.length})`;
   const body=document.getElementById('studentsBody');
-  if(!students.length){ body.innerHTML='<tr><td colspan="6"><div class="empty">Inga elever har gått med än. Dela klasskoden.</div></td></tr>'; return; }
-  body.innerHTML = students.map(st=>{
+  if(!students.length){ body.innerHTML='<tr><td colspan="8"><div class="empty">Inga elever har gått med än. Dela klasskoden.</div></td></tr>'; return; }
+  // Sort: needs-attention first, then lowest average
+  const sorted=[...students].sort((a,b)=>{
+    const an=needsAttention(a)?0:1, bn=needsAttention(b)?0:1;
+    if(an!==bn) return an-bn;
+    const aa=a.avg_percent===null?999:a.avg_percent, bb=b.avg_percent===null?999:b.avg_percent;
+    return aa-bb;
+  });
+  body.innerHTML = sorted.map(st=>{
     const weak = st.weak_categories.length
       ? st.weak_categories.map(w=>`<span class="weakTag" title="Bästa resultat ${w.best}%">${esc(w.category)} ${w.best}%</span>`).join('')
       : '<span class="muted">—</span>';
-    return `<tr>
-      <td><div class="stEmail" title="${esc(st.email)}">${esc(st.email)}</div></td>
+    const dot = needsAttention(st) ? '<span class="attn" title="Behöver stöd"></span>' : '';
+    return `<tr class="clickable" data-sid="${esc(st.student_id)}" role="button" tabindex="0" title="Visa elevens historik">
+      <td><div class="stEmail" title="${esc(st.email)}">${dot}${esc(st.email)}</div></td>
       <td class="num">${st.xp}</td>
       <td class="num">${st.tests_taken}</td>
       <td class="num">${st.avg_percent===null?'<span class="muted">—</span>':st.avg_percent+'%'}</td>
       <td>${resultBadge(st)}<div class="num muted" style="margin-top:3px">${fmtDate(st.last_at)}</div></td>
+      <td>${sparkline(st.trend)}</td>
       <td><div class="weakTags">${weak}</div></td>
+      <td class="chev">›</td>
     </tr>`;
   }).join('');
+}
+
+/* ── DRILLDOWN ── */
+function catClass(best){ return best<50?'bad':best<75?'weak':''; }
+
+function renderDrilldown(student){
+  document.getElementById('ddEmail').textContent=student.email;
+  document.getElementById('ddStats').innerHTML=`
+    <span class="ddStat"><b>${student.xp}</b>XP</span>
+    <span class="ddStat"><b>${student.tests_taken}</b>Prov</span>`;
+  const tests=student.tests||[];
+  const trendVals=tests.map(t=>t.percent);
+  const cats=student.categories||[];
+  const catHtml = cats.length
+    ? cats.map(c=>`<div class="catRow">
+        <span class="catName">${esc(c.category)}</span>
+        <div class="catTrack"><div class="catFill ${catClass(c.best)}" style="width:${Math.max(c.best,3)}%"></div></div>
+        <span class="catPct">${c.best}%</span></div>`).join('')
+    : '<div class="empty">Ingen kategoridata än.</div>';
+  const testHtml = tests.length
+    ? tests.slice(-12).reverse().map(t=>`<div class="testRow">
+        <span class="tDate">${fmtDate(t.at)}</span>
+        <span>${esc(t.category||'—')}${t.correct!=null&&t.total!=null?` · ${t.correct}/${t.total}`:''}</span>
+        <span class="resBadge ${t.passed?'pass':'fail'}">${t.percent}%</span></div>`).join('')
+    : '<div class="empty">Inga prov genomförda än.</div>';
+  document.getElementById('ddBody').innerHTML=`
+    <div class="ddSecHead">Resultattrend (senaste ${trendVals.length} prov)</div>
+    <div class="ddTrendWrap">${sparkline(trendVals,560,80)}</div>
+    <div class="ddSecHead">Kategorier (svagast först)</div>
+    ${catHtml}
+    <div class="ddSecHead">Provhistorik</div>
+    ${testHtml}`;
+  document.getElementById('ddOverlay').classList.add('open');
+}
+
+async function openStudent(sid){
+  if(!activeClassId) return;
+  document.getElementById('ddEmail').textContent='Laddar…';
+  document.getElementById('ddStats').innerHTML='';
+  document.getElementById('ddBody').innerHTML='<div class="empty">Laddar elevdata…</div>';
+  document.getElementById('ddOverlay').classList.add('open');
+  try{
+    const { student } = await api('teacher_student_detail',{ classId:activeClassId, studentId:sid });
+    renderDrilldown(student);
+  }catch(e){
+    document.getElementById('ddBody').innerHTML=`<div class="insightErr">Fel: ${esc(e.message)}</div>`;
+  }
+}
+function closeDrilldown(){ document.getElementById('ddOverlay').classList.remove('open'); }
+
+/* ── P.E.R CLASS INSIGHT (cached 24h per class) ── */
+const INSIGHT_TTL = 24*60*60*1000;
+const INSIGHT_HEADINGS = ['Klassläge:','Elever som behöver stöd:','Svagaste områden i klassen:','Rekommenderad träning (nästa 1–2 veckor):'];
+function insightKey(id){ return 'proviaai_teacher_insight_'+id; }
+
+function fmtInsight(text){
+  let safe=esc(text);
+  for(const h of INSIGHT_HEADINGS) safe=safe.split(esc(h)).join('<b>'+esc(h)+'</b>');
+  return safe.replace(/\n/g,'<br>');
+}
+function renderInsight(text,ts){
+  const box=document.getElementById('insightBox'); box.style.display='';
+  box.innerHTML=`
+    <div class="insightHead">
+      <span class="insightTitle">✦ P.E.R · Klassinsikt</span>
+      <span class="insightMeta">${fmtDate(ts)} · <button class="linkBtn" id="refreshInsight">Uppdatera</button></span>
+    </div>
+    <div class="insightBody">${fmtInsight(text)}</div>`;
+}
+async function loadInsight(force){
+  const id=activeClassId; if(!id) return;
+  const box=document.getElementById('insightBox');
+  if(!force){
+    const raw=localStorage.getItem(insightKey(id));
+    if(raw){ try{ const c=JSON.parse(raw); if(Date.now()-c.ts<INSIGHT_TTL){ renderInsight(c.insight,c.ts); return; } }catch(_){} }
+  }
+  box.style.display=''; box.innerHTML='<div class="insightLoading">P.E.R analyserar klassen…</div>';
+  try{
+    const r=await api('teacher_class_insight',{ classId:id });
+    localStorage.setItem(insightKey(id),JSON.stringify({ insight:r.insight, ts:Date.now() }));
+    renderInsight(r.insight,Date.now());
+  }catch(e){ box.innerHTML=`<div class="insightErr">${esc(e.message)}</div>`; }
 }
 
 async function openClass(id){
@@ -264,6 +456,8 @@ async function openClass(id){
   const body=document.getElementById('studentsBody');
   document.getElementById('studentsSec').style.display='';
   document.getElementById('studentsHead').textContent='Laddar elever…';
+  document.getElementById('insightBox').style.display='none';
+  document.getElementById('insightBox').innerHTML='';
   body.innerHTML='';
   try{
     const { class:cls, students } = await api('teacher_students',{ classId:id });
@@ -288,6 +482,30 @@ document.getElementById('classGrid').addEventListener('keydown',e=>{
   const card=e.target.closest('.classCard');
   if(card){ e.preventDefault(); openClass(card.getAttribute('data-id')); }
 });
+
+// Student row → drilldown
+document.getElementById('studentsBody').addEventListener('click',e=>{
+  const row=e.target.closest('tr.clickable');
+  if(row) openStudent(row.getAttribute('data-sid'));
+});
+document.getElementById('studentsBody').addEventListener('keydown',e=>{
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const row=e.target.closest('tr.clickable');
+  if(row){ e.preventDefault(); openStudent(row.getAttribute('data-sid')); }
+});
+
+// P.E.R insight button + delegated refresh link
+document.getElementById('insightBtn').addEventListener('click',()=>loadInsight(false));
+document.getElementById('insightBox').addEventListener('click',e=>{
+  if(e.target.id==='refreshInsight') loadInsight(true);
+});
+
+// Drilldown close: button, backdrop, Esc
+document.getElementById('ddClose').addEventListener('click',closeDrilldown);
+document.getElementById('ddOverlay').addEventListener('click',e=>{
+  if(e.target.id==='ddOverlay') closeDrilldown();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrilldown(); });
 
 /* ── AUTH GATE ── */
 async function init(){
