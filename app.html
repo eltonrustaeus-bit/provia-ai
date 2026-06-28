@@ -521,14 +521,6 @@ white-space:nowrap;
 <!-- Login hint uppdateras dynamiskt beroende på roll -->
 <div class="loginHint" id="authHint">Skapa konto för att börja — gratis, inget kort krävs.</div>
 </div>
-<details class="codeBlock">
-<summary class="codeToggle" id="codeSummary">Alternativ: åtkomstkod</summary>
-<label class="fieldLabel" for="accessCode" id="lockLabel">Åtkomstkod</label>
-<input id="accessCode" type="password" placeholder="Skriv koden…" autocomplete="off" style="margin-bottom:10px" />
-<div class="loginBtnRow">
-<button class="btn btnP" type="button" id="unlockBtn">Lås upp</button>
-</div>
-</details>
 <div id="errorMsg" class="loginErr" aria-live="polite"></div>
 </div>
 </div>
@@ -1625,14 +1617,13 @@ try{
     }
   });
   onClick("logoutTopBtn",async()=>{await logout();});
-  onClick("unlockBtn",async()=>{unlockByCode();await refreshQuotaUi();});
   onClick("signInBtn",async()=>{await signInEmail();});
   onClick("signUpBtn",async()=>{await signUpEmail();});
   onKey((e)=>{
     if(e.key!=="Enter")return;
     const s=$("loginScreen"),visible=s&&s.style.display!=="none";if(!visible)return;
     const email=($("authEmail")?.value||"").trim(),pass=$("authPass")?.value||"";
-    if(email&&pass)signInEmail();else unlockByCode();
+    if(email&&pass)signInEmail();
   });
 
   onClick("ocrBtn",async()=>{
@@ -1782,11 +1773,11 @@ try{
         if(ok){await loadExamsFromAccountToLocal();await refreshQuotaUi();runTrainModeIfRequested();}
         else showLock();
       }else{
-        if(isUnlocked()){hideLock();runTrainModeIfRequested();}else showLock();
+        showLock();
       }
-    }catch(e){setLockError(String(e?.message||e));if(isUnlocked()){hideLock();runTrainModeIfRequested();}else showLock();}
+    }catch(e){setLockError(String(e?.message||e));showLock();}
   }else{
-    if(isUnlocked()){hideLock();runTrainModeIfRequested();}else showLock();
+    showLock();
   }
   await refreshQuotaUi();
 }catch(err){reportErr(err);}
