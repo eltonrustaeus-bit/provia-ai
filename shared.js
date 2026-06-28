@@ -1325,6 +1325,9 @@
         '.pv-er{font-family:"DM Mono",monospace;font-size:11.5px;color:var(--danger,#ff6b6b);margin-top:8px;min-height:16px;font-weight:500}',
         '.pv-bk{background:none;border:none;cursor:pointer;font-family:"DM Mono",monospace;font-size:11px;color:var(--t3,#5a7a6a);display:flex;align-items:center;gap:4px;padding:0;margin-bottom:16px;transition:color .15s}',
         '.pv-bk:hover{color:var(--t,#e8f5ee)}',
+        '.pv-tg{margin-top:14px;text-align:center;font-family:"DM Sans",sans-serif;font-size:13px;color:var(--t2,#a8c4b4)}',
+        '.pv-tg button{background:none;border:none;color:var(--a,#1bff8c);font-weight:600;font-size:13px;cursor:pointer;padding:2px 4px;font-family:"DM Sans",sans-serif}',
+        '.pv-tg button:hover{text-decoration:underline}',
         'body.light #pvCard{background:var(--bg-light,#f6fbf8)}',
       ].join('');
       document.head.appendChild(s);
@@ -1352,19 +1355,19 @@
             + '<button class="pv-se" id="pvToLog" type="button">Logga in</button>'
           + '</div>'
           + '<div id="pvVR" class="pv-vw">'
-            + '<button class="pv-bk" id="pvRBk" type="button">← Tillbaka</button>'
             + '<div class="pv-fl"><label class="pv-la" for="pvRE">E-post</label><input class="pv-in" id="pvRE" type="email" placeholder="du@exempel.se" autocomplete="email"></div>'
             + '<div class="pv-fl"><label class="pv-la" for="pvRP">Lösenord</label><input class="pv-in" id="pvRP" type="password" placeholder="Minst 8 tecken" autocomplete="new-password"></div>'
             + '<button class="pv-pm" id="pvRBtn" type="button">Skapa konto</button>'
             + '<div class="pv-er" id="pvRE2"></div>'
+            + '<div class="pv-tg">Har du redan ett konto? <button id="pvRBk" type="button">Logga in</button></div>'
             + '<div class="pv-hn">Gratis konto — inget kort krävs.</div>'
           + '</div>'
           + '<div id="pvVL" class="pv-vw">'
-            + '<button class="pv-bk" id="pvLBk" type="button">← Tillbaka</button>'
             + '<div class="pv-fl"><label class="pv-la" for="pvLE">E-post</label><input class="pv-in" id="pvLE" type="email" placeholder="du@exempel.se" autocomplete="email"></div>'
             + '<div class="pv-fl"><label class="pv-la" for="pvLP">Lösenord</label><input class="pv-in" id="pvLP" type="password" placeholder="Ditt lösenord" autocomplete="current-password"></div>'
             + '<button class="pv-pm" id="pvLBtn" type="button">Logga in</button>'
             + '<div class="pv-er" id="pvLE2"></div>'
+            + '<div class="pv-tg">Ny här? <button id="pvLBk" type="button">Skapa konto</button></div>'
           + '</div>'
         + '</div>'
       + '</div>';
@@ -1375,8 +1378,8 @@
       document.addEventListener('keydown', function(e) { if (_open && e.key === 'Escape') closeModal(); });
       document.getElementById('pvToReg').onclick = function() { switchView('register'); };
       document.getElementById('pvToLog').onclick = function() { switchView('login'); };
-      document.getElementById('pvRBk').onclick = function() { switchView('welcome'); };
-      document.getElementById('pvLBk').onclick = function() { switchView('welcome'); };
+      document.getElementById('pvRBk').onclick = function() { switchView('login'); };
+      document.getElementById('pvLBk').onclick = function() { switchView('register'); };
       document.getElementById('pvRBtn').onclick = doRegister;
       document.getElementById('pvLBtn').onclick = doLogin;
       document.getElementById('pvRP').addEventListener('keydown', function(e) { if (e.key === 'Enter') doRegister(); });
@@ -1404,7 +1407,7 @@
       _open = true;
       var el = document.getElementById('pvModal');
       if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
-      switchView(view || 'welcome');
+      switchView(view || 'login');
     }
 
     function closeModal() {
@@ -1471,7 +1474,7 @@
     }
 
     document.addEventListener('proviaOpenLogin', function(e) {
-      openModal((e.detail && e.detail.view) || 'welcome');
+      openModal((e.detail && e.detail.view) || 'login');
     });
 
     window.openProviaLogin  = openModal;
