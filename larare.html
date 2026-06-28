@@ -66,7 +66,7 @@
 
   /* STUDENT TABLE */
   .tableWrap{overflow-x:auto;border:1px solid var(--l);border-radius:var(--r)}
-  .stTable{width:100%;border-collapse:collapse;min-width:620px}
+  .stTable{width:100%;border-collapse:collapse;min-width:720px}
   .stTable thead th{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);
     letter-spacing:.07em;text-transform:uppercase;padding:11px 14px;border-bottom:1px solid var(--l);
     text-align:left;background:var(--s);white-space:nowrap}
@@ -101,6 +101,7 @@
 
   /* SPARKLINE */
   .spark{display:block}
+  .spark.lg{width:100%;height:auto}
   .spark.empty{color:var(--t3);font-family:var(--mono);font-size:11px}
 
   /* P.E.R INSIGHT BOX */
@@ -117,10 +118,11 @@
   .linkBtn:hover{color:var(--a)}
 
   /* DRILLDOWN MODAL */
-  .ddOverlay{position:fixed;inset:0;background:rgba(4,8,6,.72);backdrop-filter:blur(3px);
-    display:none;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:50;overflow-y:auto}
+  .ddOverlay{position:fixed;inset:0;background:rgba(4,8,6,.86);
+    display:none;align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:9999;overflow-y:auto}
   .ddOverlay.open{display:flex}
   .ddPanel{background:var(--bg);border:1px solid var(--l2);border-radius:var(--r);max-width:640px;width:100%;
+    position:relative;z-index:1;
     padding:0;box-shadow:0 24px 60px rgba(0,0,0,.5)}
   .ddHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 22px 16px;border-bottom:1px solid var(--l)}
   .ddEmail{font-size:17px;font-weight:600;color:var(--t);letter-spacing:-.02em;word-break:break-all}
@@ -356,7 +358,7 @@ function resultBadge(st){
 }
 
 // Inline SVG sparkline of recent percents (oldest→newest). 80% = teoriprov pass line.
-function sparkline(trend,w=92,h=26){
+function sparkline(trend,w=92,h=26,cls=''){
   if(!trend || !trend.length) return '<span class="spark empty">—</span>';
   const pad=3;
   const pts=trend.map((p,i)=>{
@@ -369,7 +371,7 @@ function sparkline(trend,w=92,h=26){
   const col=last>=80?'var(--a)':last>=60?'#f4c842':'#ff9a9a';
   const passY=(pad+(1-0.8)*(h-2*pad)).toFixed(1);
   const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="1.8" fill="${col}"/>`).join('');
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Resultattrend, senaste ${trend.length} prov">
+  return `<svg class="spark ${cls}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Resultattrend, senaste ${trend.length} prov">
     <line x1="0" y1="${passY}" x2="${w}" y2="${passY}" stroke="var(--l2)" stroke-dasharray="3 3" stroke-width="1"/>
     <path d="${d}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>${dots}
   </svg>`;
@@ -434,7 +436,7 @@ function renderDrilldown(student){
     : '<div class="empty">Inga prov genomförda än.</div>';
   document.getElementById('ddBody').innerHTML=`
     <div class="ddSecHead">Resultattrend (senaste ${trendVals.length} prov)</div>
-    <div class="ddTrendWrap">${sparkline(trendVals,560,80)}</div>
+    <div class="ddTrendWrap">${sparkline(trendVals,560,80,'lg')}</div>
     <div class="ddSecHead">Kategorier (svagast först)</div>
     ${catHtml}
     <div class="ddSecHead">Provhistorik</div>
