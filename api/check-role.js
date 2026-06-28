@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import { currentPeriodKey, getEntitlementSnapshot, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { clearLongMemory } from "./_per-memory.js";
+import { callAI } from "./_per-core.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -75,6 +76,8 @@ async function getStudentSummaries(classId) {
     const percents = results.map((r) => Math.round(r.percent || 0));
     const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null;
     const last = results[0] || null;
+    // Last up to 8 tests, oldest→newest, for an inline trend sparkline
+    const trend = results.slice(0, 8).map((r) => Math.round(r.percent || 0)).reverse();
     return {
       student_id: id,
       email: emailById[id] || "—",
@@ -85,6 +88,7 @@ async function getStudentSummaries(classId) {
       last_passed: last ? !!last.passed : null,
       last_at: last?.created_at || null,
       weak_categories: weakFromCatProg(prog.cat_prog),
+      trend,
     };
   });
 }
@@ -331,6 +335,151 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, class: { id: cls.id, name: cls.name }, students });
       } catch (e) {
         return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    // Per-student drilldown: full history + per-category mastery + percent trend.
+    // Re-verifies BOTH class ownership AND that the student is a member (deny-by-default).
+    if (action === "teacher_student_detail") {
+      const classId = String(req.body?.classId || "");
+      const studentId = String(req.body?.studentId || "");
+      if (!UUID_RE.test(classId) || !UUID_RE.test(studentId)) {
+        return res.status(400).json({ error: "Ogiltigt id." });
+      }
+      try {
+        const { data: cls } = await supabase
+          .from("classes")
+          .select("id, name, teacher_id")
+          .eq("id", classId)
+          .maybeSingle();
+        if (!cls || cls.teacher_id !== user.id) return res.status(403).json({ error: "Åtkomst nekad." });
+
+        const { data: mem } = await supabase
+          .from("class_members")
+          .select("student_id")
+          .eq("class_id", classId)
+          .eq("student_id", studentId)
+          .maybeSingle();
+        if (!mem) return res.status(404).json({ error: "Eleven finns inte i klassen." });
+
+        const [progRes, resultsRes, userRes] = await Promise.all([
+          supabase.from("driving_progress").select("cat_prog, xp").eq("user_id", studentId).maybeSingle(),
+          supabase
+            .from("driving_results")
+            .select("category, num_questions, num_correct, percent, passed, created_at")
+            .eq("user_id", studentId)
+            .order("created_at", { ascending: false })
+            .limit(50),
+          supabase.auth.admin.getUserById(studentId),
+        ]);
+
+        const prog = progRes.data || {};
+        const results = resultsRes.data || [];
+        const email = userRes.data?.user?.email || "—";
+
+        const categories = Object.entries(prog.cat_prog || {})
+          .filter(([, v]) => v && typeof v === "object")
+          .map(([category, v]) => ({ category, best: Math.round(v.best || 0), attempts: v.attempts || 0 }))
+          .sort((a, b) => a.best - b.best);
+
+        const tests = results
+          .map((r) => ({
+            at: r.created_at,
+            category: r.category || null,
+            percent: Math.round(r.percent || 0),
+            passed: !!r.passed,
+            correct: r.num_correct ?? null,
+            total: r.num_questions ?? null,
+          }))
+          .reverse(); // oldest → newest
+
+        return res.status(200).json({
+          ok: true,
+          class: { id: cls.id, name: cls.name },
+          student: { student_id: studentId, email, xp: prog.xp || 0, tests_taken: tests.length, categories, tests },
+        });
+      } catch (e) {
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+
+    // P.E.R class insight: AI summary for the TEACHER. Student data is anonymized
+    // (labels Elev 1..N, no email/PII) before it ever reaches OpenAI.
+    if (action === "teacher_class_insight") {
+      const classId = String(req.body?.classId || "");
+      if (!UUID_RE.test(classId)) return res.status(400).json({ error: "Ogiltigt klass-id." });
+      if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: "AI ej konfigurerad." });
+      try {
+        const { data: cls } = await supabase
+          .from("classes")
+          .select("id, name, teacher_id")
+          .eq("id", classId)
+          .maybeSingle();
+        if (!cls || cls.teacher_id !== user.id) return res.status(403).json({ error: "Åtkomst nekad." });
+
+        const students = await getStudentSummaries(classId);
+        const withData = students.filter((s) => s.tests_taken > 0);
+        if (withData.length < 1) {
+          return res.status(400).json({ error: "För lite data — eleverna behöver göra minst ett prov." });
+        }
+
+        // Anonymize — never send email/PII to the model
+        const anon = withData.map((s, i) => ({
+          elev: `Elev ${i + 1}`,
+          xp: s.xp,
+          prov: s.tests_taken,
+          snitt: s.avg_percent,
+          senaste: s.last_percent,
+          godkand: s.last_passed,
+          svaga: s.weak_categories.map((w) => `${w.category} ${w.best}%`),
+        }));
+        const classAvg = Math.round(
+          withData.reduce((a, s) => a + (s.avg_percent || 0), 0) / withData.length
+        );
+        const weakCount = {};
+        for (const s of withData) for (const w of s.weak_categories) weakCount[w.category] = (weakCount[w.category] || 0) + 1;
+        const topWeak = Object.entries(weakCount)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 5)
+          .map(([c, n]) => `${c} (${n} ${n === 1 ? "elev" : "elever"})`);
+
+        const systemPrompt = `Du är P.E.R — Provias AI och en erfaren lärarcoach. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i körkortsteorin.
+KRAV:
+- Saklig, professionell, max 200 ord.
+- Använd elevernas anonyma etiketter (Elev 1, Elev 2 …) — aldrig namn.
+- Peka ut konkret vilka elever som behöver stöd och varför.
+FORMAT (exakt rubriker):
+Klassläge:
+Elever som behöver stöd:
+Svagaste områden i klassen:
+Rekommenderad träning (nästa 1–2 veckor):`;
+        const userPrompt = `Klass: ${cls.name}
+Antal elever med provdata: ${withData.length}
+Klassens snitt: ${classAvg}%
+Svagaste områden (flest svaga elever): ${topWeak.join(", ") || "—"}
+
+Elevdata (anonymiserad):
+${JSON.stringify(anon, null, 2)}
+
+Skriv rapporten enligt formatet.`;
+
+        const insight = await callAI(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          { timeout: 45_000 }
+        );
+        if (!insight) return res.status(500).json({ error: "Tom rapport." });
+        return res.status(200).json({
+          ok: true,
+          insight,
+          class_avg: classAvg,
+          students_with_data: withData.length,
+          top_weak: topWeak,
+        });
+      } catch (e) {
+        return res.status(500).json({ error: "Kunde inte skapa insikt." });
       }
     }
 
