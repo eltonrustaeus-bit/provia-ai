@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
@@ -509,10 +509,10 @@
       <div class="sBody">
         <div class="sBodyInner">
           <div class="coachBox">
-            <div class="coachLabel" id="coachHeader">P.E.R · Rekommendation</div>
+            <div class="coachLabel" id="coachHeader">EX1.0 · Rekommendation</div>
             <div class="coachText" id="coachText">—</div>
             <div style="margin-top:12px">
-              <button class="btn tinyBtnP" id="perCoachBtn" type="button" style="display:none">Hämta P.E.R-analys</button>
+              <button class="btn tinyBtnP" id="perCoachBtn" type="button" style="display:none">Hämta EX1.0-analys</button>
             </div>
           </div>
           <div class="statsRow">
@@ -698,7 +698,7 @@
         course:'Kurs',show:'Visa',allCourses:'Alla kurser',selected:'valda',doneBtn:'Klar ✓',pick:'Välj',
         showingAll:(n,c)=>`${n} misstag${c?' · '+c:''}`,showingExams:(n,c)=>`${n} prov${c?' · '+c:''}`,
         removedOne:'Borttagen från felbanken.',open:'Öppna',close:'Stäng',
-        smartTips:'P.E.R-tips',smartTipsLoading:'P.E.R analyserar…',smartTipsError:'Kunde inte hämta tips — försök igen.',smartTipsCached:'cache',
+        smartTips:'EX1.0-tips',smartTipsLoading:'EX1.0 analyserar…',smartTipsError:'Kunde inte hämta tips — försök igen.',smartTipsCached:'cache',
         reportNav:'Rapport',reportTitle:'Lärarrapport',reportSub:'Kräver minst 3 genomförda prov',
         reportNeed3:n=>`Minst 3 prov krävs. Du har ${n}.`,reportReady:n=>`Redo – ${n} prov`,
         reportGenerating:'Skapar rapport…',reportError:'Kunde inte skapa rapport.',
@@ -723,7 +723,7 @@
         course:'Course',show:'Show',allCourses:'All courses',selected:'selected',doneBtn:'Done ✓',pick:'Pick',
         showingAll:(n,c)=>`${n} mistakes${c?' · '+c:''}`,showingExams:(n,c)=>`${n} exams${c?' · '+c:''}`,
         removedOne:'Removed from library.',open:'Open',close:'Close',
-        smartTips:'P.E.R tips',smartTipsLoading:'P.E.R analysing…',smartTipsError:'Could not fetch tips — try again.',smartTipsCached:'cache',
+        smartTips:'EX1.0 tips',smartTipsLoading:'EX1.0 analysing…',smartTipsError:'Could not fetch tips — try again.',smartTipsCached:'cache',
         reportNav:'Report',reportTitle:'Teacher report',reportSub:'Requires at least 3 completed exams',
         reportNeed3:n=>`At least 3 exams required. You have ${n}.`,reportReady:n=>`Ready – ${n} exams`,
         reportGenerating:'Generating…',reportError:'Could not generate report.',
@@ -761,10 +761,12 @@
 
     /* ── LOGIN OVERLAY ── */
     function showLoginOverlay(){
-      const s=$('loginScreen');if(!s)return;
-      s.style.display='flex';
-      document.documentElement.style.overflow='hidden';
-      document.body.style.overflow='hidden';
+      // Prefer the shared site-wide modal; shared.js is deferred so wait briefly.
+      if (window.openProviaLogin) { window.openProviaLogin('register'); return; }
+      let n=0; const iv=setInterval(()=>{
+        if (window.openProviaLogin) { clearInterval(iv); window.openProviaLogin('register'); }
+        else if (++n>50) { clearInterval(iv); const s=$('loginScreen'); if(s){ s.style.display='flex'; document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden'; } }
+      }, 60);
     }
     function hideLoginOverlay(){
       const s=$('loginScreen');if(!s)return;
@@ -998,8 +1000,8 @@
         return;
       }
       $('coachText').textContent=LANG==='sv'
-        ?'P.E.R är redo att analysera din progress. Klicka för att hämta personlig coaching.'
-        :'P.E.R is ready to analyse your progress. Click to get personal coaching.';
+        ?'EX1.0 är redo att analysera din progress. Klicka för att hämta personlig coaching.'
+        :'EX1.0 is ready to analyse your progress. Click to get personal coaching.';
       if(btn)btn.style.display='inline-flex';
     }
 
@@ -1218,7 +1220,7 @@
       setTopStatus(LANG==='sv'?`${h.length} prov synkade`:`${h.length} exams synced`,'ok');
       const lastA=(last&&last.attempt)?last.attempt:h[h.length-1],trend=computeTrend(h);
 
-      // Inject P.E.R context so the floating widget understands improvement page state
+      // Inject EX1.0 context so the floating widget understands improvement page state
       if (window.setPerContext) {
         const avg5=avgPct(h.slice(-5));
         const mc2=mostMistakeCourse(m);
@@ -1283,7 +1285,7 @@
     /* ── EVENTS ── */
     $('perCoachBtn')?.addEventListener('click',async()=>{
       const btn=$('perCoachBtn');
-      if(btn){btn.disabled=true;btn.textContent=LANG==='sv'?'P.E.R analyserar…':'P.E.R analysing…';}
+      if(btn){btn.disabled=true;btn.textContent=LANG==='sv'?'EX1.0 analyserar…':'EX1.0 analysing…';}
       const h=lsArr(LS_HISTORY),m=lsArr(LS_MISTAKES);
       try{
         const text=await fetchPERCoach(h,m);
@@ -1292,10 +1294,10 @@
           setCoachCache({ts:Date.now(),text});
           if(btn)btn.style.display='none';
         }else{
-          if(btn){btn.disabled=false;btn.textContent='Hämta P.E.R-analys';}
+          if(btn){btn.disabled=false;btn.textContent='Hämta EX1.0-analys';}
         }
       }catch{
-        if(btn){btn.disabled=false;btn.textContent='Hämta P.E.R-analys';}
+        if(btn){btn.disabled=false;btn.textContent='Hämta EX1.0-analys';}
       }
     });
     $('courseFilter').addEventListener('change',()=>renderAll());

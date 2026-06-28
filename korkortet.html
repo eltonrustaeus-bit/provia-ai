@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="sv">
 <head>
 <meta charset="utf-8" />
@@ -848,7 +848,7 @@ body.light .adminSaveBtn{color:#fff}
         </div>
         <div class="kkUpPlan">
           <div><div class="kkUpPlanName">Premium</div><div class="kkUpPlanTag">Obegränsat</div></div>
-          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">79 kr/mån</div><div class="kkUpPlanLimit">∞ teoriprov · P.E.R obegränsat</div></div>
+          <div class="kkUpPlanRight"><div class="kkUpPlanPrice">79 kr/mån</div><div class="kkUpPlanLimit">∞ teoriprov · EX1.0 obegränsat</div></div>
         </div>
       </div>
       <div class="kkUpActions">
@@ -1051,7 +1051,7 @@ body.light .adminSaveBtn{color:#fff}
           <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 3 11 8 6 13"/></svg>
         </button>
         <div class="nextAiRow">
-          <button class="askPerBtn" type="button" onclick="document.getElementById('perBubble')?.click()">✦ Fråga P.E.R om denna fråga</button>
+          <button class="askPerBtn" type="button" onclick="document.getElementById('perBubble')?.click()">✦ Fråga EX1.0 om denna fråga</button>
         </div>
         <button class="reportQuestionBtn" id="reportQuestionBtn" type="button">⚑ Rapportera fel i frågan</button>
       </div>
@@ -2421,10 +2421,10 @@ function renderStage(stage) {
       <div class="aiTeacherWrap" id="aiTeacherWrap">
         <div class="aiTeacherHeader">
           <div class="aiAvatar">👩‍🏫</div>
-          <div><div class="aiName">P.E.R — Provias Egna AI-Resource</div><div class="aiRole">Tillgänglig via chatten nere till höger</div></div>
+          <div><div class="aiName">EX1.0 — Provias Egna AI-Resource</div><div class="aiRole">Tillgänglig via chatten nere till höger</div></div>
         </div>
         <div class="aiMessages" id="aiMessages">
-          <div class="aiMsg teacher">Hej! Jag är P.E.R. Du har just läst teorin om <strong>${esc(cat)}</strong>. Har du frågor? Använd chatbubblan 👩‍🏫 nere till höger!</div>
+          <div class="aiMsg teacher">Hej! Jag är EX1.0. Du har just läst teorin om <strong>${esc(cat)}</strong>. Har du frågor? Använd chatbubblan 👩‍🏫 nere till höger!</div>
         </div>
       </div>
       <div class="startArea" style="margin-top:16px">
@@ -2930,7 +2930,7 @@ function renderQ(i) {
   // Text
   $("qText").textContent = q.question;
 
-  // Inject current question + exam state into P.E.R context
+  // Inject current question + exam state into EX1.0 context
   if (window.setPerContext) {
     window.setPerContext({
       page: 'körkortsteorin',
@@ -3361,7 +3361,7 @@ async function showResults() {
     if(uid) await db.from("driving_results").insert({user_id:uid,category:activeCourse||selCat,num_questions:total,num_correct:right,percent:pct,passed});
   } catch(e) { console.warn("Sparfel:",e) }
 
-  // Notify P.E.R widget — gentle redo-score nudge (non-blocking)
+  // Notify EX1.0 widget — gentle redo-score nudge (non-blocking)
   if (window.PER && window.PER.notifyExamDone) {
     const weakCatNames = weakCats.map(([c]) => c);
     window.PER.notifyExamDone(pct, weakCatNames);
@@ -3398,7 +3398,13 @@ $("retryBtn").onclick = () => {
 
 // ── LOGIN ──
 function showLoginScreen() {
-  $("loginScreen").style.display = "flex";
+  // Prefer the shared site-wide modal (Gratis att starta / Skapa konto).
+  // shared.js is deferred, so it may not be ready yet — wait briefly for it.
+  if (window.openProviaLogin) { window.openProviaLogin('register'); return; }
+  var n = 0, iv = setInterval(function(){
+    if (window.openProviaLogin) { clearInterval(iv); window.openProviaLogin('register'); }
+    else if (++n > 50) { clearInterval(iv); var s = $("loginScreen"); if (s) s.style.display = "flex"; }
+  }, 60);
 }
 
 // ── INIT ──
@@ -3463,7 +3469,7 @@ async function init() {
 
     if (!_session) {
       loader.classList.add("hide");
-      $("loginScreen").style.display = "flex";
+      showLoginScreen();
       return;
     }
 
