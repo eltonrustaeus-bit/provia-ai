@@ -79,6 +79,7 @@
   .resBadge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;
     font-weight:500;letter-spacing:.05em;padding:2px 8px;border-radius:var(--r2);text-transform:uppercase}
   .resBadge.pass{background:var(--a-dim);color:var(--a2);border:1px solid var(--l2)}
+  .resBadge.mid{background:rgba(255,200,80,.08);color:#f4c842;border:1px solid rgba(255,200,80,.25)}
   .resBadge.fail{background:rgba(255,90,90,.10);color:#ff9a9a;border:1px solid rgba(255,90,90,.3)}
   .resBadge.none{background:var(--s);color:var(--t3);border:1px solid var(--l)}
   .weakTags{display:flex;flex-wrap:wrap;gap:4px;max-width:240px}
@@ -161,7 +162,7 @@
 
     <header class="pageHero">
       <h1>Lärar-dashboard</h1>
-      <p class="pageSub">Skapa klasser, dela klasskoden med dina elever och följ deras framsteg i körkortsteorin — svaga områden, teoriprov-resultat och aktivitet.</p>
+      <p class="pageSub">För skolor och gymnasiet. Skapa klasser, dela klasskoden med dina elever och följ deras framsteg i skolarbetet — mockprov på egna ämnen, svaga begrepp och aktivitet.</p>
       <div class="whoLabel" id="whoLabel">Laddar…</div>
     </header>
 
@@ -190,7 +191,7 @@
         <div class="tableWrap">
           <table class="stTable">
             <thead><tr>
-              <th>Elev</th><th>XP</th><th>Prov</th><th>Snitt</th><th>Senaste</th><th>Trend</th><th>Svaga områden</th><th></th>
+              <th>Elev</th><th>Prov</th><th>Kurser</th><th>Snitt</th><th>Senaste</th><th>Trend</th><th>Svaga begrepp</th><th></th>
             </tr></thead>
             <tbody id="studentsBody"></tbody>
           </table>
@@ -350,11 +351,11 @@ async function deleteClass(id){
 /* ── STUDENTS ── */
 function fmtDate(s){ return s ? new Date(s).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) : '—'; }
 
+// School mockprov has no fixed pass mark — show % in color tiers instead of Godkänd/Ej.
+function pctTier(p){ return p>=75?'pass':p>=50?'mid':'fail'; }
 function resultBadge(st){
   if(st.last_percent===null) return '<span class="resBadge none">Inget prov</span>';
-  const cls = st.last_passed ? 'pass' : 'fail';
-  const lbl = st.last_passed ? 'Godkänd' : 'Ej godk.';
-  return `<span class="resBadge ${cls}">${lbl} ${st.last_percent}%</span>`;
+  return `<span class="resBadge ${pctTier(st.last_percent)}">${st.last_percent}%</span>`;
 }
 
 // Inline SVG sparkline of recent percents (oldest→newest). 80% = teoriprov pass line.
@@ -368,8 +369,8 @@ function sparkline(trend,w=92,h=26,cls=''){
   });
   const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   const last=trend[trend.length-1];
-  const col=last>=80?'var(--a)':last>=60?'#f4c842':'#ff9a9a';
-  const passY=(pad+(1-0.8)*(h-2*pad)).toFixed(1);
+  const col=last>=75?'var(--a)':last>=50?'#f4c842':'#ff9a9a';
+  const passY=(pad+(1-0.6)*(h-2*pad)).toFixed(1);
   const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="1.8" fill="${col}"/>`).join('');
   return `<svg class="spark ${cls}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Resultattrend, senaste ${trend.length} prov">
     <line x1="0" y1="${passY}" x2="${w}" y2="${passY}" stroke="var(--l2)" stroke-dasharray="3 3" stroke-width="1"/>
@@ -378,7 +379,7 @@ function sparkline(trend,w=92,h=26,cls=''){
 }
 
 function needsAttention(st){
-  return st.last_passed===false || (st.avg_percent!==null && st.avg_percent<75);
+  return st.avg_percent!==null && st.avg_percent<60;
 }
 
 function renderStudents(cls,students){
@@ -394,16 +395,17 @@ function renderStudents(cls,students){
     return aa-bb;
   });
   body.innerHTML = sorted.map(st=>{
-    const weak = st.weak_categories.length
-      ? st.weak_categories.map(w=>`<span class="weakTag" title="Bästa resultat ${w.best}%">${esc(w.category)} ${w.best}%</span>`).join('')
+    const weak = st.weak_concepts.length
+      ? st.weak_concepts.map(w=>`<span class="weakTag" title="Svag i ${esc(w.concept)} (${w.count} prov)">${esc(w.concept)}</span>`).join('')
       : '<span class="muted">—</span>';
     const dot = needsAttention(st) ? '<span class="attn" title="Behöver stöd"></span>' : '';
+    const lastLine = st.last_course ? `${esc(st.last_course)} · ${fmtDate(st.last_at)}` : fmtDate(st.last_at);
     return `<tr class="clickable" data-sid="${esc(st.student_id)}" role="button" tabindex="0" title="Visa elevens historik">
       <td><div class="stEmail" title="${esc(st.email)}">${dot}${esc(st.email)}</div></td>
-      <td class="num">${st.xp}</td>
       <td class="num">${st.tests_taken}</td>
+      <td class="num">${st.courses_count}</td>
       <td class="num">${st.avg_percent===null?'<span class="muted">—</span>':st.avg_percent+'%'}</td>
-      <td>${resultBadge(st)}<div class="num muted" style="margin-top:3px">${fmtDate(st.last_at)}</div></td>
+      <td>${resultBadge(st)}<div class="num muted" style="margin-top:3px">${lastLine}</div></td>
       <td>${sparkline(st.trend)}</td>
       <td><div class="weakTags">${weak}</div></td>
       <td class="chev">›</td>
@@ -416,30 +418,36 @@ function catClass(best){ return best<50?'bad':best<75?'weak':''; }
 
 function renderDrilldown(student){
   document.getElementById('ddEmail').textContent=student.email;
-  document.getElementById('ddStats').innerHTML=`
-    <span class="ddStat"><b>${student.xp}</b>XP</span>
-    <span class="ddStat"><b>${student.tests_taken}</b>Prov</span>`;
+  const courses=student.courses||[];
   const tests=student.tests||[];
+  const weak=student.weak_concepts||[];
+  document.getElementById('ddStats').innerHTML=`
+    <span class="ddStat"><b>${student.tests_taken}</b>Mockprov</span>
+    <span class="ddStat"><b>${courses.length}</b>Kurser</span>`;
   const trendVals=tests.map(t=>t.percent);
-  const cats=student.categories||[];
-  const catHtml = cats.length
-    ? cats.map(c=>`<div class="catRow">
-        <span class="catName">${esc(c.category)}</span>
-        <div class="catTrack"><div class="catFill ${catClass(c.best)}" style="width:${Math.max(c.best,3)}%"></div></div>
-        <span class="catPct">${c.best}%</span></div>`).join('')
-    : '<div class="empty">Ingen kategoridata än.</div>';
+  const courseHtml = courses.length
+    ? courses.map(c=>`<div class="catRow">
+        <span class="catName">${esc(c.course)}</span>
+        <div class="catTrack"><div class="catFill ${catClass(c.avg)}" style="width:${Math.max(c.avg,3)}%"></div></div>
+        <span class="catPct">${c.avg}%</span></div>`).join('')
+    : '<div class="empty">Inga mockprov än.</div>';
+  const weakHtml = weak.length
+    ? `<div class="weakTags">${weak.map(w=>`<span class="weakTag" title="${w.count} prov">${esc(w.concept)}</span>`).join('')}</div>`
+    : '<div class="empty">Inga återkommande svaga begrepp.</div>';
   const testHtml = tests.length
     ? tests.slice(-12).reverse().map(t=>`<div class="testRow">
         <span class="tDate">${fmtDate(t.at)}</span>
-        <span>${esc(t.category||'—')}${t.correct!=null&&t.total!=null?` · ${t.correct}/${t.total}`:''}</span>
-        <span class="resBadge ${t.passed?'pass':'fail'}">${t.percent}%</span></div>`).join('')
-    : '<div class="empty">Inga prov genomförda än.</div>';
+        <span>${esc(t.course||'—')}${t.total!=null?` · ${t.total} frågor`:''}</span>
+        <span class="resBadge ${pctTier(t.percent)}">${t.percent}%</span></div>`).join('')
+    : '<div class="empty">Inga mockprov genomförda än.</div>';
   document.getElementById('ddBody').innerHTML=`
-    <div class="ddSecHead">Resultattrend (senaste ${trendVals.length} prov)</div>
+    <div class="ddSecHead">Resultattrend (senaste ${trendVals.length} mockprov)</div>
     <div class="ddTrendWrap">${sparkline(trendVals,560,80,'lg')}</div>
-    <div class="ddSecHead">Kategorier (svagast först)</div>
-    ${catHtml}
-    <div class="ddSecHead">Provhistorik</div>
+    <div class="ddSecHead">Kurser (svagast först)</div>
+    ${courseHtml}
+    <div class="ddSecHead">Svaga begrepp</div>
+    ${weakHtml}
+    <div class="ddSecHead">Mockprov-historik</div>
     ${testHtml}`;
   document.getElementById('ddOverlay').classList.add('open');
 }
@@ -461,7 +469,7 @@ function closeDrilldown(){ document.getElementById('ddOverlay').classList.remove
 
 /* ── P.E.R CLASS INSIGHT (cached 24h per class) ── */
 const INSIGHT_TTL = 24*60*60*1000;
-const INSIGHT_HEADINGS = ['Klassläge:','Elever som behöver stöd:','Svagaste områden i klassen:','Rekommenderad träning (nästa 1–2 veckor):'];
+const INSIGHT_HEADINGS = ['Klassläge:','Elever som behöver stöd:','Svagaste begrepp/områden i klassen:','Rekommenderad träning (nästa 1–2 veckor):'];
 function insightKey(id){ return 'proviaai_teacher_insight_'+id; }
 
 function fmtInsight(text){

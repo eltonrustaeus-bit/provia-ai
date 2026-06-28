@@ -32,17 +32,23 @@ async function getRole(userId) {
   return normalizeRole(data?.role);
 }
 
-// Top weak categories from driving_progress.cat_prog ({ cat: { best } })
-function weakFromCatProg(catProg, limit = 3) {
-  if (!catProg || typeof catProg !== "object") return [];
-  return Object.entries(catProg)
-    .filter(([, v]) => typeof v?.best === "number" && v.best < 75)
-    .sort(([, a], [, b]) => (a.best || 0) - (b.best || 0))
+// Top weak concepts from low-scoring mockprov (concept_tags on exams < 70%).
+// School-focused: surfaces the subject topics a student keeps missing.
+function weakConceptsFromMock(rows, limit = 3) {
+  const freq = {};
+  for (const r of rows) {
+    if ((r.percent ?? 100) < 70) {
+      for (const c of r.concept_tags || []) if (c) freq[c] = (freq[c] || 0) + 1;
+    }
+  }
+  return Object.entries(freq)
+    .sort(([, a], [, b]) => b - a)
     .slice(0, limit)
-    .map(([cat, v]) => ({ category: cat, best: Math.round(v.best) }));
+    .map(([concept, n]) => ({ concept, count: n }));
 }
 
-// Aggregate per-student progress for a class. Bulk queries — no N+1.
+// Aggregate per-student MOCKPROV progress for a class (school subjects, not körkort).
+// Source: mock_results (course, percent, concept_tags). Bulk queries — no N+1.
 async function getStudentSummaries(classId) {
   const { data: members } = await supabase
     .from("class_members")
@@ -51,11 +57,10 @@ async function getStudentSummaries(classId) {
   const ids = (members || []).map((m) => m.student_id);
   if (!ids.length) return [];
 
-  const [progressRes, resultsRes, userResults] = await Promise.all([
-    supabase.from("driving_progress").select("user_id, cat_prog, xp").in("user_id", ids),
+  const [mockRes, userResults] = await Promise.all([
     supabase
-      .from("driving_results")
-      .select("user_id, percent, passed, created_at")
+      .from("mock_results")
+      .select("user_id, course, percent, num_questions, concept_tags, created_at")
       .in("user_id", ids)
       .order("created_at", { ascending: false }),
     // Resolve emails per member id — scales with class size, not platform size.
@@ -63,11 +68,8 @@ async function getStudentSummaries(classId) {
     Promise.all(ids.map((id) => supabase.auth.admin.getUserById(id))),
   ]);
 
-  const progById = {};
-  for (const p of progressRes.data || []) progById[p.user_id] = p;
-
-  const resultsById = {};
-  for (const r of resultsRes.data || []) (resultsById[r.user_id] ||= []).push(r);
+  const byId = {};
+  for (const r of mockRes.data || []) (byId[r.user_id] ||= []).push(r);
 
   const emailById = {};
   for (const u of userResults) {
@@ -76,23 +78,23 @@ async function getStudentSummaries(classId) {
   }
 
   return ids.map((id) => {
-    const prog = progById[id] || {};
-    const results = resultsById[id] || [];
-    const percents = results.map((r) => Math.round(r.percent || 0));
+    const rows = byId[id] || []; // already newest-first
+    const percents = rows.map((r) => Math.round(r.percent || 0));
     const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null;
-    const last = results[0] || null;
-    // Last up to 8 tests, oldest→newest, for an inline trend sparkline
-    const trend = results.slice(0, 8).map((r) => Math.round(r.percent || 0)).reverse();
+    const last = rows[0] || null;
+    const courses = [...new Set(rows.map((r) => r.course).filter(Boolean))];
+    // Last up to 8 mockprov, oldest→newest, for an inline trend sparkline
+    const trend = rows.slice(0, 8).map((r) => Math.round(r.percent || 0)).reverse();
     return {
       student_id: id,
       email: emailById[id] || "—",
-      xp: prog.xp || 0,
-      tests_taken: results.length,
+      tests_taken: rows.length,
       avg_percent: avg,
       last_percent: last ? Math.round(last.percent || 0) : null,
-      last_passed: last ? !!last.passed : null,
+      last_course: last?.course || null,
       last_at: last?.created_at || null,
-      weak_categories: weakFromCatProg(prog.cat_prog),
+      courses_count: courses.length,
+      weak_concepts: weakConceptsFromMock(rows),
       trend,
     };
   });
@@ -367,33 +369,39 @@ export default async function handler(req, res) {
           .maybeSingle();
         if (!mem) return res.status(404).json({ error: "Eleven finns inte i klassen." });
 
-        const [progRes, resultsRes, userRes] = await Promise.all([
-          supabase.from("driving_progress").select("cat_prog, xp").eq("user_id", studentId).maybeSingle(),
+        const [resultsRes, userRes] = await Promise.all([
           supabase
-            .from("driving_results")
-            .select("category, num_questions, num_correct, percent, passed, created_at")
+            .from("mock_results")
+            .select("course, num_questions, percent, concept_tags, created_at")
             .eq("user_id", studentId)
             .order("created_at", { ascending: false })
             .limit(50),
           supabase.auth.admin.getUserById(studentId),
         ]);
 
-        const prog = progRes.data || {};
         const results = resultsRes.data || [];
         const email = userRes.data?.user?.email || "—";
 
-        const categories = Object.entries(prog.cat_prog || {})
-          .filter(([, v]) => v && typeof v === "object")
-          .map(([category, v]) => ({ category, best: Math.round(v.best || 0), attempts: v.attempts || 0 }))
-          .sort((a, b) => a.best - b.best);
+        // Per-course (subject) aggregation — weakest first
+        const courseMap = {};
+        for (const r of results) {
+          const c = r.course || "Okänd kurs";
+          (courseMap[c] ||= []).push(Math.round(r.percent || 0));
+        }
+        const courses = Object.entries(courseMap)
+          .map(([course, ps]) => ({
+            course,
+            avg: Math.round(ps.reduce((a, b) => a + b, 0) / ps.length),
+            best: Math.max(...ps),
+            attempts: ps.length,
+          }))
+          .sort((a, b) => a.avg - b.avg);
 
         const tests = results
           .map((r) => ({
             at: r.created_at,
-            category: r.category || null,
+            course: r.course || null,
             percent: Math.round(r.percent || 0),
-            passed: !!r.passed,
-            correct: r.num_correct ?? null,
             total: r.num_questions ?? null,
           }))
           .reverse(); // oldest → newest
@@ -401,7 +409,14 @@ export default async function handler(req, res) {
         return res.status(200).json({
           ok: true,
           class: { id: cls.id, name: cls.name },
-          student: { student_id: studentId, email, xp: prog.xp || 0, tests_taken: tests.length, categories, tests },
+          student: {
+            student_id: studentId,
+            email,
+            tests_taken: tests.length,
+            courses,
+            weak_concepts: weakConceptsFromMock(results, 8),
+            tests,
+          },
         });
       } catch (e) {
         return res.status(500).json({ error: "Internal server error" });
@@ -431,39 +446,38 @@ export default async function handler(req, res) {
         // Anonymize — never send email/PII to the model
         const anon = withData.map((s, i) => ({
           elev: `Elev ${i + 1}`,
-          xp: s.xp,
           prov: s.tests_taken,
+          kurser: s.courses_count,
           snitt: s.avg_percent,
           senaste: s.last_percent,
-          godkand: s.last_passed,
-          svaga: s.weak_categories.map((w) => `${w.category} ${w.best}%`),
+          svaga_begrepp: s.weak_concepts.map((w) => w.concept),
         }));
         const classAvg = Math.round(
           withData.reduce((a, s) => a + (s.avg_percent || 0), 0) / withData.length
         );
         const weakCount = {};
-        for (const s of withData) for (const w of s.weak_categories) weakCount[w.category] = (weakCount[w.category] || 0) + 1;
+        for (const s of withData) for (const w of s.weak_concepts) weakCount[w.concept] = (weakCount[w.concept] || 0) + 1;
         const topWeak = Object.entries(weakCount)
           .sort(([, a], [, b]) => b - a)
           .slice(0, 5)
           .map(([c, n]) => `${c} (${n} ${n === 1 ? "elev" : "elever"})`);
 
-        const systemPrompt = `Du är P.E.R — Provias AI och en erfaren lärarcoach. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i körkortsteorin.
+        const systemPrompt = `Du är P.E.R — Provias AI och en erfaren lärarcoach för gymnasie- och grundskola. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i skolarbetet — baserat på mockprov eleverna gjort på sina egna ämnen och material (inte körkort).
 KRAV:
 - Saklig, professionell, max 200 ord.
 - Använd elevernas anonyma etiketter (Elev 1, Elev 2 …) — aldrig namn.
-- Peka ut konkret vilka elever som behöver stöd och varför.
+- Peka ut konkret vilka elever som behöver stöd och i vilka ämnen/begrepp.
 FORMAT (exakt rubriker):
 Klassläge:
 Elever som behöver stöd:
-Svagaste områden i klassen:
+Svagaste begrepp/områden i klassen:
 Rekommenderad träning (nästa 1–2 veckor):`;
         const userPrompt = `Klass: ${cls.name}
 Antal elever med provdata: ${withData.length}
-Klassens snitt: ${classAvg}%
-Svagaste områden (flest svaga elever): ${topWeak.join(", ") || "—"}
+Klassens snitt (mockprov): ${classAvg}%
+Svagaste begrepp (flest svaga elever): ${topWeak.join(", ") || "—"}
 
-Elevdata (anonymiserad):
+Elevdata (anonymiserad, mockprov på egna ämnen):
 ${JSON.stringify(anon, null, 2)}
 
 Skriv rapporten enligt formatet.`;
