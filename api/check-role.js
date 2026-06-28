@@ -32,23 +32,46 @@ async function getRole(userId) {
   return normalizeRole(data?.role);
 }
 
-// Top weak concepts from low-scoring mockprov (concept_tags on exams < 70%).
-// School-focused: surfaces the subject topics a student keeps missing.
-function weakConceptsFromMock(rows, limit = 3) {
+// Mockprov score from a user_exams.result ({ total_points, max_points, per_question[] }).
+function examPercent(result) {
+  const t = Number(result?.total_points || 0);
+  const m = Number(result?.max_points || 0);
+  return m > 0 ? Math.round((t / m) * 100) : 0;
+}
+
+// Concept tags the student got wrong in one exam (per_question points < max_points).
+function examFailConcepts(result) {
+  const pq = Array.isArray(result?.per_question) ? result.per_question : [];
+  return pq
+    .filter((q) => Number(q.points || 0) < Number(q.max_points || 0))
+    .map((q) => q.concept_tag)
+    .filter((c) => c && c !== "Okänt" && c !== "Unknown");
+}
+
+// Top weak concepts across a student's mockprov — the subject topics they keep missing.
+function weakConceptsFromExams(exams, limit = 3) {
   const freq = {};
-  for (const r of rows) {
-    if ((r.percent ?? 100) < 70) {
-      for (const c of r.concept_tags || []) if (c) freq[c] = (freq[c] || 0) + 1;
-    }
-  }
+  for (const e of exams) for (const c of e.failConcepts || []) freq[c] = (freq[c] || 0) + 1;
   return Object.entries(freq)
     .sort(([, a], [, b]) => b - a)
     .slice(0, limit)
     .map(([concept, n]) => ({ concept, count: n }));
 }
 
+// Normalize a user_exams row → compact mockprov record.
+function normalizeExam(r) {
+  return {
+    course: r.course || null,
+    percent: examPercent(r.result),
+    num_questions: Array.isArray(r.result?.per_question) ? r.result.per_question.length : null,
+    failConcepts: examFailConcepts(r.result),
+    created_at: r.created_at,
+  };
+}
+
 // Aggregate per-student MOCKPROV progress for a class (school subjects, not körkort).
-// Source: mock_results (course, percent, concept_tags). Bulk queries — no N+1.
+// Source: user_exams (the populated mockprov table; mock_results is not reliably written).
+// Bulk queries — no N+1.
 async function getStudentSummaries(classId) {
   const { data: members } = await supabase
     .from("class_members")
@@ -57,10 +80,10 @@ async function getStudentSummaries(classId) {
   const ids = (members || []).map((m) => m.student_id);
   if (!ids.length) return [];
 
-  const [mockRes, userResults] = await Promise.all([
+  const [examsRes, userResults] = await Promise.all([
     supabase
-      .from("mock_results")
-      .select("user_id, course, percent, num_questions, concept_tags, created_at")
+      .from("user_exams")
+      .select("user_id, course, result, created_at")
       .in("user_id", ids)
       .order("created_at", { ascending: false }),
     // Resolve emails per member id — scales with class size, not platform size.
@@ -69,7 +92,7 @@ async function getStudentSummaries(classId) {
   ]);
 
   const byId = {};
-  for (const r of mockRes.data || []) (byId[r.user_id] ||= []).push(r);
+  for (const r of examsRes.data || []) (byId[r.user_id] ||= []).push(normalizeExam(r));
 
   const emailById = {};
   for (const u of userResults) {
@@ -78,23 +101,23 @@ async function getStudentSummaries(classId) {
   }
 
   return ids.map((id) => {
-    const rows = byId[id] || []; // already newest-first
-    const percents = rows.map((r) => Math.round(r.percent || 0));
+    const exams = byId[id] || []; // already newest-first
+    const percents = exams.map((e) => e.percent);
     const avg = percents.length ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null;
-    const last = rows[0] || null;
-    const courses = [...new Set(rows.map((r) => r.course).filter(Boolean))];
+    const last = exams[0] || null;
+    const courses = [...new Set(exams.map((e) => e.course).filter(Boolean))];
     // Last up to 8 mockprov, oldest→newest, for an inline trend sparkline
-    const trend = rows.slice(0, 8).map((r) => Math.round(r.percent || 0)).reverse();
+    const trend = exams.slice(0, 8).map((e) => e.percent).reverse();
     return {
       student_id: id,
       email: emailById[id] || "—",
-      tests_taken: rows.length,
+      tests_taken: exams.length,
       avg_percent: avg,
-      last_percent: last ? Math.round(last.percent || 0) : null,
+      last_percent: last ? last.percent : null,
       last_course: last?.course || null,
       last_at: last?.created_at || null,
       courses_count: courses.length,
-      weak_concepts: weakConceptsFromMock(rows),
+      weak_concepts: weakConceptsFromExams(exams),
       trend,
     };
   });
@@ -371,22 +394,22 @@ export default async function handler(req, res) {
 
         const [resultsRes, userRes] = await Promise.all([
           supabase
-            .from("mock_results")
-            .select("course, num_questions, percent, concept_tags, created_at")
+            .from("user_exams")
+            .select("course, result, created_at")
             .eq("user_id", studentId)
             .order("created_at", { ascending: false })
             .limit(50),
           supabase.auth.admin.getUserById(studentId),
         ]);
 
-        const results = resultsRes.data || [];
+        const exams = (resultsRes.data || []).map(normalizeExam);
         const email = userRes.data?.user?.email || "—";
 
         // Per-course (subject) aggregation — weakest first
         const courseMap = {};
-        for (const r of results) {
-          const c = r.course || "Okänd kurs";
-          (courseMap[c] ||= []).push(Math.round(r.percent || 0));
+        for (const e of exams) {
+          const c = e.course || "Okänd kurs";
+          (courseMap[c] ||= []).push(e.percent);
         }
         const courses = Object.entries(courseMap)
           .map(([course, ps]) => ({
@@ -397,13 +420,8 @@ export default async function handler(req, res) {
           }))
           .sort((a, b) => a.avg - b.avg);
 
-        const tests = results
-          .map((r) => ({
-            at: r.created_at,
-            course: r.course || null,
-            percent: Math.round(r.percent || 0),
-            total: r.num_questions ?? null,
-          }))
+        const tests = exams
+          .map((e) => ({ at: e.created_at, course: e.course, percent: e.percent, total: e.num_questions }))
           .reverse(); // oldest → newest
 
         return res.status(200).json({
@@ -414,7 +432,7 @@ export default async function handler(req, res) {
             email,
             tests_taken: tests.length,
             courses,
-            weak_concepts: weakConceptsFromMock(results, 8),
+            weak_concepts: weakConceptsFromExams(exams, 8),
             tests,
           },
         });
