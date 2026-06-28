@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import { currentPeriodKey, getEntitlementSnapshot, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { clearLongMemory } from "./_per-memory.js";
@@ -125,14 +125,6 @@ async function getStudentSummaries(classId) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-  // Access code verification (no auth required)
-  if (req.body && req.body.code !== undefined) {
-    const secret = process.env.ACCESS_CODE;
-    if (!secret) return res.status(500).json({ error: "Server misconfigured" });
-    const ok = (req.body.code || "").trim() === secret;
-    return ok ? res.status(200).json({ ok: true }) : res.status(401).json({ error: "Invalid code" });
-  }
 
   const user = await requireAuth(req, res);
   if (!user) return;
@@ -441,7 +433,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // P.E.R class insight: AI summary for the TEACHER. Student data is anonymized
+    // EX1.0 class insight: AI summary for the TEACHER. Student data is anonymized
     // (labels Elev 1..N, no email/PII) before it ever reaches OpenAI.
     if (action === "teacher_class_insight") {
       const classId = String(req.body?.classId || "");
@@ -480,7 +472,7 @@ export default async function handler(req, res) {
           .slice(0, 5)
           .map(([c, n]) => `${c} (${n} ${n === 1 ? "elev" : "elever"})`);
 
-        const systemPrompt = `Du är P.E.R — Provias AI och en erfaren lärarcoach för gymnasie- och grundskola. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i skolarbetet — baserat på mockprov eleverna gjort på sina egna ämnen och material (inte körkort).
+        const systemPrompt = `Du är EX1.0 — Provias AI och en erfaren lärarcoach för gymnasie- och grundskola. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i skolarbetet — baserat på mockprov eleverna gjort på sina egna ämnen och material (inte körkort).
 KRAV:
 - Saklig, professionell, max 200 ord.
 - Använd elevernas anonyma etiketter (Elev 1, Elev 2 …) — aldrig namn.
