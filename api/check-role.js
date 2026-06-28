@@ -51,14 +51,16 @@ async function getStudentSummaries(classId) {
   const ids = (members || []).map((m) => m.student_id);
   if (!ids.length) return [];
 
-  const [progressRes, resultsRes, usersRes] = await Promise.all([
+  const [progressRes, resultsRes, userResults] = await Promise.all([
     supabase.from("driving_progress").select("user_id, cat_prog, xp").in("user_id", ids),
     supabase
       .from("driving_results")
       .select("user_id, percent, passed, created_at")
       .in("user_id", ids)
       .order("created_at", { ascending: false }),
-    supabase.auth.admin.listUsers({ perPage: 1000 }),
+    // Resolve emails per member id — scales with class size, not platform size.
+    // (Avoids listUsers({perPage:1000}), which silently dropped emails past 1000 users.)
+    Promise.all(ids.map((id) => supabase.auth.admin.getUserById(id))),
   ]);
 
   const progById = {};
@@ -68,7 +70,10 @@ async function getStudentSummaries(classId) {
   for (const r of resultsRes.data || []) (resultsById[r.user_id] ||= []).push(r);
 
   const emailById = {};
-  for (const u of usersRes.data?.users || []) emailById[u.id] = u.email;
+  for (const u of userResults) {
+    const usr = u?.data?.user;
+    if (usr) emailById[usr.id] = usr.email;
+  }
 
   return ids.map((id) => {
     const prog = progById[id] || {};
