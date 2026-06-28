@@ -1,4 +1,4 @@
-/* Provia Shared — page transitions + welcome animation + P.E.R widget */
+﻿/* Provia Shared — page transitions + welcome animation + EX1.0 widget */
 (function () {
   'use strict';
 
@@ -86,7 +86,7 @@
     } catch (_) {}
   });
 
-  /* ── P.E.R FLOATING WIDGET ── */
+  /* ── EX1.0 FLOATING WIDGET ── */
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
@@ -132,7 +132,7 @@
     }
   }
 
-  /* Pages call this to inject richer context into the P.E.R widget */
+  /* Pages call this to inject richer context into the EX1.0 widget */
   window.setPerContext = function(ctx) {
     window._perPageContext = ctx || null;
     if (ctx && window.PER && window.PER._resetNudge) window.PER._resetNudge();
@@ -516,7 +516,7 @@
       if (sendBtn) sendBtn.disabled = true;
 
       addMsg(q, 'user');
-      var typing = addMsg('P.E.R skriver…', 'teacher typing');
+      var typing = addMsg('EX1.0 skriver…', 'teacher typing');
 
       var hist = perGetHist();
       var token = await getToken();
@@ -612,7 +612,7 @@
           if (typing) {
             if (r.status === 401) {
               typing.className = 'per-msg teacher';
-              typing.textContent = 'Logga in för att chatta med P.E.R.';
+              typing.textContent = 'Logga in för att chatta med EX1.0.';
             } else if (!r.ok) {
               typing.className = 'per-msg teacher';
               typing.textContent = data.error || 'Fel — försök igen.';
@@ -774,9 +774,9 @@
         '<div id="perPanel">' +
           '<div class="per-hdr">' +
             '<div class="per-av"><span class="per-av-txt">PER</span><span class="per-av-bars"><span></span><span></span><span></span></span></div>' +
-            '<div><div class="per-nm">P.E.R</div><div class="per-rl">PROVIAS AI</div></div>' +
+            '<div><div class="per-nm">EX1.0</div><div class="per-rl">PROVIAS AI</div></div>' +
             '<div class="per-hdr-btns">' +
-              '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
+              '<button class="per-clr" id="perQuizBtn" title="Quiz – EX1.0 frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
               '<button class="per-clr" id="perReadyBtn" title="Din körkortsredo-score"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>' +
               '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
               '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
@@ -788,12 +788,12 @@
             '<div class="per-msg teacher">Vad kan jag hjälpa dig med?</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
-            '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
-            '<button id="perMicBtn" title="Tala med P.E.R">🎤</button>' +
+            '<input id="perInput" type="text" placeholder="Fråga EX1.0…" autocomplete="off" />' +
+            '<button id="perMicBtn" title="Tala med EX1.0">🎤</button>' +
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
-        '<button id="perBubble" title="Chatta med P.E.R">P·E·R</button>';
+        '<button id="perBubble" title="Chatta med EX1.0">P·E·R</button>';
       document.body.appendChild(widget);
 
       document.getElementById('perBubble').onclick = toggle;
@@ -915,7 +915,7 @@
           _micListening = active;
           if (micBtn) micBtn.classList.toggle('listening', active);
           if (perAvEl) perAvEl.classList.toggle('per-listening', active);
-          if (perInpEl) perInpEl.placeholder = active ? 'Lyssnar…' : 'Fråga P.E.R…';
+          if (perInpEl) perInpEl.placeholder = active ? 'Lyssnar…' : 'Fråga EX1.0…';
         }
 
         function createRecognition() {
@@ -1025,7 +1025,7 @@
                 if (introDiv) {
                   introDiv.className = 'per-msg teacher';
                   introDiv.innerHTML = '';
-                  var introText = 'Hallå! Jag är P.E.R. Jag svarar på allt om Provia — vad det är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Fråga på!';
+                  var introText = 'Hallå! Jag är EX1.0. Jag svarar på allt om Provia — vad det är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Fråga på!';
                   typewriterMsg(introDiv, introText, 14);
                   setTimeout(function() {
                     addQuickReplies(['Vad är Provia?', 'Varför inte ChatGPT?', 'Vad kostar det?']);
@@ -1288,47 +1288,49 @@
       var s = document.createElement('style');
       s.id = 'pvStyles';
       s.textContent = [
-        '#pvModal{position:fixed;inset:0;z-index:10000;background:rgba(4,10,7,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:none;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .2s ease}',
+        '#pvModal{position:fixed;inset:0;z-index:10000;background:rgba(3,8,6,.82);backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);display:none;align-items:center;justify-content:center;padding:18px;opacity:0;transition:opacity .22s ease}',
         '#pvModal.pv-on{opacity:1}',
-        '#pvCard{background:var(--s,#111a15);border:1px solid rgba(27,255,140,.22);border-radius:14px;width:min(400px,100%);overflow:hidden;transform:translateY(14px) scale(.97);transition:transform .24s cubic-bezier(.22,.61,.36,1)}',
+        '#pvCard{position:relative;background:linear-gradient(180deg,var(--s2,#162019),var(--s,#111a15));border:1px solid rgba(27,255,140,.18);border-radius:18px;width:min(412px,100%);overflow:hidden;box-shadow:0 30px 80px -20px rgba(0,0,0,.75);transform:translateY(16px) scale(.96);transition:transform .26s cubic-bezier(.22,.61,.36,1)}',
         '#pvModal.pv-on #pvCard{transform:none}',
-        '.pv-hd{padding:24px 22px 16px;border-bottom:1px solid rgba(255,255,255,.07);text-align:center;position:relative}',
-        '.pv-cl{position:absolute;top:13px;right:13px;width:28px;height:28px;border:1px solid rgba(255,255,255,.1);border-radius:50%;background:none;cursor:pointer;font-size:14px;color:var(--t3,#5a7a6a);display:grid;place-items:center;transition:border-color .15s,color .15s;line-height:1}',
-        '.pv-cl:hover{border-color:rgba(255,255,255,.28);color:var(--t,#e8f5ee)}',
-        '.pv-lg{height:26px;width:auto;display:block;margin:0 auto 12px}',
-        '.pv-ti{font-weight:700;font-size:19px;color:var(--t,#e8f5ee);letter-spacing:-.03em;margin-bottom:3px}',
-        '.pv-sb{font-family:"DM Mono",monospace;font-size:10.5px;color:var(--t3,#5a7a6a);letter-spacing:.06em;min-height:16px}',
-        '.pv-bd{padding:22px}',
-        '.pv-vw{display:none;animation:pvIn .16s ease}',
+        '#pvCard::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--a,#1bff8c),transparent);opacity:.7}',
+        '.pv-hd{padding:30px 26px 18px;text-align:center;position:relative}',
+        '.pv-cl{position:absolute;top:14px;right:14px;width:30px;height:30px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:none;cursor:pointer;font-size:15px;color:var(--t3,#5a7a6a);display:grid;place-items:center;transition:border-color .15s,color .15s,background .15s;line-height:1}',
+        '.pv-cl:hover{border-color:rgba(255,255,255,.28);color:var(--t,#e8f5ee);background:rgba(255,255,255,.04)}',
+        '.pv-lg{height:34px;width:auto;display:block;margin:0 auto 16px;filter:drop-shadow(0 4px 14px rgba(27,255,140,.35))}',
+        '.pv-ti{font-family:"DM Sans",sans-serif;font-weight:700;font-size:23px;color:var(--t,#e8f5ee);letter-spacing:-.035em;margin-bottom:7px;line-height:1.1}',
+        '.pv-sb{font-family:"DM Mono",monospace;font-size:10px;color:var(--a,#1bff8c);letter-spacing:.14em;min-height:14px;font-weight:500}',
+        '.pv-bd{padding:6px 26px 26px}',
+        '.pv-vw{display:none;animation:pvIn .18s ease}',
         '.pv-vw.pv-vx{display:block}',
-        '@keyframes pvIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}',
-        '.pv-fl{margin-bottom:13px}',
-        '.pv-la{font-family:"DM Mono",monospace;font-size:10px;color:var(--t3,#5a7a6a);letter-spacing:.07em;text-transform:uppercase;display:block;margin-bottom:5px}',
-        '.pv-in{width:100%;padding:11px 13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-size:14px;color:var(--t,#e8f5ee);font-family:"DM Sans",sans-serif;outline:none;transition:border-color .15s;box-sizing:border-box}',
-        '.pv-in:focus{border-color:rgba(27,255,140,.5)}',
-        '.pv-in::placeholder{color:rgba(255,255,255,.2)}',
-        'body.light .pv-in{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.12);color:#091810}',
-        'body.light .pv-in:focus{border-color:rgba(7,168,99,.5)}',
-        'body.light .pv-in::placeholder{color:rgba(0,0,0,.22)}',
-        '.pv-pm{width:100%;height:48px;background:var(--a,#1bff8c);color:#08100d;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:background .15s,transform .12s;margin-bottom:10px;display:flex;align-items:center;justify-content:center}',
-        '.pv-pm:hover{background:var(--a2,#00e67a);transform:translateY(-1px)}',
-        '.pv-pm:active{transform:scale(.98)}',
-        '.pv-pm:disabled{opacity:.4;cursor:not-allowed;transform:none}',
-        'body.light .pv-pm{color:#fff}',
-        '.pv-se{width:100%;height:46px;background:none;border:1px solid rgba(255,255,255,.13);color:var(--t,#e8f5ee);border-radius:10px;font-weight:600;font-size:15px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:border-color .15s,background .15s,transform .12s;margin-bottom:10px;display:flex;align-items:center;justify-content:center}',
-        '.pv-se:hover{border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.04);transform:translateY(-1px)}',
+        '@keyframes pvIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
+        '.pv-fl{margin-bottom:14px}',
+        '.pv-la{font-family:"DM Mono",monospace;font-size:9.5px;color:var(--t3,#5a7a6a);letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:7px}',
+        '.pv-in{width:100%;height:48px;padding:0 14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.1);border-radius:10px;font-size:14.5px;color:var(--t,#e8f5ee);font-family:"DM Sans",sans-serif;outline:none;transition:border-color .15s,box-shadow .15s,background .15s;box-sizing:border-box}',
+        '.pv-in:focus{border-color:rgba(27,255,140,.55);background:rgba(27,255,140,.04);box-shadow:0 0 0 3px rgba(27,255,140,.1)}',
+        '.pv-in::placeholder{color:rgba(255,255,255,.22)}',
+        'body.light .pv-in{background:rgba(0,0,0,.035);border-color:rgba(0,0,0,.12);color:#091810}',
+        'body.light .pv-in:focus{border-color:rgba(7,168,99,.55);box-shadow:0 0 0 3px rgba(7,168,99,.12)}',
+        'body.light .pv-in::placeholder{color:rgba(0,0,0,.24)}',
+        '.pv-pm{width:100%;height:50px;background:var(--a,#1bff8c);color:#06120c;border:none;border-radius:11px;font-weight:700;font-size:15px;letter-spacing:-.01em;cursor:pointer;font-family:"DM Sans",sans-serif;transition:filter .15s,transform .12s,box-shadow .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -8px rgba(27,255,140,.55)}',
+        '.pv-pm:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 12px 28px -8px rgba(27,255,140,.6)}',
+        '.pv-pm:active{transform:scale(.985)}',
+        '.pv-pm:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}',
+        'body.light .pv-pm{color:#fff;background:#07a863}',
+        '.pv-se{width:100%;height:48px;background:none;border:1px solid rgba(255,255,255,.13);color:var(--t,#e8f5ee);border-radius:11px;font-weight:600;font-size:14.5px;cursor:pointer;font-family:"DM Sans",sans-serif;transition:border-color .15s,background .15s,transform .12s;margin-bottom:10px;display:flex;align-items:center;justify-content:center}',
+        '.pv-se:hover{border-color:rgba(27,255,140,.4);background:rgba(27,255,140,.05);transform:translateY(-1px)}',
         'body.light .pv-se{border-color:rgba(0,0,0,.14);color:#091810}',
         '.pv-dv{display:flex;align-items:center;gap:10px;margin:4px 0 14px;font-family:"DM Mono",monospace;font-size:10px;color:var(--t3,#5a7a6a)}',
         '.pv-dv::before,.pv-dv::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.07)}',
         'body.light .pv-dv::before,body.light .pv-dv::after{background:rgba(0,0,0,.1)}',
-        '.pv-hn{font-family:"DM Mono",monospace;font-size:11px;color:var(--t3,#5a7a6a);text-align:center;margin-top:8px}',
-        '.pv-er{font-family:"DM Mono",monospace;font-size:11.5px;color:var(--danger,#ff6b6b);margin-top:8px;min-height:16px;font-weight:500}',
+        '.pv-hn{font-family:"DM Mono",monospace;font-size:10.5px;color:var(--t3,#5a7a6a);text-align:center;margin-top:14px;letter-spacing:.02em;line-height:1.5}',
+        '.pv-er{font-family:"DM Sans",sans-serif;font-size:12.5px;color:var(--danger,#ff6b6b);margin-top:10px;min-height:16px;font-weight:500}',
         '.pv-bk{background:none;border:none;cursor:pointer;font-family:"DM Mono",monospace;font-size:11px;color:var(--t3,#5a7a6a);display:flex;align-items:center;gap:4px;padding:0;margin-bottom:16px;transition:color .15s}',
         '.pv-bk:hover{color:var(--t,#e8f5ee)}',
-        '.pv-tg{margin-top:14px;text-align:center;font-family:"DM Sans",sans-serif;font-size:13px;color:var(--t2,#a8c4b4)}',
+        '.pv-tg{margin-top:16px;text-align:center;font-family:"DM Sans",sans-serif;font-size:13px;color:var(--t2,#a8c4b4)}',
         '.pv-tg button{background:none;border:none;color:var(--a,#1bff8c);font-weight:600;font-size:13px;cursor:pointer;padding:2px 4px;font-family:"DM Sans",sans-serif}',
         '.pv-tg button:hover{text-decoration:underline}',
-        'body.light #pvCard{background:var(--bg-light,#f6fbf8)}',
+        'body.light #pvCard{background:linear-gradient(180deg,#ffffff,var(--bg-light,#f6fbf8))}',
+        '@media(prefers-reduced-motion:reduce){#pvCard,.pv-pm,.pv-se,.pv-vw{transition:none;animation:none}}',
       ].join('');
       document.head.appendChild(s);
     }
@@ -1393,9 +1395,10 @@
         var el = document.getElementById(map[k]);
         if (el) el.classList.toggle('pv-vx', k === view);
       });
-      var titles = { welcome:'Välkommen!', register:'Skapa konto', login:'Logga in' };
+      var titles = { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in' };
+      var subs = { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA' };
       var ti = document.getElementById('pvTi'); if (ti) ti.textContent = titles[view] || '';
-      var sb = document.getElementById('pvSb'); if (sb) sb.textContent = view === 'welcome' ? 'GRATIS ATT STARTA · INGET KORT KRÄVS' : '';
+      var sb = document.getElementById('pvSb'); if (sb) sb.textContent = subs[view] || '';
       var focusMap = { register:'pvRE', login:'pvLE' };
       if (focusMap[view]) setTimeout(function() { var inp = document.getElementById(focusMap[view]); if (inp) inp.focus(); }, 60);
       ['pvRE2','pvLE2'].forEach(function(id) { var e = document.getElementById(id); if (e) e.textContent = ''; });
@@ -1407,7 +1410,7 @@
       _open = true;
       var el = document.getElementById('pvModal');
       if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
-      switchView(view || 'login');
+      switchView(view || 'register');
     }
 
     function closeModal() {
@@ -1474,7 +1477,7 @@
     }
 
     document.addEventListener('proviaOpenLogin', function(e) {
-      openModal((e.detail && e.detail.view) || 'login');
+      openModal((e.detail && e.detail.view) || 'register');
     });
 
     window.openProviaLogin  = openModal;
