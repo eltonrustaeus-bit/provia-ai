@@ -144,18 +144,23 @@ function buildMockPayload(userId, course, per, total, maxTotal) {
   return { user_id: userId, course: (course || "").slice(0, 100), percent: pct, num_questions: per.length, concept_tags: conceptTags, error_tags: errorTags };
 }
 
-function saveMockResult(payload) {
-  fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
-      "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
-      "Prefer": "return=minimal"
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(5000)
-  }).catch(() => {});
+// Returns a promise — callers MUST await before sending the response.
+// On Vercel the lambda freezes once res is sent, so an un-awaited POST here
+// gets killed mid-flight (this is why mock_results stayed empty). Never throws.
+async function saveMockResult(payload) {
+  try {
+    await fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(5000)
+    });
+  } catch { /* best-effort analytics write — never block grading */ }
 }
 
 async function requireAuth(req) {
@@ -288,7 +293,7 @@ module.exports = async function handler(req, res) {
     if (nonMcPack.length === 0) {
       // Output in original question order
       const per = questions.map((q) => perById.get(String(q.id ?? ""))).filter(Boolean);
-      saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
+      await saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
       return json(res, 200, {
         ok: true,
         result: { total_points: total, max_points: maxTotal, per_question: per }
@@ -433,7 +438,7 @@ module.exports = async function handler(req, res) {
         .map((q) => perById.get(String(q.id ?? "")) || null)
         .filter(Boolean);
 
-      saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
+      await saveMockResult(buildMockPayload(user.id, course, per, total, maxTotal));
       return json(res, 200, {
         ok: true,
         result: {
