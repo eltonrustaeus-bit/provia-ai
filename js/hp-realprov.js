@@ -39,7 +39,12 @@ export async function initRealProv(rootId) {
   } catch { root.innerHTML = '<p class="hp-dim">Kunde inte ladda provlistan.</p>'; return; }
 
   let imported = [];
-  try { const s = await api('/api/hp-realprov', { action: 'status' }); imported = s?.imported || []; } catch {}
+  let passesByProv = {};
+  try {
+    const s = await api('/api/hp-realprov', { action: 'status' });
+    imported = s?.imported || [];
+    passesByProv = s?.passes || {};
+  } catch {}
 
   const admins = catalog.administrations || [];
   const list = document.createElement('div');
@@ -67,24 +72,25 @@ export async function initRealProv(rootId) {
   list.addEventListener('click', (e) => {
     const btn = e.target.closest('.hp-real-grade');
     if (!btn) return;
-    openGrader(panel, btn.dataset.prov, btn.dataset.label);
+    openGrader(panel, btn.dataset.prov, btn.dataset.label, passesByProv[btn.dataset.prov] || []);
   });
 }
 
-const PASSES = [
-  { no: '1', label: 'Provpass 1 — Verbal (ORD, LÄS, MEK, ELF)' },
-  { no: '2', label: 'Provpass 2 — Kvantitativ (XYZ, KVA, NOG, DTK)' },
-  { no: '4', label: 'Provpass 4 — Verbal (ORD, LÄS, MEK, ELF)' },
-  { no: '5', label: 'Provpass 5 — Kvantitativ (XYZ, KVA, NOG, DTK)' },
-];
+const DELPROV_OF = {
+  verbal: 'ORD, LÄS, MEK, ELF',
+  kvant: 'XYZ, KVA, NOG, DTK',
+};
 
-function openGrader(panel, provId, label) {
+function openGrader(panel, provId, label, passes) {
+  const opts = (passes.length ? passes : [])
+    .map(p => `<option value="${p.no}">Provpass ${p.no} — ${p.type === 'verbal' ? 'Verbal' : 'Kvantitativ'} (${DELPROV_OF[p.type] || ''})</option>`)
+    .join('');
   panel.hidden = false;
   panel.innerHTML =
     `<h3 class="hp-section-h">Registrera resultat — ${label}</h3>` +
     `<p class="hp-dim">Gör det riktiga provet på studera.nu. Välj provpass och klistra in dina svar i ordning (1–40, t.ex. "1A 2C 3B …"). Vi rättar mot facit och fördelar resultatet på rätt delprov. Bara dina svar skickas — aldrig provtexten.</p>` +
     `<label class="hp-field"><span>Provpass</span>` +
-    `<select id="hpRealPass">${PASSES.map(p => `<option value="${p.no}">${p.label}</option>`).join('')}</select></label>` +
+    `<select id="hpRealPass">${opts}</select></label>` +
     `<textarea id="hpRealAns" rows="3" placeholder="1A 2C 3B 4E 5A 6D 7D 8C 9A 10C …"></textarea>` +
     `<div class="hp-actions"><button id="hpRealSubmit" class="hp-btn" type="button">Rätta provpass</button></div>` +
     `<div id="hpRealResult" class="hp-explain" hidden></div>`;
