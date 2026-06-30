@@ -1,0 +1,151 @@
+// api/hp-realprov.js  (ESM)
+// Grades a user's answers to a REAL past högskoleprov against the official facit, and
+// feeds the result into the diagnostic engine at delprov granularity.
+//  - Facit (answer keys = facts) live server-side only (api/_hp-facit.js); never sent to client.
+//  - Real item TEXT is never stored or transmitted — Provia only links to UHR's PDF.
+//  - Updates hp_mastery for the delprov-level node and logs a hp_sessions row (kind=real_prov).
+//
+// POST { action:'status' }                      -> which provs have facit imported
+// POST { action:'grade', prov_id, answers }     answers = { ORD: {"1":"A",...} | ["A",null,...], ... }
+
+import { getFacit, hasFacit, FACIT } from './_hp-facit.js';
+
+const SB = process.env.SUPABASE_URL;
+const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const DELPROV = ['ORD', 'LAS', 'ELF', 'MEK', 'XYZ', 'KVA', 'NOG', 'DTK'];
+
+function json(res, status, obj) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(obj));
+}
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
+}
+async function requireAuth(req) {
+  const token = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  try {
+    const r = await fetch(SB + '/auth/v1/user', {
+      headers: { Authorization: 'Bearer ' + token, apikey: SRK }, signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.id ? d : null;
+  } catch { return null; }
+}
+async function sbSelect(pathQuery) {
+  const r = await fetch(SB + '/rest/v1/' + pathQuery, {
+    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK }, signal: AbortSignal.timeout(5000),
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+async function sbWrite(pathQuery, rows, prefer = 'return=minimal') {
+  await fetch(SB + '/rest/v1/' + pathQuery, {
+    method: 'POST',
+    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json', Prefer: prefer },
+    body: JSON.stringify(rows), signal: AbortSignal.timeout(6000),
+  });
+}
+
+function nextMastery({ mastery, attempts, difficulty, correct }) {
+  const expected = 1 / (1 + Math.pow(10, ((difficulty * 100) - mastery) / 40));
+  const K = attempts < 10 ? 24 : 12;
+  return Math.max(0, Math.min(100, mastery + K * ((correct ? 1 : 0) - expected)));
+}
+
+// Normalize answers[delprov] (object or array) into a 1-indexed letter map.
+function toItemMap(input) {
+  const out = {};
+  if (Array.isArray(input)) {
+    input.forEach((v, i) => { if (v) out[i + 1] = String(v).toUpperCase(); });
+  } else if (input && typeof input === 'object') {
+    for (const [k, v] of Object.entries(input)) { if (v) out[Number(k)] = String(v).toUpperCase(); }
+  }
+  return out;
+}
+
+async function handleGrade(user, body, res) {
+  const provId = String(body.prov_id || '');
+  if (!hasFacit(provId)) return json(res, 400, { ok: false, error: 'no_facit', message: 'Facit för detta prov är inte importerat ännu.' });
+  const facit = getFacit(provId).delprov;
+  const answers = body.answers || {};
+
+  const perDelprov = {};
+  let totalCorrect = 0, totalAnswered = 0;
+
+  for (const dp of DELPROV) {
+    if (!facit[dp]) continue;
+    const key = facit[dp];                       // ["A","C",...] 0-indexed = item1
+    const given = toItemMap(answers[dp]);
+    let correct = 0, answered = 0;
+    for (let i = 0; i < key.length; i++) {
+      const correctLetter = key[i];
+      const userLetter = given[i + 1];
+      if (!userLetter) continue;                 // unanswered item
+      answered++;
+      if (userLetter === correctLetter) correct++;
+    }
+    if (answered === 0) continue;
+    perDelprov[dp] = { correct, answered, total: key.length, percent: Math.round((correct / answered) * 100) };
+    totalCorrect += correct; totalAnswered += answered;
+
+    // Update delprov-level mastery (node id === delprov for level-1 nodes).
+    const mRows = await sbSelect(
+      `hp_mastery?select=mastery,attempts&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${dp}&limit=1`
+    );
+    let mastery = Number(mRows?.[0]?.mastery) || 0;
+    let attempts = Number(mRows?.[0]?.attempts) || 0;
+    // Replay each answered item through Elo at a representative difficulty (0.55 for real prov).
+    for (let i = 0; i < key.length; i++) {
+      const userLetter = given[i + 1];
+      if (!userLetter) continue;
+      mastery = nextMastery({ mastery, attempts, difficulty: 0.55, correct: userLetter === key[i] });
+      attempts++;
+    }
+    await sbWrite('hp_mastery', [{
+      user_id: user.id, node_id: dp, mastery, attempts,
+      last_seen: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }], 'resolution=merge-duplicates,return=minimal');
+  }
+
+  if (totalAnswered === 0) return json(res, 400, { ok: false, error: 'no_answers' });
+
+  await sbWrite('hp_sessions', [{
+    user_id: user.id, kind: 'real_prov', raw_correct: totalCorrect, raw_total: totalAnswered,
+    scaled_score: null, per_delprov: perDelprov,
+    started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+  }]);
+
+  return json(res, 200, {
+    ok: true, prov_id: provId,
+    overall: { correct: totalCorrect, answered: totalAnswered, percent: Math.round((totalCorrect / totalAnswered) * 100) },
+    per_delprov: perDelprov,
+    note: 'Skalpoäng visas när normeringstabell för detta prov finns. Resultatet har uppdaterat din mastery per delprov.',
+  });
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return json(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); }
+  if (!SB || !SRK) return json(res, 500, { ok: false, error: 'Supabase env missing' });
+
+  const user = await requireAuth(req);
+  if (!user) return json(res, 401, { ok: false, error: 'Unauthorized' });
+
+  let body; try { body = await readJsonBody(req); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+  const action = String(body.action || 'status');
+
+  try {
+    if (action === 'status') {
+      return json(res, 200, { ok: true, imported: Object.keys(FACIT).filter(hasFacit) });
+    }
+    if (action === 'grade') return await handleGrade(user, body, res);
+    return json(res, 400, { ok: false, error: 'Unknown action' });
+  } catch (e) {
+    return json(res, 500, { ok: false, error: 'Server error', details: String(e) });
+  }
+}

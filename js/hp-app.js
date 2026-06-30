@@ -3,6 +3,7 @@
 // Answer key is revealed only by the submit response (api/hp-diagnose), never pre-submit.
 
 import { loadGraph, pickNextNode, difficultyFor, getNode } from './hp-graph.js';
+import { initRealProv } from './hp-realprov.js';
 
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
@@ -173,6 +174,7 @@ async function boot() {
   show('hpMain'); hide('hpGate');
   await loadDiagnosis();
   renderProgress();
+  initRealProv('hpReal');
 }
 
 boot();

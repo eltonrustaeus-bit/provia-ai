@@ -66,6 +66,18 @@
     .hp-bar i { display: block; height: 100%; background: var(--accent); }
     .hp-mval { font-family: "DM Mono", monospace; font-size: .8rem; color: var(--text-dim); text-align: right; }
     .hp-section-h { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); margin: 0 0 .9rem; }
+    .hp-dim { color: var(--text-dim); }
+    .hp-real-row { display: grid; grid-template-columns: 1fr auto auto; gap: .75rem; align-items: center; padding: .6rem 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+    .hp-real-label { font-weight: 500; }
+    .hp-link { color: var(--accent); text-decoration: none; font-size: .85rem; }
+    .hp-link:hover { text-decoration: underline; }
+    .hp-real-soon { font-size: .78rem; }
+    .hp-field { display: flex; flex-direction: column; gap: .35rem; margin: .75rem 0; font-size: .85rem; color: var(--text-dim); }
+    .hp-field select, textarea {
+      font: inherit; color: var(--text); background: var(--surface-2);
+      border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .7rem; width: 100%;
+    }
+    @media (max-width: 560px) { .hp-real-row { grid-template-columns: 1fr; gap: .25rem; } }
     [hidden] { display: none !important; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
@@ -116,6 +128,12 @@
           <h2 class="hp-section-h">Din mastery — svagast först</h2>
           <div id="hpWeak"></div>
         </div>
+      </section>
+
+      <section class="hp-card" aria-labelledby="hpRealH">
+        <h2 id="hpRealH" class="hp-section-h">Tidigare prov — träna på riktiga högskoleprov</h2>
+        <p class="hp-dim" style="margin:.2rem 0 1.1rem">Officiella prov från UHR. Vi länkar till studera.nu (ingen kopia lagras). Gör provet, registrera dina svar — vi rättar mot facit och uppdaterar din diagnos.</p>
+        <div id="hpReal"></div>
       </section>
     </div>
   </main>
