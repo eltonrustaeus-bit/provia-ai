@@ -1,0 +1,23 @@
+{
+  "version": "2026-06-30",
+  "note": "Råpoäng → skalpoäng (0.0–2.0). Each verbal/kvant del is normed separately; total = mean of the two dels, rounded to nearest 0.05. UHR publishes an exact normeringstabell per administration; until those are seeded here, 'default' is an APPROXIMATE curve and results are labeled 'uppskattat'.",
+  "scale": { "min": 0.0, "max": 2.0, "round_step": 0.05 },
+  "default": {
+    "label": "Generell uppskattning (ej officiell normering)",
+    "curve": [
+      [0.00, 0.00],
+      [0.20, 0.20],
+      [0.30, 0.40],
+      [0.40, 0.65],
+      [0.50, 0.90],
+      [0.60, 1.15],
+      [0.70, 1.40],
+      [0.80, 1.65],
+      [0.90, 1.85],
+      [1.00, 2.00]
+    ]
+  },
+  "per_administration": {
+    "_note": "Add exact UHR normeringstabeller here keyed by prov id, e.g. \"2024-04\": { verbal:[[raw,scaled],...], kvant:[...] }. When present, used instead of default."
+  }
+}

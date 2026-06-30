@@ -61,7 +61,20 @@ async function loadDiagnosis() {
     if (d?.ok && Array.isArray(d.weak_nodes)) {
       for (const w of d.weak_nodes) state.masteryMap[w.node_id] = w.mastery;
     }
+    if (d?.ok) renderPrediction(d.prediction, d.target_score);
   } catch { /* first-run users have no diagnosis yet */ }
+}
+
+function renderPrediction(pred, target) {
+  const card = el('hpPred');
+  if (!pred || pred.score == null) { if (card) card.hidden = true; return; }
+  card.hidden = false;
+  el('hpPredScore').textContent = Number(pred.score).toFixed(2);
+  el('hpPredCi').textContent = `±${pred.ci} · säkerhet: ${pred.confidence}`;
+  el('hpPredBar').style.width = Math.round((pred.score / 2) * 100) + '%';
+  const targetTxt = target ? ` Mål: ${Number(target).toFixed(1)}.` : '';
+  el('hpPredNote').textContent =
+    `Uppskattning baserad på din träning hittills (ej officiell normering).${targetTxt} Gör en fullsimulering för en skarpare siffra.`;
 }
 
 async function fetchBatch() {

@@ -100,7 +100,11 @@ function openGrader(panel, provId, label) {
     const rows = Object.entries(d.per_delprov || {})
       .map(([dp, p]) => `<b>${dp}:</b> ${p.correct}/${p.answered} (${p.percent}%) · mastery ${p.mastery}`)
       .join('<br>');
+    const sc = d.scaled || {};
+    const scLine = (sc.total != null)
+      ? `<br><b>Uppskattad skalpoäng (denna del):</b> ${sc.total.toFixed(2)}${sc.verbal != null ? ` · verbal ${sc.verbal.toFixed(2)}` : ''}${sc.kvant != null ? ` · kvant ${sc.kvant.toFixed(2)}` : ''}`
+      : '';
     out.innerHTML =
-      `<b>Provpass ${passNo}:</b> ${d.overall.correct}/${d.overall.answered} rätt (${d.overall.percent}%)<br>${rows}<br><span class="hp-dim">${d.note}</span>`;
+      `<b>Provpass ${passNo}:</b> ${d.overall.correct}/${d.overall.answered} rätt (${d.overall.percent}%)<br>${rows}${scLine}<br><span class="hp-dim">${d.note}</span>`;
   });
 }
