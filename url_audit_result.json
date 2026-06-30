@@ -1,0 +1,480 @@
+{
+  "checked": 79,
+  "broken": [
+    {
+      "id": 1,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sweden_road_sign_B1.svg/330px-Sweden_road_sign_B1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 2,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_D1-3.svg/330px-Sweden_road_sign_D1-3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 3,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Sweden_road_sign_A37.svg/330px-Sweden_road_sign_A37.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 4,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Sweden_road_sign_A17.svg/330px-Sweden_road_sign_A17.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 5,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/330px-Sweden_road_sign_E19.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 6,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_T2.svg/330px-Sweden_road_sign_T2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 7,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sweden_road_sign_E2.svg/330px-Sweden_road_sign_E2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 8,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sweden_road_sign_A8.svg/250px-Sweden_road_sign_A8.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 20,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sweden_road_sign_E14.svg/250px-Sweden_road_sign_E14.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 29,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Sweden_road_sign_C31-5.svg/330px-Sweden_road_sign_C31-5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 30,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Sweden_road_sign_F5.svg/250px-Sweden_road_sign_F5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 34,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Sweden_road_sign_C31-7.svg/330px-Sweden_road_sign_C31-7.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 73,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_B2.svg/330px-Sweden_road_sign_B2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 74,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_B4.svg/330px-Sweden_road_sign_B4.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 76,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Sweden_road_sign_C1.svg/330px-Sweden_road_sign_C1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 78,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Sweden_road_sign_C16.svg/330px-Sweden_road_sign_C16.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 79,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Sweden_road_sign_A35.svg/330px-Sweden_road_sign_A35.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 80,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Sweden_road_sign_E3.svg/330px-Sweden_road_sign_E3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 81,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Sweden_road_sign_A20.svg/330px-Sweden_road_sign_A20.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 82,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Sweden_road_sign_E23.svg/330px-Sweden_road_sign_E23.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 83,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Sweden_road_sign_A13.svg/330px-Sweden_road_sign_A13.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 98,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Sweden_road_sign_B8.svg/250px-Sweden_road_sign_B8.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 100,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Traffic_lights_4_phases.svg/250px-Traffic_lights_4_phases.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 106,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sweden_road_sign_C38.svg/250px-Sweden_road_sign_C38.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 144,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Sweden_road_sign_C2.svg/330px-Sweden_road_sign_C2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 145,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Sweden_road_sign_A15.svg/330px-Sweden_road_sign_A15.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 147,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Sweden_road_sign_A36.svg/330px-Sweden_road_sign_A36.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 148,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/330px-Sweden_road_sign_C35.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 149,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Sweden_road_sign_E11-3.svg/330px-Sweden_road_sign_E11-3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 156,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Sweden_road_sign_E4.svg/330px-Sweden_road_sign_E4.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 157,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Sweden_road_sign_D1-2.svg/330px-Sweden_road_sign_D1-2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 165,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Sweden_road_sign_D4.svg/250px-Sweden_road_sign_D4.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 174,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Traffic_lights_4_phases.svg/250px-Traffic_lights_4_phases.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 351,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Sweden_road_sign_A1-1.svg/330px-Sweden_road_sign_A1-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 352,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Sweden_road_sign_A1-2.svg/330px-Sweden_road_sign_A1-2.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 353,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Sweden_road_sign_A3.svg/330px-Sweden_road_sign_A3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 354,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Sweden_road_sign_A6.svg/330px-Sweden_road_sign_A6.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 357,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_A21.svg/330px-Sweden_road_sign_A21.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 358,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Sweden_road_sign_A22.svg/330px-Sweden_road_sign_A22.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 359,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Sweden_road_sign_A24-1.svg/330px-Sweden_road_sign_A24-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 360,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Sweden_road_sign_A25.svg/330px-Sweden_road_sign_A25.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 361,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Sweden_road_sign_A31.svg/330px-Sweden_road_sign_A31.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 363,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Sweden_road_sign_B5.svg/330px-Sweden_road_sign_B5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 365,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Sweden_road_sign_C3.svg/330px-Sweden_road_sign_C3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 366,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Sweden_road_sign_C5.svg/330px-Sweden_road_sign_C5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 367,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Sweden_road_sign_C11.svg/330px-Sweden_road_sign_C11.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 368,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Sweden_road_sign_C31-3.svg/330px-Sweden_road_sign_C31-3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 371,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Sweden_road_sign_D10.svg/330px-Sweden_road_sign_D10.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 372,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_D11-1.svg/330px-Sweden_road_sign_D11-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 375,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Sweden_road_sign_E7.svg/330px-Sweden_road_sign_E7.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 376,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Sweden_road_sign_A7.svg/330px-Sweden_road_sign_A7.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 378,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Sweden_road_sign_A5-1.svg/330px-Sweden_road_sign_A5-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 502,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_C36.svg/250px-Sweden_road_sign_C36.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 504,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/250px-Sweden_road_sign_C39.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 510,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/250px-Sweden_road_sign_E22.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 514,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/250px-Sweden_road_sign_E22.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 517,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Sweden_road_sign_C35.svg/250px-Sweden_road_sign_C35.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 519,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Sweden_road_sign_E22.svg/250px-Sweden_road_sign_E22.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 520,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Sweden_road_sign_E19.svg/250px-Sweden_road_sign_E19.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 551,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Sweden_road_sign_C39.svg/330px-Sweden_road_sign_C39.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 552,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Sweden_road_sign_A33.svg/330px-Sweden_road_sign_A33.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 557,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Sweden_road_sign_D3.svg/330px-Sweden_road_sign_D3.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 560,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Sweden_road_sign_C17.svg/330px-Sweden_road_sign_C17.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 563,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Sweden_road_sign_E5.svg/330px-Sweden_road_sign_E5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 606,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Sweden_road_sign_F5.svg/250px-Sweden_road_sign_F5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 607,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Sweden_road_sign_A8.svg/250px-Sweden_road_sign_A8.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 612,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Sweden_road_sign_A4.svg/330px-Sweden_road_sign_A4.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 613,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Sweden_road_sign_A10.svg/330px-Sweden_road_sign_A10.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 614,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Sweden_road_sign_A14.svg/330px-Sweden_road_sign_A14.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 615,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Sweden_road_sign_A16.svg/330px-Sweden_road_sign_A16.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 617,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Sweden_road_sign_A26.svg/330px-Sweden_road_sign_A26.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 619,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Sweden_road_sign_A34.svg/330px-Sweden_road_sign_A34.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 621,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sweden_road_sign_C36.svg/330px-Sweden_road_sign_C36.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 622,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Sweden_road_sign_C38.svg/330px-Sweden_road_sign_C38.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 623,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Sweden_road_sign_C40-1.svg/330px-Sweden_road_sign_C40-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 624,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Sweden_road_sign_E1.svg/330px-Sweden_road_sign_E1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 625,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Sweden_road_sign_E6.svg/330px-Sweden_road_sign_E6.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 629,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/38/Sweden_road_sign_E13-5.svg/330px-Sweden_road_sign_E13-5.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    },
+    {
+      "id": 630,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Sweden_road_sign_D2-1.svg/330px-Sweden_road_sign_D2-1.svg.png",
+      "status": "error",
+      "error": "AggregateError"
+    }
+  ],
+  "ok": 0
+}

@@ -1,0 +1,39 @@
+{
+  "version": "2026-06-30",
+  "note": "Edges drive adaptive selection + cross-delprov root-causing. type: prereq (must master 'from' before 'to'), shares_skill (transfer), harder_variant.",
+  "edges": [
+    { "from": "ord.synonym", "to": "ord.lowfreq", "type": "harder_variant", "weight": 0.6 },
+    { "from": "ord.roots", "to": "ord.lowfreq", "type": "prereq", "weight": 0.7 },
+    { "from": "ord.roots", "to": "ord.loanwords", "type": "prereq", "weight": 0.6 },
+    { "from": "ord.context", "to": "ord.lowfreq", "type": "shares_skill", "weight": 0.5 },
+
+    { "from": "las.huvudtes", "to": "las.inferens", "type": "prereq", "weight": 0.7 },
+    { "from": "las.inferens", "to": "las.attityd", "type": "prereq", "weight": 0.6 },
+    { "from": "las.struktur", "to": "las.huvudtes", "type": "shares_skill", "weight": 0.5 },
+
+    { "from": "mek.koherens", "to": "mek.konnektiv", "type": "prereq", "weight": 0.7 },
+    { "from": "mek.konnektiv", "to": "mek.register", "type": "shares_skill", "weight": 0.5 },
+    { "from": "ord.synonym", "to": "mek.koherens", "type": "shares_skill", "weight": 0.5 },
+
+    { "from": "elf.gist", "to": "elf.detail", "type": "shares_skill", "weight": 0.5 },
+    { "from": "elf.vocab", "to": "elf.inference", "type": "prereq", "weight": 0.6 },
+    { "from": "elf.detail", "to": "elf.inference", "type": "prereq", "weight": 0.6 },
+
+    { "from": "xyz.brak_procent", "to": "xyz.algebra", "type": "prereq", "weight": 0.7 },
+    { "from": "xyz.algebra", "to": "xyz.funktioner", "type": "prereq", "weight": 0.8 },
+    { "from": "xyz.brak_procent", "to": "kva.andelar", "type": "shares_skill", "weight": 0.7 },
+    { "from": "xyz.brak_procent", "to": "dtk.proportion", "type": "prereq", "weight": 0.7 },
+    { "from": "xyz.brak_procent", "to": "dtk.enhetsbyte", "type": "shares_skill", "weight": 0.6 },
+
+    { "from": "kva.storlek", "to": "kva.andelar", "type": "prereq", "weight": 0.7 },
+    { "from": "kva.andelar", "to": "kva.villkor", "type": "prereq", "weight": 0.6 },
+    { "from": "kva.villkor", "to": "nog.tillracklig", "type": "shares_skill", "weight": 0.7 },
+
+    { "from": "nog.tillracklig", "to": "nog.slutledning", "type": "prereq", "weight": 0.8 },
+    { "from": "xyz.algebra", "to": "nog.slutledning", "type": "shares_skill", "weight": 0.5 },
+
+    { "from": "dtk.avlasning", "to": "dtk.proportion", "type": "prereq", "weight": 0.7 },
+    { "from": "dtk.proportion", "to": "dtk.trend", "type": "prereq", "weight": 0.6 },
+    { "from": "dtk.enhetsbyte", "to": "dtk.trend", "type": "shares_skill", "weight": 0.5 }
+  ]
+}

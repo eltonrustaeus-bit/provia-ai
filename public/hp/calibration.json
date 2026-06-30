@@ -1,0 +1,32 @@
+{
+  "version": "2026-06-30",
+  "purpose": "Non-copyrightable statistical profile of real högskoleprovet, used to make AI-generated items match real style/difficulty. Extracted offline by scripts/hp-calibrate.js from past prov. NO verbatim item text is stored here — only aggregate statistics. Facts (counts, formats) are not copyrightable; expression (the items) is, and is deliberately excluded.",
+  "legal_note": "Generated items are original expression in the real format. Real prov are used only as a statistical reference, never redistributed.",
+  "delprov": {
+    "ORD": {
+      "option_count": 5,
+      "items_per_administration": null,
+      "stem_pattern": "single target word (sometimes short phrase); 5 single-word answer alternatives a–e; pick closest in meaning",
+      "answer_position_bias": null,
+      "vocab_frequency_band": "low-to-mid frequency Swedish; includes loanwords, archaic, domain terms",
+      "mean_target_word_length": null,
+      "distractor_strategy": "near-synonyms, same semantic field, false-friend morphology"
+    },
+    "LAS": { "option_count": 4, "passage_word_count_range": [400, 1000], "items_per_passage_range": [2, 6], "stem_pattern": "question about a Swedish non-fiction passage" },
+    "MEK": { "option_count": 4, "stem_pattern": "passage with 1–3 gaps; choose the alternative that fits all gaps coherently" },
+    "ELF": { "option_count": 4, "passage_word_count_range": [300, 800], "lang": "en", "stem_pattern": "question about an English passage; vocab-in-context and inference" },
+    "XYZ": { "option_count": 4, "stem_pattern": "math problem, one numeric/algebraic answer", "math_render": "katex" },
+    "KVA": { "option_count": 4, "fixed_options": ["I är störst", "II är störst", "I och II är lika stora", "informationen är otillräcklig"], "stem_pattern": "compare quantity I vs II" },
+    "NOG": { "option_count": 5, "fixed_options": ["(1) ensam är tillräcklig men inte (2)", "(2) ensam är tillräcklig men inte (1)", "(1) och (2) tillsammans är tillräckliga", "(1) och (2) var för sig är tillräckliga", "informationen är otillräcklig"], "stem_pattern": "is the given information sufficient to answer?" },
+    "DTK": { "option_count": 4, "stem_pattern": "read value/relation from a diagram, table, or map", "asset": "inline structured data → client renders SVG" }
+  },
+  "scaling": {
+    "note": "raw→skalpoäng (normerad) tables are public UHR facts; store per administration in norm_tables.json (not yet seeded). scaled range 0.0–2.0.",
+    "scaled_min": 0.0,
+    "scaled_max": 2.0
+  },
+  "extracted": {
+    "note": "Filled by scripts/hp-calibrate.js. Each run appends an administration's aggregate stats (counts, length distributions, answer-position histogram). Never raw item text.",
+    "administrations": []
+  }
+}

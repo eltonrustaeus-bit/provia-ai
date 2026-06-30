@@ -1,4 +1,4 @@
-import { requireAuth } from "./_auth.js";
+﻿import { requireAuth } from "./_auth.js";
 import { callAI } from "./_per-core.js";
 
 function safeString(x, maxLen) {
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
   const courseGuide = pickCourseGuide(c);
 
-  const systemPrompt = `Du är P.E.R — Provias Egna AI-Resource.
+  const systemPrompt = `Du är EX1.0 — Provias Egna AI-Resource.
 Du ska ge korta, konkreta tips för en fråga eleven fått fel på.
 Tipsen måste anpassas efter kursen.
 

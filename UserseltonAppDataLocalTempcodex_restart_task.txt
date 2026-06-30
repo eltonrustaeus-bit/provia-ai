@@ -1,0 +1,81 @@
+Read C:UserseltonDesktopProvKlarUFapiadmin.js in full.
+Then rewrite the entire file from scratch, keeping every existing line exactly as-is EXCEPT for the following targeted changes.
+Do NOT use patch or anchor-based edits. Write the complete new file content directly using the write_file tool.
+
+CHANGE 1 - image_url validation in update-question action:
+Replace the existing if/else block that validates updates.image_url.
+New logic: if no image_url then safe.image_url=null.
+Else trim it. isWikimedia = URL starts with https://upload.wikimedia.org/wikipedia/commons/ AND length is at most 1000.
+isOwnStorage = URL starts with https://mnmotdluigzeehdjbhbu.supabase.co/storage/v1/object/public/question-images/ AND length is at most 500.
+If neither: return 400 json ok:false error: image_url must be Wikimedia commons URL, Supabase Storage URL, or null.
+Otherwise: safe.image_url = the trimmed value.
+
+CHANGE 2 - list-questions select columns:
+Append these columns to the existing .select() string: image_url, image_description, image_status, image_priority, image_prompt, image_source, image_notes, reviewed_at, reviewed_by, report_count.
+Keep all existing columns unchanged.
+After existing filter if-blocks, read imgFilter from req.body.imgFilter and add:
+  if imgFilter is priority-high then filter image_priority equals high
+  if imgFilter is prompt-ready then filter image_status equals prompt_ready
+  if imgFilter is pending-review then filter image_status in array containing uploaded
+
+CHANGE 3 - Add module-level helper before export default:
+function buildScenarioDescription(q) {
+  const cat = q.category || empty string;
+  const question = q.question || empty string;
+  const correct = object mapping A to option_a B to option_b C to option_c D to option_d then bracket q.correct, or empty string;
+  Build desc by concatenating: question with ? removed and trimmed, then period space Context colon space, then cat, then space situation period space The correct answer is colon space, then correct. Trim result.
+  Return desc.substring(0, 400);
+}
+
+CHANGE 4 - Add 4 new action blocks before the final Unknown action return statement:
+
+Action generate-prompt:
+  Call requireAdmin. Validate questionId is a positive integer from req.body.
+  Fetch row from driving_questions by id. Return 404 if not found.
+  Call buildScenarioDescription(q) to get situation string.
+  Build prompt: Create a realistic educational driving theory scenario image for a Swedish driving test app. The image should show: {situation}. Use a driver perspective from inside or just behind the vehicle. Swedish road environment, daylight, clear visibility, pedagogical composition. Do not include readable license plates, brand logos, incorrect traffic signs, distorted vehicles, or text overlays. High quality, clean, realistic, 16:9 format.
+  Update driving_questions row: set image_prompt to prompt and image_status to prompt_ready.
+  Return ok:true prompt:prompt questionId:questionId.
+
+Action update-image-status:
+  Call requireAdmin. Read questionId, image_status, image_notes, image_source, image_priority from req.body.
+  Validate questionId is positive integer.
+  Valid statuses array: missing, prompt_ready, pending_upload, uploaded, approved, rejected.
+  Valid sources array: chatgpt_manual, official_asset, own_photo, other, none.
+  Valid priorities array: high, medium, low, none.
+  Return 400 if any provided value is not in the valid list.
+  Build updates object. If image_status is provided add to updates. If status is approved or rejected also add reviewed_at equal to new Date().toISOString().
+  If image_notes is provided add trimmed version max 500 chars or null. If image_source provided add to updates. If image_priority provided add to updates.
+  Return 400 if updates object is empty.
+  Call supabase update on driving_questions where id equals questionId, select single result.
+  Return ok:true question:data.
+
+Action upload-image:
+  Call requireAdmin. Read questionId, imageData, mimeType from req.body.
+  Validate questionId is positive integer.
+  Allowed mime types object: image/jpeg maps to jpg, image/png maps to png, image/webp maps to webp.
+  Return 400 if mimeType not in allowed list.
+  Return 400 if imageData is not a non-empty string.
+  Decode Buffer.from(imageData, base64). Return 400 if buffer.length exceeds 5 times 1024 times 1024.
+  Build filename: q- then questionId then dash then Date.now() then dot then the extension.
+  Call supabase.storage.from(question-images).upload(filename, buffer, object with contentType and upsert false).
+  Return 500 if upload error.
+  Call supabase.storage.from(question-images).getPublicUrl(filename) to get publicUrl from data.publicUrl.
+  Update driving_questions where id equals questionId: set image_url to publicUrl, image_status to uploaded, image_source to chatgpt_manual.
+  Return 500 if update error.
+  Return ok:true url:publicUrl filename:filename.
+
+Action export-prompts:
+  Call requireAdmin. Read category and limit from req.body. Default limit to 10. Clamp between 1 and 50.
+  Query driving_questions selecting id,category,question,option_a,option_b,option_c,option_d,correct,explanation,image_status,image_prompt,image_priority where image_url IS NULL, ordered by image_priority ascending, limited to count.
+  If category is provided filter by category equals category.
+  Map each result to object with id, category, question, priority (from image_priority or none), prompt (use existing image_prompt if set, otherwise build using buildScenarioDescription and same template as generate-prompt action).
+  Return ok:true prompts:results count:results.length.
+
+CONSTRAINTS:
+  Only edit C:UserseltonDesktopProvKlarUFapiadmin.js
+  Keep ESM style import/export
+  No new npm dependencies
+  All existing actions unchanged
+  All new action if-blocks must return before final res.status(400).json ok:false error:Unknown action
+  buildScenarioDescription is defined at module scope outside export default

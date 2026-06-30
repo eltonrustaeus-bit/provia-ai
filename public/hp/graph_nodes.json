@@ -1,0 +1,50 @@
+{
+  "version": "2026-06-30",
+  "note": "Provia HP concept graph. level 1=delprov, 2=area, 3=concept. difficulty_band = expected b-param range 0..1. Verify/extend counts against real prov via scripts/hp-calibrate.js.",
+  "nodes": [
+    { "id": "ORD", "delprov": "ORD", "area": null, "label": "Ordförståelse", "level": 1, "difficulty_band": [0.2, 0.9], "skill_tags": ["vocabulary"] },
+    { "id": "ord.synonym", "delprov": "ORD", "area": "ORD", "label": "Synonymer & nyans", "level": 2, "difficulty_band": [0.2, 0.6], "skill_tags": ["synonym", "nyans"] },
+    { "id": "ord.roots", "delprov": "ORD", "area": "ORD", "label": "Latinska/grekiska rötter", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["morfem", "etymologi"] },
+    { "id": "ord.context", "delprov": "ORD", "area": "ORD", "label": "Kontextledtråd", "level": 3, "difficulty_band": [0.3, 0.7], "skill_tags": ["kontext"] },
+    { "id": "ord.lowfreq", "delprov": "ORD", "area": "ORD", "label": "Lågfrekventa & ålderdomliga ord", "level": 3, "difficulty_band": [0.6, 0.95], "skill_tags": ["lågfrekvens"] },
+    { "id": "ord.loanwords", "delprov": "ORD", "area": "ORD", "label": "Främmande/låneord", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["låneord"] },
+
+    { "id": "LAS", "delprov": "LAS", "area": null, "label": "Svensk läsförståelse", "level": 1, "difficulty_band": [0.3, 0.9], "skill_tags": ["reading"] },
+    { "id": "las.huvudtes", "delprov": "LAS", "area": "LAS", "label": "Huvudtes & syfte", "level": 2, "difficulty_band": [0.3, 0.7], "skill_tags": ["huvudtes"] },
+    { "id": "las.inferens", "delprov": "LAS", "area": "LAS", "label": "Inferens", "level": 2, "difficulty_band": [0.5, 0.9], "skill_tags": ["inferens"] },
+    { "id": "las.attityd", "delprov": "LAS", "area": "LAS", "label": "Författarattityd & ton", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["attityd"] },
+    { "id": "las.struktur", "delprov": "LAS", "area": "LAS", "label": "Textstruktur", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["struktur"] },
+
+    { "id": "MEK", "delprov": "MEK", "area": null, "label": "Meningskomplettering", "level": 1, "difficulty_band": [0.3, 0.85], "skill_tags": ["cloze"] },
+    { "id": "mek.koherens", "delprov": "MEK", "area": "MEK", "label": "Koherens & sammanhang", "level": 2, "difficulty_band": [0.3, 0.7], "skill_tags": ["koherens"] },
+    { "id": "mek.konnektiv", "delprov": "MEK", "area": "MEK", "label": "Konnektivbindeord", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["konnektiv"] },
+    { "id": "mek.register", "delprov": "MEK", "area": "MEK", "label": "Stilregister", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["register"] },
+
+    { "id": "ELF", "delprov": "ELF", "area": null, "label": "Engelsk läsförståelse", "level": 1, "difficulty_band": [0.3, 0.85], "skill_tags": ["english"] },
+    { "id": "elf.gist", "delprov": "ELF", "area": "ELF", "label": "Gist & main idea", "level": 2, "difficulty_band": [0.3, 0.6], "skill_tags": ["gist"] },
+    { "id": "elf.detail", "delprov": "ELF", "area": "ELF", "label": "Detail retrieval", "level": 2, "difficulty_band": [0.3, 0.7], "skill_tags": ["detail"] },
+    { "id": "elf.vocab", "delprov": "ELF", "area": "ELF", "label": "Vocabulary-in-context", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["vocab"] },
+    { "id": "elf.inference", "delprov": "ELF", "area": "ELF", "label": "Inference (EN)", "level": 3, "difficulty_band": [0.5, 0.9], "skill_tags": ["inference"] },
+
+    { "id": "XYZ", "delprov": "XYZ", "area": null, "label": "Matematisk problemlösning", "level": 1, "difficulty_band": [0.3, 0.9], "skill_tags": ["math"] },
+    { "id": "xyz.brak_procent", "delprov": "XYZ", "area": "XYZ", "label": "Bråk, procent & förändringsfaktor", "level": 2, "difficulty_band": [0.3, 0.7], "skill_tags": ["procent", "bråk"] },
+    { "id": "xyz.algebra", "delprov": "XYZ", "area": "XYZ", "label": "Algebra & ekvationer", "level": 2, "difficulty_band": [0.4, 0.8], "skill_tags": ["algebra", "ekvation"] },
+    { "id": "xyz.funktioner", "delprov": "XYZ", "area": "XYZ", "label": "Funktioner", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["funktion"] },
+    { "id": "xyz.geometri", "delprov": "XYZ", "area": "XYZ", "label": "Geometri", "level": 3, "difficulty_band": [0.4, 0.85], "skill_tags": ["geometri"] },
+
+    { "id": "KVA", "delprov": "KVA", "area": null, "label": "Kvantitativa jämförelser", "level": 1, "difficulty_band": [0.3, 0.85], "skill_tags": ["compare"] },
+    { "id": "kva.storlek", "delprov": "KVA", "area": "KVA", "label": "Storleksordning", "level": 2, "difficulty_band": [0.3, 0.7], "skill_tags": ["storlek"] },
+    { "id": "kva.andelar", "delprov": "KVA", "area": "KVA", "label": "Andelar & kvoter", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["andel"] },
+    { "id": "kva.villkor", "delprov": "KVA", "area": "KVA", "label": "Villkor & tillräcklighet", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["villkor"] },
+
+    { "id": "NOG", "delprov": "NOG", "area": null, "label": "Kvantitativa resonemang", "level": 1, "difficulty_band": [0.4, 0.9], "skill_tags": ["reasoning"] },
+    { "id": "nog.tillracklig", "delprov": "NOG", "area": "NOG", "label": "Tillräcklig information", "level": 2, "difficulty_band": [0.4, 0.8], "skill_tags": ["tillräcklighet"] },
+    { "id": "nog.slutledning", "delprov": "NOG", "area": "NOG", "label": "Logisk slutledning", "level": 3, "difficulty_band": [0.5, 0.9], "skill_tags": ["slutledning"] },
+
+    { "id": "DTK", "delprov": "DTK", "area": null, "label": "Diagram, tabeller & kartor", "level": 1, "difficulty_band": [0.3, 0.85], "skill_tags": ["data"] },
+    { "id": "dtk.avlasning", "delprov": "DTK", "area": "DTK", "label": "Avläsning", "level": 2, "difficulty_band": [0.3, 0.6], "skill_tags": ["avläsning"] },
+    { "id": "dtk.proportion", "delprov": "DTK", "area": "DTK", "label": "Proportion & andel", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["proportion"] },
+    { "id": "dtk.enhetsbyte", "delprov": "DTK", "area": "DTK", "label": "Enhetsbyte & skala", "level": 3, "difficulty_band": [0.4, 0.8], "skill_tags": ["enhet", "skala"] },
+    { "id": "dtk.trend", "delprov": "DTK", "area": "DTK", "label": "Trend & jämförelse", "level": 3, "difficulty_band": [0.5, 0.85], "skill_tags": ["trend"] }
+  ]
+}
