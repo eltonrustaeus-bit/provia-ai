@@ -71,28 +71,36 @@ export async function initRealProv(rootId) {
   });
 }
 
+const PASSES = [
+  { no: '1', label: 'Provpass 1 — Verbal (ORD, LÄS, MEK, ELF)' },
+  { no: '2', label: 'Provpass 2 — Kvantitativ (XYZ, KVA, NOG, DTK)' },
+  { no: '4', label: 'Provpass 4 — Verbal (ORD, LÄS, MEK, ELF)' },
+  { no: '5', label: 'Provpass 5 — Kvantitativ (XYZ, KVA, NOG, DTK)' },
+];
+
 function openGrader(panel, provId, label) {
   panel.hidden = false;
   panel.innerHTML =
     `<h3 class="hp-section-h">Registrera resultat — ${label}</h3>` +
-    `<p class="hp-dim">Gör det riktiga provet på studera.nu. Klistra sedan in dina svar per delprov (t.ex. "1A 2C 3B …"). Vi rättar mot facit och uppdaterar din mastery. Dina svar — inte provtexten — skickas.</p>` +
-    `<label class="hp-field"><span>Delprov</span>` +
-    `<select id="hpRealDp">${DELPROV.map(d => `<option value="${d}">${d}</option>`).join('')}</select></label>` +
-    `<textarea id="hpRealAns" rows="3" placeholder="1A 2C 3B 4E 5A …"></textarea>` +
-    `<div class="hp-actions"><button id="hpRealSubmit" class="hp-btn" type="button">Rätta</button></div>` +
+    `<p class="hp-dim">Gör det riktiga provet på studera.nu. Välj provpass och klistra in dina svar i ordning (1–40, t.ex. "1A 2C 3B …"). Vi rättar mot facit och fördelar resultatet på rätt delprov. Bara dina svar skickas — aldrig provtexten.</p>` +
+    `<label class="hp-field"><span>Provpass</span>` +
+    `<select id="hpRealPass">${PASSES.map(p => `<option value="${p.no}">${p.label}</option>`).join('')}</select></label>` +
+    `<textarea id="hpRealAns" rows="3" placeholder="1A 2C 3B 4E 5A 6D 7D 8C 9A 10C …"></textarea>` +
+    `<div class="hp-actions"><button id="hpRealSubmit" class="hp-btn" type="button">Rätta provpass</button></div>` +
     `<div id="hpRealResult" class="hp-explain" hidden></div>`;
 
   panel.querySelector('#hpRealSubmit').addEventListener('click', async () => {
-    const dp = panel.querySelector('#hpRealDp').value;
+    const passNo = panel.querySelector('#hpRealPass').value;
     const answers = parseAnswers(panel.querySelector('#hpRealAns').value);
     if (!Object.keys(answers).length) return;
     const out = panel.querySelector('#hpRealResult');
     out.hidden = false; out.textContent = 'Rättar…';
-    const d = await api('/api/hp-realprov', { action: 'grade', prov_id: provId, answers: { [dp]: answers } });
+    const d = await api('/api/hp-realprov', { action: 'grade', prov_id: provId, passes: { [passNo]: answers } });
     if (!d?.ok) { out.textContent = d?.message || 'Kunde inte rätta detta prov ännu.'; return; }
-    const p = d.per_delprov[dp];
-    out.innerHTML = p
-      ? `<b>${dp}:</b> ${p.correct}/${p.answered} rätt (${p.percent}%). Din mastery för ${dp} har uppdaterats. ${d.note}`
-      : `Inga svar registrerade för ${dp}.`;
+    const rows = Object.entries(d.per_delprov || {})
+      .map(([dp, p]) => `<b>${dp}:</b> ${p.correct}/${p.answered} (${p.percent}%) · mastery ${p.mastery}`)
+      .join('<br>');
+    out.innerHTML =
+      `<b>Provpass ${passNo}:</b> ${d.overall.correct}/${d.overall.answered} rätt (${d.overall.percent}%)<br>${rows}<br><span class="hp-dim">${d.note}</span>`;
   });
 }
