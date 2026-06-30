@@ -65,7 +65,7 @@ el('hpGateBtn')?.addEventListener?.('click', () => {
 
 async function loadDiagnosis() {
   try {
-    const d = await api('/api/hp-diagnose', { action: 'diagnosis' });
+    const d = await api('/api/hp', { op: 'diagnose', action: 'diagnosis' });
     if (d?.ok && Array.isArray(d.weak_nodes)) {
       for (const w of d.weak_nodes) state.masteryMap[w.node_id] = w.mastery;
     }
@@ -88,7 +88,7 @@ function renderPrediction(pred, target) {
 async function fetchBatch() {
   const node_id = pickNextNode(DELPROV, state.masteryMap) || 'ord.synonym';
   const difficulty = difficultyFor(node_id, state.masteryMap);
-  const d = await api('/api/hp-generate', { node_id, delprov: DELPROV, n: BATCH, difficulty });
+  const d = await api('/api/hp', { op: 'generate', node_id, delprov: DELPROV, n: BATCH, difficulty });
   state.queue = (d?.items || []).slice();
   return state.queue.length;
 }
@@ -135,7 +135,8 @@ async function submitAnswer(chosenIndex, btn) {
   [...el('hpOptions').children].forEach(b => { b.disabled = true; });
   let d;
   try {
-    d = await api('/api/hp-diagnose', {
+    d = await api('/api/hp', {
+      op: 'diagnose',
       action: 'submit',
       question_id: state.current.id,
       chosen_index: chosenIndex,

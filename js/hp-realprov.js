@@ -41,7 +41,7 @@ export async function initRealProv(rootId) {
   let imported = [];
   let passesByProv = {};
   try {
-    const s = await api('/api/hp-realprov', { action: 'status' });
+    const s = await api('/api/hp', { op: 'realprov', action: 'status' });
     imported = s?.imported || [];
     passesByProv = s?.passes || {};
   } catch {}
@@ -101,7 +101,7 @@ function openGrader(panel, provId, label, passes) {
     if (!Object.keys(answers).length) return;
     const out = panel.querySelector('#hpRealResult');
     out.hidden = false; out.textContent = 'Rättar…';
-    const d = await api('/api/hp-realprov', { action: 'grade', prov_id: provId, passes: { [passNo]: answers } });
+    const d = await api('/api/hp', { op: 'realprov', action: 'grade', prov_id: provId, passes: { [passNo]: answers } });
     if (!d?.ok) { out.textContent = d?.message || 'Kunde inte rätta detta prov ännu.'; return; }
     const rows = Object.entries(d.per_delprov || {})
       .map(([dp, p]) => `<b>${dp}:</b> ${p.correct}/${p.answered} (${p.percent}%) · mastery ${p.mastery}`)
