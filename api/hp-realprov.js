@@ -8,7 +8,7 @@
 // POST { action:'status' }                      -> which provs have facit imported
 // POST { action:'grade', prov_id, answers }     answers = { ORD: {"1":"A",...} | ["A",null,...], ... }
 
-import { getFacit, hasFacit, FACIT } from './_hp-facit.js';
+import { getFacit, hasFacit, FACIT, delprovForItem } from './_hp-facit.js';
 
 const SB = process.env.SUPABASE_URL;
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -72,59 +72,62 @@ function toItemMap(input) {
 async function handleGrade(user, body, res) {
   const provId = String(body.prov_id || '');
   if (!hasFacit(provId)) return json(res, 400, { ok: false, error: 'no_facit', message: 'Facit för detta prov är inte importerat ännu.' });
-  const facit = getFacit(provId).delprov;
-  const answers = body.answers || {};
+  const passes = getFacit(provId).passes;
+  // Accept either { passes: { "1": {item:letter} } } or a single { pass, answers }.
+  const userPasses = body.passes || (body.pass ? { [String(body.pass)]: body.answers } : {});
 
-  const perDelprov = {};
+  // Accumulate per-delprov correctness across the submitted passes.
+  const perDelprov = {};                         // dp -> { correct, answered, results:[{correct}] }
   let totalCorrect = 0, totalAnswered = 0;
 
-  for (const dp of DELPROV) {
-    if (!facit[dp]) continue;
-    const key = facit[dp];                       // ["A","C",...] 0-indexed = item1
-    const given = toItemMap(answers[dp]);
-    let correct = 0, answered = 0;
+  for (const [passNo, rawAnswers] of Object.entries(userPasses)) {
+    const pass = passes[passNo];
+    if (!pass) continue;
+    const key = pass.answers;                    // ["B","E",...] index0 = item1
+    const given = toItemMap(rawAnswers);
     for (let i = 0; i < key.length; i++) {
-      const correctLetter = key[i];
       const userLetter = given[i + 1];
       if (!userLetter) continue;                 // unanswered item
-      answered++;
-      if (userLetter === correctLetter) correct++;
+      const dp = delprovForItem(pass.type, i + 1);
+      if (!dp) continue;
+      const isCorrect = userLetter === key[i];
+      const bucket = perDelprov[dp] || (perDelprov[dp] = { correct: 0, answered: 0, results: [] });
+      bucket.answered++; if (isCorrect) bucket.correct++;
+      bucket.results.push(isCorrect);
+      totalAnswered++; if (isCorrect) totalCorrect++;
     }
-    if (answered === 0) continue;
-    perDelprov[dp] = { correct, answered, total: key.length, percent: Math.round((correct / answered) * 100) };
-    totalCorrect += correct; totalAnswered += answered;
+  }
 
-    // Update delprov-level mastery (node id === delprov for level-1 nodes).
+  if (totalAnswered === 0) return json(res, 400, { ok: false, error: 'no_answers' });
+
+  // Update delprov-level mastery (node id === delprov for level-1 nodes) via Elo replay.
+  const out = {};
+  for (const [dp, b] of Object.entries(perDelprov)) {
     const mRows = await sbSelect(
       `hp_mastery?select=mastery,attempts&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${dp}&limit=1`
     );
     let mastery = Number(mRows?.[0]?.mastery) || 0;
     let attempts = Number(mRows?.[0]?.attempts) || 0;
-    // Replay each answered item through Elo at a representative difficulty (0.55 for real prov).
-    for (let i = 0; i < key.length; i++) {
-      const userLetter = given[i + 1];
-      if (!userLetter) continue;
-      mastery = nextMastery({ mastery, attempts, difficulty: 0.55, correct: userLetter === key[i] });
+    for (const correct of b.results) {
+      mastery = nextMastery({ mastery, attempts, difficulty: 0.55, correct });
       attempts++;
     }
     await sbWrite('hp_mastery', [{
       user_id: user.id, node_id: dp, mastery, attempts,
       last_seen: new Date().toISOString(), updated_at: new Date().toISOString(),
     }], 'resolution=merge-duplicates,return=minimal');
+    out[dp] = { correct: b.correct, answered: b.answered, percent: Math.round((b.correct / b.answered) * 100), mastery: Math.round(mastery) };
   }
-
-  if (totalAnswered === 0) return json(res, 400, { ok: false, error: 'no_answers' });
-
   await sbWrite('hp_sessions', [{
     user_id: user.id, kind: 'real_prov', raw_correct: totalCorrect, raw_total: totalAnswered,
-    scaled_score: null, per_delprov: perDelprov,
+    scaled_score: null, per_delprov: perDelprovOut,
     started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
   }]);
 
   return json(res, 200, {
     ok: true, prov_id: provId,
     overall: { correct: totalCorrect, answered: totalAnswered, percent: Math.round((totalCorrect / totalAnswered) * 100) },
-    per_delprov: perDelprov,
+    per_delprov: perDelprovOut,
     note: 'Skalpoäng visas när normeringstabell för detta prov finns. Resultatet har uppdaterat din mastery per delprov.',
   });
 }
