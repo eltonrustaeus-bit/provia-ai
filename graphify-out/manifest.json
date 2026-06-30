@@ -1,18 +1,18 @@
 {
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\package.json": {
-    "mtime": 1780007295.0363388,
-    "ast_hash": "fa78f1fec62220e69a8e045aa6d987c8",
-    "semantic_hash": "fa78f1fec62220e69a8e045aa6d987c8"
+    "mtime": 1781902648.076005,
+    "ast_hash": "7d26b73c5357973aefb2ee43b362e325",
+    "semantic_hash": "7d26b73c5357973aefb2ee43b362e325"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\vercel.json": {
-    "mtime": 1779831603.2859972,
-    "ast_hash": "370330df3237128166312f1fbffa8166",
-    "semantic_hash": "370330df3237128166312f1fbffa8166"
+    "mtime": 1782856459.6049328,
+    "ast_hash": "2950f78ab5e25dfd459aaa93034c4ac4",
+    "semantic_hash": "2950f78ab5e25dfd459aaa93034c4ac4"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\check-role.js": {
-    "mtime": 1779650572.3931239,
-    "ast_hash": "ae3950e2e8b67248710ced28ae75ff42",
-    "semantic_hash": "ae3950e2e8b67248710ced28ae75ff42"
+    "mtime": 1782686540.578563,
+    "ast_hash": "29108c888fdc632a8b2b92b415aa3acf",
+    "semantic_hash": "29108c888fdc632a8b2b92b415aa3acf"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\delete-exams.js": {
     "mtime": 1779650569.2518237,
@@ -20,44 +20,39 @@
     "semantic_hash": "8c8fcb64b27258d01b603a47915ca9ce"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\explain.js": {
-    "mtime": 1780052059.7500365,
-    "ast_hash": "0613c6d9a07de1dee2e3c35c15f7b141",
-    "semantic_hash": "0613c6d9a07de1dee2e3c35c15f7b141"
+    "mtime": 1782856371.2936337,
+    "ast_hash": "d5d2dc0a1bc3b6788080bce325520c10",
+    "semantic_hash": "d5d2dc0a1bc3b6788080bce325520c10"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\generate-exam.js": {
-    "mtime": 1779651219.5677507,
-    "ast_hash": "99f77bc362a7899cda342c2e30bb13f7",
-    "semantic_hash": "99f77bc362a7899cda342c2e30bb13f7"
+    "mtime": 1782584191.9001224,
+    "ast_hash": "02111c5df78adca9e47c76f5576d471b",
+    "semantic_hash": "02111c5df78adca9e47c76f5576d471b"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\grade.js": {
-    "mtime": 1779829913.5086808,
-    "ast_hash": "41f0c661be2d3597bf49633ef340e0b5",
-    "semantic_hash": "41f0c661be2d3597bf49633ef340e0b5"
+    "mtime": 1782684442.276886,
+    "ast_hash": "8f1e914f7816ec7227857e7d77ec165c",
+    "semantic_hash": "8f1e914f7816ec7227857e7d77ec165c"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\ocr.js": {
-    "mtime": 1779651194.947697,
-    "ast_hash": "3faf8778e9fa5cca7f241fbc3ab32848",
-    "semantic_hash": "3faf8778e9fa5cca7f241fbc3ab32848"
+    "mtime": 1780135993.6436346,
+    "ast_hash": "18c4fdb60acf1edf21d700a05b35e94d",
+    "semantic_hash": "18c4fdb60acf1edf21d700a05b35e94d"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\signup.js": {
-    "mtime": 1779650624.1976202,
-    "ast_hash": "0951cd3ada1f31452bb2e5cd2bb52ae8",
-    "semantic_hash": "0951cd3ada1f31452bb2e5cd2bb52ae8"
-  },
-  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\smart-tips.js": {
-    "mtime": 1779651120.1825423,
-    "ast_hash": "3fdf5f20bbd9928821ba5a077f49762a",
-    "semantic_hash": "3fdf5f20bbd9928821ba5a077f49762a"
+    "mtime": 1782684442.2868805,
+    "ast_hash": "f6fdee4a991e48ead0e152ce128f1e3a",
+    "semantic_hash": "f6fdee4a991e48ead0e152ce128f1e3a"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\teacher-report.js": {
-    "mtime": 1779651136.3878193,
-    "ast_hash": "f4d414610a6c9353eb1754fa2dd09ffb",
-    "semantic_hash": "f4d414610a6c9353eb1754fa2dd09ffb"
+    "mtime": 1782684442.3088796,
+    "ast_hash": "17fd3f3bfb274016439d818a81c4ec34",
+    "semantic_hash": "17fd3f3bfb274016439d818a81c4ec34"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\add_questions_batch2.py": {
-    "mtime": 1779320613.8214314,
-    "ast_hash": "c74e57d01abad3c2861a8d2d1779a4bb",
-    "semantic_hash": "c74e57d01abad3c2861a8d2d1779a4bb"
+    "mtime": 1780494303.1876297,
+    "ast_hash": "f73f6bda86219484b3370e96b663dd7e",
+    "semantic_hash": "f73f6bda86219484b3370e96b663dd7e"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\insert_questions.py": {
     "mtime": 1779317348.9206755,
@@ -70,19 +65,19 @@
     "semantic_hash": "c927050af93e3b05bcbee4e2dcf000a8"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\admin.html": {
-    "mtime": 1780019772.0781448,
-    "ast_hash": "23e9e4436f6b2d88ea157e19a45b7109",
-    "semantic_hash": "23e9e4436f6b2d88ea157e19a45b7109"
+    "mtime": 1782856915.3303936,
+    "ast_hash": "a422645aa9d08e6dc57392875165ed52",
+    "semantic_hash": "a422645aa9d08e6dc57392875165ed52"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\app.html": {
-    "mtime": 1780019771.796145,
-    "ast_hash": "4e1ad0a86242e3cd3a01694c57ff117e",
-    "semantic_hash": "4e1ad0a86242e3cd3a01694c57ff117e"
+    "mtime": 1782686561.4441347,
+    "ast_hash": "acb01432273cb8d8f9c46beb38af3836",
+    "semantic_hash": "acb01432273cb8d8f9c46beb38af3836"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\CLAUDE.md": {
-    "mtime": 1780047232.1131618,
-    "ast_hash": "7d3e6c6d1716c59e0eaf1ceb3a4397e3",
-    "semantic_hash": "7d3e6c6d1716c59e0eaf1ceb3a4397e3"
+    "mtime": 1782075778.285405,
+    "ast_hash": "a44869ba4387528d77c69cda16d82ae2",
+    "semantic_hash": "a44869ba4387528d77c69cda16d82ae2"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\DESIGN.md": {
     "mtime": 1779525618.7436566,
@@ -90,29 +85,29 @@
     "semantic_hash": "af816d64d609d7902e036aa2a0403333"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\f\u00f6rb\u00e4ttring.html": {
-    "mtime": 1780019771.396144,
-    "ast_hash": "a4f8aa39049f3e39d4aa00618dc9de73",
-    "semantic_hash": "a4f8aa39049f3e39d4aa00618dc9de73"
+    "mtime": 1782856398.9999151,
+    "ast_hash": "d81035b8f44cbd9e291deb12209a60a1",
+    "semantic_hash": "d81035b8f44cbd9e291deb12209a60a1"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\index.html": {
-    "mtime": 1780047016.6645381,
-    "ast_hash": "5b4ae500878624ad3a2689aafd81efb7",
-    "semantic_hash": "5b4ae500878624ad3a2689aafd81efb7"
+    "mtime": 1782685364.1718066,
+    "ast_hash": "8eb700ba481889552588e6ccb5b14221",
+    "semantic_hash": "8eb700ba481889552588e6ccb5b14221"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\korkortet.html": {
-    "mtime": 1780052060.4569864,
-    "ast_hash": "389e2f300bbc3341bcf2c8bcb75d2deb",
-    "semantic_hash": "389e2f300bbc3341bcf2c8bcb75d2deb"
+    "mtime": 1782685873.864834,
+    "ast_hash": "5f87fa64d334bdf20a01231176bb8035",
+    "semantic_hash": "5f87fa64d334bdf20a01231176bb8035"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\live-demo.html": {
-    "mtime": 1779655889.3801396,
-    "ast_hash": "0bbef86eb57f275514792ffc48195000",
-    "semantic_hash": "0bbef86eb57f275514792ffc48195000"
+    "mtime": 1782684443.6299233,
+    "ast_hash": "01461896f777122ee619f53382b6cf86",
+    "semantic_hash": "01461896f777122ee619f53382b6cf86"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\pricing.html": {
-    "mtime": 1780047055.6822724,
-    "ast_hash": "399eff1249d93b185596908bdbe20e03",
-    "semantic_hash": "399eff1249d93b185596908bdbe20e03"
+    "mtime": 1782684443.637935,
+    "ast_hash": "dfc018dcd983f3a425cb9958f9861165",
+    "semantic_hash": "dfc018dcd983f3a425cb9958f9861165"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\PRODUCT.md": {
     "mtime": 1779525598.7302015,
@@ -155,14 +150,14 @@
     "semantic_hash": "291b9a8f7e8abee902d4db5061263058"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\shared.js": {
-    "mtime": 1780014836.379601,
-    "ast_hash": "5f776e8da5fb31abf2460f47188fba13",
-    "semantic_hash": "5f776e8da5fb31abf2460f47188fba13"
+    "mtime": 1782685054.0294113,
+    "ast_hash": "8fec806c222f16f12863672995ecceaf",
+    "semantic_hash": "8fec806c222f16f12863672995ecceaf"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude\\settings.json": {
-    "mtime": 1779649948.5162277,
-    "ast_hash": "0bb736c857ad757fa7c1c538359f1bd4",
-    "semantic_hash": "0bb736c857ad757fa7c1c538359f1bd4"
+    "mtime": 1780528143.695398,
+    "ast_hash": "ac0356e0d6501395e5288644b370af68",
+    "semantic_hash": "ac0356e0d6501395e5288644b370af68"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\.claude-flow\\daemon-state.json": {
     "mtime": 1779652499.9155402,
@@ -195,19 +190,19 @@
     "semantic_hash": "3079dc3e2fe4c60cf8609e79e1db6765"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\admin.js": {
-    "mtime": 1779657860.548175,
-    "ast_hash": "8ca1d5bdeb6227be605f6b6e5fbeec30",
-    "semantic_hash": "8ca1d5bdeb6227be605f6b6e5fbeec30"
+    "mtime": 1782684442.0618048,
+    "ast_hash": "0d04fc497979d27a9e19fdf6b3c44b78",
+    "semantic_hash": "0d04fc497979d27a9e19fdf6b3c44b78"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\create-checkout-session.js": {
-    "mtime": 1779830162.8080375,
-    "ast_hash": "82e68b0498bfef1e0ecec18ba6333ce8",
-    "semantic_hash": "82e68b0498bfef1e0ecec18ba6333ce8"
+    "mtime": 1782584165.9455178,
+    "ast_hash": "6adb5a24b1747c5574ae41209c6ae8f0",
+    "semantic_hash": "6adb5a24b1747c5574ae41209c6ae8f0"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\stripe-webhook.js": {
-    "mtime": 1779830175.065967,
-    "ast_hash": "3e87911e469d1e32229e2307e7172086",
-    "semantic_hash": "3e87911e469d1e32229e2307e7172086"
+    "mtime": 1781949995.625911,
+    "ast_hash": "ae7399178b7abab7127fb2f14d65d779",
+    "semantic_hash": "ae7399178b7abab7127fb2f14d65d779"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_auth.js": {
     "mtime": 1779650526.549042,
@@ -225,9 +220,9 @@
     "semantic_hash": "f42631df18cd95b7f0b991fd2609c30a"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\upload_new_questions.py": {
-    "mtime": 1780006892.5682108,
-    "ast_hash": "aa3dd5b5c1c07d23fb44df98e9ea654c",
-    "semantic_hash": "aa3dd5b5c1c07d23fb44df98e9ea654c"
+    "mtime": 1780494334.1234403,
+    "ast_hash": "c86da1d1aa9a2e022e945d6ea51fce9e",
+    "semantic_hash": "c86da1d1aa9a2e022e945d6ea51fce9e"
   },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\verify_korkortet.mjs": {
     "mtime": 1780007495.1799917,
@@ -333,5 +328,550 @@
     "mtime": 1782076002.597238,
     "ast_hash": "975ba7f16de013d828ce217ee1bab1c3",
     "semantic_hash": "975ba7f16de013d828ce217ee1bab1c3"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\audit_report.json": {
+    "mtime": 1780617871.2529497,
+    "ast_hash": "df3c08e39f7918626a7f5fb30df3d405",
+    "semantic_hash": "df3c08e39f7918626a7f5fb30df3d405"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\final_questions.json": {
+    "mtime": 1781948075.9059713,
+    "ast_hash": "64ddae0caedf0b8319c9f73278b9e804",
+    "semantic_hash": "64ddae0caedf0b8319c9f73278b9e804"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\url_audit_result.json": {
+    "mtime": 1781948391.1963103,
+    "ast_hash": "11e7fc487b037838f7d8fae7a71a9a70",
+    "semantic_hash": "11e7fc487b037838f7d8fae7a71a9a70"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\hp.js": {
+    "mtime": 1782858136.9990332,
+    "ast_hash": "67da17bc280508386ddd1cad0949559e",
+    "semantic_hash": "67da17bc280508386ddd1cad0949559e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_hp-facit.js": {
+    "mtime": 1782855248.4825058,
+    "ast_hash": "a800319e201a46f8b3659b2eb1518d6e",
+    "semantic_hash": "a800319e201a46f8b3659b2eb1518d6e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_hp-norm.js": {
+    "mtime": 1782854970.350478,
+    "ast_hash": "44513e2f141a43e7a1dde3b163b5020c",
+    "semantic_hash": "44513e2f141a43e7a1dde3b163b5020c"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_per-context.js": {
+    "mtime": 1780494784.6329784,
+    "ast_hash": "e6e04910d875794b113a8f84a3a4eee5",
+    "semantic_hash": "e6e04910d875794b113a8f84a3a4eee5"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_per-core.js": {
+    "mtime": 1782684554.1644862,
+    "ast_hash": "8b7f0e4d1678ebd5cda6fdc370d63652",
+    "semantic_hash": "8b7f0e4d1678ebd5cda6fdc370d63652"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_per-memory.js": {
+    "mtime": 1782684442.3298962,
+    "ast_hash": "46596ddacf45cc273aede1ace1c51b2b",
+    "semantic_hash": "46596ddacf45cc273aede1ace1c51b2b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_provia-kb.js": {
+    "mtime": 1782684442.338886,
+    "ast_hash": "1a595ef584542eed93e3c7f522260637",
+    "semantic_hash": "1a595ef584542eed93e3c7f522260637"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\api\\_provia-rules.js": {
+    "mtime": 1782853381.5405698,
+    "ast_hash": "1a079e8719a77fcedd43c37cb892e7dd",
+    "semantic_hash": "1a079e8719a77fcedd43c37cb892e7dd"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\js\\hp-app.js": {
+    "mtime": 1782858157.8229482,
+    "ast_hash": "4b764c91b644a5a1495282e53c51b125",
+    "semantic_hash": "4b764c91b644a5a1495282e53c51b125"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\js\\hp-graph.js": {
+    "mtime": 1782853475.4497967,
+    "ast_hash": "647891668e7809906f2a2f1f93c80855",
+    "semantic_hash": "647891668e7809906f2a2f1f93c80855"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\js\\hp-realprov.js": {
+    "mtime": 1782858171.2520063,
+    "ast_hash": "a31e6f762a53fe699289d8d6e0bc5184",
+    "semantic_hash": "a31e6f762a53fe699289d8d6e0bc5184"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\js\\intro-splash.js": {
+    "mtime": 1782586243.7131362,
+    "ast_hash": "42252dc62941b075dec80beffd3241ba",
+    "semantic_hash": "42252dc62941b075dec80beffd3241ba"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\hp\\calibration.json": {
+    "mtime": 1782853233.875392,
+    "ast_hash": "d7f8620f9763c2f6ac5e479ddc4a5ac4",
+    "semantic_hash": "d7f8620f9763c2f6ac5e479ddc4a5ac4"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\hp\\graph_edges.json": {
+    "mtime": 1782853213.5893521,
+    "ast_hash": "180a3633c4dc3e20b17060725460cce8",
+    "semantic_hash": "180a3633c4dc3e20b17060725460cce8"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\hp\\graph_nodes.json": {
+    "mtime": 1782853199.776877,
+    "ast_hash": "68458687e8fb7044eff1ba18c2d4f769",
+    "semantic_hash": "68458687e8fb7044eff1ba18c2d4f769"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\hp\\norm_tables.json": {
+    "mtime": 1782854858.4265983,
+    "ast_hash": "2627d9739f33e14d8ad8dfa3c3efd8ab",
+    "semantic_hash": "2627d9739f33e14d8ad8dfa3c3efd8ab"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\hp\\real_prov_catalog.json": {
+    "mtime": 1782855307.1515348,
+    "ast_hash": "8854c1024b25481333adca38001ecdb9",
+    "semantic_hash": "8854c1024b25481333adca38001ecdb9"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\add_images_and_fixes.js": {
+    "mtime": 1780616871.526258,
+    "ast_hash": "75a4d8c5bd14e7471a639b5601e66489",
+    "semantic_hash": "75a4d8c5bd14e7471a639b5601e66489"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\apply_sync.js": {
+    "mtime": 1780618155.621404,
+    "ast_hash": "19370f79866c3bfb2e24b387211a4d16",
+    "semantic_hash": "19370f79866c3bfb2e24b387211a4d16"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\audit_road_sign_questions.js": {
+    "mtime": 1780426261.6485243,
+    "ast_hash": "0bc0955d59b036c5e4a478efead71eb7",
+    "semantic_hash": "0bc0955d59b036c5e4a478efead71eb7"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\build_final_questions.js": {
+    "mtime": 1780345354.6753435,
+    "ast_hash": "cc7baa6d105550544c632ee41187e5c8",
+    "semantic_hash": "cc7baa6d105550544c632ee41187e5c8"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\check_images.js": {
+    "mtime": 1780619615.621166,
+    "ast_hash": "292fd707b6ecac1ec4f4f3c39e76d408",
+    "semantic_hash": "292fd707b6ecac1ec4f4f3c39e76d408"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\comprehensive_audit.js": {
+    "mtime": 1780616455.0874987,
+    "ast_hash": "fb833ed37264a2eab121a837d2f1ff69",
+    "semantic_hash": "fb833ed37264a2eab121a837d2f1ff69"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\expand_sign_questions.js": {
+    "mtime": 1780658006.0163987,
+    "ast_hash": "90a9bdf3a1a2dcf43920438edec44c32",
+    "semantic_hash": "90a9bdf3a1a2dcf43920438edec44c32"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\extra_questions.json": {
+    "mtime": 1780344113.3171794,
+    "ast_hash": "310381be293a2505de1b8fa91a923b20",
+    "semantic_hash": "310381be293a2505de1b8fa91a923b20"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\fix_blocked_questions.js": {
+    "mtime": 1780420903.929502,
+    "ast_hash": "cdf7aa360749430ba28abc1139b38c1e",
+    "semantic_hash": "cdf7aa360749430ba28abc1139b38c1e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\fix_broken_image_urls.mjs": {
+    "mtime": 1780964211.138874,
+    "ast_hash": "608f4c7bd40238e0b36a5af316d10431",
+    "semantic_hash": "608f4c7bd40238e0b36a5af316d10431"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\fix_image_questions_bulk.js": {
+    "mtime": 1780349523.1517923,
+    "ast_hash": "43b82fe89274440b3fe53a995fe38545",
+    "semantic_hash": "43b82fe89274440b3fe53a995fe38545"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\fix_questions.js": {
+    "mtime": 1780346498.0929155,
+    "ast_hash": "c3080d8e2ca7395c8656a8aa914c261b",
+    "semantic_hash": "c3080d8e2ca7395c8656a8aa914c261b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\fix_sign_duplicates_and_rephrase.js": {
+    "mtime": 1780655301.8866918,
+    "ast_hash": "9edc95b074fe8b9b8224a2224e85c89e",
+    "semantic_hash": "9edc95b074fe8b9b8224a2224e85c89e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\generate-svgs.js": {
+    "mtime": 1781895033.8850896,
+    "ast_hash": "8dca74944402045a9a4e2d97d515a5ec",
+    "semantic_hash": "8dca74944402045a9a4e2d97d515a5ec"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\harden_korkort_questions.js": {
+    "mtime": 1780421325.222452,
+    "ast_hash": "cef380998ea2d9f2ee532d6fb532211b",
+    "semantic_hash": "cef380998ea2d9f2ee532d6fb532211b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\hp-calibrate.js": {
+    "mtime": 1782853260.3774116,
+    "ast_hash": "e17ac70cd548a76461e3fa137f09a37b",
+    "semantic_hash": "e17ac70cd548a76461e3fa137f09a37b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\hp-import-facit.js": {
+    "mtime": 1782854506.4123065,
+    "ast_hash": "ebeafac72ab9ceb8dbeabef7a02139ad",
+    "semantic_hash": "ebeafac72ab9ceb8dbeabef7a02139ad"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\hp-parse-facit.js": {
+    "mtime": 1782855338.0285418,
+    "ast_hash": "9fe8f25e123e16161501b81448ac9bcf",
+    "semantic_hash": "9fe8f25e123e16161501b81448ac9bcf"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\image_url_overrides.json": {
+    "mtime": 1780345319.2590835,
+    "ast_hash": "b0b8a6fd7c45d8067f8d739ab8a895d1",
+    "semantic_hash": "b0b8a6fd7c45d8067f8d739ab8a895d1"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\manual_review_active_images.js": {
+    "mtime": 1780426721.4457598,
+    "ast_hash": "2b6608fd2497f5afdee91d7ed45d7b6b",
+    "semantic_hash": "2b6608fd2497f5afdee91d7ed45d7b6b"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\manual_review_text_issues.js": {
+    "mtime": 1780426924.5452805,
+    "ast_hash": "e5d72670700b0a8f695c5134078105ad",
+    "semantic_hash": "e5d72670700b0a8f695c5134078105ad"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\new_questions_batch3.js": {
+    "mtime": 1780617859.8768983,
+    "ast_hash": "352e23e5b89592cb33651d38fcbeb3b4",
+    "semantic_hash": "352e23e5b89592cb33651d38fcbeb3b4"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\patch-image-urls.js": {
+    "mtime": 1781895072.8508322,
+    "ast_hash": "4269a7b12a8d09c2f465556b4b1e7e8e",
+    "semantic_hash": "4269a7b12a8d09c2f465556b4b1e7e8e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\polish_question_text_and_duplicates.js": {
+    "mtime": 1780428599.5494757,
+    "ast_hash": "be9ba254988704d686688e134e49f9cb",
+    "semantic_hash": "be9ba254988704d686688e134e49f9cb"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\record-reel-frames.js": {
+    "mtime": 1781904529.0274913,
+    "ast_hash": "65b398e3298b95ed4c87a129e38bd25f",
+    "semantic_hash": "65b398e3298b95ed4c87a129e38bd25f"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\record-reel.js": {
+    "mtime": 1781903219.8533463,
+    "ast_hash": "aba46a47dafa5c5c0f159520cce1de38",
+    "semantic_hash": "aba46a47dafa5c5c0f159520cce1de38"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\repair_blocked_questions.js": {
+    "mtime": 1780427587.674395,
+    "ast_hash": "70dd14812b21d548a600a6219eccda4d",
+    "semantic_hash": "70dd14812b21d548a600a6219eccda4d"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\road_sign_truth_table.json": {
+    "mtime": 1780427508.985044,
+    "ast_hash": "0080b3aff29ae3560d4da0347e4e0637",
+    "semantic_hash": "0080b3aff29ae3560d4da0347e4e0637"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\screenshot-instagram.js": {
+    "mtime": 1781900611.3971412,
+    "ast_hash": "a01b8dd3929bfccba299da35699a6e23",
+    "semantic_hash": "a01b8dd3929bfccba299da35699a6e23"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\send-basic-pitch.mjs": {
+    "mtime": 1782045905.8598902,
+    "ast_hash": "9374e2f0e629de0ad947e0aec2eafa42",
+    "semantic_hash": "9374e2f0e629de0ad947e0aec2eafa42"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\serve-instagram.js": {
+    "mtime": 1781904065.8084216,
+    "ast_hash": "dc40049845f4251b86373c465191aebf",
+    "semantic_hash": "dc40049845f4251b86373c465191aebf"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\sync_supabase_questions.js": {
+    "mtime": 1780350228.3011434,
+    "ast_hash": "e6009c9a012a0ad3bc300b07d227e9a3",
+    "semantic_hash": "e6009c9a012a0ad3bc300b07d227e9a3"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\test-emails.js": {
+    "mtime": 1782684443.0839598,
+    "ast_hash": "efd4fe4a79cc030a8fbbd2bb8b4601da",
+    "semantic_hash": "efd4fe4a79cc030a8fbbd2bb8b4601da"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\scripts\\verify_korkort_local.js": {
+    "mtime": 1780426305.7637272,
+    "ast_hash": "ac4f36d2fa1c4fdc3f9a40d486576f0a",
+    "semantic_hash": "ac4f36d2fa1c4fdc3f9a40d486576f0a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations\\20260603_add_mock_exam_quota.sql": {
+    "mtime": 1780496287.7683208,
+    "ast_hash": "0b813dacc2afccdb41dfabc6ad059e8e",
+    "semantic_hash": "0b813dacc2afccdb41dfabc6ad059e8e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations\\20260620_per_structured_memory.sql": {
+    "mtime": 1781982366.127456,
+    "ast_hash": "b6b1fbbbd0908b52de6cb0e525db46d7",
+    "semantic_hash": "b6b1fbbbd0908b52de6cb0e525db46d7"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations\\20260627_teacher_dashboard.sql": {
+    "mtime": 1782589761.021845,
+    "ast_hash": "f65b76bc7c4f1ae06ec2d8149b3b525d",
+    "semantic_hash": "f65b76bc7c4f1ae06ec2d8149b3b525d"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations\\20260630_hp_schema.sql": {
+    "mtime": 1782853157.3152716,
+    "ast_hash": "841169d049cf591841e74c7a11c845a9",
+    "semantic_hash": "841169d049cf591841e74c7a11c845a9"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations\\20260701_hp_fixes.sql": {
+    "mtime": 1782857958.0789833,
+    "ast_hash": "eb41f700de22003aab5e50f0714fd351",
+    "semantic_hash": "eb41f700de22003aab5e50f0714fd351"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations_rollback\\20260627_teacher_dashboard_ROLLBACK.sql": {
+    "mtime": 1782589765.9558368,
+    "ast_hash": "950255a358e4d9fc853c8f3d0b4af7c4",
+    "semantic_hash": "950255a358e4d9fc853c8f3d0b4af7c4"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations_rollback\\20260630_hp_schema_ROLLBACK.sql": {
+    "mtime": 1782853165.054999,
+    "ast_hash": "9e4a2bb1d11ed69c518bf42142eac502",
+    "semantic_hash": "9e4a2bb1d11ed69c518bf42142eac502"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations_rollback\\20260701_hp_fixes_ROLLBACK.sql": {
+    "mtime": 1782857967.7407815,
+    "ast_hash": "74ea31fe93cc873bf6d6a5e581568ead",
+    "semantic_hash": "74ea31fe93cc873bf6d6a5e581568ead"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\supabase\\migrations_rollback\\atomic_quota_and_anon_rate_limit_ROLLBACK.sql": {
+    "mtime": 1782584386.630717,
+    "ast_hash": "e590b580aec6791f614dc5572f2a5771",
+    "semantic_hash": "e590b580aec6791f614dc5572f2a5771"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\test-results\\.last-run.json": {
+    "mtime": 1782645920.3021843,
+    "ast_hash": "ff6d5dab1dfd50cea584142bc288ce9e",
+    "semantic_hash": "ff6d5dab1dfd50cea584142bc288ce9e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\tests\\teacher-portal.smoke.mjs": {
+    "mtime": 1782645951.5682654,
+    "ast_hash": "a0a2b01a37ba2f3095d243b132e7eca6",
+    "semantic_hash": "a0a2b01a37ba2f3095d243b132e7eca6"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\AGENTS.md": {
+    "mtime": 1780347521.5643902,
+    "ast_hash": "9e7953eca136c06ea4b072a7557090df",
+    "semantic_hash": "9e7953eca136c06ea4b072a7557090df"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\agents_log.md": {
+    "mtime": 1780345360.2377088,
+    "ast_hash": "f9d4c8e38b216243a5497e00c9529059",
+    "semantic_hash": "f9d4c8e38b216243a5497e00c9529059"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\bildfix_rapport.md": {
+    "mtime": 1780350216.2398057,
+    "ast_hash": "169a1773b5bbc710d4985b5a194e92e5",
+    "semantic_hash": "169a1773b5bbc710d4985b5a194e92e5"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\blocked_questions_repair_report.md": {
+    "mtime": 1780427595.8799193,
+    "ast_hash": "4698a98f6e8c381fc7e6298ba50a1bc5",
+    "semantic_hash": "4698a98f6e8c381fc7e6298ba50a1bc5"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\google52ca1d3d9412d7b8.html": {
+    "mtime": 1780068416.2732103,
+    "ast_hash": "eb32edd399951e47997c88481438631e",
+    "semantic_hash": "eb32edd399951e47997c88481438631e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\integritetspolicy.html": {
+    "mtime": 1782684443.488918,
+    "ast_hash": "1ff46ed281cbede4dc33dd6a24ec7ef7",
+    "semantic_hash": "1ff46ed281cbede4dc33dd6a24ec7ef7"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\konto.html": {
+    "mtime": 1782684443.4949646,
+    "ast_hash": "ffa72bf863a4de51b191a50a3a68260a",
+    "semantic_hash": "ffa72bf863a4de51b191a50a3a68260a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\korkort_quality_audit.md": {
+    "mtime": 1780421332.6460352,
+    "ast_hash": "226accdc4ad8da4ae99114d5ac3c2a2e",
+    "semantic_hash": "226accdc4ad8da4ae99114d5ac3c2a2e"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\larare.html": {
+    "mtime": 1782684443.6019175,
+    "ast_hash": "ad6c73939c6bf03f73fa71b063a227b2",
+    "semantic_hash": "ad6c73939c6bf03f73fa71b063a227b2"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\manual_image_review_report.md": {
+    "mtime": 1780426736.1434882,
+    "ast_hash": "43566fd398dcae59121c1d6458f9c536",
+    "semantic_hash": "43566fd398dcae59121c1d6458f9c536"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\manual_text_review_report.md": {
+    "mtime": 1780426950.17453,
+    "ast_hash": "6c61c86920afd6584029e262cfcb8571",
+    "semantic_hash": "6c61c86920afd6584029e262cfcb8571"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\provia-hp.html": {
+    "mtime": 1782855628.1890888,
+    "ast_hash": "6e9fdc21139f9db9f686269df01b6867",
+    "semantic_hash": "6e9fdc21139f9db9f686269df01b6867"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\PROVIA_HP_SPEC.md": {
+    "mtime": 1782852919.9411926,
+    "ast_hash": "f9c033ff06784e3ae5bf71bf1143e7b3",
+    "semantic_hash": "f9c033ff06784e3ae5bf71bf1143e7b3"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\road_sign_audit_report.md": {
+    "mtime": 1780428608.1648543,
+    "ast_hash": "96b9187d19574ee7eddc5609e945ca0c",
+    "semantic_hash": "96b9187d19574ee7eddc5609e945ca0c"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\robots.txt": {
+    "mtime": 1780068181.9504318,
+    "ast_hash": "4db1cc56d6f0a52f51ead64f0c5d69a7",
+    "semantic_hash": "4db1cc56d6f0a52f51ead64f0c5d69a7"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\UserseltonAppDataLocalTempcodex_admin_task.txt": {
+    "mtime": 1781949397.6755428,
+    "ast_hash": "cca069e9f6b2a72a41ca89090f8654f7",
+    "semantic_hash": "cca069e9f6b2a72a41ca89090f8654f7"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\UserseltonAppDataLocalTempcodex_restart_task.txt": {
+    "mtime": 1781954838.9431107,
+    "ast_hash": "cc357415339a4a2e4c84e4ae8e17c838",
+    "semantic_hash": "cc357415339a4a2e4c84e4ae8e17c838"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\validation_report.md": {
+    "mtime": 1780345360.235713,
+    "ast_hash": "bfe79f6865c89c12290780988eaf4c66",
+    "semantic_hash": "bfe79f6865c89c12290780988eaf4c66"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\download.html": {
+    "mtime": 1781904070.1592212,
+    "ast_hash": "c6b7a1288dd6146ffcfc1f3fc6a58acc",
+    "semantic_hash": "c6b7a1288dd6146ffcfc1f3fc6a58acc"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\post_01_stats.html": {
+    "mtime": 1781901322.02164,
+    "ast_hash": "8acb509758ac7a6973541c8676dba97f",
+    "semantic_hash": "8acb509758ac7a6973541c8676dba97f"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\post_02_ai.html": {
+    "mtime": 1781901342.9359908,
+    "ast_hash": "b0b0aad300920e9e91e1f14115aee264",
+    "semantic_hash": "b0b0aad300920e9e91e1f14115aee264"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\post_03_adaptive.html": {
+    "mtime": 1781901365.5615807,
+    "ast_hash": "41711b83e1f5a89b8210c8aec881fd68",
+    "semantic_hash": "41711b83e1f5a89b8210c8aec881fd68"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\post_04_exam.html": {
+    "mtime": 1781901384.8177187,
+    "ast_hash": "25ae47e5c56056252d4a924498c4d798",
+    "semantic_hash": "25ae47e5c56056252d4a924498c4d798"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\reel.html": {
+    "mtime": 1781903069.4704387,
+    "ast_hash": "fa319e9d6147053d2171bf187e4debea",
+    "semantic_hash": "fa319e9d6147053d2171bf187e4debea"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_016.svg": {
+    "mtime": 1781897890.6336474,
+    "ast_hash": "e0d9ce548eab89e333cde5879b853af1",
+    "semantic_hash": "e0d9ce548eab89e333cde5879b853af1"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_017.svg": {
+    "mtime": 1781897890.9373453,
+    "ast_hash": "f58da0bc39b134ef7d86e8040d720a16",
+    "semantic_hash": "f58da0bc39b134ef7d86e8040d720a16"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_018.svg": {
+    "mtime": 1781897890.9483395,
+    "ast_hash": "a8880a09d21b7de142872c3f45314395",
+    "semantic_hash": "a8880a09d21b7de142872c3f45314395"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_022.svg": {
+    "mtime": 1781897890.9613395,
+    "ast_hash": "f855ee9e0417df71b7238a4f8adae32f",
+    "semantic_hash": "f855ee9e0417df71b7238a4f8adae32f"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_023.svg": {
+    "mtime": 1781897890.9733448,
+    "ast_hash": "aba2190eee7c52fb925c83410179b0be",
+    "semantic_hash": "aba2190eee7c52fb925c83410179b0be"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_025.svg": {
+    "mtime": 1781897890.9873505,
+    "ast_hash": "37a46fb0c3f20306777e05727502b74a",
+    "semantic_hash": "37a46fb0c3f20306777e05727502b74a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_027.svg": {
+    "mtime": 1781897891.0023403,
+    "ast_hash": "d27e7ca69879761e9946af7aadf61ffd",
+    "semantic_hash": "d27e7ca69879761e9946af7aadf61ffd"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_095.svg": {
+    "mtime": 1781897891.0183632,
+    "ast_hash": "73f3c94a5a35641543daa636b0ddcc3d",
+    "semantic_hash": "73f3c94a5a35641543daa636b0ddcc3d"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_096.svg": {
+    "mtime": 1781897891.0318987,
+    "ast_hash": "80be582a2e79e339f8d1482e1d25d532",
+    "semantic_hash": "80be582a2e79e339f8d1482e1d25d532"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_097.svg": {
+    "mtime": 1781897891.0479033,
+    "ast_hash": "b5751dcee7c2d3dc64b2557aeb85d30c",
+    "semantic_hash": "b5751dcee7c2d3dc64b2557aeb85d30c"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_175.svg": {
+    "mtime": 1781897891.0649035,
+    "ast_hash": "7abad9fa796d6289fe28ea0de5ab7372",
+    "semantic_hash": "7abad9fa796d6289fe28ea0de5ab7372"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_179.svg": {
+    "mtime": 1781897891.0829194,
+    "ast_hash": "52ee272f43755cd03681693087e05682",
+    "semantic_hash": "52ee272f43755cd03681693087e05682"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_501.svg": {
+    "mtime": 1781897891.100899,
+    "ast_hash": "6cd2f92f43c70c0d3cadad277dcbed07",
+    "semantic_hash": "6cd2f92f43c70c0d3cadad277dcbed07"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_503.svg": {
+    "mtime": 1781897891.1149132,
+    "ast_hash": "b1f9e484d91140d0a06934d2ff3307fc",
+    "semantic_hash": "b1f9e484d91140d0a06934d2ff3307fc"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_505.svg": {
+    "mtime": 1781897891.1384473,
+    "ast_hash": "586840e2033ecdea09ae45444c18da11",
+    "semantic_hash": "586840e2033ecdea09ae45444c18da11"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\korkort\\q_574.svg": {
+    "mtime": 1781897891.156454,
+    "ast_hash": "2ddc2c6fe4ff75e64bad6ed1ac2fda61",
+    "semantic_hash": "2ddc2c6fe4ff75e64bad6ed1ac2fda61"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\public\\signs\\E19.svg": {
+    "mtime": 1780659818.4216554,
+    "ast_hash": "edb8d4da8f6ff0649e43b7b5ad19cbd1",
+    "semantic_hash": "edb8d4da8f6ff0649e43b7b5ad19cbd1"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\reel.mp4": {
+    "mtime": 1781904589.947055,
+    "ast_hash": "3e54b059b037b3860e33bd4844c4da4a",
+    "semantic_hash": "3e54b059b037b3860e33bd4844c4da4a"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\reel.webm": {
+    "mtime": 1781902067.4146175,
+    "ast_hash": "03dbf2674eb2ce2f0c0a747e8fadd481",
+    "semantic_hash": "03dbf2674eb2ce2f0c0a747e8fadd481"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\instagram\\reel_raw.webm": {
+    "mtime": 1781903265.8291602,
+    "ast_hash": "7ac9a91a99af505ba62e8fa0fcf9ac4f",
+    "semantic_hash": "7ac9a91a99af505ba62e8fa0fcf9ac4f"
   }
 }

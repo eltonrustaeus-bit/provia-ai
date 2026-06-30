@@ -45,7 +45,7 @@ Vercel serverless exam platform for Swedish students. No framework, no build ste
 ## Graphify First
 Before reading any source file, query the graphify graph:
 `C:\Users\elton\Desktop\ProvKlarUF\graphify-out\graph.json`
-212 nodes, 211 edges, 36 communities. Only fall back to raw file reads if graph lacks detail.
+1747 nodes, 2161 edges, 209 communities (updated 2026-07-01, incl. HP). Only fall back to raw file reads if graph lacks detail.
 
 ## körkortsteorin — modes (uppdaterad 2026-06-21)
 Övning-mode BORTTAGEN. Kvar: **kurser** (default), **teoriprov**, **repetition**, admin (hidden).
