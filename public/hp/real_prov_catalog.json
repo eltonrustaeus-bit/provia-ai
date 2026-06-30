@@ -5,21 +5,133 @@
   "terms_note": "UHR publicerar tidigare provhäften och facit gratis för nedladdning. Provia lagrar ALDRIG provtexten — vi länkar till officiella PDF:er och rättar mot facit (svarsnycklar = fakta). Ingen verbatim provtext i Provia.",
   "url_pattern": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-{season}-{year}/  (season = varen|hosten)",
   "administrations": [
-    { "id": "2026-04", "label": "Vår 2026 (18 apr)", "season": "varen", "year": 2026, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2026/", "facit_imported": false },
-    { "id": "2025-10", "label": "Höst 2025 (19 okt)", "season": "hosten", "year": 2025, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2025/", "facit_imported": false },
-    { "id": "2025-04", "label": "Vår 2025 (5 apr)", "season": "varen", "year": 2025, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2025/", "facit_imported": false },
-    { "id": "2024-10", "label": "Höst 2024 (20 okt)", "season": "hosten", "year": 2024, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2024/", "facit_imported": false },
-    { "id": "2024-04", "label": "Vår 2024 (13 apr)", "season": "varen", "year": 2024, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2024/", "facit_imported": true },
-    { "id": "2023-10", "label": "Höst 2023 (22 okt)", "season": "hosten", "year": 2023, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2023/", "facit_imported": false },
-    { "id": "2023-03", "label": "Vår 2023 (25 mar)", "season": "varen", "year": 2023, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2023/", "facit_imported": false },
-    { "id": "2022-10", "label": "Höst 2022 (23 okt)", "season": "hosten", "year": 2022, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2022/", "facit_imported": false },
-    { "id": "2022-03", "label": "Vår 2022 (12 mar)", "season": "varen", "year": 2022, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2022/", "facit_imported": false },
-    { "id": "2021-10", "label": "Höst 2021 (24 okt)", "season": "hosten", "year": 2021, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2021/", "facit_imported": false },
-    { "id": "2021-03", "label": "Vår 2021 (13 mar)", "season": "varen", "year": 2021, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2021/", "facit_imported": false },
-    { "id": "2020-10", "label": "Höst 2020 (25 okt)", "season": "hosten", "year": 2020, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2020/", "facit_imported": false },
-    { "id": "2019-10", "label": "Höst 2019 (20 okt)", "season": "hosten", "year": 2019, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2019/", "facit_imported": false },
-    { "id": "2019-04", "label": "Vår 2019 (6 apr)", "season": "varen", "year": 2019, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2019/", "facit_imported": false },
-    { "id": "2018-10", "label": "Höst 2018 (21 okt)", "season": "hosten", "year": 2018, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2018/", "facit_imported": false },
-    { "id": "2018-04", "label": "Vår 2018 (14 apr)", "season": "varen", "year": 2018, "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2018/", "facit_imported": false }
+    {
+      "id": "2026-04",
+      "label": "Vår 2026 (18 apr)",
+      "season": "varen",
+      "year": 2026,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2026/",
+      "facit_imported": false
+    },
+    {
+      "id": "2025-10",
+      "label": "Höst 2025 (19 okt)",
+      "season": "hosten",
+      "year": 2025,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2025/",
+      "facit_imported": false
+    },
+    {
+      "id": "2025-04",
+      "label": "Vår 2025 (5 apr)",
+      "season": "varen",
+      "year": 2025,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2025/",
+      "facit_imported": true
+    },
+    {
+      "id": "2024-10",
+      "label": "Höst 2024 (20 okt)",
+      "season": "hosten",
+      "year": 2024,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2024/",
+      "facit_imported": true
+    },
+    {
+      "id": "2024-04",
+      "label": "Vår 2024 (13 apr)",
+      "season": "varen",
+      "year": 2024,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2024/",
+      "facit_imported": true
+    },
+    {
+      "id": "2023-10",
+      "label": "Höst 2023 (22 okt)",
+      "season": "hosten",
+      "year": 2023,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2023/",
+      "facit_imported": true
+    },
+    {
+      "id": "2023-03",
+      "label": "Vår 2023 (25 mar)",
+      "season": "varen",
+      "year": 2023,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2023/",
+      "facit_imported": true
+    },
+    {
+      "id": "2022-10",
+      "label": "Höst 2022 (23 okt)",
+      "season": "hosten",
+      "year": 2022,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2022/",
+      "facit_imported": false
+    },
+    {
+      "id": "2022-03",
+      "label": "Vår 2022 (12 mar)",
+      "season": "varen",
+      "year": 2022,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2022/",
+      "facit_imported": false
+    },
+    {
+      "id": "2021-10",
+      "label": "Höst 2021 (24 okt)",
+      "season": "hosten",
+      "year": 2021,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2021/",
+      "facit_imported": false
+    },
+    {
+      "id": "2021-03",
+      "label": "Vår 2021 (13 mar)",
+      "season": "varen",
+      "year": 2021,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2021/",
+      "facit_imported": false
+    },
+    {
+      "id": "2020-10",
+      "label": "Höst 2020 (25 okt)",
+      "season": "hosten",
+      "year": 2020,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2020/",
+      "facit_imported": false
+    },
+    {
+      "id": "2019-10",
+      "label": "Höst 2019 (20 okt)",
+      "season": "hosten",
+      "year": 2019,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2019/",
+      "facit_imported": false
+    },
+    {
+      "id": "2019-04",
+      "label": "Vår 2019 (6 apr)",
+      "season": "varen",
+      "year": 2019,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2019/",
+      "facit_imported": false
+    },
+    {
+      "id": "2018-10",
+      "label": "Höst 2018 (21 okt)",
+      "season": "hosten",
+      "year": 2018,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-hosten-2018/",
+      "facit_imported": false
+    },
+    {
+      "id": "2018-04",
+      "label": "Vår 2018 (14 apr)",
+      "season": "varen",
+      "year": 2018,
+      "official_url": "https://www.studera.nu/hogskoleprov/fpn/provfragor-och-facit-varen-2018/",
+      "facit_imported": false
+    }
   ]
 }

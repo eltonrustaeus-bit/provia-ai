@@ -8,7 +8,7 @@
 // POST { action:'status' }                      -> which provs have facit imported
 // POST { action:'grade', prov_id, answers }     answers = { ORD: {"1":"A",...} | ["A",null,...], ... }
 
-import { getFacit, hasFacit, FACIT, delprovForItem } from './_hp-facit.js';
+import { getFacit, hasFacit, FACIT, delprovForItem, passMeta } from './_hp-facit.js';
 import { scaleDel, combineTotal } from './_hp-norm.js';
 
 const VERBAL = ['ORD', 'LAS', 'MEK', 'ELF'];
@@ -168,7 +168,10 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'status') {
-      return json(res, 200, { ok: true, imported: Object.keys(FACIT).filter(hasFacit) });
+      const imported = Object.keys(FACIT).filter(hasFacit);
+      const passes = {};
+      for (const id of imported) passes[id] = passMeta(id);
+      return json(res, 200, { ok: true, imported, passes });
     }
     if (action === 'grade') return await handleGrade(user, body, res);
     return json(res, 400, { ok: false, error: 'Unknown action' });
