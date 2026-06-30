@@ -94,6 +94,12 @@
     <h1>Högskoleprovet, smartare.</h1>
     <p class="hp-sub">Vi diagnostiserar exakt var du tappar poäng och bygger en adaptiv träning som tar dig dit du vill. Plugga smartare — inte mer.</p>
 
+    <!-- Private demo: account not allowed -->
+    <section id="hpNA" class="hp-card" hidden aria-labelledby="hpNAH">
+      <h2 id="hpNAH" class="hp-section-h">Sidan är inte tillgänglig</h2>
+      <p class="hp-dim" style="margin:.2rem 0 0">Provia HP är i privat beta och inte öppen ännu.</p>
+    </section>
+
     <!-- Auth gate -->
     <section id="hpGate" class="hp-card" hidden aria-labelledby="hpGateH">
       <h2 id="hpGateH" class="hp-section-h">Skapa konto för att börja</h2>
@@ -103,6 +109,17 @@
 
     <!-- Main app -->
     <div id="hpMain" hidden>
+      <section id="hpPred" class="hp-card" hidden aria-labelledby="hpPredH">
+        <h2 id="hpPredH" class="hp-section-h">Din prognos</h2>
+        <div style="display:flex;align-items:baseline;gap:.6rem">
+          <span id="hpPredScore" style="font-family:'DM Mono',monospace;font-size:2.6rem;color:var(--accent);line-height:1">–</span>
+          <span id="hpPredCi" class="hp-dim" style="font-size:.95rem"></span>
+        </div>
+        <div class="hp-bar" style="height:8px;margin:.9rem 0 .4rem"><i id="hpPredBar" style="width:0%"></i></div>
+        <div class="hp-dim" style="display:flex;justify-content:space-between;font-size:.72rem;font-family:'DM Mono',monospace"><span>0.0</span><span>1.0</span><span>2.0</span></div>
+        <p id="hpPredNote" class="hp-dim" style="font-size:.82rem;margin:.7rem 0 0"></p>
+      </section>
+
       <section id="hpIntro" class="hp-card" aria-labelledby="hpIntroH">
         <h2 id="hpIntroH" class="hp-section-h">Diagnostiskt pass — Ordförståelse</h2>
         <p style="color:var(--text-dim);margin:.2rem 0 1.1rem">Svara på 5 ord i taget. Vi mäter inte bara rätt/fel — vi kartlägger <em>vilka</em> ordtyper som sänker dig och anpassar nästa pass.</p>

@@ -13,6 +13,8 @@ import { normalizeRole } from './_provia-rules.js';
 
 const SB = process.env.SUPABASE_URL;
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Private demo — only the owner account may use Provia HP until public release.
+const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -162,6 +164,7 @@ export default async function handler(req, res) {
 
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { ok: false, error: 'Unauthorized' });
+  if (user.id !== OWNER_ID) return json(res, 403, { ok: false, error: 'not_available' });
   void normalizeRole; // role gating reserved for future per-tier diagnosis depth
 
   let body; try { body = await readJsonBody(req); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }

@@ -8,6 +8,8 @@ import { initRealProv } from './hp-realprov.js';
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
 const BATCH = 5;
+// Private demo — only the owner account may view/use Provia HP until public release.
+const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
 const state = {
   masteryMap: {},
@@ -24,6 +26,12 @@ function token() {
   try {
     const s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
     return s?.access_token || '';
+  } catch { return ''; }
+}
+function sessionUserId() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
+    return s?.user?.id || '';
   } catch { return ''; }
 }
 function el(id) { return document.getElementById(id); }
@@ -184,7 +192,12 @@ async function startSession() {
 async function boot() {
   await loadGraph();
   if (!token()) { gate(); return; }
-  show('hpMain'); hide('hpGate');
+  // Private demo gate — owner account only.
+  if (sessionUserId() !== OWNER_ID) {
+    hide('hpMain'); hide('hpGate'); show('hpNA');
+    return;
+  }
+  hide('hpNA'); show('hpMain'); hide('hpGate');
   await loadDiagnosis();
   renderProgress();
   initRealProv('hpReal');
