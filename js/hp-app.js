@@ -103,9 +103,22 @@ function renderProgress() {
   weakWrap.innerHTML = '';
   for (const [nid, m] of entries.slice(0, 5)) {
     const n = getNode(nid);
+    const label = n ? n.label : (nid.startsWith('delprov:') ? nid.slice(8) : nid);
+    const pct = Math.round(m);
+    // Build with textContent — never interpolate node_id into innerHTML (stored-XSS guard).
     const row = document.createElement('div');
     row.className = 'hp-mrow';
-    row.innerHTML = `<span>${n ? n.label : nid}</span><span class="hp-bar"><i style="width:${Math.round(m)}%"></i></span><span class="hp-mval">${Math.round(m)}</span>`;
+    const name = document.createElement('span');
+    name.textContent = label;
+    const bar = document.createElement('span');
+    bar.className = 'hp-bar';
+    const fill = document.createElement('i');
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    const val = document.createElement('span');
+    val.className = 'hp-mval';
+    val.textContent = String(pct);
+    row.append(name, bar, val);
     weakWrap.appendChild(row);
   }
 }
