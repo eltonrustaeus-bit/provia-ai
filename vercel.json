@@ -9,6 +9,8 @@
     "api/teacher-report.js": { "maxDuration": 60 },
     "api/check-role.js": { "maxDuration": 60 },
     "api/ocr.js": { "maxDuration": 60 },
-    "api/explain.js": { "maxDuration": 30 }
+    "api/explain.js": { "maxDuration": 30 },
+    "api/hp-generate.js": { "maxDuration": 60 },
+    "api/hp-diagnose.js": { "maxDuration": 30 }
   }
 }

@@ -1,0 +1,33 @@
+Extend C:UserseltonDesktopProvKlarUFapiadmin.js with image workflow support. Read the full file first before making changes. Do NOT modify existing actions (list-users, set-role, list-questions, update-question, delete-question).
+
+CHANGE 1 - Fix image_url validation around line 147.
+Replace the existing image_url validation block. New logic:
+- If updates.image_url is falsy: safe.image_url = null
+- Else trim the value; check isWikimedia = matches regex starts with https://upload.wikimedia.org/wikipedia/commons/ AND length<=1000; check isOwnStorage = matches regex starts with https://mnmotdluigzeehdjbhbu.supabase.co/storage/v1/object/public/question-images/ AND length<=500; if neither return 400 json with error: image_url must be Wikimedia commons URL, Supabase Storage URL, or null; else safe.image_url = trimmed value
+
+CHANGE 2 - Extend list-questions select and add image filters.
+Replace .select() columns with: id, category, question, option_a, option_b, option_c, option_d, correct, explanation, difficulty, image_url, image_description, image_status, image_priority, image_prompt, image_source, image_notes, reviewed_at, reviewed_by, report_count
+After existing filter blocks, read imgFilter from req.body.imgFilter and add: if imgFilter===priority-high then query.eq(image_priority,high); if imgFilter===prompt-ready then query.eq(image_status,prompt_ready); if imgFilter===pending-review then query.in(image_status,[uploaded])
+
+CHANGE 3 - Add module-level helper before export default.
+function buildScenarioDescription(q) builds a description string by combining q.question (with ? removed), category, and the correct answer option. Returns string truncated to 400 chars. Correct answer determined by {A:q.option_a,B:q.option_b,C:q.option_c,D:q.option_d}[q.correct].
+
+CHANGE 4 - New action generate-prompt.
+Validate questionId is positive integer with requireAdmin. Fetch question from driving_questions. Call buildScenarioDescription to get situation. Build a long English prompt for AI image generation: start with Create a realistic educational driving theory scenario image for a Swedish driving test app. The image should show: {situation}. Use a driver perspective from inside or just behind the vehicle. Swedish road environment, daylight, clear visibility, pedagogical composition. Do not include readable license plates, brand logos, incorrect traffic signs, distorted vehicles, or text overlays. High quality, clean, realistic, 16:9 format. Save prompt to image_prompt column and set image_status=prompt_ready. Return {ok:true,prompt,questionId}.
+
+CHANGE 5 - New action update-image-status.
+requireAdmin. Accept questionId, image_status, image_notes, image_source, image_priority from req.body. Validate: VALID_STATUSES=[missing,prompt_ready,pending_upload,uploaded,approved,rejected]; VALID_SOURCES=[chatgpt_manual,official_asset,own_photo,other,none]; VALID_PRIORITIES=[high,medium,low,none]. Build updates object. When status becomes approved or rejected also set reviewed_at=new Date().toISOString(). Sanitize image_notes to max 500 chars or null. Update row, return updated question.
+
+CHANGE 6 - New action upload-image.
+requireAdmin. Accept questionId (positive integer), imageData (base64 string), mimeType (one of image/jpeg, image/png, image/webp). Decode base64 to Buffer. Reject if buffer.length > 5MB. Build filename: q-{questionId}-{Date.now()}.{ext}. Upload buffer to supabase.storage bucket question-images. Get public URL via getPublicUrl. Update driving_questions row: image_url=publicUrl, image_status=uploaded, image_source=chatgpt_manual. Return {ok:true,url:publicUrl,filename}.
+
+CHANGE 7 - New action export-prompts.
+requireAdmin. Accept optional category and limit (clamp to 1-50, default 10). Query driving_questions selecting id,category,question,option_a-d,correct,explanation,image_status,image_prompt,image_priority where image_url IS NULL, ordered by image_priority ascending, limited to count. Filter by category if given. Map each question: use existing image_prompt or generate one from buildScenarioDescription with same prompt template as in generate-prompt action. Return {ok:true,prompts:[{id,category,question,priority,prompt}],count}.
+
+CONSTRAINTS:
+- Only modify C:UserseltonDesktopProvKlarUFapiadmin.js
+- Keep ESM style, no CJS
+- No new npm dependencies (only @supabase/supabase-js already imported)
+- All new action if-blocks must return before final fallthrough res.status(400).json({ok:false,error:Unknown action})
+- buildScenarioDescription is module-scope outside export default
+- Do not alter any existing action

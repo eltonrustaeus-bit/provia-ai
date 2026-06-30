@@ -149,11 +149,6 @@
     "ast_hash": "6ee55cb34dc2a5ae6468113031b243e2",
     "semantic_hash": "6ee55cb34dc2a5ae6468113031b243e2"
   },
-  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\image\\provklar-logo.png": {
-    "mtime": 1779225222.7057984,
-    "ast_hash": "4dd7d48abe6d3ba0832bd2792db5299f",
-    "semantic_hash": "4dd7d48abe6d3ba0832bd2792db5299f"
-  },
   "C:\\Users\\elton\\Desktop\\ProvKlarUF\\korkortet-srs.js": {
     "mtime": 1780049326.4740448,
     "ast_hash": "291b9a8f7e8abee902d4db5061263058",
@@ -333,5 +328,10 @@
     "mtime": 1780007580.461233,
     "ast_hash": "396f97993f7875b04fcf33438c05bedb",
     "semantic_hash": "396f97993f7875b04fcf33438c05bedb"
+  },
+  "C:\\Users\\elton\\Desktop\\ProvKlarUF\\graphify-notes\\session-2026-06-21-korkortet-refactor.md": {
+    "mtime": 1782076002.597238,
+    "ast_hash": "975ba7f16de013d828ce217ee1bab1c3",
+    "semantic_hash": "975ba7f16de013d828ce217ee1bab1c3"
   }
 }

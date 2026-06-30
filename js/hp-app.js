@@ -1,0 +1,178 @@
+// js/hp-app.js — Provia HP MVP orchestrator (ES module).
+// Flow: auth gate (pvModal) -> diagnostic/train loop on ORD -> server-authoritative mastery.
+// Answer key is revealed only by the submit response (api/hp-diagnose), never pre-submit.
+
+import { loadGraph, pickNextNode, difficultyFor, getNode } from './hp-graph.js';
+
+const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+const DELPROV = 'ORD';
+const BATCH = 5;
+
+const state = {
+  masteryMap: {},
+  sessionId: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
+  queue: [],
+  current: null,
+  servedAt: 0,
+  answered: 0,
+  correct: 0,
+  context: 'diagnostic',
+};
+
+function token() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
+    return s?.access_token || '';
+  } catch { return ''; }
+}
+function el(id) { return document.getElementById(id); }
+function show(id) { const e = el(id); if (e) e.hidden = false; }
+function hide(id) { const e = el(id); if (e) e.hidden = true; }
+
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+    body: JSON.stringify(body),
+  });
+  if (r.status === 401) { gate(); throw new Error('unauthorized'); }
+  return r.json();
+}
+
+function gate() {
+  hide('hpMain'); show('hpGate');
+  window.PROVIA_AUTH_REDIRECT = 'provia-hp.html';
+  // shared.js is deferred; poll briefly for the modal opener.
+  let tries = 0;
+  const t = setInterval(() => {
+    if (window.openProviaLogin) { clearInterval(t); }
+    if (++tries > 40) clearInterval(t);
+  }, 100);
+}
+
+el('hpGateBtn')?.addEventListener?.('click', () => {
+  if (window.openProviaLogin) window.openProviaLogin('register');
+});
+
+async function loadDiagnosis() {
+  try {
+    const d = await api('/api/hp-diagnose', { action: 'diagnosis' });
+    if (d?.ok && Array.isArray(d.weak_nodes)) {
+      for (const w of d.weak_nodes) state.masteryMap[w.node_id] = w.mastery;
+    }
+  } catch { /* first-run users have no diagnosis yet */ }
+}
+
+async function fetchBatch() {
+  const node_id = pickNextNode(DELPROV, state.masteryMap) || 'ord.synonym';
+  const difficulty = difficultyFor(node_id, state.masteryMap);
+  const d = await api('/api/hp-generate', { node_id, delprov: DELPROV, n: BATCH, difficulty });
+  state.queue = (d?.items || []).slice();
+  return state.queue.length;
+}
+
+function renderProgress() {
+  const pct = state.answered ? Math.round((state.correct / state.answered) * 100) : 0;
+  el('hpStatAnswered').textContent = String(state.answered);
+  el('hpStatAcc').textContent = state.answered ? pct + '%' : '–';
+  // weakest node readout
+  const entries = Object.entries(state.masteryMap).filter(([, m]) => m > 0).sort((a, b) => a[1] - b[1]);
+  const weakWrap = el('hpWeak');
+  weakWrap.innerHTML = '';
+  for (const [nid, m] of entries.slice(0, 5)) {
+    const n = getNode(nid);
+    const row = document.createElement('div');
+    row.className = 'hp-mrow';
+    row.innerHTML = `<span>${n ? n.label : nid}</span><span class="hp-bar"><i style="width:${Math.round(m)}%"></i></span><span class="hp-mval">${Math.round(m)}</span>`;
+    weakWrap.appendChild(row);
+  }
+}
+
+function renderQuestion() {
+  const q = state.current;
+  const node = getNode(q.node_id);
+  el('hpNodeLabel').textContent = node ? node.label : q.node_id;
+  el('hpStem').textContent = q.stem;
+  const opts = el('hpOptions');
+  opts.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const b = document.createElement('button');
+    b.className = 'hp-opt';
+    b.type = 'button';
+    b.textContent = opt;
+    b.addEventListener('click', () => submitAnswer(i, b), { once: true });
+    opts.appendChild(b);
+  });
+  el('hpExplain').hidden = true;
+  el('hpNext').hidden = true;
+  state.servedAt = Date.now();
+}
+
+async function submitAnswer(chosenIndex, btn) {
+  // lock buttons
+  [...el('hpOptions').children].forEach(b => { b.disabled = true; });
+  let d;
+  try {
+    d = await api('/api/hp-diagnose', {
+      action: 'submit',
+      question_id: state.current.id,
+      chosen_index: chosenIndex,
+      served_at: state.servedAt,
+      session_id: state.sessionId,
+      context: state.context,
+    });
+  } catch { return; }
+  if (!d?.ok) return;
+
+  state.answered++;
+  if (d.is_correct) state.correct++;
+  state.masteryMap[d.node_id] = d.mastery;
+
+  const buttons = [...el('hpOptions').children];
+  buttons.forEach((b, i) => {
+    if (i === d.correct_index) b.classList.add('hp-correct');
+    if (i === chosenIndex && !d.is_correct) b.classList.add('hp-wrong');
+  });
+
+  const ex = el('hpExplain');
+  ex.textContent = d.explanation || '';
+  ex.hidden = false;
+  el('hpNext').hidden = false;
+  renderProgress();
+}
+
+async function nextQuestion() {
+  if (!state.queue.length) {
+    el('hpStem').textContent = 'Laddar nästa pass…';
+    el('hpOptions').innerHTML = '';
+    el('hpExplain').hidden = true;
+    el('hpNext').hidden = true;
+    try {
+      const got = await fetchBatch();
+      if (!got) {
+        el('hpStem').textContent = 'Inga fler frågor just nu — du har tränat klart detta pass. Kom tillbaka imorgon eller uppgradera för obegränsad generering.';
+        return;
+      }
+    } catch { el('hpStem').textContent = 'Kunde inte ladda frågor. Försök igen.'; return; }
+  }
+  state.current = state.queue.shift();
+  renderQuestion();
+}
+
+el('hpNext')?.addEventListener?.('click', nextQuestion);
+el('hpStartBtn')?.addEventListener?.('click', startSession);
+
+async function startSession() {
+  hide('hpIntro'); show('hpQuiz');
+  await nextQuestion();
+}
+
+async function boot() {
+  await loadGraph();
+  if (!token()) { gate(); return; }
+  show('hpMain'); hide('hpGate');
+  await loadDiagnosis();
+  renderProgress();
+}
+
+boot();
