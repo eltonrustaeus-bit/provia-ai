@@ -61,8 +61,9 @@ async function sbSelect(pathQuery) {
   if (!r.ok) return [];
   return r.json();
 }
-async function sbInsert(table, rows, prefer = 'return=representation') {
-  const r = await fetch(SB + '/rest/v1/' + table, {
+async function sbInsert(table, rows, prefer = 'return=representation', onConflict = null) {
+  const url = SB + '/rest/v1/' + table + (onConflict ? '?on_conflict=' + encodeURIComponent(onConflict) : '');
+  const r = await fetch(url, {
     method: 'POST',
     headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json', Prefer: prefer },
     body: JSON.stringify(rows), signal: AbortSignal.timeout(8000),
@@ -70,6 +71,19 @@ async function sbInsert(table, rows, prefer = 'return=representation') {
   if (!r.ok) return null;
   if (prefer.includes('minimal')) return true;
   return r.json();
+}
+// Atomic Elo mastery update (FOR UPDATE row lock in apply_hp_mastery RPC) — replaces the
+// racy read-modify-write that could lose concurrent updates. Returns { mastery, attempts } or null.
+async function applyMastery(userId, nodeId, difficulty, correct) {
+  const r = await fetch(SB + '/rest/v1/rpc/apply_hp_mastery', {
+    method: 'POST',
+    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_user_id: userId, p_node_id: nodeId, p_difficulty: difficulty, p_correct: correct }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!r.ok) return null;
+  const d = await r.json().catch(() => null);
+  return d && typeof d.mastery === 'number' ? d : null;
 }
 async function consumeQuota(rpc, userId, limit) {
   if (limit.cap === Infinity) return { ok: true, unlimited: true };
@@ -84,12 +98,6 @@ async function consumeQuota(rpc, userId, limit) {
   if (!r.ok) { const e = new Error(rpc + ' failed'); e.details = d || raw; throw e; }
   return { ok: d?.ok === true, count: Number(d?.count || 0), limit: d?.limit ?? limit.cap, unlimited: d?.unlimited === true };
 }
-function nextMastery({ mastery, attempts, difficulty, correct }) {
-  const expected = 1 / (1 + Math.pow(10, ((difficulty * 100) - mastery) / 40));
-  const K = attempts < 10 ? 24 : 12;
-  return Math.max(0, Math.min(100, mastery + K * ((correct ? 1 : 0) - expected)));
-}
-
 // ── op: generate ────────────────────────────────────────────────────────────
 function normalizeStem(s) { return String(s || '').toLowerCase().replace(/[^a-zåäö0-9]+/g, ' ').trim(); }
 function stemHash(node_id, stem) { return crypto.createHash('sha256').update(node_id + '|' + normalizeStem(stem)).digest('hex').slice(0, 32); }
@@ -165,14 +173,18 @@ async function opGenerate(user, body) {
   try { generated = await generateOrd(node_id, difficulty, need, model); } catch { /* best-effort */ }
 
   const toInsert = [];
+  const batchHashes = new Set();
   for (const q of generated) {
     const source_hash = stemHash(node_id, q.stem);
-    if (seenIds.has(source_hash)) continue;
+    if (batchHashes.has(source_hash)) continue; // de-dupe within this batch (seenIds holds question_id UUIDs, not hashes)
+    batchHashes.add(source_hash);
     toInsert.push({ delprov, node_id, stem: q.stem, options: q.options, correct_index: q.correct_index,
       explanation: q.explanation, difficulty: Math.min(1, Math.max(0, Number(q.difficulty) || difficulty)), source_hash, quality: 'good' });
   }
   let inserted = [];
-  if (toInsert.length) inserted = (await sbInsert('hp_questions', toInsert)) || [];
+  // ignore-duplicates on source_hash: a stem whose hash already exists must NOT reject the
+  // whole batch (the unique index would 409 the entire POST and return zero rows otherwise).
+  if (toInsert.length) inserted = (await sbInsert('hp_questions', toInsert, 'resolution=ignore-duplicates,return=representation', 'source_hash')) || [];
   items = items.concat(inserted).slice(0, n);
   return { status: 200, obj: { ok: true, items: items.map(publicItem), meta: { source: 'cache+generated', role, served: items.length, generated: inserted.length, quota } } };
 }
@@ -208,13 +220,8 @@ async function diagnoseSubmit(user, body) {
     confidence, session_id: sessionId || crypto.randomUUID(), context,
   }], 'return=minimal');
 
-  const mRows = await sbSelect(`hp_mastery?select=mastery,attempts&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${encodeURIComponent(q.node_id)}&limit=1`);
-  const prev = mRows?.[0] || { mastery: 0, attempts: 0 };
-  const mastery = nextMastery({ mastery: Number(prev.mastery) || 0, attempts: Number(prev.attempts) || 0, difficulty: Number(q.difficulty) || 0.5, correct: isCorrect });
-  await sbInsert('hp_mastery', [{
-    user_id: user.id, node_id: q.node_id, mastery, attempts: (Number(prev.attempts) || 0) + 1,
-    last_seen: new Date().toISOString(), updated_at: new Date().toISOString(),
-  }], 'resolution=merge-duplicates,return=minimal');
+  const m = await applyMastery(user.id, q.node_id, Number(q.difficulty) || 0.5, isCorrect);
+  const mastery = m ? m.mastery : 0;
 
   return { status: 200, obj: {
     ok: true, is_correct: isCorrect, correct_index: q.correct_index, explanation: q.explanation,
@@ -275,11 +282,14 @@ async function realprovGrade(user, body) {
 
   const out = {};
   for (const [dp, b] of Object.entries(perDelprov)) {
-    const mRows = await sbSelect(`hp_mastery?select=mastery,attempts&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${dp}&limit=1`);
-    let mastery = Number(mRows?.[0]?.mastery) || 0;
-    let attempts = Number(mRows?.[0]?.attempts) || 0;
-    for (const correct of b.results) { mastery = nextMastery({ mastery, attempts, difficulty: 0.55, correct }); attempts++; }
-    await sbInsert('hp_mastery', [{ user_id: user.id, node_id: dp, mastery, attempts, last_seen: new Date().toISOString(), updated_at: new Date().toISOString() }], 'resolution=merge-duplicates,return=minimal');
+    // Namespace delprov-aggregate mastery as "delprov:ORD" so it never collides with
+    // graph-node mastery (e.g. "ord.synonym") written by the train/diagnose loop.
+    const masteryNode = 'delprov:' + dp;
+    let mastery = 0;
+    for (const correct of b.results) {
+      const m = await applyMastery(user.id, masteryNode, 0.55, correct);
+      if (m) mastery = m.mastery;
+    }
     out[dp] = { correct: b.correct, answered: b.answered, percent: Math.round((b.correct / b.answered) * 100), mastery: Math.round(mastery) };
   }
 
@@ -297,7 +307,9 @@ async function realprovGrade(user, body) {
     per_delprov: { ...out, _scaled: { verbal: vScaled, kvant: kScaled, total: totalScaled, approx: true } },
     started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
   }], 'return=minimal');
-  if (totalScaled !== null) {
+  // Only a full verbal+kvant result is a valid prediction. A single delprov pass (verbal OR
+  // kvant alone) must not overwrite predicted_score, or the gauge shows half the test as a whole.
+  if (vScaled !== null && kScaled !== null && totalScaled !== null) {
     await sbInsert('hp_progress', [{ user_id: user.id, predicted_score: totalScaled, predicted_at: new Date().toISOString() }], 'resolution=merge-duplicates,return=minimal');
   }
   return { status: 200, obj: {
@@ -334,6 +346,7 @@ export default async function handler(req, res) {
     else return json(res, 400, { ok: false, error: 'Unknown op' });
     return json(res, result.status, result.obj);
   } catch (e) {
-    return json(res, 500, { ok: false, error: 'Server error', details: String(e) });
+    console.error('hp handler error:', e); // log server-side; never leak internals to the client
+    return json(res, 500, { ok: false, error: 'Server error' });
   }
 }

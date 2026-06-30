@@ -34,9 +34,12 @@ export async function initRealProv(rootId) {
 
   let catalog;
   try {
-    const res = await fetch('/public/hp/real_prov_catalog.json').catch(() => fetch('/hp/real_prov_catalog.json'));
+    // fetch() only rejects on network error, not on 404 — so check res.ok and fall back explicitly.
+    let res = await fetch('/public/hp/real_prov_catalog.json');
+    if (!res.ok) res = await fetch('/hp/real_prov_catalog.json');
+    if (!res.ok) throw new Error('catalog ' + res.status);
     catalog = await res.json();
-  } catch { root.innerHTML = '<p class="hp-dim">Kunde inte ladda provlistan.</p>'; return; }
+  } catch { root.textContent = 'Kunde inte ladda provlistan.'; return; }
 
   let imported = [];
   let passesByProv = {};
