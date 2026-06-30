@@ -134,7 +134,26 @@ async function handleDiagnosis(user, res) {
   const weak = (rows || []).filter(r => r.attempts > 0 && r.mastery < 60)
     .slice(0, 8)
     .map(r => ({ node_id: r.node_id, mastery: Math.round(r.mastery), attempts: r.attempts }));
-  return json(res, 200, { ok: true, weak_nodes: weak, node_count: (rows || []).length });
+
+  const prog = await sbSelect(
+    `hp_progress?select=predicted_score,predicted_at,target_score,xp,streak_days&user_id=eq.${encodeURIComponent(user.id)}&limit=1`
+  );
+  const p = prog?.[0] || {};
+  // Confidence widens when there's little data / no full sim yet (Codex C6).
+  const totalAttempts = (rows || []).reduce((s, r) => s + (r.attempts || 0), 0);
+  const ci = totalAttempts >= 120 ? 0.1 : totalAttempts >= 40 ? 0.2 : 0.35;
+
+  return json(res, 200, {
+    ok: true,
+    weak_nodes: weak,
+    node_count: (rows || []).length,
+    prediction: p.predicted_score != null
+      ? { score: p.predicted_score, ci, confidence: ci <= 0.1 ? 'hög' : ci <= 0.2 ? 'medel' : 'låg', approx: true }
+      : null,
+    target_score: p.target_score ?? null,
+    xp: p.xp ?? 0,
+    streak_days: p.streak_days ?? 0,
+  });
 }
 
 export default async function handler(req, res) {

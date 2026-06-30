@@ -9,6 +9,10 @@
 // POST { action:'grade', prov_id, answers }     answers = { ORD: {"1":"A",...} | ["A",null,...], ... }
 
 import { getFacit, hasFacit, FACIT, delprovForItem } from './_hp-facit.js';
+import { scaleDel, combineTotal } from './_hp-norm.js';
+
+const VERBAL = ['ORD', 'LAS', 'MEK', 'ELF'];
+const KVANT = ['XYZ', 'KVA', 'NOG', 'DTK'];
 
 const SB = process.env.SUPABASE_URL;
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -118,17 +122,37 @@ async function handleGrade(user, body, res) {
     }], 'resolution=merge-duplicates,return=minimal');
     out[dp] = { correct: b.correct, answered: b.answered, percent: Math.round((b.correct / b.answered) * 100), mastery: Math.round(mastery) };
   }
+  // Estimated skalpoäng (per del → total). Only dels with answered items contribute.
+  const sumDel = (group) => group.reduce((a, dp) => {
+    const b = perDelprov[dp];
+    return b ? { correct: a.correct + b.correct, answered: a.answered + b.answered } : a;
+  }, { correct: 0, answered: 0 });
+  const verbalRaw = sumDel(VERBAL);
+  const kvantRaw = sumDel(KVANT);
+  const verbalScaled = verbalRaw.answered ? scaleDel(verbalRaw.correct, verbalRaw.answered).scaled : null;
+  const kvantScaled = kvantRaw.answered ? scaleDel(kvantRaw.correct, kvantRaw.answered).scaled : null;
+  const totalScaled = combineTotal(verbalScaled, kvantScaled);
+
   await sbWrite('hp_sessions', [{
     user_id: user.id, kind: 'real_prov', raw_correct: totalCorrect, raw_total: totalAnswered,
-    scaled_score: null, per_delprov: perDelprovOut,
+    scaled_score: totalScaled,
+    per_delprov: { ...perDelprovOut, _scaled: { verbal: verbalScaled, kvant: kvantScaled, total: totalScaled, approx: true } },
     started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
   }]);
+
+  // Update the user's working prediction (latest estimate; refined as more data arrives).
+  if (totalScaled !== null) {
+    await sbWrite('hp_progress', [{
+      user_id: user.id, predicted_score: totalScaled, predicted_at: new Date().toISOString(),
+    }], 'resolution=merge-duplicates,return=minimal');
+  }
 
   return json(res, 200, {
     ok: true, prov_id: provId,
     overall: { correct: totalCorrect, answered: totalAnswered, percent: Math.round((totalCorrect / totalAnswered) * 100) },
     per_delprov: perDelprovOut,
-    note: 'Skalpoäng visas när normeringstabell för detta prov finns. Resultatet har uppdaterat din mastery per delprov.',
+    scaled: { verbal: verbalScaled, kvant: kvantScaled, total: totalScaled, approx: true },
+    note: 'Skalpoäng är en uppskattning (ej officiell normering). Din mastery och prognos har uppdaterats.',
   });
 }
 
