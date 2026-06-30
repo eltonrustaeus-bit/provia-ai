@@ -5,13 +5,10 @@
     "api/create-checkout-session.js": { "maxDuration": 15 },
     "api/grade.js": { "maxDuration": 60 },
     "api/generate-exam.js": { "maxDuration": 60 },
-    "api/smart-tips.js": { "maxDuration": 60 },
     "api/teacher-report.js": { "maxDuration": 60 },
     "api/check-role.js": { "maxDuration": 60 },
     "api/ocr.js": { "maxDuration": 60 },
-    "api/explain.js": { "maxDuration": 30 },
-    "api/hp-generate.js": { "maxDuration": 60 },
-    "api/hp-diagnose.js": { "maxDuration": 30 },
-    "api/hp-realprov.js": { "maxDuration": 30 }
+    "api/explain.js": { "maxDuration": 60 },
+    "api/hp.js": { "maxDuration": 60 }
   }
 }

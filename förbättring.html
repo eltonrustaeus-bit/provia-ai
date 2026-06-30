@@ -1012,7 +1012,7 @@
     async function fetchTips(m){
       const{data:sd}=await db.auth.getSession();
       const token=sd?.session?.access_token||'';
-      const res=await fetch('/api/smart-tips',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({question:m.question,feedback:m.feedback,model_answer:m.model_answer,course:m.course})});
+      const res=await fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({tipsMode:true,question:m.question,feedback:m.feedback,model_answer:m.model_answer,course:m.course})});
       const data=await res.json();if(!res.ok)throw new Error(data?.error||'failed');return String(data?.tips||'');
     }
 
