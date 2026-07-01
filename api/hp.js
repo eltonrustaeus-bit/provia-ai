@@ -11,7 +11,7 @@
 import crypto from 'crypto';
 import { callAI } from './_per-core.js';
 import { normalizeRole, getFeatureLimit, currentPeriodKey } from './_provia-rules.js';
-import { scaleDel, combineTotal } from './_hp-norm.js';
+import { scaleDel, scaleDelWithTable, combineTotal } from './_hp-norm.js';
 import { getFacit, hasFacit, FACIT, delprovForItem, passMeta } from './_hp-facit.js';
 
 const SB = process.env.SUPABASE_URL;
@@ -297,14 +297,25 @@ async function realprovGrade(user, body) {
     const b = perDelprov[dp];
     return b ? { correct: a.correct + b.correct, answered: a.answered + b.answered } : a;
   }, { correct: 0, answered: 0 });
+  // Editable normering: prefer hp_normering rows (exact seeded table) over the JSON anchor curve.
+  // Table is small; fetch all rows and pick prov-specific first, then generic (prov_id null).
+  const normRows = await sbSelect('hp_normering?select=section,prov_id,raw_score,raw_total,normerad&limit=1000');
+  const rowsFor = (section) => {
+    const all = (normRows || []).filter(r => r.section === section);
+    const specific = all.filter(r => r.prov_id === provId);
+    return specific.length ? specific : all.filter(r => r.prov_id == null);
+  };
   const vRaw = sumDel(VERBAL), kRaw = sumDel(KVANT);
-  const vScaled = vRaw.answered ? scaleDel(vRaw.correct, vRaw.answered).scaled : null;
-  const kScaled = kRaw.answered ? scaleDel(kRaw.correct, kRaw.answered).scaled : null;
+  const vRes = vRaw.answered ? scaleDelWithTable(vRaw.correct, vRaw.answered, rowsFor('verbal')) : { scaled: null, approx: true };
+  const kRes = kRaw.answered ? scaleDelWithTable(kRaw.correct, kRaw.answered, rowsFor('kvant')) : { scaled: null, approx: true };
+  const vScaled = vRes.scaled, kScaled = kRes.scaled;
   const totalScaled = combineTotal(vScaled, kScaled);
+  // approx=false only when every scored section used an exact table (official normering).
+  const approx = !((vScaled === null || !vRes.approx) && (kScaled === null || !kRes.approx) && (vScaled !== null || kScaled !== null));
 
   await sbInsert('hp_sessions', [{
     user_id: user.id, kind: 'real_prov', raw_correct: totalCorrect, raw_total: totalAnswered, scaled_score: totalScaled,
-    per_delprov: { ...out, _scaled: { verbal: vScaled, kvant: kScaled, total: totalScaled, approx: true } },
+    per_delprov: { ...out, _scaled: { verbal: vScaled, kvant: kScaled, total: totalScaled, approx } },
     started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
   }], 'return=minimal');
   // Only a full verbal+kvant result is a valid prediction. A single delprov pass (verbal OR
@@ -315,8 +326,10 @@ async function realprovGrade(user, body) {
   return { status: 200, obj: {
     ok: true, prov_id: provId,
     overall: { correct: totalCorrect, answered: totalAnswered, percent: Math.round((totalCorrect / totalAnswered) * 100) },
-    per_delprov: out, scaled: { verbal: vScaled, kvant: kScaled, total: totalScaled, approx: true },
-    note: 'Skalpoäng är en uppskattning (ej officiell normering). Din mastery och prognos har uppdaterats.',
+    per_delprov: out, scaled: { verbal: vScaled, kvant: kScaled, total: totalScaled, approx },
+    note: approx
+      ? 'Skalpoäng är en uppskattning (ej officiell normering). Din mastery och prognos har uppdaterats.'
+      : 'Skalpoäng enligt seedad normeringstabell. Din mastery och prognos har uppdaterats.',
   } };
 }
 function opRealprov(user, body) {
