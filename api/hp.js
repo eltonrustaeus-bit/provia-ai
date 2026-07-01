@@ -218,6 +218,48 @@ async function generateFixedAlt(kind, node_id, difficulty, n, model) {
     .map(q => ({ stem: q.stem, options: [...options], correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
 }
 
+// ── XYZ: matematisk problemlösning (4 alternativ A–D, LaTeX-matematik) ───────
+function xyzSchema(n) {
+  return { type: 'json_schema', name: 'hp_xyz_schema', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['items'], properties: {
+      items: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false,
+        required: ['stem', 'options', 'correct_index', 'explanation', 'difficulty'],
+        properties: {
+          stem: { type: 'string' },
+          options: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'string' } },
+          correct_index: { type: 'integer', minimum: 0, maximum: 3 },
+          explanation: { type: 'string' },
+          difficulty: { type: 'number' },
+        },
+      } },
+    },
+  } };
+}
+function xyzSystemPrompt(difficulty) {
+  return [
+    'Du skapar XYZ-uppgifter (matematisk problemlösning) i exakt högskoleprovets format.',
+    'Varje uppgift: en frågeställning (stem) + EXAKT FYRA svarsalternativ (options), exakt ETT rätt.',
+    'Skriv all matematik med LaTeX mellan $...$ (t.ex. $\\frac{3}{4}$, $x^2$, $\\sqrt{2}$, $12\\%$). Även alternativen ska vara LaTeX vid behov.',
+    'Håll det lösbart utan miniräknare — realistiska HP-tal. Distraktorer ska spegla vanliga räknefel.',
+    `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)} (0=lätt, 1=svår).`,
+    'explanation: kort steg-för-steg-lösning (LaTeX ok) + varför en typisk distraktor lockar.',
+    'Original innehåll — kopiera ALDRIG riktiga provuppgifter verbatim. Svenska.',
+  ].join(' ');
+}
+async function generateXyz(node_id, difficulty, n, model) {
+  const out = await callAI([
+    { role: 'system', content: xyzSystemPrompt(difficulty) },
+    { role: 'user', content: `Skapa ${n} XYZ-uppgifter för noden "${node_id}".` },
+  ], { model, schema: xyzSchema(n), timeout: 40000 });
+  let parsed; try { parsed = JSON.parse(out); } catch { return []; }
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  return items
+    .filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
+      Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
+    .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+}
+
 function publicItem(row) {
   return { id: row.id, node_id: row.node_id, delprov: row.delprov, stem: row.stem, options: row.options, difficulty: row.difficulty };
 }
@@ -227,7 +269,7 @@ async function opGenerate(user, body) {
   const n = Math.min(10, Math.max(1, parseInt(body.n, 10) || 5));
   const difficulty = Math.min(1, Math.max(0, Number(body.difficulty) || 0.5));
   if (!node_id) return { status: 400, obj: { ok: false, error: 'Missing node_id' } };
-  const GENERATABLE = ['ORD', 'KVA', 'NOG'];
+  const GENERATABLE = ['ORD', 'KVA', 'NOG', 'XYZ'];
   if (!GENERATABLE.includes(delprov)) return { status: 400, obj: { ok: false, error: `Generation supports ${GENERATABLE.join('/')} only` } };
 
   const role = normalizeRole(await loadUserRole(user.id));
@@ -248,9 +290,9 @@ async function opGenerate(user, body) {
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   let generated = [];
   try {
-    generated = delprov === 'ORD'
-      ? await generateOrd(node_id, difficulty, need, model)
-      : await generateFixedAlt(delprov, node_id, difficulty, need, model);
+    generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, model)
+      : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, model)
+        : await generateFixedAlt(delprov, node_id, difficulty, need, model);
   } catch { /* best-effort */ }
 
   const toInsert = [];
@@ -435,8 +477,8 @@ function shuffle(arr) {
   return arr;
 }
 
-const SIM_DELPROV = ['ORD', 'KVA', 'NOG'];       // delprov with a question bank so far
-const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120 }; // per-question seconds (real-HP pace)
+const SIM_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ'];        // delprov with a question bank so far
+const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120, XYZ: 96 }; // per-question seconds (real-HP pace)
 
 async function simulateStart(user, body) {
   const delprov = String(body.delprov || 'ORD').slice(0, 8);

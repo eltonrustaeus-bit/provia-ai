@@ -5,6 +5,7 @@
 import { loadGraph, pickNextNode, difficultyFor, getNode } from './hp-graph.js';
 import { initRealProv } from './hp-realprov.js';
 import { initSim } from './hp-sim.js';
+import { renderMath } from './hp-math.js';
 
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
@@ -12,7 +13,8 @@ const BATCH = 5;
 // Private demo — only the owner account may view/use Provia HP until public release.
 const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
-const FALLBACK_NODE = { ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig' };
+const FALLBACK_NODE = { ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig', XYZ: 'xyz.algebra' };
+const TRAIN_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ'];
 
 const state = {
   masteryMap: {},
@@ -145,6 +147,7 @@ function renderQuestion() {
   });
   el('hpExplain').hidden = true;
   el('hpNext').hidden = true;
+  renderMath(el('hpStem')); renderMath(opts);
   state.servedAt = Date.now();
 }
 
@@ -178,6 +181,7 @@ async function submitAnswer(chosenIndex, btn) {
   const ex = el('hpExplain');
   ex.textContent = d.explanation || '';
   ex.hidden = false;
+  renderMath(ex);
   el('hpNext').hidden = false;
   renderProgress();
 }
@@ -205,7 +209,7 @@ el('hpStartBtn')?.addEventListener?.('click', startSession);
 
 async function startSession() {
   const sel = el('hpTrainDelprov');
-  if (sel && ['ORD', 'KVA', 'NOG'].includes(sel.value)) state.delprov = sel.value;
+  if (sel && TRAIN_DELPROV.includes(sel.value)) state.delprov = sel.value;
   hide('hpIntro'); show('hpQuiz');
   await nextQuestion();
 }

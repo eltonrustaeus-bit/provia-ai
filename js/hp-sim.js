@@ -3,6 +3,8 @@
 // Timer recomputes remaining from a wall-clock endAt, so a backgrounded/throttled tab
 // never drifts — and the server re-validates elapsed on submit regardless.
 
+import { renderMath } from './hp-math.js';
+
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 
 function token() {
@@ -79,6 +81,7 @@ function renderQ() {
   });
   el('hpSimPrev').disabled = sim.idx === 0;
   el('hpSimNext').disabled = sim.idx === sim.items.length - 1;
+  renderMath(el('hpSimStem')); renderMath(opts);
   renderNav();
 }
 
