@@ -88,6 +88,12 @@
     .hp-navcell--active { outline: 2px solid var(--accent); color: var(--text); }
     .hp-opt--picked { border-color: var(--accent); background: rgba(27,255,140,.10); }
     .hp-simhead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
+    .hp-tblwrap { overflow-x: auto; margin: 0 0 1.1rem; }
+    .hp-tbl { border-collapse: collapse; width: 100%; font-family: "DM Mono", monospace; font-size: .82rem; }
+    .hp-tbl caption { text-align: left; color: var(--text-dim); font-size: .78rem; margin-bottom: .4rem; }
+    .hp-tbl th, .hp-tbl td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; white-space: nowrap; }
+    .hp-tbl thead th { background: var(--surface-2); color: var(--text); }
+    .hp-tbl td { color: var(--text-dim); }
     [hidden] { display: none !important; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
@@ -139,6 +145,7 @@
             <option value="KVA">Kvantitativa jämförelser (KVA)</option>
             <option value="NOG">Kvantitativa resonemang (NOG)</option>
             <option value="XYZ">Matematisk problemlösning (XYZ)</option>
+            <option value="DTK">Diagram, tabeller, kartor (DTK)</option>
           </select>
         </label>
         <button id="hpStartBtn" class="hp-btn" type="button">Starta pass</button>
@@ -151,6 +158,7 @@
             <div class="hp-stat"><b id="hpStatAcc">–</b><span>träffsäkerhet</span></div>
           </div>
           <p class="hp-node" id="hpNodeLabel">—</p>
+          <div id="hpData"></div>
           <p class="hp-stem" id="hpStem">…</p>
           <div class="hp-opts" id="hpOptions"></div>
           <div class="hp-explain" id="hpExplain" hidden></div>
@@ -177,6 +185,7 @@
               <option value="KVA">Kvantitativa jämförelser (KVA) — ~1.2 min/fråga</option>
               <option value="NOG">Kvantitativa resonemang (NOG) — ~2 min/fråga</option>
               <option value="XYZ">Matematisk problemlösning (XYZ) — ~1.6 min/fråga</option>
+              <option value="DTK">Diagram, tabeller, kartor (DTK) — ~2.3 min/fråga</option>
             </select>
           </label>
           <label class="hp-field">Antal frågor
@@ -197,6 +206,7 @@
           </div>
           <div id="hpSimNav" class="hp-nav"></div>
           <p class="hp-node" id="hpSimNodeLabel">—</p>
+          <div id="hpSimData"></div>
           <p class="hp-stem" id="hpSimStem">…</p>
           <div class="hp-opts" id="hpSimOpts"></div>
           <div class="hp-actions" style="justify-content:space-between">
