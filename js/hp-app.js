@@ -30,6 +30,9 @@ const state = {
   correct: 0,
   context: 'diagnostic',
   delprov: DELPROV,
+  adaptive: false,
+  adaptReason: '',
+  adaptLocked: null,
 };
 
 function token() {
@@ -96,9 +99,17 @@ function renderPrediction(pred, target) {
 }
 
 async function fetchBatch() {
-  const dp = state.delprov;
-  const node_id = pickNextNode(dp, state.masteryMap) || FALLBACK_NODE[dp] || 'ord.synonym';
-  const difficulty = difficultyFor(node_id, state.masteryMap);
+  let dp = state.delprov, node_id = null, difficulty = null;
+  if (state.adaptive) {
+    let t;
+    try { t = await api('/api/hp', { op: 'adaptive' }); } catch { t = null; }
+    if (t?.locked) { state.adaptLocked = t; return 'LOCKED'; }
+    if (t?.ok && t.node_id) { dp = t.delprov; node_id = t.node_id; difficulty = t.difficulty; state.delprov = dp; state.adaptReason = t.reason || ''; }
+  }
+  if (!node_id) {
+    node_id = pickNextNode(dp, state.masteryMap) || FALLBACK_NODE[dp] || 'ord.synonym';
+    difficulty = difficultyFor(node_id, state.masteryMap);
+  }
   const d = await api('/api/hp', { op: 'generate', node_id, delprov: dp, n: BATCH, difficulty });
   state.queue = (d?.items || []).slice();
   return state.queue.length;
@@ -137,7 +148,8 @@ function renderProgress() {
 function renderQuestion() {
   const q = state.current;
   const node = getNode(q.node_id);
-  el('hpNodeLabel').textContent = node ? node.label : q.node_id;
+  const label = node ? node.label : q.node_id;
+  el('hpNodeLabel').textContent = state.adaptive && state.adaptReason ? `★ ${label} — ${state.adaptReason}` : label;
   renderContext(el('hpData'), q);
   el('hpStem').textContent = q.stem;
   const opts = el('hpOptions');
@@ -199,6 +211,11 @@ async function nextQuestion() {
     el('hpNext').hidden = true;
     try {
       const got = await fetchBatch();
+      if (got === 'LOCKED') {
+        const a = state.adaptLocked || { attempts: 0, need: 10 };
+        el('hpStem').textContent = `Adaptivt läge låses upp efter ${a.need} besvarade frågor (du har ${a.attempts}). Träna valfritt delprov först.`;
+        return;
+      }
       if (!got) {
         el('hpStem').textContent = 'Inga fler frågor just nu — du har tränat klart detta pass. Kom tillbaka imorgon eller uppgradera för obegränsad generering.';
         return;
@@ -213,8 +230,9 @@ el('hpNext')?.addEventListener?.('click', nextQuestion);
 el('hpStartBtn')?.addEventListener?.('click', startSession);
 
 async function startSession() {
-  const sel = el('hpTrainDelprov');
-  if (sel && TRAIN_DELPROV.includes(sel.value)) state.delprov = sel.value;
+  const v = el('hpTrainDelprov')?.value;
+  state.adaptive = v === 'ADAPT';
+  if (!state.adaptive && TRAIN_DELPROV.includes(v)) state.delprov = v;
   hide('hpIntro'); show('hpQuiz');
   await nextQuestion();
 }

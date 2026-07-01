@@ -637,6 +637,53 @@ function opRealprov(user, body) {
   return { status: 200, obj: { ok: true, imported, passes } };
 }
 
+// ── op: adaptive ────────────────────────────────────────────────────────────
+// Picks the next target across ALL delprov from server-side mastery: weakest delprov
+// → weakest node in it → difficulty just above current mastery. Occasionally explores an
+// untouched delprov. Client then calls op:generate with the returned target. Unlocks at
+// ADAPT_MIN_ATTEMPTS answers (≈ the spec's "after a few sessions").
+const ADAPT_MIN_ATTEMPTS = 10;
+const NODE_PREFIX_DELPROV = { 'ord.': 'ORD', 'kva.': 'KVA', 'nog.': 'NOG', 'xyz.': 'XYZ', 'dtk.': 'DTK', 'mek.': 'MEK', 'las.': 'LAS', 'elf.': 'ELF' };
+const ADAPT_FALLBACK_NODE = { ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig', XYZ: 'xyz.algebra', DTK: 'dtk.avlasning', MEK: 'mek.koherens', LAS: 'las.inferens', ELF: 'elf.gist' };
+const ALL_DELPROV = ['ORD', 'LAS', 'MEK', 'ELF', 'XYZ', 'KVA', 'NOG', 'DTK'];
+function delprovOfNode(nodeId) {
+  if (nodeId.startsWith('delprov:')) return nodeId.slice(8);
+  return NODE_PREFIX_DELPROV[nodeId.slice(0, 4)] || null;
+}
+async function opAdaptive(user) {
+  const rows = await sbSelect(`hp_mastery?select=node_id,mastery,attempts&user_id=eq.${encodeURIComponent(user.id)}&limit=300`);
+  const totalAttempts = (rows || []).reduce((s, r) => s + (r.attempts || 0), 0);
+  if (totalAttempts < ADAPT_MIN_ATTEMPTS) {
+    return { status: 200, obj: { ok: true, locked: true, attempts: totalAttempts, need: ADAPT_MIN_ATTEMPTS } };
+  }
+  const agg = {};        // delprov -> { sum, cnt }
+  const nodeMast = {};   // concept node -> { mastery, delprov }  (skip delprov:* aggregates for node pick)
+  for (const r of rows) {
+    const dp = delprovOfNode(r.node_id);
+    if (!dp) continue;
+    (agg[dp] || (agg[dp] = { sum: 0, cnt: 0 }));
+    agg[dp].sum += r.mastery; agg[dp].cnt++;
+    if (!r.node_id.startsWith('delprov:')) nodeMast[r.node_id] = { mastery: r.mastery, delprov: dp };
+  }
+  const seen = Object.keys(agg);
+  const unseen = ALL_DELPROV.filter(d => !seen.includes(d));
+  let delprov;
+  if (unseen.length && Math.random() < 0.35) {
+    delprov = unseen[Math.floor(Math.random() * unseen.length)];   // explore an untouched delprov
+  } else {
+    delprov = seen.sort((a, b) => (agg[a].sum / agg[a].cnt) - (agg[b].sum / agg[b].cnt))[0] || ALL_DELPROV[0];
+  }
+  const nodesIn = Object.entries(nodeMast).filter(([, v]) => v.delprov === delprov).sort((a, b) => a[1].mastery - b[1].mastery);
+  let node_id, mastery;
+  if (nodesIn.length) { node_id = nodesIn[0][0]; mastery = nodesIn[0][1].mastery; }
+  else { node_id = ADAPT_FALLBACK_NODE[delprov]; mastery = 0; }
+  const difficulty = Number(Math.max(0.3, Math.min(0.85, (mastery / 100) + 0.12)).toFixed(2));
+  return { status: 200, obj: {
+    ok: true, locked: false, delprov, node_id, difficulty,
+    reason: nodesIn.length ? `Svagast just nu: ${delprov} (mastery ${Math.round(mastery)})` : `Utforskar ${delprov}`,
+  } };
+}
+
 // ── op: simulate ──────────────────────────────────────────────────────────
 // Timed provpass simulation (assessment, not training): serves questions without keys,
 // server owns the clock (started_at), grades on submit. Blanks count as wrong (denominator
@@ -784,6 +831,7 @@ export default async function handler(req, res) {
     else if (body.op === 'diagnose') result = await opDiagnose(user, body);
     else if (body.op === 'realprov') result = await opRealprov(user, body);
     else if (body.op === 'simulate') result = await opSimulate(user, body);
+    else if (body.op === 'adaptive') result = await opAdaptive(user);
     else return json(res, 400, { ok: false, error: 'Unknown op' });
     return json(res, result.status, result.obj);
   } catch (e) {
