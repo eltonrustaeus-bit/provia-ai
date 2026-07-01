@@ -4,6 +4,7 @@
 // never drifts — and the server re-validates elapsed on submit regardless.
 
 import { renderMath } from './hp-math.js';
+import { renderData } from './hp-table.js';
 
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 
@@ -64,6 +65,7 @@ function renderQ() {
   if (!q) return;
   el('hpSimProg').textContent = `Fråga ${sim.idx + 1} / ${sim.items.length}`;
   el('hpSimNodeLabel').textContent = q.node_id || q.delprov || '';
+  renderData(el('hpSimData'), q.data);
   el('hpSimStem').textContent = q.stem;
   const opts = el('hpSimOpts');
   opts.innerHTML = '';

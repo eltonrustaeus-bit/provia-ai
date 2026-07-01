@@ -260,8 +260,70 @@ async function generateXyz(node_id, difficulty, n, model) {
     .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
 }
 
+// ── DTK: diagram/tabeller/kartor (MVP = tabell, 4 alternativ A–D) ────────────
+const DTK_MAX_COLS = 8, DTK_MAX_ROWS = 12, DTK_CELL_MAX = 60;
+function dtkSchema(n) {
+  return { type: 'json_schema', name: 'hp_dtk_schema', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['items'], properties: {
+      items: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false,
+        required: ['stem', 'table', 'options', 'correct_index', 'explanation', 'difficulty'],
+        properties: {
+          stem: { type: 'string' },
+          table: {
+            type: 'object', additionalProperties: false, required: ['title', 'headers', 'rows'],
+            properties: {
+              title: { type: 'string' },
+              headers: { type: 'array', items: { type: 'string' } },
+              rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+            },
+          },
+          options: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'string' } },
+          correct_index: { type: 'integer', minimum: 0, maximum: 3 },
+          explanation: { type: 'string' },
+          difficulty: { type: 'number' },
+        },
+      } },
+    },
+  } };
+}
+function dtkSystemPrompt(difficulty) {
+  return [
+    'Du skapar DTK-uppgifter (diagram, tabeller, kartor) i högskoleprovets format — MVP: TABELL.',
+    'Skapa en liten realistisk datatabell (title, headers, rows) och EN fråga (stem) som kräver att man läser av eller räknar från tabellen.',
+    `Tabellen: max ${DTK_MAX_COLS} kolumner och ${DTK_MAX_ROWS} rader. Alla celler som text (siffror som strängar, t.ex. "1240").`,
+    'EXAKT FYRA svarsalternativ (options), exakt ETT rätt. Ingen LaTeX behövs — vanliga tal.',
+    `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)}.`,
+    'Frågan ska gå att lösa ENBART utifrån tabellen. explanation: vilken cell/beräkning som ger svaret. Original innehåll. Svenska.',
+  ].join(' ');
+}
+function sanitizeTable(t) {
+  if (!t || !Array.isArray(t.headers) || !Array.isArray(t.rows)) return null;
+  const cell = (v) => String(v ?? '').slice(0, DTK_CELL_MAX);
+  const headers = t.headers.slice(0, DTK_MAX_COLS).map(cell);
+  if (headers.length < 2) return null;
+  const rows = t.rows.slice(0, DTK_MAX_ROWS)
+    .map(r => (Array.isArray(r) ? r.slice(0, headers.length).map(cell) : []))
+    .filter(r => r.length === headers.length);
+  if (!rows.length) return null;
+  return { type: 'table', title: cell(t.title || ''), headers, rows };
+}
+async function generateDtk(node_id, difficulty, n, model) {
+  const out = await callAI([
+    { role: 'system', content: dtkSystemPrompt(difficulty) },
+    { role: 'user', content: `Skapa ${n} DTK-tabelluppgifter för noden "${node_id}".` },
+  ], { model, schema: dtkSchema(n), timeout: 40000 });
+  let parsed; try { parsed = JSON.parse(out); } catch { return []; }
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  return items
+    .map(q => ({ q, table: sanitizeTable(q?.table) }))
+    .filter(({ q, table }) => table && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
+      Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
+    .map(({ q, table }) => ({ stem: q.stem, data: table, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+}
+
 function publicItem(row) {
-  return { id: row.id, node_id: row.node_id, delprov: row.delprov, stem: row.stem, options: row.options, difficulty: row.difficulty };
+  return { id: row.id, node_id: row.node_id, delprov: row.delprov, stem: row.stem, options: row.options, difficulty: row.difficulty, data: row.data || null };
 }
 async function opGenerate(user, body) {
   const node_id = String(body.node_id || '').slice(0, 64);
@@ -269,11 +331,11 @@ async function opGenerate(user, body) {
   const n = Math.min(10, Math.max(1, parseInt(body.n, 10) || 5));
   const difficulty = Math.min(1, Math.max(0, Number(body.difficulty) || 0.5));
   if (!node_id) return { status: 400, obj: { ok: false, error: 'Missing node_id' } };
-  const GENERATABLE = ['ORD', 'KVA', 'NOG', 'XYZ'];
+  const GENERATABLE = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK'];
   if (!GENERATABLE.includes(delprov)) return { status: 400, obj: { ok: false, error: `Generation supports ${GENERATABLE.join('/')} only` } };
 
   const role = normalizeRole(await loadUserRole(user.id));
-  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty&node_id=eq.${encodeURIComponent(node_id)}&quality=eq.good&limit=60`);
+  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data&node_id=eq.${encodeURIComponent(node_id)}&quality=eq.good&limit=60`);
   const seen = await sbSelect(`hp_attempts?select=question_id&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${encodeURIComponent(node_id)}`);
   const seenIds = new Set((seen || []).map(r => r.question_id));
   let items = (pool || []).filter(q => !seenIds.has(q.id)).slice(0, n);
@@ -292,7 +354,8 @@ async function opGenerate(user, body) {
   try {
     generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, model)
       : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, model)
-        : await generateFixedAlt(delprov, node_id, difficulty, need, model);
+        : delprov === 'DTK' ? await generateDtk(node_id, difficulty, need, model)
+          : await generateFixedAlt(delprov, node_id, difficulty, need, model);
   } catch { /* best-effort */ }
 
   const toInsert = [];
@@ -302,7 +365,8 @@ async function opGenerate(user, body) {
     if (batchHashes.has(source_hash)) continue; // de-dupe within this batch (seenIds holds question_id UUIDs, not hashes)
     batchHashes.add(source_hash);
     toInsert.push({ delprov, node_id, stem: q.stem, options: q.options, correct_index: q.correct_index,
-      explanation: q.explanation, difficulty: Math.min(1, Math.max(0, Number(q.difficulty) || difficulty)), source_hash, quality: 'good' });
+      explanation: q.explanation, difficulty: Math.min(1, Math.max(0, Number(q.difficulty) || difficulty)),
+      data: q.data || null, source_hash, quality: 'good' });
   }
   let inserted = [];
   // ignore-duplicates on source_hash: a stem whose hash already exists must NOT reject the
@@ -477,8 +541,8 @@ function shuffle(arr) {
   return arr;
 }
 
-const SIM_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ'];        // delprov with a question bank so far
-const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120, XYZ: 96 }; // per-question seconds (real-HP pace)
+const SIM_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK'];             // delprov with a question bank so far
+const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120, XYZ: 96, DTK: 138 }; // per-question seconds (real-HP pace)
 
 async function simulateStart(user, body) {
   const delprov = String(body.delprov || 'ORD').slice(0, 8);
@@ -492,7 +556,7 @@ async function simulateStart(user, body) {
   catch { return { status: 200, obj: { ok: false, error: 'quota_unavailable' } }; }
   if (!quota.ok) return { status: 200, obj: { ok: false, error: 'quota_exhausted', message: 'Provpass-simulering kräver Basic eller Premium.' } };
 
-  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty&delprov=eq.${encodeURIComponent(delprov)}&quality=eq.good&limit=200`);
+  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data&delprov=eq.${encodeURIComponent(delprov)}&quality=eq.good&limit=200`);
   const seen = await sbSelect(`hp_attempts?select=question_id&user_id=eq.${encodeURIComponent(user.id)}&delprov=eq.${encodeURIComponent(delprov)}&context=eq.simulate`);
   const seenIds = new Set((seen || []).map(r => r.question_id));
   let items = shuffle((pool || []).filter(q => !seenIds.has(q.id)));
