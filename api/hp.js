@@ -322,8 +322,139 @@ async function generateDtk(node_id, difficulty, n, model) {
     .map(({ q, table }) => ({ stem: q.stem, data: table, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
 }
 
+// ── MEK: meningskomplettering (self-contained, 4 alternativ, ingen passage) ──
+function mekSystemPrompt(difficulty) {
+  return [
+    'Du skapar MEK-uppgifter (meningskomplettering) i exakt högskoleprovets format.',
+    'En mening (stem) med EN eller FLERA luckor markerade med "_____" (fem understreck per lucka).',
+    'EXAKT FYRA svarsalternativ (options). Vid flera luckor fyller varje alternativ ALLA luckor i ordning, separerade med " – ".',
+    'Exakt ETT alternativ ger en språkligt och innehållsligt korrekt mening. Distraktorer ska vara rimliga men fel (fel bindeord, fel register, fel kollokation).',
+    `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)} (0=lätt, 1=svår).`,
+    'explanation: kort varför rätt alternativ passar och varför en typisk distraktor lockar. Original innehåll. Svenska.',
+  ].join(' ');
+}
+async function generateMek(node_id, difficulty, n, model) {
+  const out = await callAI([
+    { role: 'system', content: mekSystemPrompt(difficulty) },
+    { role: 'user', content: `Skapa ${n} MEK-uppgifter för noden "${node_id}".` },
+  ], { model, schema: xyzSchema(n), timeout: 40000 });  // same 4-opt shape as XYZ
+  let parsed; try { parsed = JSON.parse(out); } catch { return []; }
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  return items
+    .filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
+      Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
+    .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+}
+
+// ── LAS / ELF: passage + grouped questions (shared reading text) ─────────────
+const PASSAGE_DELPROV = ['LAS', 'ELF'];
+function passageSchema(n) {
+  return { type: 'json_schema', name: 'hp_passage_schema', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['passage', 'items'], properties: {
+      passage: { type: 'object', additionalProperties: false, required: ['body'], properties: { body: { type: 'string' } } },
+      items: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false,
+        required: ['stem', 'options', 'correct_index', 'explanation', 'difficulty'],
+        properties: {
+          stem: { type: 'string' },
+          options: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'string' } },
+          correct_index: { type: 'integer', minimum: 0, maximum: 3 },
+          explanation: { type: 'string' },
+          difficulty: { type: 'number' },
+        },
+      } },
+    },
+  } };
+}
+function lasSystemPrompt(difficulty, n) {
+  return [
+    'Du skapar en LÄS-uppgift (svensk läsförståelse) i högskoleprovets format.',
+    'Skriv först en sammanhängande sakprosatext (passage.body) på 150–250 ord — resonerande, gärna om samhälle, vetenskap eller kultur. Använd \\n\\n mellan stycken.',
+    `Skapa sedan ${n} flervalsfrågor (items) som ENBART går att besvara utifrån texten (huvudtes, inferens, attityd, struktur).`,
+    'Varje fråga: stem + EXAKT FYRA alternativ (options), exakt ETT rätt.',
+    `Svårighetsgrad runt ${difficulty.toFixed(2)}. explanation: vilken del av texten som ger svaret. Original innehåll — kopiera aldrig verkliga prov. Svenska.`,
+  ].join(' ');
+}
+function elfSystemPrompt(difficulty, n) {
+  return [
+    'You create an ELF task (English reading comprehension) in the Swedish Högskoleprovet format.',
+    'First write a coherent English passage (passage.body) of 150–250 words — argumentative or informative. Use \\n\\n between paragraphs.',
+    `Then create ${n} multiple-choice questions (items) answerable ONLY from the passage (gist, detail, vocabulary-in-context, inference).`,
+    'Each question: stem + EXACTLY FOUR options, exactly one correct. Stems and options in ENGLISH.',
+    `Difficulty around ${difficulty.toFixed(2)}. explanation in SWEDISH (which part of the text gives the answer). Original content — never copy real tests.`,
+  ].join(' ');
+}
+async function generatePassage(delprov, node_id, difficulty, n, model) {
+  const isElf = delprov === 'ELF';
+  const out = await callAI([
+    { role: 'system', content: isElf ? elfSystemPrompt(difficulty, n) : lasSystemPrompt(difficulty, n) },
+    { role: 'user', content: `Skapa en text och ${n} frågor för noden "${node_id}".` },
+  ], { model, schema: passageSchema(n), timeout: 45000 });
+  let parsed; try { parsed = JSON.parse(out); } catch { return null; }
+  const body = parsed?.passage?.body;
+  if (typeof body !== 'string' || body.length < 40) return null;
+  const items = (Array.isArray(parsed?.items) ? parsed.items : [])
+    .filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
+      Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
+    .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+  if (!items.length) return null;
+  return { body, lang: isElf ? 'en' : 'sv', items };
+}
+
+// Generate + persist for one node. Handles both flat delprov and passage delprov
+// (LAS/ELF insert a shared hp_passages row, then link questions via passage_id).
+async function generateAndInsert(delprov, node_id, difficulty, need, model) {
+  const clampDiff = (x) => Math.min(1, Math.max(0, Number(x) || difficulty));
+  const insertQs = async (rows) => rows.length
+    ? (await sbInsert('hp_questions', rows, 'resolution=ignore-duplicates,return=representation', 'source_hash')) || []
+    : [];
+
+  if (PASSAGE_DELPROV.includes(delprov)) {
+    let gen;
+    try { gen = await generatePassage(delprov, node_id, difficulty, need, model); } catch { return []; }
+    if (!gen) return [];
+    const pRows = await sbInsert('hp_passages', [{ delprov, lang: gen.lang, body: gen.body, word_count: gen.body.split(/\s+/).filter(Boolean).length }]);
+    const passage_id = pRows?.[0]?.id;
+    if (!passage_id) return [];
+    const seen = new Set(); const toInsert = [];
+    for (const q of gen.items) {
+      const source_hash = stemHash(node_id, q.stem);
+      if (seen.has(source_hash)) continue; seen.add(source_hash);
+      toInsert.push({ delprov, node_id, stem: q.stem, options: q.options, correct_index: q.correct_index,
+        explanation: q.explanation, difficulty: clampDiff(q.difficulty), passage_id, data: null, source_hash, quality: 'good' });
+    }
+    return insertQs(toInsert);
+  }
+
+  let generated = [];
+  try {
+    generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, model)
+      : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, model)
+        : delprov === 'MEK' ? await generateMek(node_id, difficulty, need, model)
+          : delprov === 'DTK' ? await generateDtk(node_id, difficulty, need, model)
+            : await generateFixedAlt(delprov, node_id, difficulty, need, model);
+  } catch { return []; }
+  const seen = new Set(); const toInsert = [];
+  for (const q of generated) {
+    const source_hash = stemHash(node_id, q.stem);
+    if (seen.has(source_hash)) continue; seen.add(source_hash);
+    toInsert.push({ delprov, node_id, stem: q.stem, options: q.options, correct_index: q.correct_index,
+      explanation: q.explanation, difficulty: clampDiff(q.difficulty), data: q.data || null, source_hash, quality: 'good' });
+  }
+  return insertQs(toInsert);
+}
+
 function publicItem(row) {
   return { id: row.id, node_id: row.node_id, delprov: row.delprov, stem: row.stem, options: row.options, difficulty: row.difficulty, data: row.data || null };
+}
+// Attach the shared reading text to LAS/ELF items (server-side join; clients can't read tables directly).
+async function attachPassages(items) {
+  const base = items.map(publicItem);
+  const ids = [...new Set(items.map(i => i.passage_id).filter(Boolean))];
+  if (!ids.length) return base;
+  const rows = await sbSelect(`hp_passages?select=id,body,lang&id=in.(${ids.map(encodeURIComponent).join(',')})`);
+  const map = {}; for (const p of (rows || [])) map[p.id] = { body: p.body, lang: p.lang };
+  return items.map((i, idx) => ({ ...base[idx], passage: i.passage_id ? (map[i.passage_id] || null) : null }));
 }
 async function opGenerate(user, body) {
   const node_id = String(body.node_id || '').slice(0, 64);
@@ -331,49 +462,28 @@ async function opGenerate(user, body) {
   const n = Math.min(10, Math.max(1, parseInt(body.n, 10) || 5));
   const difficulty = Math.min(1, Math.max(0, Number(body.difficulty) || 0.5));
   if (!node_id) return { status: 400, obj: { ok: false, error: 'Missing node_id' } };
-  const GENERATABLE = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK'];
+  const GENERATABLE = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK', 'MEK', 'LAS', 'ELF'];
   if (!GENERATABLE.includes(delprov)) return { status: 400, obj: { ok: false, error: `Generation supports ${GENERATABLE.join('/')} only` } };
 
   const role = normalizeRole(await loadUserRole(user.id));
-  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data&node_id=eq.${encodeURIComponent(node_id)}&quality=eq.good&limit=60`);
+  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data,passage_id&node_id=eq.${encodeURIComponent(node_id)}&quality=eq.good&limit=60`);
   const seen = await sbSelect(`hp_attempts?select=question_id&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${encodeURIComponent(node_id)}`);
   const seenIds = new Set((seen || []).map(r => r.question_id));
   let items = (pool || []).filter(q => !seenIds.has(q.id)).slice(0, n);
 
   if (items.length >= n || role === 'gratis') {
-    return { status: 200, obj: { ok: true, items: items.map(publicItem), meta: { source: 'cache', role, served: items.length } } };
+    return { status: 200, obj: { ok: true, items: await attachPassages(items), meta: { source: 'cache', role, served: items.length } } };
   }
   const need = n - items.length;
   let quota;
   try { quota = await consumeQuota('consume_hp_gen_quota', user.id, getFeatureLimit(role, 'hpGen')); }
-  catch { return { status: 200, obj: { ok: true, items: items.map(publicItem), meta: { source: 'cache_only', role, served: items.length, gen_error: 'quota_unavailable' } } }; }
-  if (!quota.ok) return { status: 200, obj: { ok: true, items: items.map(publicItem), meta: { source: 'cache_only', role, served: items.length, quota_exhausted: true } } };
+  catch { return { status: 200, obj: { ok: true, items: await attachPassages(items), meta: { source: 'cache_only', role, served: items.length, gen_error: 'quota_unavailable' } } }; }
+  if (!quota.ok) return { status: 200, obj: { ok: true, items: await attachPassages(items), meta: { source: 'cache_only', role, served: items.length, quota_exhausted: true } } };
 
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-  let generated = [];
-  try {
-    generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, model)
-      : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, model)
-        : delprov === 'DTK' ? await generateDtk(node_id, difficulty, need, model)
-          : await generateFixedAlt(delprov, node_id, difficulty, need, model);
-  } catch { /* best-effort */ }
-
-  const toInsert = [];
-  const batchHashes = new Set();
-  for (const q of generated) {
-    const source_hash = stemHash(node_id, q.stem);
-    if (batchHashes.has(source_hash)) continue; // de-dupe within this batch (seenIds holds question_id UUIDs, not hashes)
-    batchHashes.add(source_hash);
-    toInsert.push({ delprov, node_id, stem: q.stem, options: q.options, correct_index: q.correct_index,
-      explanation: q.explanation, difficulty: Math.min(1, Math.max(0, Number(q.difficulty) || difficulty)),
-      data: q.data || null, source_hash, quality: 'good' });
-  }
-  let inserted = [];
-  // ignore-duplicates on source_hash: a stem whose hash already exists must NOT reject the
-  // whole batch (the unique index would 409 the entire POST and return zero rows otherwise).
-  if (toInsert.length) inserted = (await sbInsert('hp_questions', toInsert, 'resolution=ignore-duplicates,return=representation', 'source_hash')) || [];
+  const inserted = await generateAndInsert(delprov, node_id, difficulty, need, model);
   items = items.concat(inserted).slice(0, n);
-  return { status: 200, obj: { ok: true, items: items.map(publicItem), meta: { source: 'cache+generated', role, served: items.length, generated: inserted.length, quota } } };
+  return { status: 200, obj: { ok: true, items: await attachPassages(items), meta: { source: 'cache+generated', role, served: items.length, generated: inserted.length, quota } } };
 }
 
 // ── op: diagnose ────────────────────────────────────────────────────────────
@@ -541,8 +651,8 @@ function shuffle(arr) {
   return arr;
 }
 
-const SIM_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK'];             // delprov with a question bank so far
-const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120, XYZ: 96, DTK: 138 }; // per-question seconds (real-HP pace)
+const SIM_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK', 'MEK', 'LAS', 'ELF'];         // all 8 delprov
+const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120, XYZ: 96, DTK: 138, MEK: 60, LAS: 150, ELF: 132 }; // per-question seconds
 
 async function simulateStart(user, body) {
   const delprov = String(body.delprov || 'ORD').slice(0, 8);
@@ -556,7 +666,7 @@ async function simulateStart(user, body) {
   catch { return { status: 200, obj: { ok: false, error: 'quota_unavailable' } }; }
   if (!quota.ok) return { status: 200, obj: { ok: false, error: 'quota_exhausted', message: 'Provpass-simulering kräver Basic eller Premium.' } };
 
-  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data&delprov=eq.${encodeURIComponent(delprov)}&quality=eq.good&limit=200`);
+  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty,data,passage_id&delprov=eq.${encodeURIComponent(delprov)}&quality=eq.good&limit=200`);
   const seen = await sbSelect(`hp_attempts?select=question_id&user_id=eq.${encodeURIComponent(user.id)}&delprov=eq.${encodeURIComponent(delprov)}&context=eq.simulate`);
   const seenIds = new Set((seen || []).map(r => r.question_id));
   let items = shuffle((pool || []).filter(q => !seenIds.has(q.id)));
@@ -572,7 +682,7 @@ async function simulateStart(user, body) {
   }]);
   const sessionId = sessRows?.[0]?.id;
   if (!sessionId) return { status: 500, obj: { ok: false, error: 'session_create_failed' } };
-  return { status: 200, obj: { ok: true, session_id: sessionId, duration_s: durationS, delprov, items: items.map(publicItem) } };
+  return { status: 200, obj: { ok: true, session_id: sessionId, duration_s: durationS, delprov, items: await attachPassages(items) } };
 }
 
 async function simulateSubmit(user, body) {

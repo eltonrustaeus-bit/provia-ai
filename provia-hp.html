@@ -94,6 +94,7 @@
     .hp-tbl th, .hp-tbl td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; white-space: nowrap; }
     .hp-tbl thead th { background: var(--surface-2); color: var(--text); }
     .hp-tbl td { color: var(--text-dim); }
+    .hp-passage { background: var(--surface-2); border-left: 2px solid var(--accent); border-radius: var(--radius); padding: 1rem 1.1rem; margin: 0 0 1.1rem; color: var(--text); font-size: .98rem; line-height: 1.65; white-space: pre-line; max-height: 45vh; overflow-y: auto; }
     [hidden] { display: none !important; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
@@ -146,6 +147,9 @@
             <option value="NOG">Kvantitativa resonemang (NOG)</option>
             <option value="XYZ">Matematisk problemlösning (XYZ)</option>
             <option value="DTK">Diagram, tabeller, kartor (DTK)</option>
+            <option value="MEK">Meningskomplettering (MEK)</option>
+            <option value="LAS">Svensk läsförståelse (LÄS)</option>
+            <option value="ELF">Engelsk läsförståelse (ELF)</option>
           </select>
         </label>
         <button id="hpStartBtn" class="hp-btn" type="button">Starta pass</button>
@@ -186,6 +190,9 @@
               <option value="NOG">Kvantitativa resonemang (NOG) — ~2 min/fråga</option>
               <option value="XYZ">Matematisk problemlösning (XYZ) — ~1.6 min/fråga</option>
               <option value="DTK">Diagram, tabeller, kartor (DTK) — ~2.3 min/fråga</option>
+              <option value="MEK">Meningskomplettering (MEK) — ~1 min/fråga</option>
+              <option value="LAS">Svensk läsförståelse (LÄS) — ~2.5 min/fråga</option>
+              <option value="ELF">Engelsk läsförståelse (ELF) — ~2.2 min/fråga</option>
             </select>
           </label>
           <label class="hp-field">Antal frågor
