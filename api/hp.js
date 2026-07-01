@@ -17,6 +17,10 @@ import { getFacit, hasFacit, FACIT, delprovForItem, passMeta } from './_hp-facit
 const SB = process.env.SUPABASE_URL;
 const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
+// Launch flag: unset/false → owner-only private beta (current). Set HP_PUBLIC=true in the
+// Vercel env to open Provia HP to all authenticated users (quota RPCs already enforce the
+// per-role caps: gratis cache-only, basic+ generate/simulate). Single toggle for go-live.
+const HP_PUBLIC = process.env.HP_PUBLIC === 'true';
 const VERBAL = ['ORD', 'LAS', 'MEK', 'ELF'];
 const KVANT = ['XYZ', 'KVA', 'NOG', 'DTK'];
 const MIN_PLAUSIBLE_MS = 300;
@@ -860,9 +864,14 @@ export default async function handler(req, res) {
 
   const user = await requireAuth(req);
   if (!user) return json(res, 401, { ok: false, error: 'Unauthorized' });
-  if (user.id !== OWNER_ID) return json(res, 403, { ok: false, error: 'not_available' });
 
   let body; try { body = await readJsonBody(req); } catch { return json(res, 400, { ok: false, error: 'Invalid JSON' }); }
+
+  // Access decision: public launch flag OR the owner (private beta). op:config lets the client
+  // ask before rendering, so the gate lives in one place and flips with one env var.
+  const allowed = HP_PUBLIC || user.id === OWNER_ID;
+  if (body.op === 'config') return json(res, 200, { ok: true, allowed, public: HP_PUBLIC, owner: user.id === OWNER_ID });
+  if (!allowed) return json(res, 403, { ok: false, error: 'not_available' });
 
   try {
     let result;

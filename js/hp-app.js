@@ -11,8 +11,6 @@ import { renderContext } from './hp-table.js';
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
 const BATCH = 5;
-// Private demo — only the owner account may view/use Provia HP until public release.
-const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
 const FALLBACK_NODE = {
   ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig', XYZ: 'xyz.algebra',
@@ -39,12 +37,6 @@ function token() {
   try {
     const s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
     return s?.access_token || '';
-  } catch { return ''; }
-}
-function sessionUserId() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
-    return s?.user?.id || '';
   } catch { return ''; }
 }
 function el(id) { return document.getElementById(id); }
@@ -240,11 +232,11 @@ async function startSession() {
 async function boot() {
   await loadGraph();
   if (!token()) { gate(); return; }
-  // Private demo gate — owner account only.
-  if (sessionUserId() !== OWNER_ID) {
-    hide('hpMain'); hide('hpGate'); show('hpNA');
-    return;
-  }
+  // Server decides access: owner during private beta, everyone once HP_PUBLIC is enabled.
+  let cfg;
+  try { cfg = await api('/api/hp', { op: 'config' }); }
+  catch { return; }   // api() already routed a 401 to the login modal; don't clobber it
+  if (!cfg?.allowed) { hide('hpMain'); hide('hpGate'); show('hpNA'); return; }
   hide('hpNA'); show('hpMain'); hide('hpGate');
   await loadDiagnosis();
   renderProgress();
