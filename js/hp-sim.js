@@ -86,9 +86,9 @@ async function startSim() {
   const btn = el('hpSimStart');
   if (btn) btn.disabled = true;
   const count = parseInt(el('hpSimCount')?.value, 10) || 10;
-  const duration_s = count * 30;   // ORD ≈ 0.5 min/fråga
+  const delprov = el('hpSimDelprov')?.value || 'ORD';   // server sets duration per delprov pace
   let d;
-  try { d = await api('/api/hp', { op: 'simulate', action: 'start', delprov: 'ORD', count, duration_s }); }
+  try { d = await api('/api/hp', { op: 'simulate', action: 'start', delprov, count }); }
   catch { d = null; }
   if (btn) btn.disabled = false;
   if (!d?.ok) {
@@ -136,12 +136,13 @@ function renderResult(d, auto) {
   const o = d.overall || {};
   el('hpSimScore').textContent = o.correct + ' / ' + o.served;
   el('hpSimPct').textContent = (o.percent ?? 0) + '%';
-  const scaled = d.scaled?.verbal;
-  el('hpSimScaled').textContent = scaled != null ? scaled.toFixed(2) : '–';
+  const s = d.scaled || {};
+  const scaled = s.total ?? s.verbal ?? s.kvant;
+  el('hpSimScaled').textContent = scaled != null ? Number(scaled).toFixed(2) : '–';
   const notes = [];
   if (auto || d.overtime) notes.push(d.overtime ? 'Tiden gick ut — inlämnat automatiskt.' : 'Inlämnat vid tidsgräns.');
-  notes.push(d.scaled?.approx ? 'Skalpoäng: uppskattning (ej officiell normering).' : 'Skalpoäng enligt seedad tabell.');
-  notes.push('Endast verbal (ORD) i denna beta — kvant tillkommer.');
+  notes.push(s.approx ? 'Skalpoäng: uppskattning (ej officiell normering).' : 'Skalpoäng enligt seedad tabell.');
+  notes.push('Ett delprov i taget i denna beta — hela provpass tillkommer.');
   el('hpSimNote').textContent = notes.join(' ');
 
   const wrap = el('hpSimBreakdown');

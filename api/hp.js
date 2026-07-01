@@ -142,6 +142,82 @@ async function generateOrd(node_id, difficulty, n, model) {
   return items.filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 5 &&
     Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 5 && typeof q.explanation === 'string');
 }
+// ── KVA / NOG: fixed alternatives (AI generates only stem + correct_index + explanation) ──
+const KVA_OPTIONS = Object.freeze([
+  'Kvantitet I är större',
+  'Kvantitet II är större',
+  'Kvantiteterna är lika stora',
+  'Informationen är otillräcklig',
+]);
+const NOG_OPTIONS = Object.freeze([
+  '(1) allena är tillräcklig men inte (2) allena',
+  '(2) allena är tillräcklig men inte (1) allena',
+  '(1) och (2) tillsammans är tillräckliga men ingen av dem allena',
+  'Vardera allena är tillräcklig',
+  '(1) och (2) tillsammans är otillräckliga',
+]);
+
+// Schema for fixed-alternative math items: AI returns stem/correct_index/explanation/difficulty only.
+function fixedAltSchema(n, maxIndex, name) {
+  return { type: 'json_schema', name, strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['items'], properties: {
+      items: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false,
+        required: ['stem', 'correct_index', 'explanation', 'difficulty'],
+        properties: {
+          stem: { type: 'string' },
+          correct_index: { type: 'integer', minimum: 0, maximum: maxIndex },
+          explanation: { type: 'string' },
+          difficulty: { type: 'number' },
+        },
+      } },
+    },
+  } };
+}
+
+function kvaSystemPrompt(difficulty) {
+  return [
+    'Du skapar KVA-uppgifter (Kvantitativa jämförelser) i exakt högskoleprovets format.',
+    'Varje uppgift jämför två kvantiteter. Formatera stem så här (använd radbrytningar \\n):',
+    'ev. gemensam information först, sedan raderna "Kvantitet I: …" och "Kvantitet II: …".',
+    'Svarsalternativen är FASTA (I större / II större / lika / otillräckligt) — generera dem INTE.',
+    'correct_index: 0=I större, 1=II större, 2=lika, 3=informationen otillräcklig.',
+    'Använd endast ren text/unicode-matematik (× ÷ ² ³ √ ½ ⁻ osv). ANVÄND INTE LaTeX eller $-tecken.',
+    `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)} (0=lätt, 1=svår).`,
+    'Se till att rätt svar följer logiskt; "otillräcklig" ska bara vara rätt när det verkligen inte går att avgöra.',
+    'explanation: kort uträkning/resonemang som visar varför alternativet är rätt. Original innehåll. Svenska.',
+  ].join(' ');
+}
+function nogSystemPrompt(difficulty) {
+  return [
+    'Du skapar NOG-uppgifter (Kvantitativa resonemang / tillräcklighet) i exakt högskoleprovets format.',
+    'Varje uppgift har EN fråga och TVÅ påståenden. Formatera stem så här (radbrytningar \\n):',
+    'frågan först, sedan raderna "(1) …" och "(2) …".',
+    'Svarsalternativen är FASTA (sufficiency A–E) — generera dem INTE.',
+    'correct_index: 0=(1) räcker ensam ej (2), 1=(2) räcker ensam ej (1), 2=(1)+(2) tillsammans men ingen ensam, 3=vardera ensam räcker, 4=tillsammans otillräckligt.',
+    'Avgör tillräcklighet — man ska INTE behöva räkna ut det slutliga svaret, bara om informationen räcker.',
+    'Använd endast ren text/unicode-matematik. ANVÄND INTE LaTeX eller $-tecken.',
+    `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)}.`,
+    'explanation: kort resonemang om varför varje påstående räcker/inte räcker. Original innehåll. Svenska.',
+  ].join(' ');
+}
+
+async function generateFixedAlt(kind, node_id, difficulty, n, model) {
+  const isKva = kind === 'KVA';
+  const options = isKva ? KVA_OPTIONS : NOG_OPTIONS;
+  const maxIndex = options.length - 1;
+  const out = await callAI([
+    { role: 'system', content: isKva ? kvaSystemPrompt(difficulty) : nogSystemPrompt(difficulty) },
+    { role: 'user', content: `Skapa ${n} ${kind}-uppgifter för noden "${node_id}".` },
+  ], { model, schema: fixedAltSchema(n, maxIndex, `hp_${kind.toLowerCase()}_schema`), timeout: 40000 });
+  let parsed; try { parsed = JSON.parse(out); } catch { return []; }
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  return items
+    .filter(q => q && typeof q.stem === 'string' && Number.isInteger(q.correct_index) &&
+      q.correct_index >= 0 && q.correct_index <= maxIndex && typeof q.explanation === 'string')
+    .map(q => ({ stem: q.stem, options: [...options], correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+}
+
 function publicItem(row) {
   return { id: row.id, node_id: row.node_id, delprov: row.delprov, stem: row.stem, options: row.options, difficulty: row.difficulty };
 }
@@ -151,7 +227,8 @@ async function opGenerate(user, body) {
   const n = Math.min(10, Math.max(1, parseInt(body.n, 10) || 5));
   const difficulty = Math.min(1, Math.max(0, Number(body.difficulty) || 0.5));
   if (!node_id) return { status: 400, obj: { ok: false, error: 'Missing node_id' } };
-  if (delprov !== 'ORD') return { status: 400, obj: { ok: false, error: 'MVP supports ORD only' } };
+  const GENERATABLE = ['ORD', 'KVA', 'NOG'];
+  if (!GENERATABLE.includes(delprov)) return { status: 400, obj: { ok: false, error: `Generation supports ${GENERATABLE.join('/')} only` } };
 
   const role = normalizeRole(await loadUserRole(user.id));
   const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty&node_id=eq.${encodeURIComponent(node_id)}&quality=eq.good&limit=60`);
@@ -170,7 +247,11 @@ async function opGenerate(user, body) {
 
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   let generated = [];
-  try { generated = await generateOrd(node_id, difficulty, need, model); } catch { /* best-effort */ }
+  try {
+    generated = delprov === 'ORD'
+      ? await generateOrd(node_id, difficulty, need, model)
+      : await generateFixedAlt(delprov, node_id, difficulty, need, model);
+  } catch { /* best-effort */ }
 
   const toInsert = [];
   const batchHashes = new Set();
@@ -354,11 +435,14 @@ function shuffle(arr) {
   return arr;
 }
 
+const SIM_DELPROV = ['ORD', 'KVA', 'NOG'];       // delprov with a question bank so far
+const DELPROV_SEC = { ORD: 30, KVA: 72, NOG: 120 }; // per-question seconds (real-HP pace)
+
 async function simulateStart(user, body) {
   const delprov = String(body.delprov || 'ORD').slice(0, 8);
-  if (delprov !== 'ORD') return { status: 400, obj: { ok: false, error: 'MVP simulation supports ORD only' } };
+  if (!SIM_DELPROV.includes(delprov)) return { status: 400, obj: { ok: false, error: `Simulation supports ${SIM_DELPROV.join('/')} only` } };
   const count = Math.min(40, Math.max(5, parseInt(body.count, 10) || 10));
-  const durationS = Math.min(3600, Math.max(60, parseInt(body.duration_s, 10) || count * 30));
+  const durationS = Math.min(3600, Math.max(60, parseInt(body.duration_s, 10) || count * (DELPROV_SEC[delprov] || 30)));
 
   const role = normalizeRole(await loadUserRole(user.id));
   let quota;
@@ -426,13 +510,19 @@ async function simulateSubmit(user, body) {
   }
   if (attempts.length) await sbInsert('hp_attempts', attempts, 'return=minimal');
 
-  // Normering: denominator = served count (blanks wrong). ORD-only sim → verbal partial estimate.
+  // Normering: denominator = served count (blanks wrong). Scale whichever section(s) have data.
   const normRows = await sbSelect('hp_normering?select=section,prov_id,raw_score,raw_total,normerad&limit=1000');
   const genericRows = (section) => (normRows || []).filter(r => r.section === section && r.prov_id == null);
-  const vServed = VERBAL_DEL.reduce((s, dp) => s + (Number(served[dp]) || 0), 0);
-  const vCorrect = VERBAL_DEL.reduce((s, dp) => s + (perDelprov[dp]?.correct || 0), 0);
-  const vDenom = vServed || VERBAL_DEL.reduce((s, dp) => s + (perDelprov[dp]?.answered || 0), 0);
-  const vRes = vDenom ? scaleDelWithTable(vCorrect, vDenom, genericRows('verbal')) : { scaled: null, approx: true };
+  const sectionRes = (group, section) => {
+    const svd = group.reduce((s, dp) => s + (Number(served[dp]) || 0), 0);
+    const cor = group.reduce((s, dp) => s + (perDelprov[dp]?.correct || 0), 0);
+    const denom = svd || group.reduce((s, dp) => s + (perDelprov[dp]?.answered || 0), 0);
+    return denom ? scaleDelWithTable(cor, denom, genericRows(section)) : { scaled: null, approx: true };
+  };
+  const vRes = sectionRes(VERBAL_DEL, 'verbal');
+  const kRes = sectionRes(KVANT, 'kvant');
+  const totalScaled = combineTotal(vRes.scaled, kRes.scaled);
+  const approx = (vRes.scaled != null && vRes.approx) || (kRes.scaled != null && kRes.approx) || totalScaled == null;
 
   const per = {};
   for (const [dp, b] of Object.entries(perDelprov)) {
@@ -442,15 +532,15 @@ async function simulateSubmit(user, body) {
 
   await sbInsert('hp_sessions', [{
     id: sessionId, user_id: user.id, kind: 'delprov_sim',
-    raw_correct: correct, raw_total: sess.raw_total || answered, scaled_score: vRes.scaled,
-    per_delprov: { ...per, _config: cfg, _scaled: { verbal: vRes.scaled, approx: vRes.approx }, overtime },
+    raw_correct: correct, raw_total: sess.raw_total || answered, scaled_score: totalScaled,
+    per_delprov: { ...per, _config: cfg, _scaled: { verbal: vRes.scaled, kvant: kRes.scaled, total: totalScaled, approx }, overtime },
     finished_at: new Date().toISOString(),
   }], 'resolution=merge-duplicates,return=minimal', 'id');
 
   return {
     status: 200, obj: {
       ok: true, overall: { correct, answered, served: sess.raw_total || answered, percent: (sess.raw_total || answered) ? Math.round((correct / (sess.raw_total || answered)) * 100) : 0 },
-      per_delprov: per, scaled: { verbal: vRes.scaled, approx: vRes.approx },
+      per_delprov: per, scaled: { verbal: vRes.scaled, kvant: kRes.scaled, total: totalScaled, approx },
       overtime, elapsed_s: Math.round(elapsedMs / 1000), duration_s: durationS,
     },
   };

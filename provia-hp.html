@@ -48,7 +48,7 @@
     .hp-stat b { font-family: "DM Mono", monospace; font-size: 1.6rem; color: var(--accent); }
     .hp-stat span { font-size: .8rem; color: var(--text-dim); }
     .hp-node { font-family: "DM Mono", monospace; font-size: .78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
-    .hp-stem { font-size: 1.55rem; font-weight: 500; margin: 0 0 1.25rem; letter-spacing: -.01em; }
+    .hp-stem { font-size: 1.55rem; font-weight: 500; margin: 0 0 1.25rem; letter-spacing: -.01em; white-space: pre-line; }
     .hp-opts { display: grid; gap: .5rem; }
     .hp-opt {
       text-align: left; font: inherit; cursor: pointer; color: var(--text);
@@ -132,7 +132,14 @@
 
       <section id="hpIntro" class="hp-card" aria-labelledby="hpIntroH">
         <h2 id="hpIntroH" class="hp-section-h">Diagnostiskt pass — Ordförståelse</h2>
-        <p style="color:var(--text-dim);margin:.2rem 0 1.1rem">Svara på 5 ord i taget. Vi mäter inte bara rätt/fel — vi kartlägger <em>vilka</em> ordtyper som sänker dig och anpassar nästa pass.</p>
+        <p style="color:var(--text-dim);margin:.2rem 0 1.1rem">Svara på 5 frågor i taget. Vi mäter inte bara rätt/fel — vi kartlägger <em>vilka</em> frågetyper som sänker dig och anpassar nästa pass.</p>
+        <label class="hp-field">Delprov
+          <select id="hpTrainDelprov">
+            <option value="ORD">Ordförståelse (ORD)</option>
+            <option value="KVA">Kvantitativa jämförelser (KVA)</option>
+            <option value="NOG">Kvantitativa resonemang (NOG)</option>
+          </select>
+        </label>
         <button id="hpStartBtn" class="hp-btn" type="button">Starta pass</button>
       </section>
 
@@ -163,6 +170,13 @@
 
         <div id="hpSimLaunch">
           <p class="hp-dim" style="margin:.2rem 0 1rem">Skarpt tidsläge: inga förklaringar under provet, autoinlämning när tiden tar slut. Rättning och skalpoäng efteråt.</p>
+          <label class="hp-field">Delprov
+            <select id="hpSimDelprov">
+              <option value="ORD">Ordförståelse (ORD) — ~0.5 min/fråga</option>
+              <option value="KVA">Kvantitativa jämförelser (KVA) — ~1.2 min/fråga</option>
+              <option value="NOG">Kvantitativa resonemang (NOG) — ~2 min/fråga</option>
+            </select>
+          </label>
           <label class="hp-field">Antal frågor
             <select id="hpSimCount">
               <option value="10">10 frågor (~5 min)</option>
@@ -196,7 +210,7 @@
           <div class="hp-stats">
             <div class="hp-stat"><b id="hpSimScore">–</b><span>rätt</span></div>
             <div class="hp-stat"><b id="hpSimPct">–</b><span>träffsäkerhet</span></div>
-            <div class="hp-stat"><b id="hpSimScaled">–</b><span>skalpoäng (verbal)</span></div>
+            <div class="hp-stat"><b id="hpSimScaled">–</b><span>skalpoäng (uppskattad)</span></div>
           </div>
           <div id="hpSimBreakdown" style="margin:.5rem 0 1rem"></div>
           <p id="hpSimNote" class="hp-dim" style="font-size:.82rem;margin:0 0 1rem"></p>

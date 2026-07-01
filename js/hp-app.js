@@ -12,6 +12,8 @@ const BATCH = 5;
 // Private demo — only the owner account may view/use Provia HP until public release.
 const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
+const FALLBACK_NODE = { ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig' };
+
 const state = {
   masteryMap: {},
   sessionId: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
@@ -21,6 +23,7 @@ const state = {
   answered: 0,
   correct: 0,
   context: 'diagnostic',
+  delprov: DELPROV,
 };
 
 function token() {
@@ -87,9 +90,10 @@ function renderPrediction(pred, target) {
 }
 
 async function fetchBatch() {
-  const node_id = pickNextNode(DELPROV, state.masteryMap) || 'ord.synonym';
+  const dp = state.delprov;
+  const node_id = pickNextNode(dp, state.masteryMap) || FALLBACK_NODE[dp] || 'ord.synonym';
   const difficulty = difficultyFor(node_id, state.masteryMap);
-  const d = await api('/api/hp', { op: 'generate', node_id, delprov: DELPROV, n: BATCH, difficulty });
+  const d = await api('/api/hp', { op: 'generate', node_id, delprov: dp, n: BATCH, difficulty });
   state.queue = (d?.items || []).slice();
   return state.queue.length;
 }
@@ -200,6 +204,8 @@ el('hpNext')?.addEventListener?.('click', nextQuestion);
 el('hpStartBtn')?.addEventListener?.('click', startSession);
 
 async function startSession() {
+  const sel = el('hpTrainDelprov');
+  if (sel && ['ORD', 'KVA', 'NOG'].includes(sel.value)) state.delprov = sel.value;
   hide('hpIntro'); show('hpQuiz');
   await nextQuestion();
 }
