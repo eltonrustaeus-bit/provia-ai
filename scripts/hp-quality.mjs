@@ -38,7 +38,10 @@ const run = want.length ? want : Object.keys(PLAN);
 function printItem(it, i) {
   console.log(`  [${i + 1}] ${it.stem}`);
   (it.options || []).forEach((o, k) => console.log(`      ${k === it.correct_index ? '✓' : ' '} ${String.fromCharCode(65 + k)}. ${o}`));
-  if (it.data?.type === 'table') console.log(`      TABELL: ${it.data.title} | ${it.data.headers.join(' | ')} | ${it.data.rows.length} rader`);
+  if (it.data?.type === 'table') {
+    console.log(`      TABELL: ${it.data.title} [${it.data.headers.join(' | ')}]`);
+    it.data.rows.forEach(r => console.log(`         ${r.join(' | ')}`));
+  }
   console.log(`      förklaring: ${String(it.explanation || '').slice(0, 160)}`);
   console.log(`      difficulty: ${it.difficulty}`);
 }
