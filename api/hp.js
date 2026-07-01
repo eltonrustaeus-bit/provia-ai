@@ -185,6 +185,7 @@ function kvaSystemPrompt(difficulty) {
     'Använd endast ren text/unicode-matematik (× ÷ ² ³ √ ½ ⁻ osv). ANVÄND INTE LaTeX eller $-tecken.',
     `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)} (0=lätt, 1=svår).`,
     'Se till att rätt svar följer logiskt; "otillräcklig" ska bara vara rätt när det verkligen inte går att avgöra.',
+    'KRITISKT (självkontroll): räkna ut båda kvantiteterna FÖRST. correct_index (0=I större, 1=II större, 2=lika, 3=otillräcklig) MÅSTE exakt matcha slutsatsen i din explanation.',
     'explanation: kort uträkning/resonemang som visar varför alternativet är rätt. Original innehåll. Svenska.',
   ].join(' ');
 }
@@ -195,7 +196,8 @@ function nogSystemPrompt(difficulty) {
     'frågan först, sedan raderna "(1) …" och "(2) …".',
     'Svarsalternativen är FASTA (sufficiency A–E) — generera dem INTE.',
     'correct_index: 0=(1) räcker ensam ej (2), 1=(2) räcker ensam ej (1), 2=(1)+(2) tillsammans men ingen ensam, 3=vardera ensam räcker, 4=tillsammans otillräckligt.',
-    'Avgör tillräcklighet — man ska INTE behöva räkna ut det slutliga svaret, bara om informationen räcker.',
+    'Avgör tillräcklighet — man ska INTE behöva räkna ut det slutliga svaret, bara om informationen räcker för att ge ETT entydigt svar.',
+    'KRITISKT (självkontroll): pröva VARJE påstående separat och sedan tillsammans. En intervall (t.ex. "mellan 6 och 9") räcker INTE för en "hur många"-fråga → då är svaret otillräckligt. correct_index MÅSTE exakt matcha slutsatsen i din explanation (0=(1) ensam, 1=(2) ensam, 2=båda tillsammans, 3=vardera ensam, 4=otillräckligt).',
     'Använd endast ren text/unicode-matematik. ANVÄND INTE LaTeX eller $-tecken.',
     `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)}.`,
     'explanation: kort resonemang om varför varje påstående räcker/inte räcker. Original innehåll. Svenska.',
@@ -244,6 +246,7 @@ function xyzSystemPrompt(difficulty) {
     'Håll det lösbart utan miniräknare — realistiska HP-tal. Distraktorer ska spegla vanliga räknefel.',
     `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)} (0=lätt, 1=svår).`,
     'explanation: kort steg-för-steg-lösning (LaTeX ok) + varför en typisk distraktor lockar.',
+    'KRITISKT (självkontroll): Lös uppgiften FÖRST. Säkerställ att ditt uträknade svar finns med som EXAKT ett av de fyra alternativen, och att correct_index (0-indexerat) pekar på just det alternativet. correct_index MÅSTE stämma med slutsatsen i din explanation. Om de inte stämmer, gör om uppgiften.',
     'Original innehåll — kopiera ALDRIG riktiga provuppgifter verbatim. Svenska.',
   ].join(' ');
 }
@@ -294,7 +297,8 @@ function dtkSystemPrompt(difficulty) {
     `Tabellen: max ${DTK_MAX_COLS} kolumner och ${DTK_MAX_ROWS} rader. Alla celler som text (siffror som strängar, t.ex. "1240").`,
     'EXAKT FYRA svarsalternativ (options), exakt ETT rätt. Ingen LaTeX behövs — vanliga tal.',
     `Sikta på svårighetsgrad runt ${difficulty.toFixed(2)}.`,
-    'Frågan ska gå att lösa ENBART utifrån tabellen. explanation: vilken cell/beräkning som ger svaret. Original innehåll. Svenska.',
+    'Frågan ska gå att lösa ENBART utifrån tabellen. explanation: vilken cell/beräkning som ger svaret.',
+    'KRITISKT (självkontroll): räkna ut svaret från tabellen FÖRST. Säkerställ att det uträknade värdet finns med som EXAKT ett alternativ och att correct_index pekar på just det. correct_index MÅSTE stämma med uträkningen i din explanation. Original innehåll. Svenska.',
   ].join(' ');
 }
 function sanitizeTable(t) {
@@ -403,7 +407,12 @@ async function generatePassage(delprov, node_id, difficulty, n, model) {
 
 // Generate + persist for one node. Handles both flat delprov and passage delprov
 // (LAS/ELF insert a shared hp_passages row, then link questions via passage_id).
+const KVANT_SET = new Set(['XYZ', 'KVA', 'NOG', 'DTK']);
 async function generateAndInsert(delprov, node_id, difficulty, need, model) {
+  // Quality pass finding: gpt-4o-mini reliably mislabels correct_index on quantitative items
+  // (explanation right, index wrong). gpt-4o fixes KVA/NOG fully and cuts XYZ errors. Route the
+  // kvant delprov to a stronger model; verbal (ORD/MEK/LÄS/ELF) stay on the cheaper default.
+  const genModel = KVANT_SET.has(delprov) ? (process.env.OPENAI_MATH_MODEL || 'gpt-4o') : model;
   const clampDiff = (x) => Math.min(1, Math.max(0, Number(x) || difficulty));
   const insertQs = async (rows) => rows.length
     ? (await sbInsert('hp_questions', rows, 'resolution=ignore-duplicates,return=representation', 'source_hash')) || []
@@ -411,7 +420,7 @@ async function generateAndInsert(delprov, node_id, difficulty, need, model) {
 
   if (PASSAGE_DELPROV.includes(delprov)) {
     let gen;
-    try { gen = await generatePassage(delprov, node_id, difficulty, need, model); } catch { return []; }
+    try { gen = await generatePassage(delprov, node_id, difficulty, need, genModel); } catch { return []; }
     if (!gen) return [];
     const pRows = await sbInsert('hp_passages', [{ delprov, lang: gen.lang, body: gen.body, word_count: gen.body.split(/\s+/).filter(Boolean).length }]);
     const passage_id = pRows?.[0]?.id;
@@ -428,11 +437,11 @@ async function generateAndInsert(delprov, node_id, difficulty, need, model) {
 
   let generated = [];
   try {
-    generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, model)
-      : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, model)
-        : delprov === 'MEK' ? await generateMek(node_id, difficulty, need, model)
-          : delprov === 'DTK' ? await generateDtk(node_id, difficulty, need, model)
-            : await generateFixedAlt(delprov, node_id, difficulty, need, model);
+    generated = delprov === 'ORD' ? await generateOrd(node_id, difficulty, need, genModel)
+      : delprov === 'XYZ' ? await generateXyz(node_id, difficulty, need, genModel)
+        : delprov === 'MEK' ? await generateMek(node_id, difficulty, need, genModel)
+          : delprov === 'DTK' ? await generateDtk(node_id, difficulty, need, genModel)
+            : await generateFixedAlt(delprov, node_id, difficulty, need, genModel);
   } catch { return []; }
   const seen = new Set(); const toInsert = [];
   for (const q of generated) {
@@ -839,3 +848,7 @@ export default async function handler(req, res) {
     return json(res, 500, { ok: false, error: 'Server error' });
   }
 }
+
+// Test-only exports (unused by the serverless handler; enables an offline generation
+// quality harness — see scripts/hp-quality.mjs). Safe: no side effects.
+export const _test = { generateOrd, generateXyz, generateMek, generateDtk, generateFixedAlt, generatePassage };
