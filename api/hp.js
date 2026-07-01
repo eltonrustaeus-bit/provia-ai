@@ -346,6 +346,24 @@ function sanitizeTable(t) {
   if (!rows.length) return null;
   return { type: 'table', title: cell(t.title || ''), headers, rows };
 }
+// Verify-pass for DTK: re-read the table and solve independently (from stem+table+options
+// only), keep only items whose independent answer matches correct_index. Same rationale and
+// fail-open behavior as verifyXyz — the model computes the table right but can mislabel.
+async function verifyDtk(items, model) {
+  if (!items.length) return items;
+  const payload = items.map((q, i) => ({ i, stem: q.stem, table: q.data, options: q.options }));
+  let out;
+  try {
+    out = await callAI([
+      { role: 'system', content: 'Du är en noggrann kontrollant för tabelluppgifter. För VARJE uppgift, läs tabellen (table) och lös frågan utifrån ENDAST stem, table och options. Returnera 0-baserat index för det enda korrekta alternativet, annars -1. Räkna noga.' },
+      { role: 'user', content: JSON.stringify(payload) },
+    ], { model, schema: xyzVerifySchema(items.length), timeout: 40000 });
+  } catch { return items; }
+  let parsed; try { parsed = JSON.parse(out); } catch { return items; }
+  const res = Array.isArray(parsed?.results) ? parsed.results : null;
+  if (!res || res.length !== items.length) return items;
+  return items.filter((q, i) => Number.isInteger(res[i]?.index) && res[i].index === q.correct_index);
+}
 async function generateDtk(node_id, difficulty, n, model) {
   const out = await callAI([
     { role: 'system', content: dtkSystemPrompt(difficulty) },
@@ -353,11 +371,12 @@ async function generateDtk(node_id, difficulty, n, model) {
   ], { model, schema: dtkSchema(n), timeout: 40000 });
   let parsed; try { parsed = JSON.parse(out); } catch { return []; }
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
+  const built = items
     .map(q => ({ q, table: sanitizeTable(q?.table) }))
     .filter(({ q, table }) => table && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
       Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
     .map(({ q, table }) => ({ stem: q.stem, data: table, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+  return verifyDtk(built, model);   // discard items the independent table-solve disagrees with
 }
 
 // ── MEK: meningskomplettering (self-contained, 4 alternativ, ingen passage) ──
