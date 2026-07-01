@@ -250,17 +250,47 @@ function xyzSystemPrompt(difficulty) {
     'Original innehåll — kopiera ALDRIG riktiga provuppgifter verbatim. Svenska.',
   ].join(' ');
 }
+// Verify-pass: an independent second solve. Even gpt-4o occasionally writes a correct
+// explanation but points correct_index at the wrong option. Solve each item again from
+// stem+options ONLY, and keep only items where the independent answer agrees with the
+// generator's correct_index. Fail-open (return unfiltered) only if the verify call itself
+// errors, so a transient failure degrades to hardened-prompt quality instead of zero items.
+function xyzVerifySchema(n) {
+  return { type: 'json_schema', name: 'hp_xyz_verify', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['results'], properties: {
+      results: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false, required: ['index'],
+        properties: { index: { type: 'integer', minimum: -1, maximum: 3 } },
+      } },
+    },
+  } };
+}
+async function verifyXyz(items, model) {
+  if (!items.length) return items;
+  const payload = items.map((q, i) => ({ i, stem: q.stem, options: q.options }));
+  let out;
+  try {
+    out = await callAI([
+      { role: 'system', content: 'Du är en noggrann matematikkontrollant. För VARJE uppgift, lös den själv utifrån ENDAST stem och options. Returnera 0-baserat index för det enda korrekta alternativet. Om inget alternativ är entydigt korrekt, returnera -1. Räkna noga.' },
+      { role: 'user', content: JSON.stringify(payload) },
+    ], { model, schema: xyzVerifySchema(items.length), timeout: 40000 });
+  } catch { return items; }  // verify unavailable → don't nuke the batch
+  let parsed; try { parsed = JSON.parse(out); } catch { return items; }
+  const res = Array.isArray(parsed?.results) ? parsed.results : null;
+  if (!res || res.length !== items.length) return items;
+  return items.filter((q, i) => Number.isInteger(res[i]?.index) && res[i].index === q.correct_index);
+}
 async function generateXyz(node_id, difficulty, n, model) {
   const out = await callAI([
     { role: 'system', content: xyzSystemPrompt(difficulty) },
     { role: 'user', content: `Skapa ${n} XYZ-uppgifter för noden "${node_id}".` },
   ], { model, schema: xyzSchema(n), timeout: 40000 });
   let parsed; try { parsed = JSON.parse(out); } catch { return []; }
-  const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
+  const items = (Array.isArray(parsed?.items) ? parsed.items : [])
     .filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
       Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
     .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+  return verifyXyz(items, model);   // discard items the independent solve disagrees with
 }
 
 // ── DTK: diagram/tabeller/kartor (MVP = tabell, 4 alternativ A–D) ────────────
