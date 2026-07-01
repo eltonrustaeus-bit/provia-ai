@@ -4,6 +4,7 @@
 
 import { loadGraph, pickNextNode, difficultyFor, getNode } from './hp-graph.js';
 import { initRealProv } from './hp-realprov.js';
+import { initSim } from './hp-sim.js';
 
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
@@ -214,6 +215,7 @@ async function boot() {
   hide('hpNA'); show('hpMain'); hide('hpGate');
   await loadDiagnosis();
   renderProgress();
+  initSim();
   initRealProv('hpReal');
 }
 

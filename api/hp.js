@@ -340,6 +340,127 @@ function opRealprov(user, body) {
   return { status: 200, obj: { ok: true, imported, passes } };
 }
 
+// ── op: simulate ──────────────────────────────────────────────────────────
+// Timed provpass simulation (assessment, not training): serves questions without keys,
+// server owns the clock (started_at), grades on submit. Blanks count as wrong (denominator
+// = served count, no negative marking — mirrors real HP). Per-answer Elo is intentionally
+// skipped here to stay well under the serverless limit; attempts are still recorded
+// (context='simulate') so mastery can be derived later.
+const SIM_GRACE_MS = 8000;
+const VERBAL_DEL = ['ORD', 'LAS', 'MEK', 'ELF'];
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+
+async function simulateStart(user, body) {
+  const delprov = String(body.delprov || 'ORD').slice(0, 8);
+  if (delprov !== 'ORD') return { status: 400, obj: { ok: false, error: 'MVP simulation supports ORD only' } };
+  const count = Math.min(40, Math.max(5, parseInt(body.count, 10) || 10));
+  const durationS = Math.min(3600, Math.max(60, parseInt(body.duration_s, 10) || count * 30));
+
+  const role = normalizeRole(await loadUserRole(user.id));
+  let quota;
+  try { quota = await consumeQuota('consume_hp_sim_quota', user.id, getFeatureLimit(role, 'hpSim')); }
+  catch { return { status: 200, obj: { ok: false, error: 'quota_unavailable' } }; }
+  if (!quota.ok) return { status: 200, obj: { ok: false, error: 'quota_exhausted', message: 'Provpass-simulering kräver Basic eller Premium.' } };
+
+  const pool = await sbSelect(`hp_questions?select=id,node_id,delprov,stem,options,difficulty&delprov=eq.${encodeURIComponent(delprov)}&quality=eq.good&limit=200`);
+  const seen = await sbSelect(`hp_attempts?select=question_id&user_id=eq.${encodeURIComponent(user.id)}&delprov=eq.${encodeURIComponent(delprov)}&context=eq.simulate`);
+  const seenIds = new Set((seen || []).map(r => r.question_id));
+  let items = shuffle((pool || []).filter(q => !seenIds.has(q.id)));
+  if (items.length < 3) items = shuffle((pool || []).slice());  // reuse pool if too few unseen
+  items = items.slice(0, count);
+  if (items.length < 3) return { status: 200, obj: { ok: false, error: 'insufficient_pool', message: 'För få frågor i banken ännu — träna delprov för att fylla på.' } };
+
+  const served = { [delprov]: items.length };
+  const sessRows = await sbInsert('hp_sessions', [{
+    user_id: user.id, kind: 'delprov_sim', raw_total: items.length,
+    per_delprov: { _config: { delprov, duration_s: durationS, served } },
+    started_at: new Date().toISOString(),
+  }]);
+  const sessionId = sessRows?.[0]?.id;
+  if (!sessionId) return { status: 500, obj: { ok: false, error: 'session_create_failed' } };
+  return { status: 200, obj: { ok: true, session_id: sessionId, duration_s: durationS, delprov, items: items.map(publicItem) } };
+}
+
+async function simulateSubmit(user, body) {
+  const sessionId = String(body.session_id || '');
+  if (!sessionId) return { status: 400, obj: { ok: false, error: 'missing_session' } };
+  const rows = await sbSelect(`hp_sessions?select=id,user_id,kind,started_at,finished_at,per_delprov,raw_total&id=eq.${encodeURIComponent(sessionId)}&limit=1`);
+  const sess = rows?.[0];
+  if (!sess || sess.user_id !== user.id) return { status: 404, obj: { ok: false, error: 'session_not_found' } };
+  if (sess.kind !== 'delprov_sim') return { status: 400, obj: { ok: false, error: 'wrong_kind' } };
+  if (sess.finished_at) return { status: 409, obj: { ok: false, error: 'already_submitted' } };
+
+  const cfg = sess.per_delprov?._config || {};
+  const durationS = Number(cfg.duration_s) || 0;
+  const served = cfg.served || {};
+  const startedMs = Date.parse(sess.started_at);
+  const elapsedMs = Number.isFinite(startedMs) ? Date.now() - startedMs : 0;
+  const overtime = durationS > 0 && elapsedMs > durationS * 1000 + SIM_GRACE_MS;
+
+  const answers = (body.answers && typeof body.answers === 'object') ? body.answers : {};
+  const qids = Object.keys(answers).slice(0, 60);
+  const qRows = qids.length
+    ? await sbSelect(`hp_questions?select=id,node_id,delprov,correct_index&id=in.(${qids.map(encodeURIComponent).join(',')})`)
+    : [];
+  const qMap = {}; for (const q of qRows) qMap[q.id] = q;
+
+  const attempts = [];
+  const perDelprov = {};
+  let correct = 0, answered = 0;
+  for (const qid of qids) {
+    const q = qMap[qid]; if (!q) continue;
+    const chosen = Number.isInteger(answers[qid]) ? answers[qid] : null;
+    const isCorrect = chosen === q.correct_index;
+    answered++; if (isCorrect) correct++;
+    const b = perDelprov[q.delprov] || (perDelprov[q.delprov] = { correct: 0, answered: 0 });
+    b.answered++; if (isCorrect) b.correct++;
+    attempts.push({
+      user_id: user.id, question_id: q.id, node_id: q.node_id, delprov: q.delprov,
+      chosen_index: chosen, is_correct: isCorrect, response_ms: 0, confidence: null,
+      session_id: sessionId, context: 'simulate',
+    });
+  }
+  if (attempts.length) await sbInsert('hp_attempts', attempts, 'return=minimal');
+
+  // Normering: denominator = served count (blanks wrong). ORD-only sim → verbal partial estimate.
+  const normRows = await sbSelect('hp_normering?select=section,prov_id,raw_score,raw_total,normerad&limit=1000');
+  const genericRows = (section) => (normRows || []).filter(r => r.section === section && r.prov_id == null);
+  const vServed = VERBAL_DEL.reduce((s, dp) => s + (Number(served[dp]) || 0), 0);
+  const vCorrect = VERBAL_DEL.reduce((s, dp) => s + (perDelprov[dp]?.correct || 0), 0);
+  const vDenom = vServed || VERBAL_DEL.reduce((s, dp) => s + (perDelprov[dp]?.answered || 0), 0);
+  const vRes = vDenom ? scaleDelWithTable(vCorrect, vDenom, genericRows('verbal')) : { scaled: null, approx: true };
+
+  const per = {};
+  for (const [dp, b] of Object.entries(perDelprov)) {
+    const denom = Number(served[dp]) || b.answered;
+    per[dp] = { correct: b.correct, answered: b.answered, served: denom, percent: denom ? Math.round((b.correct / denom) * 100) : 0 };
+  }
+
+  await sbInsert('hp_sessions', [{
+    id: sessionId, user_id: user.id, kind: 'delprov_sim',
+    raw_correct: correct, raw_total: sess.raw_total || answered, scaled_score: vRes.scaled,
+    per_delprov: { ...per, _config: cfg, _scaled: { verbal: vRes.scaled, approx: vRes.approx }, overtime },
+    finished_at: new Date().toISOString(),
+  }], 'resolution=merge-duplicates,return=minimal', 'id');
+
+  return {
+    status: 200, obj: {
+      ok: true, overall: { correct, answered, served: sess.raw_total || answered, percent: (sess.raw_total || answered) ? Math.round((correct / (sess.raw_total || answered)) * 100) : 0 },
+      per_delprov: per, scaled: { verbal: vRes.scaled, approx: vRes.approx },
+      overtime, elapsed_s: Math.round(elapsedMs / 1000), duration_s: durationS,
+    },
+  };
+}
+
+function opSimulate(user, body) {
+  if (body.action === 'submit') return simulateSubmit(user, body);
+  return simulateStart(user, body);
+}
+
 // ── router ──────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return json(res, 405, { ok: false, error: 'METHOD_NOT_ALLOWED' }); }
@@ -356,6 +477,7 @@ export default async function handler(req, res) {
     if (body.op === 'generate') result = await opGenerate(user, body);
     else if (body.op === 'diagnose') result = await opDiagnose(user, body);
     else if (body.op === 'realprov') result = await opRealprov(user, body);
+    else if (body.op === 'simulate') result = await opSimulate(user, body);
     else return json(res, 400, { ok: false, error: 'Unknown op' });
     return json(res, result.status, result.obj);
   } catch (e) {

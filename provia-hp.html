@@ -78,6 +78,16 @@
       border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .7rem; width: 100%;
     }
     @media (max-width: 560px) { .hp-real-row { grid-template-columns: 1fr; gap: .25rem; } }
+    .hp-timer { font-family: "DM Mono", monospace; font-size: 2rem; color: var(--accent); letter-spacing: .04em; }
+    .hp-timer--warn { color: #ffd166; }
+    .hp-timer--bad { color: #ff5d5d; animation: hp-pulse 1s ease-in-out infinite; }
+    @keyframes hp-pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+    .hp-nav { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 1rem; }
+    .hp-navcell { font-family: "DM Mono", monospace; font-size: .75rem; width: 30px; height: 30px; cursor: pointer; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); }
+    .hp-navcell--done { color: var(--accent); border-color: rgba(27,255,140,.4); }
+    .hp-navcell--active { outline: 2px solid var(--accent); color: var(--text); }
+    .hp-opt--picked { border-color: var(--accent); background: rgba(27,255,140,.10); }
+    .hp-simhead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
     [hidden] { display: none !important; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
@@ -144,6 +154,53 @@
         <div class="hp-card">
           <h2 class="hp-section-h">Din mastery — svagast först</h2>
           <div id="hpWeak"></div>
+        </div>
+      </section>
+
+      <!-- Provpass-simulering (timed, no feedback until submit) -->
+      <section class="hp-card" aria-labelledby="hpSimH">
+        <h2 id="hpSimH" class="hp-section-h">Provpass-simulering — tidspress</h2>
+
+        <div id="hpSimLaunch">
+          <p class="hp-dim" style="margin:.2rem 0 1rem">Skarpt tidsläge: inga förklaringar under provet, autoinlämning när tiden tar slut. Rättning och skalpoäng efteråt.</p>
+          <label class="hp-field">Antal frågor
+            <select id="hpSimCount">
+              <option value="10">10 frågor (~5 min)</option>
+              <option value="20">20 frågor (~10 min)</option>
+              <option value="40">40 frågor (~20 min)</option>
+            </select>
+          </label>
+          <button id="hpSimStart" class="hp-btn" type="button">Starta simulering</button>
+          <p id="hpSimMsg" class="hp-dim" hidden style="margin:.8rem 0 0"></p>
+        </div>
+
+        <div id="hpSimRun" hidden>
+          <div class="hp-simhead">
+            <span id="hpSimProg" class="hp-node" style="margin:0">Fråga 1 / 10</span>
+            <span id="hpSimTimer" class="hp-timer">--:--</span>
+          </div>
+          <div id="hpSimNav" class="hp-nav"></div>
+          <p class="hp-node" id="hpSimNodeLabel">—</p>
+          <p class="hp-stem" id="hpSimStem">…</p>
+          <div class="hp-opts" id="hpSimOpts"></div>
+          <div class="hp-actions" style="justify-content:space-between">
+            <div style="display:flex;gap:.5rem">
+              <button id="hpSimPrev" class="hp-btn hp-btn--ghost" type="button">← Föregående</button>
+              <button id="hpSimNext" class="hp-btn hp-btn--ghost" type="button">Nästa →</button>
+            </div>
+            <button id="hpSimSubmit" class="hp-btn" type="button">Lämna in</button>
+          </div>
+        </div>
+
+        <div id="hpSimResult" hidden>
+          <div class="hp-stats">
+            <div class="hp-stat"><b id="hpSimScore">–</b><span>rätt</span></div>
+            <div class="hp-stat"><b id="hpSimPct">–</b><span>träffsäkerhet</span></div>
+            <div class="hp-stat"><b id="hpSimScaled">–</b><span>skalpoäng (verbal)</span></div>
+          </div>
+          <div id="hpSimBreakdown" style="margin:.5rem 0 1rem"></div>
+          <p id="hpSimNote" class="hp-dim" style="font-size:.82rem;margin:0 0 1rem"></p>
+          <button id="hpSimAgain" class="hp-btn hp-btn--ghost" type="button">Ny simulering</button>
         </div>
       </section>
 
