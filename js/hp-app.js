@@ -6,7 +6,7 @@ import { loadGraph, pickNextNode, difficultyFor, getNode } from './hp-graph.js';
 import { initRealProv } from './hp-realprov.js';
 import { initSim } from './hp-sim.js';
 import { renderMath } from './hp-math.js';
-import { renderData } from './hp-table.js';
+import { renderContext } from './hp-table.js';
 
 const SUPA_LS = 'sb-mnmotdluigzeehdjbhbu-auth-token';
 const DELPROV = 'ORD';
@@ -14,8 +14,11 @@ const BATCH = 5;
 // Private demo — only the owner account may view/use Provia HP until public release.
 const OWNER_ID = '4a2d4593-16d3-4f9f-bc6c-54c856c21553';
 
-const FALLBACK_NODE = { ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig', XYZ: 'xyz.algebra', DTK: 'dtk.avlasning' };
-const TRAIN_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK'];
+const FALLBACK_NODE = {
+  ORD: 'ord.synonym', KVA: 'kva.storlek', NOG: 'nog.tillracklig', XYZ: 'xyz.algebra',
+  DTK: 'dtk.avlasning', MEK: 'mek.koherens', LAS: 'las.inferens', ELF: 'elf.gist',
+};
+const TRAIN_DELPROV = ['ORD', 'KVA', 'NOG', 'XYZ', 'DTK', 'MEK', 'LAS', 'ELF'];
 
 const state = {
   masteryMap: {},
@@ -135,7 +138,7 @@ function renderQuestion() {
   const q = state.current;
   const node = getNode(q.node_id);
   el('hpNodeLabel').textContent = node ? node.label : q.node_id;
-  renderData(el('hpData'), q.data);
+  renderContext(el('hpData'), q);
   el('hpStem').textContent = q.stem;
   const opts = el('hpOptions');
   opts.innerHTML = '';
