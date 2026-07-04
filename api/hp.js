@@ -833,22 +833,42 @@ async function opAdaptive(user) {
     agg[dp].sum += r.mastery; agg[dp].cnt++;
     if (!r.node_id.startsWith('delprov:')) nodeMast[r.node_id] = { mastery: r.mastery, delprov: dp };
   }
+  // Personalized-pass distribution (spec): bias practice 60% weakest / 25% mid / 15% maintenance.
+  // A single call returns one target; sampling the tier per call makes a whole session converge to
+  // that mix without any client change. Candidates = every seen concept node plus one fallback node
+  // per untouched delprov (mastery 0), so exploration falls naturally into the weakest tier.
   const seen = Object.keys(agg);
   const unseen = ALL_DELPROV.filter(d => !seen.includes(d));
-  let delprov;
-  if (unseen.length && Math.random() < 0.35) {
-    delprov = unseen[Math.floor(Math.random() * unseen.length)];   // explore an untouched delprov
-  } else {
-    delprov = seen.sort((a, b) => (agg[a].sum / agg[a].cnt) - (agg[b].sum / agg[b].cnt))[0] || ALL_DELPROV[0];
+  const candidates = Object.entries(nodeMast).map(([nid, v]) => ({ node_id: nid, delprov: v.delprov, mastery: v.mastery }));
+  for (const dp of unseen) candidates.push({ node_id: ADAPT_FALLBACK_NODE[dp], delprov: dp, mastery: 0 });
+  if (!candidates.length) candidates.push({ node_id: ADAPT_FALLBACK_NODE.ORD, delprov: 'ORD', mastery: 0 });
+  candidates.sort((a, b) => a.mastery - b.mastery);
+
+  const n = candidates.length;
+  const third = Math.max(1, Math.floor(n / 3));
+  const r = Math.random();
+  const tier = r < 0.60 ? 'weak' : r < 0.85 ? 'mid' : 'maint';
+  const pools = { weak: candidates.slice(0, third), mid: candidates.slice(third, 2 * third), maint: candidates.slice(2 * third) };
+  const pool = pools[tier].length ? pools[tier] : candidates;   // collapse to full list if a tier is empty
+  const pick = pool[0];   // lowest-mastery node in the chosen tier = the "next best training area"
+
+  // Difficulty ladder: promote when recent rolling accuracy on this node is high, demote when low.
+  // mastery already sets the base; the ladder nudges it from the last few attempts on THIS node.
+  const recent = await sbSelect(`hp_attempts?select=is_correct&user_id=eq.${encodeURIComponent(user.id)}&node_id=eq.${encodeURIComponent(pick.node_id)}&order=created_at.desc&limit=8`);
+  let ladder = 0, acc = null;
+  if (Array.isArray(recent) && recent.length >= 4) {
+    acc = recent.filter(a => a.is_correct).length / recent.length;
+    if (acc > 0.75) ladder = 0.10;        // promote
+    else if (acc < 0.40) ladder = -0.15;  // demote
   }
-  const nodesIn = Object.entries(nodeMast).filter(([, v]) => v.delprov === delprov).sort((a, b) => a[1].mastery - b[1].mastery);
-  let node_id, mastery;
-  if (nodesIn.length) { node_id = nodesIn[0][0]; mastery = nodesIn[0][1].mastery; }
-  else { node_id = ADAPT_FALLBACK_NODE[delprov]; mastery = 0; }
-  const difficulty = Number(Math.max(0.3, Math.min(0.85, (mastery / 100) + 0.12)).toFixed(2));
+  const difficulty = Number(Math.max(0.30, Math.min(0.90, (pick.mastery / 100) + 0.12 + ladder)).toFixed(2));
+
+  const tierSv = tier === 'weak' ? 'Svagast (fokus 60%)' : tier === 'mid' ? 'Mellannivå (25%)' : 'Underhåll (15%)';
+  const ladderSv = ladder > 0 ? ` · höjd nivå (${Math.round(acc * 100)}% rätt senast)`
+    : ladder < 0 ? ` · sänkt nivå (${Math.round(acc * 100)}% rätt senast)` : '';
   return { status: 200, obj: {
-    ok: true, locked: false, delprov, node_id, difficulty,
-    reason: nodesIn.length ? `Svagast just nu: ${delprov} (mastery ${Math.round(mastery)})` : `Utforskar ${delprov}`,
+    ok: true, locked: false, delprov: pick.delprov, node_id: pick.node_id, difficulty, tier,
+    reason: `${tierSv} · ${pick.delprov}, mastery ${Math.round(pick.mastery)}${ladderSv}`,
   } };
 }
 
