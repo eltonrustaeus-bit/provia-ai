@@ -142,9 +142,10 @@ async function generateOrd(node_id, difficulty, n, model) {
     { role: 'user', content: `Skapa ${n} ORD-uppgifter för noden "${node_id}".` },
   ], { model, schema: ordSchema(n), timeout: 40000 });
   let parsed; try { parsed = JSON.parse(out); } catch { return []; }
-  const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items.filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 5 &&
+  const raw = Array.isArray(parsed?.items) ? parsed.items : [];
+  const items = raw.filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 5 &&
     Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 5 && typeof q.explanation === 'string');
+  return verifyVerbal('ORD', items, null, model);   // discard items the independent reviewer rejects
 }
 // ── KVA / NOG: fixed alternatives (AI generates only stem + correct_index + explanation) ──
 const KVA_OPTIONS = Object.freeze([
@@ -379,6 +380,51 @@ async function generateDtk(node_id, difficulty, n, model) {
   return verifyDtk(built, model);   // discard items the independent table-solve disagrees with
 }
 
+// Verify-pass for the VERBAL delprov (ORD/MEK/LÄS/ELF), which previously had no validation at
+// all. An independent adversarial reviewer re-solves each item from ONLY the given material and
+// flags rubric violations (spelling/grammar, more than one defensible answer, duplicate/overlapping
+// options, unclear format). An item is kept only when the reviewer's answer matches the generator's
+// correct_index AND the item passes the rubric (clean). Fail-open (return unfiltered) when the
+// reviewer call errors, so a transient failure degrades to generator quality instead of nuking the
+// batch — same posture as verifyXyz/verifyDtk. Index range spans 0..4 to cover ORD's 5 options.
+function verbalVerifySchema(n) {
+  return { type: 'json_schema', name: 'hp_verbal_verify', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['results'], properties: {
+      results: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false, required: ['index', 'clean'],
+        properties: {
+          index: { type: 'integer', minimum: -1, maximum: 4 },
+          clean: { type: 'boolean' },
+        },
+      } },
+    },
+  } };
+}
+const VERBAL_VERIFY_ROLE = {
+  ORD: 'Uppgiften ger ETT målord (stem) och FEM alternativ; rätt alternativ är det ord som ligger NÄRMAST målordet i betydelse.',
+  MEK: 'Uppgiften ger en mening med lucka/luckor (_____) och FYRA alternativ; rätt alternativ ger en språkligt och innehållsligt korrekt mening.',
+  LAS: 'Uppgiften ger en text (passage) och en fråga med FYRA alternativ; rätt alternativ följer ENBART av texten.',
+  ELF: 'The task gives an English passage and a question with FOUR options; the correct option follows ONLY from the passage.',
+};
+async function verifyVerbal(delprov, items, passageBody, model) {
+  if (!items.length) return items;
+  const payload = items.map((q, i) => ({ i, ...(passageBody ? { passage: passageBody } : {}), stem: q.stem, options: q.options }));
+  let out;
+  try {
+    out = await callAI([
+      { role: 'system', content:
+        'Du är en sträng, oberoende granskare av högskoleprov-uppgifter. ' + (VERBAL_VERIFY_ROLE[delprov] || '') +
+        ' För VARJE uppgift: (1) lös den själv utifrån ENDAST det givna materialet och returnera 0-baserat index för det ENDA rätta alternativet, annars -1.' +
+        ' (2) Sätt clean=false om något av följande gäller: stavfel eller grammatikfel, fler än ett försvarbart rätt alternativ, två alternativ betyder i praktiken samma sak, eller otydligt/felaktigt format. Annars clean=true. Var petig.' },
+      { role: 'user', content: JSON.stringify(payload) },
+    ], { model, schema: verbalVerifySchema(items.length), timeout: 40000 });
+  } catch { return items; }  // reviewer unavailable → don't nuke the batch
+  let parsed; try { parsed = JSON.parse(out); } catch { return items; }
+  const res = Array.isArray(parsed?.results) ? parsed.results : null;
+  if (!res || res.length !== items.length) return items;
+  return items.filter((q, i) => res[i]?.clean === true && Number.isInteger(res[i]?.index) && res[i].index === q.correct_index);
+}
+
 // ── MEK: meningskomplettering (self-contained, 4 alternativ, ingen passage) ──
 function mekSystemPrompt(difficulty) {
   return [
@@ -396,11 +442,12 @@ async function generateMek(node_id, difficulty, n, model) {
     { role: 'user', content: `Skapa ${n} MEK-uppgifter för noden "${node_id}".` },
   ], { model, schema: xyzSchema(n), timeout: 40000 });  // same 4-opt shape as XYZ
   let parsed; try { parsed = JSON.parse(out); } catch { return []; }
-  const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
+  const raw = Array.isArray(parsed?.items) ? parsed.items : [];
+  const items = raw
     .filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 4 &&
       Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
     .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+  return verifyVerbal('MEK', items, null, model);   // discard items the independent reviewer rejects
 }
 
 // ── LAS / ELF: passage + grouped questions (shared reading text) ─────────────
@@ -455,7 +502,9 @@ async function generatePassage(delprov, node_id, difficulty, n, model) {
       Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 4 && typeof q.explanation === 'string')
     .map(q => ({ stem: q.stem, options: q.options, correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
   if (!items.length) return null;
-  return { body, lang: isElf ? 'en' : 'sv', items };
+  const verified = await verifyVerbal(delprov, items, body, model);   // reviewer must agree, given the passage
+  if (!verified.length) return null;
+  return { body, lang: isElf ? 'en' : 'sv', items: verified };
 }
 
 // Generate + persist for one node. Handles both flat delprov and passage delprov
