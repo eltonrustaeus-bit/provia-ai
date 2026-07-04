@@ -136,6 +136,29 @@ function ordSystemPrompt(difficulty) {
     'Original innehåll — kopiera ALDRIG riktiga provord verbatim. Svenska.',
   ].join(' ');
 }
+// Lexicon gate for ORD (reputation-critical): every headword and every option must be a real
+// Swedish word present in hp_ord_lexicon. Invented or misspelled words are rejected with NO repair.
+// FAIL-OPEN while the lexicon is unseeded/unavailable — an empty table would otherwise reject every
+// item and break ORD generation, so the gate only activates once words exist (same posture as
+// _hp-facit / hp_normering). Model spelling-judgment is unreliable for rare HP vocabulary, so this
+// deterministic DB check complements (does not replace) the verifyVerbal reviewer.
+function normLexWord(w) { return String(w || '').toLowerCase().normalize('NFC').replace(/^[^a-zåäöéèü]+|[^a-zåäöéèü]+$/g, '').trim(); }
+async function checkOrdLexicon(items) {
+  if (!items.length) return items;
+  const probe = await sbSelect('hp_ord_lexicon?select=word&limit=1');
+  if (!Array.isArray(probe) || !probe.length) return items;   // not seeded → gate inactive (fail-open)
+  const wordsOf = (q) => [normLexWord(q.stem), ...(Array.isArray(q.options) ? q.options.map(normLexWord) : [])].filter(Boolean);
+  const all = [...new Set(items.flatMap(wordsOf))];
+  const found = new Set();
+  for (let i = 0; i < all.length; i += 100) {
+    const chunk = all.slice(i, i + 100);
+    let rows;
+    try { rows = await sbSelect(`hp_ord_lexicon?select=word&word=in.(${chunk.map(encodeURIComponent).join(',')})`); }
+    catch { return items; }   // lookup infra hiccup → don't nuke the batch
+    for (const r of (rows || [])) found.add(r.word);
+  }
+  return items.filter((q) => wordsOf(q).every((w) => found.has(w)));
+}
 async function generateOrd(node_id, difficulty, n, model) {
   const out = await callAI([
     { role: 'system', content: ordSystemPrompt(difficulty) },
@@ -145,7 +168,8 @@ async function generateOrd(node_id, difficulty, n, model) {
   const raw = Array.isArray(parsed?.items) ? parsed.items : [];
   const items = raw.filter(q => q && typeof q.stem === 'string' && Array.isArray(q.options) && q.options.length === 5 &&
     Number.isInteger(q.correct_index) && q.correct_index >= 0 && q.correct_index < 5 && typeof q.explanation === 'string');
-  return verifyVerbal('ORD', items, null, model);   // discard items the independent reviewer rejects
+  const verified = await verifyVerbal('ORD', items, null, model);   // discard items the reviewer rejects
+  return checkOrdLexicon(verified);   // then reject any item with a non-lexicon (invented/misspelled) word
 }
 // ── KVA / NOG: fixed alternatives (AI generates only stem + correct_index + explanation) ──
 const KVA_OPTIONS = Object.freeze([
