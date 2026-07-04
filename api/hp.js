@@ -233,6 +233,38 @@ function nogSystemPrompt(difficulty) {
   ].join(' ');
 }
 
+// Verify-pass for KVA/NOG. Unlike XYZ these have FIXED semantic options, so the reviewer maps the
+// stem to one of the fixed indices (KVA: I/II/equal/insufficient; NOG: the 5 sufficiency cases) and
+// we keep only items whose independent verdict matches the generator's correct_index. Same fail-open
+// posture as verifyXyz — a transient reviewer error degrades to hardened-prompt (+gpt-4o) quality.
+function fixedVerifySchema(n, maxIndex) {
+  return { type: 'json_schema', name: 'hp_fixed_verify', strict: true, schema: {
+    type: 'object', additionalProperties: false, required: ['results'], properties: {
+      results: { type: 'array', minItems: n, maxItems: n, items: {
+        type: 'object', additionalProperties: false, required: ['index'],
+        properties: { index: { type: 'integer', minimum: -1, maximum: maxIndex } },
+      } },
+    },
+  } };
+}
+const KVA_VERIFY_SYS = 'Du är en noggrann matematikkontrollant för KVA (kvantitativa jämförelser). För VARJE uppgift, jämför Kvantitet I och II utifrån ENDAST stem. Returnera 0-baserat index: 0=I större, 1=II större, 2=lika stora, 3=informationen otillräcklig. Om inget av dessa kan fastställas entydigt, returnera -1. Räkna noga.';
+const NOG_VERIFY_SYS = 'Du är en noggrann kontrollant för NOG (informationstillräcklighet). För VARJE uppgift, pröva påstående (1) och (2) var för sig och sedan tillsammans, utifrån ENDAST stem. Returnera 0-baserat index: 0=(1) ensam räcker men inte (2) ensam, 1=(2) ensam räcker men inte (1) ensam, 2=(1)+(2) tillsammans räcker men ingen ensam, 3=vardera ensam räcker, 4=tillsammans otillräckligt. En intervall räcker inte för en exakt "hur många"-fråga. Osäker → -1.';
+async function verifyFixedAlt(kind, items, model) {
+  if (!items.length) return items;
+  const maxIndex = (kind === 'KVA' ? KVA_OPTIONS.length : NOG_OPTIONS.length) - 1;
+  const payload = items.map((q, i) => ({ i, stem: q.stem }));
+  let out;
+  try {
+    out = await callAI([
+      { role: 'system', content: kind === 'KVA' ? KVA_VERIFY_SYS : NOG_VERIFY_SYS },
+      { role: 'user', content: JSON.stringify(payload) },
+    ], { model, schema: fixedVerifySchema(items.length, maxIndex), timeout: 40000 });
+  } catch { return items; }  // reviewer unavailable → don't nuke the batch
+  let parsed; try { parsed = JSON.parse(out); } catch { return items; }
+  const res = Array.isArray(parsed?.results) ? parsed.results : null;
+  if (!res || res.length !== items.length) return items;
+  return items.filter((q, i) => Number.isInteger(res[i]?.index) && res[i].index === q.correct_index);
+}
 async function generateFixedAlt(kind, node_id, difficulty, n, model) {
   const isKva = kind === 'KVA';
   const options = isKva ? KVA_OPTIONS : NOG_OPTIONS;
@@ -243,10 +275,11 @@ async function generateFixedAlt(kind, node_id, difficulty, n, model) {
   ], { model, schema: fixedAltSchema(n, maxIndex, `hp_${kind.toLowerCase()}_schema`), timeout: 40000 });
   let parsed; try { parsed = JSON.parse(out); } catch { return []; }
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
-  return items
+  const mapped = items
     .filter(q => q && typeof q.stem === 'string' && Number.isInteger(q.correct_index) &&
       q.correct_index >= 0 && q.correct_index <= maxIndex && typeof q.explanation === 'string')
     .map(q => ({ stem: q.stem, options: [...options], correct_index: q.correct_index, explanation: q.explanation, difficulty: q.difficulty }));
+  return verifyFixedAlt(kind, mapped, model);   // discard items the independent solve disagrees with
 }
 
 // ── XYZ: matematisk problemlösning (4 alternativ A–D, LaTeX-matematik) ───────
