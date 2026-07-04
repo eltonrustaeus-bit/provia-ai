@@ -96,7 +96,8 @@
     try {
       var path = window.location.pathname.toLowerCase();
       var page = 'app';
-      if (path.includes('korkortet')) page = 'körkortsteorin';
+      if (path.includes('provia-hp')) page = 'högskoleprovet';
+      else if (path.includes('korkortet')) page = 'körkortsteorin';
       else if (path.includes('rb') || path.includes('rbattring') || path.includes('forbattring') || path.includes('förbättring')) page = 'förbättring';
       else if (path.includes('pricing')) page = 'prisplan';
       else if (path === '/' || path.includes('index')) page = 'startsida';
@@ -143,6 +144,12 @@
     try {
       var path = window.location.pathname.toLowerCase();
       var pc = window._perPageContext;
+      if (path.includes('provia-hp')) {
+        if (pc && pc.currentQuestion && pc.currentQuestion.text) {
+          return 'Fastnat på uppgiften? Fråga varför — eller be om en ledtråd.';
+        }
+        return 'Tränar högskoleprovet? Fråga om ord, läsförståelse eller matte — jag förklarar metoden.';
+      }
       if (path.includes('korkortet')) {
         if (pc && pc.currentQuestion && pc.currentQuestion.text) {
           return 'Kör fast på den här? Fråga på.';

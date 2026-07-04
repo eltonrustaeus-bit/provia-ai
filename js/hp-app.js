@@ -137,6 +137,34 @@ function renderProgress() {
   }
 }
 
+// Feed the site-wide P.E.R widget (shared.js) the current HP context so it can coach on the
+// exact item the user is on. Pre-answer we pass NO answer — and the client never holds the key
+// anyway (api/hp withholds correct_index/explanation until submit), so a "ge mig en ledtråd"
+// request cannot leak the answer. Post-answer we add the revealed key/explanation so P.E.R can
+// explain WHY. weakAreas come from server-authoritative mastery.
+function weakAreaLabels() {
+  return Object.entries(state.masteryMap)
+    .filter(([, m]) => m > 0).sort((a, b) => a[1] - b[1]).slice(0, 5)
+    .map(([nid, m]) => {
+      const n = getNode(nid);
+      const label = n ? n.label : (nid.startsWith('delprov:') ? nid.slice(8) : nid);
+      return `${label} (${Math.round(m)})`;
+    });
+}
+function syncPerContext(answerInfo) {
+  if (typeof window.setPerContext !== 'function') return;   // shared.js deferred; skip until ready
+  const q = state.current;
+  const ctx = { mode: 'högskoleprov-träning', level: state.delprov, weakAreas: weakAreaLabels() };
+  if (q) {
+    ctx.currentQuestion = {
+      text: q.stem, delprov: state.delprov, node: q.node_id,
+      options: Array.isArray(q.options) ? q.options : undefined,
+    };
+    if (answerInfo) Object.assign(ctx.currentQuestion, answerInfo);
+  }
+  window.setPerContext(ctx);
+}
+
 function renderQuestion() {
   const q = state.current;
   const node = getNode(q.node_id);
@@ -158,6 +186,7 @@ function renderQuestion() {
   el('hpNext').hidden = true;
   renderMath(el('hpStem')); renderMath(opts);
   state.servedAt = Date.now();
+  syncPerContext();   // pre-answer: no key in context (client doesn't hold it) → hints can't leak
 }
 
 async function submitAnswer(chosenIndex, btn) {
@@ -193,6 +222,12 @@ async function submitAnswer(chosenIndex, btn) {
   renderMath(ex);
   el('hpNext').hidden = false;
   renderProgress();
+  syncPerContext({   // post-answer: reveal is now on the client, let P.E.R explain WHY
+    chosenAnswer: state.current.options?.[chosenIndex],
+    correctAnswer: state.current.options?.[d.correct_index],
+    explanation: d.explanation || '',
+    wasCorrect: !!d.is_correct,
+  });
 }
 
 async function nextQuestion() {
