@@ -196,7 +196,11 @@ async function requireAuth(req) {
 }
 
 async function loadCentralRules() {
-  return import("./_provia-rules.js");
+  const m = await import("./_provia-rules.js");
+  // This file is CJS and dynamically imports the ESM rules module. After
+  // Vercel's ESM→CJS compile the named exports aren't reliably exposed on the
+  // namespace, so `m.normalizeRole` can be undefined — fall back to default.
+  return (m && typeof m.normalizeRole === "function") ? m : (m.default || m);
 }
 
 async function loadUserRole(userId) {

@@ -641,6 +641,10 @@ white-space:nowrap;
 <div class="sBody">
 <label class="fieldLabel" for="pastedText" id="tPasteLabel">Studiematerial</label>
 <textarea id="pastedText" placeholder="Rubriker → punktlista → definitioner/formler → exempel"></textarea>
+<div class="sNav" style="margin-top:10px;justify-content:flex-start">
+<button class="btn btnG" type="button" id="fillExampleBtn">✨ Fyll i exempeltext</button>
+<span class="sNavHint" id="fillExampleHint">Ingen text redo? Prova med ett färdigt exempel.</span>
+</div>
 <div class="uploadBox" style="margin-top:16px">
 <div class="uploadTop">
 <span class="uploadTitle" id="tOcrTitle">Bild → OCR (valfritt)</span>
@@ -1184,8 +1188,20 @@ function setWizardStep(step,opts={}){
   if(gn){gn.style.display=hideNav?"none":"";}
   document.body.classList.toggle("exam-mode",hideNav);
 }
+const EXAMPLE_MATERIAL=`Derivata — sammanfattning
+Definition: derivatan f'(x) beskriver funktionens momentana förändringshastighet.
+Deriveringsregler:
+- Konstant: d/dx(c) = 0
+- Potens: d/dx(x^n) = n·x^(n-1)
+- Summa: (f+g)' = f' + g'
+- Produkt: (f·g)' = f'·g + f·g'
+- Kedjeregeln: (f(g(x)))' = f'(g(x))·g'(x)
+Exempel: f(x) = 3x^2 + 2x - 5 ger f'(x) = 6x + 2.
+Tillämpning: sätt f'(x) = 0 för att hitta extrempunkter (max/min).
+Andraderivatan f''(x) avgör om punkten är max (f''<0) eller min (f''>0).`;
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
+  onClick("fillExampleBtn",()=>{const ta=pastedTextEl();if(!ta)return;ta.value=EXAMPLE_MATERIAL;ta.dispatchEvent(new Event("input",{bubbles:true}));ta.focus();setStatus(LANG==="sv"?"Exempeltext ifylld — tryck \"Nästa\" för att fortsätta.":"Example text added — press \"Next\" to continue.","ok");});
   onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}setWizardStep(1);});
   onClick("wBack1",()=>setWizardStep(0));
   onClick("wBack2",()=>setWizardStep(1));
