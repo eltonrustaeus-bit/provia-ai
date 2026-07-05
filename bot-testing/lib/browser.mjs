@@ -247,8 +247,17 @@ async function doMockprov(page, persona) {
     const ta = page.locator("#pastedText").first();
     if (await ta.isVisible({ timeout: 4000 })) {
       const usedExample = await robustClick(page, "#fillExampleBtn", 2500);
-      if (usedExample) await sleep(600);
-      const hasText = await ta.inputValue().then((v) => v.trim().length > 0).catch(() => false);
+      // Poll for the fill instead of a single fast check — the button works,
+      // but the value lands a beat after the click and a rushed check reads
+      // empty (that false-negative was polluting reports as a fake bug).
+      let hasText = false;
+      if (usedExample) {
+        for (let i = 0; i < 6; i++) {
+          hasText = await ta.inputValue().then((v) => v.trim().length > 0).catch(() => false);
+          if (hasText) break;
+          await sleep(400);
+        }
+      }
       if (usedExample && hasText) {
         notes.push("använde exempeltext-knappen");
       } else {
