@@ -642,7 +642,7 @@ white-space:nowrap;
 <span class="sNum">01</span>
 <div class="sMeta">
 <div class="sTitle" id="tStep1">Material</div>
-<div class="sDesc" id="tStep1Sub">Klistra in ditt material — eller tryck ✨ Fyll i exempeltext för att testa direkt</div>
+<div class="sDesc" id="tStep1Sub">Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel</div>
 </div>
 <svg class="sChev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="6 3 11 8 6 13"/></svg>
 </div>
@@ -650,10 +650,6 @@ white-space:nowrap;
 <div class="sBody">
 <label class="fieldLabel" for="pastedText" id="tPasteLabel">Studiematerial</label>
 <textarea id="pastedText" placeholder="Rubriker → punktlista → definitioner/formler → exempel"></textarea>
-<div class="sNav" style="margin-top:10px;justify-content:flex-start">
-<button class="btn btnG" type="button" id="fillExampleBtn">✨ Fyll i exempeltext</button>
-<span class="sNavHint" id="fillExampleHint">Ingen text redo? Prova med ett färdigt exempel.</span>
-</div>
 <div class="uploadBox" style="margin-top:16px">
 <div class="uploadTop">
 <span class="uploadTitle" id="tOcrTitle">Bild → OCR (valfritt)</span>
@@ -667,7 +663,7 @@ white-space:nowrap;
 </div>
 <div class="tipBox" id="formatHint">Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.</div>
 <div class="sNav">
-<span class="sNavHint" id="wHint0">Fyll i material — eller tryck ✨ Fyll i exempeltext</span>
+<span class="sNavHint" id="wHint0">Klistra in ditt studiematerial ovan</span>
 <button class="btn btnP" type="button" id="wNext0">Nästa: Inställningar →</button>
 </div>
 </div>
@@ -855,7 +851,7 @@ sv:{
   lockLabel:"Åtkomstkod",unlock:"Lås upp",toInfo:"Infosidan",toImprove:"Förbättring",
   m1:"01 — Material",m2:"02 — Inställningar",m3:"03 — Mockprov",m4:"04 — Rättning",
   mImprove:"Förbättring",mLang:"English",mLogout:"Logga ut",
-  step1:"Material",step1Sub:"Klistra in ditt material — eller tryck ✨ Fyll i exempeltext för att testa direkt",
+  step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
@@ -881,7 +877,7 @@ sv:{
   quotaHitMonth:"Du har nått månadsgränsen. Uppgradera till Premium för obegränsat.",
   openSection:"Öppna",closeSection:"Stäng",
   wLabel0:"Material",wLabel1:"Inställningar",wLabel2:"Mockprov",wLabel3:"Rättning",
-  wNext0:"Nästa: Inställningar →",wHint0:"Fyll i material — eller tryck ✨ Fyll i exempeltext",
+  wNext0:"Nästa: Inställningar →",wHint0:"Klistra in ditt studiematerial ovan",
   wHint1:'Redo? Tryck "Skapa mockprov" — du får frågorna direkt',
   wBack:"← Tillbaka",wNext2:"Rätta prov →",wRestart:"Nytt prov →",
   heroSub:"Klistra in ditt studiematerial, välj nivå och antal frågor — ProviaAi genererar ett komplett prov med automatisk rättning och modellsvar.",
@@ -895,7 +891,7 @@ en:{
   toInfo:"Info page",toImprove:"Improve",
   m1:"01 — Material",m2:"02 — Settings",m3:"03 — Mock exam",m4:"04 — Grading",
   mImprove:"Improve",mLang:"Svenska",mLogout:"Log out",
-  step1:"Material",step1Sub:"Paste your material — or press ✨ Fill example text to try it instantly",
+  step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
@@ -921,7 +917,7 @@ en:{
   quotaHitMonth:"You've reached the monthly limit. Upgrade to Premium for unlimited.",
   openSection:"Open",closeSection:"Close",
   wLabel0:"Material",wLabel1:"Settings",wLabel2:"Mock exam",wLabel3:"Grading",
-  wNext0:"Next: Settings →",wHint0:"Fill in material — or press ✨ Fill example text",
+  wNext0:"Next: Settings →",wHint0:"Paste your study material above",
   wHint1:'Ready? Press "Generate mock exam" — you get the questions right away',
   wBack:"← Back",wNext2:"Grade exam →",wRestart:"New exam →",
   heroSub:"Paste your study material, choose level and number of questions — ProviaAi generates a complete exam with automatic grading and model answers.",
@@ -1198,20 +1194,8 @@ function setWizardStep(step,opts={}){
   if(gn){gn.style.display=hideNav?"none":"";}
   document.body.classList.toggle("exam-mode",hideNav);
 }
-const EXAMPLE_MATERIAL=`Derivata — sammanfattning
-Definition: derivatan f'(x) beskriver funktionens momentana förändringshastighet.
-Deriveringsregler:
-- Konstant: d/dx(c) = 0
-- Potens: d/dx(x^n) = n·x^(n-1)
-- Summa: (f+g)' = f' + g'
-- Produkt: (f·g)' = f'·g + f·g'
-- Kedjeregeln: (f(g(x)))' = f'(g(x))·g'(x)
-Exempel: f(x) = 3x^2 + 2x - 5 ger f'(x) = 6x + 2.
-Tillämpning: sätt f'(x) = 0 för att hitta extrempunkter (max/min).
-Andraderivatan f''(x) avgör om punkten är max (f''<0) eller min (f''>0).`;
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
-  onClick("fillExampleBtn",()=>{const ta=pastedTextEl();if(!ta)return;ta.value=EXAMPLE_MATERIAL;ta.dispatchEvent(new Event("input",{bubbles:true}));ta.focus();setStatus(LANG==="sv"?"Exempeltext ifylld — tryck \"Nästa\" för att fortsätta.":"Example text added — press \"Next\" to continue.","ok");});
   onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}setWizardStep(1);});
   onClick("wBack1",()=>setWizardStep(0));
   onClick("wBack2",()=>setWizardStep(1));
