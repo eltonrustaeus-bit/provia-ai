@@ -1443,7 +1443,9 @@ function staggerIn(els,delayMs){
 function renderExam(exam){
   currentExam=exam; const qs=Array.isArray(exam.questions)?exam.questions:[]; const t=T[LANG];
   const em=examMetaEl(),eb=examBodyEl(),rm=resultMetaEl(),rb=resultBodyEl();
-  if(em)em.textContent=`${exam.title||(LANG==="sv"?"Mockprov":"Mock exam")} · ${LANG==="sv"?"Nivå":"Level"}: ${exam.level||"—"} · ${qs.length} ${LANG==="sv"?"frågor":"questions"}`;
+  if(em)em.textContent=LANG==="sv"
+    ?`${qs.length} frågor · Nivå ${exam.level||"—"} — besvara allt och tryck Rätta prov`
+    :`${qs.length} questions · Level ${exam.level||"—"} — answer all, then press Grade exam`;
   if(eb)eb.innerHTML=""; if(rm)rm.textContent=t.noGrade; if(rb)rb.innerHTML="";
   qs.forEach((q,idx)=>{
     const box=document.createElement("div"); box.className="qBox";
