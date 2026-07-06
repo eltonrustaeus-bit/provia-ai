@@ -91,15 +91,21 @@ async function shot(page, outDir, name) {
 // --- per-step interactions (all best-effort) ---
 
 async function acceptCookies(page) {
-  // Consent banner blocks clicks; accept once (persists per origin).
-  try {
-    const btn = page.locator("#ckAcceptBtn");
-    if (await btn.isVisible({ timeout: 1500 })) {
-      await btn.click({ timeout: SOFT_TIMEOUT });
-      await sleep(400);
+  // Consent banner can appear late (after signup) and blocks interaction /
+  // gates wizard init. Try a few times, match by id or button text.
+  const sel = "#ckAcceptBtn, button:has-text('Acceptera alla'), button:has-text('Accept all')";
+  for (let i = 0; i < 3; i++) {
+    try {
+      const btn = page.locator(sel).first();
+      if (await btn.isVisible({ timeout: 1000 })) {
+        await btn.evaluate((el) => el.click()).catch(() => btn.click({ timeout: SOFT_TIMEOUT }));
+        await sleep(400);
+        return;
+      }
+    } catch {
+      /* keep trying */
     }
-  } catch {
-    /* no banner */
+    await sleep(600);
   }
 }
 
@@ -234,6 +240,7 @@ async function interactGeneric(page, stepName) {
 // it wait for the slow AI round-trips instead of bailing early.
 async function doMockprov(page, persona) {
   const notes = [];
+  await acceptCookies(page); // late-appearing banner can block the wizard
   const course =
     persona.primaryMode === "matte"
       ? persona.role.includes("åk 1") || persona.age <= 16
