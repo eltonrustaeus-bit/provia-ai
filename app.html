@@ -1290,7 +1290,17 @@ function hideGradingOverlay(){
 function setStatus(txt,kind){ const s=statusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function setOcrStatus(txt,kind){ const s=ocrStatusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function isUnlocked(){ return localStorage.getItem(ACCESS_FLAG_KEY)==="true"; }
-function showLock(){ const s=$("loginScreen"); if(window.openProviaLogin){ if(s){s.style.display="none";s.setAttribute("aria-hidden","true");} document.documentElement.style.overflow="";document.body.style.overflow=""; window.openProviaLogin('register'); return; } if(!s)return;s.style.display="flex";s.setAttribute("aria-hidden","false");document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden"; }
+function showLock(){
+  const s=$("loginScreen");
+  const openShared=()=>{ if(s){s.style.display="none";s.setAttribute("aria-hidden","true");} document.documentElement.style.overflow="";document.body.style.overflow=""; window.openProviaLogin('register'); };
+  const openFallback=()=>{ if(!s)return;s.style.display="flex";s.setAttribute("aria-hidden","false");document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden"; };
+  if(window.openProviaLogin){ openShared(); return; }
+  // shared.js is deferred and may not be ready yet — wait briefly for it (same pattern as förbättring.html/korkortet.html) before falling back to the legacy inline overlay.
+  let n=0; const iv=setInterval(()=>{
+    if(window.openProviaLogin){ clearInterval(iv); openShared(); }
+    else if(++n>50){ clearInterval(iv); openFallback(); }
+  },60);
+}
 function hideLock(){ const s=$("loginScreen");if(!s)return;s.style.display="none";s.setAttribute("aria-hidden","true");document.documentElement.style.overflow="";document.body.style.overflow=""; }
 function setLockError(msg){ const em=$("errorMsg");if(em)em.textContent=msg||""; }
 async function logout(){
