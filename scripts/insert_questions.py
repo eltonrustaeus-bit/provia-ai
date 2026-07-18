@@ -3,7 +3,7 @@
 import json, urllib.request, sys
 
 SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co"
-ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8"
+ANON_KEY = "sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN"
 
 QUESTIONS = [
   # VÄGMÄRKEN

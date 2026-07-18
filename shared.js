@@ -1278,7 +1278,7 @@
   /* ── SHARED LOGIN MODAL ── */
   (function() {
     var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-    var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubW90ZGx1aWd6ZWVoZGpiaGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMzcwODQsImV4cCI6MjA4NTkxMzA4NH0.pEV4zBWqxnrPVyvrenPVArXxvXr1eRU1eRaXhl7AIY8';
+    var SUPA_ANON = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
     var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
     var _view     = 'welcome';
     var _open     = false;

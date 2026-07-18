@@ -47,7 +47,6 @@ module.exports = async function handler(req, res) {
       {
         headers: {
           "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
-          "Authorization": "Bearer " + process.env.SUPABASE_SERVICE_ROLE_KEY,
         },
         signal: AbortSignal.timeout(5000)
       }

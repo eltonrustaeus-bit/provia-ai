@@ -47,7 +47,7 @@ for (let i = 0; i < words.length; i += BATCH) {
   const rows = words.slice(i, i + BATCH).map((w) => ({ word: w, source, tags: tag ? [tag] : [] }));
   const r = await fetch(SB + '/rest/v1/hp_ord_lexicon?on_conflict=word', {
     method: 'POST',
-    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    headers: { apikey: SRK, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
     body: JSON.stringify(rows),
   });
   if (!r.ok) { console.error(`Batch ${i}-${i + rows.length} failed: ${r.status} ${await r.text()}`); process.exit(1); }

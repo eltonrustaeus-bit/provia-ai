@@ -52,7 +52,7 @@ async function requireAuth(req) {
 async function loadUserRole(userId) {
   try {
     const r = await fetch(SB + '/rest/v1/profiles?select=role&id=eq.' + encodeURIComponent(userId),
-      { headers: { apikey: SRK, Authorization: 'Bearer ' + SRK }, signal: AbortSignal.timeout(5000) });
+      { headers: { apikey: SRK }, signal: AbortSignal.timeout(5000) });
     if (!r.ok) return 'gratis';
     const d = await r.json();
     return String(d?.[0]?.role || 'gratis');
@@ -60,7 +60,7 @@ async function loadUserRole(userId) {
 }
 async function sbSelect(pathQuery) {
   const r = await fetch(SB + '/rest/v1/' + pathQuery, {
-    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK }, signal: AbortSignal.timeout(5000),
+    headers: { apikey: SRK }, signal: AbortSignal.timeout(5000),
   });
   if (!r.ok) return [];
   return r.json();
@@ -69,7 +69,7 @@ async function sbInsert(table, rows, prefer = 'return=representation', onConflic
   const url = SB + '/rest/v1/' + table + (onConflict ? '?on_conflict=' + encodeURIComponent(onConflict) : '');
   const r = await fetch(url, {
     method: 'POST',
-    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json', Prefer: prefer },
+    headers: { apikey: SRK, 'Content-Type': 'application/json', Prefer: prefer },
     body: JSON.stringify(rows), signal: AbortSignal.timeout(8000),
   });
   if (!r.ok) return null;
@@ -81,7 +81,7 @@ async function sbInsert(table, rows, prefer = 'return=representation', onConflic
 async function applyMastery(userId, nodeId, difficulty, correct) {
   const r = await fetch(SB + '/rest/v1/rpc/apply_hp_mastery', {
     method: 'POST',
-    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json' },
+    headers: { apikey: SRK, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_user_id: userId, p_node_id: nodeId, p_difficulty: difficulty, p_correct: correct }),
     signal: AbortSignal.timeout(5000),
   });
@@ -93,7 +93,7 @@ async function consumeQuota(rpc, userId, limit) {
   if (limit.cap === Infinity) return { ok: true, unlimited: true };
   const r = await fetch(SB + '/rest/v1/rpc/' + rpc, {
     method: 'POST',
-    headers: { apikey: SRK, Authorization: 'Bearer ' + SRK, 'Content-Type': 'application/json' },
+    headers: { apikey: SRK, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_user_id: userId, p_period_key: currentPeriodKey(limit.period), p_limit: limit.cap }),
     signal: AbortSignal.timeout(5000),
   });
