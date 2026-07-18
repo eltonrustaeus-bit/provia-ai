@@ -113,3 +113,59 @@ Migrationen applicerad via Supabase MCP (`apply_migration`, atomär transaktion)
 
 ## Gate Result
 **PASS** (efter fixar, före applicering — i enlighet med uppdragets krav att Codex granskar migration och RLS INNAN tillämpning).
+
+---
+
+## Review ID
+CR-2026-07-19-004
+
+## Scope
+Oberoende granskning (read-only) av Fas 3-leveransen (pilotkorpus + gold-set, uppdragets §38 Fas 3)
+**innan applicering mot produktionsdatabasen**: `supabase/migrations/20260721_knowledge_engine_corpus_seed.sql`
++ `_ROLLBACK.sql`, `docs/provia-knowledge-engine/pilot-corpus-sources.md`,
+`tests/evals/legal-v1/gold-set.v1.json`, `tests/evals/legal-v1/validate-gold-set.mjs`, mot referens
+i `20260720_knowledge_engine_schema.sql` och `schemas/exam-question.schema.json`. Körd read-only
+(`codex exec --sandbox read-only`), inkl. att själv köra `node tests/evals/legal-v1/validate-gold-set.mjs`.
+
+## Commit / Diff
+Ingen diff — nya, ännu ospårade filer på branch `feature/provia-knowledge-engine-v1`, inte applicerade
+mot databasen vid granskningstillfället.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga.
+
+### MEDIUM
+- `schemas/exam-question.schema.json` (`source_chunk_ids`-beskrivningen) förutsätter `review_status='approved'`
+  för chunks som används i **publicerad** generering (§18/§24), medan Fas 3-seeden avsiktligt sätter
+  samtliga 20 chunks till `pending`. Gold-setet refererar alltså chunks som (ännu) inte uppfyller
+  produktionskravet. Status: **fixat** — `tests/evals/legal-v1/gold-set.v1.json` fick ett nytt
+  `eval_only_notice`-fält som uttryckligen säger att gold-set-payloads är en fristående eval-fixture
+  (mäter Fas 4/5-genereringspipelinens kvalitet mot mänskligt facit) och **inte** får infogas direkt
+  som rader i `exam_questions` förrän en människa satt motsvarande chunks till `approved`.
+
+### LOW
+- Inga SQL/DDL-kompatibilitetsproblem: `on conflict (id)` matchar primary keys på samtliga fyra
+  INSERT-block, `on conflict (chunk_id, concept_id)` matchar `chunk_concepts`s composite primary key.
+- Rollback-ordningen (`chunk_concepts` → `knowledge_chunks` → `knowledge_documents` → `concepts` →
+  `knowledge_sources`) är korrekt och scopead till forward-seedens hårdkodade ID:n.
+- Manifestet (`pilot-corpus-sources.md`) är internt konsistent med SQL:n: källornas `license_status='approved'`
+  (rättighetsfråga, redan beslutad i `10-open-questions.md` #2) hålls uttryckligen isär från
+  `review_status='pending'` (juridisk innehållsgranskning, ej gjord av Claude).
+- Gold-set-schema-edge-cases utöver vad `validate-gold-set.mjs` redan testar: inga träffar (MC
+  `correct_answer` pekar på existerande option-id:n, inga dubblerade option-id:n, `short_answer`
+  saknar `options`, inga dubblerade concept/source-id:n per fråga).
+
+## Claude Resolution
+MEDIUM-fyndet fixat direkt (se ovan). `node tests/evals/legal-v1/validate-gold-set.mjs` omkört efter
+fixen: 101/101 kontroller PASS. Inget kvarstår öppet från denna omgång.
+
+## Tests
+`node tests/evals/legal-v1/validate-gold-set.mjs` — 101/101 PASS (50 frågor mot
+`schemas/exam-question.schema.json` + korsreferens mot migrationens seedade UUID:er).
+`node tests/schema/validate-schemas.mjs` — 21/21 PASS (regression, oförändrad).
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter — samma mönster som tidigare granskningar). Redo för
+applicering mot produktionsdatabasen `mnmotdluigzeehdjbhbu`.
