@@ -27,7 +27,7 @@ Syntes av `docs/security/secrets-audit.md`, `rls-audit.md`, `service-role-audit.
 
 | Allvarlighet | Fynd | Status |
 |---|---|---|
-| HIGH | `api/_per-memory.js:292` — chatthistorik osanerad mot prompt-injection i minnesprofil-prompten (till skillnad från `pageContext`, som saneras) | Öppen, föreslagen Fas 1/7-uppgift |
+| HIGH | `api/_per-memory.js:292` — chatthistorik osanerad mot prompt-injection i minnesprofil-prompten (till skillnad från `pageContext`, som saneras) | **Fixat 2026-07-18** — `PRIVATE_OR_SECRET_REGEX` utökad med `_per-context.js`s injection-fraser |
 | MEDIUM | `apply_hp_mastery`-RPC saknar radlås vid första försök på en nod → förlorad uppdatering-race | Öppen, lågt allvar (självpåverkande, ingen cross-user-läcka) |
 | MEDIUM | `check-role.js:485` — AI-genererat klassrapportinnehåll osanerat i lärarrapport-prompt | Öppen, indirekt injection-väg |
 | LOW | Råa felmeddelanden (`String(e)`) läcker till klient i flera endpoints | Öppen, generell härdning |

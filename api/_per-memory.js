@@ -6,7 +6,10 @@ const MAX_HIST_CHARS  = 3000;
 const MEMORY_TTL_DAYS = 90;
 const MAX_HELP_LOG    = 20;
 
-const PRIVATE_OR_SECRET_REGEX = /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+?\d[\d\s().-]{7,}\d)|api[_ -]?key|secret|token|password|supabase_service_role|stripe_secret|openai_api_key|system prompt|developer message)\b/i;
+// Matches _per-context.js's BLOCKED_CONTEXT_REGEX coverage of prompt-injection phrasing
+// (ignore previous instructions, env variable dumps) in addition to PII/secret patterns —
+// student chat history is untrusted input and must be filtered the same way pageContext is.
+const PRIVATE_OR_SECRET_REGEX = /\b([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?:\+?\d[\d\s().-]{7,}\d)|api[_ -]?key|secret|token|password|supabase_service_role|stripe_secret|openai_api_key|system prompt|developer message|ignore previous|ignore all|env(?:ironment)? variables?)\b/i;
 
 function cleanMemoryText(value, maxLen = 180) {
   const text = String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLen);

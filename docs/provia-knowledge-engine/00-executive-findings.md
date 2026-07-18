@@ -66,11 +66,13 @@ Se full lista i `10-open-questions.md`. De viktigaste: (a) var ska nya serverles
 
 ## 12. Rekommendation
 
-# **CONDITIONAL GO**
+# **GO**
 
-Villkor för att gå vidare till Fas 1:
-1. Du bekräftar att service_role-nyckelrotationen är genomförd (se `02-security-findings.md`).
-2. Du tar beslut om hosting-frågan i §7/`10-open-questions.md` fråga #1.
-3. Du bekräftar att HIGH-fyndet från Codex (`_per-memory.js`) tas som en Fas 1-uppgift snarare än blockerande — annars gör vi det till en förutsättning.
+Samtliga villkor uppfyllda 2026-07-18:
+1. ✅ Service_role-nyckeln roterad och verifierad live; git-historiken rensad och force-pushad.
+2. ✅ Hosting-beslut taget: konsolidera i `api/knowledge.js` (hp.js-mönstret) — se `10-open-questions.md` #1.
+3. ✅ Codex HIGH-fyndet (`_per-memory.js`) beslutat fixas som fristående uppgift, inte blockerande för Fas 1.
+4. ✅ Rättighetsstatus för pilotens källmaterial: börja med fri lagtext + Skolverkets ämnesplaner.
+5. ✅ De fem icke-blockerande buggarna samlas i en separat uppföljnings-PR, utanför knowledge-engine-scopet.
 
-Inget i den befintliga kodbasens arkitektur, säkerhetsläge (efter fixarna ovan) eller datamodell utgör ett skäl att inte fortsätta. Körkorts- och matematikmodulerna är obesökta och opåverkade, i linje med uppdragets icke-förhandlingsbara avgränsningar.
+Fullständig beslutslogg: `10-open-questions.md`. Fas 1 (kontrakt, ADR, schemas) kan påbörjas. Körkorts- och matematikmodulerna förblir obesökta och opåverkade, i linje med uppdragets icke-förhandlingsbara avgränsningar.
