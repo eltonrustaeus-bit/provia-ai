@@ -27,9 +27,9 @@ Frågor som inte kunde avgöras från repot — **besvarade av produktägaren 20
 
 Genomfört 2026-07-18: `git filter-repo --path scripts/fix_broken_image_urls.mjs --invert-paths`, force-pushat till `origin/main`. Commit `91fdb62` och den läckande filen finns inte längre i historiken. Nyckeln var redan roterad och verifierad live innan rensningen kördes.
 
-## 6. HP-verifierarens "blind lösning"-mönster — BESLUTAT
+## 6. HP-verifierarens "blind lösning"-mönster — KONTROLLERAT OCH BEKRÄFTAT (Fas 1)
 
-**Kontrolleras i Fas 1** innan juridik-verifieraren designas. `hp.js` läses, rörs inte.
+`hp.js`s `verifyVerbal()` och `verifyFixedAlt()` skickar **aldrig** `correct_index`/`explanation` i den payload som går till modellen — bara `{i, stem, options}` (och `passage` där relevant). Verifieraren löser uppgiften blint; jämförelsen mot generatorns facit (`res[i].index === q.correct_index`) sker i JavaScript-kod efter AI-svaret, inte i prompten. Detta uppfyller uppdragets §25.1 exakt. `src/ai/prompts/legal-verifier-blind/` kan kopiera detta mönster rakt av. `hp.js` oförändrad.
 
 ## 7. GDPR-kontoradering — kvarstår öppen (utanför scope)
 

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proviaai.se/schemas/error-classification.schema.json",
+  "title": "ErrorClassification",
+  "description": "Matchar student_error_events (uppdragets §14.9/§29). error_code måste vara ett av koderna i error-codes.json — valideras deterministiskt mot den listan, inte fritt av modellen.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question_id", "concept_id", "error_code", "severity"],
+  "properties": {
+    "question_id": { "type": "string", "format": "uuid" },
+    "concept_id": { "type": "string", "format": "uuid" },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "MISSING_CORE_CONCEPT",
+        "CONFUSES_TWO_CONCEPTS",
+        "CORRECT_RULE_WRONG_APPLICATION",
+        "UNSUPPORTED_CONCLUSION",
+        "INCOMPLETE_REASONING",
+        "MISREADS_FACT_PATTERN",
+        "USES_OUTDATED_RULE",
+        "LANGUAGE_CLARITY",
+        "OTHER_REVIEW_REQUIRED"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    }
+  }
+}

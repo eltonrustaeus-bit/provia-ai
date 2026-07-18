@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proviaai.se/schemas/generation-job.schema.json",
+  "title": "GenerationJob",
+  "description": "Matchar generation_jobs-tabellen (uppdragets §13.1/§14). Jobbsteg körs synkront per request (ADR 0003) — denna post är progress-spårning, inte en köpost.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "user_id", "job_type", "status", "pipeline_version", "idempotency_key"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "school_id": { "type": ["string", "null"], "format": "uuid" },
+    "job_type": { "type": "string", "enum": ["legal_exam_generation"] },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "planning",
+        "retrieving",
+        "generating",
+        "validating",
+        "verifying",
+        "repairing",
+        "assembling",
+        "completed",
+        "partially_completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "step": { "type": "string" },
+    "progress_current": { "type": "integer", "minimum": 0 },
+    "progress_total": { "type": "integer", "minimum": 0 },
+    "error_code": { "type": ["string", "null"] },
+    "error_message_sanitized": {
+      "description": "Aldrig rå felsträng till klient — se admin.js-mönstret för strukturerade felsvar, inte String(e) rakt av (Codex LOW-fynd, docs/codex_review.md).",
+      "type": ["string", "null"]
+    },
+    "retry_count": { "type": "integer", "minimum": 0, "default": 0 },
+    "idempotency_key": { "type": "string" },
+    "pipeline_version": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "corpus_version": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proviaai.se/schemas/exam-question.schema.json",
+  "title": "ExamQuestion",
+  "description": "En knowledge-engine-genererad fråga innan/efter verifiering. Matchar exam_questions-tabellen (uppdragets §14.7/§23). Frågetypen är begränsad till samma två typer som befintlig mockprovsgenerering redan stödjer (api/generate-exam.js) — ingen essay-typ.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_type",
+    "question",
+    "correct_answer",
+    "explanation",
+    "difficulty",
+    "concept_ids",
+    "curriculum_refs",
+    "source_chunk_ids"
+  ],
+  "properties": {
+    "question_type": {
+      "type": "string",
+      "enum": ["multiple_choice", "short_answer"]
+    },
+    "question": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "options": {
+      "description": "Endast för multiple_choice. Tomt/utelämnat för short_answer.",
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "text"],
+        "properties": {
+          "id": { "type": "string", "enum": ["A", "B", "C", "D", "E"] },
+          "text": { "type": "string", "minLength": 1, "maxLength": 400 }
+        }
+      }
+    },
+    "correct_answer": {
+      "description": "Multiple_choice: en eller flera options-id. Short_answer: modellsvar som fritext i en array med ett element.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 2000
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["E", "C", "A"]
+    },
+    "concept_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "format": "uuid" }
+    },
+    "curriculum_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "source_chunk_ids": {
+      "description": "Måste peka på knowledge_chunks med review_status=approved (uppdragets §18/§24) — valideras deterministiskt, inte av modellen.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "format": "uuid" }
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": ["pending", "passed", "repaired", "rejected", "manual_review"],
+      "default": "pending"
+    },
+    "generator_provider": { "type": "string" },
+    "generator_model": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "pipeline_version": { "type": "string" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "question_type": { "const": "multiple_choice" } } },
+      "then": { "required": ["options"] }
+    },
+    {
+      "if": { "properties": { "question_type": { "const": "short_answer" } } },
+      "then": { "not": { "required": ["options"] } }
+    }
+  ]
+}
