@@ -169,3 +169,114 @@ fixen: 101/101 kontroller PASS. Inget kvarstår öppet från denna omgång.
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter — samma mönster som tidigare granskningar). Redo för
 applicering mot produktionsdatabasen `mnmotdluigzeehdjbhbu`.
+
+---
+
+## Review ID
+CR-2026-07-20-005
+
+## Scope
+Oberoende granskning (read-only) av Fas 4-migrationen (embedding-kolumn + pgvector, uppdragets §38
+Fas 4) **innan applicering mot produktionsdatabasen**: `supabase/migrations/20260722_knowledge_engine_embeddings.sql`
++ `_ROLLBACK.sql`, mot referens i `docs/adr/0005-embedding-model-and-retrieval.md` och
+`20260720_knowledge_engine_schema.sql`. Körd read-only (`codex exec --sandbox read-only`).
+
+## Commit / Diff
+Ingen diff — ny, ännu ospårad fil på branch `feature/provia-knowledge-engine-v1`, inte applicerad
+mot databasen vid granskningstillfället.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga.
+
+### MEDIUM
+- `create extension if not exists vector;` installerade pgvector i `public`-schemat. Supabase
+  rekommenderar `with schema extensions` (portabilitet, undviker att blanda extension-objekt med
+  applikationsschemat). Status: **fixat** — `create extension if not exists vector with schema
+  extensions;` + `embedding extensions.vector(1536)`. Indexets `vector_cosine_ops`
+  (operatorklass) lämnades medvetet oschema-kvalificerad, eftersom Supabase alltid har
+  `extensions` i aktiv `search_path` — kommenterat i migrationsfilen.
+
+### LOW
+- `add column if not exists` verifierar inte dimension på en ev. redan existerande `embedding`-
+  kolumn — accepterat, irrelevant risk för en kontrollerad ny miljö (Fas 2:s tabell har ingen
+  sådan kolumn sedan tidigare).
+- HNSW-indexet byggs på en ännu tom/nullable kolumn — inte ett fel, men bekräftar att
+  backfill-scriptet (Fas 4.5) och retrieval-koden (Fas 4.6) måste hantera `embedding is null`.
+
+## OK (bekräftat av Codex, ingen ändring)
+- HNSW-syntax korrekt (`using hnsw (embedding vector_cosine_ops)`), 1536 dimensioner inom
+  pgvector/Supabase-gränsen för `text-embedding-3-small`.
+- RLS opåverkad — tabellen har redan RLS PÅ utan policy, en nullable kolumn ändrar inte det.
+- Rollback säker och tillräcklig: index + kolumn tas bort, extension lämnas medvetet kvar (att
+  droppa en extension är en bredare operation som kan påverka andra objekt).
+- Ingen destruktiv schemaändring, ingen race condition mellan kolumn och separat backfill.
+
+## Claude Resolution
+MEDIUM-fyndet fixat direkt (se ovan). Inget kvarstår öppet från denna omgång.
+
+## Tests
+Inga automatiska tester (read-only SQL-granskning, ingen kod att köra lokalt för DDL-ändringar).
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för applicering mot produktionsdatabasen
+`mnmotdluigzeehdjbhbu`.
+
+---
+
+## Review ID
+CR-2026-07-23-006
+
+## Scope
+Oberoende granskning (read-only) av Fas 4:s retrieval-funktion **innan applicering mot
+produktionsdatabasen**: `supabase/migrations/20260723_knowledge_engine_retrieval_function.sql` +
+`_ROLLBACK.sql`, mot referens i den redan godkända `20260722_knowledge_engine_embeddings.sql`
+(CR-2026-07-20-005), samt `src/retrieval/legal-retrieval.mjs`,
+`tests/retrieval/legal-retrieval.test.mjs`, `scripts/knowledge-embed-chunks.mjs`. Körd read-only
+(`codex exec --sandbox read-only`), inkl. att köra `node tests/retrieval/legal-retrieval.test.mjs`.
+
+## Commit / Diff
+Ingen diff — nya, ännu ospårade filer på branch `feature/provia-knowledge-engine-v1`, inte
+applicerade mot databasen vid granskningstillfället.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga.
+
+### MEDIUM
+- `match_knowledge_chunks`s villkor `(p_include_pending or kc.review_status = 'approved')` gjorde
+  att `p_include_pending=true` (Fas 4-testläget mot pilotkorpusen) i praktiken bar bort HELA
+  filtret — inklusive `review_status='blocked'`-chunks, inte bara `pending`. Ett testläge som
+  namnges "inkludera pending" hade av misstag kunnat returnera blockerat innehåll. Status:
+  **fixat** — villkoret är nu `kc.review_status = 'approved' or (p_include_pending and
+  kc.review_status = 'pending')`, vilket aldrig returnerar `blocked` oavsett flaggan.
+
+### LOW
+- `src/retrieval/legal-retrieval.mjs` propagerar upp till 300 tecken rått OpenAI-felsvar i
+  `Error.message`. Ingen nyckelläcka, men bör härdas innan modulen eventuellt exponeras direkt i
+  ett API-svar (Fas 5, `api/knowledge.js`). Status: **accepterat, uppskjutet till Fas 5** — samma
+  typ av känt mönster som redan accepterats en gång (CR-2026-07-18-001, felmeddelande-läckage),
+  inte blockerande för en migration som inte rör produktionskod ännu.
+
+## OK (bekräftat av Codex, ingen ändring)
+- `extensions.vector(1536)`-typen, `<=>`-cosine-distance/likhetsberäkning, `websearch_to_tsquery`
+  mot `content_tsv`, och `language sql stable` är alla korrekta.
+- `SECURITY INVOKER` fungerar med en service_role-anropare (bypassar RLS); anon/authenticated
+  nekas fortsatt eftersom `knowledge_chunks` saknar policy.
+- Rollback-signaturen matchar funktionens faktiska argumentlista exakt.
+- `scripts/knowledge-embed-chunks.mjs`: ingen nyckelläcka, rimlig per-chunk-felhantering,
+  `.is("embedding", null)` är korrekt supabase-js-syntax.
+- `node tests/retrieval/legal-retrieval.test.mjs` — alla mocktester PASS.
+
+## Claude Resolution
+MEDIUM-fyndet fixat direkt (se ovan). LOW-fyndet medvetet uppskjutet (se ovan), inte blockerande.
+
+## Tests
+`node tests/retrieval/legal-retrieval.test.mjs` — 10/10 PASS (omkört efter SQL-fixen, ingen
+JS-ändring krävdes eftersom fixen var ren SQL).
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för applicering mot produktionsdatabasen
+`mnmotdluigzeehdjbhbu`.
