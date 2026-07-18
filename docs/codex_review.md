@@ -74,3 +74,42 @@ Samtliga sex fynd åtgärdade direkt (se ovan) — inget kvarstår öppet från 
 
 ## Gate Result
 **PASS.** Inga öppna fynd. Fas 1-leveransen redo för Fas 2 (migrationer, RLS, feature flags).
+
+---
+
+## Review ID
+CR-2026-07-18-003
+
+## Scope
+Oberoende granskning av Fas 2-migrationen (`supabase/migrations/20260720_knowledge_engine_schema.sql` + `_ROLLBACK.sql`) **innan tillämpning mot produktionsdatabasen** (obligatoriskt per uppdragets §3.4/§38). Uppdrag: FK-typer/riktningar, GDPR-kaskader, RLS-läckor, check-constraint-strikthet, rollback-körbarhet, konsistens mot Fas 1-scheman. Körd read-only (`codex exec --sandbox read-only`).
+
+## Commit / Diff
+Ingen diff — migrationsfilerna lästa på branch `feature/provia-knowledge-engine-v1`, inte ännu applicerade mot databasen vid granskningstillfället.
+
+## Findings
+
+### HIGH
+- `ai_usage_events.user_id references auth.users(id) on delete set null` bröt mot GDPR-cascade-mönstret — lämnade kvar per-user usage-metadata efter kontoradering utan explicit retentionsbeslut. Status: **fixat** (`on delete cascade`).
+
+### MEDIUM
+- `ai_usage_events.job_id` saknade FK mot `generation_jobs(id)`. Status: **fixat** (`on delete set null`, tillagd efter `generation_jobs` skapats i samma migration).
+- `exam_questions.source_chunk_ids`/`concept_ids` (uuid[]) saknar referentiell integritet — motsade schema-kommentaren om giltiga source IDs utan att SQL-filen förklarade varför. Status: **fixat** (kommentar tillagd: Postgres stödjer inte FK på array-element, giltighet valideras i applikationskod per §24, inte av DB:n).
+- `student_mastery.mastery_score`/`confidence` saknade rimlighetsgränser. Status: **fixat** (`mastery_score between 0 and 100` — matchar `apply_hp_mastery`s etablerade skala; `confidence between 0 and 1`).
+
+### LOW
+- `generation_jobs.job_type` saknade check-constraint trots enum i `schemas/generation-job.schema.json`. Status: **fixat**.
+- `generation_jobs.pipeline_version` var nullable i SQL men required i schemat. Status: **fixat** (`not null default 'v1'`).
+- `ai_usage_events.subscription_tier` saknade enum-check. Status: **fixat** (matchar `VALID_ROLES` i `api/admin.js`).
+
+### OK (bekräftat av Codex, ingen ändring)
+- `exam_questions_select_own`-policyns subquery mot `exam_blueprints.user_id` läcker inte data mellan användare.
+- Rollback-ordningen (efter fix, se nedan) är körbar.
+
+## Claude Resolution
+Samtliga sju fynd fixade direkt i migrationsfilen innan applicering. En sidoeffekt av `job_id`-FK-fixen: rollback-filens ursprungliga manuella drop-ordning (`generation_jobs` före `ai_usage_events`) skulle ha misslyckats eftersom `ai_usage_events` nu har en FK mot `generation_jobs`. Löst genom att byta hela rollback-filen till `drop table ... cascade` för samtliga 13 tabeller — enklare och robustare än att hålla reda på exakt FK-beroendeordning manuellt, säkert eftersom inget utanför denna migrations egna 13 tabeller beror på dem.
+
+## Tests
+Migrationen applicerad via Supabase MCP (`apply_migration`, atomär transaktion) efter samtliga fixar. Live-verifiering efteråt: alla 13 tabeller RLS=true, exakt 5 SELECT-only-policyer, 0 INSERT/UPDATE/DELETE-policyer, 7 feature flags seedade (alla false), FK-constraint bekräftad, `get_advisors(security)` visar inga nya WARN/ERROR. Se `docs/provia-knowledge-engine/12-fas2-results.md`.
+
+## Gate Result
+**PASS** (efter fixar, före applicering — i enlighet med uppdragets krav att Codex granskar migration och RLS INNAN tillämpning).

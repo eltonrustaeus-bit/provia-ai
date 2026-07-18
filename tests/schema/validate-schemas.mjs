@@ -221,6 +221,12 @@ const UUID = "00000000-0000-4000-8000-000000000000";
     const bad = { ...valid, input_tokens: -1 };
     assert.equal(validate(bad), false);
   });
+
+  check("ai-usage-event: missing user_id passes (system/ingestion events)", () => {
+    const good = { ...valid };
+    delete good.user_id;
+    assert.equal(validate(good), true, ajv.errorsText(validate.errors));
+  });
 }
 
 // ── error-classification.schema.json + error-codes.json consistency ──

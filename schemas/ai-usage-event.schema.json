@@ -7,7 +7,6 @@
   "additionalProperties": false,
   "required": [
     "id",
-    "user_id",
     "feature",
     "pipeline_step",
     "provider",
@@ -21,7 +20,10 @@
     "id": { "type": "string", "format": "uuid" },
     "request_id": { "type": "string" },
     "job_id": { "type": ["string", "null"], "format": "uuid" },
-    "user_id": { "type": "string", "format": "uuid" },
+    "user_id": {
+      "description": "Null för systemhändelser utan enskild användare (t.ex. embed-steget vid korpus-ingestion, Fas 3).",
+      "type": ["string", "null"], "format": "uuid"
+    },
     "school_id": { "type": ["string", "null"], "format": "uuid" },
     "subscription_tier": { "type": "string", "enum": ["gratis", "basic", "premium", "admin", "teacher"] },
     "feature": { "type": "string" },
