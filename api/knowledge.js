@@ -113,18 +113,31 @@ async function opGenerate(req, res, user) {
     return res.status(400).json({ error: "question_type måste vara multiple_choice eller short_answer" });
   }
 
-  const { data: job, error: jobLoadError } = await supabase
+  // Atomisk "claim" av jobbet i EN UPDATE...WHERE-sats (Fas 6.2-härdning av Codex MEDIUM-fyndet
+  // i CR-2026-07-2X-007): Postgres serialiserar konkurrerande UPDATE...WHERE status='queued' mot
+  // samma rad — bara ETT av två samtidiga anrop kan matcha och byta status till 'generating'.
+  // Det andra får `data.length === 0` (ingen SELECT+UPDATE-race kvar, till skillnad mot Fas 5:s
+  // två-stegslösning). Ägarskap kontrolleras i samma sats (`eq('user_id', user.id)`) så ett
+  // 403 (fel ägare) och ett 409 (fel status) inte kan förväxlas — vi särskiljer dem med en
+  // uppföljande läsning bara när claim-satsen inte gav någon träff.
+  const { data: claimedRows, error: claimError } = await supabase
     .from("generation_jobs")
-    .select("id, user_id, status, input_json")
+    .update({ status: "generating", step: "generate", started_at: new Date().toISOString() })
     .eq("id", job_id)
-    .single();
-  if (jobLoadError || !job) return res.status(404).json({ error: "Jobbet hittades inte" });
-  if (job.user_id !== user.id) return res.status(403).json({ error: "Jobbet tillhör inte dig" });
-  // Codex MEDIUM-fynd: utan detta kan samma job_id anropas parallellt och bränna dubbel
-  // OpenAI-kostnad. "queued" är den enda giltiga startpunkten för generate.
-  if (job.status !== "queued") {
-    return res.status(409).json({ error: `Jobbet har redan status "${job.status}"` });
+    .eq("user_id", user.id)
+    .eq("status", "queued")
+    .select("id, input_json");
+  if (claimError) return res.status(500).json({ error: "Kunde inte starta jobbet" });
+
+  if (!claimedRows || claimedRows.length === 0) {
+    // Särskilj 404 (finns ej/fel ägare) från 409 (finns men redan claimat) med en ren läsning —
+    // denna SELECT är inte i sig ett race-fönster eftersom den bara avgör felkoden, inte om
+    // generering får starta (det avgjordes redan, atomärt, av UPDATE:en ovan).
+    const { data: existing } = await supabase.from("generation_jobs").select("user_id, status").eq("id", job_id).maybeSingle();
+    if (!existing || existing.user_id !== user.id) return res.status(404).json({ error: "Jobbet hittades inte" });
+    return res.status(409).json({ error: `Jobbet har redan status "${existing.status}"` });
   }
+  const job = claimedRows[0];
 
   const blueprintId = job.input_json?.blueprint_id;
   const { data: blueprint, error: blueprintLoadError } = await supabase
@@ -144,13 +157,6 @@ async function opGenerate(req, res, user) {
   if (conceptError || !concept) return res.status(404).json({ error: "Konceptet hittades inte" });
 
   const level = job.input_json?.level || "E";
-
-  // Deterministisk "claim" av jobbet (status queued→generating) INNAN AI-anropen görs. Stänger
-  // inte hela race-fönstret (ingen atomär UPDATE...WHERE status='queued' RETURNING här ännu),
-  // men i kombination med statuskontrollen ovan gör den ett dubbelanrop osannolikt i praktiken —
-  // fullständig atomär spärr är en rimlig Fas 6/7-uppföljning, inte blockerande för denna fas
-  // eftersom endpointen är feature-flag-inert.
-  await supabase.from("generation_jobs").update({ status: "generating", step: "generate", started_at: new Date().toISOString() }).eq("id", job_id);
 
   let result;
   try {

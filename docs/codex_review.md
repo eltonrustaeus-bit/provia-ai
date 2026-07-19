@@ -356,3 +356,59 @@ beslutspunkt för produktägaren, inte en kodbugg — dokumenterat i `15-fas5-re
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Kärnkraven i §25 bekräftat korrekta. Redo för en
 kontrollerad, medvetet kostsam end-to-end-testkörning (`scripts/knowledge-generate-smoke.mjs`) —
 Vercel-funktionstaket kvarstår som separat beslutspunkt innan ev. bred deploy.
+
+---
+
+## Review ID
+CR-2026-07-2X-008
+
+## Scope
+Oberoende granskning (read-only) av en konsolideringsändring i en **LIVE** produktionsfil,
+`api/check-role.js` (använd av riktiga betalande användare — inte en feature-flag-inert yta som
+Fas 5). Bakgrund: Vercel API bekräftade `exceeded_serverless_functions_per_deployment` (13 routade
+`api/*.js`-filer, Hobby-planens gräns är 12) på de senaste två preview-deployen av denna branch.
+Produktägaren valde att konsolidera `api/delete-exams.js` (35 rader, en enkel `DELETE FROM
+user_exams WHERE user_id=...`) in i `api/check-role.js`s redan etablerade `action`-dispatch-mönster,
+istället för att uppgradera Vercel-planen. Granskningen omfattade `api/check-role.js` (ny
+`delete_exams`-gren), borttagningen av `api/delete-exams.js`, samt anropsplatserna i `app.html` och
+`förbättring.html`.
+
+## Commit / Diff
+Ingen diff vid granskningstillfället — ändringar i working tree, inte committade än.
+
+## Findings
+
+### HIGH
+- Vid första granskningstillfället var `api/check-role.js` inte `git add`:ad — bara klientfilerna
+  och borttagningen av `api/delete-exams.js` var stagade. Hade det committats så hade
+  `/api/delete-exams` försvunnit medan klienterna anropade en `check-role.js` utan den nya grenen
+  — föll igenom till default-rollhämtning, `200 { role }`, INGEN radering hade skett. Status:
+  **fixat** — `api/check-role.js` staged tillsammans med resten innan commit.
+
+### LOW
+- `förbättring.html`s anrop saknade redan (**förexisterande, inte introducerad av denna ändring**)
+  en `Authorization`-header — `api/delete-exams.js` krävde `requireAuth` så anropet gav redan
+  `401` innan konsolideringen. Status: **fixat proaktivt** (utöver vad som krävdes för att bara
+  bevara befintligt beteende) — `db.auth.getSession()`-mönstret som redan används tre andra
+  ställen i samma fil applicerat här också, så knappen faktiskt fungerar nu.
+
+### OK (bekräftat av Codex, ingen ändring)
+- `requireAuth` körs innan `action` läses — `delete_exams` kan inte nås utan giltig Bearer-JWT.
+- Raderingen är korrekt `user_id`-scopad (`eq("user_id", user.id)`, serverside — klientens
+  `user_id`-fält i body ignoreras, ingen risk att en användare kan radera en annan användares rader).
+- Den nya grenen stör inte de befintliga action-grenarna (`entitlements`, `per_memory_clear`,
+  `kk_save`, `kk_load`, `bump_kk`, `portal`, `cancel_sub`, `teacher_*`, `student_*`) eller
+  default-fallback-beteendet i slutet av `handler()`.
+
+## Claude Resolution
+Båda fynden fixade direkt (se ovan). Vercel-funktionstaket är nu bekräftat löst: 12 routade
+`api/*.js`-filer efter denna konsolidering (inklusive `api/knowledge.js`).
+
+## Tests
+`node --check api/check-role.js` och `api/knowledge.js` — OK. Full regression:
+`validate-schemas.mjs` 21/21, `validate-prompt-modules.mjs` 17/17, `validate-gold-set.mjs`
+101/101, `legal-retrieval.test.mjs` 10/10, `legal-generation.test.mjs` 10/10 — samtliga PASS.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för commit och en verifierande
+preview-deploy.

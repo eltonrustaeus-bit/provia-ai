@@ -1758,9 +1758,10 @@ try{
       try {
         const token = await getAccessToken();
         if (token) {
-          await fetch("/api/delete-exams", {
+          await fetch("/api/check-role", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ action: "delete_exams" })
           });
         }
       } catch (_) {}
