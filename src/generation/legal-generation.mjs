@@ -262,3 +262,82 @@ export async function generateVerifiedQuestion({
     pipelineVersion: PIPELINE_VERSION,
   };
 }
+
+/**
+ * Sparar resultatet av generateVerifiedQuestion() till exam_questions + question_verifications.
+ * Delad mellan api/knowledge.js:s opGenerate (riktig användare, riktig respons) och
+ * scripts/knowledge-shadow-run.mjs (shadow mode, Fas 10 — intern körning, aldrig visad för en
+ * elev) så persisteringslogiken bara finns på ett ställe.
+ *
+ * @param {object} opts
+ * @param {import("@supabase/supabase-js").SupabaseClient} opts.supabase
+ * @param {string} opts.blueprintId
+ * @param {number} opts.position
+ * @param {{ id: string, curriculum_ref: string }} opts.concept
+ * @param {"multiple_choice"|"short_answer"} opts.questionType
+ * @param {"E"|"C"|"A"} opts.level
+ * @param {ReturnType<typeof generateVerifiedQuestion> extends Promise<infer T> ? T : never} opts.result
+ *   — resultatet från en lyckad (`result.ok === true`) generateVerifiedQuestion()-körning.
+ * @returns {Promise<{ ok: true, examQuestionId: string, jobFinalStatus: string } | { ok: false, error: string }>}
+ */
+export async function persistGeneratedQuestion({ supabase, blueprintId, position, concept, questionType, level, result }) {
+  const q = result.question;
+
+  const { data: examQuestion, error: insertError } = await supabase
+    .from("exam_questions")
+    .insert({
+      blueprint_id: blueprintId,
+      position,
+      question_type: questionType,
+      payload: {
+        question_type: questionType,
+        question: q.question,
+        options: q.options ?? undefined,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        difficulty: level,
+        concept_ids: [concept.id],
+        curriculum_refs: [concept.curriculum_ref],
+        source_chunk_ids: result.sourceChunkIds,
+        verification_status: result.verificationStatus,
+        generator_provider: "openai",
+        generator_model: result.generatorModel,
+        prompt_version: result.promptVersion,
+        pipeline_version: result.pipelineVersion,
+      },
+      verification_status: result.verificationStatus,
+      generator_provider: "openai",
+      generator_model: result.generatorModel,
+      prompt_version: result.promptVersion,
+      pipeline_version: result.pipelineVersion,
+      source_chunk_ids: result.sourceChunkIds,
+      concept_ids: [concept.id],
+    })
+    .select()
+    .single();
+  if (insertError) return { ok: false, error: insertError.message };
+
+  const { error: verificationInsertError } = await supabase.from("question_verifications").insert({
+    question_id: examQuestion.id,
+    verifier_provider: "openai",
+    verifier_model: result.verifierModel,
+    result: result.verification,
+    passed: result.verification.recommended_action === "publish",
+    failure_codes: result.verification.failure_codes,
+    repair_recommended: result.repaired,
+  });
+  if (verificationInsertError) {
+    // Codex LOW-fynd (CR-2026-07-2X-012): refaktoreringen till denna delade funktion tappade
+    // server-side loggning av detta fel — återställd här (samma plats felet uppstår, oavsett
+    // vilken anropare — api/knowledge.js eller scripts/knowledge-shadow-run.mjs — som ringde upp).
+    console.error("question_verifications insert error:", verificationInsertError.message);
+  }
+
+  // Samma princip som Codex MEDIUM-fyndet i api/knowledge.js (CR-2026-07-2X-007): tyst
+  // ignorerat verifieringsfel ska inte se ut som "completed".
+  return {
+    ok: true,
+    examQuestionId: examQuestion.id,
+    jobFinalStatus: verificationInsertError ? "partially_completed" : "completed",
+  };
+}

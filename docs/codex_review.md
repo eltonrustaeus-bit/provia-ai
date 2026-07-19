@@ -575,3 +575,62 @@ concurrency-test av `consume_per_chat_quota`: 5/5 samtidiga anrop serialiserade 
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för aktivering av `per_legal_rag_enabled`
 när övriga förutsättningar (mänsklig granskning av relevanta chunks) också är uppfyllda.
+
+---
+
+## Review ID
+CR-2026-07-2X-012
+
+## Scope
+Oberoende granskning (read-only) av Fas 10 (shadow mode) — den FÖRSTA koden avsedd att köras mot
+skarp databas med en feature-flagga (`legal_shadow_mode`) som medvetet ska förbli påslagen, till
+skillnad från tidigare fasers trippel-inerta ytor. Granskade `src/generation/legal-generation.mjs`
+(ny `persistGeneratedQuestion()`), `api/knowledge.js` (refaktorerad + ny shadow-svarsgren),
+`scripts/knowledge-shadow-run.mjs` (nytt internt batch-script).
+
+## Commit / Diff
+Ingen diff — ändringar i working tree.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga.
+
+### MEDIUM
+- `legal_shadow_mode`-flaggan kollades bara en gång före hela batchen i
+  `scripts/knowledge-shadow-run.mjs` — fungerade inte som en operativ kill switch om flaggan
+  slogs av mitt i en lång körning. Status: **fixat** — rechecka flaggan innan varje enskild
+  generering, avbryter resten av batchen (`status='cancelled'`) om den slås av.
+- `generation_jobs.status` sattes alltid till `'completed'` oavsett om enstaka frågor misslyckades
+  att sparas — avvek från API-vägens `jobFinalStatus`-semantik. Status: **fixat** — samma
+  `partially_completed`-logik som `api/knowledge.js` nu tillämpad även i shadow-scriptet.
+- Shadow-genererade `exam_blueprints`-rader (kopplade till samma OWNER_ID som används för
+  lärardashboard-testning) hade ingen egen markör — risk att blandas ihop med riktiga
+  användarprov om ett framtida UI listar OWNER_ID:s "mina prov" (bekräftat: inget UI gör det
+  idag, men inte en garanti för framtiden). Status: **fixat** — `source_material_ref` sätts till
+  en tydlig `"SHADOW_RUN"`-markör på varje shadow-blueprint.
+
+### LOW
+- Extraktionen till `persistGeneratedQuestion()` tappade den tidigare server-side-loggningen av
+  `question_verifications`-insertfel. Status: **fixat** — `console.error` återställd.
+
+## OK (bekräftat av Codex, ingen ändring)
+- Shadow-svarsgrenen i `api/knowledge.js` returnerar exakt `{ ok: true, shadow: true,
+  question_id }` — inget genererat elevinnehåll, facit, eller verifieringsresultat läcker till
+  klienten i det fallet.
+- `includePending` fortsatt hårdkodat `false` i både API-vägen och shadow-scriptet.
+- Refaktoreringen till `persistGeneratedQuestion()` är beteendemässigt likvärdig med den gamla
+  inline-koden (bortsett från den nu åtgärdade loggnings-regressionen).
+
+## Claude Resolution
+Samtliga fynd fixade direkt (se ovan). Bekräftat oberoende (innan granskningen ens startade) att
+inget befintligt UI listar `exam_blueprints`/`exam_questions` — den tredje MEDIUM-punktens risk
+var latent, inte aktiv, men markören är en billig, korrekt försiktighetsåtgärd ändå.
+
+## Tests
+`node --check` på samtliga ändrade filer OK. Full regression (samtliga testfiler) grönt.
+Säkerhetsspärren (vägrar köra utan `legal_shadow_mode=true`) omtestad efter fixarna — fungerar.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för en kontrollerad, medveten aktivering
+av `legal_shadow_mode` och en skarp körning av `scripts/knowledge-shadow-run.mjs`.

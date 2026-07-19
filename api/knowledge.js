@@ -16,7 +16,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
-import { generateVerifiedQuestion, PIPELINE_VERSION, PROMPT_VERSION } from "../src/generation/legal-generation.mjs";
+import { generateVerifiedQuestion, persistGeneratedQuestion, PIPELINE_VERSION, PROMPT_VERSION } from "../src/generation/legal-generation.mjs";
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -185,46 +185,22 @@ async function opGenerate(req, res, user) {
     return res.status(422).json({ error: "no_approved_sources", reason: result.reason });
   }
 
-  const q = result.question;
   const nextPosition = Number.isInteger(position) ? position : 0;
 
-  const { data: examQuestion, error: insertError } = await supabase
-    .from("exam_questions")
-    .insert({
-      blueprint_id: blueprintId,
-      position: nextPosition,
-      question_type,
-      payload: {
-        question_type,
-        question: q.question,
-        options: q.options ?? undefined,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation,
-        difficulty: level,
-        concept_ids: [concept.id],
-        curriculum_refs: [concept.curriculum_ref],
-        source_chunk_ids: result.sourceChunkIds,
-        verification_status: result.verificationStatus,
-        generator_provider: "openai",
-        generator_model: result.generatorModel,
-        prompt_version: result.promptVersion,
-        pipeline_version: result.pipelineVersion,
-      },
-      verification_status: result.verificationStatus,
-      generator_provider: "openai",
-      generator_model: result.generatorModel,
-      prompt_version: result.promptVersion,
-      pipeline_version: result.pipelineVersion,
-      source_chunk_ids: result.sourceChunkIds,
-      concept_ids: [concept.id],
-    })
-    .select()
-    .single();
-  if (insertError) {
+  const persisted = await persistGeneratedQuestion({
+    supabase,
+    blueprintId,
+    position: nextPosition,
+    concept,
+    questionType: question_type,
+    level,
+    result,
+  });
+  if (!persisted.ok) {
     // Codex LOW-fynd: läck inte råa DB-feldetaljer till klienten. Logga server-side (Vercel-loggar),
     // returnera bara en generisk, sanerad text — samma mönster som error_message_sanitized-fältet
     // i generation_jobs.
-    console.error("exam_questions insert error:", insertError.message);
+    console.error("exam_questions insert error:", persisted.error);
     await supabase
       .from("generation_jobs")
       .update({ status: "failed", error_code: "persist_error", error_message_sanitized: "Kunde inte spara frågan" })
@@ -232,39 +208,30 @@ async function opGenerate(req, res, user) {
     return res.status(500).json({ error: "Kunde inte spara frågan" });
   }
 
-  const { error: verificationInsertError } = await supabase.from("question_verifications").insert({
-    question_id: examQuestion.id,
-    verifier_provider: "openai",
-    verifier_model: result.verifierModel,
-    result: result.verification,
-    passed: result.verification.recommended_action === "publish",
-    failure_codes: result.verification.failure_codes,
-    repair_recommended: result.repaired,
-  });
-
-  // Codex MEDIUM-fynd: att tyst ignorera detta fel och ändå markera jobbet "completed" skulle
-  // lämna en fråga utan spårbar verifieringsrad trots att svaret till klienten ser lyckat ut.
-  // "partially_completed" är en redan giltig status i schemat för precis denna situation.
-  const jobFinalStatus = verificationInsertError ? "partially_completed" : "completed";
-  if (verificationInsertError) {
-    console.error("question_verifications insert error:", verificationInsertError.message);
-  }
-
   await supabase
     .from("generation_jobs")
     .update({
-      status: jobFinalStatus,
+      status: persisted.jobFinalStatus,
       step: "assemble",
       progress_current: nextPosition + 1,
       completed_at: new Date().toISOString(),
     })
     .eq("id", job_id);
 
+  // Shadow mode (§14.12/Fas 10): när legal_shadow_mode=true körs och sparas allt som vanligt för
+  // intern granskning (exam_questions/question_verifications ovan är opåverkade), men klienten
+  // får ALDRIG se det faktiska genererade innehållet eller verifieringsutfallet — bara att ett
+  // jobb kördes. Det är hela poängen med shadow mode: samla in kvalitetsdata i skala innan någon
+  // elev någonsin exponeras för resultatet.
+  if (await flagsEnabled(["legal_shadow_mode"])) {
+    return res.status(200).json({ ok: true, shadow: true, question_id: persisted.examQuestionId });
+  }
+
   return res.status(200).json({
-    question_id: examQuestion.id,
+    question_id: persisted.examQuestionId,
     verification_status: result.verificationStatus,
     recommended_action: result.verification.recommended_action,
-    job_status: jobFinalStatus,
+    job_status: persisted.jobFinalStatus,
   });
 }
 
