@@ -5,6 +5,8 @@ import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
 import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory, updateHelpLevelSignal } from "./_per-memory.js";
 import { getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { buildPERContextPack } from "./_per-context.js";
+import { retrieveChunks } from "../src/retrieval/legal-retrieval.mjs";
+import perLegalPrompt, { sanitizeLegalQuestion } from "../src/ai/prompts/per-legal/v1.js";
 
 const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
 const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
@@ -117,6 +119,63 @@ Max 200 ord.`;
   }
 }
 
+// ── LEGAL MODE — P.E.R/EX1.0 juridikläge (Fas 7, uppdragets §27.2) ──
+// Feature-flag-gated (per_legal_rag_enabled, false sedan Fas 2-seedningen) OCH kräver att
+// legalMode:true faktiskt skickas i body — ingen befintlig frontend-yta gör det än, så denna gren
+// är i praktiken tredubbelt inert (ingen UI-trigger + flagga av + retrieveChunks() hittar inga
+// review_status='approved' chunks eftersom pilotkorpusen ännu är helt 'pending', se
+// 13-fas3-results.md). includePending hårdkodat false här av samma skäl som i api/knowledge.js
+// (§18/§24) — aldrig klientstyrt.
+async function legalModeEnabled() {
+  const { data, error } = await supabase.from("feature_flags").select("enabled").eq("key", "per_legal_rag_enabled").maybeSingle();
+  return !error && data?.enabled === true;
+}
+
+async function handleLegalMode(req, res, body, user) {
+  if (!(await legalModeEnabled())) {
+    return res.status(403).json({ error: "Juridikläge är inte aktiverat" });
+  }
+
+  const question = sanitizeLegalQuestion(body.userQuestion || body.topic || "");
+  if (!question) return res.status(400).json({ error: "Ingen fråga angiven" });
+
+  let retrieved;
+  try {
+    retrieved = await retrieveChunks(supabase, question, { matchCount: 4, includePending: false });
+  } catch (e) {
+    return res.status(502).json({ error: "Kunde inte söka i källmaterialet" });
+  }
+
+  // Inga godkända källor hittades — abstain utan att anropa den GENERATIVA modellen (§27.2: får
+  // aldrig komplettera saknade fakta från modellminne). Codex-fynd (CR-2026-07-2X-009): ett
+  // embeddings-anrop görs ändå inne i retrieveChunks() ovan (krävs för själva sökningen) —
+  // försumbar kostnad (samma order som Fas 4:s backfill), men "inget OpenAI-anrop alls" vore fel
+  // påstående. Det som garanterat aldrig sker vid abstain är ett genererat, ogrundat svar.
+  if (!retrieved.length) {
+    return res.status(200).json({
+      ok: true,
+      status: "insufficient_evidence",
+      answer: null,
+      reason: "Inget godkänt källmaterial hittades för den här frågan än.",
+    });
+  }
+
+  const sourceChunks = retrieved.map((r) => ({ section_ref: r.section_ref, content: r.content }));
+  try {
+    const out = await callAI(
+      [
+        { role: "system", content: perLegalPrompt.systemPrompt() },
+        { role: "user", content: perLegalPrompt.buildUserPrompt({ question, sourceChunks }) },
+      ],
+      { schema: perLegalPrompt.outputSchema(), timeout: 30_000 }
+    );
+    const parsed = JSON.parse(out);
+    return res.status(200).json({ ok: true, ...parsed });
+  } catch (e) {
+    return res.status(502).json({ error: "AI-anrop misslyckades" });
+  }
+}
+
 async function loadPerHistory(userId) {
   try {
     const { data } = await supabase
@@ -186,6 +245,9 @@ export default async function handler(req, res) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+
+  // ── LEGAL MODE (Fas 7) — se handleLegalMode ovan för inertness-garantierna ──
+  if (body.legalMode === true) return handleLegalMode(req, res, body, user);
 
   // ── READINESS SCORE MODE ──
   if (Array.isArray(body.scores)) {

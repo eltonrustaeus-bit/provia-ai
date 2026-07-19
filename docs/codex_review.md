@@ -412,3 +412,60 @@ Båda fynden fixade direkt (se ovan). Vercel-funktionstaket är nu bekräftat l�
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för commit och en verifierande
 preview-deploy.
+
+---
+
+## Review ID
+CR-2026-07-2X-009
+
+## Scope
+Oberoende granskning (read-only), extra rigör, av en additiv ändring i en **LIVE** produktionsfil
+med riktig elevtrafik: `api/explain.js` (P.E.R/EX1.0-chatten). Fas 7: P.E.R juridikläge. Nya
+`src/ai/prompts/per-legal/v1.js`, ny `handleLegalMode()`/`legalModeEnabled()` i `explain.js`, en
+ny dispatch-rad `if (body.legalMode === true) ...` insatt efter `requireAuth()`.
+
+## Commit / Diff
+Ingen diff — ändringar i working tree, jämförda mot `HEAD` via `git diff api/explain.js`.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga.
+
+### MEDIUM
+- Kommentaren påstod "abstain UTAN att anropa modellen alls", men `retrieveChunks()` gör alltid
+  ett embeddings-anrop (krävs för själva sökningen) innan den kan avgöra att noll chunks hittades
+  — bara det GENERATIVA anropet (`callAI()` med `per_legal_response`-schemat) hoppas över vid
+  abstain. Status: **fixat** — kommentaren omskriven för att exakt beskriva vad som faktiskt
+  garanteras (inget genererat, ogrundat svar), inte "inget OpenAI-anrop alls".
+
+### LOW
+- Inget kvot-/rate-limit-skydd på `legalMode`-grenen efter att `per_legal_rag_enabled` slås på.
+  Status: **accepterat, dokumenterat som förutsättning för aktivering** (samma kategori fynd som
+  redan dokumenterad och löst för `api/knowledge.js` i Fas 6, men inte upprepad här eftersom denna
+  gren är trippel-inert: ingen frontend-yta skickar `legalMode` än, flaggan är false, och
+  pilotkorpusen har inga `approved`-chunks). Se `16-fas6-7-results.md`.
+
+## OK (bekräftat av Codex, ingen ändring)
+- Dispatchen är helt additiv — `tipsMode`/`landingMode` körs fortfarande före, alla befintliga
+  lägen (readiness/teach/streaming/explain) opåverkade, ordning intakt.
+- Strikt `=== true`-jämförelse — ingen befintlig klient kan råka trigga grenen (repo-sökning
+  bekräftar att `legalMode` inte skickas av någon befintlig frontend-kod).
+- Feature-flag-kollen är fail-closed (kräver `enabled === true` utan DB-fel, annars nekad).
+- `includePending` hårdkodat `false`, kan inte sättas av klient.
+- `sanitizeLegalQuestion()` speglar `BLOCKED_CONTEXT_REGEX`-mönstret i `_per-context.js` exakt.
+- Inga felsvar läcker interna undantagsdetaljer.
+- `node --check api/explain.js` OK, `validate-prompt-modules.mjs` 22/22 PASS.
+
+## Claude Resolution
+MEDIUM-fyndet fixat direkt. LOW-fyndet medvetet dokumenterat som en förutsättning innan
+`per_legal_rag_enabled` någonsin sätts till `true` i produktion — inte blockerande för denna
+commit eftersom ytan är trippel-inert.
+
+## Tests
+`node --check api/explain.js` OK. `node tests/schema/validate-prompt-modules.mjs` — 22/22 PASS.
+Full regression (samtliga tidigare testfiler) — grönt.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för commit och en verifierande
+preview-deploy.
