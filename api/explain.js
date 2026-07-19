@@ -139,6 +139,33 @@ async function handleLegalMode(req, res, body, user) {
   const question = sanitizeLegalQuestion(body.userQuestion || body.topic || "");
   if (!question) return res.status(400).json({ error: "Ingen fråga angiven" });
 
+  // Fas 8.3-härdning (Codex LOW-fynd, CR-2026-07-2X-009): legalMode hade inget kvotskydd.
+  // Återanvänder samma perChat-kvot (plan/roll-baserad, atomisk RPC) som TEACH MODE redan
+  // använder nedan i denna fil — juridikläget är konceptuellt en specialiserad P.E.R-chatt, så
+  // det delar naturligt samma kvotpott istället för att uppfinna en egen mekanism. Placerad EFTER
+  // frågevalideringen ovan (Codex CR-2026-07-2X-011-fynd) så en tom/ogiltig request inte bränner
+  // kvot, men fortfarande FÖRE retrieval/AI-anropen nedan så en nekad kvot faktiskt sparar kostnad.
+  const { data: prof, error: profErr } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profErr) return res.status(500).json({ error: "DB error" });
+  const role = normalizeRole(prof?.role);
+  const legalCfg = getFeatureLimit(role, "perChat");
+  if (legalCfg.cap !== Infinity) {
+    const key = currentPeriodKey(legalCfg.period);
+    const { data: q, error: qErr } = await supabase.rpc("consume_per_chat_quota", {
+      p_user_id: user.id,
+      p_period_key: key,
+      p_limit: legalCfg.cap,
+    });
+    if (qErr) return res.status(500).json({ error: "Quota check failed" });
+    if (!q?.ok) {
+      return res.status(429).json({ error: "Quota exceeded", count: q?.count ?? legalCfg.cap, limit: legalCfg.cap });
+    }
+  }
+
   let retrieved;
   try {
     retrieved = await retrieveChunks(supabase, question, { matchCount: 4, includePending: false });

@@ -525,3 +525,53 @@ refaktoreringen bekräftar oförändrat (korrekt) beteende.
 
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter).
+
+---
+
+## Review ID
+CR-2026-07-2X-011
+
+## Scope
+Oberoende granskning (read-only), extra rigör (live fil, riktig elevtrafik), av Fas 8.3:
+kvot-/rate-limit-skydd för `legalMode` i `api/explain.js`. Uppföljning av CR-2026-07-2X-009:s LOW-
+fynd. Ändringen återanvänder TEACH MODE:s befintliga `perChat`-kvotmönster
+(`getFeatureLimit`+`consume_per_chat_quota`).
+
+## Commit / Diff
+Ingen diff — ändringar i working tree.
+
+## Findings
+
+### CRITICAL / HIGH / MEDIUM
+Inga.
+
+### LOW
+- Kvoten konsumerades före frågevalideringen (`sanitizeLegalQuestion`/tomkoll) — en ogiltig
+  request kunde bränna en elevs kvotplats och ändå returnera 400. Status: **fixat** —
+  frågevalideringen flyttad före kvotkonsumtionen, som fortfarande ligger före
+  retrieval/AI-anropen.
+- RPC:ns atomik (`consume_per_chat_quota`) gick inte att verifiera från källkod i repot
+  (forward-migrationen är ospårad, se `docs/current-system/database-map.md`). Status: **verifierat
+  live** — 5 samtidiga RPC-anrop mot samma `period_key` gav exakt `count=1,2,3,4,5` (inga
+  dubbletter), vilket bekräftar `SELECT ... FOR UPDATE`-serialisering fungerar i praktiken, inte
+  bara enligt dokumentation. Testdata (ett testkontos `per_quota_count`/`per_quota_period`)
+  återställd till 0/null efteråt.
+
+## OK (bekräftat av Codex, ingen ändring)
+- Kvotkontrollen ligger (efter fix) korrekt: efter frågevalidering, före retrieval/embeddings/
+  generativt AI-anrop — en nekad kvot sparar faktisk kostnad.
+- Delad `perChat`-kvotpott med TEACH MODE är en rimlig, avsiktlig produktavvägning (juridikläge =
+  specialiserad P.E.R-chatt), inte en säkerhetsläcka.
+- Ändringen stör inte TEACH MODE:s egen kvotlogik längre ner i samma fil.
+
+## Claude Resolution
+Ordningsfyndet fixat direkt. Atomik-fyndet löst genom en direkt live-verifiering (5 samtidiga
+anrop), inte bara dokumentationstillit.
+
+## Tests
+`node --check api/explain.js` OK. Full regression (samtliga testfiler) — grönt. Live
+concurrency-test av `consume_per_chat_quota`: 5/5 samtidiga anrop serialiserade korrekt.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för aktivering av `per_legal_rag_enabled`
+när övriga förutsättningar (mänsklig granskning av relevanta chunks) också är uppfyllda.
