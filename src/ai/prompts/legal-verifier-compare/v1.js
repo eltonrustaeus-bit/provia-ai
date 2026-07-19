@@ -68,12 +68,12 @@ function schema() {
   };
 }
 
-function systemPrompt() {
+function systemPrompt(subjectLabel = "kursen") {
   return [
-    "Du granskar en juridisk provfrågas facit mot källutdragen och mot en oberoende blind lösning.",
-    "semantic_equivalent_to_generator: sätt true om den oberoende blinda lösningen uttrycker SAMMA juridiska sakinnehåll som generatorns facit, även om formuleringen skiljer sig (t.ex. två olika fritextsvar som båda korrekt beskriver samma regel). Sätt false om de säger olika saker i sak, inte bara olika ordval. Detta är särskilt viktigt för fritextsvar (short_answer), där ordagrann matchning aldrig kan avgöra detta.",
+    `Du granskar en provfrågas facit (${subjectLabel}) mot källutdragen och mot en oberoende blind lösning.`,
+    "semantic_equivalent_to_generator: sätt true om den oberoende blinda lösningen uttrycker SAMMA sakinnehåll som generatorns facit, även om formuleringen skiljer sig (t.ex. två olika fritextsvar som båda korrekt beskriver samma regel/fakta). Sätt false om de säger olika saker i sak, inte bara olika ordval. Detta är särskilt viktigt för fritextsvar (short_answer), där ordagrann matchning aldrig kan avgöra detta.",
     "factual_support (0-1): hur väl stöds generatorns facit av källutdragen (1=fullt stött, 0=inget stöd/motsagt).",
-    "citation_support (0-1): hur väl pekar explanation på rätt källutdrag/paragraf.",
+    "citation_support (0-1): hur väl pekar explanation på rätt källutdrag.",
     "ambiguity_score (0-1): hur tvetydig frågan är (1=mycket tvetydig/flera försvarbara svar).",
     "course_alignment (0-1): hur väl frågan matchar det angivna konceptet/kursen.",
     "difficulty_alignment (0-1): hur väl den faktiska svårighetsgraden matchar den avsedda.",

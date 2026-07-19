@@ -151,7 +151,7 @@ async function opGenerate(req, res, user) {
 
   const { data: concept, error: conceptError } = await supabase
     .from("concepts")
-    .select("id, slug, name, definition, curriculum_ref")
+    .select("id, slug, name, definition, curriculum_ref, subject, course")
     .eq("id", concept_id)
     .single();
   if (conceptError || !concept) return res.status(404).json({ error: "Konceptet hittades inte" });

@@ -1,4 +1,10 @@
-// Genererings- + verifieringspipeline för juridikfrågor (uppdragets §23-25, Fas 5).
+// Genererings- + verifieringspipeline för provfrågor (uppdragets §23-25, Fas 5).
+// Ämnesgeneraliserad (Elton, 2026-07-19): ursprungligen byggd bara för juridik/Privatjuridik,
+// men varken databasschemat (concepts.subject/course var redan generellt) eller pipelinens
+// logik var faktiskt juridik-specifik — bara promptordvalet var det. subjectLabel() nedan bygger
+// en läsbar ämnesetikett från concept.subject/course och skickas nu igenom till alla fyra
+// promptmoduler istället för hårdkodat "juridik"/"Privatjuridik". Nästa pilotämne (t.ex. matte)
+// kräver bara en egen godkänd källkorpus (concepts/knowledge_chunks-rader) — ingen kodändring.
 // EN fråga per anrop (generateVerifiedQuestion) — batching (flera frågor/anrop) är en framtida
 // optimering, inte en Fas 5-nödvändighet (ADR 0003: synkront per request räcker för pilotens volym).
 //
@@ -41,6 +47,15 @@ function normalizeAnswer(arr) {
   return [...(arr ?? [])].map(String).map((s) => s.trim().toUpperCase()).sort().join("|");
 }
 
+// Läsbar ämnesetikett för promptarna, byggd från concepts-tabellens redan generella
+// subject/course-kolumner. Fallback matchar prompt-modulernas egna default ("kursen") om
+// konceptet av något skäl saknar subject (ska inte hända i praktiken — concepts.subject är
+// not null i schemat — men ingen anledning att krascha pipelinen på det).
+function subjectLabel(concept) {
+  if (!concept?.subject) return undefined;
+  return concept.course ? `${concept.subject} (${concept.course})` : concept.subject;
+}
+
 /**
  * Fas 8.2-kalibrering (Codex CR-2026-07-2X-010-fynd: extraherad till en egen, testbar,
  * exporterad funktion istället för att ligga inline i den icke-exporterade runVerification()).
@@ -76,7 +91,7 @@ export function deterministicDecision({ canAnswerFromSources, generatorAnswerMat
   return "publish";
 }
 
-async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyMs }) {
+async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyMs, subject }) {
   if (!supabase) return;
   try {
     await supabase.from("ai_usage_events").insert({
@@ -84,7 +99,7 @@ async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyM
       user_id: userId ?? null,
       feature: "legal_exam_generation",
       pipeline_step: pipelineStep,
-      subject: "Privatjuridik",
+      subject: subject ?? null,
       provider: "openai",
       model,
       prompt_version: PROMPT_VERSION,
@@ -97,10 +112,11 @@ async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyM
 }
 
 async function runVerification({ supabase, jobId, userId, question, sourceChunks, level, concept }) {
+  const subject = subjectLabel(concept);
   let t0 = Date.now();
   const blindOut = await callAI(
     [
-      { role: "system", content: legalVerifierBlind.systemPrompt(level, concept.name) },
+      { role: "system", content: legalVerifierBlind.systemPrompt(level, concept.name, subject) },
       {
         role: "user",
         content: legalVerifierBlind.buildUserPrompt({
@@ -114,13 +130,13 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
     ],
     { model: verifierModel(), schema: legalVerifierBlind.outputSchema(), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: verifierModel(), latencyMs: Date.now() - t0 });
+  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: verifierModel(), latencyMs: Date.now() - t0, subject: concept.subject });
   const blindResult = JSON.parse(blindOut);
 
   t0 = Date.now();
   const compareOut = await callAI(
     [
-      { role: "system", content: legalVerifierCompare.systemPrompt() },
+      { role: "system", content: legalVerifierCompare.systemPrompt(subject) },
       {
         role: "user",
         content: legalVerifierCompare.buildUserPrompt({
@@ -136,7 +152,7 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
     ],
     { model: verifierModel(), schema: legalVerifierCompare.outputSchema(), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: verifierModel(), latencyMs: Date.now() - t0 });
+  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: verifierModel(), latencyMs: Date.now() - t0, subject: concept.subject });
   const compareResult = JSON.parse(compareOut);
 
   const generatorAnswerMatches = computeGeneratorAnswerMatches({
@@ -179,7 +195,7 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
  * @param {import("@supabase/supabase-js").SupabaseClient} opts.supabase
  * @param {string} [opts.jobId]
  * @param {string} [opts.userId]
- * @param {{ id: string, name: string, definition: string, curriculum_ref: string }} opts.concept
+ * @param {{ id: string, name: string, definition: string, curriculum_ref: string, subject?: string, course?: string }} opts.concept
  * @param {"multiple_choice"|"short_answer"} opts.questionType
  * @param {"E"|"C"|"A"} opts.level
  * @param {boolean} [opts.includePending] — ALDRIG klientstyrt i produktion, se filhuvudet.
@@ -203,16 +219,17 @@ export async function generateVerifiedQuestion({
     return { ok: false, reason: "no_chunks_retrieved", concept: concept.slug ?? concept.name };
   }
   const sourceChunks = retrieved.map((r) => ({ chunk_id: r.chunk_id, section_ref: r.section_ref, content: r.content }));
+  const subject = subjectLabel(concept);
 
   let t0 = Date.now();
   const genOut = await callAI(
     [
-      { role: "system", content: legalGenerator.systemPrompt(questionType, level) },
+      { role: "system", content: legalGenerator.systemPrompt(questionType, level, subject) },
       { role: "user", content: legalGenerator.buildUserPrompt({ concept: concept.name, sourceChunks, questionType, count: 1 }) },
     ],
     { model: generatorModel(), schema: legalGenerator.outputSchema(1, questionType), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "generate", model: generatorModel(), latencyMs: Date.now() - t0 });
+  await logUsage(supabase, { jobId, userId, pipelineStep: "generate", model: generatorModel(), latencyMs: Date.now() - t0, subject: concept.subject });
   const generated = JSON.parse(genOut).items[0];
   const question = { question_type: questionType, ...generated };
 
@@ -224,12 +241,12 @@ export async function generateVerifiedQuestion({
     t0 = Date.now();
     const repairOut = await callAI(
       [
-        { role: "system", content: legalRepair.systemPrompt() },
+        { role: "system", content: legalRepair.systemPrompt(subject) },
         { role: "user", content: legalRepair.buildUserPrompt({ question, verificationResult: verification, sourceChunks }) },
       ],
       { model: generatorModel(), schema: legalRepair.outputSchema(questionType), timeout: 40000 }
     );
-    await logUsage(supabase, { jobId, userId, pipelineStep: "repair", model: generatorModel(), latencyMs: Date.now() - t0 });
+    await logUsage(supabase, { jobId, userId, pipelineStep: "repair", model: generatorModel(), latencyMs: Date.now() - t0, subject: concept.subject });
     const repairedFields = JSON.parse(repairOut);
     finalQuestion = { question_type: questionType, ...repairedFields };
     repaired = true;

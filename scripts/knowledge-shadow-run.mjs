@@ -57,7 +57,7 @@ async function main() {
 
   const { data: concepts, error: conceptsError } = await supabase
     .from("concepts")
-    .select("id, slug, name, definition, curriculum_ref")
+    .select("id, slug, name, definition, curriculum_ref, subject, course")
     .eq("subject", "Privatjuridik");
   if (conceptsError || !concepts?.length) {
     console.error("Kunde inte läsa concepts:", conceptsError?.message);

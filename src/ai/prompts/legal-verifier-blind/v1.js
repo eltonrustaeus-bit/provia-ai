@@ -1,8 +1,9 @@
 // legal-verifier-blind v1 — uppdragets §25.1: verifieraren löser frågan SJÄLV innan den ser
 // generatorns facit. Får ALDRIG ta emot correct_answer/explanation/source_chunk_ids i denna
-// prompt — bara {question, options, sourceChunks, level, concept}, exakt samma princip som
-// api/hp.js:s verifyVerbal() (bekräftad korrekt i Fas 1, se 10-open-questions.md #6). Jämförelsen
-// mot generatorns facit sker i JS-kod i api/knowledge.js, INTE här och INTE av modellen.
+// prompt — bara {question, options, sourceChunks, level, concept, subjectLabel}, exakt samma
+// princip som api/hp.js:s verifyVerbal() (bekräftad korrekt i Fas 1, se 10-open-questions.md #6).
+// Jämförelsen mot generatorns facit sker i JS-kod i src/generation/legal-generation.mjs, INTE här
+// och INTE av modellen. Ämnesgeneraliserad — se legal-generator/v1.js:s filhuvud för resonemanget.
 
 function schema() {
   return {
@@ -32,9 +33,9 @@ function schema() {
   };
 }
 
-function systemPrompt(level, concept) {
+function systemPrompt(level, concept, subjectLabel = "kursen") {
   return [
-    "Du är en sträng, oberoende granskare av juridiska provfrågor (Privatjuridik, svensk gymnasieskola).",
+    `Du är en sträng, oberoende granskare av provfrågor för ${subjectLabel}.`,
     `Koncept: ${concept}. Kursnivå: ${level}.`,
     "Lös frågan SJÄLV utifrån ENDAST de bifogade källutdragen — du får inte facit, bara frågan/alternativen och källorna.",
     "Om källutdragen inte räcker för att avgöra ett svar med rimlig säkerhet: sätt can_answer_from_sources=false och independent_answer=[].",

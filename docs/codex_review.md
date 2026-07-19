@@ -634,3 +634,64 @@ Säkerhetsspärren (vägrar köra utan `legal_shadow_mode=true`) omtestad efter 
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för en kontrollerad, medveten aktivering
 av `legal_shadow_mode` och en skarp körning av `scripts/knowledge-shadow-run.mjs`.
+
+---
+
+## Review ID
+CR-2026-07-2X-013
+
+## Scope
+Oberoende granskning (read-only) av en ämnesgeneraliseringsändring — produktägaren vill kunna
+återanvända hela exam-pipelinen för andra ämnen än juridik (t.ex. matte) i framtiden. Granskade
+de fyra promptmodulerna (nu `subjectLabel`-parametriserade), `src/generation/legal-generation.mjs`
+(ny `subjectLabel(concept)`-hjälpfunktion, `logUsage()` tar nu dynamiskt `subject`), samt
+concept-queries i `api/knowledge.js`/scripten (utökade med `subject, course`).
+
+## Commit / Diff
+Ingen diff — ändringar i working tree.
+
+## Findings
+
+### CRITICAL / HIGH
+Inga. §25.1 (blind-steget ser aldrig facit), §25.2/§25.4 (deterministisk jämförelse/beslut,
+`computeGeneratorAnswerMatches()`/`deterministicDecision()` orörda) uttryckligen bekräftade intakta.
+
+### MEDIUM
+- Ändringen i `legal-generator/v1.js` var inte en helt ren parametrisering — utöver att lägga till
+  `subjectLabel` byttes även "lagtext/ämnesplan" mot bredare "kursmaterial/ämnesplan" och
+  "juridiska fakta/paragrafer/lagrum" mot "fakta, definitioner, formler, årtal eller regler".
+  Status: **accepterat, inte "fel"** — orden "lagtext"/"paragrafer" är i sig juridik-specifika och
+  MÅSTE generaliseras för att en framtida matte-prompt ska vara meningsfull. Dokumenterat här
+  explicit (istället för att kallas "ren parametrisering") så framtida granskare inte förväxlar
+  detta med en oavsiktlig regression. Live-testat mot befintligt juridikinnehåll efteråt — fungerar
+  identiskt (samma verifieringsutfall som innan ändringen).
+
+### LOW
+- `legal-verifier-compare/v1.js` hade kvarvarande juridik-specifik text ("juridiska sakinnehåll",
+  "källutdrag/paragraf") som missats i generaliseringen. Status: **fixat** — generaliserad ordval.
+- `ai_usage_events.feature` loggas fortfarande som `"legal_exam_generation"` (hårdkodat) — kopplat
+  till `generation_jobs.job_type`s DB-CHECK-constraint (`check (job_type in
+  ('legal_exam_generation'))`, satt i Fas 2-schemat), som skulle kräva en egen migration att
+  generalisera. Status: **accepterat, dokumenterat som separat framtida steg** — inte i scope för
+  en ren applikationskodsändring utan schemaändring.
+
+## OK (bekräftat av Codex, ingen ändring)
+- Nya `systemPrompt(..., subjectLabel = "kursen")`-signaturer är bakåtkompatibla (valfri parameter
+  sist, med default).
+- `ai_usage_events.subject` är nullable i schemat — ingen risk för constraint-fel även om
+  `concept.subject` någon gång saknas.
+
+## Claude Resolution
+LOW-fyndet (kvarvarande juridiktext i compare-prompten) fixat direkt. MEDIUM-fyndet är en medveten,
+dokumenterad avvikelse från "ren parametrisering" — inte en bugg, men beskrivningen korrigerad så
+den inte överdriver hur begränsad ändringen är. `feature`-fältets hårdkodning dokumenterad som en
+känd, avsiktligt uppskjuten begränsning.
+
+## Tests
+Full regression (samtliga testfiler) grönt efter fixen. Live-test mot befintligt
+juridikinnehåll (`fullmakt`-konceptet): identiskt beteende (`passed`/`publish`) som innan
+generaliseringen. `ai_usage_events.subject` bekräftat dynamiskt satt (`'Privatjuridik'`, inte
+hårdkodat) i nya rader.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter).

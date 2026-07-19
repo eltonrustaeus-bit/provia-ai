@@ -1,4 +1,9 @@
-// legal-generator v1 — genererar juridikfrågor i batcher från retrieved chunks (uppdragets §23).
+// legal-generator v1 — genererar provfrågor i batcher från retrieved chunks (uppdragets §23).
+// Trots namnet (kvar från Fas 5, då bara juridik/Privatjuridik fanns) är denna modul
+// ÄMNESGENERELL sedan generaliseringen: subjectLabel skickas in av anropande kod
+// (src/generation/legal-generation.mjs, byggd från concepts.subject/course i databasen) — inget
+// härdkodat "juridik"/"Privatjuridik" kvar i själva prompten. Filnamnet/mappnamnet döps om i en
+// separat, ren cleanup-commit senare (risk/nytta motiverar inte det just nu).
 // Tillåtna källor: ENDAST ctx.sourceChunks (text hämtad via retrieveChunks(), se
 // src/retrieval/legal-retrieval.mjs). Abstain-regel: modellen får INTE hitta på fakta som inte
 // finns i sourceChunks — om källorna inte räcker för att fylla n frågor ska den hellre returnera
@@ -53,11 +58,11 @@ function batchSchema(n, questionType) {
   };
 }
 
-function systemPrompt(questionType, difficulty) {
+function systemPrompt(questionType, difficulty, subjectLabel = "kursen") {
   return [
-    "Du skapar juridiska provfrågor för svenska gymnasiekursen Privatjuridik.",
-    "Du får ENDAST använda fakta som uttryckligen finns i de bifogade källutdragen (lagtext/ämnesplan).",
-    "Hitta ALDRIG på paragrafer, lagrum, årtal eller juridiska fakta som inte står i källutdragen.",
+    `Du skapar provfrågor för ${subjectLabel}.`,
+    "Du får ENDAST använda fakta som uttryckligen finns i de bifogade källutdragen (kursmaterial/ämnesplan).",
+    "Hitta ALDRIG på fakta, definitioner, formler, årtal eller regler som inte står i källutdragen.",
     "Om källutdragen inte räcker för att ställa en meningsfull fråga: skriv en enklare fråga som ändå är helt källgrundad, sänk aldrig kraven på källgrundning.",
     questionType === "multiple_choice"
       ? "Varje fråga har 3-5 svarsalternativ (options), exakt ETT eller FLERA är korrekta (correct_answer anger option-id:n)."

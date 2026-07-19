@@ -37,9 +37,9 @@ function schema(questionType) {
   };
 }
 
-function systemPrompt() {
+function systemPrompt(subjectLabel = "kursen") {
   return [
-    "Du korrigerar EN juridisk provfråga utifrån en verifieringsrapport som pekar på konkreta brister.",
+    `Du korrigerar EN provfråga (${subjectLabel}) utifrån en verifieringsrapport som pekar på konkreta brister.`,
     "Du får ENDAST ändra formulering, svarsalternativ, facit och förklaring — koncept, ämnesområde och källutdrag ligger fast.",
     "Åtgärda EXAKT de brister som verifieringsrapporten pekar på (unsupported_claims, contradictions, ambiguity, wrong_answer) — hitta inte på nya fakta utöver källutdragen.",
     "Om bristen inte går att fixa utan att byta källa/koncept: gör frågan smalare/enklare så den blir helt källgrundad, ändra aldrig vad källutdragen faktiskt säger.",

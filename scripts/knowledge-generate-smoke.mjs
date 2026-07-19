@@ -39,7 +39,7 @@ const conceptCount = Number(process.argv[2] || 1);
 async function main() {
   const { data: concepts, error } = await supabase
     .from("concepts")
-    .select("id, slug, name, definition, curriculum_ref")
+    .select("id, slug, name, definition, curriculum_ref, subject, course")
     .eq("subject", "Privatjuridik")
     .limit(conceptCount);
   if (error || !concepts?.length) {
