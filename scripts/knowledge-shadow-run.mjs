@@ -175,6 +175,14 @@ async function main() {
     .from("generation_jobs")
     .update({ status: finalStatus, step: "assemble", progress_current: position, completed_at: new Date().toISOString() })
     .eq("id", job.id);
+  // exam_blueprints.status lämnades tidigare på sitt initiala 'generating' för alltid — den här
+  // scriptkörningen äger hela blueprintens livscykel (till skillnad från api/knowledge.js:s
+  // flerstegs-opGenerate, som kan bygga en blueprint över flera separata anrop och där "klar" är
+  // en svårare fråga), så det är säkert att slutföra den här.
+  await supabase
+    .from("exam_blueprints")
+    .update({ status: abortedByFlag ? "failed" : "completed" })
+    .eq("id", blueprint.id);
 
   console.log("\nUtfall (shadow, sparat i exam_questions/question_verifications, inte visat för någon elev):");
   console.log(JSON.stringify(outcomeCounts, null, 2));
