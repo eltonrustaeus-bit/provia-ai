@@ -280,3 +280,79 @@ JS-ändring krävdes eftersom fixen var ren SQL).
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för applicering mot produktionsdatabasen
 `mnmotdluigzeehdjbhbu`.
+
+---
+
+## Review ID
+CR-2026-07-2X-007
+
+## Scope
+Oberoende granskning (read-only) av Fas 5-koden — den FÖRSTA fasen som skriver produktionskod
+(en ny API-endpoint) i detta uppdrag, inte bara migrationer/dokument: `api/knowledge.js` (ny
+konsoliderad router), `src/generation/legal-generation.mjs` (generering/verifiering/repair-
+pipeline), `src/ai/prompts/legal-*/v1.js` (innehåll/logik, inte bara exportform som i tidigare
+granskning), `tests/generation/legal-generation.test.mjs`,
+`scripts/knowledge-generate-smoke.mjs`. Körd read-only (`codex exec --sandbox read-only`), inkl.
+att köra `node tests/generation/legal-generation.test.mjs`.
+
+## Commit / Diff
+Ingen diff — nya, ännu ospårade filer på branch `feature/provia-knowledge-engine-v1`.
+
+## Findings
+
+### CRITICAL
+Inga.
+
+**§25.1/§25.2/§25.4 bekräftat korrekt** (samma säkerhetsegenskap som `api/hp.js`s `verifyVerbal()`):
+blind-verifieraren får aldrig `correct_answer`/`explanation`; matchningen mot generatorns facit
+beräknas deterministiskt i kod (`normalizeAnswer`-jämförelse), inte av modellen; kodens
+`deterministicDecision()` skriver alltid över compare-modellens eget `recommended_action`-förslag;
+repair körs exakt en gång (inget loop-scenario, nedgraderas till `manual_review` om reparationen
+fortfarande behöver repareras).
+
+### HIGH
+- **Vercel-funktionstak**: `api/knowledge.js` är den 13:e routade `api/*.js`-filen.
+  `docs/current-system/vercel-runtime-map.md` §4 dokumenterar 12 befintliga endpoints och en
+  kodkommentar i `hp.js` som uttryckligen säger "Hobby plan has a 12-function cap". Status: **inte
+  kod-fixbart** utan att antingen konsolidera ytterligare eller uppgradera Vercel-planen — flaggat
+  som ett beslut för produktägaren (se `15-fas5-results.md`), inte löst i denna commit. Påverkar
+  bara en eventuell Vercel-build av denna branch, inte produktions-`main`.
+- **Ingen kvot-/rate-limit-gate** runt en kostsam AI-pipeline. Status: **fixat** — en enkel,
+  självständig daglig gräns (`MAX_JOBS_PER_USER_PER_DAY = 20`, fail-closed vid DB-osäkerhet)
+  tillagd i `opBlueprint`, oberoende av `api/_provia-rules.js` (delad fil, rörs inte).
+
+### MEDIUM
+- Inget kontroll av `job.status` före generering → race där samma `job_id` kan trigga dubbel
+  OpenAI-kostnad. Status: **fixat** — `generate` kräver nu `status==='queued'`, avvisar annars
+  med 409. (Fullständig atomär `UPDATE...WHERE status='queued'` är en rimlig framtida härdning,
+  inte blockerande här eftersom endpointen är feature-flag-inert.)
+- Fel vid insert i `question_verifications` ignorerades tyst, jobbet markerades ändå `completed`.
+  Status: **fixat** — jobbet markeras `partially_completed` (redan en giltig status i schemat) om
+  verifieringsraden inte kunde sparas, felet loggas server-side.
+- En misslyckad `generation_jobs`-insert lämnade en redan skapad `exam_blueprint` som en övergiven
+  `draft` för alltid. Status: **fixat** — blueprinten markeras `failed` explicit.
+- `job.input_json.blueprint_id` användes utan att verifiera ägarskap oberoende av jobbet. Status:
+  **fixat** — `generate` laddar nu blueprinten separat och verifierar `user_id` innan generering.
+
+### LOW
+- `insertError.message` returnerades rakt av till klienten (kan läcka schema-/constraintdetaljer).
+  Status: **fixat** — loggas server-side (`console.error`), klienten får ett generiskt meddelande.
+- Ingen övre gräns på `question_count`. Status: **fixat** — `MAX_QUESTION_COUNT = 100`.
+- Bekräftat: `scripts/knowledge-generate-smoke.mjs` anropar `generateVerifiedQuestion()` direkt,
+  skriver INTE till `exam_questions`/`generation_jobs` (bara `ai_usage_events` via `logUsage()`,
+  fail-open, `job_id`/`user_id`=null). Ingen ändring behövdes.
+
+## Claude Resolution
+Samtliga fixbara fynd åtgärdade direkt (se ovan). Vercel-funktionstaket kvarstår som ett
+beslutspunkt för produktägaren, inte en kodbugg — dokumenterat i `15-fas5-results.md`.
+
+## Tests
+`node tests/generation/legal-generation.test.mjs` — 10/10 PASS (omkört efter fixarna ovan, ingen
+ändring i `deterministicDecision()` själv krävdes). Full regression: `validate-schemas.mjs` 21/21,
+`validate-prompt-modules.mjs` 17/17, `validate-gold-set.mjs` 101/101,
+`legal-retrieval.test.mjs` 10/10 — samtliga PASS.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter). Kärnkraven i §25 bekräftat korrekta. Redo för en
+kontrollerad, medvetet kostsam end-to-end-testkörning (`scripts/knowledge-generate-smoke.mjs`) —
+Vercel-funktionstaket kvarstår som separat beslutspunkt innan ev. bred deploy.
