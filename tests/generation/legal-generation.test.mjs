@@ -4,7 +4,7 @@
 //   node tests/generation/legal-generation.test.mjs
 
 import assert from "node:assert/strict";
-import { deterministicDecision } from "../../src/generation/legal-generation.mjs";
+import { deterministicDecision, computeGeneratorAnswerMatches } from "../../src/generation/legal-generation.mjs";
 
 let failures = 0;
 const ok = (name) => console.log(`  PASS  ${name}`);
@@ -101,6 +101,48 @@ check("modellens EGEN recommended_action-nyckel (om den fanns i compareResult) p
   const withFakeField = { ...goodCompare, recommended_action: "reject" };
   const action = deterministicDecision({ canAnswerFromSources: true, generatorAnswerMatches: true, compareResult: withFakeField });
   assert.equal(action, "publish", "ett eventuellt recommended_action-fält i compareResult ska ignoreras helt");
+});
+
+// ── computeGeneratorAnswerMatches (Fas 8.2-kalibrering) ──
+
+check("multiple_choice: exakt match (samma option-ID, oavsett ordning) ger true", () => {
+  const matches = computeGeneratorAnswerMatches({
+    questionType: "multiple_choice",
+    independentAnswer: ["B", "A"],
+    generatorAnswer: ["A", "B"],
+    compareResult: { semantic_equivalent_to_generator: false }, // ska IGNORERAS för multiple_choice
+  });
+  assert.equal(matches, true);
+});
+
+check("multiple_choice: olika option-ID ger false, ÄVEN OM compareResult påstår semantic_equivalent_to_generator=true", () => {
+  const matches = computeGeneratorAnswerMatches({
+    questionType: "multiple_choice",
+    independentAnswer: ["A"],
+    generatorAnswer: ["B"],
+    compareResult: { semantic_equivalent_to_generator: true },
+  });
+  assert.equal(matches, false, "multiple_choice ska ALDRIG lita på modellens semantic_equivalent_to_generator");
+});
+
+check("short_answer: använder compareResult.semantic_equivalent_to_generator, inte strängmatchning", () => {
+  const matches = computeGeneratorAnswerMatches({
+    questionType: "short_answer",
+    independentAnswer: ["Helt annorlunda formulering men samma sakinnehåll"],
+    generatorAnswer: ["Original-formulering av facit"],
+    compareResult: { semantic_equivalent_to_generator: true },
+  });
+  assert.equal(matches, true, "short_answer ska lita på modellens semantiska bedömning, inte exakt strängmatch");
+});
+
+check("short_answer: semantic_equivalent_to_generator=false ger false även vid identiska strängar", () => {
+  const matches = computeGeneratorAnswerMatches({
+    questionType: "short_answer",
+    independentAnswer: ["Samma text"],
+    generatorAnswer: ["Samma text"],
+    compareResult: { semantic_equivalent_to_generator: false },
+  });
+  assert.equal(matches, false);
 });
 
 console.log(`\n${failures === 0 ? "Alla" : failures + " av"} kontroller klara.`);

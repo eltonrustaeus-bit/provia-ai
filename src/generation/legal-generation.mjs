@@ -4,8 +4,13 @@
 //
 // Säkerhetsegenskap (§25.1/§25.2), bevisad i api/hp.js:s verifyVerbal() och kopierad rakt av:
 // - legal-verifier-blind FÅR ALDRIG generatorns facit — löser frågan självständigt.
-// - Om generatorns facit matchar den blinda lösningen avgörs DETERMINISTISKT i JS (normalize+jämför
-//   nedan), INTE av någon modellprompt — samma princip som hp.js:s `res[i].index === q.correct_index`.
+// - Om generatorns facit matchar den blinda lösningen avgörs för multiple_choice DETERMINISTISKT
+//   i JS (computeGeneratorAnswerMatches() nedan, normalize+jämför option-ID:n) — samma princip
+//   som hp.js:s `res[i].index === q.correct_index`. För short_answer är exakt strängmatchning
+//   meningslös (två sakligt likvärdiga fritextsvar är nästan aldrig identiska strängar), så där
+//   används istället compare-stegets modell-bedömda `semantic_equivalent_to_generator` (Fas 8.2
+//   -kalibrering — se computeGeneratorAnswerMatches()). Den bedömningen görs av samma modell som
+//   redan ser facit i compare-steget, inte av blind-steget — §25.1 gäller fortfarande blind-steget.
 // - legal-verifier-compare ser facit (det är hela poängen med jämförelsesteget) men dess modell-
 //   genererade `recommended_action` skrivs ALLTID över av deterministicDecision() nedan innan
 //   resultatet sparas — schemas/question-verification.schema.json är explicit om att modellens
@@ -34,6 +39,24 @@ export function verifierModel() {
 
 function normalizeAnswer(arr) {
   return [...(arr ?? [])].map(String).map((s) => s.trim().toUpperCase()).sort().join("|");
+}
+
+/**
+ * Fas 8.2-kalibrering (Codex CR-2026-07-2X-010-fynd: extraherad till en egen, testbar,
+ * exporterad funktion istället för att ligga inline i den icke-exporterade runVerification()).
+ *
+ * multiple_choice: deterministisk strängjämförelse av option-ID:n (litet, diskret värdemängd —
+ * exakt matchning är rätt mått här, ingen AI-bedömning behövs eller bör användas).
+ *
+ * short_answer: exakt strängmatchning av fritext är i praktiken alltid falskt negativt (två
+ * sakligt likvärdiga svar är nästan aldrig identiska strängar) — använder istället compare-
+ * stegets modell-bedömda `semantic_equivalent_to_generator`. Modellen som gör den bedömningen
+ * ser redan facit (det är hela poängen med compare-steget, §25.2) — det här läcker INGET till
+ * blind-steget, som fortfarande aldrig ser facit (§25.1, opåverkat av denna funktion).
+ */
+export function computeGeneratorAnswerMatches({ questionType, independentAnswer, generatorAnswer, compareResult }) {
+  if (questionType === "short_answer") return compareResult.semantic_equivalent_to_generator === true;
+  return normalizeAnswer(independentAnswer) === normalizeAnswer(generatorAnswer);
 }
 
 /**
@@ -94,8 +117,6 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
   await logUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: verifierModel(), latencyMs: Date.now() - t0 });
   const blindResult = JSON.parse(blindOut);
 
-  const generatorAnswerMatches = normalizeAnswer(blindResult.independent_answer) === normalizeAnswer(question.correct_answer);
-
   t0 = Date.now();
   const compareOut = await callAI(
     [
@@ -117,6 +138,13 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
   );
   await logUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: verifierModel(), latencyMs: Date.now() - t0 });
   const compareResult = JSON.parse(compareOut);
+
+  const generatorAnswerMatches = computeGeneratorAnswerMatches({
+    questionType: question.question_type,
+    independentAnswer: blindResult.independent_answer,
+    generatorAnswer: question.correct_answer,
+    compareResult,
+  });
 
   const recommendedAction = deterministicDecision({
     canAnswerFromSources: blindResult.can_answer_from_sources,

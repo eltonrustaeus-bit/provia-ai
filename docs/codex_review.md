@@ -469,3 +469,59 @@ Full regression (samtliga tidigare testfiler) — grönt.
 ## Gate Result
 **PASS** (CONDITIONAL PASS innan fix, PASS efter). Redo för commit och en verifierande
 preview-deploy.
+
+---
+
+## Review ID
+CR-2026-07-2X-010
+
+## Scope
+Oberoende granskning (read-only) av Fas 8.2: kalibrering av `short_answer`-verifiering. Bakgrund:
+live-test (Fas 6.3) visade att exakt strängmatchning mellan blind-verifierarens svar och
+generatorns facit nästan alltid gav falskt negativt för fritextsvar (två sakligt korrekta men
+olika formulerade svar matchar aldrig exakt), vilket skickade korrekta `short_answer`-frågor till
+`insufficient_evidence`/`manual_review` istället för `publish`. Granskade
+`src/ai/prompts/legal-verifier-compare/v1.js` (nytt schema-fält
+`semantic_equivalent_to_generator`) och `src/generation/legal-generation.mjs` (ny funktion
+`computeGeneratorAnswerMatches()`).
+
+## Commit / Diff
+Ingen diff — ändringar i working tree.
+
+## Findings
+
+### CRITICAL / HIGH / MEDIUM
+Inga.
+
+### LOW
+- Matchningslogiken (`multiple_choice` → deterministisk kod, `short_answer` → modell-bedömd) låg
+  inline i den icke-exporterade `runVerification()`, inte separat testbar. Status: **fixat** —
+  extraherad till en egen exporterad funktion `computeGeneratorAnswerMatches()`, med 4 nya
+  dedikerade tester (inkl. en som uttryckligen bekräftar att `multiple_choice` ALDRIG litar på
+  `semantic_equivalent_to_generator`, bara på den deterministiska strängjämförelsen).
+- Filhuvudets säkerhetsbeskrivning var delvis inaktuell (påstod att matchningen alltid är
+  deterministisk JS, utan att nämna `short_answer`-undantaget). Status: **fixat** — uppdaterad.
+
+## OK (bekräftat av Codex, ingen ändring)
+- Inget läckage till legal-verifier-blind — den ser fortfarande bara `question`/`options`/
+  `sourceChunks`/`level`/`concept`, aldrig facit eller `semantic_equivalent_to_generator`.
+- Avvägningen (MC=deterministisk, short_answer=modell-bedömd) är rimlig: den tidigare exakta
+  strängmatchningen för `short_answer` var i praktiken verkningslös (blockerade nästan alltid
+  korrekta svar), så den nya modell-bedömningen är strikt bättre för den frågetypen.
+- `deterministicDecision()`s övriga oberoende kontroller (factual_support/citation_support/
+  ambiguity_score/contradictions/unsupported_claims) kan fortfarande fånga en `short_answer`-fråga
+  där modellen slarvigt satt `semantic_equivalent_to_generator=true` men samtidigt rapporterat
+  svagt stöd eller motsägelser.
+- Schemaändringen är bakåtkompatibel — påverkar inte `question-verification.schema.json`s
+  persisterade resultatform.
+
+## Claude Resolution
+Båda LOW-fynden fixade direkt (se ovan).
+
+## Tests
+`node tests/generation/legal-generation.test.mjs` — 14/14 PASS (10 befintliga + 4 nya för
+`computeGeneratorAnswerMatches()`). Full regression grön. Live-omtest av `short_answer` efter
+refaktoreringen bekräftar oförändrat (korrekt) beteende.
+
+## Gate Result
+**PASS** (CONDITIONAL PASS innan fix, PASS efter).
