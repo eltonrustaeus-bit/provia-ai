@@ -57,28 +57,40 @@ elevvänd generering förrän en människa satt `review_status='approved'`.
 
 ## Chunks (`knowledge_chunks`) — 20 st
 
-| chunk | dokument | section_ref | chunk_type | Innehåll (sammanfattat här, fullt citat i migrationsfilen) |
-|---|---|---|---|---|
-| chunk_01 | Avtalslagen | 1 kap 1 § | lagtext_verbatim | Anbud/svar bindande för avgivaren |
-| chunk_02 | Avtalslagen | 1 kap 2 § | lagtext_verbatim | Svarsfrist vid bestämd tid; beräkning från brevdatum/telegram |
-| chunk_03 | Avtalslagen | 1 kap 3 § | lagtext_verbatim | Skälig tid vid odaterat anbud; muntligt anbud kräver omedelbar accept |
-| chunk_04 | Avtalslagen | 1 kap 4 § | lagtext_verbatim | Sent svar = nytt anbud, undantag vid god tro |
-| chunk_05 | Avtalslagen | 1 kap 5 § | lagtext_verbatim | Avslaget anbud är förfallet |
-| chunk_06 | Avtalslagen | 1 kap 6 § | lagtext_verbatim | Oren accept = avslag + nytt anbud |
-| chunk_07 | Avtalslagen | 1 kap 7 § | lagtext_verbatim | Återkallelse måste komma fram före/samtidigt med anbudet/svaret |
-| chunk_08 | Avtalslagen | 2 kap 10 § | lagtext_verbatim | Fullmäktigens rättshandling inom fullmaktens gränser binder huvudmannen |
-| chunk_09 | Avtalslagen | 2 kap 11 § | lagtext_verbatim | Överskriden befogenhet ej gällande vid tredje mans onda tro |
-| chunk_10 | Avtalslagen | 2 kap 18 § | lagtext_verbatim | Återkallelse av fullmakt gäller när meddelande når fullmäktigen |
-| chunk_11 | Avtalslagen | 2 kap 25 § | lagtext_verbatim | Fullmäktigens skadeståndsansvar utan fullmakt (falsus procurator) |
-| chunk_12 | Avtalslagen | 3 kap 33 § | lagtext_sammanfattning | Tro och heder — ogiltighet vid otillbörliga omständigheter (ofullständigt citat) |
-| chunk_13 | Avtalslagen | 3 kap 36 § | lagtext_sammanfattning | Jämkning av oskäliga avtalsvillkor, särskild hänsyn till konsument |
-| chunk_14 | Föräldrabalken | 9 kap 1 § | lagtext_verbatim | Underårig är omyndig, får ej råda över egendom/åta förbindelser (utdrag) |
-| chunk_15 | Föräldrabalken | 9 kap 3 § | lagtext_verbatim | 16-årsregeln: egen rätt till vad som förvärvats genom eget arbete |
-| chunk_16 | Konsumentköplagen | 4 kap 1 § | lagtext_verbatim | Varan ska stämma överens med avtalet |
-| chunk_17 | Konsumentköplagen | 4 kap 2 § | lagtext_verbatim | Varans avsedda egenskaper när avtalet inte reglerar allt |
-| chunk_18 | Konsumentköplagen | 5 kap 2 § | lagtext_verbatim | Reklamation inom skälig tid; tvåmånadersregeln |
-| chunk_19 | Ämnesplan | Avtalsrätt | laroplan_utdrag | "Hur avtal sluts samt deras rättsverkan." |
-| chunk_20 | Ämnesplan | Konsumenträtt och köprätt | laroplan_utdrag | "Regler som rör köp mellan konsument och näringsidkare, konsumentkrediter samt köp mellan privatpersoner." |
+**Mänsklig granskning påbörjad 2026-07-19** (produktägaren, se `dagbok.md` på Desktop): 4 chunks
+genomlästa mot källan och satta `review_status='approved'` i produktionsdatabasen. Resten kvar
+`pending`. review_status-kolumnen nedan är alltså live databasstatus vid senaste uppdatering av
+detta dokument, inte bara ett ursprungligt seedvärde.
+
+| chunk | dokument | section_ref | chunk_type | review_status | Innehåll (sammanfattat här, fullt citat i migrationsfilen) |
+|---|---|---|---|---|---|
+| chunk_01 | Avtalslagen | 1 kap 1 § | lagtext_verbatim | pending | Anbud/svar bindande för avgivaren |
+| chunk_02 | Avtalslagen | 1 kap 2 § | lagtext_verbatim | pending | Svarsfrist vid bestämd tid; beräkning från brevdatum/telegram |
+| chunk_03 | Avtalslagen | 1 kap 3 § | lagtext_verbatim | pending | Skälig tid vid odaterat anbud; muntligt anbud kräver omedelbar accept |
+| chunk_04 | Avtalslagen | 1 kap 4 § | lagtext_verbatim | pending | Sent svar = nytt anbud, undantag vid god tro |
+| chunk_05 | Avtalslagen | 1 kap 5 § | lagtext_verbatim | pending | Avslaget anbud är förfallet |
+| chunk_06 | Avtalslagen | 1 kap 6 § | lagtext_verbatim | pending | Oren accept = avslag + nytt anbud |
+| chunk_07 | Avtalslagen | 1 kap 7 § | lagtext_verbatim | pending | Återkallelse måste komma fram före/samtidigt med anbudet/svaret |
+| chunk_08 | Avtalslagen | 2 kap 10 § | lagtext_verbatim | pending | Fullmäktigens rättshandling inom fullmaktens gränser binder huvudmannen |
+| chunk_09 | Avtalslagen | 2 kap 11 § | lagtext_verbatim | pending | Överskriden befogenhet ej gällande vid tredje mans onda tro |
+| chunk_10 | Avtalslagen | 2 kap 18 § | lagtext_verbatim | pending | Återkallelse av fullmakt gäller när meddelande når fullmäktigen |
+| chunk_11 | Avtalslagen | 2 kap 25 § | lagtext_verbatim | pending | Fullmäktigens skadeståndsansvar utan fullmakt (falsus procurator) |
+| chunk_12 | Avtalslagen | 3 kap 33 § | lagtext_sammanfattning | pending | Tro och heder — ogiltighet vid otillbörliga omständigheter (ofullständigt citat) |
+| chunk_13 | Avtalslagen | 3 kap 36 § | lagtext_sammanfattning | pending | Jämkning av oskäliga avtalsvillkor, särskild hänsyn till konsument |
+| chunk_14 | Föräldrabalken | 9 kap 1 § | lagtext_verbatim | **approved** | Underårig är omyndig, får ej råda över egendom/åta förbindelser (utdrag) |
+| chunk_15 | Föräldrabalken | 9 kap 3 § | lagtext_verbatim | pending | 16-årsregeln: egen rätt till vad som förvärvats genom eget arbete |
+| chunk_16 | Konsumentköplagen | 4 kap 1 § | lagtext_verbatim | **approved** | Varan ska stämma överens med avtalet |
+| chunk_17 | Konsumentköplagen | 4 kap 2 § | lagtext_verbatim | **approved** | Varans avsedda egenskaper när avtalet inte reglerar allt |
+| chunk_18 | Konsumentköplagen | 5 kap 2 § | lagtext_verbatim | **approved** | Reklamation inom skälig tid; tvåmånadersregeln |
+| chunk_19 | Ämnesplan | Avtalsrätt | laroplan_utdrag | pending | "Hur avtal sluts samt deras rättsverkan." |
+| chunk_20 | Ämnesplan | Konsumenträtt och köprätt | laroplan_utdrag | pending | "Regler som rör köp mellan konsument och näringsidkare, konsumentkrediter samt köp mellan privatpersoner." |
+
+Med dessa 4 godkända täcker **`konsumentkop-fel`** (chunk_16+17) och **`reklamation`** (chunk_18)
+sina koncept helt — produktionsvägen (`includePending=false`, `api/knowledge.js` och
+`api/explain.js`s `legalMode`) kan nu faktiskt hitta godkänt källmaterial för dessa två koncept.
+Verifierat live: `retrieveChunks(..., {includePending:false})` för en fråga om Konsumentköplagen
+returnerade 3 godkända chunks. `underarigas-rattshandlingsformaga` (chunk_14 godkänd, chunk_15
+kvar pending) är delvis täckt.
 
 ## Kända begränsningar
 
