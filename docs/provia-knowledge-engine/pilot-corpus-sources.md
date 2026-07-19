@@ -57,12 +57,13 @@ elevvänd generering förrän en människa satt `review_status='approved'`.
 
 ## Chunks (`knowledge_chunks`) — 20 st
 
-**Mänsklig granskning påbörjad 2026-07-19** (produktägaren, se `dagbok.md` på Desktop): 4 chunks
-genomlästa mot källan och satta `review_status='approved'` i produktionsdatabasen. Resten kvar
-`pending`. review_status-kolumnen nedan är alltså live databasstatus vid senaste uppdatering av
-detta dokument, inte bara ett ursprungligt seedvärde.
+**Mänsklig granskning slutförd 2026-07-19** (produktägaren, se `17-fas8-results.md` och
+`dagbok.md` på Desktop): samtliga 20 chunks genomlästa och godkända. Två av dem (33 §/36 §) hade
+dessutom **innehållsfel** som korrigerades under granskningen — se korrigeringsmigrationen
+`20260724_knowledge_engine_corpus_correction.sql`. review_status-kolumnen nedan är live
+databasstatus, inte ett ursprungligt seedvärde.
 
-| chunk | dokument | section_ref | chunk_type | review_status | Innehåll (sammanfattat här, fullt citat i migrationsfilen) |
+| chunk | dokument | section_ref | chunk_type | review_status | Innehåll (fullt citat i migrationsfilen) |
 |---|---|---|---|---|---|
 | chunk_01 | Avtalslagen | 1 kap 1 § | lagtext_verbatim | **approved** | Anbud/svar bindande för avgivaren |
 | chunk_02 | Avtalslagen | 1 kap 2 § | lagtext_verbatim | **approved** | Svarsfrist vid bestämd tid; beräkning från brevdatum/telegram |
@@ -75,33 +76,46 @@ detta dokument, inte bara ett ursprungligt seedvärde.
 | chunk_09 | Avtalslagen | 2 kap 11 § | lagtext_verbatim | **approved** | Överskriden befogenhet ej gällande vid tredje mans onda tro |
 | chunk_10 | Avtalslagen | 2 kap 18 § | lagtext_verbatim | **approved** | Återkallelse av fullmakt gäller när meddelande når fullmäktigen |
 | chunk_11 | Avtalslagen | 2 kap 25 § | lagtext_verbatim | **approved** | Fullmäktigens skadeståndsansvar utan fullmakt (falsus procurator) |
-| chunk_12 | Avtalslagen | 3 kap 33 § | lagtext_sammanfattning | pending | Tro och heder — ogiltighet vid otillbörliga omständigheter (ofullständigt citat) |
-| chunk_13 | Avtalslagen | 3 kap 36 § | lagtext_sammanfattning | pending | Jämkning av oskäliga avtalsvillkor, särskild hänsyn till konsument |
+| chunk_12 | Avtalslagen | 3 kap 33 § | lagtext_verbatim ⟲ | **approved** | Tro och heder — **innehåll korrigerat 2026-07-19**, fullständig lydelse inkl. motpartens onda tro |
+| chunk_13 | Avtalslagen | 3 kap 36 § | lagtext_verbatim ⟲ | **approved** | Jämkning av oskäliga avtalsvillkor — **innehåll korrigerat 2026-07-19**, samtliga 4 stycken |
 | chunk_14 | Föräldrabalken | 9 kap 1 § | lagtext_verbatim | **approved** | Underårig är omyndig, får ej råda över egendom/åta förbindelser (utdrag) |
-| chunk_15 | Föräldrabalken | 9 kap 3 § | lagtext_verbatim | pending | 16-årsregeln: egen rätt till vad som förvärvats genom eget arbete |
+| chunk_15 | Föräldrabalken | 9 kap 3 § | lagtext_verbatim | **approved** | 16-årsregeln — ålderdomlig formulering bekräftad genuint gällande lydelse |
 | chunk_16 | Konsumentköplagen | 4 kap 1 § | lagtext_verbatim | **approved** | Varan ska stämma överens med avtalet |
 | chunk_17 | Konsumentköplagen | 4 kap 2 § | lagtext_verbatim | **approved** | Varans avsedda egenskaper när avtalet inte reglerar allt |
 | chunk_18 | Konsumentköplagen | 5 kap 2 § | lagtext_verbatim | **approved** | Reklamation inom skälig tid; tvåmånadersregeln |
-| chunk_19 | Ämnesplan | Avtalsrätt | laroplan_utdrag | pending | "Hur avtal sluts samt deras rättsverkan." |
-| chunk_20 | Ämnesplan | Konsumenträtt och köprätt | laroplan_utdrag | pending | "Regler som rör köp mellan konsument och näringsidkare, konsumentkrediter samt köp mellan privatpersoner." |
+| chunk_19 | Ämnesplan | Avtalsrätt | laroplan_utdrag | **approved** | Bekräftat ordagrant matchande Skolverkets centrala innehåll |
+| chunk_20 | Ämnesplan | Konsumenträtt och köprätt | laroplan_utdrag | **approved** | Bekräftat ordagrant matchande Skolverkets centrala innehåll |
 
-**Uppdatering samma kväll:** ytterligare 11 chunks godkända (samtliga ordagrant bekräftade
-paragrafer i Avtalslagen 1 kap och 2 kap — anbud/accept §1-7, fullmakt §10/11/18/25).
-Produktägaren valde medvetet att LÄMNA de 5 svagast källverifierade chunksen (33 §, 36 §,
-Föräldrabalken 9 kap 3 §, de två läroplans-utdragen) som `pending` tills de kan verifieras
-specifikt mot fullständig lagtext — inte godkända slentrianmässigt bara för att resten godkändes.
+⟲ = innehållet ändrades under granskningen (inte bara statusändring) — se
+`20260724_knowledge_engine_corpus_correction.sql` för fullständig historik.
 
-**Status: 15/20 chunks `approved`, 5/20 `pending`.** Med detta täcker **`anbud-accept`**,
-**`fullmakt`**, **`konsumentkop-fel`** och **`reklamation`** (4 av 6 koncept) sina koncept helt
-med godkänt källmaterial — produktionsvägen (`includePending=false`, `api/knowledge.js` och
-`api/explain.js`s `legalMode`) kan nu faktiskt hitta godkänt källmaterial för dessa fyra koncept.
-Verifierat live för båda omgångarna. `underarigas-rattshandlingsformaga` (chunk_14 godkänd,
-chunk_15 kvar pending) är delvis täckt. `avtals-ogiltighet` har fortfarande inget godkänt
-källmaterial alls (båda dess chunks — 33 §, 36 § — är bland de 5 kvarvarande).
+**Status: 20/20 chunks `approved`.** Samtliga 6 koncept har nu fullt godkänt källmaterial —
+produktionsvägen (`includePending=false`, `api/knowledge.js` och `api/explain.js`s `legalMode`)
+kan hitta godkänt källmaterial för alla koncept, inklusive `avtals-ogiltighet` som tidigare saknade
+allt godkänt innehåll.
+
+**Granskningsresultat i detalj:**
+- **Avtalslagen 3 kap 33 §**: den seedade texten var **ofullständig** (saknade sista ledet om att
+  motparten måste antas ha haft vetskap om de otillbörliga omständigheterna). Fullständig lydelse
+  hämtad och korsverifierad mot två oberoende källor (riksdagen.se + lagen.nu, exakt matchande) —
+  korrigerad i databasen, `chunk_type` uppgraderad från `lagtext_sammanfattning` till
+  `lagtext_verbatim`.
+- **Avtalslagen 3 kap 36 §**: den seedade texten var en **AI-sammanfattning**, inte lagtext (2
+  meningar istället för paragrafens faktiska 4 stycken). Fullständig lydelse hämtad och
+  korsverifierad på samma sätt, korrigerad i databasen.
+- **Föräldrabalken 9 kap 3 §**: den ålderdomliga formuleringen ("äge") bekräftades vara **genuint
+  gällande lydelse** direkt från riksdagen.se, inte en föråldrad version — paragrafen har aldrig
+  omformulerats sedan 1949 till skillnad från 9 kap 1 § som moderniserades separat. Godkänd utan
+  innehållsändring.
+- **Skolverkets läroplansutdrag** (båda): bekräftade ordagrant matchande (verifierat mot
+  betygskriterier.se och en oberoende sökning) — endast skiftlägesskillnad ("Hur"/"hur"), ingen
+  saklig avvikelse. Godkända utan ändring.
 
 ## Kända begränsningar
 
-- chunk_12/chunk_13 (33 §/36 §) och chunk_15 (FB 9:3, ålderdomlig formulering) är de svagast
-  källverifierade — prioritera dessa vid mänsklig granskning innan `approved`.
-- Embedding saknas (Fas 4, pgvector ej installerat).
+- Embedding saknas fortfarande inte längre relevant här — alla 20 chunks embeddades i Fas 4,
+  oberoende av review_status.
 - Endast paragrafer relevanta för pilotens fyra delområden är ingesterade — inte hela lagarna.
+- Ingen ytterligare mänsklig granskning krävs för pilotkorpusen i sin nuvarande, avgränsade
+  omfattning (20 chunks, 6 koncept) — om korpusen utökas med fler paragrafer/ämnesområden i en
+  framtida fas gäller samma granskningsprincip på nytt innehåll.

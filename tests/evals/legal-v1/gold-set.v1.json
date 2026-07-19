@@ -370,7 +370,7 @@
           {"id": "D", "text": "Att rättshandlingen avser fast egendom"}
         ],
         "correct_answer": ["B"],
-        "explanation": "§33 (utdrag): rättshandlingen \"må ej göras gällande, där omständigheterna vid dess tillkomst voro sådana, att det skulle strida mot tro och heder att med vetskap om dem åberopa rättshandlingen.\"",
+        "explanation": "§33: rättshandlingen \"må ej göras gällande, där omständigheterna vid dess tillkomst voro sådana, att det skulle strida mot tro och heder att med vetskap om dem åberopa rättshandlingen, och den, gentemot vilken rättshandlingen företogs, måste antagas hava ägt sådan vetskap.\" (Paragrafen kräver alltså även att motparten själv insåg de otillbörliga omständigheterna.)",
         "difficulty": "E",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 33 §"],
@@ -427,7 +427,7 @@
           {"id": "D", "text": "Överlämna frågan till Konsumentverket för beslut"}
         ],
         "correct_answer": ["B"],
-        "explanation": "Enligt sammanfattningen av §36 får ett oskäligt villkor \"jämkas eller lämnas utan avseende.\"",
+        "explanation": "§36 första stycket: ett oskäligt avtalsvillkor \"får jämkas eller lämnas utan avseende.\"",
         "difficulty": "E",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
@@ -446,7 +446,7 @@
           {"id": "D", "text": "Endast om avtalet ingåtts skriftligt eller muntligt"}
         ],
         "correct_answer": ["B"],
-        "explanation": "Sammanfattningen av §36 räknar upp: \"avtalets innehåll, omständigheterna vid avtalets tillkomst, senare inträffade förhållanden och omständigheterna i övrigt.\"",
+        "explanation": "§36 första stycket räknar upp: \"avtalets innehåll, omständigheterna vid avtalets tillkomst, senare inträffade förhållanden och omständigheterna i övrigt.\"",
         "difficulty": "C",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
@@ -465,7 +465,7 @@
           {"id": "D", "text": "Fullmäktige som saknar fullmakt"}
         ],
         "correct_answer": ["B"],
-        "explanation": "§36 (sammanfattning): \"särskild hänsyn [ska tas] till behovet av skydd för den som i egenskap av konsument eller annars intar en underlägsen ställning i avtalsförhållandet.\"",
+        "explanation": "§36 andra stycket: \"särskild hänsyn [skall] tagas till behovet av skydd för den som i egenskap av konsument eller eljest intager en underlägsen ställning i avtalsförhållandet.\"",
         "difficulty": "E",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
@@ -478,7 +478,7 @@
         "question_type": "short_answer",
         "question": "Gäller 3 kap 36 § enbart avtalsvillkor i egentlig mening, eller något bredare?",
         "correct_answer": ["Något bredare — enligt sammanfattningen gäller jämkningsmöjligheten även villkor utanför det egentliga avtalet."],
-        "explanation": "Sammanfattningen av §36 anger uttryckligen att paragrafen \"gäller även villkor utanför egentligt avtal.\"",
+        "explanation": "§36 tredje stycket: \"Första och andra styckena äga motsvarande tillämpning i fråga om villkor vid annan rättshandling än avtal.\"",
         "difficulty": "A",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
@@ -489,10 +489,10 @@
       "gold_id": "PRIVJUR-V1-027",
       "payload": {
         "question_type": "short_answer",
-        "question": "En elev läser i en lärobok att \"33 § alltid gör avtalet helt ogiltigt\". Stämmer detta med den ingesterade lagtexten, och varför/varför inte?",
-        "correct_answer": ["Delvis missvisande: den ingesterade texten av §33 gäller specifikt att rättshandlingen 'ej må göras gällande' när omständigheterna vid tillkomsten stred mot tro och heder att åberopa med vetskap om dem — men källchunken är märkt som ett ofullständigt citat (pending review), så hela paragrafens räckvidd är inte bekräftad i denna korpus och bör verifieras mot fullständig lagtext innan påståendet görs kategoriskt."],
-        "explanation": "Testar källkritik: chunk_12 är explicit flaggad som ofullständigt citat (review_status pending, chunk_type lagtext_sammanfattning) — frågan övar att inte övergeneralisera från en ofullständig källa.",
-        "difficulty": "C",
+        "question": "Räcker det enligt 3 kap 33 § att omständigheterna vid en rättshandlings tillkomst var otillbörliga (stred mot tro och heder), eller krävs något mer av motparten för att rättshandlingen ska kunna göras ogiltig?",
+        "correct_answer": ["Nej, det räcker inte i sig — paragrafen kräver även att motparten (den mot vilken rättshandlingen riktades) själv måste antas ha haft vetskap om de otillbörliga omständigheterna. Utan motpartens onda tro kan rättshandlingen inte ogiltigförklaras enligt 33 §, även om omständigheterna objektivt sett var otillbörliga."],
+        "explanation": "§33 sista ledet: \"...och den, gentemot vilken rättshandlingen företogs, måste antagas hava ägt sådan vetskap.\" Ett tvåledat rekvisit: dels objektivt otillbörliga omständigheter, dels motpartens (antagna) subjektiva vetskap om dem.",
+        "difficulty": "A",
         "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
         "curriculum_refs": ["Avtalslagen 3 kap 33 §"],
         "source_chunk_ids": ["c42e7145-61ee-47ae-96c9-0c279264449f"]
