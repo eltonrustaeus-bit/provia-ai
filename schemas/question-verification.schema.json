@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proviaai.se/schemas/question-verification.schema.json",
+  "title": "QuestionVerificationResult",
+  "description": "Strukturerat resultat från legal-verifier-compare (uppdragets §25.3). Poäng är interna hjälpvärden, INTE absolut sanning — recommended_action avgörs av deterministisk beslutslogik (§25.4), inte av modellen själv.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "independent_answer",
+    "generator_answer_matches",
+    "factual_support",
+    "citation_support",
+    "ambiguity_score",
+    "course_alignment",
+    "difficulty_alignment",
+    "unsupported_claims",
+    "contradictions",
+    "failure_codes",
+    "repairable",
+    "recommended_action"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "insufficient_evidence"]
+    },
+    "independent_answer": {
+      "description": "Verifierarens egen, blinda lösning (§25.1) — inte generatorns.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "generator_answer_matches": { "type": "boolean" },
+    "factual_support": { "type": "number", "minimum": 0, "maximum": 1 },
+    "citation_support": { "type": "number", "minimum": 0, "maximum": 1 },
+    "ambiguity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "course_alignment": { "type": "number", "minimum": 0, "maximum": 1 },
+    "difficulty_alignment": { "type": "number", "minimum": 0, "maximum": 1 },
+    "unsupported_claims": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "failure_codes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "WRONG_ANSWER",
+          "MULTIPLE_DEFENSIBLE_ANSWERS",
+          "FABRICATED_SOURCE",
+          "OUTDATED_RULE",
+          "MISSING_CONDITION",
+          "WRONG_DIFFICULTY",
+          "INSUFFICIENT_EVIDENCE",
+          "AMBIGUOUS_PHRASING"
+        ]
+      }
+    },
+    "repairable": { "type": "boolean" },
+    "recommended_action": {
+      "description": "Modellens rekommendation — den DETERMINISTISKA beslutslogiken (§25.4) i api/knowledge.js avgör faktiskt PASS/REPAIR/REJECT/MANUAL_REVIEW, inte detta fält direkt.",
+      "type": "string",
+      "enum": ["publish", "repair", "reject", "manual_review"]
+    }
+  }
+}

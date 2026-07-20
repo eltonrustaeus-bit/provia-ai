@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://proviaai.se/schemas/ai-usage-event.schema.json",
+  "title": "AiUsageEvent",
+  "description": "Matchar ai_usage_events (uppdragets §14.11). Byggs FÖRST av alla knowledge-engine-tabeller (docs/provia-knowledge-engine/05-cost-baseline.md, 07-proposed-v1-architecture.md §3) — ger kostnadssynlighet för hela plattformen, inte bara juridik-piloten. Lagra ALDRIG elevtext/svar/dokument här, bara metadata (§14.11).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "feature",
+    "pipeline_step",
+    "provider",
+    "model",
+    "input_tokens",
+    "output_tokens",
+    "latency_ms",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "request_id": { "type": "string" },
+    "job_id": { "type": ["string", "null"], "format": "uuid" },
+    "user_id": {
+      "description": "Null för systemhändelser utan enskild användare (t.ex. embed-steget vid korpus-ingestion, Fas 3).",
+      "type": ["string", "null"], "format": "uuid"
+    },
+    "school_id": { "type": ["string", "null"], "format": "uuid" },
+    "subscription_tier": { "type": "string", "enum": ["gratis", "basic", "premium", "admin", "teacher"] },
+    "feature": { "type": "string" },
+    "pipeline_step": {
+      "type": "string",
+      "enum": [
+        "classify", "blueprint", "embed", "retrieve", "generate", "validate",
+        "verify_blind", "verify_compare", "repair", "assemble", "grade",
+        "error_classify", "mastery_update"
+      ]
+    },
+    "subject": { "type": "string" },
+    "course": { "type": "string" },
+    "provider": { "type": "string", "enum": ["openai"] },
+    "model": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "pipeline_version": { "type": "string" },
+    "corpus_version": { "type": "string" },
+    "input_tokens": { "type": "integer", "minimum": 0 },
+    "cached_input_tokens": { "type": "integer", "minimum": 0 },
+    "output_tokens": { "type": "integer", "minimum": 0 },
+    "embedding_tokens": { "type": "integer", "minimum": 0 },
+    "retrieval_candidates": { "type": "integer", "minimum": 0 },
+    "retrieved_chunks": { "type": "integer", "minimum": 0 },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "cache_hit": { "type": "boolean" },
+    "retry_count": { "type": "integer", "minimum": 0, "default": 0 },
+    "verification_passed": { "type": ["boolean", "null"] },
+    "estimated_cost": { "type": ["number", "null"], "minimum": 0 },
+    "currency": { "type": "string", "default": "USD" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -271,6 +271,19 @@ export default async function handler(req, res) {
     }
   }
 
+  // Delete all mockprov history for the signed-in user (formerly its own api/delete-exams.js —
+  // folded in here to stay within Vercel Hobby's 12-function cap, see docs/provia-knowledge-engine/
+  // 16-fas6-7-results.md). Behavior unchanged: same table, same user-scoped delete, same auth.
+  if (action === "delete_exams") {
+    try {
+      const { error } = await supabase.from("user_exams").delete().eq("user_id", user.id);
+      if (error) return res.status(500).json({ error: "Delete failed" });
+      return res.status(200).json({ ok: true });
+    } catch (e) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   // ── Class feature (teacher dashboard + student join) — PRIVATE DEMO ──
   // Locked to OWNER_ID while in development. 404 hides existence from everyone else.
   const isClassAction =

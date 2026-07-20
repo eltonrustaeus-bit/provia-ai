@@ -11,6 +11,8 @@
 //
 // No frontend changes required.
 
+const assessment = require("./_assessment");
+
 function json(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -195,8 +197,15 @@ module.exports = async function handler(req, res) {
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
   const chunks = [];
-  req.on("data", (c) => chunks.push(c));
+  let responded = false;
+  const sendOnce = (status, obj) => { if (responded) return; responded = true; json(res, status, obj); };
+  // Without this, a stalled/aborted request stream would leave the handler hanging
+  // with no response — one of the ways grading could "load forever".
+  req.on("error", (e) => sendOnce(400, { ok: false, error: "Request stream error", details: String(e) }));
+  req.on("aborted", () => sendOnce(400, { ok: false, error: "Request aborted" }));
   req.on("end", async () => {
+    if (responded) return; // stream already errored/aborted — don't double-respond
+    responded = true;
     let p;
     try {
       const raw = Buffer.concat(chunks).toString("utf8");
@@ -244,6 +253,23 @@ module.exports = async function handler(req, res) {
 
         let pts = 0;
         let fb = "";
+
+        // Reject a tampered answer key: the browser holds correct_index, so a
+        // manipulated payload could otherwise buy full marks. Signed at generation.
+        const keyOk = assessment.verifyAnswerKey(q, q.akey_sig);
+        if (!keyOk) {
+          total += 0;
+          perById.set(id, {
+            id, points: 0, max_points: maxP,
+            feedback: lang === "sv"
+              ? "Fel: frågans facit kunde inte verifieras och rättades inte."
+              : "Error: the answer key could not be verified and was not graded.",
+            model_answer: String(q.model_answer || q.rubric || ""),
+            concept_tag: typeof q.concept_tag === "string" ? q.concept_tag.slice(0, 60) : "",
+            error_tags: ["answer_key_unverified"]
+          });
+          continue;
+        }
 
         if (correctIndex >= 0 && chosenIndex >= 0) {
           pts = chosenIndex === correctIndex ? maxP : 0;

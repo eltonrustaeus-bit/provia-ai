@@ -1,0 +1,903 @@
+{
+  "version": "v1",
+  "subject": "Privatjuridik",
+  "course": "JURPRI0",
+  "pilot_area": "Avtalsrätt och konsumenträtt",
+  "created": "2026-07-19",
+  "description": "Manuellt författat och källgrundat gold-set för Fas 3 (pilotkorpus). Varje fråga citerar concept_ids/source_chunk_ids som seedas av supabase/migrations/20260721_knowledge_engine_corpus_seed.sql — se docs/provia-knowledge-engine/pilot-corpus-sources.md för fullständigt källmanifest. payload-objektet i varje fråga är avsett att validera mot schemas/exam-question.schema.json.",
+  "eval_only_notice": "VIKTIGT (Codex CR-2026-07-19-004, MEDIUM-fynd): schemas/exam-question.schema.json kräver att source_chunk_ids pekar på knowledge_chunks med review_status='approved' för PUBLICERAD generering (§18/§24). Alla chunks denna fil refererar är seedade med review_status='pending' (se pilot-corpus-sources.md). Detta gold-set är därför en fristående eval-fixture för att mäta Fas 4/5-genereringspipelinens kvalitet mot en mänskligt författad facit — payloads här får INTE infogas direkt som rader i exam_questions-tabellen förrän en människa satt motsvarande chunks till 'approved'.",
+  "concept_id_map": {
+    "anbud-accept": "d6b91831-5c79-4ea5-9873-47867d3e3b94",
+    "fullmakt": "fdefaa54-0764-436f-b71c-3ae850f77667",
+    "avtals-ogiltighet": "f5efa722-08c5-4712-87d7-14f919babf2c",
+    "underarigas-rattshandlingsformaga": "7b410904-2b1a-4ee4-99f2-8525b1dc4a6e",
+    "konsumentkop-fel": "bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb",
+    "reklamation": "e4a370b2-1838-48fc-84eb-03bdceec30e1"
+  },
+  "questions": [
+    {
+      "gold_id": "PRIVJUR-V1-001",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt Avtalslagen 1 kap 1 § — vad krävs för att ett anbud och ett svar på anbudet ska vara bindande?",
+        "options": [
+          {"id": "A", "text": "Att de är skriftliga och undertecknade av båda parter"},
+          {"id": "B", "text": "Att anbudet och svaret uppfyller de villkor som anges i 2–9 §§"},
+          {"id": "C", "text": "Att en notarie bevittnat rättshandlingen"},
+          {"id": "D", "text": "Att motparten uttryckligen godkänt bindande verkan i efterhand"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§1 säger att anbud och svar är bindande \"efter ty här nedan i 2–9 §§ sägs\" — dvs enligt de närmare reglerna i resten av kapitlet, inte pga skriftlighet eller bevittning.",
+        "difficulty": "E",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 1 §"],
+        "source_chunk_ids": ["ff25a7c9-6e91-4df9-a814-6d11b77c8bf2"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-002",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Ett brev med ett anbud är daterat 1 mars och innehåller en bestämd svarsfrist. Från vilken tidpunkt räknas fristen enligt 1 kap 2 §?",
+        "options": [
+          {"id": "A", "text": "Från den dag mottagaren öppnar brevet"},
+          {"id": "B", "text": "Från den dag brevet är dagtecknat"},
+          {"id": "C", "text": "Från den dag anbudet skickades till tryck"},
+          {"id": "D", "text": "Från den dag mottagaren bekräftar mottagandet"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§2 anger uttryckligen att tidrymden \"skall räknas från den dag brevet är dagtecknat\" (eller den tid telegrammet lämnades in), inte från mottagande eller bekräftelse.",
+        "difficulty": "C",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 2 §"],
+        "source_chunk_ids": ["e93cdda5-df59-4c90-9a4e-fa5aab962da3"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-003",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad gäller enligt 1 kap 2 § om anbudsgivaren själv bestämt en viss tid för svar?",
+        "options": [
+          {"id": "A", "text": "Svaret måste komma anbudsgivaren till handa inom den tiden"},
+          {"id": "B", "text": "Svaret räcker att det avsänds inom tiden, oavsett ankomst"},
+          {"id": "C", "text": "Tiden är endast vägledande och inte bindande"},
+          {"id": "D", "text": "Anbudsgivaren måste påminna mottagaren innan tiden löper ut"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "§2: anbudsgivaren \"anses hava föreskrivit, att svaret skall inom den tid komma honom till handa\" — avgörande är att svaret kommer fram i tid, inte bara avsänds i tid.",
+        "difficulty": "E",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 2 §"],
+        "source_chunk_ids": ["e93cdda5-df59-4c90-9a4e-fa5aab962da3"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-004",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Ett muntligt anbud lämnas utan att anstånd med svaret medges. Vad krävs enligt 1 kap 3 §?",
+        "options": [
+          {"id": "A", "text": "Svar inom skälig tid, som vid skriftliga anbud"},
+          {"id": "B", "text": "Omedelbar accept"},
+          {"id": "C", "text": "Accept inom 24 timmar"},
+          {"id": "D", "text": "Ingen tidsgräns alls eftersom anbudet är muntligt"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§3 andra meningen: muntligt anbud utan anstånd \"måste omedelbart antagas\" — den skäliga tidsfristen gäller bara skriftliga anbud utan angiven svarstid.",
+        "difficulty": "C",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 3 §"],
+        "source_chunk_ids": ["870869fe-9a45-4b53-a962-b87138019b26"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-005",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Ett anbud lämnas i brev utan att någon svarstid anges. Enligt vilken måttstock ska mottagaren bedöma hur lång tid hen har på sig att svara, enligt 1 kap 3 §?",
+        "correct_answer": ["Skälig tid — den tid som vid anbudets avgivande skäligen kunde beräknas åtgå (ingen fast tidsgräns anges i lagtexten)."],
+        "explanation": "§3: \"måste antagande svar komma anbudsgivaren till handa inom den tid, som vid anbudets avgivande skäligen kunde av honom beräknas åtgå\" — en skälighetsbedömning, ingen exakt dagars-gräns.",
+        "difficulty": "A",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 3 §"],
+        "source_chunk_ids": ["870869fe-9a45-4b53-a962-b87138019b26"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-006",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "B accepterar A:s anbud, men svaret kommer fram för sent på grund av ett postförsenat brev. Vad blir huvudregeln enligt 1 kap 4 §?",
+        "options": [
+          {"id": "A", "text": "Avtal har ändå slutits eftersom B skickade svaret i tid"},
+          {"id": "B", "text": "Svaret gäller som ett nytt anbud från B"},
+          {"id": "C", "text": "A är bunden av avtalet ändå"},
+          {"id": "D", "text": "Anbudet förlängs automatiskt"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§4 huvudregel: \"Antagande svar, som för sent kommer anbudsgivaren till handa, skall gälla såsom nytt anbud\" — det är alltså B som nu blivit anbudsgivare, inte ett slutet avtal.",
+        "difficulty": "C",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 4 §"],
+        "source_chunk_ids": ["ffb5e1dd-d608-4a69-940b-edd7602dd2f8"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-007",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilket undantag gäller enligt 1 kap 4 § från huvudregeln att ett för sent svar gäller som nytt anbud?",
+        "options": [
+          {"id": "A", "text": "Om B kan bevisa att brevet postades i tid"},
+          {"id": "B", "text": "Om A rimligen borde ha insett att svaret kom fram i rätt tid, men A ändå utgått från att det var försent"},
+          {"id": "C", "text": "Om B avsänder svaret och rimligen utgår från att det kommit fram i tid, och mottagaren måste inse detta"},
+          {"id": "D", "text": "Om avtalet gäller en kommersiell affär mellan näringsidkare"}
+        ],
+        "correct_answer": ["C"],
+        "explanation": "§4 andra meningen: undantaget gäller när avsändaren (B) \"utgår från att det framkommit i rätt tid och mottagaren måste inse detta\" — fokus ligger på avsändarens goda tro och mottagarens insikt.",
+        "difficulty": "A",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 4 §"],
+        "source_chunk_ids": ["ffb5e1dd-d608-4a69-940b-edd7602dd2f8"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-008",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "B tackar nej till A:s anbud men ångrar sig och vill acceptera innan svarstiden gått ut. Vad säger 1 kap 5 §?",
+        "options": [
+          {"id": "A", "text": "B kan acceptera fram till dess att svarstiden löpt ut, trots det tidigare avslaget"},
+          {"id": "B", "text": "Anbudet är förfallet i och med avslaget, även om svarstiden inte gått ut"},
+          {"id": "C", "text": "Avslaget är utan verkan om det skedde muntligt"},
+          {"id": "D", "text": "A måste skicka ett nytt anbud för att B ska kunna acceptera"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§5: \"Avslås anbud, vare det förfallet, ändå att den tid, varunder det eljest skolat gälla, ej gått till ända\" — avslaget gör anbudet förfallet oavsett kvarvarande svarstid.",
+        "difficulty": "E",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 5 §"],
+        "source_chunk_ids": ["9a7eddf0-43d9-4ff5-b192-8c8f424b7f54"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-009",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "B svarar \"ja\" på A:s anbud men lägger till ett villkor om längre garantitid som inte fanns i anbudet. Hur bedöms B:s svar enligt 1 kap 6 §?",
+        "options": [
+          {"id": "A", "text": "Som ett accepterande av anbudet, med garantitillägget som ett separat önskemål"},
+          {"id": "B", "text": "Som ett avslag i förening med ett nytt anbud (om inte det särskilda undantaget om god tro/insikt gäller)"},
+          {"id": "C", "text": "Som en bindande accept eftersom B sagt \"ja\""},
+          {"id": "D", "text": "Som ogiltigt eftersom man inte får ändra ett anbud"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§6: ett svar som pga tillägg, inskränkning eller förbehåll inte överensstämmer med anbudet \"skall gälla såsom avslag i förening med nytt anbud\", såvida inte samma typ av undantag som i §4 (god tro/insikt) gäller.",
+        "difficulty": "C",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 6 §"],
+        "source_chunk_ids": ["74c177cd-d116-45ba-8653-171b87060966"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-010",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "A skickar ett anbud och ångrar sig direkt. A skickar en återkallelse med bud som hinner fram till B samtidigt som anbudsbrevet. Är återkallelsen giltig enligt 1 kap 7 §?",
+        "options": [
+          {"id": "A", "text": "Nej, återkallelse måste alltid komma fram innan originalmeddelandet"},
+          {"id": "B", "text": "Ja, det räcker att återkallelsen kommer fram innan mottagaren tagit del av anbudet, eller samtidigt därmed"},
+          {"id": "C", "text": "Nej, en återkallelse kan aldrig ske efter att anbudet avsänts"},
+          {"id": "D", "text": "Ja, men bara om mottagaren uttryckligen godkänner återkallelsen"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§7: återkallelse gäller om den \"kommer den, till vilken anbudet eller svaret är riktat, till handa innan han tager del av detta eller samtidigt därmed\" — samtidig ankomst räcker.",
+        "difficulty": "E",
+        "concept_ids": ["d6b91831-5c79-4ea5-9873-47867d3e3b94"],
+        "curriculum_refs": ["Avtalslagen 1 kap 7 §"],
+        "source_chunk_ids": ["3e71e257-576e-4a0b-a5bc-358fb22c0787"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-011",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt 2 kap 10 § — vem blir bunden av en rättshandling som en fullmäktig företar inom fullmaktens gränser?",
+        "options": [
+          {"id": "A", "text": "Endast fullmäktigen själv"},
+          {"id": "B", "text": "Fullmaktsgivaren (huvudmannen), gentemot tredje man"},
+          {"id": "C", "text": "Tredje man, gentemot fullmäktigen"},
+          {"id": "D", "text": "Ingen blir bunden förrän huvudmannen godkänt rättshandlingen i efterhand"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§10: fullmaktsgivaren \"varder omedelbart berättigad och förpliktad i förhållande till tredje man\" genom fullmäktigens rättshandling inom fullmaktens gränser.",
+        "difficulty": "E",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 10 §"],
+        "source_chunk_ids": ["f30973ed-a76c-4e71-a60b-f7b7c77d0651"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-012",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En fullmäktig ingår ett avtal inom fullmaktens yttre gränser, men har fått en särskild muntlig instruktion att inte sälja till just detta pris — och bryter mot instruktionen. Vad krävs enligt 2 kap 11 § för att rättshandlingen ändå inte ska gälla mot huvudmannen?",
+        "options": [
+          {"id": "A", "text": "Att fullmäktigen agerat i ond tro"},
+          {"id": "B", "text": "Att tredje man insåg eller bort inse att fullmäktigen överskred sin befogenhet"},
+          {"id": "C", "text": "Att avtalet inte är skriftligt"},
+          {"id": "D", "text": "Att huvudmannen inom en vecka protesterar"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§11: rättshandlingen är inte gällande mot huvudmannen \"såframt tredje man insåg eller bort inse, att fullmäktigen sålunda överskred sin befogenhet\" — avgörande är tredje mans onda tro/vårdslöshet.",
+        "difficulty": "C",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 11 §"],
+        "source_chunk_ids": ["1f2d4949-a180-47d7-8b39-60f2325ac74b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-013",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Vad är skillnaden mellan fullmaktens \"gränser\" (§10) och de \"särskilda inskränkande föreskrifter\" (§11), sett till vem rättshandlingen kan göras ogiltig mot?",
+        "correct_answer": ["Överskrids de yttre gränserna är rättshandlingen inte bindande alls för huvudmannen. Överskrids bara en intern instruktion enligt 11 §, blir rättshandlingen ändå inte gällande mot huvudmannen, men bara om tredje man insåg eller borde ha insett överskridandet — annars gäller den mot huvudmannen."],
+        "explanation": "Grundas på lydelsen i §10 (gränser) och §11 (särskilda inskränkande föreskrifter + tredje mans onda tro/culpa som villkor).",
+        "difficulty": "A",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 10 §", "Avtalslagen 2 kap 11 §"],
+        "source_chunk_ids": ["f30973ed-a76c-4e71-a60b-f7b7c77d0651", "1f2d4949-a180-47d7-8b39-60f2325ac74b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-014",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En fullmakt grundar sig enbart på ett meddelande från fullmaktsgivaren till fullmäktigen. När är den återkallad enligt 2 kap 18 §?",
+        "options": [
+          {"id": "A", "text": "När fullmaktsgivaren beslutat att återkalla den, oavsett om fullmäktigen fått veta det"},
+          {"id": "B", "text": "När meddelandet om återkallelse kommit fullmäktigen till handa"},
+          {"id": "C", "text": "När tredje man informerats om återkallelsen"},
+          {"id": "D", "text": "Automatiskt efter tre månader"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§18: fullmakten \"är återkallad, när meddelande från fullmaktsgivaren, att fullmakten icke vidare skall gälla, kommit fullmäktigen till handa\".",
+        "difficulty": "E",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 18 §"],
+        "source_chunk_ids": ["848807f5-79f7-4a46-9aec-7d94de14279d"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-015",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad är den praktiska konsekvensen av att fullmakten enligt §18 formellt kvarstår tills meddelandet nått fullmäktigen?",
+        "options": [
+          {"id": "A", "text": "Fullmäktigen kan fortsätta binda huvudmannen fram till dess, även om huvudmannen redan bestämt sig för att återkalla den"},
+          {"id": "B", "text": "Fullmäktigen förlorar automatiskt sin behörighet så fort huvudmannen fattat beslutet"},
+          {"id": "C", "text": "Tredje man bär alltid risken för en återkallelse som inte kommit fullmäktigen till handa"},
+          {"id": "D", "text": "Fullmakten kan aldrig återkallas utan tredje mans samtycke"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "Eftersom återkallelsen enligt §18 gäller först när meddelandet når fullmäktigen, kan fullmäktigen i mellantiden fortsätta agera med bindande verkan för huvudmannen.",
+        "difficulty": "C",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 18 §"],
+        "source_chunk_ids": ["848807f5-79f7-4a46-9aec-7d94de14279d"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-016",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad ansvarar den som uppträder som fullmäktig för, enligt 2 kap 25 §, om han saknar fullmakt?",
+        "options": [
+          {"id": "A", "text": "Han riskerar bara ett administrativt varningsbrev"},
+          {"id": "B", "text": "Han blir personligen bunden av avtalet i huvudmannens ställe"},
+          {"id": "C", "text": "Han ska ersätta tredje man den skada som denne lider av att inte kunna göra rättshandlingen gällande mot huvudmannen"},
+          {"id": "D", "text": "Han går fri om han trodde sig ha fullmakt"}
+        ],
+        "correct_answer": ["C"],
+        "explanation": "§25: den som uppträder som fullmäktig utan att kunna styrka fullmakt är \"pliktig att ersätta tredje man all skada, som denne lider därigenom att han icke kan göra rättshandlingen gällande mot huvudmannen.\"",
+        "difficulty": "E",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 25 §"],
+        "source_chunk_ids": ["a98b3c76-eaee-4193-9d5b-1326e079fea8"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-017",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad kan en påstådd fullmäktig göra enligt 2 kap 25 § för att undgå skadeståndsansvaret mot tredje man?",
+        "options": [
+          {"id": "A", "text": "Bevisa att han själv trodde att han hade fullmakt"},
+          {"id": "B", "text": "Styrka att han handlat efter fullmakt, eller att rättshandlingen godkänts av (eller ändå gäller mot) den uppgivne huvudmannen"},
+          {"id": "C", "text": "Betala tillbaka det belopp avtalet avsåg"},
+          {"id": "D", "text": "Hänvisa till att tredje man kände fullmäktigen sedan tidigare"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§25 undantar ansvar om fullmäktigen \"förmår styrka, att han handlat efter fullmakt eller att den rättshandling, varom fråga är, blivit godkänd av den uppgivne huvudmannen eller ändock är gällande mot honom\".",
+        "difficulty": "C",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 25 §"],
+        "source_chunk_ids": ["a98b3c76-eaee-4193-9d5b-1326e079fea8"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-018",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En fullmäktig saknar fullmakt helt, men huvudmannen väljer i efterhand att godkänna (ratihabera) rättshandlingen. Vad blir följden enligt logiken i 2 kap 25 §?",
+        "options": [
+          {"id": "A", "text": "Fullmäktigen ansvarar ändå gentemot tredje man"},
+          {"id": "B", "text": "Fullmäktigen går fri från skadeståndsansvar eftersom rättshandlingen blivit godkänd av huvudmannen"},
+          {"id": "C", "text": "Rättshandlingen är ogiltig trots godkännandet"},
+          {"id": "D", "text": "Tredje man måste ändå stämma fullmäktigen personligen"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§25 undantar uttryckligen ansvar när rättshandlingen \"blivit godkänd av den uppgivne huvudmannen\" — efterhandsgodkännande läker bristen på fullmakt i ansvarshänseende.",
+        "difficulty": "A",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 25 §"],
+        "source_chunk_ids": ["a98b3c76-eaee-4193-9d5b-1326e079fea8"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-019",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Enligt 2 kap 10 §, vad är det avgörande villkoret för att en rättshandling som fullmäktigen företar ska binda huvudmannen?",
+        "correct_answer": ["Att fullmäktigen handlar inom fullmaktens gränser och i fullmaktsgivarens namn."],
+        "explanation": "§10: \"...genom rättshandling, som fullmäktigen inom fullmaktens gränser företager i fullmaktsgivarens namn.\"",
+        "difficulty": "E",
+        "concept_ids": ["fdefaa54-0764-436f-b71c-3ae850f77667"],
+        "curriculum_refs": ["Avtalslagen 2 kap 10 §"],
+        "source_chunk_ids": ["f30973ed-a76c-4e71-a60b-f7b7c77d0651"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-020",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad krävs enligt 3 kap 33 § för att en rättshandling som annars är giltig ändå inte ska få göras gällande?",
+        "options": [
+          {"id": "A", "text": "Att rättshandlingen är muntlig"},
+          {"id": "B", "text": "Att omständigheterna vid dess tillkomst var sådana att det skulle strida mot tro och heder att åberopa den med vetskap om dem"},
+          {"id": "C", "text": "Att motparten är näringsidkare"},
+          {"id": "D", "text": "Att rättshandlingen avser fast egendom"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§33: rättshandlingen \"må ej göras gällande, där omständigheterna vid dess tillkomst voro sådana, att det skulle strida mot tro och heder att med vetskap om dem åberopa rättshandlingen, och den, gentemot vilken rättshandlingen företogs, måste antagas hava ägt sådan vetskap.\" (Paragrafen kräver alltså även att motparten själv insåg de otillbörliga omständigheterna.)",
+        "difficulty": "E",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 33 §"],
+        "source_chunk_ids": ["c42e7145-61ee-47ae-96c9-0c279264449f"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-021",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilket allmänt begrepp inom avtalsrätten brukar 3 kap 33 § sammanfattas som?",
+        "options": [
+          {"id": "A", "text": "Ocker"},
+          {"id": "B", "text": "Generalklausulen om tro och heder (\"33 §-regeln\")"},
+          {"id": "C", "text": "Condictio indebiti"},
+          {"id": "D", "text": "Pactum turpe"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§33 kallas ofta \"tro och heder\"-paragrafen eller den allmänna generalklausulen om ogiltighet, till skillnad från lagens mer specifika ogiltighetsgrunder.",
+        "difficulty": "C",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 33 §"],
+        "source_chunk_ids": ["c42e7145-61ee-47ae-96c9-0c279264449f"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-022",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad är den viktigaste skillnaden mellan 3 kap 33 § och 3 kap 36 § när det gäller vad domstolen kan göra med rättshandlingen/avtalsvillkoret?",
+        "options": [
+          {"id": "A", "text": "33 § gör hela rättshandlingen overksam om den åberopas i strid mot tro och heder; 36 § ger möjlighet att jämka eller lämna ett oskäligt villkor utan avseende, utan att nödvändigtvis ogiltigförklara hela avtalet"},
+          {"id": "B", "text": "Båda paragraferna kan bara tillämpas på konsumentavtal"},
+          {"id": "C", "text": "36 § är enbart tillämplig på fullmaktsförhållanden"},
+          {"id": "D", "text": "33 § gäller bara skriftliga avtal, 36 § bara muntliga"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "§33 avser en rättshandlings ogiltighet i sin helhet vid ond tro om otillbörliga omständigheter; §36 ger en jämkningsmöjlighet — en mer flexibel rättsföljd.",
+        "difficulty": "A",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 33 §", "Avtalslagen 3 kap 36 §"],
+        "source_chunk_ids": ["c42e7145-61ee-47ae-96c9-0c279264449f", "71ce73fa-ae4e-446e-8db3-995deed36a4b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-023",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt 3 kap 36 §, vad kan en domstol göra med ett avtalsvillkor som är oskäligt?",
+        "options": [
+          {"id": "A", "text": "Endast ogiltigförklara hela avtalet"},
+          {"id": "B", "text": "Jämka villkoret eller lämna det utan avseende"},
+          {"id": "C", "text": "Bötfälla den part som föreslagit villkoret"},
+          {"id": "D", "text": "Överlämna frågan till Konsumentverket för beslut"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§36 första stycket: ett oskäligt avtalsvillkor \"får jämkas eller lämnas utan avseende.\"",
+        "difficulty": "E",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
+        "source_chunk_ids": ["71ce73fa-ae4e-446e-8db3-995deed36a4b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-024",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilka omständigheter ska beaktas vid skälighetsbedömningen enligt 3 kap 36 §?",
+        "options": [
+          {"id": "A", "text": "Bara avtalets innehåll"},
+          {"id": "B", "text": "Avtalets innehåll, omständigheterna vid tillkomsten, senare inträffade förhållanden och omständigheterna i övrigt"},
+          {"id": "C", "text": "Endast parternas ekonomiska ställning"},
+          {"id": "D", "text": "Endast om avtalet ingåtts skriftligt eller muntligt"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§36 första stycket räknar upp: \"avtalets innehåll, omständigheterna vid avtalets tillkomst, senare inträffade förhållanden och omständigheterna i övrigt.\"",
+        "difficulty": "C",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
+        "source_chunk_ids": ["71ce73fa-ae4e-446e-8db3-995deed36a4b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-025",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilken partsgrupp får enligt 3 kap 36 § särskild hänsyn vid skälighetsbedömningen?",
+        "options": [
+          {"id": "A", "text": "Näringsidkare i allmänhet"},
+          {"id": "B", "text": "Den som i egenskap av konsument eller annars intar en underlägsen ställning i avtalsförhållandet"},
+          {"id": "C", "text": "Staten som avtalspart"},
+          {"id": "D", "text": "Fullmäktige som saknar fullmakt"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§36 andra stycket: \"särskild hänsyn [skall] tagas till behovet av skydd för den som i egenskap av konsument eller eljest intager en underlägsen ställning i avtalsförhållandet.\"",
+        "difficulty": "E",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
+        "source_chunk_ids": ["71ce73fa-ae4e-446e-8db3-995deed36a4b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-026",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Gäller 3 kap 36 § enbart avtalsvillkor i egentlig mening, eller något bredare?",
+        "correct_answer": ["Något bredare — enligt sammanfattningen gäller jämkningsmöjligheten även villkor utanför det egentliga avtalet."],
+        "explanation": "§36 tredje stycket: \"Första och andra styckena äga motsvarande tillämpning i fråga om villkor vid annan rättshandling än avtal.\"",
+        "difficulty": "A",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 36 §"],
+        "source_chunk_ids": ["71ce73fa-ae4e-446e-8db3-995deed36a4b"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-027",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Räcker det enligt 3 kap 33 § att omständigheterna vid en rättshandlings tillkomst var otillbörliga (stred mot tro och heder), eller krävs något mer av motparten för att rättshandlingen ska kunna göras ogiltig?",
+        "correct_answer": ["Nej, det räcker inte i sig — paragrafen kräver även att motparten (den mot vilken rättshandlingen riktades) själv måste antas ha haft vetskap om de otillbörliga omständigheterna. Utan motpartens onda tro kan rättshandlingen inte ogiltigförklaras enligt 33 §, även om omständigheterna objektivt sett var otillbörliga."],
+        "explanation": "§33 sista ledet: \"...och den, gentemot vilken rättshandlingen företogs, måste antagas hava ägt sådan vetskap.\" Ett tvåledat rekvisit: dels objektivt otillbörliga omständigheter, dels motpartens (antagna) subjektiva vetskap om dem.",
+        "difficulty": "A",
+        "concept_ids": ["f5efa722-08c5-4712-87d7-14f919babf2c"],
+        "curriculum_refs": ["Avtalslagen 3 kap 33 §"],
+        "source_chunk_ids": ["c42e7145-61ee-47ae-96c9-0c279264449f"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-028",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt Föräldrabalken 9 kap 1 §, vad gäller som huvudregel för den som är under arton år?",
+        "options": [
+          {"id": "A", "text": "Hen är omyndig och får inte själv råda över sin egendom eller åta sig förbindelser"},
+          {"id": "B", "text": "Hen får ingå alla avtal men föräldrarna ansvarar ekonomiskt"},
+          {"id": "C", "text": "Hen är myndig i ekonomiska frågor från 16 års ålder"},
+          {"id": "D", "text": "Hen behöver alltid domstolens tillstånd för varje rättshandling"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "FB 9 kap 1 §: \"Den som är under arton år (underårig) är omyndig och får inte själv råda över sin egendom eller åta sig förbindelser.\"",
+        "difficulty": "E",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 1 §"],
+        "source_chunk_ids": ["253907ac-2c0f-4485-9287-4ed5af9ae76d"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-029",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En 15-åring skriver på ett låneavtal utan förmyndares samtycke. Vad blir huvudregelns konsekvens enligt 9 kap 1 §?",
+        "options": [
+          {"id": "A", "text": "Avtalet är fullt giltigt eftersom 15-åringen förstod villkoren"},
+          {"id": "B", "text": "Avtalet omfattas av huvudregeln om att underåriga inte själva får åta sig förbindelser"},
+          {"id": "C", "text": "Avtalet blir giltigt automatiskt vid 16 års ålder"},
+          {"id": "D", "text": "Långivaren blir alltid skadeståndsskyldig"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "Huvudregeln i 9 kap 1 § gäller generellt \"förbindelser\" — ett låneavtal är en ekonomisk förbindelse som faller under huvudregeln, utan att den ingesterade chunken anger några undantag för detta scenario.",
+        "difficulty": "C",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 1 §"],
+        "source_chunk_ids": ["253907ac-2c0f-4485-9287-4ed5af9ae76d"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-030",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Källchunken för 9 kap 1 § är märkt som ett utdrag där paragrafens eventuella undantag inte är bekräftade ordagrant. Kan gold-set-svaret ange exakt vilka undantag som finns i paragrafen?",
+        "correct_answer": ["Nej — denna korpus bekräftar inte några undantag ordagrant för 9 kap 1 §. Enligt chunkens metadata krävs komplettering/verifiering mot fullständig lagtext innan sådana undantag kan anges med säkerhet."],
+        "explanation": "Medveten fråga om källans gränser — chunken är flaggad \"Utdrag — paragrafens undantag ... ej bekräftade ordagrant i denna hämtning\", vilket frågan explicit testar att granskaren uppmärksammar.",
+        "difficulty": "A",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 1 §"],
+        "source_chunk_ids": ["253907ac-2c0f-4485-9287-4ed5af9ae76d"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-031",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Från vilken ålder får en underårig enligt 9 kap 3 § själv råda över vad hen förvärvat genom eget arbete?",
+        "options": [
+          {"id": "A", "text": "15 år"},
+          {"id": "B", "text": "16 år"},
+          {"id": "C", "text": "17 år"},
+          {"id": "D", "text": "18 år"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§3: \"Underårig äge själv råda över vad han genom eget arbete förvärvat efter det han fyllt sexton år.\"",
+        "difficulty": "E",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 3 §"],
+        "source_chunk_ids": ["ab8df1c0-b92c-43d0-8c6a-e607eeca05b5"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-032",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En 17-åring har ett sommarjobb och får lön insatt på ett eget konto. Omfattas lönen av undantaget i 9 kap 3 §?",
+        "options": [
+          {"id": "A", "text": "Nej, lön omfattas aldrig av undantaget"},
+          {"id": "B", "text": "Ja, eftersom lönen är förvärvad genom eget arbete efter 16 års ålder"},
+          {"id": "C", "text": "Endast om föräldrarna gett sitt samtycke i förväg"},
+          {"id": "D", "text": "Endast om beloppet understiger ett visst prisbasbelopp"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§3 ger den underårige rätt att själv råda över \"vad han genom eget arbete förvärvat efter det han fyllt sexton år\" — en 17-årings arbetsinkomst omfattas direkt.",
+        "difficulty": "C",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 3 §"],
+        "source_chunk_ids": ["ab8df1c0-b92c-43d0-8c6a-e607eeca05b5"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-033",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt 9 kap 3 §, omfattar undantaget också avkastningen av den förvärvade egendomen (t.ex. ränta på sparad lön)?",
+        "options": [
+          {"id": "A", "text": "Nej, bara själva ursprungsbeloppet"},
+          {"id": "B", "text": "Ja — \"detsamma gäller avkastningen av sådan egendom och vad som trätt i egendomens ställe\""},
+          {"id": "C", "text": "Endast om egendomen omvandlats till fast egendom"},
+          {"id": "D", "text": "Frågan regleras inte alls i 9 kap 3 §"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "§3 andra meningen utökar undantaget uttryckligen till avkastning och substitut: \"Detsamma gäller avkastningen av sådan egendom och vad som trätt i egendomens ställe.\"",
+        "difficulty": "A",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 3 §"],
+        "source_chunk_ids": ["ab8df1c0-b92c-43d0-8c6a-e607eeca05b5"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-034",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Varför flaggas ordalydelsen i chunken för 9 kap 3 § särskilt för mänsklig granskning i pilotkorpusens manifest, trots att texten är ett bekräftat citat?",
+        "correct_answer": ["Ordval som 'äge' och 'han' är ålderdomlig lagspråksstil som kan tyda på en äldre lagtextversion eller inaktuell paragrafnumrering — manifestet flaggar att lydelsen bör verifieras mot gällande lagtext innan chunken godkänns för publicerad generering, trots att citatet i sig är bekräftat ordagrant från källhämtningen."],
+        "explanation": "Testar medvetenhet om skillnaden mellan \"verbatim_confirmed\" (bekräftat citat från en hämtning) och faktisk aktualitet av gällande rätt — två olika kvalitetsdimensioner.",
+        "difficulty": "C",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 3 §"],
+        "source_chunk_ids": ["ab8df1c0-b92c-43d0-8c6a-e607eeca05b5"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-035",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilken lag reglerar underårigas rättshandlingsförmåga, enligt denna korpus?",
+        "options": [
+          {"id": "A", "text": "Avtalslagen (1915:218)"},
+          {"id": "B", "text": "Föräldrabalken (1949:381)"},
+          {"id": "C", "text": "Konsumentköplagen (2022:260)"},
+          {"id": "D", "text": "Skadeståndslagen"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "Underårigas rättshandlingsförmåga regleras i Föräldrabalken 9 kap, inte i Avtalslagen eller Konsumentköplagen.",
+        "difficulty": "E",
+        "concept_ids": ["7b410904-2b1a-4ee4-99f2-8525b1dc4a6e"],
+        "curriculum_refs": ["Föräldrabalken 9 kap 1 §", "Föräldrabalken 9 kap 3 §"],
+        "source_chunk_ids": ["253907ac-2c0f-4485-9287-4ed5af9ae76d", "ab8df1c0-b92c-43d0-8c6a-e607eeca05b5"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-036",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt Konsumentköplagen 4 kap 1 §, vad är utgångspunkten för om en vara är avtalsenlig?",
+        "options": [
+          {"id": "A", "text": "Marknadspris"},
+          {"id": "B", "text": "Att varan stämmer överens med vad som följer av avtalet"},
+          {"id": "C", "text": "Tillverkarens garantivillkor"},
+          {"id": "D", "text": "Branschstandard oavsett avtalet"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "4 kap 1 §: \"Varan ska i fråga om art, beskrivning, mängd, kvalitet, funktionalitet, kompatibilitet, driftskompatibilitet och i övrigt stämma överens med vad som följer av avtalet.\"",
+        "difficulty": "E",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 1 §"],
+        "source_chunk_ids": ["705e599c-3798-410d-9d33-f530098e7b93"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-037",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilka egenskaper räknas uttryckligen upp i 4 kap 1 § som varan ska stämma överens med avtalet i fråga om?",
+        "options": [
+          {"id": "A", "text": "Endast pris och leveranstid"},
+          {"id": "B", "text": "Art, beskrivning, mängd, kvalitet, funktionalitet, kompatibilitet och driftskompatibilitet"},
+          {"id": "C", "text": "Endast varans vikt och färg"},
+          {"id": "D", "text": "Endast varans ursprungsland"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "Uppräkningen i 4 kap 1 § är exakt: \"art, beskrivning, mängd, kvalitet, funktionalitet, kompatibilitet, driftskompatibilitet och i övrigt\".",
+        "difficulty": "C",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 1 §"],
+        "source_chunk_ids": ["705e599c-3798-410d-9d33-f530098e7b93"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-038",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad reglerar 4 kap 2 § som ett tillägg till 4 kap 1 §?",
+        "options": [
+          {"id": "A", "text": "Vilka krav varan ska uppfylla utöver vad som uttryckligen följer av avtalet"},
+          {"id": "B", "text": "Endast prisets storlek"},
+          {"id": "C", "text": "Endast leveranstidens längd"},
+          {"id": "D", "text": "Konsumentens ångerrätt"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "4 kap 2 § inleds \"Varan ska, utöver vad som följer av 1 §...\" och räknar upp ytterligare krav som gäller även om avtalet inte reglerat allt.",
+        "difficulty": "E",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-039",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En konsument köper en dammsugare som fungerar men saknar bruksanvisning för underhåll. Vilken punkt i 4 kap 2 § är mest relevant?",
+        "options": [
+          {"id": "A", "text": "Punkt 1, om varans avsedda ändamål"},
+          {"id": "B", "text": "Punkt 5, om att varan ska åtföljas av anvisningar för användning, förvaring och skötsel som konsumenten med fog kan förutsätta"},
+          {"id": "C", "text": "Punkt 2, om prov/modell"},
+          {"id": "D", "text": "Punkt 4, om marknadsföringsuppgifter"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "4 kap 2 § punkt 5: varan ska \"åtföljas av den förpackning och andra tillbehör samt anvisningar för installation, montering, användning, förvaring och skötsel som konsumenten med fog kan förutsätta.\"",
+        "difficulty": "C",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-040",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En säljare visar upp ett provexemplar i butiken, men den levererade varan har sämre kvalitet än provet. Vilken punkt i 4 kap 2 § blir relevant?",
+        "options": [
+          {"id": "A", "text": "Punkt 2, om att varan ska stämma överens med kvaliteten på ett prov eller en modell som gjorts tillgänglig före köpet"},
+          {"id": "B", "text": "Punkt 3, om varans normala hållbarhet"},
+          {"id": "C", "text": "Punkt 1, om varans avsedda ändamål"},
+          {"id": "D", "text": "Ingen punkt, provexemplar saknar rättslig betydelse"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "4 kap 2 § punkt 2 gäller uttryckligen \"kvaliteten på och näringsidkarens beskrivning av ett prov eller en modell som har gjorts tillgänglig för konsumenten före köpet.\"",
+        "difficulty": "C",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-041",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En näringsidkare marknadsför en vara med särskilda påståenden om hållbarhet, men varan uppfyller inte dessa påståenden. Vilken punkt i 4 kap 2 § reglerar detta, och vem kan påståendena härröra från enligt lagtexten?",
+        "options": [
+          {"id": "A", "text": "Punkt 4 — påståenden från näringsidkaren, ett tidigare säljled, eller för näringsidkarens räkning, vid marknadsföring eller annars före köpet"},
+          {"id": "B", "text": "Punkt 4 — enbart påståenden direkt från säljande näringsidkaren själv"},
+          {"id": "C", "text": "Punkt 3 — bara varans normala egenskaper oavsett marknadsföring"},
+          {"id": "D", "text": "Ingen punkt reglerar marknadsföringspåståenden"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "Punkt 4 omfattar uttryckligen uppgifter som lämnats \"av näringsidkaren eller någon i ett tidigare säljled eller för näringsidkarens räkning ... vid marknadsföringen av varan eller annars före köpet\" — bredare än bara säljaren själv.",
+        "difficulty": "A",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-042",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Vad krävs enligt 4 kap 1 § för att en vara ska vara avtalsenlig avseende funktionalitet och kompatibilitet?",
+        "correct_answer": ["Att varan stämmer överens med vad som följer av avtalet i fråga om funktionalitet och kompatibilitet (samt art, beskrivning, mängd, kvalitet och driftskompatibilitet)."],
+        "explanation": "Direkt hämtat från 4 kap 1 §:s uppräkning.",
+        "difficulty": "E",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 1 §"],
+        "source_chunk_ids": ["705e599c-3798-410d-9d33-f530098e7b93"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-043",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Om avtalet inte alls reglerar en varas hållbarhet, vilken måttstock används enligt 4 kap 2 § punkt 3 för att avgöra vad konsumenten kan förvänta sig?",
+        "correct_answer": ["Vad som är normalt förekommande för varor av samma slag och som konsumenten med fog kan förutsätta med hänsyn till varans art."],
+        "explanation": "4 kap 2 § punkt 3: hållbarhet (m.fl. särdrag) ska vara \"normalt förekommande för varor av samma slag och som konsumenten med fog kan förutsätta med hänsyn till varans art.\"",
+        "difficulty": "C",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-044",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vilken lag reglerar frågan om \"fel i varan\" vid konsumentköp i denna korpus?",
+        "options": [
+          {"id": "A", "text": "Avtalslagen"},
+          {"id": "B", "text": "Föräldrabalken"},
+          {"id": "C", "text": "Konsumentköplagen (2022:260)"},
+          {"id": "D", "text": "Skolverkets ämnesplan"}
+        ],
+        "correct_answer": ["C"],
+        "explanation": "Fel i varan regleras i Konsumentköplagen 4 kap, inte i de övriga ingesterade källorna.",
+        "difficulty": "E",
+        "concept_ids": ["bb5df550-7a26-4a4a-94b7-2e1aaff3c9cb"],
+        "curriculum_refs": ["Konsumentköplagen 4 kap 1 §", "Konsumentköplagen 4 kap 2 §"],
+        "source_chunk_ids": ["705e599c-3798-410d-9d33-f530098e7b93", "13e16dc7-f2af-4140-906f-3c2556be51df"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-045",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Vad måste en konsument göra enligt 5 kap 2 § för att få åberopa att en vara är felaktig?",
+        "options": [
+          {"id": "A", "text": "Reklamera muntligen inom 24 timmar"},
+          {"id": "B", "text": "Lämna näringsidkaren ett meddelande om felet inom skälig tid efter det att konsumenten borde ha märkt felet"},
+          {"id": "C", "text": "Returnera varan direkt utan föregående meddelande"},
+          {"id": "D", "text": "Vänta minst en månad innan reklamation görs"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "5 kap 2 §: \"Konsumenten får åberopa att varan är felaktig endast om han eller hon lämnar näringsidkaren ett meddelande om felet inom skälig tid efter det att konsumenten borde ha märkt felet (reklamation).\"",
+        "difficulty": "E",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-046",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Enligt 5 kap 2 §, vilken tidsfrist anses alltid vara i rätt tid?",
+        "options": [
+          {"id": "A", "text": "En vecka efter köpet"},
+          {"id": "B", "text": "Två månader efter det att konsumenten märkt felet"},
+          {"id": "C", "text": "Sex månader efter köpet oavsett när felet märktes"},
+          {"id": "D", "text": "Tre år efter köpet"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "\"En reklamation som görs inom två månader efter det att konsumenten märkt felet ska alltid anses ha gjorts i rätt tid.\"",
+        "difficulty": "E",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-047",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "En konsument märker ett fel efter 5 veckor men reklamerar först i vecka 7 efter att ha märkt felet. Har reklamationen enligt 5 kap 2 § definitivt gjorts i rätt tid?",
+        "options": [
+          {"id": "A", "text": "Ja, eftersom det är inom två månader (ca 8-9 veckor) efter att felet märktes"},
+          {"id": "B", "text": "Nej, eftersom fristen räknas från köptillfället, inte från upptäckten"},
+          {"id": "C", "text": "Nej, eftersom reklamation alltid måste ske inom en vecka"},
+          {"id": "D", "text": "Frågan kan inte besvaras utan att veta varans pris"}
+        ],
+        "correct_answer": ["A"],
+        "explanation": "Tvåmånadersregeln räknas \"efter det att konsumenten märkt felet\" — 7 veckor efter upptäckt ligger inom två månader och räknas därför alltid som i rätt tid.",
+        "difficulty": "C",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-048",
+      "payload": {
+        "question_type": "multiple_choice",
+        "question": "Innebär tvåmånadersregeln i 5 kap 2 § att en reklamation som görs efter två månader alltid är för sen?",
+        "options": [
+          {"id": "A", "text": "Ja, två månader är en absolut yttersta gräns"},
+          {"id": "B", "text": "Nej — regeln säger bara att reklamation inom två månader alltid räknas som i rätt tid; den utesluter inte att en senare reklamation också kan vara inom \"skälig tid\" beroende på omständigheterna"},
+          {"id": "C", "text": "Ja, men bara för livsmedel"},
+          {"id": "D", "text": "Nej, tvåmånadersregeln gäller bara näringsidkare emellan"}
+        ],
+        "correct_answer": ["B"],
+        "explanation": "Lagtexten anger en miniminivå (\"ska alltid anses ha gjorts i rätt tid\" inom två månader) — den anger inte att allt därutöver per automatik är för sent; denna chunk specificerar inte närmare bortom huvudregeln.",
+        "difficulty": "A",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-049",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Vad kallas det på svenskt juridiskt fackspråk när en konsument meddelar säljaren om ett fel i varan, enligt 5 kap 2 §?",
+        "correct_answer": ["Reklamation."],
+        "explanation": "5 kap 2 § definierar uttryckligen: \"...ett meddelande om felet inom skälig tid efter det att konsumenten borde ha märkt felet (reklamation).\"",
+        "difficulty": "E",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    },
+    {
+      "gold_id": "PRIVJUR-V1-050",
+      "payload": {
+        "question_type": "short_answer",
+        "question": "Från vilken tidpunkt börjar tvåmånadersfristen i 5 kap 2 § att räknas — från köpet eller från något annat?",
+        "correct_answer": ["Från det att konsumenten märkt (upptäckt) felet, inte från själva köptillfället."],
+        "explanation": "\"En reklamation som görs inom två månader efter det att konsumenten märkt felet...\" — fristen utgår från upptäckten, inte köpdatumet.",
+        "difficulty": "C",
+        "concept_ids": ["e4a370b2-1838-48fc-84eb-03bdceec30e1"],
+        "curriculum_refs": ["Konsumentköplagen 5 kap 2 §"],
+        "source_chunk_ids": ["9ccc3440-8bfe-4a98-8db9-17e1ca029768"]
+      }
+    }
+  ]
+}

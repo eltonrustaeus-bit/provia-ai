@@ -657,10 +657,12 @@
       const uid=await getUserId();
       if(!uid) return{ok:false,error:'Not logged in'};
       try{
-        const r=await fetch('/api/delete-exams',{
+        const{data:sd}=await db.auth.getSession();
+        const token=sd?.session?.access_token||'';
+        const r=await fetch('/api/check-role',{
           method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({user_id:uid})
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+          body:JSON.stringify({action:'delete_exams'})
         });
         const data=await r.json();
         if(!r.ok) return{ok:false,error:data?.error||'delete failed'};

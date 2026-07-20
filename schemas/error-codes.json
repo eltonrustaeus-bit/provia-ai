@@ -1,0 +1,42 @@
+{
+  "$comment": "Fast felkod-enum för student_error_events (uppdragets §29). Modellen får inte hitta på egna koder — se src/ai/prompts/error-classifier/. Jämför med api/grade.js's error_tags-enum (definition_missing, concept_confusion, calculation_error, units_missing, method_missing, reasoning_gap, missing_steps, structure_weak, example_missing, language_unclear, off_topic, insufficient_material, mc_wrong) — samma idé, juridik-domänens variant nedan följer uppdragets egen §29-lista rakt av eftersom den redan är skriven för resonemangsämnen (juridik), inte matematik.",
+  "version": "v1",
+  "codes": [
+    {
+      "code": "MISSING_CORE_CONCEPT",
+      "description": "Eleven saknar eller nämner inte det centrala juridiska begreppet frågan kräver."
+    },
+    {
+      "code": "CONFUSES_TWO_CONCEPTS",
+      "description": "Eleven blandar ihop två snarlika begrepp (t.ex. fullmakt och ställningsfullmakt)."
+    },
+    {
+      "code": "CORRECT_RULE_WRONG_APPLICATION",
+      "description": "Rätt regel identifierad men felaktigt tillämpad på det aktuella fallet."
+    },
+    {
+      "code": "UNSUPPORTED_CONCLUSION",
+      "description": "Slutsatsen saknar stöd i den regel/källa eleven själv angett."
+    },
+    {
+      "code": "INCOMPLETE_REASONING",
+      "description": "Resonemanget saknar nödvändiga mellansteg för att nå slutsatsen."
+    },
+    {
+      "code": "MISREADS_FACT_PATTERN",
+      "description": "Eleven har missförstått eller feltolkat det faktiska scenariot i frågan."
+    },
+    {
+      "code": "USES_OUTDATED_RULE",
+      "description": "Eleven refererar en regel som inte längre gäller eller är uppdaterad."
+    },
+    {
+      "code": "LANGUAGE_CLARITY",
+      "description": "Resonemanget är i sak rimligt men otydligt/svårläst formulerat."
+    },
+    {
+      "code": "OTHER_REVIEW_REQUIRED",
+      "description": "Felet passar inte i någon annan kategori — flaggas för manuell granskning, inte ett fritt textfält."
+    }
+  ]
+}

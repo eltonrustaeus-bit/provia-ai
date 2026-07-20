@@ -280,8 +280,20 @@ text-align:left;width:100%;
 transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease;
 }
 .mcOpt:hover{border-color:var(--l2);background:var(--a-dim);color:var(--t);transform:translateY(-1px)}
-.mcOpt.sel{border-color:var(--a);background:rgba(27,255,140,.07);color:var(--t)}
-body.light .mcOpt.sel{background:rgba(13,148,96,.07)}
+.mcOpt:disabled{cursor:default;transform:none}
+.mcOpt:disabled:hover{background:var(--bg)}
+.mcOpt.correct:disabled:hover{background:rgba(27,255,140,.10)}
+.mcOpt.incorrect:disabled:hover{background:rgba(255,107,107,.10)}
+.mcSym{margin-left:auto;font-weight:800;font-size:15px}
+/* Selected BEFORE grading: neutral highlight — must NOT read as "correct".
+   The brand accent (green) is reserved for the graded-correct state. */
+.mcOpt.sel{border-color:var(--t2);background:var(--s2);color:var(--t);box-shadow:inset 0 0 0 1px var(--t2)}
+body.light .mcOpt.sel{background:var(--s2)}
+/* AFTER grading (set by renderResult): text + symbol + colour together */
+.mcOpt.correct{border-color:var(--a);background:rgba(27,255,140,.10);color:var(--t);box-shadow:inset 0 0 0 1px var(--a)}
+.mcOpt.incorrect{border-color:#ff6b6b;background:rgba(255,107,107,.10);color:var(--t);box-shadow:inset 0 0 0 1px #ff6b6b}
+.mcOpt.correct .mcLetter{background:var(--a);border-color:var(--a);color:#08100d}
+.mcOpt.incorrect .mcLetter{background:#ff6b6b;border-color:#ff6b6b;color:#1a0808}
 .mcLetter{
 width:24px;height:24px;border-radius:var(--r2);
 display:grid;place-items:center;flex-shrink:0;
@@ -289,8 +301,7 @@ font-family:'DM Mono',monospace;font-size:11px;font-weight:500;
 background:var(--s);border:1px solid var(--l);color:var(--t3);
 transition:background .16s ease,border-color .16s ease,color .16s ease;
 }
-.mcOpt.sel .mcLetter{background:var(--a);border-color:var(--a);color:#08100d}
-body.light .mcOpt.sel .mcLetter{color:#fff}
+.mcOpt.sel .mcLetter{background:var(--t2);border-color:var(--t2);color:var(--bg)}
 
 /* RESULT */
 .resultItem{
@@ -309,7 +320,8 @@ margin-top:12px;padding-top:12px;border-top:1px solid var(--l);margin-bottom:6px
 @media(max-width:640px){
   .qBox{padding:16px}
   .mcOpt{min-height:54px;font-size:15px}
-  #examBody{padding-bottom:120px}
+  /* room for the sticky grade bar + iOS safe area so the last question stays reachable */
+  #examBody{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 }
 
 /* LOGIN */
@@ -392,11 +404,17 @@ content:"";animation:dots 1.4s steps(4,end) infinite;
 
 /* FLOATING GRADE BUTTON — sticky vid botten av exam-steget */
 .floatingGradeBar{
-position:sticky;bottom:16px;z-index:9999;
+position:sticky;
+/* lift above the iOS home indicator / Safari toolbar */
+bottom:calc(16px + env(safe-area-inset-bottom,0px));
+z-index:9999;
 display:none;
 margin:16px 0 0;
 }
 .floatingGradeBar.show{display:block}
+/* keep the P.E.R bubble clear of the sticky grade bar during the exam step */
+body.exam-mode #perWidget{bottom:calc(96px + env(safe-area-inset-bottom,0px))!important}
+@media(max-width:480px){body.exam-mode #perWidget{bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}}
 .floatingGradeInner{
 display:flex;align-items:center;justify-content:space-between;gap:12px;
 background:rgba(8,16,13,.92);backdrop-filter:blur(14px);
@@ -816,6 +834,7 @@ const LS_UI_OPEN = "proviaai_ui_open";
 const LS_CUSTOM_COURSES = "proviaai_custom_courses";
 const LS_THEME = "proviaai_theme";
 const LS_ROLE = "proviaai_role";
+const LS_PENDING_ANSWERS = "proviaai_pending_answers"; // answers saved before grading, cleared on success
 
 // ── QUOTA CONSTANTS PER ROLL ──────────────────────────────────────────
 // Gratis: 2 prov per vecka (räknat måndag–söndag)
@@ -834,6 +853,7 @@ function safeJsonParse(s, fallback){ try{ return JSON.parse(s); } catch { return
 function lsGetArray(key){ const v = localStorage.getItem(key); const arr = safeJsonParse(v, []); return Array.isArray(arr) ? arr : []; }
 function lsGetObj(key){ const v = localStorage.getItem(key); const obj = safeJsonParse(v, null); return (obj && typeof obj === "object") ? obj : null; }
 function lsSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function lsRemove(key){ try{ localStorage.removeItem(key); } catch {} }
 function escapeHtml(s){
   return String(s ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
@@ -1063,12 +1083,23 @@ const SupabaseGlobal=(typeof window!=="undefined")?window.supabase:null;
 const db=(USE_SUPABASE&&SupabaseGlobal&&typeof SupabaseGlobal.createClient==="function")?SupabaseGlobal.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 
 async function getAccessToken(){ if(!db) return ""; try{ const {data,error}=await db.auth.getSession(); if(error)return""; return data?.session?.access_token||""; }catch{return "";} }
-async function postJson(path,payload){
-  const token=await getAccessToken(); const headers={"Content-Type":"application/json"};
-  if(token) headers["Authorization"]=`Bearer ${token}`;
-  const resp=await fetch(path,{method:"POST",headers,body:JSON.stringify(payload)});
-  const raw=await resp.text(); let data=null; try{data=JSON.parse(raw);}catch{}
-  return{ok:resp.ok,status:resp.status,raw,data};
+async function postJson(path,payload,opts){
+  // Never throws — always resolves {ok,status,raw,data,timedOut,networkError}.
+  // A missing client timeout was the root cause of the "loads forever, no error,
+  // no retry" grading hang: if the server stalled, this await never settled.
+  const timeoutMs=(opts&&Number(opts.timeoutMs))||45000;
+  const ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;
+  try{
+    const token=await getAccessToken(); const headers={"Content-Type":"application/json"};
+    if(token) headers["Authorization"]=`Bearer ${token}`;
+    const resp=await fetch(path,{method:"POST",headers,body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined});
+    const raw=await resp.text(); let data=null; try{data=JSON.parse(raw);}catch{}
+    return{ok:resp.ok,status:resp.status,raw,data,timedOut:false,networkError:false};
+  }catch(err){
+    const timedOut=!!(ctrl&&ctrl.signal&&ctrl.signal.aborted);
+    return{ok:false,status:0,raw:"",data:null,timedOut,networkError:!timedOut,error:String(err&&err.message||err)};
+  }finally{ if(timer)clearTimeout(timer); }
 }
 
 function applyServerEntitlements(entitlements){
@@ -1271,6 +1302,7 @@ const examMetaEl=()=>$("examMeta"),examBodyEl=()=>$("examBody");
 const resultMetaEl=()=>$("resultMeta"),resultBodyEl=()=>$("resultBody");
 const imageInputEl=()=>$("imageInput"),ocrStatusEl=()=>$("ocrStatus");
 let currentExam=null;
+let isGrading=false; // guard: blocks duplicate concurrent grading requests
 
 function setBusy(isBusy,label){
   const sw=spinWrap(),ms=miniStateEl();
@@ -1444,8 +1476,37 @@ function staggerIn(els,delayMs){
   });
 }
 
+// Subject-agnostic last line of defence: a structurally broken question must never
+// reach the student or the grader, regardless of subject (law, math, code, languages…).
+function isRenderableQuestion(q){
+  if(!q||typeof q!=="object")return false;
+  if(!String(q.question||"").trim())return false;
+  const type=String(q.type||"");
+  if(type==="mc"){
+    if(!Array.isArray(q.options)||q.options.length<2)return false;
+    if(q.options.some(o=>!String(o??"").trim()))return false;              // no empty options
+    const ci=q.correct_index;
+    if(!Number.isInteger(ci)||ci<0||ci>=q.options.length)return false;     // answer key must point at a real option
+    const norm=q.options.map(o=>String(o).trim().toLowerCase());
+    if(new Set(norm).size!==norm.length)return false;                      // duplicate/overlapping options
+  }
+  return true;
+}
+
 function renderExam(exam){
-  currentExam=exam; const qs=Array.isArray(exam.questions)?exam.questions:[]; const t=T[LANG];
+  currentExam=exam; const t=T[LANG];
+  const rawQs=Array.isArray(exam.questions)?exam.questions:[];
+  const qs=rawQs.filter(isRenderableQuestion);
+  const droppedCount=rawQs.length-qs.length;
+  currentExam.questions=qs; // only renderable questions proceed to answering + grading
+  if(qs.length===0){
+    setStatus(LANG==="sv"?"Provet kunde inte skapas med tillräcklig kvalitet. Försök generera igen.":"The exam could not be built with sufficient quality. Please generate again.","bad");
+    const g=$("gradeBtn");if(g)g.disabled=true;
+    return;
+  }
+  if(droppedCount>0){
+    showToast(LANG==="sv"?`${droppedCount} fråga(or) uteslöts pga kvalitetskontroll.`:`${droppedCount} question(s) were excluded by the quality check.`,"warn");
+  }
   const em=examMetaEl(),eb=examBodyEl(),rm=resultMetaEl(),rb=resultBodyEl();
   if(em)em.textContent=LANG==="sv"
     ?`${qs.length} frågor · Nivå ${exam.level||"—"} — besvara allt och tryck Rätta prov`
@@ -1459,7 +1520,10 @@ function renderExam(exam){
     const box=document.createElement("div"); box.className="qBox";
     const qid=String(q.id??(idx+1));
     const meta=document.createElement("div"); meta.className="qMeta";
-    meta.textContent=`ID: ${qid} · ${LANG==="sv"?"Poäng":"Points"}: ${q.points??"—"} · ${LANG==="sv"?"Typ":"Type"}: ${q.type??($("qType")?.value||"")}`;
+    // Student-facing meta only — internal id/type are debug fields and must never leak here.
+    const ptsLabel=LANG==="sv"?"poäng":"points"; const ptsVal=Number(q.points)||0;
+    meta.textContent=(LANG==="sv"?`Fråga ${idx+1} av ${qs.length}`:`Question ${idx+1} of ${qs.length}`)+` · ${ptsVal} ${ptsLabel}`;
+    meta.dataset.qid=qid; meta.dataset.qtype=String(q.type||""); // kept as data-* for admin/debug tooling, not shown
     const text=document.createElement("div"); text.className="qText"; text.textContent=q.question??"";
     box.appendChild(meta); box.appendChild(text);
     if((q.type==="mc")&&Array.isArray(q.options)&&q.options.length){
@@ -1498,14 +1562,39 @@ function renderExam(exam){
   const fb=$("floatingGradeBar");if(fb&&qs.length>0)fb.classList.add("show");
 }
 
+// After grading: colour + symbol the original MC options and lock them.
+// correct → accent green ✓, wrongly chosen → red ✗. Colour is never the only signal.
+function markMcResults(){
+  if(!currentExam||!Array.isArray(currentExam.questions))return;
+  currentExam.questions.forEach((q,idx)=>{
+    if(q.type!=="mc"||!Array.isArray(q.options))return;
+    const qid=String(q.id??(idx+1));
+    const group=document.querySelector(`.mcGroup[data-qid="${CSS.escape(qid)}"]`);
+    if(!group)return;
+    const ci=Number.isInteger(q.correct_index)?q.correct_index:-1;
+    const hidden=document.querySelector(`input.mcAnswer[data-qid="${CSS.escape(qid)}"]`);
+    const chosen=(hidden?.value||"").trim().toUpperCase();
+    group.querySelectorAll(".mcOpt").forEach((btn,i)=>{
+      btn.classList.remove("sel"); btn.disabled=true;
+      const letter=String.fromCharCode(65+i); let sym="";
+      if(i===ci){btn.classList.add("correct");sym="✓";}
+      else if(letter===chosen){btn.classList.add("incorrect");sym="✗";}
+      if(sym&&!btn.querySelector(".mcSym")){const s=document.createElement("span");s.className="mcSym";s.textContent=sym;btn.appendChild(s);}
+    });
+  });
+}
+
 function renderResult(r){
   const t=T[LANG],rm=resultMetaEl(),rb=resultBodyEl();
   if(rm)rm.textContent=`${LANG==="sv"?"Resultat":"Result"}: ${r.total_points}/${r.max_points}`;
+  markMcResults();
   const wrap=document.createElement("div");
-  (r.per_question||[]).forEach(item=>{
-    const d=document.createElement("div"); d.className="resultItem";
+  (r.per_question||[]).forEach((item,idx)=>{
+    const d=document.createElement("div"); d.className="resultItem"; d.dataset.qid=String(item.id||"");
     const model=String(item.model_answer||"").trim();
-    d.innerHTML=`<div class="qMeta">ID: ${escapeHtml(item.id)} · ${item.points}/${item.max_points}</div><div class="resultFeedback">${escapeHtml(item.feedback||"")}</div><div class="resultModelLabel">${t.fullScore}</div><div class="resultModelText">${escapeHtml(model)}</div>`;
+    // Student-facing: question number + points, never the internal id.
+    const qLabel=LANG==="sv"?`Fråga ${idx+1}`:`Question ${idx+1}`;
+    d.innerHTML=`<div class="qMeta">${qLabel} · ${item.points}/${item.max_points}</div><div class="resultFeedback">${escapeHtml(item.feedback||"")}</div><div class="resultModelLabel">${t.fullScore}</div><div class="resultModelText">${escapeHtml(model)}</div>`;
     if(Number(item.points||0)<Number(item.max_points||0)){
       const ask=document.createElement("button");
       ask.type="button"; ask.className="askPerBtnApp"; ask.textContent="✦ Fråga EX1.0";
@@ -1680,7 +1769,7 @@ try{
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
-    const res=await postJson("/api/generate-exam",payload);
+    const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
     if(res.status===429&&res.data){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
       setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();return;
@@ -1710,6 +1799,7 @@ try{
   });
 
   onClick("gradeBtn",async()=>{
+    if(isGrading)return; // block duplicate submits while one grading run is active
     hideDebug();const t=T[LANG];
     if(!currentExam||!Array.isArray(currentExam.questions)||currentExam.questions.length===0){setStatus(t.genFirst,"bad");return;}
     const answers=[];
@@ -1720,29 +1810,63 @@ try{
     });
     const pastedText=(pastedTextEl()?.value||"").trim();
     const payload={lang:LANG,pastedText,questions:currentExam.questions,answers};
+    // Persist answers up front so a failed/timed-out grading never loses the user's work.
+    try{lsSet(LS_PENDING_ANSWERS,{ts:Date.now(),answers});}catch{}
+
+    isGrading=true;
     setBusy(true,t.gradeWorking);setStatus(t.gradeWorking,"");
     showGradingOverlay();
-    const res=await postJson("/api/grade",payload);
-    hideGradingOverlay();
-    if(!res.ok||!res.data||!res.data.ok){setBusy(false);setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);return;}
-    const result=res.data.result;
-    renderResult(result);
-    await ensureUserProfileRow();await updateMastery(result);
-    try{await saveExamToAccount({material:pastedText,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},answers,result});}catch{}
-    const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
-    const attempt={ts,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
-    const history=lsGetArray(LS_HISTORY);history.push(attempt);while(history.length>60)history.shift();lsSet(LS_HISTORY,history);
-    lsSet(LS_LAST,{ts,attempt,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},result});
-    const mistakes=lsGetArray(LS_MISTAKES);
-    const qById=new Map((currentExam.questions||[]).map(q=>[String(q.id??""),q]));
-    const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
-    (result.per_question||[]).forEach(item=>{
-      const got=Number(item.points||0),m=Number(item.max_points||0);
-      if(m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
-    });
-    while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
-    try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-    setBusy(false);setStatus(t.gradeDone,"ok");showToast(t.gradeDone,"ok");setWizardStep(3);
+    let res;
+    try{
+      // Sit just above the 60s server maxDuration (vercel.json) so a server-side
+      // error/504 reaches us before the client aborts. grade.js aborts OpenAI at 45s.
+      res=await postJson("/api/grade",payload,{timeoutMs:62000});
+    }finally{
+      hideGradingOverlay();
+    }
+
+    try{
+      if(!res||!res.ok||!res.data||!res.data.ok){
+        const msg = res&&res.timedOut
+          ? (LANG==="sv"?"Rättningen tog längre tid än vanligt och avbröts. Dina svar är sparade — tryck Rätta prov igen.":"Grading took longer than usual and was cancelled. Your answers are saved — press Grade again.")
+          : res&&res.networkError
+            ? (LANG==="sv"?"Nätverksfel vid rättning. Dina svar är sparade — försök igen.":"Network error while grading. Your answers are saved — try again.")
+            : (LANG==="sv"?`Rättningen kunde inte slutföras (fel ${res?res.status:0}). Dina svar är sparade — försök igen.`:`Grading could not complete (error ${res?res.status:0}). Your answers are saved — try again.`);
+        setStatus(msg,"bad");showToast(msg,"bad");
+        if(res&&res.raw)showDebug(res.raw);
+        return; // finally re-enables the button → retry is always available
+      }
+      const result=res.data.result;
+      if(!result||!Array.isArray(result.per_question)||result.per_question.length===0){
+        const msg=LANG==="sv"?"Rättningssvaret var ofullständigt. Dina svar är sparade — försök igen.":"The grading response was incomplete. Your answers are saved — try again.";
+        setStatus(msg,"bad");showToast(msg,"bad");return;
+      }
+      renderResult(result);
+      // Post-grading persistence is best-effort — a failure here must not wipe the visible result.
+      try{await ensureUserProfileRow();await updateMastery(result);}catch{}
+      try{await saveExamToAccount({material:pastedText,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},answers,result});}catch{}
+      const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
+      const attempt={ts,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
+      const history=lsGetArray(LS_HISTORY);history.push(attempt);while(history.length>60)history.shift();lsSet(LS_HISTORY,history);
+      lsSet(LS_LAST,{ts,attempt,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},result});
+      const mistakes=lsGetArray(LS_MISTAKES);
+      const qById=new Map((currentExam.questions||[]).map(q=>[String(q.id??""),q]));
+      const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
+      (result.per_question||[]).forEach(item=>{
+        const got=Number(item.points||0),m=Number(item.max_points||0);
+        if(m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
+      });
+      while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
+      try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
+      try{lsRemove(LS_PENDING_ANSWERS);}catch{}
+      setStatus(t.gradeDone,"ok");showToast(t.gradeDone,"ok");setWizardStep(3);
+    }catch(err){
+      const msg=LANG==="sv"?"Ett fel uppstod efter rättningen. Dina svar är sparade.":"An error occurred after grading. Your answers are saved.";
+      setStatus(msg,"bad");showToast(msg,"bad");showDebug(String(err&&err.message||err));
+    }finally{
+      isGrading=false;
+      setBusy(false); // always re-enables gradeBtn (currentExam still set) → retry
+    }
   });
 
   onClick("clearBtn", async () => {
@@ -1758,9 +1882,10 @@ try{
       try {
         const token = await getAccessToken();
         if (token) {
-          await fetch("/api/delete-exams", {
+          await fetch("/api/check-role", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token }
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+            body: JSON.stringify({ action: "delete_exams" })
           });
         }
       } catch (_) {}
