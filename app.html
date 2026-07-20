@@ -1769,7 +1769,7 @@ try{
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
-    const res=await postJson("/api/generate-exam",payload);
+    const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
     if(res.status===429&&res.data){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
       setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();return;
@@ -1818,8 +1818,9 @@ try{
     showGradingOverlay();
     let res;
     try{
-      // Client timeout is the ceiling; server (grade.js) aborts its OpenAI call at 45s.
-      res=await postJson("/api/grade",payload,{timeoutMs:60000});
+      // Sit just above the 60s server maxDuration (vercel.json) so a server-side
+      // error/504 reaches us before the client aborts. grade.js aborts OpenAI at 45s.
+      res=await postJson("/api/grade",payload,{timeoutMs:62000});
     }finally{
       hideGradingOverlay();
     }
