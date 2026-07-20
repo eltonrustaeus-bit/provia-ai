@@ -6,6 +6,8 @@
 // - Tar bort essä helt (endast: mc, short)
 // - JSON-schema som aldrig tillåter "essay"
 
+const assessment = require("./_assessment");
+
 function json(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -515,11 +517,23 @@ module.exports = async function handler(req, res) {
       }
     } catch { /* reviewer is best-effort — never block delivery */ }
 
+    // ── SUBJECT-PROFILE QUALITY GATE ───────────────────────────────────────
+    // Subject-agnostic: drop questions unsafe to show (any subject) and sign each
+    // answer key so a tampered correct_index from the browser cannot score points.
+    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
+    const gate = assessment.gateExam(exam, { profile: subjectProfile });
+    exam.questions = gate.questions;
+    if (exam.questions.length === 0) {
+      return json(res, 502, { ok: false, error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.", gate: { profile: subjectProfile, dropped: gate.dropped } });
+    }
+
     return json(res, 200, {
       ok: true,
       exam,
       meta: {
         isMath,
+        subjectProfile,
+        gate: { profile: subjectProfile, dropped: gate.dropped.length, flagged: gate.flagged.length },
         model,
         review: reviewMeta,
         entitlements,
