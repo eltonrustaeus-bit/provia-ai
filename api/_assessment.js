@@ -56,6 +56,13 @@ const SUBJECT_KEYWORDS = {
     "algoritm", "funktion(", "kompilera", "syntax", "programming", "code"],
 };
 
+// Terms that are legally obsolete but still show up in AI-generated distractors
+// because they're common in older training text. Extend this list as new cases
+// are found in practice — it is a safety net, not a full legal dictionary.
+const LAW_DEPRECATED_TERMS = [
+  { term: /\bsnatteri\b/i, note: "ersatt av 'ringa stöld' sedan lagändringen 2017" },
+];
+
 // ── Cognitive level → what the student must actually do (not just harder words) ──
 const COGNITIVE_VERBS = {
   E: ["identifiera", "definiera", "beskriva", "ange", "nämna", "känna igen",
@@ -144,6 +151,10 @@ const PROFILES = {
       if (q.type === "mc" && /\balltid\b|\baldrig\b|\bendast\b/i.test(String(q.question || ""))) {
         issues.push("law_categorical_wording");
       }
+      const haystack = [String(q.question || ""), ...(Array.isArray(q.options) ? q.options.map(String) : [])].join(" \n ");
+      if (LAW_DEPRECATED_TERMS.some(({ term }) => term.test(haystack))) {
+        issues.push("law_deprecated_terminology");
+      }
       return issues;
     },
   },
@@ -159,7 +170,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
-  "cognitive_level_missing", "scoring_rubric_missing_for_open",
+  "cognitive_level_missing", "scoring_rubric_missing_for_open", "law_deprecated_terminology",
 ]);
 // Non-blocking issues are flagged (soft warnings) but the question is kept:
 //   law_categorical_wording — surfaced to reviewers/logs, not auto-dropped.

@@ -63,6 +63,16 @@ check("law: flags categorical wording but keeps question", (() => {
   return g.questions.length === 1 && g.flagged.length === 1 && g.flagged[0].issues.includes("law_categorical_wording");
 })());
 
+check("law: flags deprecated term 'snatteri' as a distractor option", (() => {
+  const g = A.gateExam({ questions: [{ id: "13", type: "mc", question: "Vilket brott kan leda till fängelse i mer än två år?", options: ["Vårdslöshet i trafik", "Mord", "Snatteri", "Skadegörelse"], correct_index: 1, points: 1, cognitive_level: "förstå" }] }, { profile: "law" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("law_deprecated_terminology");
+})());
+
+check("law: does not flag a question with no deprecated terms", (() => {
+  const g = A.gateExam({ questions: [{ id: "14", type: "mc", question: "Vilket brott klassas som personbrott?", options: ["Stöld", "Misshandel", "Skadegörelse", "Bedrägeri"], correct_index: 1, points: 1, cognitive_level: "förstå" }] }, { profile: "law" });
+  return g.questions.length === 1;
+})());
+
 // ── answer-key signing / tamper detection ──
 check("signs kept questions", (() => {
   const g = A.gateExam({ questions: [{ ...goodMc }] }, { profile: "generic" });
