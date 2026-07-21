@@ -139,5 +139,54 @@ check("COGNITIVE_VERBS exports E/C/A with non-empty verb lists", (() => {
   return v && Array.isArray(v.E) && v.E.length > 0 && Array.isArray(v.C) && v.C.length > 0 && Array.isArray(v.A) && v.A.length > 0;
 })());
 
+// ── Regression: the 3 reported bad questions ──────────────────────────────
+// Q1 ("Vilket brott klassas som personbrott?") and Q2 (nödvärn, vague scoring)
+// are NOT structurally invalid — they need the AI verifier (api/_verifier.js,
+// wired in api/generate-exam.js) to catch shallowness/ambiguity. Only Q3's
+// "snatteri" distractor is a deterministic, structural catch. Full coverage
+// for Q1/Q2 lives in the verifier's prompt design, not this file.
+
+check("regression Q3: rejects the exact reported deprecated-term distractor", (() => {
+  const q3 = {
+    id: "q3", type: "mc",
+    question: "Vilket av följande brott kan leda till fängelse i mer än två år?",
+    options: ["Ej avsiktligt brott", "Vårdslöshet i trafik", "Mord", "Snatteri"],
+    correct_index: 2, points: 1, cognitive_level: "förstå",
+  };
+  const g = A.gateExam({ questions: [q3] }, { profile: "law" });
+  return g.questions.length === 0;
+})());
+
+check("regression Q3 corrected: a scenario-based question with real, comparable crime categories passes", (() => {
+  const q3fixed = {
+    id: "q3b", type: "mc",
+    question: "En person misshandlar en annan person så allvarligt att offret får bestående men. Vilket brott är det tydligaste exemplet på ett brott som kan ge fängelse i mer än två år?",
+    options: ["Ringa stöld", "Vårdslöshet i trafik", "Grov misshandel", "Skadegörelse"],
+    correct_index: 2, points: 1, cognitive_level: "tillämpa",
+  };
+  const g = A.gateExam({ questions: [q3fixed] }, { profile: "law" });
+  return g.questions.length === 1;
+})());
+
+check("regression Q2 corrected: nödvärn question passes with an explicit scoring_rubric", (() => {
+  const q2fixed = {
+    id: "q2b", type: "short",
+    question: "Förklara vad nödvärn innebär. Beskriv när en nödvärnssituation kan föreligga och vad som avgör om försvarshandlingen är tillåten. Ge ett kort exempel.",
+    options: [], correct_index: -1, points: 3, cognitive_level: "förstå",
+    model_answer: "Nödvärn är rätten att försvara sig mot ett pågående eller överhängande brottsligt angrepp. En nödvärnssituation föreligger vid ett påbörjat eller nära förestående angrepp. Försvarshandlingen är tillåten om den inte är uppenbart oförsvarlig i förhållande till angreppets art. Exempel: att knuffa undan en angripare för att komma undan ett slag.",
+    scoring_rubric: {
+      parts: [
+        { description: "Korrekt definition av nödvärn", points: 1 },
+        { description: "När en nödvärnssituation föreligger", points: 1 },
+        { description: "Vad som avgör om försvaret är tillåtet + exempel", points: 1 },
+      ],
+      full_score_requirements: "Alla tre delmoment ovan, kort och korrekt.",
+      partial_credit_notes: "1p om bara definitionen ges utan de andra delarna.",
+    },
+  };
+  const g = A.gateExam({ questions: [q2fixed] }, { profile: "law" });
+  return g.questions.length === 1;
+})());
+
 if (failures) { console.error(`\n${failures} check(s) failed.`); process.exit(1); }
 console.log("\nAll assessment-core checks passed.");
