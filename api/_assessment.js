@@ -55,6 +55,17 @@ const SUBJECT_KEYWORDS = {
   programming: ["programmering", "kod", "python", "javascript", "java ", "c++",
     "algoritm", "funktion(", "kompilera", "syntax", "programming", "code"],
 };
+
+// ── Cognitive level → what the student must actually do (not just harder words) ──
+const COGNITIVE_VERBS = {
+  E: ["identifiera", "definiera", "beskriva", "ange", "nämna", "känna igen",
+      "identify", "define", "describe", "state", "recognize"],
+  C: ["förklara", "tillämpa", "jämföra", "resonera", "motivera", "analysera översiktligt",
+      "explain", "apply", "compare", "reason", "justify"],
+  A: ["analysera", "värdera", "väga", "nyansera", "kritiskt granska", "syntetisera",
+      "analyze", "evaluate", "weigh", "critically assess", "synthesize"],
+};
+
 function detectSubjectProfile(course, pastedText) {
   const s = `${String(course || "")}\n${String(pastedText || "")}`.toLowerCase();
   let best = "generic", bestHits = 0;
@@ -73,6 +84,9 @@ function generalQualityIssues(q) {
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
   if (!(Number(q.points) > 0)) issues.push("nonpositive_points");
 
+  const cogLevel = String(q.cognitive_level || "").trim().toLowerCase();
+  if (!cogLevel) issues.push("cognitive_level_missing");
+
   const type = String(q.type || "");
   if (type === "mc") {
     const opts = Array.isArray(q.options) ? q.options : [];
@@ -86,6 +100,14 @@ function generalQualityIssues(q) {
     // open-ended: must be gradeable → needs a model answer or rubric
     if (!String(q.model_answer || "").trim() && !String(q.rubric || "").trim()) {
       issues.push("open_question_ungradeable");
+    }
+    // If a structured rubric is present at all, it must be shaped correctly —
+    // a half-written scoring_rubric is worse than none (grade.js would silently
+    // ignore it and fall back, hiding the authoring bug). Absent is fine (legacy).
+    if (q.scoring_rubric !== undefined) {
+      const parts = q.scoring_rubric && Array.isArray(q.scoring_rubric.parts) ? q.scoring_rubric.parts : null;
+      const validParts = parts && parts.length > 0 && parts.every(p => p && String(p.description || "").trim() && Number(p.points) > 0);
+      if (!validParts) issues.push("scoring_rubric_missing_for_open");
     }
   }
   // leaked internal instructions
@@ -137,6 +159,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
+  "cognitive_level_missing", "scoring_rubric_missing_for_open",
 ]);
 // Non-blocking issues are flagged (soft warnings) but the question is kept:
 //   law_categorical_wording — surfaced to reviewers/logs, not auto-dropped.
@@ -181,4 +204,5 @@ module.exports = {
   signAnswerKey,
   verifyAnswerKey,
   answerKeyString,
+  COGNITIVE_VERBS,
 };
