@@ -479,9 +479,9 @@ module.exports = async function handler(req, res) {
         const approvedIds = new Set();
         const rejectedIds = [];
         for (const q of exam.questions) {
-          const res = v1.perQuestion.get(String(q.id));
+          const vres = v1.perQuestion.get(String(q.id));
           verifierOutcome.checked++;
-          if (res && verifier.decideApproval(res)) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
+          if (vres && verifier.decideApproval(vres)) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
           else { rejectedIds.push(String(q.id)); verifierOutcome.rejected++; }
         }
         // Tracks whichever verifier result map is currently authoritative for
@@ -498,6 +498,13 @@ module.exports = async function handler(req, res) {
           // the subset that DID pass verification — never ship a question the
           // verifier explicitly rejected merely because regeneration failed.
           const originalGatedQuestions = exam.questions;
+          // Snapshot round-1's structural gate result so the fallback path
+          // (regeneration attempted but round-2 verifier call fails, or
+          // regeneration fails outright) can restore it alongside
+          // exam.questions/activeVerifierMap — otherwise gate would keep
+          // describing round-2's regenerated exam even though round-1
+          // questions are what actually ships.
+          const round1Gate = gate;
           let regenerationSucceeded = false;
           const r2 = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
@@ -519,9 +526,9 @@ module.exports = async function handler(req, res) {
                   const kept = [];
                   const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: true };
                   for (const q of regatedQuestions) {
-                    const res = v2.perQuestion.get(String(q.id));
+                    const vres = v2.perQuestion.get(String(q.id));
                     outcome2.checked++;
-                    if (res && verifier.decideApproval(res)) { kept.push(q); outcome2.approved++; }
+                    if (vres && verifier.decideApproval(vres)) { kept.push(q); outcome2.approved++; }
                     else outcome2.rejected++;
                   }
                   if (kept.length > 0) {
@@ -541,6 +548,7 @@ module.exports = async function handler(req, res) {
             // original, unfiltered (still verifier-rejected) batch.
             exam.questions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
             activeVerifierMap = v1.perQuestion;
+            gate = round1Gate;
             // verifierOutcome already holds round-1 checked/approved/rejected counts.
           }
         } else {
@@ -552,15 +560,15 @@ module.exports = async function handler(req, res) {
         // only reads .question/.options/.type/.points/.id, unknown properties
         // are simply ignored, never rendered.
         for (const q of exam.questions) {
-          const res = activeVerifierMap.get(String(q.id));
-          q.validation_status = res ? "verified" : "gate_only";
-          q.confidence_score = res
+          const vres = activeVerifierMap.get(String(q.id));
+          q.validation_status = vres ? "verified" : "gate_only";
+          q.confidence_score = vres
             ? Number((
-                (Number(res.factual_accuracy) + Number(res.ambiguity_score >= 0 ? 1 - res.ambiguity_score : 0) +
-                 Number(res.difficulty_match) + Number(res.scoring_quality) + Number(res.language_quality)) / 5
+                (Number(vres.factual_accuracy) + Number(vres.ambiguity_score >= 0 ? 1 - vres.ambiguity_score : 0) +
+                 Number(vres.difficulty_match) + Number(vres.scoring_quality) + Number(vres.language_quality)) / 5
               ).toFixed(2))
             : null;
-          q.detected_issues = res && Array.isArray(res.issues) ? res.issues : [];
+          q.detected_issues = vres && Array.isArray(vres.issues) ? vres.issues : [];
         }
       } else {
         // Verifier call failed outright (network/parse error) — fail open on the
