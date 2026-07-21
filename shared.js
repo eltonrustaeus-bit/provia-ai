@@ -733,6 +733,7 @@
         '#perNudge{position:absolute;bottom:64px;right:0;background:var(--s,#111a15);border:1px solid rgba(27,255,140,.3);border-radius:10px;padding:9px 14px;font-size:12.5px;font-family:"DM Sans",sans-serif;color:var(--t,#e8f5ee);white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.55);cursor:pointer;animation:perUp .22s ease;z-index:1;user-select:none}',
         '#perNudge:hover{border-color:rgba(27,255,140,.55);background:var(--s2,#162019)}',
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
+        '#perWidget.per-minimized{transform:scale(.001);opacity:0;pointer-events:none;transition:transform .15s ease,opacity .15s ease}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
         '#perWidget.per-left{right:auto!important;left:22px!important}',
@@ -771,7 +772,9 @@
         '.per-chip{background:none;border:1px solid rgba(27,255,140,.3);border-radius:20px;color:var(--a,#1bff8c);font-size:11.5px;font-family:"DM Sans",sans-serif;padding:5px 11px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap}',
         '.per-chip:hover{background:rgba(27,255,140,.08);border-color:rgba(27,255,140,.6)}',
         '.per-nav-cta{display:inline-flex;align-items:center;margin-top:10px;padding:8px 14px;background:none;border:1px solid rgba(27,255,140,.35);color:var(--a,#1bff8c);border-radius:6px;font-size:12px;font-family:"DM Sans",sans-serif;font-weight:600;text-decoration:none;cursor:pointer;transition:background .15s,border-color .15s}',
-        '.per-nav-cta:hover{background:rgba(27,255,140,.08);border-color:rgba(27,255,140,.7)}'
+        '.per-nav-cta:hover{background:rgba(27,255,140,.08);border-color:rgba(27,255,140,.7)}',
+        '@media(max-width:480px){#perPanel{max-height:70vh}}',
+        '@media(max-width:480px){#perPanel{max-height:70dvh}}'
       ].join('');
       document.head.appendChild(style);
 
@@ -804,6 +807,25 @@
       document.body.appendChild(widget);
 
       document.getElementById('perBubble').onclick = toggle;
+
+      // Never let the widget sit over a focused answer field on mobile — shrink
+      // it out of the way instead of guessing a safe position for every keyboard
+      // height/browser-chrome combination.
+      (function () {
+        var widget = document.getElementById('perWidget');
+        if (!widget) return;
+        var isAnswerField = function (el) {
+          return el && (el.classList.contains('answerTa') || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.id !== 'perInput'));
+        };
+        document.addEventListener('focusin', function (e) {
+          if (window.innerWidth > 480) return; // desktop/tablet behavior unchanged
+          if (isAnswerField(e.target)) widget.classList.add('per-minimized');
+        });
+        document.addEventListener('focusout', function (e) {
+          if (isAnswerField(e.target)) widget.classList.remove('per-minimized');
+        });
+      })();
+
       document.getElementById('perSendBtn').onclick = function () {
         var q = (document.getElementById('perInput').value || '').trim();
         if (q) send(q);
