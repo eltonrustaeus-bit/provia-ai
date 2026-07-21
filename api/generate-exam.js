@@ -8,6 +8,19 @@
 
 const assessment = require("./_assessment");
 
+function cognitiveVerbHint(lang) {
+  const v = assessment.COGNITIVE_VERBS;
+  return lang === "sv"
+    ? `Nivå E ska kräva: ${v.E.slice(0, 5).join(", ")}. ` +
+      `Nivå C ska kräva: ${v.C.slice(0, 5).join(", ")}. ` +
+      `Nivå A ska kräva: ${v.A.slice(0, 5).join(", ")}. ` +
+      "Svårighetsgraden ska ändra VAD eleven måste göra, inte bara ordvalet."
+    : `Level E must require: ${v.E.slice(0, 5).join(", ")}. ` +
+      `Level C must require: ${v.C.slice(0, 5).join(", ")}. ` +
+      `Level A must require: ${v.A.slice(0, 5).join(", ")}. ` +
+      "The difficulty level must change WHAT the student has to do, not just the wording.";
+}
+
 function json(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -56,72 +69,6 @@ function pickModel({ isMath }) {
   return isMath ? math : base;
 }
 
-function buildReviewerSchema() {
-  return {
-    type: "json_schema",
-    name: "exam_review_schema",
-    strict: true,
-    schema: {
-      type: "object",
-      additionalProperties: false,
-      required: ["passed", "flagged_ids", "quality"],
-      properties: {
-        passed: { type: "boolean" },
-        flagged_ids: { type: "array", items: { type: "string" } },
-        quality: { type: "string", enum: ["good", "acceptable", "poor"] }
-      }
-    }
-  };
-}
-
-async function reviewExam(exam, apiKey, model) {
-  const reviewItems = exam.questions.map(q => ({
-    id: q.id,
-    type: q.type,
-    question: q.question,
-    options: q.options,
-    correct_index: q.correct_index,
-  }));
-
-  const systemPrompt =
-    "Du är en kvalitetsgranskar för gymnasieprovfrågor. Granska varje fråga och flagga frågor som har:\n" +
-    "1) Tvetydiga formuleringar (mer än ett rimligt svar)\n" +
-    "2) Fel correct_index (svaret pekar på fel alternativ)\n" +
-    "3) MC-alternativ där flera är uppenbara rätt svar\n" +
-    "4) Frågor som saknar tillräcklig kontext för att kunna besvaras\n\n" +
-    "Flagga BARA uppenbara fel. Om du är osäker — flagga inte.\n" +
-    "passed=false om fler än 30% av frågorna är flaggade.\n" +
-    "quality: 'good'=0 flaggade, 'acceptable'=1-2, 'poor'=fler.";
-
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      input: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(reviewItems) }
-      ],
-      text: { format: buildReviewerSchema() }
-    }),
-    signal: AbortSignal.timeout(20_000)
-  });
-
-  if (!r.ok) return null;
-  const raw = await r.text();
-  let data;
-  try { data = JSON.parse(raw); } catch { return null; }
-
-  const outputText =
-    (Array.isArray(data?.output) &&
-      data.output
-        .flatMap(o => (Array.isArray(o?.content) ? o.content : []))
-        .find(c => c?.type === "output_text")?.text) || null;
-
-  if (!outputText) return null;
-  try { return JSON.parse(outputText); } catch { return null; }
-}
-
 function buildMockExamSchema(numQuestions) {
   return {
     type: "json_schema",
@@ -142,25 +89,49 @@ function buildMockExamSchema(numQuestions) {
             type: "object",
             additionalProperties: false,
             required: [
-              "id",
-              "type",
-              "points",
-              "question",
-              "options",
-              "correct_index",
-              "rubric",
-              "model_answer"
+              "id", "type", "points", "question", "options", "correct_index",
+              "rubric", "model_answer",
+              "topic", "subtopic", "learning_objective", "source_references",
+              "cognitive_level", "accepted_answers", "estimated_answer_length",
+              "scoring_rubric"
             ],
             properties: {
               id: { type: "string" },
-              // Endast dessa typer (ingen essay)
               type: { type: "string", enum: ["mc", "short"] },
               points: { type: "number" },
               question: { type: "string" },
               options: { type: "array", items: { type: "string" }, maxItems: 6 },
               correct_index: { type: "integer" },
               rubric: { type: "string" },
-              model_answer: { type: "string" }
+              model_answer: { type: "string" },
+              topic: { type: "string" },
+              subtopic: { type: "string" },
+              learning_objective: { type: "string" },
+              source_references: { type: "array", items: { type: "string" }, maxItems: 5 },
+              cognitive_level: { type: "string", enum: ["minnas", "förstå", "tillämpa", "analysera", "värdera"] },
+              accepted_answers: { type: "array", items: { type: "string" }, maxItems: 5 },
+              estimated_answer_length: { type: "string", enum: ["none", "one_word", "one_sentence", "short_paragraph", "long_paragraph"] },
+              // additionalProperties:false on a strict schema means this object must
+              // always be present; for "mc" questions the model sends an empty-parts
+              // shape and _assessment.js's gate only enforces shape for type==="short".
+              scoring_rubric: {
+                type: "object",
+                additionalProperties: false,
+                required: ["parts", "full_score_requirements", "partial_credit_notes"],
+                properties: {
+                  parts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["description", "points"],
+                      properties: { description: { type: "string" }, points: { type: "number" } }
+                    }
+                  },
+                  full_score_requirements: { type: "string" },
+                  partial_credit_notes: { type: "string" }
+                }
+              }
             }
           }
         }
@@ -342,7 +313,14 @@ module.exports = async function handler(req, res) {
     "2) Om type=='mc': options ska ha 3–5 alternativ och correct_index ska vara 0..(options.length-1). " +
     "3) Om type=='short': options ska vara [] och correct_index ska vara -1. " +
     "4) rubric ska vara kort och poängfokuserad. " +
-    "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. ";
+    "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. " +
+    "6) topic/subtopic/learning_objective ska kort beskriva vad frågan mäter. " +
+    "7) source_references ska lista vilken del av det inskickade materialet frågan bygger på (kort citat eller rubrik) — hitta ALDRIG på fakta som inte finns i materialet. " +
+    "8) cognitive_level ska vara ett av: minnas, förstå, tillämpa, analysera, värdera — matchat mot nivå (se separat instruktion). " +
+    "9) Om type=='short': scoring_rubric.parts ska bryta ner poängen i konkreta delmoment (t.ex. 'Definition: 1p', 'Villkor: 2p') som tillsammans summerar till points. full_score_requirements ska säga EXAKT vad som krävs för full poäng — fråga aldrig i hemlighet efter mer än vad question-texten bad om. accepted_answers ska lista alternativa godtagbara formuleringar. " +
+    "10) Om type=='mc': scoring_rubric ska ändå finnas i svaret men med tom parts-array, full_score_requirements='' , partial_credit_notes=''. " +
+    "11) estimated_answer_length ska matcha vad points faktiskt kräver — en 1-poängsfråga ska inte kräva 'long_paragraph'. " +
+    cognitiveVerbHint("sv") + " ";
 
   const systemSvMath =
     "MATTE-LÄGE: Prioritera exakta, beräkningsbaserade frågor. " +
@@ -359,7 +337,14 @@ module.exports = async function handler(req, res) {
     "2) If type=='mc': options must have 3–5 choices and correct_index must be 0..(options.length-1). " +
     "3) If type=='short': options must be [] and correct_index must be -1. " +
     "4) rubric must be short and point-focused. " +
-    "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. ";
+    "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. " +
+    "6) topic/subtopic/learning_objective must briefly describe what the question measures. " +
+    "7) source_references must list which part of the provided material the question is based on (brief quote or heading) — NEVER invent facts not in the material. " +
+    "8) cognitive_level must be one of: minnas, förstå, tillämpa, analysera, värdera — matched to the level (see separate instruction). " +
+    "9) If type=='short': scoring_rubric.parts must break down the points into concrete sub-components (e.g. 'Definition: 1p', 'Conditions: 2p') that sum to points. full_score_requirements must state EXACTLY what is required for full marks — never secretly ask for more than what the question text requested. accepted_answers must list alternative acceptable phrasings. " +
+    "10) If type=='mc': scoring_rubric must still be present in the response but with an empty parts array, full_score_requirements='', partial_credit_notes=''. " +
+    "11) estimated_answer_length must match what the points actually require — a 1-point question should not require 'long_paragraph'. " +
+    cognitiveVerbHint("en") + " ";
 
   const systemEnMath =
     "MATH MODE: Prioritize exact calculation questions. " +
@@ -466,6 +451,9 @@ module.exports = async function handler(req, res) {
         if (!Array.isArray(q.options)) q.options = [];
         q.options = [];
         q.correct_index = -1;
+        if (!q.scoring_rubric || !Array.isArray(q.scoring_rubric.parts)) {
+          return json(res, 500, { ok: false, error: "Missing scoring_rubric on short question", question: q });
+        }
       } else {
         if (!Array.isArray(q.options) || q.options.length < 3) {
           return json(res, 500, { ok: false, error: "MC options invalid", question: q });
@@ -476,16 +464,48 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── REVIEWER PASS ──────────────────────────────────────────────────
-    let reviewMeta = { quality: "good", flagged: 0, retried: false };
-    try {
-      const review = await reviewExam(exam, apiKey, model);
-      if (review) {
-        reviewMeta.quality = review.quality || "good";
-        reviewMeta.flagged = (review.flagged_ids || []).length;
+    // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
+    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
+    let gate = assessment.gateExam(exam, { profile: subjectProfile });
+    exam.questions = gate.questions;
 
-        if (!review.passed) {
-          // Too many issues — regenerate once
+    // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
+    const verifier = require("./_verifier");
+    let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
+    if (exam.questions.length > 0) {
+      const v1 = await verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang });
+      verifierOutcome.callOk = v1.callOk;
+      if (v1.callOk) {
+        const approvedIds = new Set();
+        const rejectedIds = [];
+        for (const q of exam.questions) {
+          const vres = v1.perQuestion.get(String(q.id));
+          verifierOutcome.checked++;
+          if (vres && verifier.decideApproval(vres)) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
+          else { rejectedIds.push(String(q.id)); verifierOutcome.rejected++; }
+        }
+        // Tracks whichever verifier result map is currently authoritative for
+        // per-question stamping below — round 1 unless a regeneration round
+        // actually succeeds and replaces exam.questions with round-2 output.
+        let activeVerifierMap = v1.perQuestion;
+        // One bounded regeneration attempt for the whole exam if too much was
+        // rejected (mirrors the existing >30%-flagged retry threshold below) —
+        // never loop, never regenerate per-question (cost + spec §13 says no
+        // unbounded regeneration loops).
+        if (rejectedIds.length > 0 && rejectedIds.length / exam.questions.length > 0.3) {
+          // Round-1 structurally-gated questions, kept aside so that if
+          // regeneration fails for any reason we can still fall back to just
+          // the subset that DID pass verification — never ship a question the
+          // verifier explicitly rejected merely because regeneration failed.
+          const originalGatedQuestions = exam.questions;
+          // Snapshot round-1's structural gate result so the fallback path
+          // (regeneration attempted but round-2 verifier call fails, or
+          // regeneration fails outright) can restore it alongside
+          // exam.questions/activeVerifierMap — otherwise gate would keep
+          // describing round-2's regenerated exam even though round-1
+          // questions are what actually ships.
+          const round1Gate = gate;
+          let regenerationSucceeded = false;
           const r2 = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -493,47 +513,121 @@ module.exports = async function handler(req, res) {
             signal: AbortSignal.timeout(45_000)
           });
           const raw2 = await r2.text();
-          let data2;
-          try { data2 = JSON.parse(raw2); } catch { data2 = null; }
-
+          let data2; try { data2 = JSON.parse(raw2); } catch { data2 = null; }
           if (r2.ok && data2) {
-            const out2 =
-              (Array.isArray(data2.output) &&
-                data2.output
-                  .flatMap(o => (Array.isArray(o.content) ? o.content : []))
-                  .find(c => c.type === "output_text")?.text) || null;
-            let exam2;
-            try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
-
+            const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
+            let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
             if (exam2 && Array.isArray(exam2.questions) && exam2.questions.length === numQuestions) {
-              exam = exam2;
-              reviewMeta.retried = true;
-              reviewMeta.quality = "good";
+              gate = assessment.gateExam(exam2, { profile: subjectProfile });
+              const regatedQuestions = gate.questions;
+              if (regatedQuestions.length > 0) {
+                const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang });
+                if (v2.callOk) {
+                  const kept = [];
+                  const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: true };
+                  for (const q of regatedQuestions) {
+                    const vres = v2.perQuestion.get(String(q.id));
+                    outcome2.checked++;
+                    if (vres && verifier.decideApproval(vres)) { kept.push(q); outcome2.approved++; }
+                    else outcome2.rejected++;
+                  }
+                  if (kept.length > 0) {
+                    exam.questions = kept;
+                    activeVerifierMap = v2.perQuestion;
+                    verifierOutcome = outcome2;
+                    regenerationSucceeded = true;
+                  }
+                }
+              }
             }
           }
+          if (!regenerationSucceeded) {
+            // Regeneration failed outright (network/parse/shape) or produced
+            // zero verified-approved questions after re-gating/re-verifying —
+            // fall back to the round-1 approved subset instead of shipping the
+            // original, unfiltered (still verifier-rejected) batch.
+            exam.questions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
+            activeVerifierMap = v1.perQuestion;
+            gate = round1Gate;
+            // verifierOutcome already holds round-1 checked/approved/rejected counts.
+          }
+        } else {
+          exam.questions = exam.questions.filter(q => approvedIds.has(String(q.id)));
+        }
+        // Stamp per-question validation metadata (spec: every question carries
+        // its own validation_status/confidence_score/detected_issues, not just
+        // an aggregate). Safe to leave on the object — app.html's renderExam()
+        // only reads .question/.options/.type/.points/.id, unknown properties
+        // are simply ignored, never rendered.
+        for (const q of exam.questions) {
+          const vres = activeVerifierMap.get(String(q.id));
+          q.validation_status = vres ? "verified" : "gate_only";
+          q.confidence_score = vres
+            ? Number((
+                (Number(vres.factual_accuracy) + Number(vres.ambiguity_score >= 0 ? 1 - vres.ambiguity_score : 0) +
+                 Number(vres.difficulty_match) + Number(vres.source_alignment) + Number(vres.scoring_quality) +
+                 Number(vres.language_quality)) / 6
+              ).toFixed(2))
+            : null;
+          q.detected_issues = vres && Array.isArray(vres.issues) ? vres.issues : [];
+        }
+      } else {
+        // Verifier call failed outright (network/parse error) — fail open on the
+        // structural gate's output rather than blocking delivery entirely (matches
+        // the existing best-effort behavior of the old reviewer pass), but say so.
+        for (const q of exam.questions) {
+          q.validation_status = "gate_only";
+          q.confidence_score = null;
+          q.detected_issues = [];
         }
       }
-    } catch { /* reviewer is best-effort — never block delivery */ }
-
-    // ── SUBJECT-PROFILE QUALITY GATE ───────────────────────────────────────
-    // Subject-agnostic: drop questions unsafe to show (any subject) and sign each
-    // answer key so a tampered correct_index from the browser cannot score points.
-    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
-    const gate = assessment.gateExam(exam, { profile: subjectProfile });
-    exam.questions = gate.questions;
-    if (exam.questions.length === 0) {
-      return json(res, 502, { ok: false, error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.", gate: { profile: subjectProfile, dropped: gate.dropped } });
     }
+
+    if (exam.questions.length === 0) {
+      return json(res, 502, {
+        ok: false,
+        error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.",
+        gate: { profile: subjectProfile, dropped: gate.dropped },
+      });
+    }
+
+    // ── OBSERVABILITY (structured, no question/answer content logged) ─────
+    console.log(JSON.stringify({
+      event: "exam_quality_gate",
+      subjectProfile,
+      numRequested: numQuestions,
+      structurallyDropped: gate.dropped.length,
+      structurallyFlagged: gate.flagged.length,
+      verifierChecked: verifierOutcome.checked,
+      verifierApproved: verifierOutcome.approved,
+      verifierRejected: verifierOutcome.rejected,
+      verifierCallOk: verifierOutcome.callOk,
+      finalQuestionCount: exam.questions.length,
+    }));
+
+    // Verifier-internal fields (validation_status/confidence_score/detected_issues)
+    // are stamped above for the gating decision and the observability log, but
+    // must never reach the browser response body (plan's Global Constraint: no
+    // secrets or internal fields — akey_sig, verifier scores, prompt text — may
+    // reach the client). Strip them from a shallow-copied exam for the response
+    // only; the original exam.questions objects (used above) are left untouched.
+    const clientExam = {
+      ...exam,
+      questions: exam.questions.map((q) => {
+        const { validation_status, confidence_score, detected_issues, ...clientQuestion } = q;
+        return clientQuestion;
+      }),
+    };
 
     return json(res, 200, {
       ok: true,
-      exam,
+      exam: clientExam,
       meta: {
         isMath,
         subjectProfile,
         gate: { profile: subjectProfile, dropped: gate.dropped.length, flagged: gate.flagged.length },
+        verifier: verifierOutcome,
         model,
-        review: reviewMeta,
         entitlements,
         quota: {
           feature: "mockExam",
