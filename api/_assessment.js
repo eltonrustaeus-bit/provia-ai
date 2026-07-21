@@ -60,7 +60,7 @@ const SUBJECT_KEYWORDS = {
 // because they're common in older training text. Extend this list as new cases
 // are found in practice — it is a safety net, not a full legal dictionary.
 const LAW_DEPRECATED_TERMS = [
-  { term: /\bsnatteri\b/i, note: "ersatt av 'ringa stöld' sedan lagändringen 2017" },
+  { term: /\bsnatteri\w*/i, note: "ersatt av 'ringa stöld' sedan lagändringen 2017" },
 ];
 
 // ── Cognitive level → what the student must actually do (not just harder words) ──

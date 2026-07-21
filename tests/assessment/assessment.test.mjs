@@ -73,6 +73,21 @@ check("law: does not flag a question with no deprecated terms", (() => {
   return g.questions.length === 1;
 })());
 
+check("law: flags deprecated term 'snatteri' in inflected form 'snatteriet'", (() => {
+  const g = A.gateExam({ questions: [{ id: "15", type: "mc", question: "Vilket brott kan leda till fängelse?", options: ["Snatteriet är redan utdömt", "Mord", "Bedrägeri", "Skadegörelse"], correct_index: 1, points: 1, cognitive_level: "förstå" }] }, { profile: "law" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("law_deprecated_terminology");
+})());
+
+check("law: flags deprecated term 'snatteri' in compound form 'snatteribrott'", (() => {
+  const g = A.gateExam({ questions: [{ id: "16", type: "mc", question: "Vilken påföljd kan dömas för brott?", options: ["Bota", "Snatteribrott straffas milt", "Fängelse", "Villkorlig dom"], correct_index: 2, points: 1, cognitive_level: "förstå" }] }, { profile: "law" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("law_deprecated_terminology");
+})());
+
+check("law: flags deprecated term 'snatteri' when appearing in question text", (() => {
+  const g = A.gateExam({ questions: [{ id: "17", type: "mc", question: "Snatteriet var tidigare ett brott, men är det nu?", options: ["Ja, det är fortfarande ett brott", "Nej, det ersattes av ringa stöld", "Ja, med högre straff", "Nej, det är lagligt"], correct_index: 1, points: 1, cognitive_level: "förstå" }] }, { profile: "law" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("law_deprecated_terminology");
+})());
+
 // ── answer-key signing / tamper detection ──
 check("signs kept questions", (() => {
   const g = A.gateExam({ questions: [{ ...goodMc }] }, { profile: "generic" });
