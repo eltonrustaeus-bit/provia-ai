@@ -69,72 +69,6 @@ function pickModel({ isMath }) {
   return isMath ? math : base;
 }
 
-function buildReviewerSchema() {
-  return {
-    type: "json_schema",
-    name: "exam_review_schema",
-    strict: true,
-    schema: {
-      type: "object",
-      additionalProperties: false,
-      required: ["passed", "flagged_ids", "quality"],
-      properties: {
-        passed: { type: "boolean" },
-        flagged_ids: { type: "array", items: { type: "string" } },
-        quality: { type: "string", enum: ["good", "acceptable", "poor"] }
-      }
-    }
-  };
-}
-
-async function reviewExam(exam, apiKey, model) {
-  const reviewItems = exam.questions.map(q => ({
-    id: q.id,
-    type: q.type,
-    question: q.question,
-    options: q.options,
-    correct_index: q.correct_index,
-  }));
-
-  const systemPrompt =
-    "Du är en kvalitetsgranskar för gymnasieprovfrågor. Granska varje fråga och flagga frågor som har:\n" +
-    "1) Tvetydiga formuleringar (mer än ett rimligt svar)\n" +
-    "2) Fel correct_index (svaret pekar på fel alternativ)\n" +
-    "3) MC-alternativ där flera är uppenbara rätt svar\n" +
-    "4) Frågor som saknar tillräcklig kontext för att kunna besvaras\n\n" +
-    "Flagga BARA uppenbara fel. Om du är osäker — flagga inte.\n" +
-    "passed=false om fler än 30% av frågorna är flaggade.\n" +
-    "quality: 'good'=0 flaggade, 'acceptable'=1-2, 'poor'=fler.";
-
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      input: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(reviewItems) }
-      ],
-      text: { format: buildReviewerSchema() }
-    }),
-    signal: AbortSignal.timeout(20_000)
-  });
-
-  if (!r.ok) return null;
-  const raw = await r.text();
-  let data;
-  try { data = JSON.parse(raw); } catch { return null; }
-
-  const outputText =
-    (Array.isArray(data?.output) &&
-      data.output
-        .flatMap(o => (Array.isArray(o?.content) ? o.content : []))
-        .find(c => c?.type === "output_text")?.text) || null;
-
-  if (!outputText) return null;
-  try { return JSON.parse(outputText); } catch { return null; }
-}
-
 function buildMockExamSchema(numQuestions) {
   return {
     type: "json_schema",
@@ -530,16 +464,31 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── REVIEWER PASS ──────────────────────────────────────────────────
-    let reviewMeta = { quality: "good", flagged: 0, retried: false };
-    try {
-      const review = await reviewExam(exam, apiKey, model);
-      if (review) {
-        reviewMeta.quality = review.quality || "good";
-        reviewMeta.flagged = (review.flagged_ids || []).length;
+    // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
+    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
+    let gate = assessment.gateExam(exam, { profile: subjectProfile });
+    exam.questions = gate.questions;
 
-        if (!review.passed) {
-          // Too many issues — regenerate once
+    // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
+    const verifier = require("./_verifier");
+    let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
+    if (exam.questions.length > 0) {
+      const v1 = await verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang });
+      verifierOutcome.callOk = v1.callOk;
+      if (v1.callOk) {
+        const approvedIds = new Set();
+        const rejectedIds = [];
+        for (const q of exam.questions) {
+          const res = v1.perQuestion.get(String(q.id));
+          verifierOutcome.checked++;
+          if (res && verifier.decideApproval(res)) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
+          else { rejectedIds.push(String(q.id)); verifierOutcome.rejected++; }
+        }
+        // One bounded regeneration attempt for the whole exam if too much was
+        // rejected (mirrors the existing >30%-flagged retry threshold below) —
+        // never loop, never regenerate per-question (cost + spec §13 says no
+        // unbounded regeneration loops).
+        if (rejectedIds.length > 0 && rejectedIds.length / exam.questions.length > 0.3) {
           const r2 = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -547,37 +496,79 @@ module.exports = async function handler(req, res) {
             signal: AbortSignal.timeout(45_000)
           });
           const raw2 = await r2.text();
-          let data2;
-          try { data2 = JSON.parse(raw2); } catch { data2 = null; }
-
+          let data2; try { data2 = JSON.parse(raw2); } catch { data2 = null; }
           if (r2.ok && data2) {
-            const out2 =
-              (Array.isArray(data2.output) &&
-                data2.output
-                  .flatMap(o => (Array.isArray(o.content) ? o.content : []))
-                  .find(c => c.type === "output_text")?.text) || null;
-            let exam2;
-            try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
-
+            const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
+            let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
             if (exam2 && Array.isArray(exam2.questions) && exam2.questions.length === numQuestions) {
-              exam = exam2;
-              reviewMeta.retried = true;
-              reviewMeta.quality = "good";
+              gate = assessment.gateExam(exam2, { profile: subjectProfile });
+              exam.questions = gate.questions;
+              const v2 = await verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang });
+              verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: v2.callOk };
+              if (v2.callOk) {
+                const kept = [];
+                for (const q of exam.questions) {
+                  const res = v2.perQuestion.get(String(q.id));
+                  verifierOutcome.checked++;
+                  if (res && verifier.decideApproval(res)) { kept.push(q); verifierOutcome.approved++; }
+                  else verifierOutcome.rejected++;
+                }
+                exam.questions = kept;
+              }
             }
           }
+        } else {
+          exam.questions = exam.questions.filter(q => approvedIds.has(String(q.id)));
+        }
+        // Stamp per-question validation metadata (spec: every question carries
+        // its own validation_status/confidence_score/detected_issues, not just
+        // an aggregate). Safe to leave on the object — app.html's renderExam()
+        // only reads .question/.options/.type/.points/.id, unknown properties
+        // are simply ignored, never rendered.
+        for (const q of exam.questions) {
+          const res = v1.perQuestion.get(String(q.id));
+          q.validation_status = res ? "verified" : "gate_only";
+          q.confidence_score = res
+            ? Number((
+                (Number(res.factual_accuracy) + Number(res.ambiguity_score >= 0 ? 1 - res.ambiguity_score : 0) +
+                 Number(res.difficulty_match) + Number(res.scoring_quality) + Number(res.language_quality)) / 5
+              ).toFixed(2))
+            : null;
+          q.detected_issues = res && Array.isArray(res.issues) ? res.issues : [];
+        }
+      } else {
+        // Verifier call failed outright (network/parse error) — fail open on the
+        // structural gate's output rather than blocking delivery entirely (matches
+        // the existing best-effort behavior of the old reviewer pass), but say so.
+        for (const q of exam.questions) {
+          q.validation_status = "gate_only";
+          q.confidence_score = null;
+          q.detected_issues = [];
         }
       }
-    } catch { /* reviewer is best-effort — never block delivery */ }
-
-    // ── SUBJECT-PROFILE QUALITY GATE ───────────────────────────────────────
-    // Subject-agnostic: drop questions unsafe to show (any subject) and sign each
-    // answer key so a tampered correct_index from the browser cannot score points.
-    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
-    const gate = assessment.gateExam(exam, { profile: subjectProfile });
-    exam.questions = gate.questions;
-    if (exam.questions.length === 0) {
-      return json(res, 502, { ok: false, error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.", gate: { profile: subjectProfile, dropped: gate.dropped } });
     }
+
+    if (exam.questions.length === 0) {
+      return json(res, 502, {
+        ok: false,
+        error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.",
+        gate: { profile: subjectProfile, dropped: gate.dropped },
+      });
+    }
+
+    // ── OBSERVABILITY (structured, no question/answer content logged) ─────
+    console.log(JSON.stringify({
+      event: "exam_quality_gate",
+      subjectProfile,
+      numRequested: numQuestions,
+      structurallyDropped: gate.dropped.length,
+      structurallyFlagged: gate.flagged.length,
+      verifierChecked: verifierOutcome.checked,
+      verifierApproved: verifierOutcome.approved,
+      verifierRejected: verifierOutcome.rejected,
+      verifierCallOk: verifierOutcome.callOk,
+      finalQuestionCount: exam.questions.length,
+    }));
 
     return json(res, 200, {
       ok: true,
@@ -586,8 +577,8 @@ module.exports = async function handler(req, res) {
         isMath,
         subjectProfile,
         gate: { profile: subjectProfile, dropped: gate.dropped.length, flagged: gate.flagged.length },
+        verifier: verifierOutcome,
         model,
-        review: reviewMeta,
         entitlements,
         quota: {
           feature: "mockExam",
