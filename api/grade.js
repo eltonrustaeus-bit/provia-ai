@@ -303,12 +303,14 @@ module.exports = async function handler(req, res) {
           error_tags: pts === maxP ? [] : ["mc_wrong"]
         });
       } else {
+        const hasStructuredRubric = q.scoring_rubric && Array.isArray(q.scoring_rubric.parts) && q.scoring_rubric.parts.length > 0;
         nonMcPack.push({
           id,
           type,
           max_points: maxP,
           question: String(q.question || ""),
           rubric: String(q.rubric || ""),
+          scoring_rubric: hasStructuredRubric ? q.scoring_rubric : null,
           model_answer: String(q.model_answer || ""),
           user_answer: String(userAns || "")
         });
@@ -335,7 +337,9 @@ module.exports = async function handler(req, res) {
       "Mål: Bedöm varje elevsvar mot frågan, maxpoäng och rubric. Svara ENDAST med JSON enligt schema.\n\n" +
       "Regler (obligatoriskt):\n" +
       "1) Fakta: Använd ENDAST 'material' som faktakälla. Om materialet inte räcker, skriv tydligt 'Otillräckliga data i materialet' i feedback och ge lägre poäng.\n" +
-      "2) Poäng: points måste vara tal inom [0..max_points]. max_points måste matcha uppgiften.\n" +
+      "2) Poäng: points måste vara tal inom [0..max_points]. max_points måste matcha uppgiften. " +
+      "Om items[].scoring_rubric finns: bedöm VARJE del i scoring_rubric.parts för sig och summera — nämn i feedback vilka delar som gavs poäng. " +
+      "Kräv ALDRIG mer än vad scoring_rubric.full_score_requirements uttryckligen listar för full poäng.\n" +
       "3) Feedback (kort och precis):\n" +
       "   - Börja med 1 rad: 'Poäng: X/Y.'\n" +
       "   - Sedan 2–5 korta punkter: (a) vad som var korrekt, (b) vad som saknas/fel, (c) exakt vad som krävs för full poäng.\n" +
@@ -359,7 +363,9 @@ module.exports = async function handler(req, res) {
       "Goal: Grade each student answer against the question, max points and rubric. Output ONLY JSON per schema.\n\n" +
       "Rules (mandatory):\n" +
       "1) Facts: Use ONLY 'material' as the factual source. If material is insufficient, explicitly say 'Insufficient data in the material' in feedback and award fewer points.\n" +
-      "2) Scoring: points must be within [0..max_points]. max_points must match the item.\n" +
+      "2) Scoring: points must be within [0..max_points]. max_points must match the item. " +
+      "If items[].scoring_rubric exists: assess each part in scoring_rubric.parts separately and sum — mention in feedback which parts received points. " +
+      "Never require more than what scoring_rubric.full_score_requirements explicitly lists for full score.\n" +
       "3) Feedback:\n" +
       "   - Start with: 'Score: X/Y.'\n" +
       "   - 2–5 bullets: correct parts, missing/incorrect, what is required for full score.\n" +
