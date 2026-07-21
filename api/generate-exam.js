@@ -565,7 +565,8 @@ module.exports = async function handler(req, res) {
           q.confidence_score = vres
             ? Number((
                 (Number(vres.factual_accuracy) + Number(vres.ambiguity_score >= 0 ? 1 - vres.ambiguity_score : 0) +
-                 Number(vres.difficulty_match) + Number(vres.scoring_quality) + Number(vres.language_quality)) / 5
+                 Number(vres.difficulty_match) + Number(vres.source_alignment) + Number(vres.scoring_quality) +
+                 Number(vres.language_quality)) / 6
               ).toFixed(2))
             : null;
           q.detected_issues = vres && Array.isArray(vres.issues) ? vres.issues : [];
@@ -604,9 +605,23 @@ module.exports = async function handler(req, res) {
       finalQuestionCount: exam.questions.length,
     }));
 
+    // Verifier-internal fields (validation_status/confidence_score/detected_issues)
+    // are stamped above for the gating decision and the observability log, but
+    // must never reach the browser response body (plan's Global Constraint: no
+    // secrets or internal fields — akey_sig, verifier scores, prompt text — may
+    // reach the client). Strip them from a shallow-copied exam for the response
+    // only; the original exam.questions objects (used above) are left untouched.
+    const clientExam = {
+      ...exam,
+      questions: exam.questions.map((q) => {
+        const { validation_status, confidence_score, detected_issues, ...clientQuestion } = q;
+        return clientQuestion;
+      }),
+    };
+
     return json(res, 200, {
       ok: true,
-      exam,
+      exam: clientExam,
       meta: {
         isMath,
         subjectProfile,

@@ -39,6 +39,10 @@ check("rejects when ambiguity_score is above threshold", () => {
   assert.equal(V.decideApproval({ ...good, ambiguity_score: 0.6 }), false);
 });
 
+check("rejects when source_alignment is below threshold", () => {
+  assert.equal(V.decideApproval({ ...good, source_alignment: 0.3 }), false);
+});
+
 check("rejects when there are any required_changes, even with good scores", () => {
   assert.equal(V.decideApproval({ ...good, required_changes: ["förtydliga alternativ B"] }), false);
 });

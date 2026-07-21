@@ -48,6 +48,7 @@ const DEFAULT_THRESHOLDS = {
   minFactualAccuracy: 0.75,
   maxAmbiguity: 0.35,
   minDifficultyMatch: 0.6,
+  minSourceAlignment: 0.6,
   minScoringQuality: 0.6,
   minLanguageQuality: 0.6,
 };
@@ -63,6 +64,7 @@ function decideApproval(r, thresholds) {
   if (!(Number(r.factual_accuracy) >= t.minFactualAccuracy)) return false;
   if (!(Number(r.ambiguity_score) <= t.maxAmbiguity)) return false;
   if (!(Number(r.difficulty_match) >= t.minDifficultyMatch)) return false;
+  if (!(Number(r.source_alignment) >= t.minSourceAlignment)) return false;
   if (!(Number(r.scoring_quality) >= t.minScoringQuality)) return false;
   if (!(Number(r.language_quality) >= t.minLanguageQuality)) return false;
   return true;
