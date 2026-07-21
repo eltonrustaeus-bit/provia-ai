@@ -484,11 +484,21 @@ module.exports = async function handler(req, res) {
           if (res && verifier.decideApproval(res)) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
           else { rejectedIds.push(String(q.id)); verifierOutcome.rejected++; }
         }
+        // Tracks whichever verifier result map is currently authoritative for
+        // per-question stamping below — round 1 unless a regeneration round
+        // actually succeeds and replaces exam.questions with round-2 output.
+        let activeVerifierMap = v1.perQuestion;
         // One bounded regeneration attempt for the whole exam if too much was
         // rejected (mirrors the existing >30%-flagged retry threshold below) —
         // never loop, never regenerate per-question (cost + spec §13 says no
         // unbounded regeneration loops).
         if (rejectedIds.length > 0 && rejectedIds.length / exam.questions.length > 0.3) {
+          // Round-1 structurally-gated questions, kept aside so that if
+          // regeneration fails for any reason we can still fall back to just
+          // the subset that DID pass verification — never ship a question the
+          // verifier explicitly rejected merely because regeneration failed.
+          const originalGatedQuestions = exam.questions;
+          let regenerationSucceeded = false;
           const r2 = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -502,20 +512,36 @@ module.exports = async function handler(req, res) {
             let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
             if (exam2 && Array.isArray(exam2.questions) && exam2.questions.length === numQuestions) {
               gate = assessment.gateExam(exam2, { profile: subjectProfile });
-              exam.questions = gate.questions;
-              const v2 = await verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang });
-              verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: v2.callOk };
-              if (v2.callOk) {
-                const kept = [];
-                for (const q of exam.questions) {
-                  const res = v2.perQuestion.get(String(q.id));
-                  verifierOutcome.checked++;
-                  if (res && verifier.decideApproval(res)) { kept.push(q); verifierOutcome.approved++; }
-                  else verifierOutcome.rejected++;
+              const regatedQuestions = gate.questions;
+              if (regatedQuestions.length > 0) {
+                const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang });
+                if (v2.callOk) {
+                  const kept = [];
+                  const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: true };
+                  for (const q of regatedQuestions) {
+                    const res = v2.perQuestion.get(String(q.id));
+                    outcome2.checked++;
+                    if (res && verifier.decideApproval(res)) { kept.push(q); outcome2.approved++; }
+                    else outcome2.rejected++;
+                  }
+                  if (kept.length > 0) {
+                    exam.questions = kept;
+                    activeVerifierMap = v2.perQuestion;
+                    verifierOutcome = outcome2;
+                    regenerationSucceeded = true;
+                  }
                 }
-                exam.questions = kept;
               }
             }
+          }
+          if (!regenerationSucceeded) {
+            // Regeneration failed outright (network/parse/shape) or produced
+            // zero verified-approved questions after re-gating/re-verifying —
+            // fall back to the round-1 approved subset instead of shipping the
+            // original, unfiltered (still verifier-rejected) batch.
+            exam.questions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
+            activeVerifierMap = v1.perQuestion;
+            // verifierOutcome already holds round-1 checked/approved/rejected counts.
           }
         } else {
           exam.questions = exam.questions.filter(q => approvedIds.has(String(q.id)));
@@ -526,7 +552,7 @@ module.exports = async function handler(req, res) {
         // only reads .question/.options/.type/.points/.id, unknown properties
         // are simply ignored, never rendered.
         for (const q of exam.questions) {
-          const res = v1.perQuestion.get(String(q.id));
+          const res = activeVerifierMap.get(String(q.id));
           q.validation_status = res ? "verified" : "gate_only";
           q.confidence_score = res
             ? Number((
