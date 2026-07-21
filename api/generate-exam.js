@@ -8,6 +8,19 @@
 
 const assessment = require("./_assessment");
 
+function cognitiveVerbHint(lang) {
+  const v = assessment.COGNITIVE_VERBS;
+  return lang === "sv"
+    ? `Nivå E ska kräva: ${v.E.slice(0, 5).join(", ")}. ` +
+      `Nivå C ska kräva: ${v.C.slice(0, 5).join(", ")}. ` +
+      `Nivå A ska kräva: ${v.A.slice(0, 5).join(", ")}. ` +
+      "Svårighetsgraden ska ändra VAD eleven måste göra, inte bara ordvalet."
+    : `Level E must require: ${v.E.slice(0, 5).join(", ")}. ` +
+      `Level C must require: ${v.C.slice(0, 5).join(", ")}. ` +
+      `Level A must require: ${v.A.slice(0, 5).join(", ")}. ` +
+      "The difficulty level must change WHAT the student has to do, not just the wording.";
+}
+
 function json(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -142,25 +155,49 @@ function buildMockExamSchema(numQuestions) {
             type: "object",
             additionalProperties: false,
             required: [
-              "id",
-              "type",
-              "points",
-              "question",
-              "options",
-              "correct_index",
-              "rubric",
-              "model_answer"
+              "id", "type", "points", "question", "options", "correct_index",
+              "rubric", "model_answer",
+              "topic", "subtopic", "learning_objective", "source_references",
+              "cognitive_level", "accepted_answers", "estimated_answer_length",
+              "scoring_rubric"
             ],
             properties: {
               id: { type: "string" },
-              // Endast dessa typer (ingen essay)
               type: { type: "string", enum: ["mc", "short"] },
               points: { type: "number" },
               question: { type: "string" },
               options: { type: "array", items: { type: "string" }, maxItems: 6 },
               correct_index: { type: "integer" },
               rubric: { type: "string" },
-              model_answer: { type: "string" }
+              model_answer: { type: "string" },
+              topic: { type: "string" },
+              subtopic: { type: "string" },
+              learning_objective: { type: "string" },
+              source_references: { type: "array", items: { type: "string" }, maxItems: 5 },
+              cognitive_level: { type: "string", enum: ["minnas", "förstå", "tillämpa", "analysera", "värdera"] },
+              accepted_answers: { type: "array", items: { type: "string" }, maxItems: 5 },
+              estimated_answer_length: { type: "string", enum: ["none", "one_word", "one_sentence", "short_paragraph", "long_paragraph"] },
+              // additionalProperties:false on a strict schema means this object must
+              // always be present; for "mc" questions the model sends an empty-parts
+              // shape and _assessment.js's gate only enforces shape for type==="short".
+              scoring_rubric: {
+                type: "object",
+                additionalProperties: false,
+                required: ["parts", "full_score_requirements", "partial_credit_notes"],
+                properties: {
+                  parts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["description", "points"],
+                      properties: { description: { type: "string" }, points: { type: "number" } }
+                    }
+                  },
+                  full_score_requirements: { type: "string" },
+                  partial_credit_notes: { type: "string" }
+                }
+              }
             }
           }
         }
@@ -342,7 +379,14 @@ module.exports = async function handler(req, res) {
     "2) Om type=='mc': options ska ha 3–5 alternativ och correct_index ska vara 0..(options.length-1). " +
     "3) Om type=='short': options ska vara [] och correct_index ska vara -1. " +
     "4) rubric ska vara kort och poängfokuserad. " +
-    "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. ";
+    "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. " +
+    "6) topic/subtopic/learning_objective ska kort beskriva vad frågan mäter. " +
+    "7) source_references ska lista vilken del av det inskickade materialet frågan bygger på (kort citat eller rubrik) — hitta ALDRIG på fakta som inte finns i materialet. " +
+    "8) cognitive_level ska vara ett av: minnas, förstå, tillämpa, analysera, värdera — matchat mot nivå (se separat instruktion). " +
+    "9) Om type=='short': scoring_rubric.parts ska bryta ner poängen i konkreta delmoment (t.ex. 'Definition: 1p', 'Villkor: 2p') som tillsammans summerar till points. full_score_requirements ska säga EXAKT vad som krävs för full poäng — fråga aldrig i hemlighet efter mer än vad question-texten bad om. accepted_answers ska lista alternativa godtagbara formuleringar. " +
+    "10) Om type=='mc': scoring_rubric ska ändå finnas i svaret men med tom parts-array, full_score_requirements='' , partial_credit_notes=''. " +
+    "11) estimated_answer_length ska matcha vad points faktiskt kräver — en 1-poängsfråga ska inte kräva 'long_paragraph'. " +
+    cognitiveVerbHint("sv") + " ";
 
   const systemSvMath =
     "MATTE-LÄGE: Prioritera exakta, beräkningsbaserade frågor. " +
@@ -359,7 +403,14 @@ module.exports = async function handler(req, res) {
     "2) If type=='mc': options must have 3–5 choices and correct_index must be 0..(options.length-1). " +
     "3) If type=='short': options must be [] and correct_index must be -1. " +
     "4) rubric must be short and point-focused. " +
-    "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. ";
+    "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. " +
+    "6) topic/subtopic/learning_objective must briefly describe what the question measures. " +
+    "7) source_references must list which part of the provided material the question is based on (brief quote or heading) — NEVER invent facts not in the material. " +
+    "8) cognitive_level must be one of: minnas, förstå, tillämpa, analysera, värdera — matched to the level (see separate instruction). " +
+    "9) If type=='short': scoring_rubric.parts must break down the points into concrete sub-components (e.g. 'Definition: 1p', 'Conditions: 2p') that sum to points. full_score_requirements must state EXACTLY what is required for full marks — never secretly ask for more than what the question text requested. accepted_answers must list alternative acceptable phrasings. " +
+    "10) If type=='mc': scoring_rubric must still be present in the response but with an empty parts array, full_score_requirements='', partial_credit_notes=''. " +
+    "11) estimated_answer_length must match what the points actually require — a 1-point question should not require 'long_paragraph'. " +
+    cognitiveVerbHint("en") + " ";
 
   const systemEnMath =
     "MATH MODE: Prioritize exact calculation questions. " +
@@ -466,6 +517,9 @@ module.exports = async function handler(req, res) {
         if (!Array.isArray(q.options)) q.options = [];
         q.options = [];
         q.correct_index = -1;
+        if (!q.scoring_rubric || !Array.isArray(q.scoring_rubric.parts)) {
+          return json(res, 500, { ok: false, error: "Missing scoring_rubric on short question", question: q });
+        }
       } else {
         if (!Array.isArray(q.options) || q.options.length < 3) {
           return json(res, 500, { ok: false, error: "MC options invalid", question: q });
