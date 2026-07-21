@@ -199,6 +199,11 @@ module.exports = async function handler(req, res) {
   const chunks = [];
   let responded = false;
   const sendOnce = (status, obj) => { if (responded) return; responded = true; json(res, status, obj); };
+  // A Node readable stream stays paused (never flows, "end" never fires) until
+  // something attaches a "data" listener, calls resume(), or pipes it — without
+  // this line the handler hung forever on every request until Vercel's platform
+  // timeout killed it (matches the working pattern in api/ocr.js/stripe-webhook.js).
+  req.on("data", (c) => chunks.push(c));
   // Without this, a stalled/aborted request stream would leave the handler hanging
   // with no response — one of the ways grading could "load forever".
   req.on("error", (e) => sendOnce(400, { ok: false, error: "Request stream error", details: String(e) }));
