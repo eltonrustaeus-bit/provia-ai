@@ -26,6 +26,7 @@
   var LS_DRAFT_BASE = "exgen_flow_draft";
   var LS_HISTORY = "proviaai_history";
   var LS_MISTAKES = "proviaai_mistakes";
+  var LS_TRAIN_PICK = "proviaai_train_pick";
 
   // Ett övergivet utkast slutar vara till hjälp och börjar bli förvirrande.
   var DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -189,6 +190,88 @@
   }
 
   function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
+
+  function weakResultItems(result, questionsById) {
+    return (result && Array.isArray(result.per_question) ? result.per_question : [])
+      .map(function (item) {
+        var id = String(item.id || "");
+        var q = questionsById[id] || {};
+        var got = Number(item.points) || 0;
+        var max = Number(item.max_points) || 0;
+        return {
+          id: id,
+          q: q,
+          got: got,
+          max: max,
+          ratio: max > 0 ? got / max : 1,
+          concept: String(q.concept_tag || q.topic || q.subtopic || "").trim(),
+          feedback: String(item.feedback || "").trim()
+        };
+      })
+      .filter(function (item) { return item.max > 0 && item.got < item.max; })
+      .sort(function (a, b) {
+        if (a.ratio !== b.ratio) return a.ratio - b.ratio;
+        return (b.max - b.got) - (a.max - a.got);
+      });
+  }
+
+  function addNextTrainingCard(root, result, questionsById) {
+    var weak = weakResultItems(result, questionsById);
+    if (!weak.length) {
+      var clean = el("div", "xf-next");
+      clean.appendChild(el("div", "xf-next-k", "Nästa träning"));
+      clean.appendChild(el("h3", null, "Bra: inga tydliga luckor i det här provet"));
+      clean.appendChild(el("p", null, "Gör ett nytt prov på samma material med högre nivå eller fler frågor för att se om det sitter även när frågorna vrids om."));
+      root.appendChild(clean);
+      return;
+    }
+
+    var primary = weak[0];
+    var card = el("div", "xf-next");
+    card.appendChild(el("div", "xf-next-k", "Nästa träning"));
+    card.appendChild(el("h3", null, primary.concept ? "Börja med " + primary.concept : "Börja med den svagaste frågan"));
+
+    var intro = primary.feedback
+      ? primary.feedback.replace(/^\s*Poäng:\s*\d+\s*\/\s*\d+\.?\s*/i, "")
+      : "Det här är den tydligaste luckan från rättningen.";
+    card.appendChild(el("p", null, intro.slice(0, 210)));
+
+    var chips = el("div", "xf-next-list");
+    weak.slice(0, 4).forEach(function (item, i) {
+      var label = item.concept || ("Fråga " + (i + 1));
+      chips.appendChild(el("span", null, label + " " + item.got + "/" + item.max));
+    });
+    card.appendChild(chips);
+
+    var actions = el("div", "xf-next-actions");
+    var train = el("a", "xf-btn primary", "Träna misstagen");
+    train.href = "förbättring.html#train";
+    train.addEventListener("click", function () {
+      lsSet(LS_TRAIN_PICK, {
+        ids: weak.slice(0, 8).map(function (item) { return item.id; }),
+        course: S.course || ""
+      });
+    });
+    actions.appendChild(train);
+
+    var ask = el("button", "xf-btn ghost", "Fråga P.E.R vad du ska göra");
+    ask.type = "button";
+    ask.addEventListener("click", function () {
+      if (window.PER && window.PER.describe) {
+        window.PER.describe({
+          page: "resultat",
+          state: { phase: "result" },
+          summary: "Eleven har precis fått resultat. Svagaste område: " + (primary.concept || "okänt") + "."
+        });
+      }
+      var bubble = document.getElementById("perBubble");
+      if (bubble && !bubble.classList.contains("per-open")) bubble.click();
+    });
+    actions.appendChild(ask);
+    card.appendChild(actions);
+
+    root.appendChild(card);
+  }
 
   /* Användar-id läses ur samma Supabase-session som resten av appen. Går det
      inte att läsa faller vi tillbaka på "anon" — då blir utkastet i praktiken
@@ -1587,6 +1670,8 @@
       });
       b.appendChild(cov);
     }
+
+    addNextTrainingCard(b, r, byId);
 
     var list = el("div");
     list.style.marginTop = "28px";
