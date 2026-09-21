@@ -39,15 +39,15 @@ function buildHtml(email) {
       </td></tr>
 
       <tr><td style="padding:32px 32px 20px">
-        <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Du pluggar på gratisplanen. Här är vad du missar.</h1>
-        <p style="margin:0;font-size:15px;color:#a8c4b4;line-height:1.7">Gratisplanen ger dig 10 kursfrågor per dag och 2 AI-mockprov per vecka. Teoriprov — det som simulerar riktiga körkortsprovet — kräver Basic.</p>
+        <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#e8f5ee;line-height:1.3">Du pluggar på gratisplanen. Här är vad Basic låser upp.</h1>
+        <p style="margin:0;font-size:15px;color:#a8c4b4;line-height:1.7">Gratisplanen ger dig 3 AI-mockprov per vecka och 5 P.E.R-frågor per vecka. Basic ger mer regelbunden provträning, OCR från bilder och P.E.R varje dag.</p>
       </td></tr>
 
       <tr><td style="padding:0 32px 24px">
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#111a15;border:1px solid rgba(27,255,140,.2);border-radius:6px;overflow:hidden">
           <tr><td style="padding:16px 20px;border-bottom:1px solid rgba(27,255,140,.1)">
             <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#1bff8c;text-transform:uppercase;letter-spacing:0.6px">Basic — 29 kr/mån</p>
-            <p style="margin:0;font-size:14px;color:#e8f5ee;line-height:1.6">30 teoriprov/mån &nbsp;·&nbsp; 30 AI-mockprov/mån &nbsp;·&nbsp; Obegränsad körkortsträning &nbsp;·&nbsp; P.E.R 5/dag</p>
+            <p style="margin:0;font-size:14px;color:#e8f5ee;line-height:1.6">30 AI-mockprov/mån &nbsp;·&nbsp; OCR från bilder &nbsp;·&nbsp; historik &nbsp;·&nbsp; P.E.R 5/dag</p>
           </tr>
           <tr><td style="padding:14px 20px">
             <p style="margin:0;font-size:13px;color:#a8c4b4;line-height:1.6">Det är 1 prov per dag i en månad. Forskning visar att spridd repetition är det effektivaste sättet att lära sig — men det kräver att du faktiskt kan öva varje dag.</p>

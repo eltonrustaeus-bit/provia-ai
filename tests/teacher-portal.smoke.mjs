@@ -4,7 +4,7 @@
 //
 // What it proves:
 //   1. Teacher API actions reject unauthenticated callers (401)         [no browser]
-//   2. larare.html loads, its JS runs clean, and the private-demo gate
+//   2. larare.html loads, its JS runs clean, and the teacher auth gate
 //      hides the dashboard from anonymous visitors                       [needs chromium]
 //
 // Usage:
@@ -84,10 +84,10 @@ async function browserChecks() {
 
     try {
       await page.waitForFunction(
-        () => /Sidan finns inte/i.test(document.getElementById("whoLabel")?.textContent || ""),
+        () => /Inte inloggad|Sidan finns inte/i.test(document.getElementById("whoLabel")?.textContent || ""),
         { timeout: 10_000 }
       );
-      ok("anonymous visitor is gated (whoLabel = 'Sidan finns inte')");
+      ok("anonymous visitor is gated");
     } catch (e) {
       fail("anonymous visitor is gated", e);
     }

@@ -1,4 +1,4 @@
-// scripts/hp-per-security-check.mjs — offline regression guard for P.E.R (EX1.0) prompt hardening.
+// scripts/hp-per-security-check.mjs — offline regression guard for P.E.R prompt hardening.
 // The HP coach routes through explain.js TEACH MODE -> buildPERSystemPrompt (js/hp-app.js feeds HP
 // context via setPerContext). The spec requires P.E.R to (1) never reveal system prompt / generation
 // pipeline / internal strategy, and (2) treat user text as DATA, not commands (prompt-injection
@@ -38,7 +38,7 @@ for (const prompt of [hostile, plain]) {
 // Sanity: the injection payload lands as context DATA — below the system framing, and ABOVE the
 // hardening directives so those get the last word.
 //
-// This block asserted `hostile.indexOf('Du är EX1.0')` until 2026-08-11. The prompt opens
+// This block asserted an older assistant name until 2026-08-11. The prompt opens
 // `Du är P.E.R — ExGens AI-motor.` and has done for some time, so indexOf returned -1 and the
 // check had been failing on main continuously — a guard nobody can pass is a guard nobody reads.
 // The posture itself was never broken; measured on main: framing 0, payload 2042, directives

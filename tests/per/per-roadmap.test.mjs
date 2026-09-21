@@ -84,11 +84,11 @@ check("och säger varför det spelar roll", /kontrollerbart falskt/.test(b));
 check("blocket förbjuder ord som låter som pågående arbete",
   /Skriv aldrig .pågående/.test(b));
 check("och kräver futurum", /aldrig i presens eller perfekt/.test(b));
-/* Ett block som beskriver piloten som pågående vore samma fel i mjukare form. */
-check("piloten beskrivs som ExGens egen ambition", /ExGens egen ambition/.test(b));
+/* Ett block som beskriver pilotförslaget som pågående vore samma fel i mjukare form. */
+check("pilotförslaget beskrivs som ExGens egen ambition", /ExGens egen ambition/.test(b));
 /* Pitchen får inte läsa som hela produkten. */
-check("piloten ramas in som EN del av något större",
-  /EN pilot\s*\n?inom ExGens bredare arbete/.test(b));
+check("pilotförslaget ramas in som en del av något större",
+  /ETT\s*\n?pilotförslag inom ExGens bredare arbete/.test(b));
 check("ingen formulering om pågående samarbete",
   !/(samarbetar|tillsammans med Alléskolan|i samarbete med)/i.test(b));
 
@@ -135,22 +135,22 @@ check("och förklarar varför en sammanfattning inte duger",
 console.log("\n— I PROMPTEN —");
 check("visionsfråga tar med visionen, inte piloten", (() => {
   const p = core.buildPERSystemPrompt({ userQuestion: "vad är er vision", role: "gratis" });
-  return p.includes("EXGENS VISION") && !p.includes("ALLÉSKOLAN-PILOTEN");
+  return p.includes("EXGENS VISION") && !p.includes("ALLÉSKOLAN-PILOTFÖRSLAGET");
 })());
-check("Alléskolan-fråga tar med piloten, inte visionen", (() => {
+check("Alléskolan-fråga tar med pilotförslaget, inte visionen", (() => {
   const p = core.buildPERSystemPrompt({ userQuestion: "vad är exgens nästa projekt med alléskolan", role: "gratis" });
-  return p.includes("ALLÉSKOLAN-PILOTEN") && !p.includes("EXGENS VISION");
+  return p.includes("ALLÉSKOLAN-PILOTFÖRSLAGET") && !p.includes("EXGENS VISION");
 })());
 check("studiefråga tar INTE med något av dem", (() => {
   const p = core.buildPERSystemPrompt({ userQuestion: "förklara derivata", role: "gratis" });
-  return !p.includes("ALLÉSKOLAN-PILOTEN") && !p.includes("EXGENS VISION");
+  return !p.includes("ALLÉSKOLAN-PILOTFÖRSLAGET") && !p.includes("EXGENS VISION");
 })());
 check("visionen når landningsläget",
   core.buildPERLandingPrompt({ userQuestion: "vart är ni på väg?" }).includes("EXGENS VISION"));
-check("piloten når landningsläget när skolan nämns",
-  core.buildPERLandingPrompt({ userQuestion: "berätta om alléskolan" }).includes("ALLÉSKOLAN-PILOTEN"));
+check("pilotförslaget når landningsläget när skolan nämns",
+  core.buildPERLandingPrompt({ userQuestion: "berätta om alléskolan" }).includes("ALLÉSKOLAN-PILOTFÖRSLAGET"));
 check("prisfråga tar inte med något",
-  !/EXGENS VISION|ALLÉSKOLAN-PILOTEN/.test(core.buildPERLandingPrompt({ userQuestion: "vad kostar det?" })));
+  !/EXGENS VISION|ALLÉSKOLAN-PILOTFÖRSLAGET/.test(core.buildPERLandingPrompt({ userQuestion: "vad kostar det?" })));
 
 console.log("\n— GAMLA AVSNITT SOM ERSATTS —");
 console.log("\n— I PROMPTEN —");

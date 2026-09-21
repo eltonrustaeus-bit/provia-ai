@@ -8,7 +8,7 @@
 //
 // Alléskolan är en riktig skola med riktiga elever. Det finns INGEN kontakt,
 // inget avtal och inget samarbete i skrivande stund (2026-08-24). P.E.R. får
-// beskriva piloten som det den är — ExGens egen ambition, byggd på skolans
+// beskriva pilotförslaget som det den är — ExGens egen ambition, byggd på skolans
 // offentliga resultat — och får ALDRIG antyda att skolan är involverad,
 // tillfrågad eller positiv.
 //
@@ -42,7 +42,7 @@ export const ALLESKOLAN = Object.freeze({
  * VISION är frågan de flesta ställer: vart är ExGen på väg, vad vill ni. Svaret
  * gäller hela produkten och alla elever — inte ett ämne och inte en skola.
  *
- * ALLÉSKOLAN är en specifik pilot i matematik. Den ska bara komma upp när
+ * ALLÉSKOLAN är ett specifikt pilotförslag i matematik. Det ska bara komma upp när
  * någon frågar om just den. Att svara "vi ska hjälpa en skola i Åtvidaberg med
  * matte" på frågan om ExGens vision gör produkten mindre än den är: det låter
  * som ett lokalt matteprojekt i stället för en studieplattform för hela
@@ -73,7 +73,7 @@ export const VISION_TRIGGER_REGEX = new RegExp(
   "i"
 );
 
-/* Smal: skolan måste nämnas vid namn. Utan det kravet dök en enskild pilot upp
+/* Smal: skolan måste nämnas vid namn. Utan det kravet dök ett enskilt pilotförslag upp
    som svar på varje fråga om vart företaget är på väg. */
 export const ALLESKOLAN_TRIGGER_REGEX = /all[ée]skolan|åtvidaberg/i;
 
@@ -141,7 +141,7 @@ export function buildVisionContext() {
 }
 
 /**
- * Alléskolan-piloten. Byggs ur ALLESKOLAN så att en siffra bara kan ändras på
+ * Alléskolan-pilotförslaget. Byggs ur ALLESKOLAN så att en siffra bara kan ändras på
  * ett ställe, och märks genomgående som en plan — aldrig som pågående arbete.
  *
  * Bifogas BARA när någon frågar om skolan vid namn. Att låta den svara på
@@ -152,10 +152,11 @@ export function buildAlleskolanContext() {
   const np = a.nationelltProv;
 
   return [
-    "## ALLÉSKOLAN-PILOTEN — FÅR BERÄTTAS OM",
+    "## ALLÉSKOLAN-PILOTFÖRSLAGET — FÅR BERÄTTAS OM",
     "",
-    "Frågar någon om Alléskolan eller Åtvidaberg är det här svaret. Det är EN pilot",
-    "inom ExGens bredare arbete, inte hela produkten.",
+    "Frågar någon om Alléskolan eller Åtvidaberg är det här svaret. Det är ETT",
+    "pilotförslag inom ExGens bredare arbete, inte hela produkten och inte ett",
+    "pågående samarbete.",
     "",
     "PROBLEMET, MED SIFFROR",
     `${a.namn} i ${a.ort} har ${a.elever} elever i årskurs ${a.årskurser}. Läsåret ${a.läsår}:`,
@@ -165,7 +166,7 @@ export function buildAlleskolanContext() {
     `- Svenska ${tal(np.svenska.skolan)} mot ${tal(np.svenska.riket)}, engelska ${tal(np.engelska.skolan)} mot ${tal(np.engelska.riket)}.`,
     "",
     "Poängen med den sista raden: matematikgapet är nästan fyra gånger engelskans.",
-    "Det är där skolan tappar mest, och därför piloten börjar i matematik.",
+    "Det är där skolan tappar mest, och därför skulle pilotförslaget börja i matematik.",
     "",
     "VAD EXGEN FAKTISKT GÖR ÅT DET",
     "- Kopplar elevens fel till Skolverkets centrala innehåll för årskurs 7–9.",
@@ -175,7 +176,7 @@ export function buildAlleskolanContext() {
     "- Målet är mätbart: fler elever som når minst E, och en före/efter-mätning som visar om det faktiskt hjälpte.",
     "",
     "SÅ HÄR FÅR DU INTE SÄGA DET",
-    `ExGen har INGEN kontakt med ${a.namn}, inget avtal och inget samarbete. Piloten är`,
+    `ExGen har INGEN kontakt med ${a.namn}, inget avtal och inget samarbete. Pilotförslaget är`,
     "ExGens egen ambition, byggd på skolans offentliga resultat. Säg aldrig att skolan",
     "är involverad, tillfrågad, intresserad eller positiv — det är kontrollerbart falskt,",
     "och den som kontrollerar det är skolan själv.",
@@ -184,7 +185,7 @@ export function buildAlleskolanContext() {
        Alléskolan" i samma svar som den sa att ingen kontakt finns. Två
        motstridiga påståenden i ett stycke, och läsaren tror på det första. */
     "Skriv aldrig \"pågående\", \"arbetet med skolan\", \"vi jobbar med\" eller något annat",
-    "som låter som att en pilot redan är igång. Den är PLANERAD. Formulera det i futurum:",
+    "som låter som att en pilot redan är igång. Den är ett PLANERAT FÖRSLAG. Formulera det i futurum:",
     "\"vi vill\", \"planen är\", \"skulle innebära\" — aldrig i presens eller perfekt.",
     "",
     `Statistiken kommer från ${a.källa} och gäller läsåret ${a.läsår}. Hitta aldrig på`,

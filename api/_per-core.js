@@ -827,7 +827,7 @@ const MODUL_MARKÖRER = [
   // resten av api/explain.js via learnerProfile och collectiveBlock. Båda
   // hamnar i samma systemsträng, så en avläsning räcker.
   ["provia-faq", "## HUR EXGEN FUNGERAR — FAKTA P.E.R FÅR CITERA"],
-  ["provia-roadmap", "## ALLÉSKOLAN-PILOTEN — FÅR BERÄTTAS OM"],
+  ["provia-roadmap", "## ALLÉSKOLAN-PILOTFÖRSLAGET — FÅR BERÄTTAS OM"],
   ["provia-roadmap", "## EXGENS VISION — FÅR BERÄTTAS OM"],
   ["learner-context", "## ELEVENS KUNSKAPSLÄGE"],
   ["learner-context", "## ELEVENS HISTORIK"],
