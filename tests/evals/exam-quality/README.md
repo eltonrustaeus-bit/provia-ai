@@ -52,9 +52,9 @@ Results and a separate disagreements file land in `results/` (git-ignored).
 **Key-error rate — the headline.** An independent judge re-solves every
 multiple-choice item from the material and options only. It never sees
 `correct_index`, `model_answer` or `source_references`, so agreement is not a
-rubber stamp. This is the failure mode `api/hp.js:571` already documents for the
-quantitative HP delprov: the explanation is right and the answer key points at
-the wrong option. A student who answers correctly is marked wrong.
+rubber stamp. This catches the failure mode where the explanation is right but
+the answer key points at the wrong option. A student who answers correctly is
+marked wrong.
 
 Only disagreements where the judge reports confidence ≥ 0.8 count as key errors.
 Lower-confidence disagreements are counted separately, because on an interpretive

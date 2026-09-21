@@ -13,8 +13,8 @@ function pickModel() {
 
 /* Handskriven matematik är det svåraste ett vision-API gör, och klart svårare
    än den tryckta text materialvägen läser. Egen variabel därför, samma mönster
-   som OPENAI_MATH_MODEL i generate-exam.js och hp.js. Vilken modell den ska
-   peka på avgörs av evalen i tests/evals/solution-ocr — inte av antagande. */
+   som OPENAI_MATH_MODEL i generate-exam.js. Vilken modell den ska peka på
+   avgörs av evalen i tests/evals/solution-ocr — inte av antagande. */
 function pickVisionModel() {
   return process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 }

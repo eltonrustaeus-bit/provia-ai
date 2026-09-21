@@ -3,8 +3,7 @@
 // legal-verifier-blind är just poängen med detta steg) och bedömer kvalitativa dimensioner som
 // kod inte kan avgöra deterministiskt. För `multiple_choice` beräknas den faktiska matchningen
 // ÄNDÅ deterministiskt i src/generation/legal-generation.mjs (jämför independent_answer mot
-// generatorns facit i kod, samma princip som hp.js:s `res[i].index === q.correct_index`) — men
-// för `short_answer` är exakt strängmatchning meningslös (två sakligt likvärdiga fritextsvar är
+// generatorns facit i kod) — men för `short_answer` är exakt strängmatchning meningslös (två sakligt likvärdiga fritextsvar är
 // nästan aldrig identiska strängar), så `semantic_equivalent_to_generator` här är den signal
 // legal-generation.mjs använder istället för den frågetypen (Fas 8.2-kalibrering). Samma för
 // `recommended_action`: modellens förslag är en signal, den FAKTISKA

@@ -6,8 +6,8 @@ import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
  * KaTeX-CDN:t stubbas. Testet mäter VÅR inkoppling — att renderMath anropas på
  * rätt noder vid rätt tillfälle — inte att KaTeX fungerar. Att hämta 280 kB
  * från jsdelivr i en testsvit vore ett nätverksberoende utan motsvarande
- * upptäckt: går CDN:t ner är det inte den här kodens fel, och js/hp-math.js
- * används redan skarpt av Högskoleprovet.
+ * upptäckt: går CDN:t ner är det inte den här kodens fel, och js/math-render.js
+ * används skarpt av skolproven.
  *
  * Det som bevakas:
  *   - matematik i en fråga renderas
@@ -148,7 +148,7 @@ try {
 
   /* ── Prestandabudgeten ──────────────────────────────────────────────────── */
   {
-    /* En ren textfråga får aldrig kosta 280 kB. js/hp-math.js har en
+    /* En ren textfråga får aldrig kosta 280 kB. js/math-render.js har en
        förhandskontroll just för det, och den måste hålla även här. */
     const t = await öppna(TEXTPROV, "Historia 1b");
     await t.page.waitForTimeout(900);

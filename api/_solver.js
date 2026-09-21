@@ -16,10 +16,9 @@
 // (it is 0). Judging a question and answering it are different tasks, and only
 // the second catches arithmetic.
 //
-// api/hp.js:315 already does exactly this for the quantitative HP delprov and
-// records that it works even when the solver runs on the same model as the
-// generator — the failure mode is inattention, not ignorance. So this does not
-// need an expensive model.
+// It works even when the solver runs on the same model as the generator: the
+// failure mode is inattention, not ignorance. So this does not need an expensive
+// model.
 //
 // Runs in PARALLEL with the verifier in generate-exam.js. Both take the same
 // gated questions and neither depends on the other, so wall time is the max of

@@ -1,7 +1,7 @@
 /* ExGen shared shell — Phase 4. Header/nav/footer styles for the pages
-   Phase 1 gates (app, konto, korkortet, förbättring, larare). Deliberately
+   Phase 1 gates (app, konto, förbättring, larare). Deliberately
    namespaced "xg-" and kept in its own file so pages NOT behind the
-   maintenance gate (index, pricing, live-demo, admin) never load this and
+   maintenance gate (index, pricing, admin) never load this and
    never change — style.css and its .hWrap/.hNav/.brand rules are untouched,
    still serving those pages exactly as before.
 
@@ -186,7 +186,7 @@ html {
 
 /* ── Menyknappen ─────────────────────────────────────────────────────────────
    Ersätter .mBtn/.menuBtn i style.css. Halva den dubbleringen raderas när
-   sidorna migrerats; .menuWrap-halvan står kvar tills korkortet.html följer med
+   sidorna migrerats; de gamla sidunika menyerna är borttagna
    — se kommentaren i style.css.
 
    var(--a) nedan är avsiktlig och ska inte "rättas" till en --exgen-token. Den

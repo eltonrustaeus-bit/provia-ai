@@ -6,8 +6,8 @@
  *
  *   index                saknade sitt eget Hem
  *   förbättring          saknade både Hem och Min utveckling
- *   admin                saknade Körkortsteorin
- *   app, korkortet       egna klassnamn (.ddItem) och egna animationer
+ *   admin                hade avvikande länkar
+ *   app                  hade egna klassnamn (.ddItem) och egna animationer
  *   larare               ingen navigering alls
  *
  * Dessutom bar style.css varje menyregel dubbelt (.mWrap/.menuWrap,
@@ -36,11 +36,6 @@
  * in" för en inloggad elev. tests/frontend/header-render.mjs H10 läser
  * skriptordningen i källan, H11 mäter etiketten i DOM:en.
  *
- * korkortet.html, provia-hp.html och live-demo.html migreras INTE hit. Deras
- * moduler är avstängda i js/exgen-modules.js och sidorna omdirigerar till
- * startsidan. Körkortsraden står ändå kvar i listan nedan med sitt data-module,
- * så att en enda flagga räcker den dag modulen släpps.
- *
  * Kontrakt och motiveringar: tests/frontend/header-render.mjs och
  * tests/frontend/header-behaviour.mjs.
  */
@@ -53,7 +48,6 @@
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
     doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/>',
     pulse: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
-    car: '<path d="M5 11 8.5 5h7L19 11"/><rect x="2" y="11" width="20" height="8" rx="2"/><circle cx="7.5" cy="19" r="2"/><circle cx="16.5" cy="19" r="2"/>',
     card: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
     user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
@@ -64,7 +58,6 @@
     { href: "index.html",       label: "Hem",            icon: "home" },
     { href: "app.html",         label: "Mockprov",       icon: "doc",   pill: "AI" },
     { href: "förbättring.html", label: "Min utveckling", icon: "pulse", pill: "Coach" },
-    { href: "korkortet.html",   label: "Körkortsteorin", icon: "car",   pill: "Nytt", module: "korkort" },
     { href: "pricing.html",     label: "Priser",         icon: "card",  pill: "29/79" }
   ];
 

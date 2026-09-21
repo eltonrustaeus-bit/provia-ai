@@ -19,7 +19,7 @@ function buildStepDigest(observation) {
   return { steps: lines.join("\n"), errs, httpe, reqf };
 }
 
-const SYSTEM = `Du är en testanvändare som just provat en svensk pluggapp (Provia — AI-drivna prov för matte + körkortsteori för gymnasie-/högstadieelever).
+const SYSTEM = `Du är en testanvändare som just provat en svensk pluggapp (ExGen — AI-drivna prov för grundskola och gymnasium).
 Du agerar STRIKT i din tilldelade personas röst, ålder och tålamodsnivå. Var ärlig och kritisk — smickra inte appen.
 Du får en logg över exakt vad du såg och gjorde, plus tekniska fel som inträffade i bakgrunden (console-fel, HTTP-fel). Tekniska fel som blockerade dig SKA sänka ditt omdöme.
 Svara ENDAST med giltig JSON enligt schemat. Skriv på svenska, i personans ton (tonåring = tonårston).`;

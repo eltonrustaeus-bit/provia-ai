@@ -3,10 +3,9 @@
 -- docs/provia-knowledge-engine/pilot-corpus-sources.md och den delade dagboken på
 -- ~/Desktop/ExGen Sweden AB/dagbok.md för fullständig bakgrund.
 --
--- Denna fil REDIGERAR INTE 20260721_knowledge_engine_corpus_seed.sql i efterhand (historiska
--- migrationer skrivs inte om — samma princip som redan etablerad i detta repo, t.ex.
--- 20260719_fix_hp_mastery_race.sql som egen uppföljning istället för att ändra
--- 20260701_hp_fixes.sql). Ren datauppdatering, ingen DDL.
+-- Denna fil REDIGERAR INTE 20260721_knowledge_engine_corpus_seed.sql i efterhand.
+-- Historiska migrationer skrivs inte om; rättelser läggs som ny uppföljning.
+-- Ren datauppdatering, ingen DDL.
 --
 -- Resultat av granskningen: samtliga 20 chunks från Fas 3-seedningen godkända
 -- (review_status='approved'). 2 av dem (Avtalslagen 3 kap 33 § och 36 §) hade dessutom

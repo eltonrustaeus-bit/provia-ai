@@ -5,7 +5,7 @@
 
 ProviaAI (ProvKlarUF) is an AI-powered exam training platform for Swedish students.
 - Students paste study material → AI generates mock exams → AI grades answers with feedback
-- Dedicated Swedish driver's license theory module (körkortsprovet) with 350 curated questions
+- Current product focus: school study support for grundskola/gymnasium only
 - Deployed at: https://proviaai.se (Vercel)
 - Repo: https://github.com/eltonrustaeus-bit/provia-ai
 
@@ -34,16 +34,12 @@ Edit `.html`, `.js`, `.css` files directly and push.
 /                     ← static files served as-is by Vercel
   index.html          ← landing page
   app.html            ← core exam wizard (4 steps: material → generate → answer → grade)
-  korkortet.html      ← driving theory practice (350 questions, SRS, categories)
   förbättring.html    ← improvement coach + mistake bank (Premium feature)
   pricing.html        ← plans: Gratis / Basic / Premium
   admin.html          ← admin panel (admin role only)
   konto.html          ← user account settings
-  live-demo.html      ← animated demo for marketing
   style.css           ← global styles + design tokens
   shared.js           ← shared frontend utilities: getPageContext(), window.setPerContext()
-  korkortet-srs.js    ← SRS (spaced repetition) engine for driving theory module
-  final_questions.json ← 350 validated körkortsfrågor (primary source, loaded by korkortet.html)
 
 api/
   _auth.js            ← shared auth middleware (JWT verification)
@@ -62,12 +58,8 @@ api/
   delete-exams.js     ← delete user exams (ESM)
 
 scripts/
-  build_final_questions.js ← pipeline: merges question sources → final_questions.json
-  fix_questions.js    ← transforms question text + image descriptions
-  questions.json      ← source: 225 base questions
-  q_351_390.json      ← source: 40 questions with images
-  extra_questions.json ← source: 85 new questions (parkering, hastighet, etc.)
-  image_url_overrides.json ← sign code → Wikipedia SVG URL overrides
+  a11y-audit.mjs      ← accessibility sweep over active pages
+  test-emails.js      ← local email template smoke output
 ```
 
 ---
@@ -137,7 +129,6 @@ fetch('https://api.openai.com/v1/chat/completions', {
   - `profiles` — id (UUID), approved (bool), role (text), created_at
   - `user_exams` — id, user_id, created_at, exam_data (JSON), results (JSON)
   - `user_profiles` — extended user data
-  - `driving_questions` — original question table (fallback; primary source is now `final_questions.json`)
 - **Trigger** `handle_new_user`: auto-creates profile with `role = 'gratis'`, `approved = true`
 - **Auth**: Supabase JWT. Admin endpoints verify service role key.
 - **ALWAYS test RLS after any schema change.**
@@ -149,35 +140,6 @@ fetch('https://api.openai.com/v1/chat/completions', {
 | basic | 30 prov/mån |
 | premium | obegränsat |
 | admin | obegränsat |
-
----
-
-## Körkorts-modulen (korkortet.html)
-
-- Loads questions from `/final_questions.json` (primary) → Supabase fallback
-- 350 validated Swedish driving theory questions
-- Categories: Vägmärken (84), Trafikregler (87), Hastighet (36), Parkering (30), Alkohol (14), Säkerhet (17), Mörker (15), Väglag (15), Övrigt (52)
-- Question schema:
-  ```json
-  {
-    "id": 1,
-    "category": "Vägmärken",
-    "subcategory": "Väjning och stopp",
-    "question_type": "image | text | scenario",
-    "image_type": "varningsmärke | förbudsmärke | påbudsmärke | anvisningsmärke | vägmärke",
-    "question": "Du kör mot en korsning och ser detta märke. Vad gör du?",
-    "image_url": "https://upload.wikimedia.org/...",
-    "image_description": "Detaljerad beskrivning med hex-färger och VMF-referens",
-    "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...",
-    "correct": "B",
-    "explanation": "Rätt svar är B. [motivering]. Lagrum: TF 3 kap 17§.",
-    "law_reference": "TF 3 kap 17§",
-    "difficulty": "easy | normal | hard",
-    "commonly_failed": true
-  }
-  ```
-- SRS engine in `korkortet-srs.js` (SM-2 algorithm)
-- `commonly_failed: true` questions show "⚠ Vanligt svår" badge
 
 ---
 

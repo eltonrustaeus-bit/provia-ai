@@ -1000,43 +1000,8 @@
     <a href="integritetspolicy.html">Integritetspolicy</a>
     <span>·</span>
     <span>Studiestöd — ingen officiell betygssättning</span>
-    <!-- Genvägen till den interna demosidan. Låg tidigare i hjälten som en
-         tredje konkurrerande CTA och visades av ett skript som laddade hela
-         supabase-js UMD-bundeln från jsdelivr för att avgöra om den skulle
-         synas. Samma villkor, en fetch, och den står inte längre i vägen för
-         besökaren som ska börja. -->
-    <span id="demoSep" hidden>·</span>
-    <a id="demoBtnLink" href="live-demo.html" hidden>Se hur ExGen fungerar</a>
   </div>
 </footer>
-
-<script>
-/* Visar demolänken för den som har en roll. Läser sessionen ur samma
-   localStorage-nyckel som shared.js redan använder och frågar REST-API:et
-   direkt — ingen extra klientbundle. */
-(function(){
-  var link = document.getElementById("demoBtnLink");
-  if (!link) return;
-  var SB = "https://mnmotdluigzeehdjbhbu.supabase.co";
-  var KEY = "sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN";
-  var tok = null, uid = null;
-  try {
-    var raw = JSON.parse(localStorage.getItem("sb-mnmotdluigzeehdjbhbu-auth-token") || "{}");
-    tok = raw.access_token; uid = raw.user && raw.user.id;
-  } catch (_) {}
-  if (!tok || !uid) return;
-  fetch(SB + "/rest/v1/profiles?select=role&id=eq." + encodeURIComponent(uid),
-        { headers: { apikey: KEY, Authorization: "Bearer " + tok } })
-    .then(function(r){ return r.ok ? r.json() : []; })
-    .then(function(rows){
-      if (rows && rows[0] && rows[0].role) {
-        link.hidden = false;
-        document.getElementById("demoSep").hidden = false;
-      }
-    })
-    .catch(function(){});
-})();
-</script>
 
 
 

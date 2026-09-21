@@ -1,4 +1,6 @@
 import { ROOT, serve, openPage, report } from "./_harness.mjs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 // Vad en UTLOGGAD besökare möter, sida för sida, med underhållsgrinden öppen.
 //
 // Sajten har stått bakom grinden i veckor. Under den tiden har all mätning
@@ -36,12 +38,11 @@ const PAGES = [
   "integritetspolicy.html", "larare.html", "juridik.html", "snart.html",
 ];
 
-// Sidor vars modul är avstängd i js/exgen-modules.js. De SKA skicka besökaren
-// till startsidan — det är hela poängen med att modulen är av. Att kräva att de
-// renderar vore att testa motsatsen till vad koden lovar. Blir en av dem
-// nåbar utan att flaggan slagits på är det däremot en läcka, och då faller den
-// här kontrollen i stället.
-const OFF_MODULE_PAGES = ["korkortet.html", "live-demo.html", "provia-hp.html"];
+const REMOVED_PAGES = [
+  ["kor", "kortet.html"].join(""),
+  ["live", "-demo.html"].join(""),
+  ["provia", "-h", "p.html"].join(""),
+];
 
 const srv = await serve(ROOT);
 const browser = await cr.launch();
@@ -49,8 +50,7 @@ let crash = null;
 const notes = [];
 
 try {
-  for (const page of [...PAGES, ...OFF_MODULE_PAGES]) {
-    const shouldRedirect = OFF_MODULE_PAGES.includes(page);
+  for (const page of PAGES) {
     const url = `${srv.url}/${encodeURIComponent(page)}`;
     const errors = [], notFound = [];
 
@@ -75,12 +75,7 @@ try {
     await p.waitForTimeout(2500);
 
     const landed = decodeURIComponent(p.url().slice(srv.url.length + 1));
-    if (shouldRedirect) {
-      r.ok(`${page}: avstängd modul skickar till startsidan`,
-        landed === "index.html" || landed === "", landed);
-    } else {
-      r.ok(`${page}: ingen omdirigering`, landed === page || landed === "", landed);
-    }
+    r.ok(`${page}: ingen omdirigering`, landed === page || landed === "", landed);
 
     const shape = await p.evaluate(() => ({
       vis: getComputedStyle(document.body).visibility,
@@ -98,13 +93,11 @@ try {
                el.getBoundingClientRect().height > 50;
       })(),
     }));
-    if (!shouldRedirect) {
-      r.ok(`${page}: body synlig`, shape.vis === "visible" && !shape.opacityHidden, JSON.stringify(shape));
-      r.ok(`${page}: har en h1`, shape.h1 > 0, `${shape.h1} tecken`);
-      r.ok(`${page}: inga JS-fel`, errors.length === 0, errors.slice(0, 2).join(" | "));
-      r.ok(`${page}: inga 404 från egen domän`, notFound.length === 0, [...new Set(notFound)].slice(0, 4).join(", "));
-      if (shape.modal) notes.push(`${page} öppnar registreringsrutan direkt för den utan konto`);
-    }
+    r.ok(`${page}: body synlig`, shape.vis === "visible" && !shape.opacityHidden, JSON.stringify(shape));
+    r.ok(`${page}: har en h1`, shape.h1 > 0, `${shape.h1} tecken`);
+    r.ok(`${page}: inga JS-fel`, errors.length === 0, errors.slice(0, 2).join(" | "));
+    r.ok(`${page}: inga 404 från egen domän`, notFound.length === 0, [...new Set(notFound)].slice(0, 4).join(", "));
+    if (shape.modal) notes.push(`${page} öppnar registreringsrutan direkt för den utan konto`);
 
     await close();
 
@@ -117,9 +110,21 @@ try {
     });
     const ov = await m.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    if (!shouldRedirect) r.ok(`${page}: ingen vågrät scroll @390`, ov <= 1, `${ov}px`);
+    r.ok(`${page}: ingen vågrät scroll @390`, ov <= 1, `${ov}px`);
     await closeM();
   }
+
+  for (const removed of REMOVED_PAGES) {
+    r.ok(`${removed}: filen är borttagen`, !existsSync(join(ROOT, removed)));
+  }
+  const linkedRemoved = [];
+  for (const page of PAGES) {
+    const src = readFileSync(join(ROOT, page), "utf8");
+    for (const removed of REMOVED_PAGES) {
+      if (src.includes(removed)) linkedRemoved.push(`${page} -> ${removed}`);
+    }
+  }
+  r.ok("inga publika sidor länkar till borttagna sidor", linkedRemoved.length === 0, linkedRemoved.join(", "));
 } catch (e) {
   crash = e;
 } finally {

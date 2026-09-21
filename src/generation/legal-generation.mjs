@@ -8,12 +8,12 @@
 // EN fråga per anrop (generateVerifiedQuestion) — batching (flera frågor/anrop) är en framtida
 // optimering, inte en Fas 5-nödvändighet (ADR 0003: synkront per request räcker för pilotens volym).
 //
-// Säkerhetsegenskap (§25.1/§25.2), bevisad i api/hp.js:s verifyVerbal() och kopierad rakt av:
+// Säkerhetsegenskap (§25.1/§25.2):
 // - legal-verifier-blind FÅR ALDRIG generatorns facit — löser frågan självständigt.
 // - Om generatorns facit matchar den blinda lösningen avgörs för multiple_choice DETERMINISTISKT
-//   i JS (computeGeneratorAnswerMatches() nedan, normalize+jämför option-ID:n) — samma princip
-//   som hp.js:s `res[i].index === q.correct_index`. För short_answer är exakt strängmatchning
-//   meningslös (två sakligt likvärdiga fritextsvar är nästan aldrig identiska strängar), så där
+//   i JS (computeGeneratorAnswerMatches() nedan, normalize+jämför option-ID:n). För short_answer
+//   är exakt strängmatchning meningslös (två sakligt likvärdiga fritextsvar är nästan aldrig
+//   identiska strängar), så där
 //   används istället compare-stegets modell-bedömda `semantic_equivalent_to_generator` (Fas 8.2
 //   -kalibrering — se computeGeneratorAnswerMatches()). Den bedömningen görs av samma modell som
 //   redan ser facit i compare-steget, inte av blind-steget — §25.1 gäller fortfarande blind-steget.
@@ -107,7 +107,7 @@ async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyM
       latency_ms: latencyMs ?? 0,
     });
   } catch {
-    /* usage-loggning får aldrig blockera pipelinen (samma fail-open-princip som hp.js) */
+    /* usage-loggning får aldrig blockera elevflödet */
   }
 }
 

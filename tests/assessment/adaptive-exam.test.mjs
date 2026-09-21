@@ -65,8 +65,7 @@ check("högst fyra svaga begrepp", (() => {
 })());
 
 console.log("\n— INGEN FILTERBUBBLA —");
-/* Andelen är samma storleksordning som körkortsmodulens 40%. Ett prov helt
-   byggt på svagheter mäter inte om det eleven kan sitter kvar. */
+/* Ett prov helt byggt på svagheter mäter inte om det eleven kan sitter kvar. */
 check("högst 40% av frågorna riktas", focus({ x: rad(10, 5, "X") }, 10).maxFocusQuestions === 4);
 check("andelen håller även på ett stort prov", focus({ x: rad(10, 5, "X") }, 20).maxFocusQuestions === 8);
 check("MAX_WEAK_SHARE är 0.4", ae.MAX_WEAK_SHARE === 0.4);

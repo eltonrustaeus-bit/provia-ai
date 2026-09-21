@@ -236,8 +236,8 @@
     if (!m) return 'ser: den här sidan';
     var parts = [];
     if (m.focus && m.focus.text && typeof m.focus.number === 'number') {
-      /* körkortet.html skickar number men aldrig of — "fråga 5" är fortfarande
-         sant utan "av 65", till skillnad från att tyst falla tillbaka på
+      /* Vissa provflöden skickar number men aldrig of — "fråga 5" är fortfarande
+         sant utan "av 12", till skillnad från att tyst falla tillbaka på
          "den här sidan" som om P.E.R inte visste vilken fråga det gällde.
 
          text krävs här också: servern (cleanQuestion i _per-context.js)
@@ -249,7 +249,7 @@
         ? 'fråga ' + m.focus.number + ' av ' + m.focus.of
         : 'fråga ' + m.focus.number);
     } else if (m.focus && m.focus.text) {
-      /* js/hp-app.js skickar varken number eller of, bara text. Frågetexten
+      /* Vissa frågeflöden skickar varken number eller of, bara text. Frågetexten
          skrivs aldrig ut rakt av här — den kan vara lång och bubblan är smal
          — men raden får inte heller ljuga "den här sidan" när P.E.R faktiskt
          har en fråga i handen. */
@@ -273,9 +273,7 @@
     try {
       var path = window.location.pathname.toLowerCase();
       var page = 'app';
-      if (path.includes('provia-hp')) page = 'högskoleprovet';
-      else if (path.includes('korkortet')) page = 'körkortsteorin';
-      else if (path.includes('rb') || path.includes('rbattring') || path.includes('forbattring') || path.includes('förbättring')) page = 'förbättring';
+      if (path.includes('rb') || path.includes('rbattring') || path.includes('forbattring') || path.includes('förbättring')) page = 'förbättring';
       else if (path.includes('pricing')) page = 'prisplan';
       else if (path === '/' || path.includes('index')) page = 'startsida';
 
@@ -376,18 +374,6 @@
     try {
       var path = window.location.pathname.toLowerCase();
       var pc = window._perPageContext;
-      if (path.includes('provia-hp')) {
-        if (pc && pc.currentQuestion && pc.currentQuestion.text) {
-          return 'Fastnat på uppgiften? Fråga varför — eller be om en ledtråd.';
-        }
-        return 'Tränar högskoleprovet? Fråga om ord, läsförståelse eller matte — jag förklarar metoden.';
-      }
-      if (path.includes('korkortet')) {
-        if (pc && pc.currentQuestion && pc.currentQuestion.text) {
-          return 'Kör fast på den här? Fråga på.';
-        }
-        return 'Tränar körkortet? Fråga om regler, skyltar, korsningar — vad som helst.';
-      }
       if (path.includes('förbättring') || path.includes('forbattring') || path.includes('rbattring')) {
         return 'Vill du gå igenom dina misstag? Jag kan förklara vad som hände.';
       }
@@ -509,7 +495,7 @@
 
     function addAnswerCTA(div) {
       var btn = document.createElement('a');
-      btn.href = 'korkortet.html';
+      btn.href = 'app.html';
       btn.className = 'per-answer-cta';
       btn.textContent = 'Skapa gratis konto — inget kort krävs →';
       div.appendChild(btn);
@@ -581,7 +567,7 @@
       try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
       var now = Date.now();
       var lastWeek = hist.filter(function(e) { return e.ts && (now - Number(e.ts)) < 7 * 86400000; });
-      if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med körkortsträningen. Vad vill du fokusera på?';
+      if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med skolarbetet. Vad vill du fokusera på?';
       var avg = Math.round(lastWeek.reduce(function(s, e) { return s + (Number(e.percent) || 0); }, 0) / lastWeek.length);
       var cf = {};
       lastWeek.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
@@ -730,11 +716,9 @@
 
     var _perNavLabels = {
       'pricing.html': 'Se alla priser →',
-      'korkortet.html': 'Starta körkortsteorin →',
       'app.html': 'Prova Mockprov →',
       'förbättring.html': 'Öppna AI-coachen →',
-      'konto.html': 'Hantera konto →',
-      'live-demo.html': 'Se live-demo →'
+      'konto.html': 'Hantera konto →'
     };
 
     /* Markörerna P.E.R får skriva. Båda tas bort ur den synliga texten och
@@ -751,13 +735,13 @@
      * renderade texten. En elev som kopierar ett uttryck vill ha något de kan
      * klistra in, inte lösryckta tecken ur en formel.
      *
-     * js/hp-math.js laddar KaTeX först när texten faktiskt innehåller
+     * js/math-render.js laddar KaTeX först när texten faktiskt innehåller
      * matematik. Går den inte att hämta står källan kvar, vilket är läsbart. */
     var _perMathMod = null;
     function renderPerMath(node) {
       if (!node) return;
       try {
-        if (!_perMathMod) _perMathMod = import('/js/hp-math.js');
+        if (!_perMathMod) _perMathMod = import('/js/math-render.js');
         _perMathMod
           .then(function (m) { return m && m.renderMath ? m.renderMath(node) : null; })
           .catch(function () {});
@@ -1261,8 +1245,7 @@ function finalizeMsg(div, text) {
            Free-floating accent text uses --per-accent-text (--exgen-info-text,
            #0369A1, 5.67:1 on --exgen-bg-secondary) instead of raw teal
            (2.39:1, fails AA as text). Every var() carries a literal fallback
-           for pages that don't load exgen-tokens.css (integritetspolicy.html,
-           provia-hp.html). The #perWidget rule further down re-asserts these
+           for pages that don't load exgen-tokens.css. The #perWidget rule further down re-asserts these
            tokens unconditionally so exgen-tokens.css's own OS-level
            prefers-color-scheme:dark block can never leak in. */
         '#perWidget{position:fixed;bottom:22px;right:22px;z-index:9999;font-family:"DM Sans",sans-serif}',
@@ -1392,13 +1375,12 @@ function finalizeMsg(div, text) {
             '<div><div class="per-nm">P.E.R</div><div class="per-rl">EXGENS AI</div></div>' +
             '<div class="per-hdr-btns">' +
               '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
-              '<button class="per-clr" id="perReadyBtn" title="Din körkortsredo-score"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></button>' +
               '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
               '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
               '<button class="per-clr" id="perClearBtn" title="Rensa konversation"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
             '</div>' +
           '</div>' +
-          '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="korkortet.html">Skapa gratis konto →</a></div>' +
+          '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="app.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
             '<div class="per-msg teacher">Vad kan jag hjälpa dig med?</div>' +
           '</div>' +
@@ -1492,48 +1474,8 @@ function finalizeMsg(div, text) {
         var pc = window._perPageContext;
         var topic = (pc && pc.currentQuestion && pc.currentQuestion.category)
           ? pc.currentQuestion.category
-          : (pc && pc.page ? pc.page : 'körkortsteorin');
-        send('Quizza mig — välj en körkortsteorifråga om ' + topic + ' och ställ den till mig. Vänta på mitt svar innan du förklarar.');
-      };
-
-      /* ── READINESS SCORE ── */
-      document.getElementById('perReadyBtn').onclick = async function () {
-        if (!_open) toggle();
-        var scores = [];
-        var weakAreas = [];
-        try {
-          var lsHist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
-          scores = lsHist.slice(-20).map(function(e) { return (Number(e.percent) || 0) / 100; }).filter(function(s) { return Number.isFinite(s); });
-          var cf = {};
-          lsHist.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
-          weakAreas = Object.keys(cf).sort(function(a,b) { return cf[b]-cf[a]; }).slice(0,5);
-        } catch (_) {}
-        if (scores.length < 3) {
-          addMsg('Kör minst 3 prov för att se din redo-score.', 'teacher');
-          return;
-        }
-        var typing = addMsg('Analyserar din beredskap…', 'teacher typing');
-        try {
-          var tok = await getToken();
-          var r = await fetch('/api/explain', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-            body: JSON.stringify({ scores: scores, weakAreas: weakAreas, examsCount: scores.length })
-          });
-          var d = await r.json();
-          if (typing) {
-            typing.className = 'per-msg teacher';
-            if (r.ok && d.assessment) {
-              typing.textContent = '📊 Redo-score: ' + d.readiness + '% (' + (d.trend === 'improving' ? '↑ förbättras' : d.trend === 'declining' ? '↓ försämras' : '→ stabil') + ')\n\n' + d.assessment;
-            } else {
-              typing.textContent = d.error || 'Kunde inte hämta score.';
-            }
-          }
-        } catch (_) {
-          if (typing) { typing.className = 'per-msg teacher'; typing.textContent = 'Nätverksfel — försök igen.'; }
-        }
-        var msgs = document.getElementById('perMessages');
-        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+          : (pc && pc.page ? pc.page : 'skolmaterialet');
+        send('Quizza mig på ' + topic + ' utifrån mitt skolmaterial. Ställ en fråga och vänta på mitt svar innan du förklarar.');
       };
 
       /* Shared state for listening animation */
@@ -1665,7 +1607,7 @@ function finalizeMsg(div, text) {
                 if (introDiv) {
                   introDiv.className = 'per-msg teacher';
                   introDiv.innerHTML = '';
-                  var introText = 'Hallå! Jag är P.E.R. Jag svarar på allt om ExGen — vad det är, varför det slår ChatGPT för körkortstudier, och vad det kostar. Fråga på!';
+                  var introText = 'Hallå! Jag är P.E.R. Jag svarar på allt om ExGen — vad det är, hur det hjälper dig plugga smartare och vad det kostar. Fråga på!';
                   typewriterMsg(introDiv, introText, 14);
                   setTimeout(function() {
                     addQuickReplies(['Vad är ExGen?', 'Varför inte ChatGPT?', 'Vad kostar det?']);
@@ -1724,7 +1666,6 @@ function finalizeMsg(div, text) {
     // en dold-men-närvarande post skulle fortfarande gå att nå med tangentbordsnavigering.
     var links = [
       { href:'index.html',       icon:'🏠', label:'Hem' },
-      { href:'korkortet.html',   icon:'🚗', label:'Körkort', module:'korkort' },
       { href:'app.html',         icon:'📝', label:'Mockprov' },
       { href:'förbättring.html', icon:'📈', label:'Utveckling' },
       { href:'konto.html',       icon:'👤', label:'Konto' }
@@ -2054,9 +1995,8 @@ function finalizeMsg(div, text) {
     /* Google's four-colour mark, inlined. A remote <img> would be one more
        request in front of the login box and would break behind a school
        network that blocks Google's CDN but not the sign-in itself. */
-    /* data-module="google" hands visibility to js/exgen-modules.js, the same
-       switch that hides körkortsteorin and HP. The button and its divider stay
-       out of the DOM's painted output until that flag is turned on, which
+    /* data-module="google" hands visibility to js/exgen-modules.js. The button
+       and its divider stay out of the DOM's painted output until that flag is turned on, which
        happens the day the Google provider is enabled in Supabase. */
     function googleBtn(id) {
       return '<button class="pv-go" id="' + id + '" type="button" data-module="google">'
@@ -2230,8 +2170,8 @@ function finalizeMsg(div, text) {
       });
     }
 
-    // After successful auth: go to PROVIA_AUTH_REDIRECT if a page set one
-    // (e.g. landing → korkortet), otherwise reload so the page's gate re-runs.
+    // After successful auth: go to PROVIA_AUTH_REDIRECT if a page set one,
+    // otherwise reload so the page's gate re-runs.
     function pvAfterAuth() {
       var r = window.PROVIA_AUTH_REDIRECT;
       if (r) { location.href = r; } else { location.reload(); }
@@ -2247,8 +2187,7 @@ function finalizeMsg(div, text) {
       if (pass.length < 8) { errEl.textContent = 'Lösenordet måste vara minst 8 tecken.'; return; }
       btn.disabled = true; btn.textContent = 'Skapar konto…';
       /* Registration goes through /api/signup, not Supabase's /auth/v1/signup
-         directly. That endpoint is what the in-page forms in app.html,
-         förbättring.html and korkortet.html already use, and it is the only
+         directly. That endpoint is what the in-page forms already use, and it is the only
          path that confirms the address, sends the welcome mail and notifies
          the admin. Calling Supabase raw from here meant a user who signed up
          from the landing page silently got none of that. */
@@ -2267,7 +2206,7 @@ function finalizeMsg(div, text) {
           saveSession(d.session); closeModal();
           /* Hand the welcome animation to the destination page instead of
              playing it here and then throwing it away in the navigation —
-             same pattern korkortet.html already uses. Saves 2.6s of dead wait. */
+             the same welcome flow uses. Saves 2.6s of dead wait. */
           if (window.triggerWelcome) window.triggerWelcome(email, isNew);
           pvAfterAuth();
         } else {

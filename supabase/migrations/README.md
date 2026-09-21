@@ -22,14 +22,12 @@ bort `per_assessment` och `per_coach`.
 
 ## Läget efter genomgången 2026-08-07
 
-**Ingen migration i repot är oapplicerad.** Fyra filer saknades i ledgern trots att de körts;
-det verifierades mot schemat i stället för mot ledgern:
+**Ingen skolrelaterad migration i repot är oapplicerad.** Filer kan saknas i ledgern trots att
+de körts; när det händer verifieras effekten mot schemat i stället för mot ledgern:
 
 | Fil | Bevis på att den är körd |
 |---|---|
 | `20260603_add_mock_exam_quota` | `profiles.mock_quota_count` + `mock_quota_period` finns, `consume_mock_exam_quota()` finns |
-| `20260701_hp_fixes` | registrerad som `hp_fixes_20260701` — bara ett annat namn |
-| `20260705_hp_v2` | registrerad som `hp_v2_lexicon_validation_trgm` — bara ett annat namn |
 | `20260724_knowledge_engine_corpus_correction` | 20 av 20 chunks har `review_status='approved'`, och båda de innehållskorrigerade är `lagtext_verbatim` med `verbatim_confirmed: true` |
 
 **Två migrationer var körda utan fil i repot.** Båda är tillagda nu:
@@ -47,8 +45,8 @@ det verifierades mot schemat i stället för mot ledgern:
 
 ```
 add_stripe_columns_to_profiles          create_per_sessions
-add_korkortet_quota_and_stripe_columns  create_per_long_memory
-create_driving_progress                 add_image_workflow_columns
+legacy_quota_and_stripe_columns         create_per_long_memory
+legacy_progress_tables                  add_image_workflow_columns
 create_mock_results                     atomic_quota_and_anon_rate_limit
 revoke_quota_rpc_from_public
 ```
@@ -62,7 +60,7 @@ handskrivna migrationer.
 ## Konvention
 
 - Filnamn: `ÅÅÅÅMMDD_snake_case.sql`
-- Varje migration har en `_ROLLBACK.sql` bredvid sig. Undantagen är fem migrationer från innan
+- Varje migration har en `_ROLLBACK.sql` bredvid sig. Undantagen är tre migrationer från innan
   konventionen infördes; de står uppräknade i `scripts/check-migration-files.mjs` och listan
   ska aldrig växa.
 - Historiska migrationer skrivs inte om. En rättelse blir en ny fil.

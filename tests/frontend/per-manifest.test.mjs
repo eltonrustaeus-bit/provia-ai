@@ -122,48 +122,45 @@ const t10 = await page.evaluate(() => {
 ok("T10a dold i vila", t10.opacity === "0", t10.opacity);
 ok("T10b fångar inte klick", t10.events === "none", t10.events);
 
-// ── T11: körkortsformen — number utan of ligger inte längre om "den här sidan" ──
-// korkortet.html skickar { currentQuestion: { number, text, … } } utan `of`.
+// ── T11: frågenummer utan of ligger inte längre om "den här sidan" ────────
+// Vissa provflöden skickar { currentQuestion: { number, text, … } } utan `of`.
 // Före fixen krävde raden BÅDA number och of, så den här formen visade
 // "ser: den här sidan" trots att P.E.R hade frågan.
 const t11 = await page.evaluate(() => {
   window.PER.describe({
-    page: "körkortsteorin",
-    focus: { number: 5, text: "Vad gäller vid ett övergångsställe utan trafiksignal?", category: "Trafikregler" },
-    state: { answered: 4, remaining: 60 }
+    page: "prov",
+    focus: { number: 5, text: "Vad innebär fotosyntes?", category: "Biologi" },
+    state: { answered: 4, remaining: 6 }
   });
   return document.getElementById("perSees")?.textContent;
 });
 ok("T11 raden visar frågenumret utan \"av\"", t11 === "ser: fråga 5", String(t11));
 
-// ── T12: hp-formen — bara text, varken number eller of ────────────────────
-// js/hp-app.js skickar { currentQuestion: { text, delprov, node, … } } utan
-// number/of alls. Raden ska säga något ärligt och kort, aldrig frågetexten
-// rakt av (för lång, bubblan är smal) och aldrig "den här sidan" (P.E.R har
-// faktiskt frågan).
+// ── T12: bara text, varken number eller of ────────────────────────────────
+// Vissa frågeflöden skickar { currentQuestion: { text, … } } utan number/of.
+// Raden ska säga något ärligt och kort, aldrig frågetexten rakt av (för lång,
+// bubblan är smal) och aldrig "den här sidan" (P.E.R har faktiskt frågan).
 const t12 = await page.evaluate(() => {
   window.PER.describe({
-    page: "högskoleprovet",
-    focus: { text: "Vilket ord passar bäst i meningen: Hon kände sig alldeles ___.", delprov: "ORD" }
+    page: "prov",
+    focus: { text: "Förklara skillnaden mellan rörliga och fasta kostnader.", course: "Företagsekonomi" }
   });
   return document.getElementById("perSees")?.textContent;
 });
 ok("T12a raden är ärlig utan siffra", t12 === "ser: en fråga", String(t12));
-ok("T12b raden skriver aldrig ut frågetexten", !/Vilket ord passar/.test(t12 || ""), String(t12));
+ok("T12b raden skriver aldrig ut frågetexten", !/rörliga och fasta/.test(t12 || ""), String(t12));
 
 // ── T13: focus.number utan text ljuger inte uppåt (Fynd E) ────────────────
 // Servern (cleanQuestion i api/_per-context.js) släpper fokus helt om text
 // saknas — oavsett number, options, category eller answer. Utan samma krav
 // här kunde klienten påstå "ser: fråga 5" om ett focus-objekt som servern
 // redan behandlar som "ingen fråga alls": raden och det som faktiskt skickas
-// till modellen skulle säga olika saker. Inte nåbart från körkortet.html
-// eller js/hp-app.js idag (båda skickar alltid text) — men en latent kant
-// som specens feltabell redan sanktionerar "ser: den här sidan" för.
+// till modellen skulle säga olika saker.
 const t13 = await page.evaluate(() => {
   window.PER.describe({
-    page: "körkortsteorin",
+    page: "prov",
     focus: { number: 5 },
-    state: { answered: 4, remaining: 60 }
+    state: { answered: 4, remaining: 6 }
   });
   return document.getElementById("perSees")?.textContent;
 });

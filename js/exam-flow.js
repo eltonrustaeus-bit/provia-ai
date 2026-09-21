@@ -137,7 +137,7 @@
 
   /* Matematikrendering.
    *
-   * js/hp-math.js laddar KaTeX först när en text faktiskt innehåller
+   * js/math-render.js laddar KaTeX först när en text faktiskt innehåller
    * matematik, så en ren samhällskunskapsfråga betalar ingenting. Den filen
    * är ESM och den här är ett klassiskt skript — därför dynamisk import med
    * absolut sökväg (relativ skulle lösas mot dokumentets bas, inte skriptets).
@@ -146,13 +146,13 @@
    * källan kvar, vilket är läsbart. Ett prov får aldrig falla för att ett
    * CDN är nere.
    *
-   * Fanns tidigare bara i Högskoleprovet. En elev som fick $\frac{x}{2}$ i ett
-   * vanligt prov såg den råa strängen. */
+   * Utan detta såg en elev som fick $\frac{x}{2}$ i ett vanligt prov den råa
+   * strängen i stället för läsbar matematik. */
   var _mathMod = null;
   function renderMathIn(node) {
     if (!node) return;
     try {
-      if (!_mathMod) _mathMod = import("/js/hp-math.js");
+      if (!_mathMod) _mathMod = import("/js/math-render.js");
       _mathMod
         .then(function (m) { return m && m.renderMath ? m.renderMath(node) : null; })
         .catch(function () {});

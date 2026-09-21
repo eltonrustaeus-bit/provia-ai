@@ -26,8 +26,6 @@ const UTAN_ROLLBACK_AV_HISTORISKA_SKAL = new Set([
   "20260603_add_mock_exam_quota",
   "20260620_per_structured_memory",
   "20260627_teacher_dashboard",
-  "20260630_hp_schema",
-  "20260701_hp_fixes",
 ]);
 
 const NAMNMONSTER = /^\d{8}_[a-z0-9_]+$/;
@@ -59,11 +57,9 @@ for (const namn of rollbacks) {
   if (!migrationsSet.has(namn)) klagomal(`${namn}_ROLLBACK.sql saknar sin ${namn}.sql`);
 }
 
-// Ingen kontroll av att datumprefixen är unika. Det prövades och slog mot
-// 20260719_fix_hp_mastery_race och 20260719_stripe_webhook_idempotency, som skrevs samma dag
-// och är oberoende av varandra — den ena rör hp_mastery, den andra skapar en egen tabell.
-// Att det är oberoende går inte att avgöra ur filnamnen, och att döpa om redan körda
-// migrationer för att blidka en kontroll är sämre än att låta bli.
+// Ingen kontroll av att datumprefixen är unika. Flera oberoende migrationer kan
+// behöva skapas samma dag, och att döpa om redan körda migrationer för att
+// blidka en kontroll är sämre än att låta bli.
 
 // Namn som står kvar i undantagslistan men vars fil är borta betyder att listan har
 // ruttnat. Den ska krympa när gamla migrationer städas, aldrig växa av sig själv.

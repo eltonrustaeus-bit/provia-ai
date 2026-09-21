@@ -1,6 +1,6 @@
 // scripts/knowledge-retrieval-smoke.mjs — manuell smoke-test: kör ett urval av gold-set-frågor
 // genom retrieveChunks() mot skarp databas och kollar om rätt chunk hamnar högst upp.
-// Samma .env.local-laddningsmönster som scripts/hp-quality.mjs.
+// Laddar .env.local utan att skriva ut hemligheter.
 //   node scripts/knowledge-retrieval-smoke.mjs
 
 import { readFileSync } from "node:fs";

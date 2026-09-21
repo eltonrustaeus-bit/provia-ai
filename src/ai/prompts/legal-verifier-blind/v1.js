@@ -1,7 +1,6 @@
 // legal-verifier-blind v1 — uppdragets §25.1: verifieraren löser frågan SJÄLV innan den ser
 // generatorns facit. Får ALDRIG ta emot correct_answer/explanation/source_chunk_ids i denna
-// prompt — bara {question, options, sourceChunks, level, concept, subjectLabel}, exakt samma
-// princip som api/hp.js:s verifyVerbal() (bekräftad korrekt i Fas 1, se 10-open-questions.md #6).
+// prompt — bara {question, options, sourceChunks, level, concept, subjectLabel}.
 // Jämförelsen mot generatorns facit sker i JS-kod i src/generation/legal-generation.mjs, INTE här
 // och INTE av modellen. Ämnesgeneraliserad — se legal-generator/v1.js:s filhuvud för resonemanget.
 

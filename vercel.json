@@ -27,9 +27,6 @@
     "api/explain.js": {
       "maxDuration": 60,
       "includeFiles": "config/**"
-    },
-    "api/hp.js": {
-      "maxDuration": 60
     }
   }
 }

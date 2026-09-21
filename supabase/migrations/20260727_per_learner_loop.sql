@@ -20,8 +20,8 @@
 -- Codex-granskning 2026-07-27 (CR-PER-001, ACCEPTERAD): exam_questions.payload innehåller
 -- correct_answer + explanation (src/generation/legal-generation.mjs:309), och policyn
 -- exam_questions_select_own gav eleven direkt PostgREST-läsning av alla frågor i sin egen
--- blueprint — alltså facit till frågor eleven ännu inte besvarat. Det är exakt samma klass av
--- läcka som redan stängdes för hp_questions (20260701_hp_fixes.sql §1).
+-- blueprint — alltså facit till frågor eleven ännu inte besvarat. Klienten ska aldrig kunna
+-- läsa facit direkt från tabellen; servern skickar bara den projektion eleven ska se.
 --
 -- Verifierat före borttagning: ingen HTML/JS-yta i repot läser exam_questions direkt (grep över
 -- samtliga *.html/*.js). Servern (service_role) bypassar RLS och påverkas inte. Elevens frågor
@@ -216,20 +216,19 @@ alter table public.ai_usage_events add constraint ai_usage_events_pipeline_step_
 -- ── apply_legal_mastery() ───────────────────────────────────────────────────
 -- Atomisk uppdatering av en elevs mastery för ETT koncept.
 --
--- Codex CR-PER-003 (ACCEPTERAD): apply_hp_mastery:s `for update` låser INGENTING när raden inte
--- finns än — två samtidiga förstasvar läser båda "not found" och den ena uppdateringen tappas.
+-- Codex CR-PER-003 (ACCEPTERAD): radlås med `for update` låser ingenting när raden inte finns än.
+-- Två samtidiga förstasvar skulle annars kunna läsa "not found" och tappa den ena uppdateringen.
 -- Löses här med ett transaktionsbundet advisory lock på (user_id, concept_id), som fungerar även
--- för rader som inte finns. (Samma brist finns kvar i apply_hp_mastery; HP rörs inte i detta
--- arbete — noterad i docs/per/CODEX_REVIEW.md som separat uppföljning.)
+-- för rader som inte finns.
 --
--- Övriga skillnader mot apply_hp_mastery, alla avsiktliga:
+-- Avsiktliga modellval:
 --   • p_score är 0–1 i stället för boolean: short_answer kan ge delpoäng, och Elo-uppdateringen
 --     ska då röra sig delvis, inte som om svaret vore helt rätt eller helt fel.
 --   • p_confidence spårar bedömningens kvalitet (löpande medel i evidence_quality).
 --   • correct_attempts/last_result/last_practiced_at underhålls för rekommendationsmotorn.
 --
 -- Elo: expected = 1/(1+10^((difficulty*100 − mastery)/40)), K=24 medan attempts<10 annars 12.
--- Identiska konstanter som HP — samma 0–100-skala, samma inlärningstakt, en konvention i produkten.
+-- 0–100-skalan gör mastery begriplig och lätt att visa i elevens utveckling.
 -- p_attempt_id ger EXAKT-EN-GÅNG-semantik (Codex CR-PER-025). Att uppdatera mastery och sedan
 -- markera försöket i två separata anrop räcker inte: kraschar processen däremellan står flaggan
 -- kvar på false och nästa retry räknar samma svar en gång till. Här sker båda i SAMMA transaktion

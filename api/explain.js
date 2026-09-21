@@ -2,7 +2,6 @@
 import { requireAuth } from "./_auth.js";
 import { callAI, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
-import { MODULES } from "./_modules.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
 import { decideSalesMode, buildSalesGuardrail, SALES_MODE } from "./_per-sales.js";
@@ -21,7 +20,7 @@ import { saveInferred } from "./_learner-profile.js";
 import { helpCapFor, defaultHelpLevel } from "./_per-help.js";
 import perLegalPrompt, { sanitizeLegalQuestion } from "../src/ai/prompts/per-legal/v1.js";
 
-import { perRole, PER_FULL } from "./_per-name.js";
+import { PER_FULL } from "./_per-name.js";
 import { cacheEnabled, lookupCached, storeAnswer } from "./_per-cache.js";
 const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
 const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
@@ -392,15 +391,7 @@ export default async function handler(req, res) {
     const stdDev = Math.sqrt(rawScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rawScores.length);
     const readiness = Math.round(clamp(avgRecent + (trend === 'improving' ? 0.04 : trend === 'declining' ? -0.04 : 0) + (stdDev > 0.15 ? -0.03 : 0), 0, 1) * 100);
     const trendSv = trend === 'improving' ? 'förbättras' : trend === 'declining' ? 'försämras' : 'stabil';
-    // Beredskapsanalysen är ren statistik och fungerar för vilken provserie som helst.
-    // Bara inramningen var körkortsspecifik — och grenen nås av vilken inloggad klient som
-    // helst som postar `scores`, alltså även när körkortsmodulen är avstängd. Rutten stängs
-    // inte (knappen som anropar den ligger i shared.js och är inte modulgatead), men P.E.R
-    // slutar tala om teoriprov när modulen är av.
-    const roleLine = MODULES.korkort
-      ? `${perRole("körkortscoach")}. Bedöm elevens körkortsförberedelse.`
-      : `${PER_FULL}. Bedöm elevens provberedskap utifrån resultatserien.`;
-    const prompt = `${roleLine}\n\nDATA:\n- Snitt senaste 5 proven: ${Math.round(avgRecent*100)}%\n- Snitt alla ${examsCount} prov: ${Math.round(avgAll*100)}%\n- Trend: ${trendSv}\n- Beräknad beredskap: ${readiness}%\n- Svaga ämnen: ${rawAreas.length ? rawAreas.join(', ') : 'inga identifierade'}\n- Variation: ${stdDev > 0.15 ? 'hög (ojämnt)' : stdDev > 0.08 ? 'måttlig' : 'låg (konsekvent)'}\n\n${MODULES.korkort ? 'Körkortsprovet kräver 52/65 rätt (80%).' : 'Godkänd nivå räknas som 80%.'} Max 100 ord. Ge: omdöme (redo/nästan redo/inte redo), viktigaste åtgärd, kort motivation. Svenska.`;
+    const prompt = `${PER_FULL}. Bedöm elevens provberedskap utifrån resultatserien.\n\nDATA:\n- Snitt senaste 5 proven: ${Math.round(avgRecent*100)}%\n- Snitt alla ${examsCount} prov: ${Math.round(avgAll*100)}%\n- Trend: ${trendSv}\n- Beräknad beredskap: ${readiness}%\n- Svaga ämnen: ${rawAreas.length ? rawAreas.join(', ') : 'inga identifierade'}\n- Variation: ${stdDev > 0.15 ? 'hög (ojämnt)' : stdDev > 0.08 ? 'måttlig' : 'låg (konsekvent)'}\n\nGodkänd nivå räknas som 80%. Max 100 ord. Ge: omdöme (redo/nästan redo/inte redo), viktigaste åtgärd, kort motivation. Svenska.`;
     try {
       const assessment = await callAI([{ role: 'user', content: prompt }], { timeout: 20_000 });
       if (!assessment) return res.status(502).json({ error: 'No response' });
@@ -513,6 +504,18 @@ export default async function handler(req, res) {
       flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
 
+    // Live DB-fakta vinner alltid över den dagsgamla cachen för skolflödets
+    // uppmätta fält. De AI-härledda "mjuka" fälten (study_pattern,
+    // preferred_help_level, sessions_total, m.fl.) kommer fortsatt från minnet.
+    const mergedStructured = {
+      ...structuredMemory,
+      mock_weak_concepts:    liveExamData.mockWeakConcepts,
+      mock_recent_scores:    liveExamData.mockRecentScores,
+      felbank_weak_concepts: liveExamData.felBankWeakConcepts,
+      felbank_error_types:   liveExamData.felBankErrorTypes,
+      felbank_courses:       liveExamData.felBankCourses,
+    };
+
     /* ETT block om eleven, byggt av api/_learner-context.js med en rangordning:
        uppmätt före sagt före härlett. Tidigare byggdes fem separata avsnitt av
        fyra filer som inte visste om varandra, och gav upp till tre olika svar på
@@ -547,23 +550,12 @@ export default async function handler(req, res) {
       curriculumContext = buildCurriculumContext(concept?.label || topic || userQuestion, { year: åk });
     } catch { /* elevkontexten är personalisering, aldrig ett skäl att fela */ }
 
-    // Live DB-fakta vinner alltid över den dagsgamla cachen för dessa fält. De AI-härledda
-    // "mjuka" fälten (study_pattern, preferred_help_level, sessions_total, m.fl.) kräver ett
-    // AI-anrop att extrahera och kommer fortsatt bara från structuredMemory.
-    const mergedStructured = {
-      ...structuredMemory,
-      exam_weak_categories: liveExamData.weakCategories,
-      exam_recent_scores:   liveExamData.recentScores,
-      mock_weak_concepts:   liveExamData.mockWeakConcepts,
-      mock_recent_scores:   liveExamData.mockRecentScores,
-      felbank_weak_concepts: liveExamData.felBankWeakConcepts,
-      felbank_error_types:   liveExamData.felBankErrorTypes,
-      felbank_courses:       liveExamData.felBankCourses,
-    };
-
-    // Merge DB exam weak categories into session weak areas for immediate P.E.R awareness
-    const dbWeakCats     = mergedStructured.exam_weak_categories || [];
-    const mergedWeakAreas = [...new Set([...contextPack.weakAreas, ...dbWeakCats])].slice(0, 10);
+    // Merge DB weak concepts into session weak areas for immediate P.E.R awareness.
+    const dbWeakConcepts  = [
+      ...(mergedStructured.mock_weak_concepts || []),
+      ...(mergedStructured.felbank_weak_concepts || []),
+    ];
+    const mergedWeakAreas = [...new Set([...contextPack.weakAreas, ...dbWeakConcepts])].slice(0, 10);
 
     /* Kollektiv data: hur ALLA elever brukar gå på de begrepp den här eleven jobbar med.
        Aldrig blockerande — loadCollectiveSignals sväljer varje fel och ger [], så ett

@@ -14,20 +14,6 @@
     "journey": ["signup", "app", "forbattring", "pricing"]
   },
   {
-    "id": "liam_korkort",
-    "name": "Liam Ahmadi",
-    "age": 18,
-    "role": "Tar körkort, pluggar teorin på egen hand",
-    "goal": "Klara teoriprovet på Trafikverket första försöket, vill öva vägmärken + trafikregler",
-    "device": "mobile",
-    "techLevel": "medel",
-    "patience": "mycket låg — vill komma igång direkt, hoppar över instruktioner",
-    "willingnessToPay": "villig — körkort kostar ändå tusenlappar, 79 kr är inget",
-    "personality": "otålig, målmedveten, klickar snabbt, läser inte text noga",
-    "primaryMode": "korkort",
-    "journey": ["signup", "korkortet", "pricing"]
-  },
-  {
     "id": "sara_gy_svag",
     "name": "Sara Bergström",
     "age": 16,
@@ -81,6 +67,6 @@
     "willingnessToPay": "aldrig — ren gratis-användare, testar allt utan att betala",
     "personality": "lätt distraherad, klickar överallt, testar gränser (t.ex. når gratis-kvoten), tonårsspråk",
     "primaryMode": "matte",
-    "journey": ["signup", "app", "korkortet", "pricing"]
+    "journey": ["signup", "app", "forbattring", "pricing"]
   }
 ]

@@ -5,8 +5,8 @@
 // ingenting om eleven — noll referenser till mastery i hela filen. Varje prov
 // genererades som om eleven aldrig gjort ett förut.
 //
-// Körkortsmodulen har haft adaptivt urval länge (felsvarade frågor viktas upp
-// till 40% av frågepoolen). Mockproven, som är produktens kärna, hade det inte.
+// Mockproven är produktens kärna, så adaptiviteten måste ligga här: elevens
+// svaga begrepp viktas upp utan att provet slutar likna ett riktigt skolprov.
 //
 // TVÅ SAKER SOM MÅSTE HÅLLAS ISÄR:
 //
@@ -23,10 +23,9 @@
 import { readMastery, MIN_ATTEMPTS_TO_TRUST, WEAK_BELOW, STRONG_AT_OR_ABOVE } from "./_mastery-view.js";
 
 /* Hur stor del av provet som får styras av elevens svagheter.
-   Samma storleksordning som körkortsmodulens 40%, och av samma skäl: ett prov
-   som BARA prövar det eleven är dålig på är demoraliserande, mäter inte om
-   kunskapen sitter kvar i det de redan kan, och liknar inte det riktiga prov
-   de tränar inför. */
+   Ett prov som BARA prövar det eleven är dålig på är demoraliserande, mäter
+   inte om kunskapen sitter kvar i det de redan kan, och liknar inte det riktiga
+   prov de tränar inför. */
 export const MAX_WEAK_SHARE = 0.4;
 
 /* Under så här många frågor blir viktningen meningslös — ett prov på tre

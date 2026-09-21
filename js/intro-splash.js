@@ -27,7 +27,7 @@
   /* Signed-in users skip the brand reveal entirely. They have seen it, and a
      4s animation in front of the tool they open every day is friction rather
      than branding. Reads the Supabase session key directly, the same way
-     shared.js and js/hp-app.js already do. */
+     shared.js already does. */
   try {
     var sess = JSON.parse(localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token') || '{}');
     if (sess && sess.access_token) return;
@@ -243,7 +243,7 @@
   var pgLoaded = false, minDone = false, splashEl = null, skipped = false;
 
   /* ── Abort hook ──
-     A gated page (app, förbättring, körkortet, hp) opens the login dialog
+     A gated page (app, förbättring) opens the login dialog
      during DOMContentLoaded. Sitting through the full branded reveal before
      being allowed to log in reads as the page being broken, so any caller
      that needs the user's attention now can cut the splash short. The brand

@@ -161,13 +161,10 @@ okf("H8 DOMRect-formen (left/top/right/bottom) förstås",
 }
 
 /* Sidhuvudet renderas av js/exgen-shell.js. En sida som skriver sitt eget
-   header-block igen är exakt hur de åtta divergerade versionerna uppstod.
-   korkortet.html och de andra avstängda modulerna är undantagna — de migreras
-   den dag flaggan i js/exgen-modules.js sätts till true. */
+   header-block igen är exakt hur de divergerade versionerna uppstod. */
 {
   const rot = join(dirname(fileURLToPath(import.meta.url)), "../..");
-  const undantag = new Set(["korkortet.html", "provia-hp.html", "live-demo.html",
-    "snart.html", "aterstall.html", "juridik.html", "google52ca1d3d9412d7b8.html"]);
+  const undantag = new Set(["snart.html", "aterstall.html", "juridik.html", "google52ca1d3d9412d7b8.html"]);
   const egna = [];
   for (const f of fs.readdirSync(rot)) {
     if (!f.endsWith(".html") || undantag.has(f)) continue;

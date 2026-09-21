@@ -2,20 +2,15 @@
 -- Se docs/provia-knowledge-engine/07-proposed-v1-architecture.md och docs/adr/0001-0004
 -- för det fullständiga resonemanget bakom valen nedan.
 --
--- RLS-princip (avsiktligt STRÄNGARE än hp_*-mönstret): varje user-owned tabell får bara en
--- SELECT-policy (user_id = auth.uid()) — ingen INSERT/UPDATE/DELETE-policy för authenticated/anon.
--- Alla skrivningar sker uteslutande via api/knowledge.js med service_role (ADR 0001/0003), som
--- bypassar RLS oavsett. hp_mastery/hp_attempts/hp_progress/hp_sessions tillåter idag klienten att
--- skriva sina egna rader direkt (`for all using(...) with check(...)`) — det var precis den typen
--- av klienttillit (även om scopead till "sin egen rad") som gjorde profiles-privilegie-eskaleringen
--- möjlig (se docs/provia-knowledge-engine/02-security-findings.md): en policy som bara kollar
--- ägarskap, inte VILKA FÄLT som får ändras, är inte skydd mot att en AI-beräknad kolumn (mastery,
--- verification_status, roll) manipuleras av kontot den tillhör. De nya tabellerna har inget sådant
--- hål eftersom de inte har någon skrivpolicy alls för klienten.
+-- RLS-princip: varje user-owned tabell får bara en SELECT-policy (user_id = auth.uid()) —
+-- ingen INSERT/UPDATE/DELETE-policy för authenticated/anon. Alla skrivningar sker uteslutande
+-- via api/knowledge.js med service_role (ADR 0001/0003), som bypassar RLS. En policy som bara
+-- kollar ägarskap, inte VILKA FÄLT som får ändras, är inte skydd mot att en AI-beräknad kolumn
+-- (mastery, verification_status, roll) manipuleras av kontot den tillhör. De nya tabellerna
+-- har inget sådant hål eftersom de inte har någon skrivpolicy alls för klienten.
 --
 -- Referensdata (knowledge_sources/documents/chunks, concepts, chunk_concepts, feature_flags) har
--- RLS PÅ men ingen policy alls — samma deny-by-default-mönster som hp_normering/hp_ord_lexicon/
--- hp_questions, service_role-only.
+-- RLS PÅ men ingen policy alls: deny-by-default, service_role-only.
 --
 -- Embedding-kolumn på knowledge_chunks är MEDVETET UTELÄMNAD — pgvector-extensionen är inte
 -- installerad i detta projekt och ingen embeddingmodell/dimension är vald än (uppdragets §20).
@@ -323,8 +318,7 @@ create policy student_error_events_select_own on public.student_error_events
 create table if not exists public.student_mastery (
   user_id            uuid not null references auth.users(id) on delete cascade,
   concept_id         uuid not null references public.concepts(id) on delete cascade,
-  -- 0–100-skala, matchar den redan etablerade konventionen i apply_hp_mastery
-  -- (supabase/migrations/20260701_hp_fixes.sql / 20260719_fix_hp_mastery_race.sql).
+  -- 0–100-skala för att kunna visa progression utan att blanda in råpoäng.
   mastery_score      real not null default 0 check (mastery_score between 0 and 100),
   confidence         real not null default 0 check (confidence between 0 and 1),
   attempts           integer not null default 0,
@@ -339,8 +333,7 @@ alter table public.student_mastery enable row level security;
 create policy student_mastery_select_own on public.student_mastery
   for select using (user_id = auth.uid());
 -- Ingen insert/update/delete-policy — uppdateras av en framtida apply_legal_mastery()-RPC
--- (service_role), byggd med samma låsmönster som den redan fixade apply_hp_mastery
--- (supabase/migrations/20260719_fix_hp_mastery_race.sql). Byggs i Fas 9, inte denna migration.
+-- (service_role). Byggs i Fas 9, inte denna migration.
 
 -- ── Efterhandstillagd FK (kräver att generation_jobs redan finns) ──
 -- ai_usage_events.job_id är en korrelations-id till det jobb som orsakade AI-anropet.

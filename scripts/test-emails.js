@@ -68,11 +68,11 @@ function welcomeHtml(email) {
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr><td style="padding:13px 0;border-bottom:1px solid rgba(27,255,140,.08)">
               <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">1</span>
-              <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Kör teoriprov — AI väljer frågor du behöver träna mest på</span>
+              <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Skapa mockprov — AI utgår från ditt eget skolmaterial</span>
             </td></tr>
             <tr><td style="padding:13px 0;border-bottom:1px solid rgba(27,255,140,.08)">
               <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">2</span>
-              <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Öva körkortsteorin — vägmärken, trafikregler, alla kategorier</span>
+              <span style="color:#e8f5ee;font-size:14px;vertical-align:middle">Träna smartare — fokusera på begreppen du behöver mest</span>
             </td></tr>
             <tr><td style="padding:13px 0">
               <span style="display:inline-block;width:22px;height:22px;background:#1bff8c;color:#08100d;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:12px;vertical-align:middle">3</span>

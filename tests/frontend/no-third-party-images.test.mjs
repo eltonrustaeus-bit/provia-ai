@@ -2,9 +2,8 @@
 //
 // Användning:  node tests/frontend/no-third-party-images.test.mjs   (exit 0 = pass)
 //
-// Sju av åtta sidor hämtade en gång en 1024px-ikon från ungdrive.se för att rita den i 12x12.
-// js/exgen-shell.js löste det med en lokal fil på 2,4 kB, men korkortet.html och live-demo.html
-// låg kvar på fjärrbilden. Tre skäl till att det spelar roll:
+// Flera sidor hämtade en gång en 1024px-ikon från ungdrive.se för att rita den i 12x12.
+// js/exgen-shell.js löste det med en lokal fil på 2,4 kB. Tre skäl till att det spelar roll:
 //
 //   1. Varje sidladdning skickar besökarens IP till en domän vi inte äger — på en sajt med
 //      integritetspolicy och till stor del minderåriga användare.

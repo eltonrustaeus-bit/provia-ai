@@ -286,10 +286,9 @@ const FAQ = [
   await ctx.close();
 }
 
-// ── 7: avstängda moduler läcker inte in i jämförelsen ────────────────────
-// exgen-modules.js döljer [data-module="korkort"] innan sidan målas. En
-// jämförelsetabell som listar körkortsteorin på en plattform där modulen är
-// av är en lögn i den dyraste riktningen — den säljer något som inte finns.
+// ── 7: borttagna moduler läcker inte in i jämförelsen ────────────────────
+// Jämförelsetabellen ska bara sälja skolprodukten. Gamla produktgrenar får
+// inte ligga kvar i markupen och döljas med CSS.
 {
   const { ctx, page } = await mk();
   const t = await page.evaluate(() => {
@@ -299,12 +298,13 @@ const FAQ = [
       total: rows.length,
       visible: vis.length,
       text: vis.map(r => r.innerText.replace(/\s+/g, " ")).join(" | "),
+      allText: rows.map(r => r.innerText.replace(/\s+/g, " ")).join(" | "),
       cols: (rows[0] ? rows[0].children.length : 0),
     };
   });
   ok("7a jämförelsen har rader", t.visible > 0, JSON.stringify({ total: t.total, visible: t.visible }));
   ok("7b fyra kolumner: funktion + tre planer", t.cols === 4, String(t.cols));
-  ok("7c körkortsraderna är dolda", !/Repetitionsläge|Vägmärken|Teoriprov/i.test(t.text), t.text.slice(0, 160));
+  ok("7c gamla produktgrenar finns inte i tabellen", !/Repetitionsläge|Vägmärken|Teoriprov/i.test(t.allText), t.allText.slice(0, 160));
   ok("7d studieraderna finns kvar", /Lärarrapport/.test(t.text) && /Felbank/.test(t.text), t.text.slice(0, 200));
   await ctx.close();
 }

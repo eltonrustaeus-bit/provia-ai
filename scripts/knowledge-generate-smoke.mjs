@@ -1,7 +1,7 @@
 // scripts/knowledge-generate-smoke.mjs — end-to-end smoke-test av Fas 5:s genererings-/
 // verifieringspipeline (src/generation/legal-generation.mjs) mot skarp databas.
 // RIKTIG, ICKE-FÖRSUMBAR OpenAI-kostnad (gpt-4o-mini + gpt-4o, flera anrop per fråga) — kör
-// medvetet, inte i en loop. Samma .env.local-laddningsmönster som scripts/hp-quality.mjs.
+// medvetet, inte i en loop. Laddar .env.local utan att skriva ut hemligheter.
 //
 // includePending=true ENDAST här (test-/utvecklingsläge mot den ännu helt pending pilotkorpusen,
 // se docs/adr/0005-embedding-model-and-retrieval.md) — api/knowledge.js (produktionsvägen)

@@ -61,29 +61,9 @@ possibility of one session's checkout silently relocating another's.
 - State bug + fix. Stop. No suggestions beyond scope.
 - No guessing about bugs — read the code first.
 
-## körkortsteorin — driving_questions table (2026-06-09)
-- 352 questions, 16 categories (all normalized)
-- Categories: Vägmärken(60), Trafikregler(44), Korsningar(28), Hastighet(36), Parkering(30),
-  Möte&Omkörning(19), Mörker&Sikt(15), Väglag&Bromssträcka(16), Vägtunnlar(12),
-  Bogsering&Lastsäkring(11), Fordon&Besiktning(8), Körning med Släp(12),
-  Nödsituationer(17), Alkohol&Droger(14), Säkerhet&Utrustning(17), Miljö&Ekonomi(13)
-- 89 with image_url (all Wikimedia — E8-50/E8-70/E10-30 fixed to C31 format 2026-06-09)
-- Fields: id, category, question, option_a-d, correct, explanation, difficulty, image_url, image_description
-- TEORI_DIST: category weights for 65-question teoriprov (matches Trafikverket distribution)
-- Adaptive learning: wrong-answer questions boosted up to 40% of exam pool
-
 ## Graphify First
 Before reading any source file, query the graphify graph:
-`C:\Users\elton\Desktop\ProvKlarUF\graphify-out\graph.json`
-1747 nodes, 2161 edges, 209 communities (updated 2026-07-01, incl. HP). Only fall back to raw file reads if graph lacks detail.
-
-## körkortsteorin — modes (uppdaterad 2026-06-21)
-Övning-mode BORTTAGEN. Kvar: **kurser** (default), **teoriprov**, **repetition**, admin (hidden).
-- `currentMode = "kurser"` | `#tab-kurser` har `active` class
-- Init: `showConfig()` + hero stats uppdateras efter questions laddas (015a86f)
-- Quota: gratis=10 kursfrågor/dag (localStorage), Basic=30 teoriprov/mån (server)
-- `selCat` aldrig satt av kurser-flow → alltid `activeCourse||selCat` i DB-insert
-- Se fullständig state: `C:\Users\elton\.claude-account2\projects\C--Users-elton\memory\project_korkortet.md`
+`graphify-out/graph.json` if present. Fall back to raw file reads when the graph lacks detail or is stale.
 
 ## P.E.R Core Architecture (uppdaterad 2026-05-30)
 - `api/_per-core.js` — Delat AI-lager: `callAI()`, `buildPERSystemPrompt()`, `buildPERCoachSystemPrompt()`
@@ -95,8 +75,8 @@ Before reading any source file, query the graphify graph:
 
 ## API Routes (security-sensitive — review carefully)
 Alla 12 rutter (filer i `api/` utan `_`-prefix) står här. Det är också exakt
-Vercel Hobby-planens tak — en ny rutt kräver att en annan viks in i en befintlig,
-vilket är varför `hp.js` och `knowledge.js` dispatchar på `body.op`.
+Vercel Hobby-planens tak — en ny rutt kräver att en annan viks in i en befintlig
+eller att en gammal rutt tas bort.
 
 | File | Purpose |
 |------|---------|
@@ -117,7 +97,7 @@ vilket är varför `hp.js` och `knowledge.js` dispatchar på `body.op`.
 | `api/_per-core.js` | **PER Core Engine** — callAI + personality (ESM, importeras av explain/teacher-report) |
 | `api/generate-exam.js` | OpenAI call — rate-limit enforced (CJS) |
 | `api/grade.js` | OpenAI call — validates user owns exam (CJS) |
-| `api/explain.js` | P.E.R chat + körkortsförklaring + felbankstips — quota enforced (ESM) |
+| `api/explain.js` | P.E.R chat, studiestöd och felbankstips — quota enforced (ESM) |
 | `api/check-role.js` | Returns user role — never trust client-side role. Bär även delete-exams och Stripe-portalen |
 | `api/signup.js` | Creates user row — validate all inputs |
 | `api/admin.js` | Admin-only — verify role server-side. `body.action`-dispatch (list-users, set-role, approve, …) |
@@ -125,7 +105,6 @@ vilket är varför `hp.js` och `knowledge.js` dispatchar på `body.op`.
 | `api/teacher-report.js` | P.E.R lärarrapport — auth required (ESM) |
 | `api/create-checkout-session.js` | **Betalning.** Skapar Stripe-session — auth krävs, plan får aldrig tas från klienten okontrollerat (ESM) |
 | `api/stripe-webhook.js` | **Betalning.** Ingen `_auth` — verifieras med Stripes signatur (`constructEvent`), inte med JWT. Måste vara idempotent (ESM) |
-| `api/hp.js` | Högskoleprovet, `body.op`-dispatch (generate/diagnose/realprov) — facit hålls tillbaka före inlämning (ESM) |
 | `api/knowledge.js` | Knowledge & Learning Engine, `body.op`-dispatch — återanvänder `_auth.js` (ESM) |
 
 <!-- api/smart-tips.js stod i tabellen tills 2026-08-11 men togs bort ur repot
@@ -262,8 +241,7 @@ Any change to `api/` triggers security review checklist:
   låg mastery vore att ljuga om vad ett C-prov är.
 - **Högst 40% riktade frågor** (`MAX_WEAK_SHARE`). Ett prov som bara prövar
   svagheter är demoraliserande, mäter inte om det eleven kan sitter kvar, och
-  liknar inte det riktiga provet. Samma storleksordning som körkortsmodulens
-  adaptiva urval.
+  liknar inte det riktiga provet.
 - **Materialet styr alltid.** Instruktionen säger uttryckligen att modellen aldrig
   får hitta på innehåll som saknas i materialet för att träffa ett svagt område.
 - **Provet får inte annonsera att det är anpassat.** Ett prov som säger "det här
@@ -350,7 +328,7 @@ Any change to `api/` triggers security review checklist:
   bara `<strong>` och gav noll områden för samtliga sex Gy25-nivåer — synken
   vägrade skriva filen, vilket var rätt.
 - **Notation och rendering hänger ihop.** `generate-exam.js` MATTE-LÄGE kräver
-  LaTeX mellan `$...$`; `js/hp-math.js` renderar det i provet, rättningen och
+  LaTeX mellan `$...$`; `js/math-render.js` renderar det i provet, rättningen och
   P.E.R:s svar. Tas notationsregeln bort finns inget att rendera och hela kedjan
   blir verkningslös. KaTeX hämtas först när en text faktiskt innehåller
   matematik — en ren textfråga får aldrig kosta 280 kB.

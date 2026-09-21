@@ -58,7 +58,7 @@ export const PRODUCT_QUESTION_REGEX =
 
 /* Sidor där eleven ARBETAR. En fråga här är en studiefråga tills motsatsen är
    uttalad, oavsett vilka ord den innehåller. */
-const WORKING_PAGES = new Set(["prov", "körkortsteorin", "förbättring"]);
+const WORKING_PAGES = new Set(["prov", "förbättring"]);
 
 /**
  * Avgör säljläget.

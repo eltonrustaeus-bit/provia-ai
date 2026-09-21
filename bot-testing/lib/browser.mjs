@@ -14,7 +14,6 @@ const MOBILE = devices["Pixel 7"];
 // Maps a journey step name -> page path on the site.
 const STEP_PATH = {
   app: "/app.html",
-  korkortet: "/korkortet.html",
   forbattring: "/f%C3%B6rb%C3%A4ttring.html",
   larare: "/larare.html",
   pricing: "/pricing.html",
@@ -210,26 +209,6 @@ async function interactGeneric(page, stepName) {
       }
     } catch {
       /* keep trying */
-    }
-  }
-  // For quiz-like pages, try to answer a couple of questions generically.
-  if (stepName === "korkortet") {
-    for (let i = 0; i < 3; i++) {
-      try {
-        const opt = page.locator("[class*='opt'],[class*='alt'],[class*='answer'],[class*='choice']").filter({ hasText: /\S/ }).first();
-        if (await opt.isVisible({ timeout: 1000 })) {
-          await opt.click({ timeout: SOFT_TIMEOUT });
-          await sleep(600);
-          const next = page.locator("button:has-text('Nästa'),button:has-text('Fortsätt'),button:has-text('Rätta')").first();
-          if (await next.isVisible({ timeout: 800 })) {
-            await next.click({ timeout: SOFT_TIMEOUT });
-            await sleep(800);
-          }
-          notes.push(`svarade på fråga ${i + 1}`);
-        } else break;
-      } catch {
-        break;
-      }
     }
   }
   return notes.join("; ");

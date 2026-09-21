@@ -15,7 +15,6 @@
 // Kvoter och priser står INTE här: de byggs av buildPlanFacts() ur PLAN_RULES,
 // så att en prisändring aldrig kan ge två olika svar.
 
-import { MODULES } from "./_modules.js";
 import { getCatalog } from "./_education.js";
 
 /* Antalet ämnen läses ur den genererade katalogen i stället för att skrivas som
@@ -85,10 +84,7 @@ Att komma igång:
 Konto skapas med e-post. Gratisplanen kräver ingen kortuppgift och ingen bindningstid.
 
 Att avsluta:
-Prenumerationen avslutas när som helst från Mitt konto via Stripes portal. Ingen uppsägningstid.${MODULES.korkort ? "" : `
-
-Vad ExGen INTE gör:
-Körkortsteori och högskoleprov ingår inte i produkten. Erbjud det aldrig och påstå aldrig att det finns.`}
+Prenumerationen avslutas när som helst från Mitt konto via Stripes portal. Ingen uppsägningstid.
 
 Om något inte står här eller i faktarutan ovan: säg att du inte vet säkert och hänvisa vidare. Hitta aldrig på en funktion, en siffra eller ett löfte.`;
 }

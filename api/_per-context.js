@@ -81,7 +81,6 @@ function cleanTargets(values) {
 
 function describePage(page) {
   const normalized = cleanText(page, 50).toLowerCase();
-  if (normalized.includes("körkort")) return "körkortsteorin";
   if (normalized.includes("förbättring") || normalized.includes("forbattring")) return "förbättring";
   if (normalized.includes("pris")) return "prisplan";
   if (normalized.includes("konto")) return "konto";

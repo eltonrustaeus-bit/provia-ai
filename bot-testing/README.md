@@ -17,7 +17,7 @@ i sin egen röst. Fångar **buggar, UX-friktion, oklarheter och konverterings-si
 ```bash
 node bot-testing/run-bots.mjs                    # alla personas, headless, mot proviaai.se
 node bot-testing/run-bots.mjs --headed           # se webbläsaren live
-node bot-testing/run-bots.mjs --only=liam_korkort # bara en persona
+node bot-testing/run-bots.mjs --only=emma_gy_matte # bara en persona
 node bot-testing/run-bots.mjs --base=http://localhost:3000  # mot lokal/staging
 ```
 
@@ -39,7 +39,7 @@ node bot-testing/cleanup.mjs --delete  # raderar alla +proviabot_-konton
 
 ## Personas
 Redigera `personas.json`. Varje persona har `journey` (vilka sidor den besöker):
-`signup`, `app`, `korkortet`, `forbattring`, `larare`, `pricing`.
+`signup`, `app`, `forbattring`, `larare`, `pricing`.
 
 ## Tolka resultaten — känt brus
 Vissa "buggar" i rapporten är test-artefakter, inte prod-fel. Verifiera alltid mot prod innan du agerar:

@@ -75,15 +75,10 @@ function measuredLines(structured) {
   const lines = [];
   if (!structured) return lines;
 
-  const kat = structured.exam_weak_categories;
-  if (Array.isArray(kat) && kat.length) {
-    lines.push(`Svaga kategorier i körkortsteorin: ${kat.slice(0, 5).join(", ")}`);
-  }
-
   /* Trenden räknas ur riktiga provpoäng. score_trajectory (AI-extraherad ur
      chatten) används bara när inga riktiga poäng finns, och märks då som osäker
      längre ner i stället för att stå här. */
-  for (const [namn, serie] of [["Mockprov", structured.mock_recent_scores], ["Teoriprov", structured.exam_recent_scores]]) {
+  for (const [namn, serie] of [["Mockprov", structured.mock_recent_scores]]) {
     if (!Array.isArray(serie) || serie.length < 2) continue;
     const delta = Math.round(serie[serie.length - 1] - serie[0]);
     lines.push(`${namn} senaste ${serie.length}: ${serie.join("%, ")}% (${delta >= 0 ? "+" : ""}${delta}%)`);

@@ -5,12 +5,12 @@
  *
  *   index                saknade sitt eget Hem
  *   förbättring          saknade både Hem och Min utveckling
- *   admin                saknade Körkortsteorin
- *   app, korkortet       egna klassnamn (.ddItem) och egna animationer
+ *   admin                hade avvikande länkar
+ *   app                  hade egna klassnamn (.ddItem) och egna animationer
  *   larare               ingen navigering alls
  *
  * Dessutom bar style.css varje menyregel dubbelt (.mWrap/.menuWrap,
- * .drop/.dropdown, .ddi/.ddItem), tre öppna-klasser stöddes samtidigt, och sju
+ * .drop/.dropdown, .ddi/.ddItem), tre öppna-klasser stöddes samtidigt, och flera
  * av åtta sidor hämtade en 1024px-ikon från ungdrive.se för att rita den i
  * 12x12 medan index använde en lokal fil på 2,4 kB.
  *
@@ -41,7 +41,7 @@ const open = (width, hash = "") => openPage(browser, `${srv.url}/integritetspoli
   width, height: 900, reducedMotion: "reduce", waitUntil: "domcontentloaded", settle: 700,
 });
 
-const FACIT = ["index.html", "app.html", "förbättring.html", "korkortet.html", "pricing.html"];
+const FACIT = ["index.html", "app.html", "förbättring.html", "pricing.html"];
 
 // H1: renderaren bygger huvudet ur platshållaren.
 {
@@ -74,23 +74,6 @@ const FACIT = ["index.html", "app.html", "förbättring.html", "korkortet.html",
     [...document.querySelectorAll(".xg-nav a")].map(a => decodeURIComponent(a.getAttribute("href"))));
   ok("H2 navlistan är komplett och i rätt ordning",
     JSON.stringify(v) === JSON.stringify(FACIT), JSON.stringify(v));
-  await ctx.close();
-}
-
-// H3: körkortsraden FINNS i markupen men är dold. exgen-modules.js injicerar
-// sin regel före första målningen, och hela poängen med den filen är att en
-// flagga ska räcka den dag modulen släpps. Tas raden bort ur listan krävs en
-// kodändring i stället för ett true.
-{
-  const { ctx, page } = await open(1280);
-  const v = await page.evaluate(() => {
-    const a = document.querySelector('.xg-nav a[href="korkortet.html"]');
-    if (!a) return null;
-    const r = a.getBoundingClientRect();
-    return { module: a.getAttribute("data-module"), synlig: r.width > 0 && r.height > 0 };
-  });
-  ok("H3 körkortsraden finns med data-module och är dold medan flaggan är av",
-    !!v && v.module === "korkort" && v.synlig === false, JSON.stringify(v));
   await ctx.close();
 }
 

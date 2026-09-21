@@ -13,10 +13,8 @@ function escapeHtml(str) {
 
 /* Plan rows mirror api/_provia-rules.js — the email is the first thing a new
    user reads, so a stale quota here is a promise the product does not keep.
-   Körkortsteorin is deliberately absent: the module has been hidden from the
-   UI since 2026-07-28, and advertising it would sell something nobody can
-   reach. Palette is the current light ExGen brand (exgen-tokens.css), not the
-   dark green one the product carried under the ProviaAI name. */
+   Palette is the current light ExGen brand (exgen-tokens.css), not the dark
+   green one the product carried under the ProviaAI name. */
 function buildWelcomeHtml(email) {
   /* Number and text sit in separate cells rather than inline spans so a step
      that wraps to a second line stays indented under its own text instead of

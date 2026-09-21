@@ -12,7 +12,7 @@
 // låta modellen fylla på med påhitt).
 // Säkerhetsregel: modellen returnerar bara sina egna fält (question/options/correct_answer/
 // explanation/difficulty) — concept_ids/source_chunk_ids/curriculum_refs sätts av anropande kod
-// (redan kända från retrieval-steget), samma mönster som hp.js:s generateOrd/generateXyz.
+// (redan kända från retrieval-steget).
 
 function batchSchema(n, questionType) {
   const base = {

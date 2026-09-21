@@ -66,9 +66,9 @@ check("har svg-ikon", mf.icons.some(i => i.type === "image/svg+xml"));
 for (const i of mf.icons) check(`manifestets ${i.src} finns`, existsSync("." + i.src));
 
 console.log("\n— HTML —");
-const sidor = ["index.html","app.html","pricing.html","konto.html","korkortet.html","larare.html",
+const sidor = ["index.html","app.html","pricing.html","konto.html","larare.html",
   "admin.html","aterstall.html","integritetspolicy.html","snart.html","förbättring.html",
-  "juridik.html","live-demo.html","provia-hp.html"];
+  "juridik.html"];
 for (const f of sidor) {
   const s = readFileSync(f, "utf8");
   const ok = /rel="icon" href="\/favicon\.ico"/.test(s) && /rel="icon" href="\/image\/favicon\.svg"/.test(s)

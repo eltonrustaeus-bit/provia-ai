@@ -54,8 +54,8 @@ function looksLikeMath(course, pastedText) {
 
 function pickModel({ isMath }) {
   const base = process.env.OPENAI_MODEL || "gpt-4o-mini";
-  // OPENAI_MATH_MODEL is the canonical name (matches api/hp.js). OPENAI_MODEL_MATH
-  // kept as a fallback in case it was ever set in an env this repo can't see.
+  // OPENAI_MATH_MODEL is the canonical name for school math generation.
+  // OPENAI_MODEL_MATH is kept as a fallback in case it was ever set in an env this repo can't see.
   const math = process.env.OPENAI_MATH_MODEL || process.env.OPENAI_MODEL_MATH || base;
   return isMath ? math : base;
 }
@@ -544,9 +544,8 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "Flervalsalternativ ska vara plausibla felalternativ (typiska räknefel) och endast ett korrekt. " +
     /* Notationen. Utan den skrevs bråk som 3/4 och integraler i löpande text,
        vilket är oläsligt så fort uttrycket blir större än en rad. Klienten
-       renderar $...$ med KaTeX (js/hp-math.js) i både provet och rättningen,
-       och laddar biblioteket först när en text faktiskt innehåller matematik.
-       Samma konvention som Högskoleprovets XYZ-del redan använder. */
+       renderar $...$ med KaTeX (js/math-render.js) i både provet och rättningen,
+       och laddar biblioteket först när en text faktiskt innehåller matematik. */
     "NOTATION: skriv all matematik som LaTeX mellan $ och $ — till exempel " +
     "$\\frac{3}{4}$, $x^2$, $\\sqrt{2}$, $12\\%$, $\\int_0^1 x\\,dx$. " +
     "Det gäller frågetext, svarsalternativ, model_answer och rubric. " +

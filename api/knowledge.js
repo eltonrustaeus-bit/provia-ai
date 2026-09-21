@@ -1,7 +1,7 @@
 // api/knowledge.js — konsoliderad router för Provia Knowledge & Learning Engine (ADR 0001,
-// hp.js-mönstret: body.op-dispatch i EN fil eftersom Vercel Hobby-planens funktionstak redan är
-// nått). Återanvänder api/_auth.js för JWT-verifiering (ADR 0001 — inte en egen kopia som
-// hp.js/generate-exam.js/grade.js/ocr.js har).
+// body.op-dispatch i EN fil eftersom Vercel Hobby-planens funktionstak redan är nått).
+// Återanvänder api/_auth.js för JWT-verifiering (ADR 0001 — inte en egen kopia som
+// äldre endpoints hade).
 //
 // SPÄRR (§18/§24, oberoende av vad en klient skickar): includePending till retrieveChunks()/
 // generateVerifiedQuestion() är ALLTID hårdkodat false i denna fil — bara review_status='approved'

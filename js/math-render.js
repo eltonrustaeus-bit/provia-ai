@@ -1,6 +1,6 @@
-// js/hp-math.js — lazy KaTeX renderer for Provia HP math delprov (XYZ, and any KVA/NOG
-// that carries LaTeX). KaTeX (~280kb) is only fetched the first time a question actually
-// contains math, so the base page stays light (perf budget).
+// js/math-render.js — lazy KaTeX renderer for school math in generated exams.
+// KaTeX (~280kb) is only fetched the first time text actually contains math,
+// so the base page stays light.
 
 let _loading = null;
 const KATEX = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist';

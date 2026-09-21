@@ -1,7 +1,7 @@
 // scripts/knowledge-embed-chunks.mjs — backfiller embedding-kolumnen (Fas 4,
 // supabase/migrations/20260722_knowledge_engine_embeddings.sql) för knowledge_chunks som saknar
 // embedding. Laddar OPENAI_API_KEY/SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY från .env.local
-// (samma mönster som scripts/hp-quality.mjs — nycklarna skrivs ALDRIG ut).
+// Nycklarna skrivs ALDRIG ut.
 //
 // Skriver direkt mot produktionsdatabasen via @supabase/supabase-js + service_role (samma
 // mekanism som api/*.js redan använder för skrivningar — ingen Supabase MCP/DDL krävs, detta är

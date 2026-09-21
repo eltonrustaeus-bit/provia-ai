@@ -31,12 +31,6 @@ export const PER_GRAPH = {
       "typ": "hjälpare"
     },
     {
-      "id": "modules",
-      "etikett": "modules",
-      "fil": "_modules.js",
-      "typ": "hjälpare"
-    },
-    {
       "id": "per-abilities",
       "etikett": "per-abilities",
       "fil": "_per-abilities.js",
@@ -205,12 +199,6 @@ export const PER_GRAPH = {
       "fil": "grade.js"
     },
     {
-      "id": "hp",
-      "etikett": "hp.js",
-      "typ": "rutt",
-      "fil": "hp.js"
-    },
-    {
       "id": "teacher-report",
       "etikett": "teacher-report.js",
       "typ": "rutt",
@@ -277,16 +265,6 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
-      "id": "tabell:driving_results",
-      "etikett": "driving_results",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:driving_progress",
-      "etikett": "driving_progress",
-      "typ": "tabell"
-    },
-    {
       "id": "tabell:mock_results",
       "etikett": "mock_results",
       "typ": "tabell"
@@ -304,16 +282,6 @@ export const PER_GRAPH = {
     {
       "id": "tabell:profiles",
       "etikett": "profiles",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:driving_questions",
-      "etikett": "driving_questions",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:question_reports",
-      "etikett": "question_reports",
       "typ": "tabell"
     },
     {
@@ -390,19 +358,11 @@ export const PER_GRAPH = {
     },
     {
       "från": "per-core",
-      "till": "modules"
-    },
-    {
-      "från": "per-core",
       "till": "per-identity"
     },
     {
       "från": "per-core",
       "till": "per-name"
-    },
-    {
-      "från": "per-memory",
-      "till": "modules"
     },
     {
       "från": "per-role",
@@ -414,19 +374,11 @@ export const PER_GRAPH = {
     },
     {
       "från": "provia-faq",
-      "till": "modules"
-    },
-    {
-      "från": "provia-faq",
       "till": "education"
     },
     {
       "från": "provia-kb",
       "till": "provia-rules"
-    },
-    {
-      "från": "provia-rules",
-      "till": "modules"
     },
     {
       "från": "admin",
@@ -471,10 +423,6 @@ export const PER_GRAPH = {
     {
       "från": "explain",
       "till": "per-review"
-    },
-    {
-      "från": "explain",
-      "till": "modules"
     },
     {
       "från": "explain",
@@ -529,14 +477,6 @@ export const PER_GRAPH = {
       "till": "per-attempt"
     },
     {
-      "från": "hp",
-      "till": "per-core"
-    },
-    {
-      "från": "hp",
-      "till": "provia-rules"
-    },
-    {
       "från": "teacher-report",
       "till": "per-core"
     },
@@ -586,14 +526,6 @@ export const PER_GRAPH = {
     },
     {
       "från": "per-memory",
-      "till": "tabell:driving_results"
-    },
-    {
-      "från": "per-memory",
-      "till": "tabell:driving_progress"
-    },
-    {
-      "från": "per-memory",
       "till": "tabell:mock_results"
     },
     {
@@ -607,14 +539,6 @@ export const PER_GRAPH = {
     {
       "från": "admin",
       "till": "tabell:profiles"
-    },
-    {
-      "från": "admin",
-      "till": "tabell:driving_questions"
-    },
-    {
-      "från": "admin",
-      "till": "tabell:question_reports"
     },
     {
       "från": "admin",
@@ -655,10 +579,6 @@ export const PER_GRAPH = {
     {
       "från": "check-role",
       "till": "tabell:user_profiles"
-    },
-    {
-      "från": "check-role",
-      "till": "tabell:driving_progress"
     },
     {
       "från": "check-role",

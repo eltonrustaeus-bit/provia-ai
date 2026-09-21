@@ -33,10 +33,8 @@ const srv = await serve(ROOT);
 const R = report("header-behaviour");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
-// Varje sida som bär huvudet. korkortet.html, provia-hp.html och
-// live-demo.html utelämnas: modulerna är avstängda i js/exgen-modules.js och
-// sidorna omdirigerar till startsidan. larare.html och admin.html står inte
-// själva i navlistan men bär huvudet som alla andra.
+// Varje sida som bär huvudet. larare.html och admin.html står inte själva i
+// navlistan men bär huvudet som alla andra.
 const PAGES = ["index.html", "pricing.html", "app.html", "förbättring.html", "konto.html",
   "integritetspolicy.html", "larare.html", "admin.html"];
 
@@ -48,8 +46,7 @@ const DESTINATIONS = ["app.html", "förbättring.html", "pricing.html"];
 
 // Facit för navlistan. Sätts av den första sidan som mäts och jämförs sedan mot
 // varje annan. Det är den kontroll som saknades: "inga dubbletter" hindrar inte
-// att en sida SAKNAR en post, och det var precis felet — index utan sitt Hem,
-// förbättring utan sitt Min utveckling, admin utan Körkortsteorin.
+// att en sida SAKNAR en post.
 let NAV_FACIT = null;
 
 const browser = await chromium.launch();
@@ -110,9 +107,9 @@ const links = page => page.evaluate(() => {
 
 const navVisible = page => page.evaluate(() => {
   const box = el => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-  // .xg-menu-btn är renderarens knapp; .mWrap/.menuWrap är de handskrivna
-  // huvudena på sidor som ännu inte migrerat. Båda tas tills den sista är
-  // flyttad — korkortet.html blir kvar tills modulen släpps.
+  // .xg-menu-btn är renderarens knapp; .mWrap/.menuWrap var de handskrivna
+  // huvudena på äldre sidor. Båda selectors finns kvar i testet för att fånga
+  // en oavsiktlig återintroduktion.
   return {
     full: box(document.querySelector(".xg-nav")),
     burger: box(document.querySelector(".xg-menu-btn, .mWrap, .menuWrap")),

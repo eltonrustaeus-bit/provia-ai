@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
-import { currentPeriodKey, getEntitlementSnapshot, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
+import { getEntitlementSnapshot, normalizeRole } from "./_provia-rules.js";
 import { clearLongMemory } from "./_per-memory.js";
 import { flagsEnabled } from "./_flags.js";
 import { PERSONAS } from "./_education.js";
@@ -93,7 +93,7 @@ function normalizeExam(r) {
   };
 }
 
-// Aggregate per-student MOCKPROV progress for a class (school subjects, not körkort).
+// Aggregate per-student mockprov progress for a class.
 // Source: user_exams (the populated mockprov table; mock_results is not reliably written).
 // Bulk queries — no N+1.
 async function getStudentSummaries(classId) {
@@ -345,68 +345,6 @@ export default async function handler(req, res) {
         persona: profile.persona,
       });
     } catch {
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  }
-
-  // Save korkortet progress
-  if (action === "kk_save") {
-    const { srs_data, xp, wrong_ids, cat_prog, bookmarks } = req.body;
-    try {
-      const { error } = await supabase.from("driving_progress").upsert(
-        { user_id: user.id, srs_data: srs_data ?? {}, xp: xp ?? 0, wrong_ids: wrong_ids ?? [], cat_prog: cat_prog ?? {}, bookmarks: bookmarks ?? [], updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
-      if (error) return res.status(500).json({ error: "Save failed" });
-      return res.status(200).json({ ok: true });
-    } catch (e) {
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  }
-
-  // Load korkortet progress
-  if (action === "kk_load") {
-    try {
-      const { data, error } = await supabase.from("driving_progress").select("srs_data,xp,wrong_ids,cat_prog,bookmarks,updated_at").eq("user_id", user.id).maybeSingle();
-      if (error) return res.status(500).json({ error: "Load failed" });
-      return res.status(200).json({ data: data || null });
-    } catch (e) {
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  }
-
-  // Server-side korkortet teoriprov quota check + bump
-  if (action === "bump_kk") {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error) return res.status(500).json({ error: "DB error" });
-
-      const role = normalizeRole(data?.role);
-      const cfg = getFeatureLimit(role, "drivingTest");
-
-      if (cfg.cap === Infinity) return res.status(200).json({ ok: true, count: 0, limit: Infinity });
-
-      // cap=0 means teoriprov is not available on this plan (e.g. gratis)
-      if (cfg.cap === 0) return res.status(429).json({ error: "Teoriprov kräver Basic eller Premium.", count: 0, limit: 0 });
-
-      const periodKey = currentPeriodKey(cfg.period);
-
-      // Atomic check-and-increment — prevents quota bypass via concurrent requests
-      const { data: q, error: qErr } = await supabase.rpc("consume_kk_test_quota", {
-        p_user_id: user.id,
-        p_period_key: periodKey,
-        p_limit: cfg.cap,
-      });
-      if (qErr) return res.status(500).json({ error: "DB error" });
-      if (!q?.ok) return res.status(429).json({ error: "Quota exceeded", count: q?.count ?? cfg.cap, limit: cfg.cap });
-
-      return res.status(200).json({ ok: true, count: q.count, limit: cfg.cap });
-    } catch (e) {
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -672,7 +610,7 @@ export default async function handler(req, res) {
           .slice(0, 5)
           .map(([c, n]) => `${c} (${n} ${n === 1 ? "elev" : "elever"})`);
 
-        const systemPrompt = `Du är ${perRole("erfaren lärarcoach")} för gymnasie- och grundskola. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i skolarbetet — baserat på mockprov eleverna gjort på sina egna ämnen och material (inte körkort).
+        const systemPrompt = `Du är ${perRole("erfaren lärarcoach")} för gymnasie- och grundskola. Skriv en kort, konkret klassrapport till LÄRAREN (inte eleven) om klassens läge i skolarbetet — baserat på mockprov eleverna gjort på sina egna ämnen och material.
 KRAV:
 - Saklig, professionell, max 200 ord.
 - Använd elevernas anonyma etiketter (Elev 1, Elev 2 …) — aldrig namn.

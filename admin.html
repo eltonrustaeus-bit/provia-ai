@@ -126,12 +126,6 @@
 
   .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--l2);border-top-color:var(--a);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .reportCount{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:var(--r2);font-family:var(--mono);font-size:11px;font-weight:700;background:rgba(212,64,22,.12);color:#d44016;border:1px solid rgba(212,64,22,.25)}
-  .reportCount.hi{background:rgba(212,64,22,.22);border-color:rgba(212,64,22,.45)}
-  .reasonBadge{display:inline-block;padding:2px 8px;border-radius:var(--r2);font-family:var(--mono);font-size:9.5px;border:1px solid var(--l);color:var(--t3)}
-  .resolveBtn{padding:5px 11px;border-radius:var(--r2);border:1px solid var(--l2);background:var(--a-dim);color:var(--a2);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .14s}
-  .resolveBtn:hover{background:rgba(0,183,217,.16);color:var(--t)}
-  .qTextCell{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t);font-size:12.5px}
   </style>
 </head>
 <body>
@@ -160,7 +154,6 @@
 
   <!-- ADMIN TOOLS -->
   <div class="adminTools" style="display:flex;gap:.6rem;flex-wrap:wrap;margin:0 0 1.25rem">
-    <a data-module="hp" class="btn" href="provia-hp.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:1em;height:1em;display:inline-block;vertical-align:-0.12em" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5-10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/><path d="M20 9v6"/></svg> ExGen HP <span style="opacity:.7;font-size:.85em">privat beta</span></a>
     <a class="btn" href="larare.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:1em;height:1em;display:inline-block;vertical-align:-0.12em" aria-hidden="true"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/><path d="M9 12h.01M15 12h.01"/></svg> Lärarpanel <span style="opacity:.7;font-size:.85em">privat beta</span></a>
     <!-- per.html är olistad: inte i sitemapen, Disallow i robots.txt, ingen
          länk från sajtens navigering. Den här länken bryter inte mot det —
@@ -209,35 +202,6 @@
         </td></tr>
       </tbody>
     </table>
-  </div>
-
-  <!-- REPORTS SECTION -->
-  <div style="margin-top:32px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-      <div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--a);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">Körkort</div>
-        <h2 style="font-size:17px;font-weight:700;color:var(--t);margin:0">Rapporterade frågor</h2>
-      </div>
-      <button class="btn" id="refreshReportsBtn">↻ Uppdatera</button>
-    </div>
-    <div id="reportsStatus" style="font-family:var(--mono);font-size:11px;color:var(--t3);margin-bottom:10px">Laddar…</div>
-    <div class="tableWrap" id="reportsWrap" style="display:none">
-      <table class="userTable" aria-label="Rapporterade frågor">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Kategori</th>
-            <th>Fråga</th>
-            <th>Rapporter</th>
-            <th>Vanligaste orsak</th>
-            <th>Senast</th>
-            <th>Åtgärd</th>
-          </tr>
-        </thead>
-        <tbody id="reportsBody">
-        </tbody>
-      </table>
-    </div>
   </div>
 
 </div>
@@ -452,7 +416,6 @@ async function init() {
 
   lbl.textContent = `Admin · ${session.user.email}`;
   await loadUsers();
-  await loadReports();
 }
 
 /* FILTER CHIPS */
@@ -473,102 +436,6 @@ document.getElementById('searchBox').addEventListener('input', e => {
 
 /* REFRESH */
 document.getElementById('refreshBtn').addEventListener('click', () => loadUsers());
-
-/* REPORTS */
-const REASON_LABELS = {
-  wrong_answer: 'Fel svar',
-  wrong_image: 'Fel bild',
-  unclear: 'Otydlig',
-  other: 'Annat'
-};
-
-async function loadReports() {
-  const statusEl = document.getElementById('reportsStatus');
-  const wrapEl = document.getElementById('reportsWrap');
-  const bodyEl = document.getElementById('reportsBody');
-  statusEl.textContent = 'Laddar rapporter…';
-  wrapEl.style.display = 'none';
-
-  const { data: { session } } = await db.auth.getSession();
-  const token = session?.access_token;
-  if (!token) return;
-
-  let data;
-  try {
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action: 'list-reports' })
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || 'Misslyckades');
-    data = json.reports;
-  } catch (e) { statusEl.textContent = 'Fel vid hämtning: ' + e.message; return; }
-
-  if (!data || data.length === 0) { statusEl.textContent = 'Inga öppna rapporter.'; return; }
-
-  // Group by question_id
-  const grouped = {};
-  data.forEach(r => {
-    const qid = r.question_id;
-    if (!grouped[qid]) {
-      grouped[qid] = {
-        q: r.driving_questions,
-        reports: [],
-        reasons: {},
-        latest: r.created_at
-      };
-    }
-    grouped[qid].reports.push(r);
-    grouped[qid].reasons[r.reason] = (grouped[qid].reasons[r.reason] || 0) + 1;
-    if (r.created_at > grouped[qid].latest) grouped[qid].latest = r.created_at;
-  });
-
-  const sorted = Object.values(grouped).sort((a, b) => b.reports.length - a.reports.length);
-
-  bodyEl.innerHTML = sorted.map(g => {
-    const topReason = Object.entries(g.reasons).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const count = g.reports.length;
-    const dateStr = new Date(g.latest).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' });
-    return `<tr>
-      <td><span style="font-family:var(--mono);font-size:10.5px;color:var(--t3)">#${g.q?.id ?? '?'}</span></td>
-      <td><span class="reasonBadge">${esc(g.q?.category ?? '—')}</span></td>
-      <td class="qTextCell" title="${esc(g.q?.question ?? '')}">${esc(g.q?.question ?? '—')}</td>
-      <td><span class="reportCount ${count >= 3 ? 'hi' : ''}">${count}</span></td>
-      <td><span class="reasonBadge">${REASON_LABELS[topReason] ?? '—'}</span></td>
-      <td class="dateCell">${dateStr}</td>
-      <td><button class="resolveBtn" onclick="resolveReports(${g.q?.id ?? 0}, this)">✓ Löst</button></td>
-    </tr>`;
-  }).join('');
-
-  statusEl.textContent = `${sorted.length} frågor med ${data.length} totala rapporter`;
-  wrapEl.style.display = '';
-}
-
-async function resolveReports(questionId, btn) {
-  if (!questionId) return;
-  btn.disabled = true; btn.textContent = '…';
-
-  const { data: { session } } = await db.auth.getSession();
-  const token = session?.access_token;
-  if (!token) { btn.disabled = false; btn.textContent = '✓ Löst'; alert('Inte inloggad'); return; }
-
-  try {
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action: 'resolve-report', questionId })
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || 'Misslyckades');
-  } catch (e) { btn.disabled = false; btn.textContent = '✓ Löst'; alert('Fel: ' + e.message); return; }
-
-  btn.closest('tr').remove();
-  const remaining = document.querySelectorAll('#reportsBody tr').length;
-  document.getElementById('reportsStatus').textContent = remaining + ' frågor kvar med öppna rapporter';
-}
-
-document.getElementById('refreshReportsBtn').addEventListener('click', loadReports);
 
 init();
 </script>

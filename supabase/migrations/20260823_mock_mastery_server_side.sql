@@ -89,9 +89,9 @@ begin
 
   /* Vikten sjunker med antalet försök: de första svaren ska flytta siffran
      snabbt, senare svar ska inte kunna rasera en väl belagd nivå. Samma tanke
-     som Elo-K i apply_legal_mastery och apply_hp_mastery (K=24 första tio
-     försöken, sedan 12) — här uttryckt som en glidande vikt i stället för två
-     steg, eftersom mockproven kommer i mycket ojämnare takt.
+     som Elo-K i apply_legal_mastery (K=24 första tio försöken, sedan 12) —
+     här uttryckt som en glidande vikt i stället för två steg, eftersom
+     mockproven kommer i mycket ojämnare takt.
 
      Svårighetsgraden viktar utfallet: rätt på en svår fråga ska ge mer än rätt
      på en lätt. Utan den mäter mastery hur lätta prov eleven väljer. */

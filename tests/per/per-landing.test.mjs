@@ -67,7 +67,7 @@ console.log("\n— NAVIGERINGSMÅL —");
    Klienten validerar målet mot _perNavLabels och ritar då ingen knapp alls, så
    ingen död länk uppstod. Men besökaren blev kvar utan vägen vidare, och
    orsaken var att app.html saknades i listan modellen fick välja ur. */
-const GILTIGA = ["app.html", "pricing.html", "konto.html", "korkortet.html", "live-demo.html"];
+const GILTIGA = ["app.html", "pricing.html", "konto.html"];
 /* Bara LISTRADERNA räknas — "[GOTO:sida.html]" i den inledande meningen är en
    platshållare, och kommentaren som beskriver produktionsfelet nämner det
    påhittade namnet med flit. Ett test som läser hela prompten hade läst båda

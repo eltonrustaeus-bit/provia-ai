@@ -13,6 +13,6 @@ export default {
 };
 ```
 
-**Bekräftat i Fas 1** (`docs/provia-knowledge-engine/10-open-questions.md` #6): `api/hp.js`s `verifyVerbal()`/`verifyFixedAlt()` skickar redan bara `{stem, options}` till modellen — aldrig `correct_index`. Kopiera det mönstret rakt av när denna prompt skrivs i Fas 5. `hp.js` rörs inte.
+Verifieraren ska bara få frågan, alternativen och källorna — aldrig generatorns facit, förklaring eller käll-ID:n. Jämförelsen mot facit sker först efter den blinda lösningen.
 
 Skrivs i Fas 5.

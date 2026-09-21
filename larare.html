@@ -421,7 +421,7 @@ function resultBadge(st){
   return `<span class="resBadge ${pctTier(st.last_percent)}">${st.last_percent}%</span>`;
 }
 
-// Inline SVG sparkline of recent percents (oldest→newest). 80% = teoriprov pass line.
+// Inline SVG sparkline of recent percents (oldest→newest).
 function sparkline(trend,w=92,h=26,cls=''){
   if(!trend || !trend.length) return '<span class="spark empty">—</span>';
   const pad=3;

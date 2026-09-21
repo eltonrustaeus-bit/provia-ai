@@ -4,7 +4,7 @@
 // Usage:
 //   node bot-testing/run-bots.mjs                 # all personas, headless, prod
 //   node bot-testing/run-bots.mjs --headed        # watch the browser
-//   node bot-testing/run-bots.mjs --only=liam_korkort,emma_gy_matte
+//   node bot-testing/run-bots.mjs --only=emma_gy_matte,sara_gy_svag
 //   node bot-testing/run-bots.mjs --base=http://localhost:3000
 //
 // Creates REAL accounts on the target Supabase. Emails use plus-addressing

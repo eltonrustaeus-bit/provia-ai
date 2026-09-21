@@ -76,10 +76,10 @@ function decideApproval(r, thresholds) {
 
 // The verifier is a SECOND OPINION, so it must be allowed to run on a different
 // model than the generator. Running both roles on the same weights reproduces the
-// same blind spots: api/hp.js:571 records that gpt-4o-mini reliably mislabels
-// correct_index on quantitative items while writing a correct explanation — a
-// same-model reviewer agrees with that mistake. Falls back to the generator's
-// model so behaviour is unchanged until the env var is set.
+// same blind spots: a generator can write a correct explanation but still point
+// correct_index at the wrong option, and a same-model reviewer may agree with
+// that mistake. Falls back to the generator's model so behaviour is unchanged
+// until the env var is set.
 function verifierModel(generatorModel) {
   return process.env.OPENAI_VERIFIER_MODEL || generatorModel;
 }
