@@ -1592,30 +1592,18 @@ function finalizeMsg(div, text) {
       } catch (_) {}
       if (!_hasSession) updateLandingBar();
 
-      /* Landing pages: first-visit intro or recurring nudge */
+      /* Landing pages: keep P.E.R available without taking over the first view.
+         The old first-visit flow opened the full chat automatically after 3.5s.
+         That made the product feel interrupted before the visitor had chosen to
+         use the coach. The compact P.E.R button is always visible, so the coach
+         remains one click away without covering the page. */
       if (isLanding()) {
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
         if (firstMsg) firstMsg.textContent = 'Vad undrar du om ExGen?';
         if (isFirstVisit()) {
           markVisited();
-          setTimeout(function() {
-            if (!_open) {
-              toggle();
-              var introMsgs = document.getElementById('perMessages');
-              if (introMsgs) {
-                var introDiv = introMsgs.querySelector('.per-msg.teacher');
-                if (introDiv) {
-                  introDiv.className = 'per-msg teacher';
-                  introDiv.innerHTML = '';
-                  var introText = 'Hallå! Jag är P.E.R. Jag svarar på allt om ExGen — vad det är, hur det hjälper dig plugga smartare och vad det kostar. Fråga på!';
-                  typewriterMsg(introDiv, introText, 14);
-                  setTimeout(function() {
-                    addQuickReplies(['Vad är ExGen?', 'Varför inte ChatGPT?', 'Vad kostar det?']);
-                  }, 2600);
-                }
-              }
-            }
-          }, 3500);
+          /* Intentionally stay collapsed. P.E.R is represented by the fixed
+             button and opens only after an explicit click or Alt+P. */
         } else {
           maybeShowLandingGreeting();
         }
