@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
@@ -32,6 +33,20 @@ function proof(questions = examFor()) {
   };
 }
 
+test("the exam manifest binds the complete delivered set to its account and material", () => {
+  const questions = examFor();
+  const manifest = completion.issueExamManifest(userId, course, material, questions);
+  assert.match(manifest, /^v1\.2\.[A-Za-z0-9_-]{43}$/);
+  assert.equal(completion.verifyExamManifest(manifest, userId, course, material, questions), true);
+  assert.equal(completion.verifyExamManifest(manifest, userId, course, material, [...questions].reverse()), true);
+  assert.equal(completion.verifyExamManifest(manifest, userId, course, material, [questions[0]]), false);
+  assert.equal(completion.verifyExamManifest(manifest, userId, course, material, [questions[0], questions[0]]), false);
+  assert.equal(completion.verifyExamManifest(manifest, "student-b", course, material, questions), false);
+  assert.equal(completion.verifyExamManifest(manifest, userId, "Biologi 1", material, questions), false);
+  assert.equal(completion.verifyExamManifest(manifest, userId, course, "annat material", questions), false);
+  assert.equal(completion.verifyExamManifest("v1.2.forged", userId, course, material, questions), false);
+});
+
 test("a graded full set authorizes only its signed question for its owner", () => {
   const checked = completion.verifyCompletion(proof(), userId);
   assert.equal(checked?.question?.id, "q1");
@@ -41,6 +56,15 @@ test("a graded full set authorizes only its signed question for its owner", () =
 
 test("an ungraded set has no completion receipt", () => {
   assert.equal(completion.verifyCompletion({ ...proof(), receipt: "" }, userId), null);
+});
+
+test("a previously valid v1 receipt cannot bypass the full-set manifest", () => {
+  const old = proof();
+  const id = completion.submissionId(userId, course, old.questions);
+  const signature = crypto.createHmac("sha256", process.env.EXAM_SIGNING_SECRET)
+    .update(`exgen-exam-completion:v1:${userId}:${id}`)
+    .digest("base64url");
+  assert.equal(completion.verifyCompletion({ ...old, receipt: `v1.${id}.${signature}` }, userId), null);
 });
 
 test("another account, context, or question cannot reuse a completion", () => {

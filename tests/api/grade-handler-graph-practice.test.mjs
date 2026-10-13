@@ -18,6 +18,7 @@ const origin = "https://grade-handler.test";
 const secret = "local-only-signing-secret";
 const calls = [];
 let mockResultStatus = 204;
+let savedResultPresent = true;
 let learnerLoopEnabled = false;
 
 process.env.SUPABASE_URL = origin;
@@ -36,7 +37,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
     ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
     : []);
-  if (url.includes("/rest/v1/mock_results")) return new Response(null, { status: mockResultStatus });
+  if (url.includes("/rest/v1/mock_results")) return init.method === "POST"
+    ? new Response(null, { status: mockResultStatus })
+    : Response.json(savedResultPresent ? { num_questions: 1 } : null);
   if (url.includes("/rest/v1/concepts")) {
     return init.method === "POST"
       ? Response.json([{ id: "22222222-2222-4222-8222-222222222222" }], { status: 201 })
@@ -86,12 +89,36 @@ try {
     grade_task: tasks.sealQuestion(question, secret, contextHash),
   };
   assert.ok(publicQuestion.grade_task, "graph task is signed for the synthetic user and context");
+  const manifest = require("../../api/_exam-completion.cjs")
+    .issueExamManifest(userId, course, material, [publicQuestion]);
+  const examProof = {
+    receipt: require("../../api/_exam-completion.cjs").issueCompletion(userId, course, [publicQuestion]),
+    course, material, questions: [publicQuestion], selectedQuestionId: question.id,
+  };
+
+  const beforeProof = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry",
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(beforeProof.status, 403, "graph practice cannot reveal an answer before verified completion");
+  calls.length = 0;
+  savedResultPresent = false;
+  const deletedResult = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(deletedResult.status, 403, "deleting a graded result revokes graph practice access");
+  savedResultPresent = true;
+  calls.length = 0;
 
   const response = await invoke({
     lang: "sv",
     course,
     pastedText: material,
     mode: "graph_practice_retry",
+    examProof,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });
@@ -104,7 +131,7 @@ try {
   assert.equal(response.body.result.points, 2);
   assert.equal(response.body.result.model_answer, "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).");
   assert.ok(calls.some((call) => call.url === `${origin}/rest/v1/rpc/consume_anon_rate`), "the actual handler checks the server quota");
-  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results")), "a practice retry does not save an official result");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"), "a practice retry does not save an official result");
   assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")), "a practice retry does not update mastery");
   assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic graph retry does not call the AI provider");
 
@@ -114,6 +141,7 @@ try {
     course,
     pastedText: material,
     mode: "graph_practice_retry",
+    examProof,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });
@@ -125,6 +153,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
   });
@@ -154,6 +183,7 @@ try {
       lang: "sv",
       course,
       pastedText: material,
+      exam_manifest: manifest,
       questions: [publicQuestion],
       answers: [{ id: question.id, answer: invalidAnswer }],
     });
@@ -172,6 +202,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });
@@ -218,6 +249,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });
@@ -240,6 +272,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });

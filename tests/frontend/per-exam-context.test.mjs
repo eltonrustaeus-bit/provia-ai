@@ -11,7 +11,7 @@ const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
-  title: "Prov", level: "C",
+  title: "Prov", level: "C", exam_manifest: "synthetic-biology-manifest",
   questions: Array.from({ length: 3 }, (_, n) => ({
     id: "q" + (n + 1), type: "mc", points: 2,
     question: "Fråga nummer " + (n + 1) + " om cellandning",
@@ -263,7 +263,7 @@ ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
 // nytt mot ett S.exam som fortfarande finns kvar, mitt på resultatskärmen.
 // Kräver type:"short"; T9:s type:"mc" kan per konstruktion aldrig fånga det.
 const EXAM_SHORT = {
-  title: "Prov", level: "C",
+  title: "Prov", level: "C", exam_manifest: "synthetic-short-manifest",
   questions: Array.from({ length: 3 }, (_, n) => ({
     id: "s" + (n + 1), type: "short", points: 2,
     question: "Kortsvarsfråga " + (n + 1) + " om cellandning",

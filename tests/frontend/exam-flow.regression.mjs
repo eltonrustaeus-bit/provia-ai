@@ -30,7 +30,7 @@ fs.mkdirSync(SHOT, { recursive: true });
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
-  title: "Prov", level: "C",
+  title: "Prov", level: "C", exam_manifest: "synthetic-resume-manifest",
   questions: [
     { id: "dup", type: "mc", points: 2, question: "Fråga A — var sker citronsyracykeln?", options: ["Cytoplasman", "Matrix", "Kärnan", "Ribosomen"], correct_index: 1, topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.4"], model_answer: "Matrix", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "dup", type: "short", points: 4, question: "Fråga B — förklara jäsning.", options: [], correct_index: -1, topic: "Jäsning", cognitive_level: "tillämpa", source_references: ["s.7"], model_answer: "Vid syrebrist…", scoring_rubric: { parts: [{ description: "Orsak", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } },
@@ -315,6 +315,29 @@ async function toExam(page) {
     ok("T7c återupptaget prov går att rätta", gotResult);
     await page.screenshot({ path: SHOT + "/t7-resume.png" });
   }
+  await ctx.close();
+}
+
+// Äldre utkast saknar manifest och ska inte öppna ett prov som sedan nekas vid rättning.
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "u1");
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.evaluate(() => localStorage.setItem("exgen_flow_draft_u1", JSON.stringify({
+    ts: Date.now(), uid: "u1", course: "Biologi 1", level: "C", qType: "mc", num: 3,
+    material: "Cellandning sker i mitokondrien.",
+    exam: { questions: [{ id: "old-1", question: "Var sker cellandningen?" }] },
+    answers: { "old-1": "I mitokondrien" },
+  })));
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+  ok("T7d gammalt utkast erbjuds inte som fortsatt prov",
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).count() === 0);
+  await page.getByRole("button", { name: "Skapa nytt prov av materialet" }).click();
+  ok("T7e materialet återanvänds",
+    await page.locator("#xf .xf-screen[data-screen='material'] textarea").inputValue() === "Cellandning sker i mitokondrien.");
+  ok("T7f gamla svaren finns kvar lokalt tills nytt prov skapas",
+    !!(await page.evaluate(() => localStorage.getItem("exgen_flow_draft_u1")))?.includes("I mitokondrien"));
   await ctx.close();
 }
 

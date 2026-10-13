@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
+const examCompletion = require("./_exam-completion.cjs");
 const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 
 function cognitiveVerbHint(lang) {
@@ -1262,6 +1263,8 @@ module.exports = async function handler(req, res) {
         return clientQuestion;
       }),
     };
+    clientExam.exam_manifest = examCompletion.issueExamManifest(user.id, course, pastedText, clientExam.questions);
+    if (!clientExam.exam_manifest) throw new Error("Exam manifest unavailable");
 
     if (quota.enforced && !quota.unlimited) {
       const committed = await commitMockExamQuota(user.id, quotaPeriod, quotaRequestId);

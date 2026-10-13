@@ -609,6 +609,10 @@ export const PER_GRAPH = {
       "till": "tabell:user_profiles"
     },
     {
+      "från": "grade",
+      "till": "tabell:mock_results"
+    },
+    {
       "från": "teacher-report",
       "till": "tabell:user_exams"
     }

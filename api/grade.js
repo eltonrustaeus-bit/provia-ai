@@ -441,6 +441,22 @@ module.exports = async function handler(req, res) {
     if (new Set(questions.map((q) => q.id)).size !== questions.length) {
       return json(res, 400, { ok: false, error: "Duplicate question IDs" });
     }
+    if (p.mode !== "graph_practice_retry") {
+      if (!p.exam_manifest) {
+        return json(res, 409, { ok: false, error: "EXAM_MANIFEST_REQUIRED" });
+      }
+      if (!examCompletion.verifyExamManifest(p.exam_manifest, user.id, contextCourse, pastedText, submittedQuestions)) {
+        return json(res, 400, { ok: false, error: "EXAM_MANIFEST_INVALID" });
+      }
+    }
+    const practiceCompletion = p.mode === "graph_practice_retry"
+      ? examCompletion.verifyCompletion(p.examProof, user.id)
+      : null;
+    if (p.mode === "graph_practice_retry" &&
+        (!practiceCompletion || questions.length !== 1 || questions[0].type !== "graph" ||
+         p.examProof.questions.find((q) => q.id === questions[0].id)?.grade_task !== submittedQuestions[0].grade_task)) {
+      return json(res, 403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
+    }
     const answersArr = Array.isArray(p.answers) ? p.answers : [];
 
     const history = sanitizeHistory(p.history);
@@ -451,6 +467,21 @@ module.exports = async function handler(req, res) {
 
     const quotaClient = await supabaseClient();
     if (!quotaClient) return json(res, 503, { ok: false, error: "Grading is temporarily unavailable" });
+    if (practiceCompletion) {
+      try {
+        const { data, error } = await quotaClient.from("mock_results")
+          .select("submission_id,num_questions")
+          .eq("user_id", user.id)
+          .eq("submission_id", practiceCompletion.submissionId)
+          .maybeSingle();
+        if (error) return json(res, 503, { ok: false, error: "Graded exam could not be checked" });
+        if (data?.num_questions !== p.examProof.questions.length) {
+          return json(res, 403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
+        }
+      } catch {
+        return json(res, 503, { ok: false, error: "Graded exam could not be checked" });
+      }
+    }
     try {
       const { data: quota, error } = await quotaClient.rpc("consume_anon_rate", {
         p_bucket: "grade:" + user.id,

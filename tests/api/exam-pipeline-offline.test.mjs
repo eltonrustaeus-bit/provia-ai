@@ -148,6 +148,7 @@ try {
   assert.equal(generated.status, 200, JSON.stringify(generated.body));
   assert.equal(generated.body.ok, true);
   assert.equal(generated.body.exam.questions.length, 3);
+  assert.match(generated.body.exam.exam_manifest, /^v1\.3\./);
   for (const question of generated.body.exam.questions) {
     assert.ok(question.grade_task, "each delivered question has opaque signed grading material");
     for (const hidden of ["correct_index", "model_answer", "rubric", "scoring_rubric", "akey_sig", "confidence_score", "detected_issues"]) {
@@ -157,8 +158,29 @@ try {
   assert.equal(generated.body.meta.verifier.approved, 3);
   assert.equal(generated.body.meta.solver.checked, 3);
 
+  const missingManifest = await invoke(gradeExam, {
+    lang: "sv", course, pastedText, level: "C",
+    questions: generated.body.exam.questions,
+    answers: generated.body.exam.questions.map((q) => ({ id: q.id, answer: "" })),
+  });
+  assert.equal(missingManifest.status, 409);
+  assert.equal(missingManifest.body.error, "EXAM_MANIFEST_REQUIRED");
+
+  const beforeSubset = calls.length;
+  const subset = await invoke(gradeExam, {
+    lang: "sv", course, pastedText, level: "C",
+    exam_manifest: generated.body.exam.exam_manifest,
+    questions: generated.body.exam.questions.slice(0, 1),
+    answers: [{ id: generated.body.exam.questions[0].id, answer: "B" }],
+  });
+  assert.equal(subset.status, 400);
+  assert.equal(subset.body.error, "EXAM_MANIFEST_INVALID");
+  assert.equal(calls.slice(beforeSubset).some((call) => call.url.includes("consume_anon_rate") || call.url.includes("openai.com")), false,
+    "a submitted subset is denied before quota and model calls");
+
   const graded = await invoke(gradeExam, {
     lang: "sv", course, pastedText, level: "C",
+    exam_manifest: generated.body.exam.exam_manifest,
     questions: generated.body.exam.questions,
     answers: generated.body.exam.questions.map((q, index) => ({ id: q.id, answer: ["B", "A", "B"][index] })),
   });
@@ -275,6 +297,7 @@ try {
 
   const graphGraded = await invoke(gradeExam, {
     lang: "sv", course: graphCourse, pastedText: graphMaterial,
+    exam_manifest: graphGenerated.body.exam.exam_manifest,
     questions: [graphQuestion],
     answers: [{ id: graphQuestion.id, answer: JSON.stringify({
       type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 3 }],

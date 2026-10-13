@@ -1302,6 +1302,7 @@ const examMetaEl=()=>$("examMeta"),examBodyEl=()=>$("examBody");
 const resultMetaEl=()=>$("resultMeta"),resultBodyEl=()=>$("resultBody");
 const imageInputEl=()=>$("imageInput"),ocrStatusEl=()=>$("ocrStatus");
 let currentExam=null;
+let currentExamProof=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
 
 function setBusy(isBusy,label){
@@ -1526,20 +1527,19 @@ function isRenderableQuestion(q){
 }
 
 function renderExam(exam){
-  currentExam=exam; const t=T[LANG];
+  const t=T[LANG];
+  currentExamProof=null;
   let graphToolUnavailable=false;
   const rawQs=Array.isArray(exam.questions)?exam.questions:[];
   const qs=rawQs.filter(isRenderableQuestion);
   const droppedCount=rawQs.length-qs.length;
-  currentExam.questions=qs; // only renderable questions proceed to answering + grading
-  if(qs.length===0){
+  if(qs.length===0||droppedCount>0){
+    currentExam=null;
     setStatus(LANG==="sv"?"Provet kunde inte skapas med tillräcklig kvalitet. Försök generera igen.":"The exam could not be built with sufficient quality. Please generate again.","bad");
     const g=$("gradeBtn");if(g)g.disabled=true;
-    return;
+    return false;
   }
-  if(droppedCount>0){
-    showToast(LANG==="sv"?`${droppedCount} fråga(or) uteslöts pga kvalitetskontroll.`:`${droppedCount} question(s) were excluded by the quality check.`,"warn");
-  }
+  currentExam=exam;
   const em=examMetaEl(),eb=examBodyEl(),rm=resultMetaEl(),rb=resultBodyEl();
   if(em)em.textContent=LANG==="sv"
     ?`${qs.length} frågor · Nivå ${exam.level||"—"} — besvara allt och tryck Rätta prov`
@@ -1605,6 +1605,7 @@ function renderExam(exam){
   }
   // Visa flytande rätta-bar
   const fb=$("floatingGradeBar");if(fb&&qs.length>0)fb.classList.add("show");
+  return true;
 }
 
 // After grading: colour + symbol the original MC options and lock them.
@@ -1671,7 +1672,7 @@ function clearAll(){
   if(qTypeEl())qTypeEl().value="mix";
   if(numQuestionsEl())numQuestionsEl().value="12";
   if(imageInputEl())imageInputEl().value="";
-  setOcrStatus("");currentExam=null;
+  setOcrStatus("");currentExam=null;currentExamProof=null;
   const chk=document.getElementById("useCustomCourse"),cs=document.getElementById("courseSearch"),cc=document.getElementById("customCourse"),st=document.getElementById("coursePickerStatus");
   if(chk)chk.checked=false;if(cs)cs.value="";if(cc)cc.value="";if(st)st.textContent="";
   try{if(cc)cc.disabled=true;if(cs)cs.disabled=false;}catch{}
@@ -1846,7 +1847,8 @@ try{
     await refreshQuotaUi();
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-    renderExam(res.data.exam);setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
+    if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
+    setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
 
     // Uppdatera floating bar hint med antal frågor
     const fh=$("floatingGradeHint");
@@ -1866,6 +1868,12 @@ try{
     if(isGrading)return {ok:false,error:"Rättning pågår redan."};
     hideDebug();const t=T[LANG];
     if(!currentExam||!Array.isArray(currentExam.questions)||currentExam.questions.length===0){setStatus(t.genFirst,"bad");return {ok:false,error:t.genFirst};}
+    if(!currentExam.exam_manifest){
+      const message=LANG==="sv"
+        ?"Provet skapades med en äldre version och kan inte rättas säkert. Skapa ett nytt prov."
+        :"This exam was created with an older version and cannot be graded safely. Generate a new exam.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
     let answers;
     if(Array.isArray(answersOverride)){
       answers=answersOverride.map(a=>({id:String(a.id),answer:String(a.answer||"").trim()}));
@@ -1879,7 +1887,7 @@ try{
       });
     }
     const pastedText=(pastedTextEl()?.value||"").trim();
-    const payload={lang:LANG,course:(courseEl()?.value||"").trim(),pastedText,questions:currentExam.questions,answers};
+    const payload={lang:LANG,course:(courseEl()?.value||"").trim(),pastedText,questions:currentExam.questions,answers,exam_manifest:currentExam.exam_manifest};
     isGrading=true;
     setBusy(true,t.gradeWorking);setStatus(t.gradeWorking,"");
     // Den P.E.R-ledda ytan visar sin egen rättningsskärm. Två överlägg ovanpå
@@ -1949,7 +1957,8 @@ try{
       const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
       const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
       setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
-      return {ok:true,result,examProof:res.data.exam_proof||null,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
+      currentExamProof=res.data.exam_proof||null;
+      return {ok:true,result,examProof:currentExamProof,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
     }catch(err){
       const msg=LANG==="sv"?"Ett oväntat fel uppstod efter rättningen. Kontrollera om resultatet sparats innan du skickar in igen.":"An unexpected error occurred after grading. Check whether the result was saved before submitting again.";
       setStatus(msg,"bad");showToast(msg,"bad");showDebug(String(err&&err.message||err));
@@ -2057,7 +2066,7 @@ try{
     getPendingAccountSaves() { return getPendingAccountSaves(); },
     async gradeGraphRetry(questionId, answer) {
       const question = currentExam?.questions?.find((q) => String(q.id) === String(questionId));
-      if (!question || question.type !== "graph" || !question.grade_task) {
+      if (!question || question.type !== "graph" || !question.grade_task || !currentExamProof) {
         return { ok: false, error: "Grafuppgiften kunde inte verifieras. Skapa ett nytt prov." };
       }
       const payload = {
@@ -2066,6 +2075,13 @@ try{
         course: (courseEl()?.value || "").trim(),
         pastedText: (pastedTextEl()?.value || "").trim(),
         questions: [question],
+        examProof: {
+          receipt: currentExamProof,
+          course: (courseEl()?.value || "").trim(),
+          material: (pastedTextEl()?.value || "").trim(),
+          questions: currentExam.questions,
+          selectedQuestionId: String(question.id),
+        },
         answers: [{ id: String(question.id), answer: String(answer || "") }],
       };
       const response = await postJson("/api/grade", payload, { timeoutMs: 20000 });
@@ -2082,8 +2098,9 @@ try{
        först" — mitt i ett prov eleven redan skrivit klart. Ingen kvot dras,
        inget OpenAI-anrop görs; det är samma prov, bara tillbaka i minnet. */
     adoptExam(exam) {
-      if (!exam || !Array.isArray(exam.questions) || !exam.questions.length) return false;
+      if (!exam || !exam.exam_manifest || !Array.isArray(exam.questions) || !exam.questions.length) return false;
       currentExam = exam;
+      currentExamProof = null;
       const g = $("gradeBtn"); if (g) g.disabled = false;
       return true;
     },

@@ -16,7 +16,7 @@ try {
       const body = route.request().postDataJSON();
       if (body.qType === "mix") {
         trainingGenerateBody = body;
-        await route.fulfill({ json: { ok: true, exam: { title: "Träningsprov", level: "C", questions: [{
+        await route.fulfill({ json: { ok: true, exam: { title: "Träningsprov", level: "C", exam_manifest: "synthetic-training-manifest", questions: [{
           id: "practice-1", type: "mc", points: 1,
           question: "Vad beskriver lutningen i en rät linje?",
           options: ["Y:s förändring när x ökar med 1", "Var linjen börjar på x-axeln", "Antalet punkter på linjen"],
@@ -33,7 +33,7 @@ try {
         return;
       }
       generateBody = body;
-      await route.fulfill({ json: { ok: true, exam: { title: "Matteprov", level: "C", questions: [{
+      await route.fulfill({ json: { ok: true, exam: { title: "Matteprov", level: "C", exam_manifest: "synthetic-graph-manifest", questions: [{
         id: "graph-1", type: "graph", points: 2,
         question: "Rita grafen till y = 2x + 1. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.",
         grade_task: "opaque-test-task", options: [], topic: "Linjär funktion"
@@ -78,7 +78,7 @@ try {
         return;
       }
       gradeBody = body;
-      await route.fulfill({ json: { ok: true, result: { total_points: 1, max_points: 2, per_question: [{
+      await route.fulfill({ json: { ok: true, exam_proof: "synthetic-graded-graph-proof", result: { total_points: 1, max_points: 2, per_question: [{
         id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.", model_answer: ""
       }] } } });
     }],
@@ -243,6 +243,7 @@ try {
   const retryBox = await page.locator(".xf-graph-retry").boundingBox();
   assert.ok(retryBox && retryBox.x >= 0 && retryBox.x + retryBox.width <= 390, "retry control stays within the viewport");
   assert.equal(retryBody?.mode, "graph_practice_retry");
+  assert.equal(retryBody?.examProof?.receipt, "synthetic-graded-graph-proof");
   assert.equal(graphRetryAttempts, 3, "retry succeeds after a transient failure and a stale response");
   assert.deepEqual(retryBody?.answers, [{ id: "graph-1", answer: JSON.stringify({ type: "line", points: [{ x: 0, y: 1 }, { x: 2, y: 5 }] }) }]);
   assert.equal(retryBody?.questions?.[0]?.grade_task, "opaque-test-task");
@@ -281,6 +282,7 @@ try {
   assert.equal(generateBody?.numQuestions, 1);
   assert.deepEqual(gradeBody?.answers, [{ id: "graph-1", answer: JSON.stringify({ type: "line", points: [{ x: 0, y: 1 }, { x: 2, y: 3 }] }) }]);
   assert.equal(gradeBody?.questions?.[0]?.grade_task, "opaque-test-task");
+  assert.equal(gradeBody?.exam_manifest, "synthetic-graph-manifest");
   assert.equal("graph_spec" in gradeBody.questions[0], false);
   assert.equal(gradeBody.mode, undefined);
 

@@ -107,6 +107,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, questions),
     questions,
     answers: expected.map((item) => ({ id: item.id, answer: "Ett syntetiskt elevsvar." })),
   };

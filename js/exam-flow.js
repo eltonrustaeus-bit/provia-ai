@@ -599,7 +599,12 @@
     // eller täckningen försvann på bussen.
     var draft = readDraft();
     if (draft) {
-      var back = el("button", "xf-btn ghost", "Fortsätt provet du började");
+      var legacyDraft = !draft.exam.exam_manifest;
+      if (legacyDraft) {
+        var legacyNote = el("p", "xf-sub", "Det här provet skapades med en äldre version och kan inte rättas säkert. Ditt material finns kvar; skapa ett nytt prov för att fortsätta.");
+        act.appendChild(legacyNote);
+      }
+      var back = el("button", "xf-btn ghost", legacyDraft ? "Skapa nytt prov av materialet" : "Fortsätt provet du började");
       back.type = "button";
       back.addEventListener("click", function () {
         S.course = draft.course || "";
@@ -608,6 +613,7 @@
         S.num = draft.num || 12;
         S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 3, 20);
         S.material = draft.material || "";
+        if (legacyDraft) { stepMaterial(); return; }
         S.exam = draft.exam;
         S.answers = draft.answers || {};
         S.helped = draft.helped || {};

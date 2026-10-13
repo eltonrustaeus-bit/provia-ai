@@ -77,6 +77,7 @@ try {
     lang: "sv",
     course,
     pastedText: material,
+    exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, [publicQuestion]),
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: "y ökar med 2" }],
   });
