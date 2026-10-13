@@ -152,6 +152,12 @@ async function toExam(page) {
     await page.fill(".xf-answer", "syntetiskt svar");
     await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
     await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.waitForSelector(".xf-exam.on");
+    const resumedChoice = await page.locator(".xf-mc-opt.sel").innerText();
+    ok("T1e __proto__-svaret överlever sparat utkast och återupptagning", /^C(?:\.|\s)/.test(resumedChoice), resumedChoice);
     await page.click(".xf-exam-nav .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
     const gradedAnswers = lastGradePayload?.answers || [];
