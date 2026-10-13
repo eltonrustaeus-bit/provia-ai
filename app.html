@@ -765,7 +765,7 @@ const LS_ROLE = "proviaai_role";
 const LS_PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
 
 // ── QUOTA CONSTANTS PER ROLL ──────────────────────────────────────────
-// Gratis: 3 prov per vecka (räknat måndag–söndag) — måste matcha api/_provia-rules.js
+// Gratis: 3 prov per vecka (måndag–söndag i svensk tid) — måste matcha api/_provia-rules.js
 // Basic:  30 prov per månad (kalendermånad)
 // Premium: obegränsat
 const ROLE_LIMITS = {
@@ -821,6 +821,8 @@ sv:{
   trainLoaded:"Träningsläge: materialet är byggt av dina valda misstag. Skapa ett nytt mockprov.",
   quotaHitWeek:"Du har använt dina 3 gratis prov den här veckan. Uppgradera till Basic för 30 prov/månad.",
   quotaHitMonth:"Du har nått månadsgränsen. Uppgradera till Premium för obegränsat.",
+  quotaPilotWeek:"Du har använt veckans prov i testversionen. Du kan skapa nya prov på måndag. Kontakta den som bjöd in dig om du behöver hjälp.",
+  quotaPilotMonth:"Du har använt månadens prov i testversionen. Du kan skapa nya prov nästa månad. Kontakta den som bjöd in dig om du behöver hjälp.",
   openSection:"Öppna",closeSection:"Stäng",
   wLabel0:"Material",wLabel1:"Inställningar",wLabel2:"Mockprov",wLabel3:"Rättning",
   wNext0:"Nästa: Inställningar →",wHint0:"Klistra in ditt studiematerial ovan",
@@ -858,6 +860,8 @@ en:{
   trainLoaded:"Training mode: material built from your selected mistakes. Generate a new mock exam.",
   quotaHitWeek:"You've used your 3 free exams this week. Upgrade to Basic for 30/month.",
   quotaHitMonth:"You've reached the monthly limit. Upgrade to Premium for unlimited.",
+  quotaPilotWeek:"You've used this week's exams in the test version. You can create more on Monday. Contact the person who invited you if you need help.",
+  quotaPilotMonth:"You've used this month's exams in the test version. You can create more next month. Contact the person who invited you if you need help.",
   openSection:"Open",closeSection:"Close",
   wLabel0:"Material",wLabel1:"Settings",wLabel2:"Mock exam",wLabel3:"Grading",
   wNext0:"Next: Settings →",wHint0:"Paste your study material above",
@@ -870,9 +874,17 @@ en:{
 };
 
 // ── QUOTA HELPERS ────────────────────────────────────────────────────
-// Returnerar ISO-veckonyckel "YYYY-Www" för current week (måndag-baserad)
+// Kvotperioder följer svensk tid, även om elevens enhet har en annan tidszon.
+function stockholmQuotaDate(d = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(d);
+  const value = type => Number(parts.find(part => part.type === type)?.value);
+  return new Date(Date.UTC(value("year"), value("month") - 1, value("day")));
+}
+// Returnerar ISO-veckonyckel "YYYY-Www" (måndag–söndag i svensk tid).
 function isoWeekKey(d = new Date()) {
-  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const tmp = stockholmQuotaDate(d);
   tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
   const week = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
@@ -880,7 +892,7 @@ function isoWeekKey(d = new Date()) {
 }
 // Returnerar "YYYY-MM" för aktuell månad
 function monthKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  return stockholmQuotaDate(d).toISOString().slice(0, 7);
 }
 
 function quotaStorageKey(role, uid) {
@@ -915,6 +927,14 @@ async function checkQuota() {
   if (cfg.limit === Infinity) return { allowed: true, count: 0, limit: Infinity, period: cfg.period };
   const count = await readQuotaCount();
   return { allowed: count < cfg.limit, count, limit: cfg.limit, period: cfg.period };
+}
+
+function quotaLimitMessage(period) {
+  const pilot = window.ExGenRuntime.environment === "pilot";
+  const copy = T[LANG];
+  return period === "week"
+    ? (pilot ? copy.quotaPilotWeek : copy.quotaHitWeek)
+    : (pilot ? copy.quotaPilotMonth : copy.quotaHitMonth);
 }
 
 async function refreshQuotaUi() {
@@ -956,13 +976,13 @@ async function refreshQuotaUi() {
   // Visa banner när ≤ 1 kvar eller vid gränsen
   if (banner && bannerTxt) {
     if (left === 0) {
-      const msg = cfg.period === "week" ? T[LANG].quotaHitWeek : T[LANG].quotaHitMonth;
+      const msg = quotaLimitMessage(cfg.period);
       bannerTxt.innerHTML = `<strong>${LANG === "sv" ? "Gränsen nådd." : "Limit reached."}</strong> ${msg}`;
       banner.classList.add("show");
     } else if (left === 1) {
       bannerTxt.innerHTML = LANG === "sv"
-        ? `<strong>1 prov kvar</strong> denna ${periodLabel}. Uppgradera för mer.`
-        : `<strong>1 exam left</strong> this ${periodLabel}. Upgrade for more.`;
+        ? `<strong>1 prov kvar</strong> denna ${periodLabel}.${window.ExGenRuntime.environment === "pilot" ? " Nya prov blir tillgängliga när perioden börjar om." : " Uppgradera för mer."}`
+        : `<strong>1 exam left</strong> this ${periodLabel}.${window.ExGenRuntime.environment === "pilot" ? " More exams become available when the period resets." : " Upgrade for more."}`;
       banner.classList.add("show");
     } else {
       banner.classList.remove("show");
@@ -1816,7 +1836,7 @@ try{
     // ── QUOTA CHECK (klientside) ──────────────────────────────────────
     const quota = await checkQuota();
     if(!quota.allowed){
-      const msg = (ROLE_LIMITS[currentRole]?.period === "week") ? t.quotaHitWeek : t.quotaHitMonth;
+      const msg = quotaLimitMessage(ROLE_LIMITS[currentRole]?.period);
       setStatus(msg, "bad");
       await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
@@ -1830,10 +1850,11 @@ try{
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
-    if(res.status===429&&res.data){
+    if(res.status===429&&res.data?.error==="Quota exceeded"){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
-      setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();
-      return {ok:false,error:res.data?.message||res.data?.error||t.quotaHitMonth,quota:true};
+      const msg = quotaLimitMessage(ROLE_LIMITS[currentRole]?.period);
+      setBusy(false);setStatus(msg,"bad");await refreshQuotaUi();
+      return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);

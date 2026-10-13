@@ -12,7 +12,7 @@ import { decideSalesMode, buildSalesGuardrail, SALES_MODE } from "./_per-sales.j
 import { decidePerRole, buildRoleInstruction } from "./_per-role.js";
 import { buildCurriculumContext } from "./_math-curriculum.js";
 import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
-import { getFeatureLimit, normalizeRole } from "./_provia-rules.js";
+import { currentPeriodKey, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { buildPERContextPack } from "./_per-context.js";
 import { flagsEnabled } from "./_flags.js";
 /* buildProfileContext anropas inte härifrån längre — api/_learner-context.js är
@@ -53,14 +53,6 @@ async function callMeasuredPerAI(messages, options, { userId, feature = "per_cha
     model: result.model, usage: result.usage, latencyMs: Date.now() - startedAt,
   }, { timeoutMs: 750 });
   return result.text;
-}
-
-function currentPeriodKey(period) {
-  const now = new Date();
-  if (period === "day") return now.toISOString().slice(0, 10);
-  if (period === "month") return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const dayOfYear = Math.floor((now - new Date(Date.UTC(now.getUTCFullYear(), 0, 1))) / 86400000) + 1;
-  return `${now.getUTCFullYear()}-W${String(Math.ceil(dayOfYear / 7)).padStart(2, "0")}`;
 }
 
 function sanitize(str, maxLen) {

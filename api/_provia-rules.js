@@ -76,13 +76,19 @@ export function getEntitlementSnapshot(role) {
 }
 
 export function currentPeriodKey(period, now = new Date()) {
-  if (period === "day") return now.toISOString().slice(0, 10);
-  if (period === "month") {
-    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  }
-  const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-  const dayOfYear = Math.floor((now - start) / 86400000) + 1;
-  return `${now.getUTCFullYear()}-W${String(Math.ceil(dayOfYear / 7)).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now);
+  const value = (type) => Number(parts.find((part) => part.type === type)?.value);
+  const year = value("year"), month = value("month"), day = value("day");
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (period === "day") return date.toISOString().slice(0, 10);
+  if (period === "month") return `${year}-${String(month).padStart(2, "0")}`;
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const weekYear = date.getUTCFullYear();
+  const first = new Date(Date.UTC(weekYear, 0, 1));
+  const week = Math.ceil((((date - first) / 86400000) + 1) / 7);
+  return `${weekYear}-W${String(week).padStart(2, "0")}`;
 }
 
 export function formatLimit(limit) {
