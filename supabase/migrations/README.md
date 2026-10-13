@@ -116,6 +116,12 @@ The adjacent rollback file intentionally aborts: dropping the table while the ap
 uses it would remove the server-side exam guard. Applying this migration or enabling the
 corresponding app routes requires a separate approval and an isolated deployment plan.
 
+Read-only Supabase metadata checked on 2026-10-13 showed that the current production
+`public.mock_results` table has no `submission_id`, and its migration ledger does not include
+`20261012120017_mock_result_submission_idempotency.sql`. The active-exam migration now fails
+up front unless that earlier column and named unique index exist. This is a dependency finding,
+not permission to apply either migration to production or the schema-empty staging project.
+
 ## Kontrollera drift
 
 Filkontrollerna är maskinella och ingår i testsviten:

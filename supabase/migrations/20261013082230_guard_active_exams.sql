@@ -1,3 +1,16 @@
+do $$
+begin
+  if to_regclass('public.mock_results') is null
+    or not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'mock_results' and column_name = 'submission_id'
+    )
+    or to_regclass('public.mock_results_user_submission_id_uidx') is null then
+    raise exception 'Active exam guard requires the reviewed mock_result_submission_idempotency migration first';
+  end if;
+end;
+$$;
+
 create table public.exam_issuances (
   user_id uuid not null references auth.users(id) on delete cascade,
   submission_id text not null check (submission_id ~ '^[a-f0-9]{32}$'),
