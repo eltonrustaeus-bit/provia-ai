@@ -33,6 +33,8 @@ const calls = [];
 let state = "active";
 let count = 1;
 let fail = false;
+let answerLeaseState = "acquired";
+let issuanceBlocked = false;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   const method = init.method || "GET";
@@ -41,10 +43,13 @@ globalThis.fetch = async (input, init = {}) => {
   if (fail) return Response.json({ error: "unavailable" }, { status: 503 });
   if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(state);
   if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(count);
+  if (url.endsWith("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
+  if (url.endsWith("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.endsWith("/rest/v1/rpc/abandon_exam_issuance")) return Response.json(state === "active" ? "abandoned" : state);
   if (url.endsWith("/rest/v1/rpc/abandon_all_active_exams")) return Response.json(count);
   if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) return Response.json(state === "active" ? "saved" : state);
   if (url.includes("/rest/v1/exam_issuances")) {
+    if (method === "POST" && issuanceBlocked) return Response.json({ code: "P0001", message: "PER_ANSWER_IN_PROGRESS" }, { status: 409 });
     if (method === "POST") return Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 });
     if (method === "DELETE") return new Response(null, { status: 204 });
   }
@@ -125,5 +130,28 @@ test("unknown database state fails closed", async () => {
     assert.equal(response.statusCode, 503);
   } finally {
     fail = false;
+  }
+});
+
+test("P.E.R answer leases use opaque UUIDs and release only their own lease", async () => {
+  calls.length = 0;
+  const leaseId = "2f1d69a3-4e97-4a61-a36c-a3d0a9497df2";
+  assert.equal(await issuance.acquirePerAnswerLease(userId, leaseId), "acquired");
+  assert.equal(await issuance.releasePerAnswerLease(userId, leaseId), "released");
+  const acquire = calls.find((call) => call.url.endsWith("/rpc/acquire_per_answer_lease"));
+  const release = calls.find((call) => call.url.endsWith("/rpc/release_per_answer_lease"));
+  assert.deepEqual(JSON.parse(acquire.body), { p_user_id: userId, p_lease_id: leaseId });
+  assert.deepEqual(JSON.parse(release.body), { p_user_id: userId, p_lease_id: leaseId });
+  assert.equal(await issuance.acquirePerAnswerLease(userId, "not-a-uuid"), null);
+});
+
+test("issuance fails closed when its database trigger sees an active P.E.R answer lease", async () => {
+  calls.length = 0;
+  issuanceBlocked = true;
+  try {
+    assert.equal(await issuance.issueExam(userId, submissionId), false);
+    assert.ok(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"));
+  } finally {
+    issuanceBlocked = false;
   }
 });

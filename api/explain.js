@@ -1,4 +1,5 @@
-﻿import { createClient } from "@supabase/supabase-js";
+﻿import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
 import { callAI, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
@@ -349,14 +350,7 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan }) {
   } catch { return null; }
 }
 
-async function gateActiveExam(req, res, body, user) {
-  const activeCount = await examIssuance.activeExamCount(user.id);
-  if (activeCount === null) {
-    res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
-    return true;
-  }
-  if (activeCount === 0) return false;
-
+function sendActiveExamGuidance(req, res, body) {
   const type = body.pageContext?.currentQuestion?.type;
   const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
   const hints = en
@@ -372,10 +366,36 @@ async function gateActiveExam(req, res, body, user) {
     };
   res.setHeader("Cache-Control", "no-store");
   res.json({ answer: hints[type] || hints.short, helpCap: 0, helpLevelUsed: 0, examActive: true });
+}
+
+async function gateActiveExam(req, res, body, user) {
+  const activeCount = await examIssuance.activeExamCount(user.id);
+  if (activeCount === null) {
+    res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    return true;
+  }
+  if (activeCount === 0) return false;
+  sendActiveExamGuidance(req, res, body);
   return true;
 }
 
-export default async function handler(req, res) {
+async function acquirePerAnswerLease(user, lease) {
+  lease.userId = user.id;
+  lease.leaseId = randomUUID();
+  return examIssuance.acquirePerAnswerLease(user.id, lease.leaseId);
+}
+
+function rejectLeaseOutcome(req, res, body, outcome, { history = false } = {}) {
+  if (outcome === "exam_active") {
+    if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
+    sendActiveExamGuidance(req, res, body);
+    return true;
+  }
+  if (outcome === "busy") return res.status(409).json({ error: "PER_REQUEST_IN_PROGRESS" });
+  return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+}
+
+async function handleExplainRequest(req, res, perAnswerLease) {
   // GET — return stored PER history for the authenticated user
   if (req.method === "GET") {
     const user = await requireAuth(req, res);
@@ -383,6 +403,8 @@ export default async function handler(req, res) {
     const activeCount = await examIssuance.activeExamCount(user.id);
     if (activeCount === null) return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
     if (activeCount > 0) return res.status(409).json({ error: "EXAM_ACTIVE" });
+    const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
+    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true });
     const messages = await loadPerHistory(user.id);
     return res.json({ ok: true, history: messages });
   }
@@ -401,9 +423,12 @@ export default async function handler(req, res) {
 
   // ── LANDING MODE — unauthenticated visitors on index/pricing ──
   if (body.landingMode === true) {
+    if (isPilotMode() && !req.headers?.authorization) return denyOutOfScopePilotRoute(req, res);
     if (req.headers?.authorization) {
       const landingUser = await requireAuth(req, res);
       if (!landingUser || await gateActiveExam(req, res, body, landingUser)) return;
+      const leaseOutcome = await acquirePerAnswerLease(landingUser, perAnswerLease);
+      if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
     }
     const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
     if (!question) return res.status(400).json({ error: 'No question' });
@@ -475,6 +500,8 @@ export default async function handler(req, res) {
   const user = await requireAuth(req, res);
   if (!user) return;
   if (await gateActiveExam(req, res, body, user)) return;
+  const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
+  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
 
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
   if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
@@ -903,5 +930,16 @@ export default async function handler(req, res) {
   } catch {
     if (res.headersSent) return;
     res.status(500).json({ error: "Kunde inte skapa förklaringen just nu. Försök igen senare." });
+  }
+}
+
+export default async function handler(req, res) {
+  const perAnswerLease = { userId: null, leaseId: null };
+  try {
+    return await handleExplainRequest(req, res, perAnswerLease);
+  } finally {
+    if (perAnswerLease.userId && perAnswerLease.leaseId) {
+      await examIssuance.releasePerAnswerLease(perAnswerLease.userId, perAnswerLease.leaseId);
+    }
   }
 }

@@ -69,6 +69,38 @@ async function activeExamCount(userId) {
   }
 }
 
+async function acquirePerAnswerLease(userId, leaseId) {
+  if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(leaseId || "")) return null;
+  const response = await request("rpc/acquire_per_answer_lease", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_lease_id: leaseId }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const outcome = await response.json();
+    return ["acquired", "exam_active", "busy"].includes(outcome) ? outcome : null;
+  } catch {
+    return null;
+  }
+}
+
+async function releasePerAnswerLease(userId, leaseId) {
+  if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(leaseId || "")) return null;
+  const response = await request("rpc/release_per_answer_lease", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_lease_id: leaseId }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const outcome = await response.json();
+    return ["released", "missing"].includes(outcome) ? outcome : null;
+  } catch {
+    return null;
+  }
+}
+
 async function claimExamGrading(userId, submissionId, fingerprint) {
   if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
   const response = await request("rpc/claim_exam_grading", {
@@ -206,7 +238,8 @@ async function removeUndeliveredExam(userId, submissionId) {
 }
 
 module.exports = {
-  issueExam, examState, activeExamCount, claimExamGrading, releaseExamGrading,
+  issueExam, examState, activeExamCount, acquirePerAnswerLease, releasePerAnswerLease,
+  claimExamGrading, releaseExamGrading,
   recoverExamResult, persistExamResult, replayLearningJob,
   abandonExam, abandonAllActiveExams, removeUndeliveredExam,
 };
