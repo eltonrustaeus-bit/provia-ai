@@ -204,21 +204,13 @@ async function attemptBridge() {
   if (!_attempt) _attempt = await import("./_per-attempt.js");
   return _attempt;
 }
-let _learnerModel = null;
-async function learnerModel() {
-  if (!_learnerModel) _learnerModel = await import("../src/per/learner-model.mjs");
-  return _learnerModel;
-}
 let _flags = null;
 async function perFlags() {
   if (!_flags) _flags = await import("./_flags.js");
   return _flags;
 }
 
-/* grade.js har ingen Supabase-klient — resten av filen pratar REST med fetch.
-   recordAttempt() i learner-model.mjs vill ha en klient, så här är en, skapad
-   EN gång och återanvänd. Dynamisk import av samma skäl som ovan: filen
-   kompileras till CJS. */
+/* Keep the signed question type and bounded original answer with each result. */
 function withAttemptAnswers(per, answerMap, questions) {
   const trustedTypes = new Map(questions.map((question) => [String(question.id), question.type]));
   return per.map((item) => ({
@@ -228,8 +220,11 @@ function withAttemptAnswers(per, answerMap, questions) {
   }));
 }
 
-function buildLearningPayload(level, course, attemptRows, learnerLoopEnabled) {
+async function buildLearningPayload(level, course, attemptRows, learnerLoopEnabled) {
   const normalizedLevel = String(level || "").toUpperCase();
+  const [{ conceptKey, conceptLabel }, { conceptSlug, isRealConcept }] = await Promise.all([
+    conceptTags(), attemptBridge(),
+  ]);
   return {
     version: 1,
     level: LEVEL_DIFFICULTY[normalizedLevel] !== undefined ? normalizedLevel : "C",
@@ -242,10 +237,14 @@ function buildLearningPayload(level, course, attemptRows, learnerLoopEnabled) {
       points: Number(q.points) || 0,
       max_points: Number(q.max_points) || 0,
       concept_tag: String(q.concept_tag || "").slice(0, 80),
+      concept_key: conceptKey(q.concept_tag).slice(0, 120),
+      concept_label: conceptLabel(q.concept_tag).slice(0, 120),
+      concept_slug: isRealConcept(q.concept_tag) ? conceptSlug(q.concept_tag) : "",
     })),
   };
 }
 
+// Feature-flag evaluation uses one cached server-side Supabase client.
 let _sb = null;
 async function supabaseClient() {
   if (_sb) return _sb;
@@ -267,105 +266,6 @@ async function snapshotLearnerLoopFlag(userId) {
 // LEVEL_DIFFICULTY, så mockprov och juridikmotorn väger utfall likadant.
 const LEVEL_DIFFICULTY = { E: 0.3, C: 0.55, A: 0.8 };
 
-/* Skriver ett student_attempts-försök per rättad fråga.
- *
- * VARFÖR DEN FINNS: ExGen hade två kunskapssystem som inte matade varandra.
- * applyMockMastery() nedan skriver user_profiles.mastery vid varje prov;
- * student_attempts skrevs bara av kunskapsmotorn, som är juridikpiloten och
- * begränsad till ett konto. `_per-collective.js` läser student_attempts och
- * kunde därför ALDRIG få data. Uppmätt 2026-08-25: 0 rader.
- *
- * ADDITIV OCH OFARLIG. Rättningen är en het kodväg — ett fel här drabbar varje
- * elev som lämnar in ett prov. Därför:
- *   - allt ligger i try/catch och sväljer fel, som applyMockMastery
- *   - den ändrar aldrig vad eleven får se
- *   - den körs efter att poängen räknats, aldrig före
- *
- * BAKOM FLAGGAN. per_learner_loop_enabled är begränsad till ett konto, så det
- * här börjar samla data för Elton och vidgas när raderna ser rätt ut. En
- * felaktig taggning som når alla elevers historik är dyrare att städa än att
- * vänta.
- */
-async function recordAttempts(supabase, userId, level, per, examId, course, learnerLoopEnabled) {
-  if (!learnerLoopEnabled || !userId || !Array.isArray(per) || !per.length || !examId) return;
-  try {
-    const { flagsEnabled } = await perFlags();
-    // A later feature-flag disable is a kill switch; a later enable must not
-    // retroactively add attempts for an exam whose snapshot was ineligible.
-    if (!(await flagsEnabled(supabase, ["per_learner_loop_enabled"], userId))) return;
-
-    const A = await attemptBridge();
-    const { recordAttempt } = await learnerModel();
-    const { resolveConceptTag } = await conceptTags();
-
-    /* Högst 30 försök per prov, samma tak som mastery-skrivningen. Ett prov
-       med fler frågor än så är inte representativt, och taket hindrar att en
-       enda inlämning fyller tabellen. */
-    for (const q of per.slice(0, 30)) {
-      const tag = resolveConceptTag(q);
-      if (!A.isRealConcept(tag)) continue;
-
-      const conceptId = await A.ensureConceptId(supabase, { subject: course || "okänt", tag });
-      if (!conceptId) continue;
-
-      const maxP = Number(q?.max_points) || 0;
-      const rad = A.buildAttempt({
-        userId, conceptId, level, examId,
-        q: { ...q, score: maxP > 0 ? Number(q?.points || 0) / maxP : null },
-      });
-      if (!rad) continue;
-
-      await recordAttempt(supabase, rad);
-    }
-  } catch { /* mätningen får aldrig fälla en rättning */ }
-}
-
-/* Rätt på en svår fråga ska väga mer än rätt på en lätt. Utan viktningen mäter
-   mastery hur lätta prov eleven väljer, inte vad hen kan. */
-async function applyMockMastery(userId, level, per, attemptId) {
-  if (!userId || !Array.isArray(per) || !per.length || !attemptId) return;
-  try {
-    const { conceptKey, conceptLabel } = await conceptTags();
-    const difficulty = LEVEL_DIFFICULTY[String(level || "").toUpperCase()] ?? 0.55;
-
-    /* En rad per begrepp, inte per fråga. Två frågor om samma begrepp i samma
-       prov är ett tillfälle att mäta det begreppet, inte två — annars får ett
-       prov med sex fullmaktsfrågor sex gånger så stor vikt som ett med en. */
-    const perConcept = new Map();
-    for (const q of per) {
-      const key = conceptKey(q?.concept_tag);
-      if (!key) continue;
-      const maxP = Number(q?.max_points) || 0;
-      const ratio = maxP > 0 ? Math.min(1, Math.max(0, Number(q?.points || 0) / maxP)) : 0;
-      const entry = perConcept.get(key) || { label: conceptLabel(q.concept_tag), sum: 0, n: 0 };
-      entry.sum += ratio;
-      entry.n += 1;
-      perConcept.set(key, entry);
-    }
-    if (!perConcept.size) return;
-
-    const url = process.env.SUPABASE_URL + "/rest/v1/rpc/apply_mock_mastery_once";
-    await Promise.all([...perConcept.entries()].slice(0, 30).map(([key, e]) =>
-      fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...getSupabaseAdminHeaders(),
-        },
-        body: JSON.stringify({
-          p_user_id: userId,
-          p_submission_id: attemptId,
-          p_concept: key,
-          p_label: e.label,
-          p_ratio: e.sum / e.n,
-          p_difficulty: difficulty
-        }),
-        signal: AbortSignal.timeout(5000)
-      }).catch(() => {})
-    ));
-  } catch { /* kunskapsprofilen är personalisering, aldrig ett skäl att fela rättningen */ }
-}
-
 // Returns a promise — callers MUST await before sending the response.
 async function saveMockResult(payload) {
   return examIssuance.persistExamResult(payload);
@@ -376,19 +276,15 @@ async function persistGradedSubmission({ userId, course, per, total, maxTotal, a
   if (!state) return "state_error";
   if (state !== "grading") return state === "completed" ? "duplicate" : "inactive";
   const learnerLoopEnabled = await snapshotLearnerLoopFlag(userId);
-  const learningPayload = buildLearningPayload(level, course, attemptRows, learnerLoopEnabled);
+  const learningPayload = await buildLearningPayload(level, course, attemptRows, learnerLoopEnabled);
   const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload));
   if (saved === "duplicate") return "duplicate";
   if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
 
-  await Promise.all([
-    applyMockMastery(userId, level, per, attemptId),
-    (async () => {
-      const sb = await supabaseClient();
-      await recordAttempts(sb, userId, level, attemptRows, attemptId, course, learnerLoopEnabled);
-    })().catch(() => {}),
-  ]);
+  // The RPC commits all learning effects together; failure leaves the job
+  // pending and cannot change the already saved exam result.
+  await examIssuance.replayLearningJob(userId, attemptId);
   return "saved";
 }
 
@@ -562,6 +458,7 @@ module.exports = async function handler(req, res) {
         if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
           return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
         }
+        await examIssuance.replayLearningJob(user.id, submissionId);
         return json(res, 200, {
           ok: true, recovered: true, result: recovered.result,
           exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),

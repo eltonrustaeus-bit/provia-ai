@@ -24,6 +24,7 @@ let issuanceState = "active";
 let activeExamCount = 0;
 let savedCanonicalResult = null;
 let savedFingerprint = null;
+let replayFails = false;
 
 process.env.SUPABASE_URL = origin;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-only-service-role";
@@ -56,6 +57,9 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json("released");
   }
   if (url === `${origin}/rest/v1/rpc/recover_graded_exam_result`) return Response.json(savedCanonicalResult);
+  if (url === `${origin}/rest/v1/rpc/try_replay_mock_learning_job`) {
+    return replayFails ? new Response(null, { status: 503 }) : Response.json("processed");
+  }
   if (url === `${origin}/rest/v1/rpc/persist_graded_exam_result`) {
     if (mockResultMode === "error") return new Response(null, { status: 500 });
     if (mockResultMode === "duplicate") {
@@ -239,6 +243,7 @@ try {
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   };
+  replayFails = true;
   const official = await invoke(officialRequest);
   assert.equal(official.status, 200);
   assert.equal(official.body.persistence.mock_result_saved, true);
@@ -274,17 +279,20 @@ try {
   assert.equal(learningPayload.level, "C");
   assert.equal(learningPayload.course, course);
   assert.equal(learningPayload.learner_loop_enabled, false);
+  assert.ok(learningPayload.rows[0].concept_key);
+  assert.ok(learningPayload.rows[0].concept_slug);
   assert.deepEqual(learningPayload.rows.map((row) => [row.id, row.type, row.student_answer, row.points, row.max_points]),
     [[question.id, "graph", "", 2, 2]],
     "the durable job snapshot uses the trusted task type without retaining an answer when the learner loop is off");
   assert.match(savedPayload.p_submission_id, /^[a-f0-9]{32}$/);
   assert.match(savedPayload.p_answer_fingerprint, /^[a-f0-9]{64}$/);
   const resultWriteIndex = calls.indexOf(saved);
-  const masteryWriteIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once"));
-  assert.ok(masteryWriteIndex > resultWriteIndex,
-    "mastery is applied only after the official result has been persisted");
+  const replayIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job"));
+  assert.ok(replayIndex > resultWriteIndex,
+    "the atomic learning replay starts only after the official result has been persisted");
   assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic official graph grading does not call the AI provider");
 
+  replayFails = false;
   calls.length = 0;
   const recovered = await invoke(officialRequest);
   assert.equal(recovered.status, 200, "a lost response can be recovered from the saved canonical result");
@@ -294,8 +302,8 @@ try {
     "recovery does not charge another grading request");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")), false,
     "recovery cannot rewrite the official score");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
-    "recovery cannot reapply mastery");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), true,
+    "recovery retries pending learning effects without another grade or quota charge");
 
   calls.length = 0;
   const changedAnswers = await invoke({ ...officialRequest, answers: [{ id: question.id,
@@ -356,7 +364,7 @@ try {
   assert.equal(conflictingReplay.body.error, "EXAM_RESULT_RECOVERY_REQUIRED");
   assert.equal(conflictingReplay.body.result, undefined, "the conflicting score is never returned");
   assert.equal(conflictingReplay.body.exam_proof, undefined, "a duplicate cannot mint another completion proof");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false);
   const duplicateWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.equal(JSON.parse(duplicateWrite.body).p_submission_id, savedPayload.p_submission_id);
@@ -406,11 +414,12 @@ try {
   assert.equal(recoveredReplay.body.persistence.mock_result_saved, true,
     "a later successful idempotent write is acknowledged");
   assert.ok(recoveredReplay.body.exam_proof, "confirmed persistence restores post-exam review");
-  assert.ok(calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) >
+  assert.ok(calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")) >
     calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")),
-  "a recovered result write enables mastery only after persistence succeeds");
-  assert.ok(calls.some((call) => call.url.includes("/rest/v1/student_attempts")),
-    "a recovered result write enables learner-loop attempt persistence");
+  "a recovered result write enables transactional learning replay only after persistence succeeds");
+  assert.equal(JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body)
+    .p_learning_payload.learner_loop_enabled, true,
+    "the eventual worker retains eligible learner-loop attempts in the durable snapshot");
 
   console.log("grade handler graph: signed task, server quota, deterministic score, retry isolation, and official persistence passed");
 } finally {

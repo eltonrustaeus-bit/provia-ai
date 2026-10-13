@@ -10,7 +10,7 @@ const saved = {
 };
 const userId = "11111111-1111-4111-8111-111111111111";
 const requests = [];
-let failTable = "";
+let failRpc = false;
 
 process.env.SUPABASE_URL = "https://exam-delete.synthetic.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-server-key";
@@ -22,10 +22,10 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.pathname === "/auth/v1/user") {
     return Response.json({ id: userId, email: "student@example.test" });
   }
-  if (["/rest/v1/exam_issuances", "/rest/v1/user_exams", "/rest/v1/mock_results"].includes(url.pathname)) {
-    requests.push({ table: url.pathname.split("/").at(-1), method, userId: url.searchParams.get("user_id") });
-    if (requests.at(-1).table === failTable) return Response.json({ message: "synthetic table failure" }, { status: 503 });
-    return new Response(null, { status: 204 });
+  if (url.pathname === "/rest/v1/rpc/clear_user_exam_history") {
+    requests.push({ method, body: JSON.parse(init.body) });
+    if (failRpc) return Response.json({ message: "synthetic transaction failure" }, { status: 503 });
+    return Response.json(true);
   }
   throw new Error(`Unexpected synthetic request: ${method} ${url.pathname}`);
 };
@@ -50,18 +50,14 @@ async function invoke() {
 }
 
 try {
-  for (const failedTable of ["", "exam_issuances", "user_exams", "mock_results"]) {
-    failTable = failedTable;
+  for (const shouldFail of [false, true]) {
+    failRpc = shouldFail;
     requests.length = 0;
     const response = await invoke();
-    assert.deepEqual(requests.map((request) => request.table).sort(), failedTable === "exam_issuances"
-      ? ["exam_issuances"]
-      : ["exam_issuances", "mock_results", "user_exams"]);
-    assert.equal(requests[0].table, "exam_issuances", "issuance rows are removed before results can be deleted");
-    assert.ok(requests.every((request) => request.method === "DELETE" && request.userId === `eq.${userId}`),
-      "all deletes are scoped to the verified user's UUID");
-    if (failedTable) {
-      assert.equal(response.statusCode, 500, `${failedTable} failure must not claim success`);
+    assert.deepEqual(requests, [{ method: "POST", body: { p_user_id: userId } }],
+      "one transaction receives only the authenticated account identity");
+    if (shouldFail) {
+      assert.equal(response.statusCode, 500, "a failed transaction must not claim success");
       assert.deepEqual(response.body, { error: "Delete failed" });
     } else {
       assert.equal(response.statusCode, 200);
@@ -81,4 +77,4 @@ try {
   }
 }
 
-console.log("exam history deletion: issuance and result deletion order, account scope and partial failures passed");
+console.log("exam history deletion: one owner-bound RPC and failure reporting passed");

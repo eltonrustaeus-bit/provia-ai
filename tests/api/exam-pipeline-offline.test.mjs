@@ -68,7 +68,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) return Response.json({ committed: true });
   if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
-  if (url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) return Response.json({ ok: true });
+  if (url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")) return Response.json("processed");
   if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(gradingState);
   if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
     gradingState = "grading";
@@ -239,7 +239,7 @@ try {
     assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
       `${malformed.label} IDs refund the reserved quota`);
     assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
-    assert.equal(urls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
+    assert.equal(urls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
     assert.equal(urls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1,
       "invalid IDs are rejected before verifier or solver calls");
   }
@@ -330,7 +330,7 @@ try {
   assert.equal(graphGraded.body.result.per_question[0].max_points, 2);
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")));
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")));
-  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")));
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")));
 
   calls.length = 0;
   emptyGenerationResponse = true;
@@ -343,7 +343,7 @@ try {
   assert.equal(timeoutUrls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1);
   assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1);
   assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
-  assert.equal(timeoutUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
+  assert.equal(timeoutUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
 
   const mismatchCallsStart = calls.length;
   const mismatchedMaterial = "Den räta linjen ges av y = -2x + 3.";
@@ -367,7 +367,7 @@ try {
     "a rejected generated graph refunds its reserved quota");
   assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
     "a rejected generated graph does not commit quota");
-  assert.equal(mismatchUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
+  assert.equal(mismatchUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an unsupported generated graph is not persisted and does not update mastery");
 
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")));
@@ -387,8 +387,8 @@ try {
     `${origin}/rest/v1/rpc/commit_mock_exam_quota`,
     `${origin}/rest/v1/rpc/refund_mock_exam_quota`,
     `${origin}/rest/v1/rpc/consume_anon_rate`,
-    `${origin}/rest/v1/rpc/apply_mock_mastery_once`,
-      `${origin}/rest/v1/rpc/persist_graded_exam_result`,
+    `${origin}/rest/v1/rpc/try_replay_mock_learning_job`,
+    `${origin}/rest/v1/rpc/persist_graded_exam_result`,
     `${origin}/rest/v1/feature_flags?select=key%2Cenabled%2Callowed_user_ids&key=in.%28per_learner_loop_enabled%29`,
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),

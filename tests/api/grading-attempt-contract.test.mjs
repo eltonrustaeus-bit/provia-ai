@@ -23,10 +23,26 @@ assert.match(api, /examCompletion\.submissionId\(user\.id, course, submittedQues
   "grading uses the shared submission identity");
 assert.match(completion, /questions\.map\(\(question\) => question\?\.grade_task\)/,
   "one stable attempt ID is derived from the signed grading tasks");
-assert.match(api, /rpc\/apply_mock_mastery_once/,
-  "all mock mastery writes use the idempotent RPC");
-assert.match(api, /if \(!learnerLoopEnabled \|\| !userId \|\| !Array\.isArray\(per\) \|\| !per\.length \|\| !examId\) return/,
-  "missing attempt identity fails closed instead of falling back to a shared key");
+assert.match(api, /examIssuance\.replayLearningJob\(userId, attemptId\)/,
+  "the official save tries atomic replay after result persistence");
+assert.match(issuanceMigration, /create function public\.replay_mock_learning_job[\s\S]*?perform public\.apply_mock_mastery_once/i,
+  "each job applies idempotent mastery inside the replay transaction");
+assert.match(issuanceMigration, /p_submission_id \|\| '::' \|\| \(v_row ->> 'id'\)/,
+  "mock attempt identity remains stable across replay");
+assert.match(issuanceMigration, /create function public\.replay_mock_learning_job[\s\S]*?from public\.mock_learning_jobs[\s\S]*?for update;[\s\S]*?insert into public\.student_attempts[\s\S]*?set processed_at = now\(\), payload = '\{\}'::jsonb/i,
+  "one locked replay transaction writes attempts and clears answer-bearing payload only after success");
+assert.match(issuanceMigration, /create function public\.replay_pending_mock_learning_jobs[\s\S]*?for update skip locked/i,
+  "a bounded sweeper can claim pending jobs without duplicating concurrent work");
+assert.match(issuanceMigration, /create function public\.try_replay_mock_learning_job[\s\S]*?exception when others then[\s\S]*?next_attempt_at = now\(\) \+ make_interval/i,
+  "a failed transaction leaves work pending with bounded backoff, not partial effects");
+assert.match(issuanceMigration, /create function public\.replay_pending_mock_learning_jobs[\s\S]*?next_attempt_at <= now\(\)/i,
+  "a failing oldest job does not monopolize every sweep");
+assert.match(issuanceMigration, /create function public\.clear_user_exam_history[\s\S]*?from public\.mock_learning_jobs[\s\S]*?for update;[\s\S]*?delete from public\.exam_issuances[\s\S]*?delete from public\.user_exams[\s\S]*?delete from public\.mock_results/i,
+  "exam-history clear serializes with replay and deletes the three exam stores in one RPC");
+assert.match(issuanceMigration, /add column if not exists mock_submission_id text/i,
+  "new mock attempts carry explicit result provenance rather than a guessed key prefix");
+assert.match(issuanceMigration, /create function public\.clear_user_exam_history[\s\S]*?set student_answer = null[\s\S]*?mock_submission_id in \([\s\S]*?select submission_id from public\.mock_results/i,
+  "exam-history clear redacts proven mock answers while retaining learning scores");
 assert.match(migration, /primary key \(user_id, submission_id, concept\)/,
   "the database enforces one mastery event per user, official attempt, and concept");
 assert.match(migration, /on conflict do nothing[\s\S]*?apply_mock_mastery\(/,

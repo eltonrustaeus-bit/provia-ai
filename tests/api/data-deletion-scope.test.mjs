@@ -18,12 +18,10 @@ const apiSources = (await Promise.all(apiFiles.filter((file) => file.endsWith(".
 const examsStart = roleApi.indexOf('if (action === "delete_exams")');
 const examsEnd = roleApi.indexOf("// ── Teacher dashboard", examsStart);
 const examsRoute = roleApi.slice(examsStart, examsEnd);
-assert.match(examsRoute, /\.from\("user_exams"\)\.delete\(\)\.eq\("user_id", user\.id\)/,
-  "exam deletion is scoped to the signed-in user's exam rows");
-assert.match(examsRoute, /\.from\("mock_results"\)\.delete\(\)\.eq\("user_id", user\.id\)/,
-  "exam deletion also removes the signed-in user's teacher/P.E.R result summaries");
-assert.match(examsRoute, /examResult\?\.error\s*\|\|\s*summaryResult\?\.error/,
-  "partial remote deletion is reported as failure rather than success");
+assert.match(examsRoute, /\.rpc\("clear_user_exam_history", \{ p_user_id: user\.id \}\)/,
+  "one atomic exam-history clear is scoped to the authenticated user");
+assert.match(examsRoute, /error \|\| data !== true/,
+  "a failed or unconfirmed clear cannot be reported as success");
 assert.doesNotMatch(examsRoute, /auth\.admin\.deleteUser/, "exam-history deletion is not account deletion");
 assert.match(memory, /export async function clearLongMemory[\s\S]*?\.from\("per_long_memory"\)\.delete\(\)\.eq\("user_id", userId\)[\s\S]*?\.from\("per_sessions"\)\.delete\(\)\.eq\("user_id", userId\)/,
   "P.E.R memory/session deletion is a separate user-scoped action");

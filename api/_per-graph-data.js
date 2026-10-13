@@ -220,11 +220,6 @@ export const PER_GRAPH = {
       "typ": "flagga"
     },
     {
-      "id": "flagga:per_learner_loop_enabled",
-      "etikett": "per_learner_loop_enabled",
-      "typ": "flagga"
-    },
-    {
       "id": "flagga:legal_shadow_mode",
       "etikett": "legal_shadow_mode",
       "typ": "flagga"
@@ -237,6 +232,11 @@ export const PER_GRAPH = {
     {
       "id": "flagga:legal_rag_enabled",
       "etikett": "legal_rag_enabled",
+      "typ": "flagga"
+    },
+    {
+      "id": "flagga:per_learner_loop_enabled",
+      "etikett": "per_learner_loop_enabled",
       "typ": "flagga"
     },
     {
@@ -307,16 +307,6 @@ export const PER_GRAPH = {
     {
       "id": "tabell:user_profiles",
       "etikett": "user_profiles",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:exam_issuances",
-      "etikett": "exam_issuances",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:user_exams",
-      "etikett": "user_exams",
       "typ": "tabell"
     }
   ],
@@ -506,10 +496,6 @@ export const PER_GRAPH = {
       "till": "flagga:per_legal_rag_enabled"
     },
     {
-      "från": "grade",
-      "till": "flagga:per_learner_loop_enabled"
-    },
-    {
       "från": "per-attempt",
       "till": "tabell:concepts"
     },
@@ -584,14 +570,6 @@ export const PER_GRAPH = {
     {
       "från": "check-role",
       "till": "tabell:user_profiles"
-    },
-    {
-      "från": "check-role",
-      "till": "tabell:exam_issuances"
-    },
-    {
-      "från": "check-role",
-      "till": "tabell:user_exams"
     },
     {
       "från": "explain",

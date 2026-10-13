@@ -150,6 +150,20 @@ async function persistExamResult(payload) {
   }
 }
 
+async function replayLearningJob(userId, submissionId) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "")) return null;
+  const response = await request("rpc/try_replay_mock_learning_job", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const state = await response.json();
+    return ["processed", "done", "missing", "retry_later"].includes(state) ? state : null;
+  } catch { return null; }
+}
+
 async function abandonExam(userId, submissionId) {
   if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "")) return null;
   const response = await request("rpc/abandon_exam_issuance", {
@@ -193,5 +207,6 @@ async function removeUndeliveredExam(userId, submissionId) {
 
 module.exports = {
   issueExam, examState, activeExamCount, claimExamGrading, releaseExamGrading,
-  recoverExamResult, persistExamResult, abandonExam, abandonAllActiveExams, removeUndeliveredExam,
+  recoverExamResult, persistExamResult, replayLearningJob,
+  abandonExam, abandonAllActiveExams, removeUndeliveredExam,
 };

@@ -143,18 +143,27 @@ P.E.R's exam-derived memory now reads only marked rows; student chat and session
 remain unverified self-reports and must not be presented as official results.
 Verify effective grants, RPC execute ACL, marker provenance, forged owner inserts,
 two-account RLS, duplicate-insert and deletion
-behavior in staging before deployment. A crash between saving `mock_results` and writing
-learning attempts can still leave those secondary records incomplete. The same unapplied
-active-exam draft now captures a service-only `mock_learning_jobs` row in the result RPC,
+behavior in staging before deployment. The same unapplied active-exam draft captures a
+service-only `mock_learning_jobs` row in the result RPC,
 with trusted question types, bounded answers, level, course and learner-loop eligibility
-for replay. Deleting a verified result cascades to its pending answer snapshot.
+for replay. A service-only replay RPC applies one job's mastery and eligible attempts in
+one database transaction; the grading and recovery paths invoke it after a saved result.
+A bounded sweep RPC skips retry-backoff jobs so one bad row cannot monopolize the batch,
+but it has no approved schedule. Deleting a verified
+result cascades to its pending answer snapshot. The exam-history route now calls one
+service-only RPC to remove issuances, browser history and verified summaries atomically;
+separate learning scores and concepts remain by design and are disclosed in the UI.
+New mock-attempt rows carry explicit result provenance so the clear RPC can redact their
+raw answers before deleting result summaries; legacy attempts without proven provenance
+are not classified by string-prefix guesswork.
 When the learner loop is disabled, no raw answer is duplicated into the job;
-once a worker completes a job, the database requires it to clear the payload.
-**No worker or deletion/worker coordination transaction is implemented yet.** The
-current synchronous writes still run after commit; a crash can leave the job pending and
-the secondary records incomplete. Do not deploy this draft or call the pilot ready until
-idempotent replay, cancellation on exam deletion, retention and concurrent staging tests
-are reviewed and complete.
+once replay completes a job, the database requires it to clear the payload. A failed
+replay rolls back its effects and leaves the job pending. **These are source-level contracts,
+not PostgreSQL-verified behavior.** A crash without a later recovery request still needs
+the unscheduled sweep, and pending answer retention has no approved time limit. Do not
+deploy this draft or call the pilot ready until the schedule, retention rule, concurrent
+deletion/replay and two-account PostgreSQL tests are reviewed and complete. The current
+draft still has no maximum physical lifetime for a permanently pending answer snapshot.
 The adjacent rollback file intentionally aborts: dropping the table while the application
 uses it would remove the server-side exam guard. Applying this migration or enabling the
 corresponding app routes requires a separate approval and an isolated deployment plan.
