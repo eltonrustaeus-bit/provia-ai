@@ -1550,7 +1550,7 @@
 
     // P.E.R:s svar gällde föregående fråga. Bubblan går tillbaka i sitt gömda
     // läge vid frågebyte så att den inte ligger kvar över svarstexten.
-    document.body.classList.remove("xf-per-open");
+    closePerPanel();
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
@@ -1636,17 +1636,15 @@
        den "fråga 7" vet eleven att det är den frågan som gäller utan att
        behöva fråga. */
     var ask = el("button", "xf-ask" + (S.helped[id] ? " used" : ""),
-      S.helped[id] ? "✦ P.E.R hjälpte dig här" : "✦ Fråga P.E.R om fråga " + (i + 1));
+      S.helped[id] ? "✦ P.E.R öppnades här" : "✦ Fråga P.E.R om fråga " + (i + 1));
     ask.type = "button";
     ask.addEventListener("click", function () {
-      /* Flaggan sätts bara om panelen faktiskt öppnas. Knappen på P.E.R-bubblan
-         är en växlare: var panelen redan öppen stängde klicket den, och eleven
-         fick ändå avdrag i provsalssiffran — för att ha stängt en panel. Hela
-         tvåpoängsfunktionen står och faller med att den här flaggan är sann. */
+      /* This local marker records that the P.E.R panel opened for this question,
+         not that the learner understood or relied on the hint. */
       if (!askPer()) return;
       S.helped[id] = true;
       ask.className = "xf-ask used";
-      ask.textContent = "✦ P.E.R hjälpte dig här";
+      ask.textContent = "✦ P.E.R öppnades här";
       saveDraft();
     });
     sheet.appendChild(ask);
@@ -1688,6 +1686,12 @@
     bubble.click();
     scrollSheetClear();
     return true;
+  }
+
+  function closePerPanel() {
+    var bubble = document.getElementById("perBubble");
+    if (bubble && bubble.classList.contains("per-open")) bubble.click();
+    document.body.classList.remove("xf-per-open");
   }
 
   /* Panelen lägger sig över arkets nedre del på en telefon. exam-flow.css ger
@@ -1937,6 +1941,7 @@
   // ── Resultat ─────────────────────────────────────────────────────────────
 
   function stepResult(r, persistence, examProof) {
+    closePerPanel();
     var b = mount("result");
 
     /* Resultatsidan har ingen aktiv provfråga. En separat signerad proof från
@@ -1974,45 +1979,51 @@
     var total = Number(r.total_points) || 0;
     var max = Number(r.max_points) || 0;
 
-    // Andra siffran: samma rättning, men poängen på de frågor där P.E.R var
-    // inne stryks. Det är den siffran som gäller i en provsal, och den enda
-    // som betyder något för en lärare.
-    var helpedPts = 0;
-    (r.per_question || []).forEach(function (item) {
-      if (S.helped[String(item.id)]) helpedPts += Number(item.points) || 0;
+    // Keep the official score intact. This optional self-check covers only
+    // questions whose P.E.R panel was not opened; it is not a counterfactual
+    // grade or a server-verified measure of independent mastery.
+    var resultRows = Array.isArray(r.per_question) ? r.per_question : [];
+    var independentPoints = 0;
+    var independentMax = 0;
+    var independentCount = 0;
+    var helpedCount = 0;
+    resultRows.forEach(function (item) {
+      if (S.helped[String(item.id)]) {
+        helpedCount++;
+      } else {
+        independentCount++;
+        independentPoints += Number(item.points) || 0;
+        independentMax += Number(item.max_points) || 0;
+      }
     });
-    var solo = total - helpedPts;
-    var helpedCount = Object.keys(S.helped).length;
     var pct = max > 0 ? Math.round((total / max) * 100) : 0;
+    var hasIndependentCheck = helpedCount > 0 && independentCount > 0 && independentMax > 0;
+    var independentPct = independentMax > 0 ? Math.round((independentPoints / independentMax) * 100) : 0;
 
-    /* Den andra siffran räknas bara som ett eget besked när den skiljer sig.
-       Frågade eleven P.E.R men fick noll poäng på just den frågan är solo lika
-       med total, och att då skriva "utan hjälp hade det blivit" följt av samma
-       tal läser som ett fel. Villkoret är därför helpedPts, inte helpedCount. */
-    var helpMattered = helpedPts > 0;
-
-    if (helpMattered) {
+    if (hasIndependentCheck) {
       say("Du fick " + total + " av " + max + ".",
-          "Med hjälp på " + helpedCount + (helpedCount === 1 ? " fråga" : " frågor") + ". Utan hjälp hade det blivit " + solo + ".");
+          "P.E.R öppnades på " + helpedCount + " " + (helpedCount === 1 ? "fråga" : "frågor") +
+          ". På de " + independentCount + " frågor där P.E.R inte öppnades fick du " + independentPoints + " av " + independentMax + " poäng.");
+    } else if (helpedCount > 0 && independentCount === 0) {
+      say("Du fick " + total + " av " + max + ".",
+          "P.E.R öppnades på alla frågor, så det finns inget separat resultat för frågor utan P.E.R.");
     } else if (helpedCount > 0) {
       say("Du fick " + total + " av " + max + ".",
-          "Du frågade P.E.R, men poängen är dina — de frågorna gav inget.");
+          "P.E.R öppnades under provet. Ditt resultat ovan ändras inte av det.");
     } else {
-      say("Du fick " + total + " av " + max + ".", "Helt på egen hand.");
+      say("Du fick " + total + " av " + max + ".", "P.E.R öppnades inte under provet.");
     }
 
-    // Andra kortet visas bara när det säger något nytt. Två identiska siffror
-    // bredvid varandra läser som ett fel, inte som ett besked.
-    var scores = el("div", "xf-scores" + (helpMattered ? "" : " solo"));
+    var scores = el("div", "xf-scores" + (hasIndependentCheck ? "" : " solo"));
     var s1 = el("div", "xf-score lead");
     s1.appendChild(el("b", null, total + "/" + max));
     s1.appendChild(el("span", null, "Ditt resultat · " + pct + " %"));
     scores.appendChild(s1);
 
-    if (helpMattered) {
+    if (hasIndependentCheck) {
       var s2 = el("div", "xf-score");
-      s2.appendChild(el("b", null, solo + "/" + max));
-      s2.appendChild(el("span", null, "I provsalen · utan hjälp"));
+      s2.appendChild(el("b", null, independentPoints + "/" + independentMax));
+      s2.appendChild(el("span", null, "Frågor utan P.E.R · " + independentPct + " %"));
       scores.appendChild(s2);
     }
     b.appendChild(scores);
@@ -2086,7 +2097,7 @@
 
       var it = el("div", "xf-item");
       var head = el("div", "xf-item-head");
-      head.appendChild(el("span", null, "Fråga " + (n + 1) + (S.helped[String(item.id)] ? " · med hjälp" : "")));
+      head.appendChild(el("span", null, "Fråga " + (n + 1) + (S.helped[String(item.id)] ? " · P.E.R öppnades" : "")));
       var score = el("b", got >= m && m > 0 ? "full" : got === 0 ? "miss" : null, got + "/" + m);
       head.appendChild(score);
       it.appendChild(head);

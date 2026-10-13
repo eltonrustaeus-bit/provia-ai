@@ -191,9 +191,10 @@ async function toExam(page) {
   await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
   const afterNav = await page.evaluate(() => ({
     perOpen: document.body.classList.contains("xf-per-open"),
-    widgetVisible: getComputedStyle(document.querySelector("#perWidget")).display !== "none"
+    widgetVisible: getComputedStyle(document.querySelector("#perWidget")).display !== "none",
+    bubbleOpen: document.querySelector("#perBubble")?.classList.contains("per-open")
   }));
-  ok("T2d bubblan göms vid frågebyte", !afterNav.perOpen && !afterNav.widgetVisible);
+  ok("T2d P.E.R-panelen stängs vid frågebyte", !afterNav.perOpen && !afterNav.widgetVisible && !afterNav.bubbleOpen, JSON.stringify(afterNav));
   await ctx.close();
 }
 
@@ -380,9 +381,8 @@ async function toExam(page) {
 
 // ── T8: "Fråga P.E.R"-knappen nämner rätt frågenummer ──────────────────────
 // Tillståndsraden (#perSees) syns bara vid hover på en bubbla som är helt dold
-// under provet, så eleven kan aldrig se den där den skulle betytt något.
-// Knappen är alltid synlig — den ska bära beskedet i stället, och bara den,
-// inte det använda tillståndet ("✦ P.E.R hjälpte dig här" ska stå kvar oändrat).
+// under provet. Knappen är alltid synlig och ska tydligt ange vilken fråga
+// P.E.R-panelen öppnades för.
 {
   const { ctx, page } = await mk();
   await signIn(page, "u1");
@@ -399,8 +399,60 @@ async function toExam(page) {
     text: document.querySelector(".xf-ask")?.textContent,
     cls: document.querySelector(".xf-ask")?.className
   }));
-  ok("T8c använt tillstånd är oförändrat", used.text === "✦ P.E.R hjälpte dig här" && used.cls === "xf-ask used",
+  ok("T8c tillståndet säger att P.E.R öppnades", used.text === "✦ P.E.R öppnades här" && used.cls === "xf-ask used",
     JSON.stringify(used));
+  await ctx.close();
+}
+
+// ── T11: separate P.E.R-opened questions from the independent self-check ───
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "help-report-mixed");
+  await toExam(page);
+  await page.click(".xf-ask"); await page.waitForTimeout(400);
+  await page.click(".xf-mc-opt >> nth=0");
+  await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(250);
+  await page.fill(".xf-answer", "eget svar");
+  await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(250);
+  await page.click(".xf-mc-opt >> nth=2");
+  await page.click(".xf-exam-nav .xf-btn.primary");
+  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+  const scores = await page.locator("#xf .xf-screen[data-screen='result'] .xf-score").allTextContents();
+  const resultCopy = await page.locator("#xf .xf-screen[data-screen='result'] .xf-sub").textContent();
+  const questionLabel = await page.locator("#xf .xf-screen[data-screen='result'] .xf-item-head").first().textContent();
+  const panelOpen = await page.locator("#perBubble").evaluate(node => node.classList.contains("per-open"));
+  ok("T11a officiellt provresultat förblir 5/8", scores[0]?.includes("5/8"), JSON.stringify(scores));
+  ok("T11b självcheck räknar bara oöppnade frågor, med rätt nämnare 3/6", scores[1]?.includes("3/6") && scores[1]?.includes("Frågor utan P.E.R") && scores[1]?.includes("50 %"), JSON.stringify(scores));
+  ok("T11c texten beskriver öppning, inte kontrafaktisk provsalspoäng", /P\.E\.R öppnades på 1 fråga/.test(resultCopy || "") && !/provsalen|utan hjälp hade/i.test(resultCopy || ""), String(resultCopy));
+  ok("T11d frågeraden säger P.E.R öppnades", /P\.E\.R öppnades/.test(questionLabel || ""), String(questionLabel));
+  ok("T11e P.E.R-panelen stängs på resultatsidan", panelOpen === false);
+  await page.screenshot({ path: SHOT + "/t11-help-separated-result.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: SHOT + "/t11-help-separated-result-mobile.png" });
+  await ctx.close();
+}
+
+// ── T12: no 0/0 independent score when P.E.R was opened on every question ──
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "help-report-all");
+  await toExam(page);
+  for (let i = 0; i < EXAM.questions.length; i++) {
+    const isOpen = await page.evaluate(() => document.body.classList.contains("xf-per-open"));
+    if (isOpen) await page.click(".xf-ask");
+    await page.click(".xf-ask"); await page.waitForTimeout(250);
+    if (i === 1) await page.fill(".xf-answer", "eget svar");
+    else await page.click(".xf-mc-opt >> nth=0");
+    if (i < EXAM.questions.length - 1) {
+      await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(250);
+    }
+  }
+  await page.click(".xf-exam-nav .xf-btn.primary");
+  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+  const scoreCards = await page.locator("#xf .xf-screen[data-screen='result'] .xf-score").count();
+  const resultCopy = await page.locator("#xf .xf-screen[data-screen='result'] .xf-sub").textContent();
+  ok("T12a bara det officiella resultatkortet visas", scoreCards === 1, String(scoreCards));
+  ok("T12b alla hjälpta frågor förklaras utan 0/0", /öppnades på alla frågor/.test(resultCopy || "") && !/0\/0/.test(resultCopy || ""), String(resultCopy));
   await ctx.close();
 }
 
