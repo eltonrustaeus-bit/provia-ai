@@ -2076,6 +2076,8 @@ function finalizeMsg(div, text) {
     var SUPA_LS   = EXGEN_RUNTIME.authStorageKey;
     var _view     = 'welcome';
     var _open     = false;
+    var _returnFocus = null;
+    var _closeTimer = null;
 
     /* Set the first time an account is created or signed into on this device.
        Used to decide whether the dialog should open on "Skapa konto" or on
@@ -2308,7 +2310,22 @@ function finalizeMsg(div, text) {
 
       el.addEventListener('click', function(e) { if (e.target === el) closeModal(); });
       document.getElementById('pvCl').onclick = closeModal;
-      document.addEventListener('keydown', function(e) { if (_open && e.key === 'Escape') closeModal(); });
+      document.addEventListener('keydown', function(e) {
+        if (!_open) return;
+        if (e.key === 'Escape') { closeModal(); return; }
+        if (e.key !== 'Tab') return;
+        var modal = document.getElementById('pvModal');
+        var focusable = modal ? Array.from(modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+          .filter(function(node) { return node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden'; }) : [];
+        if (!focusable.length) { e.preventDefault(); return; }
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+          e.preventDefault(); first.focus();
+        }
+      });
       document.getElementById('pvToReg').onclick = function() { switchView('register'); };
       document.getElementById('pvToLog').onclick = function() { switchView('login'); };
       document.getElementById('pvRBk').onclick = function() { switchView('login'); };
@@ -2353,6 +2370,7 @@ function finalizeMsg(div, text) {
 
     function openModal(view, force) {
       if (isLoggedIn() && !force) return;
+      if (_closeTimer) { clearTimeout(_closeTimer); _closeTimer = null; }
       if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       /* Every page gate asks for 'register', which is right for a first-time
          visitor and wrong for everyone else — a returning student had to click
@@ -2361,6 +2379,10 @@ function finalizeMsg(div, text) {
          (the "Skapa konto" buttons inside the dialog) go through switchView
          and are untouched by this. */
       if (view === 'register' && hasAccountBefore()) view = 'login';
+      if (!_open) {
+        var active = document.activeElement;
+        _returnFocus = active && active !== document.body && typeof active.focus === 'function' ? active : null;
+      }
       syncLoginButtons();
       /* Gated pages call this during DOMContentLoaded, while the intro splash
          still owns the screen. Cut the splash short — asking someone to log in
@@ -2376,13 +2398,28 @@ function finalizeMsg(div, text) {
       var el = document.getElementById('pvModal');
       if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
       switchView(view || 'register');
+      if (!({ register:1, login:1, forgot:1 })[view || 'register']) {
+        var closeButton = document.getElementById('pvCl');
+        if (closeButton) closeButton.focus();
+      }
     }
 
     function closeModal() {
       _open = false;
       var el = document.getElementById('pvModal');
-      if (el) { el.classList.remove('pv-on'); setTimeout(function() { el.style.display = 'none'; }, 220); }
+      if (_closeTimer) clearTimeout(_closeTimer);
+      if (el) el.classList.remove('pv-on');
       document.body.style.overflow = '';
+      var returnFocus = _returnFocus;
+      _returnFocus = null;
+      _closeTimer = setTimeout(function() {
+        _closeTimer = null;
+        if (_open) return;
+        if (el) el.style.display = 'none';
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
+          try { returnFocus.focus({ preventScroll: true }); } catch (_) { returnFocus.focus(); }
+        }
+      }, 220);
     }
 
     function supaPost(path, body) {
