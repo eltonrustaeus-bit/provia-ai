@@ -138,6 +138,7 @@ async function persistExamResult(payload) {
       p_concept_tags: payload.concept_tags,
       p_error_tags: payload.error_tags,
       p_result_payload: payload.result_payload,
+      p_learning_payload: payload.learning_payload,
     }),
   });
   if (!response?.ok) return "error";

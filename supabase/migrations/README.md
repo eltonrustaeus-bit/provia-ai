@@ -144,8 +144,17 @@ remain unverified self-reports and must not be presented as official results.
 Verify effective grants, RPC execute ACL, marker provenance, forged owner inserts,
 two-account RLS, duplicate-insert and deletion
 behavior in staging before deployment. A crash between saving `mock_results` and writing
-learning attempts can still leave those secondary records incomplete. Treat this as an open
-pilot-review item, not a guarantee supplied by the local tests.
+learning attempts can still leave those secondary records incomplete. The same unapplied
+active-exam draft now captures a service-only `mock_learning_jobs` row in the result RPC,
+with trusted question types, bounded answers, level, course and learner-loop eligibility
+for replay. Deleting a verified result cascades to its pending answer snapshot.
+When the learner loop is disabled, no raw answer is duplicated into the job;
+once a worker completes a job, the database requires it to clear the payload.
+**No worker or deletion/worker coordination transaction is implemented yet.** The
+current synchronous writes still run after commit; a crash can leave the job pending and
+the secondary records incomplete. Do not deploy this draft or call the pilot ready until
+idempotent replay, cancellation on exam deletion, retention and concurrent staging tests
+are reviewed and complete.
 The adjacent rollback file intentionally aborts: dropping the table while the application
 uses it would remove the server-side exam guard. Applying this migration or enabling the
 corresponding app routes requires a separate approval and an isolated deployment plan.

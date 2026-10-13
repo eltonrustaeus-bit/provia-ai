@@ -159,7 +159,7 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
-function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint) {
+function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload) {
   const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
   const conceptTags = [...new Set(
     per.map(q => q.concept_tag).filter(c => c && c !== "Okänt" && c !== "Unknown")
@@ -172,6 +172,7 @@ function buildMockPayload(userId, course, per, total, maxTotal, attemptId, finge
     course: (course || "").slice(0, 100), percent: pct, num_questions: per.length,
     concept_tags: conceptTags, error_tags: errorTags,
     result_payload: { total_points: total, max_points: maxTotal, per_question: per },
+    learning_payload: learningPayload,
   };
 }
 
@@ -227,12 +228,39 @@ function withAttemptAnswers(per, answerMap, questions) {
   }));
 }
 
+function buildLearningPayload(level, course, attemptRows, learnerLoopEnabled) {
+  const normalizedLevel = String(level || "").toUpperCase();
+  return {
+    version: 1,
+    level: LEVEL_DIFFICULTY[normalizedLevel] !== undefined ? normalizedLevel : "C",
+    course: String(course || "").slice(0, 100),
+    learner_loop_enabled: learnerLoopEnabled,
+    rows: attemptRows.map((q) => ({
+      id: String(q.id || "").slice(0, 100),
+      type: q.type === "mc" || q.type === "multiple_choice" ? "mc" : q.type === "graph" ? "graph" : "short",
+      student_answer: learnerLoopEnabled ? String(q.student_answer ?? "").slice(0, 4000) : "",
+      points: Number(q.points) || 0,
+      max_points: Number(q.max_points) || 0,
+      concept_tag: String(q.concept_tag || "").slice(0, 80),
+    })),
+  };
+}
+
 let _sb = null;
 async function supabaseClient() {
   if (_sb) return _sb;
   if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return null;
   _sb = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
   return _sb;
+}
+
+async function snapshotLearnerLoopFlag(userId) {
+  try {
+    const sb = await supabaseClient();
+    if (!sb) return false;
+    const { flagsEnabled } = await perFlags();
+    return Boolean(await flagsEnabled(sb, ["per_learner_loop_enabled"], userId));
+  } catch { return false; }
 }
 
 // E/C/A som svårighetsgrad. Samma skala som src/per/assessment.mjs
@@ -258,10 +286,12 @@ const LEVEL_DIFFICULTY = { E: 0.3, C: 0.55, A: 0.8 };
  * felaktig taggning som når alla elevers historik är dyrare att städa än att
  * vänta.
  */
-async function recordAttempts(supabase, userId, level, per, examId, course) {
-  if (!userId || !Array.isArray(per) || !per.length || !examId) return;
+async function recordAttempts(supabase, userId, level, per, examId, course, learnerLoopEnabled) {
+  if (!learnerLoopEnabled || !userId || !Array.isArray(per) || !per.length || !examId) return;
   try {
     const { flagsEnabled } = await perFlags();
+    // A later feature-flag disable is a kill switch; a later enable must not
+    // retroactively add attempts for an exam whose snapshot was ineligible.
     if (!(await flagsEnabled(supabase, ["per_learner_loop_enabled"], userId))) return;
 
     const A = await attemptBridge();
@@ -345,7 +375,9 @@ async function persistGradedSubmission({ userId, course, per, total, maxTotal, a
   const state = await examIssuance.examState(userId, attemptId);
   if (!state) return "state_error";
   if (state !== "grading") return state === "completed" ? "duplicate" : "inactive";
-  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint));
+  const learnerLoopEnabled = await snapshotLearnerLoopFlag(userId);
+  const learningPayload = buildLearningPayload(level, course, attemptRows, learnerLoopEnabled);
+  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload));
   if (saved === "duplicate") return "duplicate";
   if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
@@ -354,7 +386,7 @@ async function persistGradedSubmission({ userId, course, per, total, maxTotal, a
     applyMockMastery(userId, level, per, attemptId),
     (async () => {
       const sb = await supabaseClient();
-      await recordAttempts(sb, userId, level, attemptRows, attemptId, course);
+      await recordAttempts(sb, userId, level, attemptRows, attemptId, course, learnerLoopEnabled);
     })().catch(() => {}),
   ]);
   return "saved";

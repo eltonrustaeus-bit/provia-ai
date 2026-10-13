@@ -258,7 +258,8 @@ try {
   const saved = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(saved, "the official graph submission writes its result through the persistence path");
   const savedPayload = JSON.parse(saved.body);
-  assert.deepEqual({ ...savedPayload, p_submission_id: undefined }, {
+  const { p_learning_payload: learningPayload, ...resultPayload } = savedPayload;
+  assert.deepEqual({ ...resultPayload, p_submission_id: undefined }, {
     p_user_id: userId,
     p_submission_id: undefined,
     p_course: course,
@@ -269,6 +270,13 @@ try {
     p_answer_fingerprint: savedPayload.p_answer_fingerprint,
     p_result_payload: official.body.result,
   });
+  assert.equal(learningPayload.version, 1);
+  assert.equal(learningPayload.level, "C");
+  assert.equal(learningPayload.course, course);
+  assert.equal(learningPayload.learner_loop_enabled, false);
+  assert.deepEqual(learningPayload.rows.map((row) => [row.id, row.type, row.student_answer, row.points, row.max_points]),
+    [[question.id, "graph", "", 2, 2]],
+    "the durable job snapshot uses the trusted task type without retaining an answer when the learner loop is off");
   assert.match(savedPayload.p_submission_id, /^[a-f0-9]{32}$/);
   assert.match(savedPayload.p_answer_fingerprint, /^[a-f0-9]{64}$/);
   const resultWriteIndex = calls.indexOf(saved);
@@ -352,6 +360,10 @@ try {
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false);
   const duplicateWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.equal(JSON.parse(duplicateWrite.body).p_submission_id, savedPayload.p_submission_id);
+  assert.equal(JSON.parse(duplicateWrite.body).p_learning_payload.learner_loop_enabled, true);
+  assert.equal(JSON.parse(duplicateWrite.body).p_learning_payload.rows[0].student_answer,
+    JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }),
+    "eligible attempt replay retains the bounded original answer");
 
   mockResultMode = "error";
   learnerLoopEnabled = true;

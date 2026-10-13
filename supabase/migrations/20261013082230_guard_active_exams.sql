@@ -23,6 +23,30 @@ revoke all on table public.mock_results from public, anon, authenticated;
 grant select, insert, update, delete on table public.mock_results to service_role;
 drop policy if exists users_own_mock_results on public.mock_results;
 
+-- Result and learning work must be committed together. A later service-only
+-- worker replays this bounded snapshot; recovery-payload expiry must not erase
+-- pending work. Deleting the verified result cascades to the snapshot, but a
+-- worker racing deletion still needs a reviewed transaction gate.
+create table public.mock_learning_jobs (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  submission_id text not null check (submission_id ~ '^[a-f0-9]{32}$'),
+  foreign key (user_id, submission_id)
+    references public.mock_results (user_id, submission_id) on delete cascade,
+  payload jsonb not null check (jsonb_typeof(payload) = 'object'),
+  created_at timestamptz not null default now(),
+  processed_at timestamptz,
+  lease_until timestamptz,
+  attempts integer not null default 0 check (attempts >= 0),
+  constraint mock_learning_jobs_processed_payload_empty
+    check (processed_at is null or payload = '{}'::jsonb),
+  primary key (user_id, submission_id)
+);
+create index mock_learning_jobs_pending_idx
+  on public.mock_learning_jobs (created_at) where processed_at is null;
+alter table public.mock_learning_jobs enable row level security;
+revoke all on table public.mock_learning_jobs from public, anon, authenticated;
+grant select, insert, update, delete on table public.mock_learning_jobs to service_role;
+
 create table public.exam_issuances (
   user_id uuid not null references auth.users(id) on delete cascade,
   submission_id text not null check (submission_id ~ '^[a-f0-9]{32}$'),
@@ -178,7 +202,8 @@ create function public.persist_graded_exam_result(
   p_num_questions integer,
   p_concept_tags text[],
   p_error_tags text[],
-  p_result_payload jsonb
+  p_result_payload jsonb,
+  p_learning_payload jsonb
 )
 returns text
 language plpgsql
@@ -202,11 +227,20 @@ begin
   if v_issuance.grading_started_at is null or
      v_issuance.answer_fingerprint is distinct from p_answer_fingerprint then return 'unclaimed'; end if;
   if v_issuance.grading_started_at <= now() - interval '2 minutes' then return 'expired'; end if;
-  if p_result_payload is null or jsonb_typeof(p_result_payload) <> 'object' or
-     jsonb_typeof(p_result_payload -> 'per_question') <> 'array' or
-     jsonb_typeof(p_result_payload -> 'total_points') <> 'number' or
-     jsonb_typeof(p_result_payload -> 'max_points') <> 'number' then return 'invalid'; end if;
+  if p_num_questions is null or p_num_questions not between 1 and 20 or
+     p_percent is null or p_percent not between 0 and 100 or
+     jsonb_typeof(p_result_payload) is distinct from 'object' or
+     jsonb_typeof(p_result_payload -> 'per_question') is distinct from 'array' or
+     jsonb_typeof(p_result_payload -> 'total_points') is distinct from 'number' or
+     jsonb_typeof(p_result_payload -> 'max_points') is distinct from 'number' then return 'invalid'; end if;
   if jsonb_array_length(p_result_payload -> 'per_question') <> p_num_questions then return 'invalid'; end if;
+  if jsonb_typeof(p_learning_payload) is distinct from 'object' or
+     p_learning_payload ->> 'version' is distinct from '1' or
+     jsonb_typeof(p_learning_payload -> 'rows') is distinct from 'array' or
+     jsonb_typeof(p_learning_payload -> 'learner_loop_enabled') is distinct from 'boolean' or
+     coalesce(p_learning_payload ->> 'level', '') not in ('E', 'C', 'A') then return 'invalid'; end if;
+  if jsonb_array_length(p_learning_payload -> 'rows') <> p_num_questions or
+     octet_length(p_learning_payload::text) > 512000 then return 'invalid'; end if;
 
   insert into public.mock_results
     (user_id, submission_id, course, percent, num_questions, concept_tags,
@@ -228,6 +262,8 @@ begin
   on conflict (user_id, submission_id) do nothing
   returning submission_id into v_saved_id;
   if v_saved_id is null then return 'duplicate'; end if;
+  insert into public.mock_learning_jobs (user_id, submission_id, payload)
+  values (p_user_id, p_submission_id, p_learning_payload);
   update public.exam_issuances
   set result_payload = p_result_payload, result_expires_at = now() + interval '7 days'
   where user_id = p_user_id and submission_id = p_submission_id;
@@ -315,7 +351,7 @@ revoke all on function public.active_exam_count(uuid) from public, anon, authent
 revoke all on function public.claim_exam_grading(uuid, text, text) from public, anon, authenticated;
 revoke all on function public.release_exam_grading(uuid, text, text) from public, anon, authenticated;
 revoke all on function public.recover_graded_exam_result(uuid, text, text) from public, anon, authenticated;
-revoke all on function public.persist_graded_exam_result(uuid, text, text, text, integer, integer, text[], text[], jsonb) from public, anon, authenticated;
+revoke all on function public.persist_graded_exam_result(uuid, text, text, text, integer, integer, text[], text[], jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.abandon_exam_issuance(uuid, text) from public, anon, authenticated;
 revoke all on function public.abandon_all_active_exams(uuid) from public, anon, authenticated;
 revoke all on function public.purge_expired_exam_issuances() from public, anon, authenticated;
@@ -324,7 +360,7 @@ grant execute on function public.active_exam_count(uuid) to service_role;
 grant execute on function public.claim_exam_grading(uuid, text, text) to service_role;
 grant execute on function public.release_exam_grading(uuid, text, text) to service_role;
 grant execute on function public.recover_graded_exam_result(uuid, text, text) to service_role;
-grant execute on function public.persist_graded_exam_result(uuid, text, text, text, integer, integer, text[], text[], jsonb) to service_role;
+grant execute on function public.persist_graded_exam_result(uuid, text, text, text, integer, integer, text[], text[], jsonb, jsonb) to service_role;
 grant execute on function public.abandon_exam_issuance(uuid, text) to service_role;
 grant execute on function public.abandon_all_active_exams(uuid) to service_role;
 grant execute on function public.purge_expired_exam_issuances() to service_role;

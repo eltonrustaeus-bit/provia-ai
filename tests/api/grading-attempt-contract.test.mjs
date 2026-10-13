@@ -25,7 +25,7 @@ assert.match(completion, /questions\.map\(\(question\) => question\?\.grade_task
   "one stable attempt ID is derived from the signed grading tasks");
 assert.match(api, /rpc\/apply_mock_mastery_once/,
   "all mock mastery writes use the idempotent RPC");
-assert.match(api, /if \(!userId \|\| !Array\.isArray\(per\) \|\| !per\.length \|\| !examId\) return/,
+assert.match(api, /if \(!learnerLoopEnabled \|\| !userId \|\| !Array\.isArray\(per\) \|\| !per\.length \|\| !examId\) return/,
   "missing attempt identity fails closed instead of falling back to a shared key");
 assert.match(migration, /primary key \(user_id, submission_id, concept\)/,
   "the database enforces one mastery event per user, official attempt, and concept");
@@ -41,6 +41,20 @@ assert.match(issuanceMigration, /claim_exam_grading[\s\S]*?for update;[\s\S]*?gr
   "one database claim precedes grading for a signed answer set");
 assert.match(issuanceMigration, /persist_graded_exam_result[\s\S]*?insert into public\.mock_results[\s\S]*?set result_payload = p_result_payload, result_expires_at = now\(\) \+ interval '7 days'/i,
   "the full recovery payload is saved with the result summary in one transaction");
+assert.match(issuanceMigration, /create table public\.mock_learning_jobs[\s\S]*?primary key \(user_id, submission_id\)/i,
+  "one pending learning job is keyed to the official result identity");
+assert.match(issuanceMigration, /foreign key \(user_id, submission_id\)[\s\S]*?references public\.mock_results \(user_id, submission_id\) on delete cascade/i,
+  "deleting a verified result also removes the pending answer snapshot");
+assert.match(issuanceMigration, /mock_learning_jobs_processed_payload_empty[\s\S]*?processed_at is null or payload = '\{\}'::jsonb/i,
+  "a completed learning job cannot retain its answer-bearing payload");
+assert.match(issuanceMigration, /insert into public\.mock_results[\s\S]*?insert into public\.mock_learning_jobs[\s\S]*?update public\.exam_issuances/i,
+  "result, retryable learning snapshot and recovery payload share one RPC transaction");
+assert.match(issuanceMigration, /revoke all on table public\.mock_learning_jobs from public, anon, authenticated/i,
+  "the browser cannot forge or consume learning jobs");
+assert.match(api, /snapshotLearnerLoopFlag\(userId\)[\s\S]*?buildLearningPayload\(level, course, attemptRows, learnerLoopEnabled\)/,
+  "learner-loop eligibility and trusted question data are captured before result persistence");
+assert.match(api, /id: String\(q\.id \|\| ""\)\.slice\(0, 100\)/,
+  "job question identities retain the full maximum signed ID length");
 assert.match(issuanceMigration, /create function public\.purge_expired_exam_issuances\(\)[\s\S]*?delete from public\.exam_issuances/i,
   "the draft defines a physical cleanup path, pending a reviewed schedule");
 assert.match(resultMigration, /ADD COLUMN IF NOT EXISTS submission_id text/i);
