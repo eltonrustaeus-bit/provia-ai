@@ -1,18 +1,9 @@
 import { ROOT, serve, openPage, report } from "./_harness.mjs";
 // Beteendekontrakt för pricing.html.
 //
-// Skrivet FÖRE ombyggnaden i Del C steg 2 och kört mot den oförändrade sidan.
-// Samma skäl som i forbattring-behaviour.mjs: ett test som aldrig sett det
-// gamla beteendet kan inte bevisa att det överlevde. Varje kontroll nedan är
-// grön på dagens markup och ska vara grön på den ombyggda, utan att en enda av
-// dem skrivs om.
-//
-// Därför frågar testet aldrig efter en klass som ombyggnaden tänker byta
-// (.planBadge, .planCta, .faqA, .compareTable). Det frågar efter vad besökaren
-// kan göra och se: att de tre planerna finns och kostar rätt, att P.E.R kan
-// skicka en dit, att rösten säger sanning om den egna användningen, att märket
-// pekar ut rätt plan, att köpknappen leder vidare, att varje FAQ-svar går att
-// nå, och att avstängda moduler inte läcker in i jämförelsen.
+// Behavior contract for pricing.html: published prices and capabilities stay
+// visible, local cache data cannot misstate server-controlled quota, every
+// plan leads somewhere, and payment failures keep a usable support path.
 //
 // Fällor, alla bekräftade i projektet tidigare:
 //   1. js/site-gate.js POSTar /api/check-role och gör location.replace("/snart.html")
@@ -24,9 +15,8 @@ import { ROOT, serve, openPage, report } from "./_harness.mjs";
 //      Kontexten körs därför med reducedMotion:"reduce" — sidans egen
 //      rm-gren hoppar över både GSAP, sifferräknaren och muspekaren, och
 //      korten står stilla på sina riktiga värden från första bildrutan.
-//   4. Rösten (setPricingVoice längst ned i body) läser localStorage vid parse,
-//      alltså före shared.js som laddas med defer. Seedning måste ske i
-//      addInitScript, inte efter goto.
+//   4. Session state is seeded before navigation because app scripts read it
+//      during initial document parsing.
 //
 // Användning:  node tests/frontend/pricing-behaviour.mjs
 
@@ -50,7 +40,7 @@ const weekStart = new Date(new Date(now).setHours(0, 0, 0, 0)).getTime() - wd * 
 // framtiden — annars beror testet på vilken veckodag det körs.
 const inWeek = n => Array.from({ length: n }, (_, i) => ({ ts: weekStart + 3600e3 + i * 60e3, course: "Biologi 1", pct: 70 }));
 
-/* seed: { role, history, profileRole, session, width }
+/* seed: { role, history, profileRole, profile, session, width }
    Servern, mockarna, sessionen och splash-förbikopplingen kommer från
    _harness.mjs; det som står kvar här är sidans egna data. */
 async function mk(s = {}) {
@@ -70,7 +60,7 @@ async function mk(s = {}) {
     mocks: {
       role: s.role || "gratis",
       // Registreras efter den generella **/rest/v1/**, annars äts den upp.
-      profiles: s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
+      profiles: s.profile ? [{ id: "u1", ...s.profile }] : s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
       extra,
     },
     state: {
@@ -168,76 +158,50 @@ const amountIn = (page, id) => page.evaluate(cid => {
   await ctx.close();
 }
 
-// ── 2: rösten säger sanning om den egna användningen ─────────────────────
-// Prissidans enda uppgift är att svara på "behöver JAG betala?". Svaret beror
-// på vad besökaren gjort, och de fem grenarna nedan är hela det svaret.
+// ── 2: pricing never treats local history as authoritative quota ─────────
 const voiceOf = page => page.evaluate(() => {
   const m = document.querySelector("main");
   return ((m && m.innerText) || "").replace(/\s+/g, " ").slice(0, 600);
 });
 
 {
-  const { ctx, page } = await mk();               // utloggad, ingen historik
-  const t = await voiceOf(page);
-  ok("2a utan data står markupens standardtext kvar", /Börja gratis/i.test(t), t.slice(0, 120));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ history: inWeek(1) });
-  const t = await voiceOf(page);
-  ok("2b under taket räknas proven den här veckan", /1 prov den här veckan/i.test(t), t.slice(0, 160));
-  ok("2c och besked om att det inte finns skäl att betala", /2 kvar/.test(t), t.slice(0, 200));
-  await ctx.close();
-}
-{
   const { ctx, page } = await mk({ history: inWeek(3) });
-  const t = await voiceOf(page);
-  ok("2d vid taket sägs det rakt ut", /slagit i taket/i.test(t), t.slice(0, 200));
-  ok("2d Basic beskrivs med sin faktiska månadsgräns", /Basic ger 30 prov i månaden för 29 kr\/månad/i.test(t), t.slice(0, 240));
+  const baseline = await voiceOf(page);
+  ok("2a prissidans huvudbudskap är generellt och begripligt", /Välj stödet som passar din studietakt/i.test(baseline));
+  ok("2b lokal historik visas inte som återstående veckokvot", !/\d+ prov den här veckan|\d+ kvar|slagit i taket/i.test(baseline), baseline.slice(0, 200));
+  ok("2c lokal historik visas inte som kontosäker månadsräkning", !/\d+ av 30 prov/i.test(baseline), baseline.slice(0, 200));
   await ctx.close();
 }
 {
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(4) });
+  const { ctx, page } = await mk({ role: "basic", history: inWeek(28) });
   const t = await voiceOf(page);
-  ok("2e Basic får sin egen räkning mot 30", /Du har Basic/i.test(t) && /4 av 30/.test(t), t.slice(0, 200));
+  ok("2d inloggad Basic får samma neutrala huvudbudskap", /Välj stödet som passar din studietakt/i.test(t), t.slice(0, 180));
+  ok("2e browserhistorik ändrar inte planrekommendationer", !/rekommenderas för dig|du närmar dig taket/i.test(t), t.slice(0, 240));
   await ctx.close();
 }
 {
-  const { ctx, page } = await mk({ role: "premium", history: inWeek(2) });
+  const { ctx, page } = await mk({ role: "premium", history: inWeek(30) });
   const t = await voiceOf(page);
-  ok("2f Premium får besked om att inga tak gäller", /Du har Premium/i.test(t) && /Inga tak/i.test(t), t.slice(0, 200));
+  ok("2f Premium får samma neutrala huvudbudskap", /Välj stödet som passar din studietakt/i.test(t), t.slice(0, 180));
   await ctx.close();
 }
 
-// ── 3: märket pekar ut den plan besökaren faktiskt har ───────────────────
-// Läser kortets egen text i stället för .planBadge, så att märket får byta
-// element i ombyggnaden.
+// ── 3: plan facts are consistent across the cards and comparison ─────────
 const cardText = (page, id) => page.evaluate(cid => {
   const el = document.getElementById(cid);
   return el ? (el.innerText || "").replace(/\s+/g, " ") : "";
 }, id);
 
 {
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(1) });
-  ok("3a Basic märks som din plan", /Basic — din plan/i.test(await cardText(page, "plan-basic")));
-  // Rösten har just sagt att Basic räcker. Då får inte kortet bredvid säga
-  // "Rekommenderas" — sidan skulle säga emot sig själv i samma synfält.
-  ok("3b ingen rekommendation medan Basic räcker", !/Rekommenderas/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(26) });
-  ok("3c nära taket rekommenderas Premium", /rekommenderas för dig/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ history: inWeek(3) });
-  ok("3d gratisanvändare vid taket rekommenderas Basic", /rekommenderas för dig/i.test(await cardText(page, "plan-basic")), await cardText(page, "plan-basic"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk();               // ingen data alls
-  ok("3e utan data står markupens Premium-tips kvar", /Rekommenderas/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
+  const { ctx, page } = await mk({ role: "basic", history: inWeek(30) });
+  const plans = await Promise.all(["plan-gratis", "plan-basic", "plan-premium"].map(id => cardText(page, id)));
+  ok("3a inga kort påstår sig vara personligt rekommenderade", !plans.some(text => /rekommenderas för dig|— rekommenderas/i.test(text)), plans.join(" | ").slice(0, 240));
+  const rows = await page.locator("main table tbody tr").allInnerTexts();
+  const accountHistory = rows.find(row => row.startsWith("Kontohistorik när du är inloggad")) || "";
+  const deviceSync = rows.find(row => row.startsWith("Synk mellan enheter när du är inloggad")) || "";
+  ok("3b kontohistorik visas för alla tre planer", (accountHistory.match(/✓/g) || []).length === 3, accountHistory);
+  ok("3c enhetssynk är tydligt villkorad av inloggning", (deviceSync.match(/✓/g) || []).length === 3, deviceSync);
+  ok("3d kvot förklaras som serverstyrd och skild från lokal historik", /Provkvoten kontrolleras av ExGen[\s\S]*historiken som visas på den här enheten/i.test(await page.locator("#zonJamfor").innerText()));
   await ctx.close();
 }
 
@@ -276,6 +240,23 @@ const cardText = (page, id) => page.evaluate(cid => {
   const { ctx, page } = await mk({ session: true, role: "basic", profileRole: "basic" });
   await page.waitForTimeout(1200);
   ok("5b synlig för betalande", await page.locator("#manageSubSection").isVisible());
+  ok("5c utan Stripe-kund visas supportväg i stället för trasig portal", await page.locator("#manageSubSupport").isVisible() && !(await page.locator("#manageSubBtn").isVisible()));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await mk({ session: true, role: "basic", profile: { role: "basic", stripe_customer_id: "cus_test" } });
+  await page.waitForTimeout(1200);
+  ok("5d Stripe-kund får portal-knappen", await page.locator("#manageSubBtn").isVisible() && !(await page.locator("#manageSubSupport").isVisible()));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await mk({ session: true, role: "basic", profile: { role: "basic", stripe_customer_id: "cus_test" } });
+  await page.waitForTimeout(1200);
+  await page.route("**/api/check-role", route => route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "portal_unavailable", message: "Kunde inte öppna betalningsportalen just nu. Försök igen senare." }) }));
+  await page.locator("#manageSubBtn").click();
+  await page.waitForFunction(() => document.getElementById("manageSubSupport")?.getBoundingClientRect().height > 0);
+  ok("5e portal-API-fel visar betalningshjälp direkt", await page.locator("#manageSubSupport").isVisible());
+  ok("5f portalfelet är uppläst via statusregion", /Kunde inte öppna betalningsportalen/i.test(await page.locator("#manageSubMessage").innerText()));
   await ctx.close();
 }
 
@@ -285,12 +266,13 @@ const cardText = (page, id) => page.evaluate(cid => {
 // redan är det nått, annars klickas frågan först.
 const FAQ = [
   ["Kan jag testa gratis", "kortuppgifter"],
-  ["Hur avbokar jag", "prenumerationsportalen"],
+  ["Hur avbokar jag", "betalningsportalen"],
   ["om jag nedgraderar", "finns kvar"],
   ["hela klassen eller skolan", "skolpaket"],
 ];
 {
   const { ctx, page } = await mk();
+  ok("6b FAQ-frågor har rubriksemantik", await page.getByRole("heading", { name: "Hur avbokar jag mitt medlemskap?", level: 3 }).count() === 1);
   for (const [q, a] of FAQ) {
     const shown = await page.evaluate(async ([qq, aa]) => {
       const vis = t => Array.from(document.querySelectorAll("main *")).some(el => {

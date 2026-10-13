@@ -88,8 +88,7 @@
   .planCard{display:flex;flex-direction:column;margin-bottom:0;
     transition:border-color var(--exgen-motion-fast) var(--exgen-motion-ease)}
   .planCard:hover{border-color:var(--xf-accent)}
-  /* Den rekommenderade planen markeras med kant, inte med en permanent puls.
-     Animationen drog blicken från innehållet och läste som dekoration. */
+  /* Premium-planen får en diskret kant som visar att fler funktioner ingår. */
   .planCard.featured{border-color:var(--xf-accent)}
 
   /* Kortet P.E.R just skickade besökaren till. Säger "här" en gång och
@@ -98,8 +97,7 @@
   .planCard--flash{box-shadow:0 0 0 2px var(--xf-accent);transition:box-shadow .3s ease}
   @media(prefers-reduced-motion:reduce){.planCard--flash{transition:none}}
 
-  /* Märket är .xf-chip. Klassnamnet .planBadge är kvar som JS-krok — röstens
-     skript byter dess text till "din plan" respektive "rekommenderas för dig". */
+  /* Märket är .xf-chip; innehållet är statiskt och påstår ingen personlig rekommendation. */
   .planBadge{align-self:flex-start;margin-bottom:14px;cursor:default}
   .planCard.featured .planBadge{border-color:var(--xf-accent);color:var(--xf-accent)}
 
@@ -180,7 +178,7 @@
   .faqGrid{display:grid;gap:8px}
   .faqItem{margin-bottom:0}
   .faqQ{font-size:var(--exgen-text-base);font-weight:var(--exgen-weight-semibold);
-    color:var(--xf-ink);margin-bottom:6px}
+    color:var(--xf-ink);margin:0 0 6px}
   .faqA{font-size:var(--exgen-text-sm);color:var(--xf-ink-2);line-height:var(--exgen-leading-relaxed)}
 
   /* ── MUSPEKARE ── samma som index.html och förbättring.html */
@@ -220,12 +218,9 @@
 
 <main class="wrap" id="main-content">
 
-  <!-- P.E.R:S RÖST
-       Ersätter "Enkel prissättning. Ingen bindningstid." — en rubrik som är
-       likadan för varenda besökare och som varje konkurrent också har.
-       En prissida ska svara på "behöver JAG betala?", och det svaret beror på
-       hur mycket eleven faktiskt använt. setPricingVoice() nedan räknar det ur
-       historiken som redan finns.
+  <!-- PRISSIDANS INGÅNG
+       Lokal webbläsarhistorik är varken en tillförlitlig kvot eller en säker
+       källa för personliga planrekommendationer.
 
        Rösten ligger i .xf-measure — samma 580px läsmått som app.html och
        förbättring.html öppnar med. Zonerna under den är bredare, se
@@ -235,8 +230,8 @@
       <div class="xf-per">
         <div class="xf-orb" aria-hidden="true"></div>
         <div style="flex:1;min-width:0">
-          <h1 class="xf-say" id="priceSay">Börja gratis.</h1>
-          <p class="xf-sub" id="priceSub">Uppgradera först när du slår i taket — inte innan.</p>
+          <h1 class="xf-say" id="priceSay">Välj stödet som passar din studietakt.</h1>
+          <p class="xf-sub" id="priceSub">Börja gratis. Uppgradera när du behöver fler prov eller fler verktyg.</p>
         </div>
       </div>
     </div>
@@ -277,7 +272,7 @@
             <li class="dim">Felbank &amp; AI-coach — kräver Premium</li>
           </ul>
 
-          <p class="xf-note">Prova plattformen utan kostnad. Uppgradera till Basic när du vill göra fler prov och få historik och synk mellan enheter.</p>
+          <p class="xf-note">Prova plattformen utan kostnad. När du är inloggad sparas provresultat i ditt konto när kontosparningen lyckas.</p>
           <a class="xf-btn ghost" href="app.html" data-pv-auth="register">Skapa ditt första prov</a>
         </div>
       </div>
@@ -299,8 +294,6 @@
           <ul class="featureList">
             <li>Upp till 30 prov per månad — ungefär ett om dagen</li>
             <li>Fota anteckningar och gör prov på dem direkt</li>
-            <li>Historik — följ din utveckling över tid</li>
-            <li>Synk mellan dator, telefon och surfplatta</li>
             <li>P.E.R — 5 frågor / dag</li>
             <li class="dim">Felbank &amp; AI-coach — kräver Premium</li>
           </ul>
@@ -312,7 +305,7 @@
 
       <!-- PREMIUM -->
       <div class="xf-card planCard featured rev d3" id="plan-premium">
-        <span class="xf-chip planBadge">Premium — Rekommenderas</span>
+        <span class="xf-chip planBadge">Premium</span>
         <div class="planName">Premium</div>
         <div class="planDesc">Maxa resultaten med personlig AI-coach.</div>
         <div class="planPriceRow">
@@ -360,7 +353,7 @@
         <tr><td>E / C / A-nivå</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Flervals + kortsvar</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Resultat &amp; poängöversikt</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
-        <tr><td>Historik</td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
+        <tr><td>Kontohistorik när du är inloggad</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>OCR från bild</td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>P.E.R AI-assistent (chatt)</td><td><span class="chk" style="font-size:11px;font-family:var(--mono)">5/vecka</span></td><td><span class="chk" style="font-size:11px;font-family:var(--mono)">5/dag</span></td><td><span class="chk" style="font-size:11px;font-family:var(--mono)">Obegränsat</span></td></tr>
         <tr><td>P.E.R ser aktuell fråga/prov</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
@@ -368,10 +361,11 @@
         <tr><td>Felbank med P.E.R-tips</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Träning från misstag</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td></tr>
         <tr><td>Lärarrapport</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td></tr>
-        <tr><td>Synk mellan enheter</td><td><span class="dash">—</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
+        <tr><td>Synk mellan enheter när du är inloggad</td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td><td><span class="chk">✓</span></td></tr>
       </tbody>
     </table>
     </div>
+    <p class="xf-note">Kontohistorik synkas när du är inloggad och sparningen lyckas. Provkvoten kontrolleras av ExGen och kan skilja sig från historiken som visas på den här enheten.</p>
   </section>
 
   <!-- ZON 3 — DIN PRENUMERATION. Visas bara för den som betalar; skriptet
@@ -380,7 +374,10 @@
     <div class="xf-eyebrow">Din prenumeration</div>
 
     <div class="xf-card subRow">
-      <div>Hantera eller avsluta din prenumeration via säker betalningsportal.</div>
+      <div>
+        <div id="manageSubMessage" aria-live="polite">Hantera eller avsluta din Stripe-prenumeration via betalningsportalen.</div>
+        <a id="manageSubSupport" href="mailto:elton.rustaeus@gmail.com" style="display:none">Kontakta ExGen om betalningshjälp</a>
+      </div>
       <button class="xf-btn ghost" id="manageSubBtn" type="button">Hantera prenumeration →</button>
     </div>
   </section>
@@ -393,22 +390,22 @@
     <div class="faqGrid">
 
       <div class="xf-card faqItem" id="fq1">
-        <div class="faqQ">Kan jag testa gratis innan jag väljer plan?</div>
+        <h3 class="faqQ">Kan jag testa gratis innan jag väljer plan?</h3>
         <div class="faqA">Ja. Du kan skapa konto och prova utan att ange kortuppgifter. Gratisläget ger dig 3 prov i veckan på ditt eget material, med rättning och modellsvar på varje fråga.</div>
       </div>
 
       <div class="xf-card faqItem" id="fq2">
-        <div class="faqQ">Hur avbokar jag mitt medlemskap?</div>
-        <div class="faqA">Du kan avsluta när som helst via prenumerationsportalen — klicka på "Hantera prenumeration" ovanför (visas om du är inloggad med ett aktivt konto), eller via menyn i appen. Ingen bindningstid och du debiteras inte för nästa period efter avslut.</div>
+        <h3 class="faqQ">Hur avbokar jag mitt medlemskap?</h3>
+        <div class="faqA">Stripe-prenumerationer kan hanteras i betalningsportalen. Om portallänken saknas eller inte fungerar, kontakta oss på elton.rustaeus@gmail.com så hjälper vi dig. Ingen bindningstid.</div>
       </div>
 
       <div class="xf-card faqItem" id="fq3">
-        <div class="faqQ">Vad händer med mina prov och historik om jag nedgraderar?</div>
+        <h3 class="faqQ">Vad händer med mina prov och historik om jag nedgraderar?</h3>
         <div class="faqA">Din historik och dina sparade prov finns kvar. Premium-funktioner (AI-coach, felbank, träningsläge) pausas men aktiveras igen om du uppgraderar tillbaka.</div>
       </div>
 
       <div class="xf-card faqItem" id="fq4">
-        <div class="faqQ">Finns det en plan för hela klassen eller skolan?</div>
+        <h3 class="faqQ">Finns det en plan för hela klassen eller skolan?</h3>
         <div class="faqA">Vi arbetar på ett skolpaket med centraliserad administration och klassöversikt. Hör av dig till oss via appen för mer info om nuvarande möjligheter.</div>
       </div>
 
@@ -512,17 +509,25 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 
 })();
 
-// Show manage-subscription section for paying users
+// Show the portal only when a Stripe customer is linked; give other paid
+// accounts a direct support route instead of a button that cannot work.
 (async function() {
   const runtime = window.ExGenRuntime || {};
   if (!window.supabase || !runtime.supabaseUrl || !runtime.publishableKey) return;
   const sb = window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey);
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
-  const { data: prof } = await sb.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
+  const { data: prof } = await sb.from("profiles").select("role, stripe_customer_id").eq("id", session.user.id).maybeSingle();
   if (!prof || !["basic","premium"].includes(prof.role)) return;
 
   document.getElementById("manageSubSection").style.display = "";
+  const hasStripeCustomer = typeof prof.stripe_customer_id === "string" && prof.stripe_customer_id.trim().length > 0;
+  document.getElementById("manageSubBtn").style.display = hasStripeCustomer ? "" : "none";
+  document.getElementById("manageSubSupport").style.display = hasStripeCustomer ? "none" : "inline-block";
+  if (!hasStripeCustomer) {
+    document.getElementById("manageSubMessage").textContent = "Vi kan inte öppna en betalningsportal för det här kontot just nu.";
+    return;
+  }
 
   document.getElementById("manageSubBtn").onclick = async function() {
     const btn = this;
@@ -538,12 +543,14 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
       if (r.ok && data.url) {
         window.location.href = data.url;
       } else {
-        alert("Fel: " + (data.message || data.error || "Okänt fel"));
+        document.getElementById("manageSubMessage").textContent = data.message || "Betalningsportalen kunde inte öppnas. Kontakta ExGen så hjälper vi dig.";
+        document.getElementById("manageSubSupport").style.display = "inline-block";
         btn.disabled = false;
         btn.textContent = "Hantera prenumeration →";
       }
     } catch {
-      alert("Nätverksfel. Försök igen.");
+      document.getElementById("manageSubMessage").textContent = "Nätverksfel. Betalningsportalen kunde inte öppnas.";
+      document.getElementById("manageSubSupport").style.display = "inline-block";
       btn.disabled = false;
       btn.textContent = "Hantera prenumeration →";
     }
@@ -617,79 +624,8 @@ document.addEventListener("DOMContentLoaded", function () {
 <!-- VISITOR BOTTOM NAV -->
 <script>
 (function () {
-  /* Vad sidan säger beror på vad eleven gjort, inte på vad vi vill sälja.
-     Räknar prov ur proviaai_history (samma nyckel som appen och
-     förbättringssidan skriver till) och rollen ur proviaai_role. Inga anrop,
-     ingen ny lagring — och en utloggad besökare får en ärlig rad i stället för
-     en påhittad siffra. */
-  function arr(k) { try { var v = JSON.parse(localStorage.getItem(k) || "[]"); return Array.isArray(v) ? v : []; } catch (_) { return []; } }
-
-  var say = document.getElementById("priceSay");
-  var sub = document.getElementById("priceSub");
-  if (!say || !sub) return;
-
-  var role = "";
-  try { role = String(localStorage.getItem("proviaai_role") || "").trim(); } catch (_) {}
-  var hist = arr("proviaai_history");
-
-  var now = new Date();
-  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  // Måndag som veckostart, svensk konvention.
-  var d = new Date(now); var wd = (d.getDay() + 6) % 7;
-  d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - wd);
-  var weekStart = d.getTime();
-
-  var inMonth = hist.filter(function (x) { return Number(x.ts) >= monthStart; }).length;
-  var inWeek = hist.filter(function (x) { return Number(x.ts) >= weekStart; }).length;
-
-  if (role === "premium") {
-    say.textContent = "Du har Premium.";
-    sub.textContent = inMonth
-      ? inMonth + " prov den här månaden. Inga tak — det är hela poängen med planen."
-      : "Inga tak. Kör så mycket du orkar.";
-  } else if (role === "basic") {
-    say.textContent = "Du har Basic.";
-    sub.textContent = inMonth
-      ? inMonth + " av 30 prov den här månaden." + (inMonth >= 24 ? " Du närmar dig taket." : "")
-      : "30 prov i månaden ingår. Du har inte börjat än den här månaden.";
-  } else if (hist.length) {
-    var left = 3 - inWeek;
-    say.textContent = inWeek + (inWeek === 1 ? " prov den här veckan." : " prov den här veckan.");
-    sub.textContent = left > 0
-      ? "Gratis räcker till 3. Du har " + left + " kvar — ingen anledning att betala än."
-      : "Gratis räcker till 3, så du har slagit i taket. Basic ger 30 prov i månaden för 29 kr/månad.";
-  }
-  // Utloggad eller utan historik: markupens standardtext står kvar.
-
-  /* Markera den plan eleven faktiskt har, och låt rekommendationen följa av
-     användningen i stället för att alltid peka på den dyraste. En badge som
-     säger "Rekommenderas" på Premium medan rösten just sagt att Basic löser
-     problemet säger emot sig själv, och det märks. */
-  var mine = role === "premium" ? "Premium" : role === "basic" ? "Basic" : hist.length ? "Gratis" : "";
-
-  /* "" = ingen åsikt, låt markupens tips stå (gäller besökare utan data).
-     null = vi VET att ingen uppgradering behövs, plocka bort tipset. */
-  var suggest = "";
-  if (role === "basic") suggest = inMonth >= 24 ? "Premium" : null;
-  else if (!role || role === "gratis") {
-    // Utan historik finns inget att gå på — då står markupens Premium-tips kvar.
-    if (hist.length && inWeek >= 3) suggest = "Basic";
-    else if (hist.length) suggest = null;   // under taket: rekommendera ingenting
-  } else if (role === "premium") suggest = null;
-
-  Array.prototype.forEach.call(document.querySelectorAll(".planCard"), function (card) {
-    var name = ((card.querySelector(".planName") || {}).textContent || "").trim();
-    var badge = card.querySelector(".planBadge");
-    if (!badge) return;
-    if (name === mine) { badge.textContent = name + " — din plan"; return; }
-    if (suggest === null) {
-      // Ingen rekommendation gäller — plocka bort den som står i markupen.
-      if (/Rekommenderas/i.test(badge.textContent)) badge.textContent = name;
-      return;
-    }
-    if (suggest && name === suggest) badge.textContent = name + " — rekommenderas för dig";
-    else if (suggest && /Rekommenderas/i.test(badge.textContent)) badge.textContent = name;
-  });
+  // Plan and quota are never inferred from browser storage; the server remains
+  // authoritative for entitlement checks.
 })();
 </script>
 </body>
