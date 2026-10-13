@@ -1364,6 +1364,7 @@ function finalizeMsg(div, text) {
     }
 
     function toggle() {
+      if (!document.getElementById('perBubble') || !document.getElementById('perPanel')) return;
       _open = !_open;
       var panel = document.getElementById('perPanel');
       var bubble = document.getElementById('perBubble');
@@ -1424,7 +1425,7 @@ function finalizeMsg(div, text) {
     }
 
     function initWidget() {
-      if (document.getElementById('perWidget')) return;
+      if (!document.body || document.body.dataset.perWidget === 'off' || document.getElementById('perWidget')) return;
 
       var style = document.createElement('style');
       style.textContent = [
@@ -1836,7 +1837,7 @@ function finalizeMsg(div, text) {
 
       /* Alt+P keyboard shortcut */
       document.addEventListener('keydown', function(e) {
-        if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P')) {
           e.preventDefault();
           toggle();
         }

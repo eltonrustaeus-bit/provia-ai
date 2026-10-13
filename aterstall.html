@@ -55,14 +55,10 @@
   .rsLink:hover{text-decoration:underline}
   .rsView{display:none}
   .rsView.on{display:block}
-  /* shared.js mounts the P.E.R assistant on every page it loads. Someone who
-     is locked out of their account has one job here, and a chat bubble is not
-     it — hide it on this page only. */
-  #perWidget{display:none!important}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
-<body>
+<body data-per-widget="off">
 
 <main class="rsWrap">
   <div class="rsCard">
