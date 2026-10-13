@@ -161,52 +161,49 @@ body.xf-grading .xf-progress { display: none; }
 .xf-exam-exit:disabled { opacity: .5; cursor: wait; }
 
 @media (max-width: 600px) {
-  .xf-exam-top { gap: 8px; padding: 10px 12px; }
+  .xf-exam-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 44px;
+    grid-template-areas: "count time exit" "dots dots dots";
+    gap: 4px 8px;
+    padding: 10px 12px;
+  }
+  .xf-exam-top > span:first-child { grid-area: count; }
+  .xf-exam-time { grid-area: time; }
+  .xf-exam-exit { grid-area: exit; }
+  .xf-exam-dots { grid-area: dots; flex: none; }
 }
 
 .xf-dot {
   position: relative;
-  width: 7px;
-  height: 7px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--xf-line);
+  background: transparent;
   border: 0;
   padding: 0;
   cursor: pointer;
   transition: all var(--exgen-motion-fast) var(--exgen-motion-ease);
 }
 
-/* Klickytan ligger i ett pseudoelement, så pricken kan vara 7px medan tummen
-   får något att sikta på — och raden behåller sin höjd, eftersom pseudoelement
-   inte deltar i flexlayouten.
-
-   Två saker styr formen, och båda är mätta, inte gissade.
-
-   Bredden stannar på 12px: exakt prickens delning (7px prick + 5px gap). En
-   bredare yta lägger sig över grannprickens mitt, och eftersom senare syskon
-   målas överst skulle ett träff mitt på pricken aktivera nästa fråga i stället.
-   12px är alltså det bredaste som går utan att en avsiktlig träff hamnar fel.
-
-   Höjden är 44px men växer nedåt från prickens överkant, inte åt båda hållen.
-   Vid 20 frågor på 390px bryts raden i två, med samma 12px mellan raderna. En
-   centrerad 44px-yta lät då undre radens prickar täcka de övres helt — mätt:
-   prick 7–10 gick inte längre att träffa. Nedåt behåller varje prick i övre
-   raden sina 12px runt sin egen mitt, och undre raden får hela ytan. Extraytan
-   hamnar dessutom där tummen faktiskt hamnar när den underskjuter en kontroll
-   högst upp på skärmen. */
-.xf-dot::after {
+.xf-dot::before {
   content: "";
   position: absolute;
-  left: 50%;
-  margin-left: -6px;
-  top: 0;
-  width: 12px;
-  height: 44px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--xf-line);
+  transition: inherit;
 }
 
-.xf-dot.done { background: var(--xf-accent); }
-.xf-dot.here { background: var(--xf-accent); transform: scale(1.55); }
-.xf-dot:hover { opacity: .7; }
+.xf-dot.done::before,
+.xf-dot.here::before { background: var(--xf-accent); }
+.xf-dot.here::before { transform: scale(1.55); }
+.xf-dot:hover::before { opacity: .7; }
+.xf-dot:focus-visible { outline: 2px solid var(--xf-accent); outline-offset: 1px; }
 
 /* Arket. Marginalen till vänster är gutter för frågenumret, precis som på ett
    utskrivet prov. */

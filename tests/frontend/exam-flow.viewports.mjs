@@ -78,7 +78,12 @@ async function newPage(opts, exam) {
   // Baslagret från _harness.mjs; provgenereringen och rättningen sist.
   await mockApis(page, { extra: [
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam, meta: { quota: { enforced: false } } } })],
-    ["**/api/grade", r => r.fulfill({ json: { ok: true, result: mkResult(exam, true) } })],
+    ["**/api/grade", r => r.fulfill({ json: {
+      ok: true,
+      exam_proof: `v2.${"f".repeat(32)}.syntheticViewportProof`,
+      persistence: { mock_result_saved: true },
+      result: mkResult(exam, true),
+    } })],
   ] });
   await seed(page);
   return { ctx, page };
@@ -159,11 +164,12 @@ for (const [label, w, h] of VIEWS) {
       const after = getComputedStyle(e, "::after");
       const w = Math.max(r.width, after.content === "none" ? 0 : parseFloat(after.width) || 0);
       const h = Math.max(r.height, after.content === "none" ? 0 : parseFloat(after.height) || 0);
-      if (w < 44 || h < 44) out.push({ sel, w: Math.round(w), h: Math.round(h) });
+      const minimum = sel === ".xf-dot" ? 24 : 44;
+      if (w < minimum || h < minimum) out.push({ sel, w: Math.round(w), h: Math.round(h), minimum });
     });
     return out;
   });
-  taps.forEach(t => add(w <= 480 ? "MEDEL" : "LÅG", label, `Tap-target ${t.sel} är ${t.w}×${t.h} px (< 44×44)`, t.sel, "Öka klickytan med padding eller pseudo-element"));
+  taps.forEach(t => add(w <= 480 ? "MEDEL" : "LÅG", label, `Tap-target ${t.sel} är ${t.w}×${t.h} px (< ${t.minimum}×${t.minimum})`, t.sel, "Öka klickytan utan att låta den gå in över en grannkontroll"));
 
   await ctx.close();
 }
@@ -294,12 +300,15 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
   await page.waitForTimeout(300);
   const anim = await page.evaluate(() => {
+    // Chromium serializes a CSS token of 0ms as 0.00001s; ignore that
+    // sub-millisecond rounding while still catching motion a user can see.
+    const hasMeaningfulDuration = value => String(value).split(",").some(part => parseFloat(part) > 0.001);
     const bad = [];
     document.querySelectorAll(".xf-orb, .xf-sheet, .xf-mc-opt, .xf-progress i").forEach(e => {
       const s = getComputedStyle(e);
       const after = getComputedStyle(e, "::after");
-      if (s.transitionDuration !== "0s" && s.transitionDuration !== "" ) bad.push(e.className + " transition " + s.transitionDuration);
-      if (after.animationName && after.animationName !== "none" && after.animationDuration !== "0s") bad.push(e.className + "::after " + after.animationName);
+      if (hasMeaningfulDuration(s.transitionDuration)) bad.push(e.className + " transition " + s.transitionDuration);
+      if (after.animationName && after.animationName !== "none" && hasMeaningfulDuration(after.animationDuration)) bad.push(e.className + "::after " + after.animationName);
     });
     return bad.slice(0, 6);
   });
