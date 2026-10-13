@@ -250,10 +250,10 @@ export async function assessAnswer({
         ],
         { model: assessorModel(), schema: errorClassifier.outputSchema(), timeout: 30000 }
       );
-      modelsUsed.push(assessorModel());
+      modelsUsed.push(out.model);
       await logUsage(supabase, {
         jobId, userId, feature: "per_learner_loop", pipelineStep: "error_classify",
-        subject: concept?.subject, course: concept?.course, model: assessorModel(), usage: out.usage,
+        subject: concept?.subject, course: concept?.course, model: out.model, usage: out.usage,
         latencyMs: Date.now() - t0, retrievedChunks: chunks.length,
         promptVersion: ASSESS_PROMPT_VERSION, pipelineVersion: ASSESS_PIPELINE_VERSION,
       });
@@ -339,10 +339,10 @@ export async function assessAnswer({
   const primaryOut = await callAIRaw(messages, {
     model: assessorModel(), schema: perAssess.outputSchema(), timeout: 40000,
   });
-  modelsUsed.push(assessorModel());
+  modelsUsed.push(primaryOut.model);
   await logUsage(supabase, {
     jobId, userId, feature: "per_learner_loop", pipelineStep: "assess",
-    subject: concept?.subject, course: concept?.course, model: assessorModel(), usage: primaryOut.usage,
+    subject: concept?.subject, course: concept?.course, model: primaryOut.model, usage: primaryOut.usage,
     latencyMs: Date.now() - tStep, retrievedChunks: chunks.length,
     promptVersion: ASSESS_PROMPT_VERSION, pipelineVersion: ASSESS_PIPELINE_VERSION,
   });
@@ -363,10 +363,10 @@ export async function assessAnswer({
       const verifyOut = await callAIRaw(messages, {
         model: assessVerifierModel(), schema: perAssess.outputSchema(), timeout: 40000,
       });
-      modelsUsed.push(assessVerifierModel());
+      modelsUsed.push(verifyOut.model);
       await logUsage(supabase, {
         jobId, userId, feature: "per_learner_loop", pipelineStep: "verify_assess",
-        subject: concept?.subject, course: concept?.course, model: assessVerifierModel(), usage: verifyOut.usage,
+        subject: concept?.subject, course: concept?.course, model: verifyOut.model, usage: verifyOut.usage,
         latencyMs: Date.now() - tStep, retrievedChunks: chunks.length,
         promptVersion: ASSESS_PROMPT_VERSION, pipelineVersion: ASSESS_PIPELINE_VERSION,
       });

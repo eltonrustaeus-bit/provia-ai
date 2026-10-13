@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
-import { callAI, callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
+import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import aiUsage from "./_ai-usage.cjs";
 import publicGuide from "./_per-public-guide.cjs";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
@@ -44,6 +44,14 @@ const supabase = createSupabaseServerClient(
   process.env.SUPABASE_URL,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+function refreshPerMemory(userId, history, learningSignals) {
+  const callMemoryAI = (messages, options) => callMeasuredPerAI(messages, options, {
+    userId,
+    feature: "per_memory",
+  });
+  return maybeRefreshLongMemory(supabase, userId, history, callMemoryAI, learningSignals);
+}
 
 async function callMeasuredPerAI(messages, options, { userId, feature = "per_chat", step = "generate" }) {
   const startedAt = Date.now();
@@ -860,7 +868,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: 'assistant', content: fullText },
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
-      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
+      refreshPerMemory(user.id, newHistory, learningSignals).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -906,7 +914,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: "assistant", content: answer },
       ].slice(-20);
       await savePerHistory(user.id, newHistory);
-      maybeRefreshLongMemory(supabase, user.id, newHistory, callAI, learningSignals).catch(() => {});
+      refreshPerMemory(user.id, newHistory, learningSignals).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:

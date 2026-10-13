@@ -16,6 +16,7 @@ Object.assign(process.env, {
 
 const requests = [];
 let activeCount = 0;
+let staleMemory = false;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
@@ -27,7 +28,8 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url.includes("/rest/v1/per_long_memory") && url.includes("updated_at")) {
-    return Response.json([{ updated_at: new Date().toISOString(), structured: {} }]);
+    const updatedAt = staleMemory ? new Date(Date.now() - 2 * 86_400_000).toISOString() : new Date().toISOString();
+    return Response.json([{ updated_at: updatedAt, structured: {} }]);
   }
   if (url.startsWith(`${origin}/rest/v1/`)) {
     return init.method === "POST" || init.method === "PATCH"
@@ -111,4 +113,20 @@ test("JSON P.E.R records Responses usage and preserves the answer", async () => 
   assert.equal(usageWrite.body[0].model, "measured-json-model");
   assert.equal(usageWrite.body[0].input_tokens, 45);
   assert.equal(usageWrite.body[0].output_tokens, 13);
+});
+
+test("background P.E.R memory refresh records both measured calls without conversation text", async () => {
+  requests.length = 0;
+  staleMemory = true;
+  await invoke("application/json");
+  for (let i = 0; i < 20 && requests.filter((request) => request.url.endsWith("/rest/v1/ai_usage_events") && request.body?.[0]?.feature === "per_memory").length < 2; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  staleMemory = false;
+
+  const writes = requests.filter((request) => request.url.endsWith("/rest/v1/ai_usage_events") && request.body?.[0]?.feature === "per_memory");
+  assert.equal(writes.length, 2);
+  assert.deepEqual(writes.map((request) => request.body[0].model), ["measured-json-model", "measured-json-model"]);
+  assert.deepEqual(writes.map((request) => request.body[0].input_tokens), [45, 45]);
+  assert.doesNotMatch(JSON.stringify(writes), /Hur börjar jag|Börja med begreppet/);
 });

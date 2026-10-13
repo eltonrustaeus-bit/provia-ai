@@ -553,7 +553,7 @@ export async function runCoach({
   await logUsage(supabase, {
     jobId, userId, feature: "per_learner_loop", pipelineStep: "coach",
     subject: concept.subject, course: concept.course,
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini", usage: out.usage,
+    model: out.model, usage: out.usage,
     latencyMs: Date.now() - t0, retrievedChunks: chunks.length,
     promptVersion: PER_PROMPT_VERSION, pipelineVersion: PER_PIPELINE_VERSION,
   });
