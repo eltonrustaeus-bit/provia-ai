@@ -379,6 +379,8 @@
             text: m.focus.text,
             options: m.focus.options,
             type: m.focus.type,
+            graphMode: m.focus.type === 'graph' && m.focus.graphMode === 'scatter' ? 'scatter'
+              : m.focus.type === 'graph' && m.focus.graphMode === 'line' ? 'line' : undefined,
             category: m.focus.category,
             answer: m.focus.answer,
             answered: !!m.focus.answered

@@ -154,6 +154,24 @@ test("direct chat calls during an exam get method guidance before quota, cache o
   }
 });
 
+test("active scatter-graph guidance is specific but never echoes point values", async () => {
+  activeCount = 1;
+  try {
+    const response = await invoke({
+      userQuestion: "Ge mig koordinaterna direkt",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "scatter", text: "Placera (0, 4), (1, 3), (2, 1)." } },
+    });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body.answer, /första värdet är vågrätt \(x\)/i);
+    assert.match(response.body.answer, /rubriker och enheter/i);
+    assert.doesNotMatch(response.body.answer, /\(0, 4\)|\(1, 3\)|\(2, 1\)|0, 4|1, 3|2, 1/);
+    assert.equal(response.body.helpLevelUsed, 0);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";

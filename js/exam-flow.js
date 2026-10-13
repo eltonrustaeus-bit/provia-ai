@@ -1438,6 +1438,8 @@
         of: qs.length,
         text: String(q.question || "").slice(0, 400),
         type: q.type || "short",
+        graphMode: q.type === "graph" && q.graph_ui && q.graph_ui.mode === "scatter" ? "scatter"
+          : q.type === "graph" ? "line" : undefined,
         options: Array.isArray(q.options) ? q.options : [],
         category: String(q.topic || ""),
         answer: ans.slice(0, 200),

@@ -351,21 +351,26 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan }) {
 }
 
 function sendActiveExamGuidance(req, res, body) {
-  const type = body.pageContext?.currentQuestion?.type;
+  const currentQuestion = body.pageContext?.currentQuestion;
+  const type = currentQuestion?.type;
+  const graphMode = type === "graph" && currentQuestion?.graphMode === "scatter" ? "scatter" : "line";
   const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
   const hints = en
     ? {
       mc: "Read what the question asks, then compare the options one at a time. Which claim can you support from your material, and why can you rule out another?",
-      graph: "First identify what each axis represents. Choose two x-values in the grid and work out their y-values. How can you check whether the line you drew matches the relationship?",
+      line: "First identify what each axis represents. Choose two x-values in the grid and work out their y-values. How can you check whether the line you drew matches the relationship?",
+      scatter: "Match each row to a point: the first value is horizontal (x), and the second is vertical (y). Check that the axis labels and units match the columns, then describe the pattern you observe without assuming every point lies on a line.",
       short: "Identify the concept or relationship the question is testing. Find a supporting point in your material, then explain it in your own words. What step is still missing?",
     }
     : {
       mc: "Läs vad frågan faktiskt ber om och jämför alternativen ett i taget. Vilket påstående kan du stödja med ditt material, och varför kan du utesluta ett annat?",
-      graph: "Börja med att se vad axlarna visar. Välj två x-värden i rutnätet och räkna fram deras y-värden. Hur kan du kontrollera att din linje stämmer med sambandet?",
+      line: "Börja med att se vad axlarna visar. Välj två x-värden i rutnätet och räkna fram deras y-värden. Hur kan du kontrollera att din linje stämmer med sambandet?",
+      scatter: "Koppla varje rad till en punkt: det första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera att axlarnas rubriker och enheter stämmer med kolumnerna. Beskriv sedan mönstret du ser utan att anta att alla punkter ligger på en linje.",
       short: "Identifiera vilket begrepp eller samband frågan prövar. Hitta stöd i ditt material och förklara med egna ord. Vilket steg behöver du fortfarande visa?",
     };
   res.setHeader("Cache-Control", "no-store");
-  res.json({ answer: hints[type] || hints.short, helpCap: 0, helpLevelUsed: 0, examActive: true });
+  const hint = type === "graph" ? hints[graphMode] : hints[type];
+  res.json({ answer: hint || hints.short, helpCap: 0, helpLevelUsed: 0, examActive: true });
 }
 
 async function gateActiveExam(req, res, body, user) {

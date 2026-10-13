@@ -13,9 +13,10 @@ const srv = await serve(ROOT, { indexFile: "app.html" });
 const EXAM = {
   title: "Prov", level: "C", exam_manifest: "synthetic-biology-manifest",
   questions: Array.from({ length: 3 }, (_, n) => ({
-    id: "q" + (n + 1), type: "mc", points: 2,
-    question: "Fråga nummer " + (n + 1) + " om cellandning",
-    options: ["Alfa", "Beta", "Gamma", "Delta"], correct_index: 1,
+    id: "q" + (n + 1), type: n === 2 ? "graph" : "mc", points: n === 2 ? 3 : 2,
+    question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen" : "Fråga nummer " + (n + 1) + " om cellandning",
+    options: n === 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n === 2 ? -1 : 1,
+    ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
     topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
     model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
     scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
@@ -90,6 +91,8 @@ ok("T4a explain anropades", !!lastExplain);
 ok("T4b rätt frågenummer i kroppen", lastExplain?.pageContext?.currentQuestion?.number === 3,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4c frågetexten i kroppen", /Fråga nummer 3/.test(lastExplain?.pageContext?.currentQuestion?.text || ""));
+ok("T4c1 scatterläge följer med för rätt aktiv fråga", lastExplain?.pageContext?.currentQuestion?.graphMode === "scatter",
+   JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4d targets i kroppen utan go", Array.isArray(lastExplain?.pageContext?.targets)
    && lastExplain.pageContext.targets.length === 3
    && lastExplain.pageContext.targets.every(t => t.go === undefined),
