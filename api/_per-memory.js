@@ -217,9 +217,11 @@ export async function updateHelpLevelSignal(supabase, userId, helpLevel) {
 
 export async function clearLongMemory(supabase, userId) {
   try {
-    await supabase.from("per_long_memory").delete().eq("user_id", userId);
-    await supabase.from("per_sessions").delete().eq("user_id", userId);
-    return true;
+    const [memoryResult, sessionsResult] = await Promise.all([
+      supabase.from("per_long_memory").delete().eq("user_id", userId),
+      supabase.from("per_sessions").delete().eq("user_id", userId),
+    ]);
+    return !memoryResult?.error && !sessionsResult?.error;
   } catch {
     return false;
   }

@@ -59,14 +59,18 @@ function makeRes() {
    Returnerar även den systemprompt som faktiskt skickades, så tester kan
    granska vad modellen fick se. */
 function stubFetch({ modelOut, role = "premium", openAiStatus = 200 }) {
-  const seen = { system: null, payload: null };
+  const seen = { system: null, payload: null, profileHeaders: null };
   global.fetch = async (url, opts) => {
     const u = String(url);
     if (u.includes("/auth/v1/user")) {
       return { ok: true, json: async () => ({ id: "u1", email: "e@e.se" }) };
     }
     if (u.includes("/rest/v1/profiles")) {
+      seen.profileHeaders = opts.headers;
       return { ok: true, json: async () => [{ role }] };
+    }
+    if (u.includes("/rest/v1/rpc/consume_anon_rate")) {
+      return { ok: true, json: async () => ({ ok: true }) };
     }
     if (u.includes("openai.com")) {
       seen.payload = JSON.parse(opts.body);
@@ -101,6 +105,9 @@ console.log("\n— MATERIALVÄGEN ÄR ORÖRD —");
   check("T1 utan mode svarar materialvägen", status === 200 && typeof data?.text === "string", JSON.stringify(data));
   check("T1 materialvägen använder INTE lösningsschemat",
     !seen.payload?.text?.format, JSON.stringify(seen.payload?.text || null));
+  check("T1 role lookup uses service-role Authorization and apikey headers",
+    seen.profileHeaders?.Authorization === "Bearer svc" && seen.profileHeaders?.apikey === "svc",
+    JSON.stringify(Object.keys(seen.profileHeaders || {})));
   check("T1 materialvägens prompt är oförändrad OCR-prompt", /Du är OCR/.test(seen.system), seen.system);
 }
 

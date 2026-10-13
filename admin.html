@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – Admin</title>
   <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
   <link rel="icon" type="image/png" sizes="192x192" href="/image/favicon-192.png" />
@@ -124,6 +125,11 @@
 
   .emptyRow td{text-align:center;padding:36px;color:var(--t3);font-family:var(--mono);font-size:12px}
 
+  /* Keep operational labels readable against the light admin surfaces. */
+  .eyebrow,.statLabel,.searchBox::placeholder,.filterChip,.userTable thead th,
+  .userTable td,.idCell,.dateCell,.roleBadge.gratis,.emptyRow td{color:#5B6472}
+  .statusBar.warn{color:#745100}
+
   .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--l2);border-top-color:var(--a);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
   @keyframes spin{to{transform:rotate(360deg)}}
   </style>
@@ -211,21 +217,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SB_URL = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-const SB_KEY = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
+const SB_URL = window.ExGenRuntime.supabaseUrl;
+const SB_KEY = window.ExGenRuntime.publishableKey;
 const db = window.supabase.createClient(SB_URL, SB_KEY);
 
 /* LOADER */
 window.addEventListener('load', () => setTimeout(() => document.getElementById('ldr').classList.add('out'), 160));
-
-/* MENU */
-const mBtn = document.getElementById('mBtn'), drop = document.getElementById('drop');
-let ct;
-function openDrop(){ clearTimeout(ct); drop.classList.remove('off'); drop.style.display='block'; requestAnimationFrame(()=>drop.classList.add('on')); mBtn.setAttribute('aria-expanded','true'); }
-function closeDrop(){ mBtn.setAttribute('aria-expanded','false'); drop.classList.remove('on'); drop.classList.add('off'); clearTimeout(ct); ct=setTimeout(()=>{drop.classList.remove('off');drop.style.display='none';},120); }
-mBtn.addEventListener('click', e=>{e.stopPropagation(); drop.classList.contains('on')?closeDrop():openDrop();});
-document.addEventListener('click', e=>{if(!drop.classList.contains('on'))return; if(!drop.contains(e.target)&&e.target!==mBtn)closeDrop();});
-document.addEventListener('keydown', e=>{if(e.key==='Escape')closeDrop();});
 
 /* STATE */
 let ALL_USERS = [];
@@ -394,7 +391,7 @@ async function init() {
 
   if (!session) {
     lbl.textContent = 'Inte inloggad';
-    document.querySelector('main').style.opacity = '0.4';
+    document.querySelector('main').setAttribute('aria-disabled', 'true');
     document.querySelector('main').style.pointerEvents = 'none';
     showStatus('Du måste vara inloggad som admin för att se den här sidan.', 'warn');
     return;
@@ -408,12 +405,14 @@ async function init() {
 
   if (data?.role !== 'admin') {
     lbl.textContent = `Ingen åtkomst (${data?.role || 'okänd roll'})`;
-    document.querySelector('main').style.opacity = '0.4';
+    document.querySelector('main').setAttribute('aria-disabled', 'true');
     document.querySelector('main').style.pointerEvents = 'none';
     showStatus('Ingen åtkomst. Kontot saknar admin-roll.', 'err');
     return;
   }
 
+  document.querySelector('main').removeAttribute('aria-disabled');
+  document.querySelector('main').style.pointerEvents = '';
   lbl.textContent = `Admin · ${session.user.email}`;
   await loadUsers();
 }

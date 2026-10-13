@@ -1,12 +1,14 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
   <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – Lärare</title>
   <meta name="description" content="Se var klassen står innan provet. Läraren skapar en klass, delar en kod, och får en anonymiserad översikt över vilka begrepp eleverna faktiskt fastnar på. Gratis att använda." />
   <link rel="canonical" href="https://exgen.se/larare.html" />
@@ -108,7 +110,7 @@
   .stTable tbody tr:last-child td{border-bottom:none}
   .stTable tbody tr.clickable{cursor:pointer;transition:background .12s}
   .stTable tbody tr.clickable:hover{background:rgba(0,183,217,.04)}
-  .stEmail{color:var(--t);font-weight:500;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stLabel{color:var(--t);font-weight:500;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .num{font-family:var(--mono);font-size:12px}
   .attn{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff6b6b;margin-right:7px;vertical-align:middle}
   .chev{color:var(--t3);font-family:var(--mono);text-align:center}
@@ -150,7 +152,7 @@
   .ddPanel{background:var(--s);border:1px solid var(--l2);border-radius:var(--exgen-radius-lg);max-width:640px;width:100%;
     position:relative;z-index:1;box-shadow:0 24px 60px rgba(0,0,0,.5)}
   .ddHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 16px;border-bottom:1px solid var(--l)}
-  .ddEmail{font-size:16px;font-weight:600;color:var(--t);letter-spacing:-.02em;word-break:break-all}
+  .ddTitle{font-size:16px;font-weight:600;color:var(--t)}
   .ddStats{display:flex;gap:20px;margin-top:10px;flex-wrap:wrap}
   .ddStat{font-family:var(--mono);font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em}
   .ddStat b{color:var(--a);font-size:16px;font-weight:700;display:block;letter-spacing:-.02em;margin-bottom:2px}
@@ -257,18 +259,18 @@
               <tbody id="studentsBody"></tbody>
             </table>
           </div>
-          <div class="pageSub" style="margin-top:10px;font-size:11.5px">Sorterat: elever som behöver stöd överst. Klicka på en elev för full historik.</div>
+          <div class="pageSub" style="margin-top:10px;font-size:11.5px">Lägre övningssnitt (under 60 % i egna mockprov) visas först. Det är en träningssignal, inte ett betyg eller en säker kunskapsbedömning. Klicka på en elev för historik.</div>
         </div>
       </section>
     </main>
   </div>
 
   <!-- DRILLDOWN MODAL -->
-  <div class="ddOverlay" id="ddOverlay" role="dialog" aria-modal="true" aria-labelledby="ddEmail">
+  <div class="ddOverlay" id="ddOverlay" role="dialog" aria-modal="true" aria-labelledby="ddTitle">
     <div class="ddPanel">
       <div class="ddHead">
         <div>
-          <div class="ddEmail" id="ddEmail">—</div>
+          <div class="ddTitle" id="ddTitle">Elevens övningshistorik</div>
           <div class="ddStats" id="ddStats"></div>
         </div>
         <button class="ddClose" id="ddClose" aria-label="Stäng">×</button>
@@ -292,8 +294,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SB_URL = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-const SB_KEY = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
+const SB_URL = window.ExGenRuntime.supabaseUrl;
+const SB_KEY = window.ExGenRuntime.publishableKey;
 const db = window.supabase.createClient(SB_URL, SB_KEY);
 
 // Ingen hårdkodad ägar-ID längre. Den här kontrollen är bara till för att visa rätt
@@ -302,6 +304,7 @@ const db = window.supabase.createClient(SB_URL, SB_KEY);
 
 let CLASSES = [];
 let activeClassId = null;
+let drilldownReturnFocus = null;
 
 function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
 
@@ -442,6 +445,7 @@ function sparkline(trend,w=92,h=26,cls=''){
 }
 
 function needsAttention(st){
+  // A low score on self-selected material is a practice signal, not a diagnosis.
   return st.avg_percent!==null && st.avg_percent<60;
 }
 
@@ -461,10 +465,10 @@ function renderStudents(cls,students){
     const weak = st.weak_concepts.length
       ? st.weak_concepts.map(w=>`<span class="weakTag" title="Svag i ${esc(w.concept)} (${w.count} prov)">${esc(w.concept)}</span>`).join('')
       : '<span class="muted">—</span>';
-    const dot = needsAttention(st) ? '<span class="attn" title="Behöver stöd"></span>' : '';
+    const dot = needsAttention(st) ? '<span class="attn" title="Övningssignal: under 60 % i mockprov"></span>' : '';
     const lastLine = st.last_course ? `${esc(st.last_course)} · ${fmtDate(st.last_at)}` : fmtDate(st.last_at);
-    return `<tr class="clickable" data-sid="${esc(st.student_id)}" role="button" tabindex="0" title="Visa elevens historik">
-      <td><div class="stEmail" title="${esc(st.email)}">${dot}${esc(st.email)}</div></td>
+    return `<tr class="clickable" data-sid="${esc(st.student_id)}" data-label="${esc(st.student_label)}" role="button" tabindex="0" title="Visa elevens historik">
+      <td><div class="stLabel">${dot}${esc(st.student_label)}</div></td>
       <td class="num">${st.tests_taken}</td>
       <td class="num">${st.courses_count}</td>
       <td class="num">${st.avg_percent===null?'<span class="muted">—</span>':st.avg_percent+'%'}</td>
@@ -479,8 +483,8 @@ function renderStudents(cls,students){
 /* ── DRILLDOWN ── */
 function catClass(best){ return best<50?'bad':best<75?'weak':''; }
 
-function renderDrilldown(student){
-  document.getElementById('ddEmail').textContent=student.email;
+function renderDrilldown(student,label){
+  document.getElementById('ddTitle').textContent=label;
   const courses=student.courses||[];
   const tests=student.tests||[];
   const weak=student.weak_concepts||[];
@@ -515,20 +519,26 @@ function renderDrilldown(student){
   document.getElementById('ddOverlay').classList.add('open');
 }
 
-async function openStudent(sid){
+async function openStudent(sid,label){
   if(!activeClassId) return;
-  document.getElementById('ddEmail').textContent='Laddar…';
+  drilldownReturnFocus = document.activeElement;
+  document.getElementById('ddTitle').textContent=label;
   document.getElementById('ddStats').innerHTML='';
   document.getElementById('ddBody').innerHTML='<div class="empty">Laddar elevdata…</div>';
   document.getElementById('ddOverlay').classList.add('open');
+  document.getElementById('ddClose').focus();
   try{
     const { student } = await api('teacher_student_detail',{ classId:activeClassId, studentId:sid });
-    renderDrilldown(student);
+    renderDrilldown(student,label);
   }catch(e){
     document.getElementById('ddBody').innerHTML=`<div class="insightErr">Fel: ${esc(e.message)}</div>`;
   }
 }
-function closeDrilldown(){ document.getElementById('ddOverlay').classList.remove('open'); }
+function closeDrilldown(){
+  document.getElementById('ddOverlay').classList.remove('open');
+  if(drilldownReturnFocus && drilldownReturnFocus.isConnected) drilldownReturnFocus.focus();
+  drilldownReturnFocus = null;
+}
 
 /* ── P.E.R CLASS INSIGHT (cached 24h per class) ── */
 const INSIGHT_TTL = 24*60*60*1000;
@@ -592,6 +602,7 @@ document.getElementById('classGrid').addEventListener('click',e=>{
 });
 document.getElementById('classGrid').addEventListener('keydown',e=>{
   if(e.key!=='Enter' && e.key!==' ') return;
+  if(e.target.closest('button')) return;
   const card=e.target.closest('.classCard');
   if(card){ e.preventDefault(); openClass(card.getAttribute('data-id')); }
 });
@@ -599,12 +610,12 @@ document.getElementById('classGrid').addEventListener('keydown',e=>{
 // Student row → drilldown
 document.getElementById('studentsBody').addEventListener('click',e=>{
   const row=e.target.closest('tr.clickable');
-  if(row) openStudent(row.getAttribute('data-sid'));
+  if(row) openStudent(row.getAttribute('data-sid'),row.getAttribute('data-label'));
 });
 document.getElementById('studentsBody').addEventListener('keydown',e=>{
   if(e.key!=='Enter' && e.key!==' ') return;
   const row=e.target.closest('tr.clickable');
-  if(row){ e.preventDefault(); openStudent(row.getAttribute('data-sid')); }
+  if(row){ e.preventDefault(); openStudent(row.getAttribute('data-sid'),row.getAttribute('data-label')); }
 });
 
 // P.E.R insight button + delegated refresh link
@@ -618,7 +629,16 @@ document.getElementById('ddClose').addEventListener('click',closeDrilldown);
 document.getElementById('ddOverlay').addEventListener('click',e=>{
   if(e.target.id==='ddOverlay') closeDrilldown();
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrilldown(); });
+document.getElementById('ddOverlay').addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ closeDrilldown(); return; }
+  if(e.key!=='Tab') return;
+  const focusable=Array.from(document.getElementById('ddOverlay').querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el=>!el.disabled);
+  if(!focusable.length){ e.preventDefault(); return; }
+  const first=focusable[0], last=focusable[focusable.length-1];
+  if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  else if(!document.getElementById('ddOverlay').contains(document.activeElement)){ e.preventDefault(); first.focus(); }
+});
 
 /* ── AUTH GATE ── */
 async function init(){

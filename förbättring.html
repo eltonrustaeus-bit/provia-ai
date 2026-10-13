@@ -1,12 +1,14 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
   <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – Min utveckling</title>
   <!-- Kräver konto. En sökträff hit landar på en inloggningsruta, inte på innehåll. -->
   <meta name="robots" content="noindex, follow" />
@@ -247,7 +249,6 @@
 
     /* P.E.R:s röst kommer från exgen-ui.css (.xf-per/.xf-orb/.xf-say/.xf-sub).
        Sidan hade en egen kopia här tills det delade lagret bröts ut. */
-
     .coachText{font-size:13px;color:var(--t2);line-height:1.72;white-space:pre-wrap}
 
     /* ── CHART ── */
@@ -416,8 +417,8 @@
       LS_PER_COACH_CACHE='proviaai_per_coach_cache';
 
     /* ── SUPABASE ── */
-    const SB_URL='https://mnmotdluigzeehdjbhbu.supabase.co'.trim();
-    const SB_KEY='sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN'.trim();
+    const SB_URL=window.ExGenRuntime.supabaseUrl.trim();
+    const SB_KEY=window.ExGenRuntime.publishableKey.trim();
     const SBG=typeof window!=='undefined'?window.supabase:null;
     const db=(SB_URL.startsWith('http')&&SB_KEY.length>40&&SBG?.createClient)?SBG.createClient(SB_URL,SB_KEY):null;
 
@@ -429,20 +430,20 @@
       if(error)return{ok:false,error:error.message||String(error)};
       return{ok:true,rows:data||[]};
     }
-    async function deleteAllUserExamsFromAccount(){
+    async function deleteAllUserExamsFromAccount(session){
       if(!db) return{ok:false,error:'Supabase not configured'};
-      const uid=await getUserId();
+      const uid=session?.user?.id||'';
       if(!uid) return{ok:false,error:'Not logged in'};
       try{
-        const{data:sd}=await db.auth.getSession();
-        const token=sd?.session?.access_token||'';
+        const token=session?.access_token||'';
+        if(!token)return{ok:false,error:'Not logged in'};
         const r=await fetch('/api/check-role',{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
           body:JSON.stringify({action:'delete_exams'})
         });
         const data=await r.json();
-        if(!r.ok) return{ok:false,error:data?.error||'delete failed'};
+        if(!r.ok||data?.ok!==true) return{ok:false,error:data?.error||'delete failed'};
         return{ok:true};
       }catch(e){
         return{ok:false,error:String(e)};
@@ -480,13 +481,13 @@
     /* ── ACCESS GATE ── */
     function disablePage(){
       const m=document.querySelector('main.wrap');
-      if(m){m.style.pointerEvents='none';m.style.opacity='0.55';}
+      if(m){m.style.pointerEvents='none';m.setAttribute('aria-disabled','true');}
       $('syncBtn')?.setAttribute('disabled','disabled');
       // resetBtn låses ALDRIG – användaren ska alltid kunna rensa sin data
     }
     function enablePage(){
       const m=document.querySelector('main.wrap');
-      if(m){m.style.pointerEvents='';m.style.opacity='';}
+      if(m){m.style.pointerEvents='';m.removeAttribute('aria-disabled');}
       $('resetBtn')?.removeAttribute('disabled');
       $('syncBtn')?.removeAttribute('disabled');
     }
@@ -680,7 +681,10 @@
     window.__reportScopeForTest=()=>currentCourse();
     function reportCacheKey(){return currentCourse()||'__all__';}
     async function fetchReport(payload){
-      const res=await fetch('/api/teacher-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const{data:sd}=await db.auth.getSession();
+      const token=sd?.session?.access_token||'';
+      if(!token)throw new Error('Logga in igen för att skapa rapporten.');
+      const res=await fetch('/api/teacher-report',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)});
       const data=await res.json();if(!res.ok)throw new Error(data?.error||'failed');return String(data?.report||data?.tips||'');
     }
     function setReportText(t){const b=$('reportBox');if(b)b.textContent=t;}
@@ -953,7 +957,7 @@
       const rN=fH.length;
       if(rN<3){setReportStatus(`Minst 3 prov krävs. Du har ${rN}.`,'warn');setReportText('—');setGenEnabled(true);hideLoad();return;}
       try{
-        const text=await fetchReport({course:course||'',exams_count:rN,history:fH.slice(-10),mistakes:fM.slice(-50)});
+        const text=await fetchReport({course:course||''});
         const norm=String(text||'').trim();
         if(!norm){setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');setGenEnabled(true);return;}
         const cache=getReportCache(),key=reportCacheKey();cache[key]={ts:Date.now(),n:rN,text:norm};setReportCache(cache);
@@ -1423,16 +1427,37 @@
       if(!btn)return;
       btn.addEventListener('click',async()=>{
         btn.setAttribute('disabled','disabled');
-        if(db){
+        let clearSession=null;
+        try{
+          const{data,error}=db?await db.auth.getSession():{data:null,error:true};
+          if(!error)clearSession=data?.session||null;
+        }catch{}
+        const clearUserId=clearSession?.user?.id||null;
+        let remoteHistoryDeleted=false;
+        if(db&&clearSession?.access_token){
           try{
-            const r=await deleteAllUserExamsFromAccount();
+            const r=await deleteAllUserExamsFromAccount(clearSession);
+            remoteHistoryDeleted=r.ok;
             if(!r.ok)console.warn('Supabase delete failed:',r.error);
           }catch(e){console.warn('Supabase delete error:',e);}
+        }
+        if(clearUserId)try{localStorage.removeItem('proviaai_pending_exams:'+clearUserId);}catch{}
+        const localDataOwner=localStorage.getItem('exgen_local_data_owner');
+        if((clearUserId||localDataOwner)&&localDataOwner!==clearUserId){
+          btn.removeAttribute('disabled');
+          window.alert(!clearUserId
+            ? 'Kontosessionen kunde inte verifieras. Lokal data lämnades orörd.'
+            : remoteHistoryDeleted
+              ? 'Kontot byttes. Serverraderingen slutfördes för det ursprungliga kontot; delad lokal data lämnades orörd.'
+              : 'Kontot byttes. Kontodata kunde inte bekräftas raderad; delad lokal data lämnades orörd.');
+          return;
         }
         [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
          LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
         renderAll();
         btn.removeAttribute('disabled');
+        if(remoteHistoryDeleted) window.alert('Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte.');
+        else window.alert('Lokal historik rensad. Kontodata kunde inte bekräftas raderad. Försök igen när anslutningen fungerar.');
       });
     });
 

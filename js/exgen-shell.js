@@ -60,6 +60,12 @@
     { href: "förbättring.html", label: "Min utveckling", icon: "pulse", pill: "Coach" },
     { href: "pricing.html",     label: "Priser",         icon: "card",  pill: "29/79" }
   ];
+  var PILOT_MODE = !!(global.ExGenRuntime && global.ExGenRuntime.environment === "pilot");
+  if (PILOT_MODE) document.documentElement.setAttribute("data-exgen-environment", "pilot");
+
+  function visibleNav() {
+    return PILOT_MODE ? NAV.filter(function (item) { return item.href === "app.html"; }) : NAV;
+  }
 
   function svg(name) {
     return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
@@ -83,8 +89,9 @@
 
   function markup() {
     var here = currentPage();
+    var links = visibleNav();
 
-    var navHtml = NAV.map(function (item) {
+    var navHtml = links.map(function (item) {
       var on = item.href === here;
       return '<a class="xg-nav-link' + (on ? " active" : "") + '"' +
         (item.module ? ' data-module="' + item.module + '"' : "") +
@@ -94,7 +101,7 @@
 
     /* Aktuell sida markeras men UTELÄMNAS INTE. Att lämna bort den var precis
        det som gjorde menyn olika beroende på var man stod. */
-    var itemHtml = NAV.map(function (item) {
+    var itemHtml = links.map(function (item) {
       var on = item.href === here;
       return '<a class="xg-menu-item' + (on ? " active" : "") + '"' +
         (item.module ? ' data-module="' + item.module + '"' : "") +
@@ -107,7 +114,10 @@
 
     /* Sidlokala poster. En knapp, aldrig en länk — det som är sidlokalt är en
        handling på sidan, inte en destination. */
-    var extra = (global.XG_MENU_EXTRA || []).map(function (item) {
+    var extras = (global.XG_MENU_EXTRA || []).filter(function (item) {
+      return !PILOT_MODE || item.label !== "Hantera prenumeration";
+    });
+    var extra = extras.map(function (item) {
       return '<button class="xg-menu-item" type="button"' +
         (item.id ? ' id="' + esc(item.id) + '"' : "") +
         (item.scroll ? ' data-scroll="' + esc(item.scroll) + '"' : "") + ">" +
@@ -136,7 +146,7 @@
       "</div>" +
       '<header class="xg-header">' +
         '<div class="xg-header-wrap">' +
-          '<a class="xg-brand" href="index.html">' +
+          '<a class="xg-brand" href="' + (PILOT_MODE ? "app.html" : "index.html") + '">' +
             '<img src="image/exgen-logo.png" alt="ExGen" style="height:20px;width:auto">' +
             '<div class="xg-brand-tag">Studieplattform för skolan</div>' +
           "</a>" +

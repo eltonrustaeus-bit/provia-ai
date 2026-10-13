@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const S = await import(join(root, "api", "_admin-stepup.js"));
+const P = await import(join(root, "api", "_admin-passkey.js"));
 
 let failures = 0;
 const check = (n, c, d = "") => {
@@ -168,9 +169,33 @@ check("koden lagras aldrig i klartext",
 /* Markeras förbrukad INNAN token utfärdas — annars kan ett avbrutet anrop
    lämna kvar en kod som redan gett tillgång. */
 check("koden markeras förbrukad före token utfärdas",
-  /markRecoveryUsed[\s\S]{0,200}mintStepUp/.test(admin));
+  /markRecoveryUsed[\s\S]*?if \(!consumed\.used\)[\s\S]*?mintStepUp/.test(admin));
+const recoveryRoute = block("recovery-use");
+check("step-up utfärdas bara efter bekräftad kodförbrukning",
+  /const consumed = await[\s\S]*?if \(consumed\.error\)[\s\S]*?if \(!consumed\.used\)[\s\S]*?mintStepUp/.test(recoveryRoute));
 check("en förbrukad kod godtas aldrig igen", /rad\.used_at\) return/.test(admin));
 check("recovery-create kräver upplåst session", /requireStepUp/.test(block("recovery-create")));
+
+console.log("\n— ATOMÄR FÖRBRUKNING —");
+async function markCodeUsed(result) {
+  const calls = [];
+  const query = {
+    update(value) { calls.push(["update", value]); return this; },
+    eq(...args) { calls.push(["eq", ...args]); return this; },
+    is(...args) { calls.push(["is", ...args]); return this; },
+    select(...args) { calls.push(["select", ...args]); return Promise.resolve(result); },
+  };
+  const store = P.supabaseStore({ from(table) { calls.push(["from", table]); return query; } });
+  return { result: await store.markRecoveryUsed(A), calls };
+}
+const consumed = await markCodeUsed({ data: [{ user_id: A }], error: null });
+check("en bekräftad rad rapporteras förbrukad", consumed.result.used && !consumed.result.error);
+check("förbrukningen villkoras atomärt på ej använd rad",
+  consumed.calls.some(c => c[0] === "is" && c[1] === "used_at" && c[2] === null));
+check("ingen träff utfärdar inte förbrukningsbekräftelse",
+  !(await markCodeUsed({ data: [], error: null })).result.used);
+check("databasfel rapporteras och failar stängt",
+  (await markCodeUsed({ data: null, error: new Error("database") })).result.error);
 
 console.log(failures ? `\n${failures} FEL\n` : "\nAllt grönt\n");
 process.exit(failures ? 1 : 0);

@@ -14,8 +14,10 @@
 // Anropar orkestratorn direkt (inte via HTTP) så att inga feature flags behöver slås på för att
 // köra röken. Flaggorna gäller fortfarande i api/knowledge.js, alltså för riktiga elever.
 
-import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "../api/_supabase-server-key.cjs";
 import { runDiagnostic, runAnswer, runCoach, getProfile } from "../src/per/orchestrator.mjs";
+
+const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 
 const userId = process.argv[2];
 const level = process.argv[3] || "E";
@@ -25,12 +27,12 @@ if (!userId) {
   console.error("Användning: node --env-file=.env.local scripts/per-e2e-smoke.mjs <user_uuid> [E|C|A] [short_answer|multiple_choice]");
   process.exit(1);
 }
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.OPENAI_API_KEY) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY och OPENAI_API_KEY krävs.");
+if (!process.env.SUPABASE_URL || !getSupabaseServerKey() || !process.env.OPENAI_API_KEY) {
+  console.error("SUPABASE_URL, SUPABASE_SECRET_KEY (eller legacy SUPABASE_SERVICE_ROLE_KEY) och OPENAI_API_KEY krävs.");
   process.exit(1);
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
 let failures = 0;
 const step = (n, text) => console.log(`\n[${n}] ${text}`);
 const ok = (text) => console.log(`   ✓ ${text}`);

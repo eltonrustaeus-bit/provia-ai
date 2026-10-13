@@ -20,10 +20,10 @@ const html = readFileSync(join(here, "..", "..", "app.html"), "utf8");
 const m = html.match(/async function postJson\(path,payload,opts\)\{[\s\S]*?\n\}/);
 assert.ok(m, "postJson not found in app.html");
 
-function makeCtx(fetchImpl) {
+function makeCtx(fetchImpl, getAccessToken = async () => null) {
   const ctx = {
     fetch: fetchImpl,
-    getAccessToken: async () => null,
+    getAccessToken,
     AbortController,
     setTimeout,
     clearTimeout,
@@ -41,7 +41,28 @@ const check = (name, cond) => {
   else { failures++; console.error(`  FAIL  ${name}`); }
 };
 
-// 1) Stalled server → aborts at the client timeout, resolves timedOut (never hangs)
+// 1) Token/session lookup hangs before fetch → the same client deadline applies
+{
+  let fetchStarted = false;
+  const fetchImpl = async () => { fetchStarted = true; throw new Error("fetch should not run"); };
+  const stalledToken = () => new Promise(() => {});
+  const postJson = makeCtx(fetchImpl, stalledToken);
+  const started = Date.now();
+  const res = await postJson("/api/grade", {}, { timeoutMs: 80 });
+  const elapsed = Date.now() - started;
+  check("token lookup: settles within the deadline", res && res.timedOut === true && elapsed < 2000);
+  check("token lookup: fetch is not started without a token result", !fetchStarted);
+}
+
+// 2) Response body stalls after headers → the same client deadline applies
+{
+  const stalledBody = async () => ({ ok: true, status: 200, text: () => new Promise(() => {}) });
+  const postJson = makeCtx(stalledBody);
+  const res = await postJson("/api/grade", {}, { timeoutMs: 80 });
+  check("response body: settles as timed out", res && res.timedOut === true && res.ok === false);
+}
+
+// 3) Stalled server → aborts at the client timeout, resolves timedOut (never hangs)
 {
   const stall = (url, opts) => new Promise((_res, rej) => {
     const sig = opts && opts.signal;
@@ -56,7 +77,7 @@ const check = (name, cond) => {
   check("stall: settled near the timeout, not indefinitely", elapsed < 2000);
 }
 
-// 2) Network failure → resolves networkError (never throws)
+// 4) Network failure → resolves networkError (never throws)
 {
   const boom = async () => { throw new TypeError("Failed to fetch"); };
   const postJson = makeCtx(boom);
@@ -66,7 +87,7 @@ const check = (name, cond) => {
   check("network error: flagged networkError", res && res.networkError === true && res.ok === false);
 }
 
-// 3) Success → returns parsed data
+// 5) Success → returns parsed data
 {
   const okFetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true, result: { total_points: 3, max_points: 3, per_question: [] } }) });
   const postJson = makeCtx(okFetch);

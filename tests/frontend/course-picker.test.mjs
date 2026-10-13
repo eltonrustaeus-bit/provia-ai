@@ -23,7 +23,7 @@ const browser = await chromium.launch();
 async function openSubjectStep({ breakCatalog = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
-  await mockApis(page);
+  await mockApis(page, { profiles: { id: "u1", approved: true, role: "premium" } });
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow: true, ok: true, role: "premium", approved: true } }));
   if (breakCatalog) {
     await page.route("**/config/education-catalog.web.json", r => r.fulfill({ status: 500, body: "" }));

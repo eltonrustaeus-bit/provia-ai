@@ -1,5 +1,10 @@
 {
   "outputDirectory": ".",
+  "git": {
+    "deploymentEnabled": {
+      "codex/exgen-school-pilot-review-2026-10-13": false
+    }
+  },
   "functions": {
     "api/stripe-webhook.js": {
       "maxDuration": 10

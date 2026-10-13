@@ -1,6 +1,7 @@
 ﻿/* Provia Shared — page transitions + welcome animation + P.E.R widget */
 (function () {
   'use strict';
+  var EXGEN_RUNTIME = window.ExGenRuntime;
 
   /* ── PAGE EXIT TRANSITION ── */
   document.addEventListener('click', function (e) {
@@ -42,6 +43,9 @@
      name could be derived — including someone who registered ten seconds
      earlier — and plain "Välkommen!" only when it had no name at all. */
   function showWelcomeAnim(name, isNew) {
+    // A login greeting must never cover an exam that has already started.
+    if (document.body.classList.contains('xf-in-exam')) return;
+
     var existing = document.getElementById('proviaWelcome');
     if (existing) existing.remove();
 
@@ -80,6 +84,11 @@
     showWelcomeAnim(nameOrEmail || '', isNew);
   };
 
+  window.dismissWelcome = function () {
+    var el = document.getElementById('proviaWelcome');
+    if (el) el.remove();
+  };
+
   /* Redirect-based welcome: set flag before location.reload() or navigate.
      Stored as JSON so the new/returning distinction survives the navigation;
      callers that pass only a name still work and fall back to the device
@@ -113,6 +122,70 @@
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
+  var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
+  var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
+  var PER_REQUEST_TIMEOUT_MS = 59000;
+
+  function currentPilotAccountId() {
+    try {
+      var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
+      return pilotSessionUserId(session) || null;
+    } catch (_) { return null; }
+  }
+
+  function pilotSessionUserId(session) {
+    if (session && session.user && session.user.id) return String(session.user.id);
+    try {
+      var part = String(session && session.access_token || '').split('.')[1];
+      if (!part) return '';
+      part = part.replace(/-/g, '+').replace(/_/g, '/');
+      while (part.length % 4) part += '=';
+      return String(JSON.parse(atob(part)).sub || '');
+    } catch (_) { return ''; }
+  }
+
+  function savePilotPendingQuestion(question, accountIdOverride) {
+    if (EXGEN_RUNTIME.environment !== 'pilot' || String(question).length > 2000) return false;
+    var accountId = arguments.length > 1 ? (accountIdOverride || '') : (currentPilotAccountId() || '');
+    try {
+      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify({
+        question: String(question),
+        savedAt: Date.now(),
+        accountId: accountId || null
+      }));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function abortPerRequestForAccountId(nextAccountId) {
+    var active = _perActiveRequest;
+    if (!active || (active.accountId || null) === (nextAccountId || null)) return;
+    if (active.cancel) active.cancel();
+    var input = document.getElementById('perInput');
+    if (input) input.value = '';
+    var messages = document.getElementById('perMessages');
+    if (messages) messages.innerHTML = '<div class="per-msg teacher">Konto ändrat. P.E.R är redo för en ny fråga.</div>';
+    var button = document.getElementById('perSendBtn');
+    if (button) button.disabled = false;
+  }
+
+  function clearPilotQuestionForAccountChange(session) {
+    if (EXGEN_RUNTIME.environment !== 'pilot') return;
+    try {
+      var raw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      var nextAccountId = pilotSessionUserId(session);
+      if (pending.accountId && nextAccountId && pending.accountId !== nextAccountId) {
+        sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+      } else if (!pending.accountId && nextAccountId) {
+        pending.accountId = nextAccountId;
+        sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify(pending));
+      }
+    } catch (_) {
+      try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
 
   /* ── Sidmanifest ──────────────────────────────────────────────────────────
      Ett kontrakt i stället för åtta gissade nycklar.
@@ -142,6 +215,7 @@
   var _perHelpCap = null;
   var _perFocusKey = null;
   var _perAskInFlight = '';
+  var _perActiveRequest = null;
 
   function perWarnKeys(obj, allowed, prefix) {
     if (!obj) return;
@@ -495,9 +569,14 @@
 
     function addAnswerCTA(div) {
       var btn = document.createElement('a');
-      btn.href = 'app.html';
+      var pilotMode = EXGEN_RUNTIME.environment === 'pilot';
+      btn.href = pilotMode ? '#' : 'app.html';
       btn.className = 'per-answer-cta';
-      btn.textContent = 'Skapa gratis konto — inget kort krävs →';
+      if (pilotMode) {
+        btn.setAttribute('data-pv-auth', 'login');
+        btn.setAttribute('data-pv-force-login', 'true');
+      }
+      btn.textContent = pilotMode ? 'Logga in med skolpilotkonto →' : 'Skapa gratis konto — inget kort krävs →';
       div.appendChild(btn);
     }
 
@@ -613,6 +692,7 @@
     }
 
     function notifyExamDone(pct, weakCatNames) {
+      if (EXGEN_RUNTIME.environment === 'pilot') return;
       var hist = [];
       try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
       var totalExams = hist.length + 1;
@@ -690,7 +770,7 @@
       if (_getToken) try { return await _getToken(); } catch (_) {}
       /* Fallback: read Supabase session directly from localStorage */
       try {
-        var raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token');
+        var raw = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
         if (raw) { var s = JSON.parse(raw); return sessionIsLive(s) ? (s.access_token || '') : ''; }
       } catch (_) {}
       return '';
@@ -1003,7 +1083,23 @@ function finalizeMsg(div, text) {
     }
 
     async function send(q, opts) {
-      if (!q) return;
+      if (!q || _perActiveRequest) return;
+      var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
+      function restoreFailedQuestion() {
+        if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
+        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId);
+        if (input) input.value = q;
+        return true;
+      }
+      if (EXGEN_RUNTIME.environment === 'pilot' && String(q).length > 2000) {
+        var longQuestionInput = document.getElementById('perInput');
+        if (longQuestionInput) longQuestionInput.value = q;
+        addMsg('Frågan är för lång för P.E.R. Korta ned den till högst 2 000 tecken.', 'teacher');
+        return;
+      }
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+      }
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
          den mot sitt tak — den här raden är hygien, inte spärren. */
       var askLevel = (opts && typeof opts.helpLevel === 'number')
@@ -1034,12 +1130,53 @@ function finalizeMsg(div, text) {
       var stopThinking = startThinking(typing, ctxForThinking);
 
       var hist = perGetHist();
-      var token = await getToken();
+      var requestTimedOut = false;
+      var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var requestState = { cancelled: false, controller: requestController, accountId: requestAccountId, cancel: null };
+      _perActiveRequest = requestState;
+      var rejectRequestDeadline;
+      var requestDeadline = new Promise(function (_, reject) { rejectRequestDeadline = reject; });
+      var reviewTimeout = null;
+      var answerCommitted = false;
+      requestState.cancel = function () {
+        requestState.cancelled = true;
+        if (requestController) requestController.abort();
+        rejectRequestDeadline(new Error('P.E.R request cancelled'));
+      };
+      function requestStillOwned() {
+        if (requestState.cancelled) return false;
+        if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
+        abortPerRequestForAccountId(currentPilotAccountId());
+        return false;
+      }
+      var requestTimeout = setTimeout(function () {
+        requestTimedOut = true;
+        if (requestController) requestController.abort();
+        rejectRequestDeadline(new Error('P.E.R request timed out'));
+      }, PER_REQUEST_TIMEOUT_MS);
 
       try {
+        var token = await Promise.race([getToken(), requestDeadline]);
+        if (!requestStillOwned()) return;
+        if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'ExGen';
         var isLandingMode = !token; // 2 free questions for any unauthenticated user, any page
+
+        if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {
+          stopThinking();
+          try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
+          savePilotPendingQuestion(q);
+          if (input) input.value = q;
+          if (typing) {
+            finalizeMsg(typing, 'P.E.R är tillgänglig för inbjudna skolpilotkonton. Logga in för att fortsätta. Din fråga finns kvar i rutan och skickas inte förrän du trycker Skicka igen.');
+            addAnswerCTA(typing);
+          }
+          if (sendBtn) sendBtn.disabled = false;
+          var pilotMessages = document.getElementById('perMessages');
+          if (pilotMessages) pilotMessages.scrollTop = pilotMessages.scrollHeight;
+          return;
+        }
 
         // Landing quota gate
         if (isLandingMode) {
@@ -1084,11 +1221,13 @@ function finalizeMsg(div, text) {
           fetchHdrs['Accept'] = 'text/event-stream';
         }
         var fetchBody = JSON.stringify(fetchBodyObj);
-        var r = await fetch('/api/explain', {
+        var r = await Promise.race([fetch('/api/explain', {
           method: 'POST',
           headers: fetchHdrs,
-          body: fetchBody
-        });
+          body: fetchBody,
+          signal: requestController ? requestController.signal : undefined
+        }), requestDeadline]);
+        if (!requestStillOwned()) return;
 
         var ct = r.headers.get('content-type') || '';
         if (r.ok && ct.includes('text/event-stream')) {
@@ -1097,9 +1236,12 @@ function finalizeMsg(div, text) {
           var sseDecoder = new TextDecoder();
           var sseBuf = '';
           var answerText = '';
+          var streamError = '';
+          var streamComplete = false;
           if (typing) { stopThinking(); typing.className = 'per-msg teacher'; typing.textContent = ''; }
           while (true) {
-            var chunk = await reader.read();
+            var chunk = await Promise.race([reader.read(), requestDeadline]);
+            if (!requestStillOwned()) return;
             if (chunk.done) break;
             sseBuf += sseDecoder.decode(chunk.value, { stream: true });
             var sseLines = sseBuf.split('\n');
@@ -1109,26 +1251,50 @@ function finalizeMsg(div, text) {
               if (!sseLine.startsWith('data: ')) continue;
               try {
                 var ev = JSON.parse(sseLine.slice(6));
+                if (!requestStillOwned()) return;
                 if (ev.delta) {
                   answerText += ev.delta;
                   if (typing) typing.textContent = answerText.replace(PER_MARKERS, '');
                   var msgsEl2 = document.getElementById('perMessages');
                   if (msgsEl2) msgsEl2.scrollTop = msgsEl2.scrollHeight;
                 }
-                if (ev.error && typing) { typing.className = 'per-msg teacher'; typing.textContent = ev.error; }
+                if (ev.error) streamError = String(ev.error);
+                if (ev.done) {
+                  streamComplete = true;
+                  if (!answerCommitted && answerText.trim()) {
+                    answerCommitted = true;
+                    clearTimeout(requestTimeout);
+                    reviewTimeout = setTimeout(function () {
+                      if (requestController) requestController.abort();
+                    }, 22000);
+                    if (typing) {
+                      finalizeMsg(typing, answerText);
+                      stepsAfterAnswer(answerText, isLandingMode);
+                    }
+                  }
+                }
                 if (ev.done && ev.history) perSaveHist(ev.history);
                 /* Rättelsen från självgranskningen. Kommer efter att svaret
                    strömmat färdigt — eleven har redan läst texten, och en
                    synlig rättelse under den är ärligare än att tyst skriva om
                    svaret eller hålla tillbaka det i väntan på granskningen.
                    Bara allvarliga fynd når hit; servern filtrerar resten. */
-                if (ev.granskning && ev.granskning.rättelse) _perRättelse = ev.granskning.rättelse;
+                if (ev.granskning && ev.granskning.rättelse) {
+                  _perRättelse = ev.granskning.rättelse;
+                  if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
+                }
                 // Taket kommer alltid härifrån, aldrig ur en egen uträkning.
                 if (typeof ev.helpCap === 'number') _perHelpCap = ev.helpCap;
               } catch (_) {}
             }
           }
-          if (typing && answerText) {
+          if (!answerCommitted && (streamError || !streamComplete || !answerText.trim())) {
+            restoreFailedQuestion();
+            if (typing) {
+              typing.className = 'per-msg teacher';
+              typing.textContent = streamError || 'Svaret avbröts innan det blev klart. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
+            }
+          } else if (!answerCommitted && typing && answerText) {
             finalizeMsg(typing, answerText);
             if (_perRättelse) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
             stepsAfterAnswer(answerText, isLandingMode);
@@ -1136,22 +1302,33 @@ function finalizeMsg(div, text) {
         } else {
           /* ── JSON fallback ── */
           var data = {};
-          try { data = await r.json(); } catch (_) {}
+          try { data = await Promise.race([r.json(), requestDeadline]); }
+          catch (err) { if (requestTimedOut) throw err; }
+          if (!requestStillOwned()) return;
           stopThinking();
           if (typing) {
             if (r.status === 401) {
-              /* Sista utvägen. getToken() sållar bort utgångna sessioner, men en
-                 token kan ha återkallats server-side eller vara ogiltig av skäl
-                 klienten inte kan se. Då ska besökaren INTE bli utelåst — de har
-                 gratisfrågor kvar och ska kunna använda dem.
-
-                 Sessionen städas bort så att nästa fråga går direkt till
-                 landningsläget i stället för att kosta ett anrop till. */
-              try { localStorage.removeItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
+              /* A rejected token needs a fresh login, but it is not an explicit
+                 sign-out. Keep account-scoped drafts until the user signs out
+                 or authenticates as a different account. */
+              if (EXGEN_RUNTIME.environment === 'pilot') {
+                if (restoreFailedQuestion()) {
+                  try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
+                }
+              } else {
+                try { localStorage.removeItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
+                if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut();
+              }
               typing.className = 'per-msg teacher';
-              typing.textContent = 'Din inloggning har gått ut. Skicka frågan igen så svarar jag — du har gratisfrågor kvar.';
-              updateLandingBar();
+              if (EXGEN_RUNTIME.environment === 'pilot') {
+                typing.textContent = 'Din inloggning har gått ut. Logga in igen med ditt skolpilotkonto. Din fråga finns kvar i rutan och skickas inte förrän du trycker Skicka igen.';
+                addAnswerCTA(typing);
+              } else {
+                typing.textContent = 'Din inloggning har gått ut. Skicka frågan igen så svarar jag — du har gratisfrågor kvar.';
+                updateLandingBar();
+              }
             } else if (!r.ok) {
+              restoreFailedQuestion();
               typing.className = 'per-msg teacher';
               typing.textContent = data.error || 'Fel — försök igen.';
             } else {
@@ -1165,7 +1342,18 @@ function finalizeMsg(div, text) {
         }
       } catch (_) {
         stopThinking();
-        if (typing) { typing.className = 'per-msg teacher'; typing.textContent = 'Nätverksfel — försök igen.'; }
+        var stillOwned = requestStillOwned();
+        if (stillOwned && !answerCommitted) restoreFailedQuestion();
+        if (stillOwned && !answerCommitted && typing) {
+          typing.className = 'per-msg teacher';
+          typing.textContent = requestTimedOut
+            ? 'P.E.R tog för lång tid att svara. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.'
+            : 'Nätverksfel — frågan finns kvar i rutan. Tryck Skicka igen när du vill försöka på nytt.';
+        }
+      } finally {
+        clearTimeout(requestTimeout);
+        clearTimeout(reviewTimeout);
+        if (_perActiveRequest === requestState) _perActiveRequest = null;
       }
 
       if (sendBtn) sendBtn.disabled = false;
@@ -1377,7 +1565,7 @@ function finalizeMsg(div, text) {
               '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
               '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
               '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
-              '<button class="per-clr" id="perClearBtn" title="Rensa konversation"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+              '<button class="per-clr" id="perClearBtn" title="Rensa på den här enheten"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
             '</div>' +
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="app.html">Skapa gratis konto →</a></div>' +
@@ -1427,9 +1615,17 @@ function finalizeMsg(div, text) {
         }
       };
       document.getElementById('perClearBtn').onclick = function () {
+        if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
+        if (EXGEN_RUNTIME.environment === 'pilot') {
+          try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+        }
+        var input = document.getElementById('perInput');
+        if (input) input.value = '';
+        var sendBtn = document.getElementById('perSendBtn');
+        if (sendBtn) sendBtn.disabled = false;
         var msgs = document.getElementById('perMessages');
-        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Klart. Vad vill du veta?</div>';
+        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.</div>';
       };
 
       /* ── POSITION & SIZE PERSISTENCE ── */
@@ -1551,6 +1747,30 @@ function finalizeMsg(div, text) {
         }
       }
 
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try {
+          var pendingRaw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+          if (pendingRaw) {
+            sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+            var pending = JSON.parse(pendingRaw);
+            var age = Date.now() - Number(pending.savedAt);
+            var currentSession = null;
+            try { currentSession = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+            var currentAccountId = pilotSessionUserId(currentSession);
+            var accountMatches = pending.accountId
+              ? pending.accountId === currentAccountId
+              : !currentAccountId;
+            if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              perInpEl.value = pending.question;
+              toggle();
+              addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
+            }
+          }
+        } catch (_) {
+          try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+        }
+      }
+
       /* Background Supabase sync — load cross-device history */
       getToken().then(function(tok) {
         if (!tok) return;
@@ -1584,7 +1804,7 @@ function finalizeMsg(div, text) {
       /* Show quota bar for unauthenticated users on all pages */
       var _hasSession = false;
       try {
-        var _rawSess = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token');
+        var _rawSess = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
         // Samma giltighetsprövning som getToken(). En utgången session ska visa
         // gratisraden, inte dölja den — annars ser besökaren inga frågor kvar
         // samtidigt som de faktiskt har tre.
@@ -1635,7 +1855,7 @@ function finalizeMsg(div, text) {
     return; // bottom nav removed
     if (document.getElementById('proviaGlobalNav')) return;
     var raw = null;
-    try { raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
+    try { raw = localStorage.getItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
     if (!raw) return;
     var sess = null;
     try { sess = JSON.parse(raw); } catch (_) {}
@@ -1706,7 +1926,12 @@ function finalizeMsg(div, text) {
     document.dispatchEvent(new CustomEvent('proviaNavReady'));
 
     window.addEventListener('storage', function(e) {
-      if (e.key !== 'sb-mnmotdluigzeehdjbhbu-auth-token') return;
+      if ((e.key === EXGEN_RUNTIME.authStorageKey || e.key === null) && EXGEN_RUNTIME.environment === 'pilot') {
+        var nextAccountId = null;
+        try { nextAccountId = pilotSessionUserId(JSON.parse(e.key === null ? 'null' : (e.newValue || 'null'))) || null; } catch (_) {}
+        abortPerRequestForAccountId(nextAccountId);
+      }
+      if (e.key !== EXGEN_RUNTIME.authStorageKey) return;
       if (!e.newValue) {
         var el = document.getElementById('proviaGlobalNav');
         if (el) el.remove();
@@ -1843,9 +2068,9 @@ function finalizeMsg(div, text) {
 
   /* ── SHARED LOGIN MODAL ── */
   (function() {
-    var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-    var SUPA_ANON = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
-    var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+    var SUPA_URL  = EXGEN_RUNTIME.supabaseUrl;
+    var SUPA_ANON = EXGEN_RUNTIME.publishableKey;
+    var SUPA_LS   = EXGEN_RUNTIME.authStorageKey;
     var _view     = 'welcome';
     var _open     = false;
 
@@ -1863,20 +2088,25 @@ function finalizeMsg(div, text) {
 
     function isLoggedIn() {
       try {
+        if (EXGEN_RUNTIME.environment === 'pilot' && sessionStorage.getItem(PILOT_REAUTH_REQUIRED_KEY) === '1') return false;
         var s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
         if (!s || !s.access_token) return false;
+        var expired = s.expires_at && Number(s.expires_at) * 1000 <= Date.now();
         /* An expired access token is still a live session as long as a refresh
            token is there — supabase-js renews it silently. Only a session that
            is both expired and unrenewable counts as signed out; treating every
            expired token as signed out would show "Logga in" to anyone who left
            a tab open for an hour. */
-        var expired = s.expires_at && Number(s.expires_at) * 1000 <= Date.now();
         if (expired && !s.refresh_token) return false;
         return true;
       } catch (_) { return false; }
     }
     function saveSession(d) {
+      abortPerRequestForAccountId(pilotSessionUserId(d) || null);
+      clearPilotQuestionForAccountChange(d);
       try { localStorage.setItem(SUPA_LS, JSON.stringify(d)); } catch (_) {}
+      try { sessionStorage.removeItem(PILOT_REAUTH_REQUIRED_KEY); } catch (_) {}
+      if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.syncSession();
       rememberAccount();
     }
 
@@ -1977,6 +2207,9 @@ function finalizeMsg(div, text) {
         '.pv-tg button:hover{text-decoration:underline}',
         '@media(prefers-reduced-motion:reduce){#pvCard,.pv-pm,.pv-se,.pv-vw{transition:none;animation:none}}',
       ].join('');
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        s.textContent += '#pvToReg,#pvVR,#pvVW .pv-dv,#pvVL .pv-tg:not([style]){display:none!important}';
+      }
       document.head.appendChild(s);
     }
 
@@ -2026,7 +2259,7 @@ function finalizeMsg(div, text) {
           + '<button class="pv-cl" id="pvCl" aria-label="Stäng">✕</button>'
           + '<img src="image/exgen-logo.png" alt="ExGen" style="height:26px;width:auto;margin-bottom:10px">'
           + '<div class="pv-ti" id="pvTi">Välkommen!</div>'
-          + '<div class="pv-sb" id="pvSb">GRATIS ATT STARTA · INGET KORT KRÄVS</div>'
+          + '<div class="pv-sb" id="pvSb">' + (EXGEN_RUNTIME.environment === 'pilot' ? 'SKOLPILOT · INBJUDNA TESTKONTON' : 'GRATIS ATT STARTA · INGET KORT KRÄVS') + '</div>'
         + '</div>'
         + '<div class="pv-bd">'
           + '<div id="pvVW" class="pv-vw pv-vx">'
@@ -2092,6 +2325,7 @@ function finalizeMsg(div, text) {
     }
 
     function switchView(view) {
+      if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       _view = view;
       var map = { welcome:'pvVW', register:'pvVR', login:'pvVL', forgot:'pvVF' };
       Object.keys(map).forEach(function(k) {
@@ -2099,7 +2333,9 @@ function finalizeMsg(div, text) {
         if (el) el.classList.toggle('pv-vx', k === view);
       });
       var titles = { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in', forgot:'Återställ lösenord' };
-      var subs = { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
+      var subs = EXGEN_RUNTIME.environment === 'pilot'
+        ? { welcome:'SKOLPILOT · INBJUDNA TESTKONTON', register:'SKOLPILOT · INBJUDNA TESTKONTON', login:'SKOLPILOT · LOGGA IN', forgot:'VI MEJLAR EN LÄNK' }
+        : { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
       var ti = document.getElementById('pvTi'); if (ti) ti.textContent = titles[view] || '';
       var sb = document.getElementById('pvSb'); if (sb) sb.textContent = subs[view] || '';
       var focusMap = { register:'pvRE', login:'pvLE', forgot:'pvFE' };
@@ -2112,8 +2348,9 @@ function finalizeMsg(div, text) {
       });
     }
 
-    function openModal(view) {
-      if (isLoggedIn()) return;
+    function openModal(view, force) {
+      if (isLoggedIn() && !force) return;
+      if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       /* Every page gate asks for 'register', which is right for a first-time
          visitor and wrong for everyone else — a returning student had to click
          past a signup form to reach the login form. Anyone who has had an
@@ -2174,11 +2411,9 @@ function finalizeMsg(div, text) {
       if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
       if (pass.length < 8) { errEl.textContent = 'Lösenordet måste vara minst 8 tecken.'; return; }
       btn.disabled = true; btn.textContent = 'Skapar konto…';
-      /* Registration goes through /api/signup, not Supabase's /auth/v1/signup
-         directly. That endpoint is what the in-page forms already use, and it is the only
-         path that confirms the address, sends the welcome mail and notifies
-         the admin. Calling Supabase raw from here meant a user who signed up
-         from the landing page silently got none of that. */
+      /* The endpoint creates an unconfirmed signup and sends one generic
+         confirmation response, so the form must never infer whether an email
+         address already has an account. */
       fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2189,36 +2424,12 @@ function finalizeMsg(div, text) {
           return d;
         });
       }).then(function(d) {
-        if (d.session && d.session.access_token) {
-          var isNew = !hasAccountBefore();
-          saveSession(d.session); closeModal();
-          /* Hand the welcome animation to the destination page instead of
-             playing it here and then throwing it away in the navigation —
-             the same welcome flow uses. Saves 2.6s of dead wait. */
-          if (window.triggerWelcome) window.triggerWelcome(email, isNew);
-          pvAfterAuth();
-        } else {
-          errEl.style.color = 'var(--a,#00768F)';
-          errEl.textContent = 'Kontot är skapat — logga in för att komma igång.';
-          btn.disabled = false; btn.textContent = 'Skapa konto';
-        }
+        errEl.style.color = 'var(--a,#00768F)';
+        errEl.textContent = d.message || 'Om adressen kan registreras skickar vi en verifieringslänk.';
+        btn.disabled = false; btn.textContent = 'Skapa konto';
       }).catch(function(e) {
         btn.disabled = false; btn.textContent = 'Skapa konto';
         errEl.style.color = '';
-        /* "Already registered" is not really an error — the person has an
-           account and picked the wrong form. Move them to the login view with
-           the address already filled in rather than making them retype it. */
-        if (/already (been )?registered/i.test(String(e.message || ''))) {
-          switchView('login');
-          var le = document.getElementById('pvLE');
-          if (le) le.value = email;
-          var lp = document.getElementById('pvLP');
-          if (lp) setTimeout(function() { lp.focus(); }, 80);
-          var lerr = document.getElementById('pvLE2');
-          if (lerr) { lerr.style.color = 'var(--a,#00768F)'; lerr.textContent = 'Du har redan ett konto — logga in här.'; }
-          rememberAccount();
-          return;
-        }
         errEl.textContent = svError(e.message, 'Kunde inte skapa kontot. Försök igen.');
       });
     }
@@ -2270,9 +2481,11 @@ function finalizeMsg(div, text) {
     // Logged-out → open the modal; logged-in → let the element do its thing (e.g. navigate).
     document.addEventListener('click', function(e) {
       var t = e.target.closest && e.target.closest('[data-pv-auth]');
-      if (!t || isLoggedIn()) return;
+      if (!t) return;
+      var forcePilotLogin = EXGEN_RUNTIME.environment === 'pilot' && t.getAttribute('data-pv-force-login') === 'true';
+      if (isLoggedIn() && !forcePilotLogin) return;
       e.preventDefault();
-      openModal(t.getAttribute('data-pv-auth') || 'register');
+      openModal(t.getAttribute('data-pv-auth') || 'register', forcePilotLogin);
     });
 
     /* ── RETURN FROM GOOGLE ──

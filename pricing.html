@@ -1,12 +1,14 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
   <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>Priser & Planer – ExGen</title>
   <meta name="description" content="Välj rätt plan för dig. ExGen ger dig prov på ditt eget kursmaterial, rättning med modellsvar, felbank och en personlig studiecoach. Gratis att börja." />
   <link rel="canonical" href="https://exgen.se/pricing.html" />
@@ -122,7 +124,6 @@
     font-size:var(--exgen-text-sm);color:var(--xf-ink-2);line-height:var(--exgen-leading-normal)}
   .featureList li::before{content:"✓";font-family:var(--exgen-font-mono);font-size:11px;
     color:var(--xf-accent);flex-shrink:0;margin-top:2px}
-  .featureList li.dim{opacity:.6}
   .featureList li.dim::before{content:"—";color:var(--xf-ink-2)}
 
   /* Sammanfattningen låg i en egen ram med accentkant — ett kort inuti ett
@@ -462,8 +463,8 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-  const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN";
+  const SUPABASE_URL = window.ExGenRuntime.supabaseUrl;
+  const SUPABASE_ANON_KEY = window.ExGenRuntime.publishableKey;
   const sb = window.supabase && window.supabase.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -515,8 +516,8 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 // Show manage-subscription section for paying users
 (async function() {
   if (!window.supabase) return;
-  const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN";
+  const SUPABASE_URL = window.ExGenRuntime.supabaseUrl;
+  const SUPABASE_ANON_KEY = window.ExGenRuntime.publishableKey;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;

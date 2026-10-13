@@ -2,11 +2,8 @@
 //
 // Usage:  node tests/assessment/solver.test.mjs   (exit 0 = pass)
 //
-// The solver can DELETE questions from a student's exam, so both directions are
-// pinned: it must drop what is genuinely broken, and it must not drop a sound
-// question just because it was unsure. Delivery is already the scarce resource
-// (79 % of requested questions reach the student), so a trigger-happy solver
-// would cost more than it buys.
+// The solver is a strict quality gate: only a complete, internally consistent
+// answer that matches the trusted key may keep a multiple-choice question.
 
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -24,21 +21,19 @@ const check = (name, cond) => {
 };
 
 const q = { id: "1", type: "mc", options: ["a", "b", "c"], correct_index: 1 };
-// Without option_verdicts the decision falls back to the index comparison, which
-// is the path used when a verdict list is malformed or missing.
-const verdict = (index, confidence = 1) => ({ id: "1", index, confidence, reason: "r" });
-// With verdicts: the solver's own per-option judgements decide.
-const withVerdicts = (verdicts, index, confidence = 1) =>
-  ({ id: "1", option_verdicts: verdicts, index, confidence, reason: "r" });
+const verdict = (question, index, optionVerdicts, confidence = 0.9) => ({
+  id: question.id, index, option_verdicts: optionVerdicts, confidence, reason: "r"
+});
+const goodVerdict = verdict(q, 1, [false, true, false]);
 
 // ── agreement keeps the question ───────────────────────────────────────────
 check("keeps when the solver lands on the same option", (() => {
-  const d = S.decideKeep(verdict(1), q);
+  const d = S.decideKeep(goodVerdict, q);
   return d.keep === true && d.reason === "solver_agrees";
 })());
 
-check("keeps on agreement even when the solver is unsure", (() => {
-  return S.decideKeep(verdict(1, 0.2), q).keep === true;
+check("keeps a valid, consistent verdict at zero confidence", (() => {
+  return S.decideKeep(verdict(q, 1, [false, true, false], 0), q).keep === true;
 })());
 
 // ── the dominant defect: several options correct ───────────────────────────
@@ -46,53 +41,60 @@ check("keeps on agreement even when the solver is unsure", (() => {
 // reporting it is necessarily UNSURE which option to pick, so gating this on
 // confidence would miss exactly what it exists to catch.
 check("drops when no single option is correct, at high confidence", (() => {
-  const d = S.decideKeep(verdict(S.NO_SINGLE_ANSWER, 0.95), q);
+  const d = S.decideKeep(verdict(q, S.NO_SINGLE_ANSWER, [false, false, false], 0.95), q);
   return d.keep === false && d.reason === "solver_no_single_answer";
 })());
 
 check("drops when no single option is correct, at LOW confidence too", (() => {
-  const d = S.decideKeep(verdict(S.NO_SINGLE_ANSWER, 0.1), q);
+  const d = S.decideKeep(verdict(q, S.NO_SINGLE_ANSWER, [false, false, false], 0.1), q);
   return d.keep === false && d.reason === "solver_no_single_answer";
 })());
 
-// ── plain disagreement needs confidence behind it ──────────────────────────
-check("drops a confident disagreement about the key", (() => {
-  const d = S.decideKeep(verdict(2, 0.9), q);
+// ── disagreements and incomplete decisions fail closed ────────────────────
+check("drops a disagreement with the trusted key", (() => {
+  const d = S.decideKeep(verdict(q, 2, [false, false, true]), q);
   return d.keep === false && d.reason === "solver_disagrees_on_key";
 })());
 
-check("drops exactly at the confidence floor", (() => {
-  return S.decideKeep(verdict(2, S.DEFAULT_MISMATCH_CONFIDENCE), q).keep === false;
+check("drops a low-confidence disagreement too", (() => {
+  return S.decideKeep(verdict(q, 2, [false, false, true], 0.1), q).keep === false;
 })());
 
-check("KEEPS a hesitant disagreement — an unsure solver must not delete a sound question", (() => {
-  const d = S.decideKeep(verdict(2, 0.4), q);
-  return d.keep === true && d.reason === "solver_disagrees_low_confidence";
+check("drops a missing verdict", (() => {
+  return S.decideKeep(undefined, q).keep === false;
 })());
 
-check("the confidence floor is overridable by the caller", (() => {
-  return S.decideKeep(verdict(2, 0.5), q, { minMismatchConfidence: 0.4 }).keep === false;
+check("drops a missing option audit", (() => {
+  return S.decideKeep({ id: q.id, index: 1, confidence: 1, reason: "r" }, q).keep === false;
 })());
 
-// ── the escape hatch: questions the solver cannot judge ────────────────────
-// Material is capped before being sent, so a question drawn from a later part
-// of a long paste may be unanswerable to the solver. That must never delete it.
-check("keeps when the solver says it cannot judge", (() => {
-  const d = S.decideKeep(verdict(S.CANNOT_JUDGE, 1), q);
-  return d.keep === true && d.reason === "solver_cannot_judge";
+check("drops CANNOT_JUDGE", (() => {
+  const d = S.decideKeep(verdict(q, S.CANNOT_JUDGE, [false, false, false]), q);
+  return d.keep === false && d.reason === "solver_cannot_judge";
 })());
 
-check("keeps when there is no verdict for the question at all", (() => {
-  return S.decideKeep(undefined, q).keep === true;
+check("drops indices below the supported sentinel range", (() => {
+  return S.decideKeep(verdict(q, -3, [false, true, false]), q).keep === false;
 })());
 
-check("keeps on a nonsense index rather than guessing", (() => {
-  return S.decideKeep(verdict(-7, 1), q).keep === true
-    && S.decideKeep({ id: "1", index: "två", confidence: 1 }, q).keep === true;
+check("drops indices above the question option range", (() => {
+  return S.decideKeep(verdict(q, q.options.length, [false, true, false]), q).keep === false;
 })());
 
-check("keeps when confidence is missing entirely", (() => {
-  return S.decideKeep({ id: "1", index: 2, reason: "r" }, q).keep === true;
+check("drops non-integer indices", (() => {
+  return S.decideKeep(verdict(q, 1.5, [false, true, false]), q).keep === false;
+})());
+
+check("drops confidence outside 0 through 1", (() => {
+  return S.decideKeep(verdict(q, 1, [false, true, false], 1.1), q).keep === false;
+})());
+
+check("drops non-finite confidence", (() => {
+  return S.decideKeep(verdict(q, 1, [false, true, false], NaN), q).keep === false;
+})());
+
+check("drops non-string reasons", (() => {
+  return S.decideKeep({ ...goodVerdict, reason: null }, q).keep === false;
 })());
 
 // ── the prompt must not leak the answer key ────────────────────────────────
@@ -152,12 +154,12 @@ check("catches the rectangle defect: perimeter 20 means x(10 - x), not x(20 - x)
   const rect = { id: "r", type: "mc", correct_index: 0,
     options: ["x(20 - x) = 24", "x(10 - x) = 24", "x(24 - x) = 20"] };
   // Solver answers option 1; the key says 0.
-  return S.decideKeep(verdict(1, 1), rect).keep === false;
+  return S.decideKeep(verdict(rect, 1, [false, true, false]), rect).keep === false;
 })());
 
 check("catches the parabola defect: f(5) = 0 for x² - 8x + 15, not 5", (() => {
   const par = { id: "p", type: "mc", correct_index: 2, options: ["-1", "0", "5"] };
-  return S.decideKeep({ id: "p", index: 1, confidence: 1, reason: "25-40+15=0" }, par).keep === false;
+  return S.decideKeep(verdict(par, 1, [false, true, false]), par).keep === false;
 })());
 
 // ── per-option audit: the change that targets ambiguity ────────────────────
@@ -168,14 +170,14 @@ check("catches the parabola defect: f(5) = 0 for x² - 8x + 15, not 5", (() => {
 // verdict is computed here from those judgements rather than trusted to the
 // model's own conclusion.
 check("drops when the solver marks two options correct", (() => {
-  const d = S.decideKeep(withVerdicts([true, true, false], 0), q);
+  const d = S.decideKeep(verdict(q, 0, [true, true, false]), q);
   return d.keep === false && d.reason === "solver_multiple_correct_options";
 })());
 
 check("drops when the solver marks two correct even if it then names the key", (() => {
   // The model picked index 1, which matches the key — but it also said option 0
   // is correct. Trusting the index alone would have kept this question.
-  const d = S.decideKeep(withVerdicts([true, true, false], 1), q);
+  const d = S.decideKeep(verdict(q, 1, [true, true, false]), q);
   return d.keep === false && d.reason === "solver_multiple_correct_options";
 })());
 
@@ -184,47 +186,41 @@ check("drops when the solver marks two correct even if it then names the key", (
 // other route to the same conclusion — the model named an option but its own
 // audit says none of them is right.
 check("drops when the solver marks no option correct", (() => {
-  const d = S.decideKeep(withVerdicts([false, false, false], 0), q);
-  return d.keep === false && d.reason === "solver_no_correct_option";
+  const d = S.decideKeep(verdict(q, 0, [false, false, false]), q);
+  return d.keep === false && d.reason === "solver_no_single_answer";
 })());
 
 check("an explicit -1 still reports the sentinel reason, not the audit reason", (() => {
-  const d = S.decideKeep(withVerdicts([false, false, false], S.NO_SINGLE_ANSWER), q);
+  const d = S.decideKeep(verdict(q, S.NO_SINGLE_ANSWER, [false, false, false]), q);
   return d.keep === false && d.reason === "solver_no_single_answer";
 })());
 
 check("keeps when exactly one option is correct and it is the key", (() => {
-  const d = S.decideKeep(withVerdicts([false, true, false], 1), q);
+  const d = S.decideKeep(verdict(q, 1, [false, true, false]), q);
   return d.keep === true && d.reason === "solver_agrees";
 })());
 
-check("the single true verdict overrides a contradictory index", (() => {
-  // Verdicts say option 1 (the key) is the only correct one, but the model
-  // wrote index 2. The audit is the better signal, so the question survives.
-  const d = S.decideKeep(withVerdicts([false, true, false], 2), q);
-  return d.keep === true && d.reason === "solver_agrees";
+check("drops when the single true verdict contradicts the reported index", (() => {
+  const d = S.decideKeep(verdict(q, 2, [false, true, false]), q);
+  return d.keep === false && d.reason === "solver_index_verdict_mismatch";
 })());
 
 check("drops when the only true verdict is not the key, regardless of confidence", (() => {
-  const d = S.decideKeep(withVerdicts([true, false, false], 0, 0.2), q);
+  const d = S.decideKeep(verdict(q, 0, [true, false, false], 0.2), q);
   return d.keep === false && d.reason === "solver_disagrees_on_key";
 })());
 
-// A malformed verdict list must never delete questions — it falls back to the
-// index comparison, which has its own confidence guard.
-check("ignores a verdict list of the wrong length", (() => {
-  const d = S.decideKeep(withVerdicts([true, true], 1), q);
-  return d.keep === true && d.reason === "solver_agrees";
+check("drops a verdict list of the wrong length", (() => {
+  return S.decideKeep(verdict(q, 1, [false, true]), q).keep === false;
 })());
 
-check("ignores a verdict list that is not an array", (() => {
-  const d = S.decideKeep({ id: "1", option_verdicts: "true,false", index: 1, confidence: 1 }, q);
-  return d.keep === true;
+check("drops a verdict list containing non-booleans", (() => {
+  return S.decideKeep(verdict(q, 1, [false, "true", false]), q).keep === false;
 })());
 
 check("ignores verdicts when the question has no options", (() => {
   const noOpts = { id: "1", type: "mc", options: [], correct_index: -1 };
-  return S.decideKeep(withVerdicts([true, true], -1), noOpts).keep === false;
+  return S.decideKeep(verdict(noOpts, -1, [true, true]), noOpts).keep === false;
 })());
 
 check("schema puts option_verdicts before index so the audit happens first", (() => {
@@ -248,13 +244,13 @@ for (const lang of ["sv", "en"]) {
 check("catches 'p gives both the root sum and the axis of symmetry'", (() => {
   const amb = { id: "a", type: "mc", correct_index: 0,
     options: ["Summan av rötterna", "Symmetrilinjen", "Produkten av rötterna"] };
-  return S.decideKeep(withVerdicts([true, true, false], 0), amb).keep === false;
+  return S.decideKeep(verdict(amb, 0, [true, true, false]), amb).keep === false;
 })());
 
 check("catches 'which is a commercial risk' with two valid risks", (() => {
   const amb = { id: "b", type: "mc", correct_index: 1,
     options: ["Maskinhaveri", "Instabil efterfrågan", "Stark konkurrens"] };
-  return S.decideKeep(withVerdicts([false, true, true], 1), amb).keep === false;
+  return S.decideKeep(verdict(amb, 1, [false, true, true]), amb).keep === false;
 })());
 
 if (failures) { console.error(`\n${failures} check(s) failed.`); process.exit(1); }

@@ -28,47 +28,81 @@ const UTAN_ROLLBACK_AV_HISTORISKA_SKAL = new Set([
   "20260627_teacher_dashboard",
 ]);
 
-const NAMNMONSTER = /^\d{8}_[a-z0-9_]+$/;
+const HISTORISKA_DATUMNAMN = new Set([
+  "20260603_add_mock_exam_quota",
+  "20260620_per_structured_memory",
+  "20260627_teacher_dashboard",
+  "20260718_fix_profiles_update_escalation",
+  "20260719_stripe_webhook_idempotency",
+  "20260720_knowledge_engine_schema",
+  "20260721_knowledge_engine_corpus_seed",
+  "20260722_knowledge_engine_embeddings",
+  "20260723_knowledge_engine_retrieval_function",
+  "20260724_knowledge_engine_corpus_correction",
+  "20260727_per_learner_loop",
+  "20260801_add_welcome_sent_at_to_profiles",
+  "20260807_async_school_generation",
+  "20260820_per_collective_stats",
+  "20260821_per_answer_cache",
+  "20260821_per_answer_cache_harden",
+  "20260822_per_cache_store",
+  "20260823_learner_profile",
+  "20260823_mock_mastery_server_side",
+  "20260825_admin_passkeys",
+  "20260825_admin_recovery_codes",
+  "20260825_per_module_activity",
+]);
 
-let fel = 0;
-const klagomal = (rad) => { fel++; console.error(`  FEL   ${rad}`); };
+const NAMNMONSTER = /^\d{8}(?:\d{6})?_[a-z0-9_]+$/;
 
-const filer = readdirSync(dir).filter((f) => f.endsWith(".sql"));
-const migrationer = filer
-  .filter((f) => !f.endsWith("_ROLLBACK.sql"))
-  .map((f) => f.replace(/\.sql$/, ""));
-const rollbacks = new Set(
-  filer.filter((f) => f.endsWith("_ROLLBACK.sql")).map((f) => f.replace(/_ROLLBACK\.sql$/, ""))
-);
+export function findMigrationFileIssues(filer) {
+  const issues = [];
+  const migrationer = filer
+    .filter((f) => f.endsWith(".sql") && !f.endsWith("_ROLLBACK.sql"))
+    .map((f) => f.replace(/\.sql$/, ""));
+  const rollbacks = new Set(
+    filer.filter((f) => f.endsWith("_ROLLBACK.sql")).map((f) => f.replace(/_ROLLBACK\.sql$/, ""))
+  );
+  const versions = new Map();
 
-for (const namn of migrationer) {
-  if (!NAMNMONSTER.test(namn)) {
-    klagomal(`${namn}.sql — namnet ska vara ÅÅÅÅMMDD_snake_case`);
+  for (const namn of migrationer) {
+    if (!NAMNMONSTER.test(namn)) {
+      issues.push(`${namn}.sql — namnet ska vara ÅÅÅÅMMDD[_HHMMSS]_snake_case`);
+    }
+    const version = namn.split("_")[0];
+    if (version.length === 8 && !HISTORISKA_DATUMNAMN.has(namn)) {
+      issues.push(`${namn}.sql — nya migrationer måste använda Supabase CLI:s unika HHMMSS-version`);
+    }
+    if (version.length === 14) {
+      const prior = versions.get(version);
+      if (prior) issues.push(`${namn}.sql delar migrationsversion ${version} med ${prior}.sql`);
+      else versions.set(version, namn);
+    }
+    if (!rollbacks.has(namn) && !UTAN_ROLLBACK_AV_HISTORISKA_SKAL.has(namn)) {
+      issues.push(`${namn}.sql saknar ${namn}_ROLLBACK.sql`);
+    }
   }
-  if (!rollbacks.has(namn) && !UTAN_ROLLBACK_AV_HISTORISKA_SKAL.has(namn)) {
-    klagomal(`${namn}.sql saknar ${namn}_ROLLBACK.sql`);
+
+  const migrationsSet = new Set(migrationer);
+  for (const namn of rollbacks) {
+    if (!migrationsSet.has(namn)) issues.push(`${namn}_ROLLBACK.sql saknar sin ${namn}.sql`);
   }
+  for (const namn of UTAN_ROLLBACK_AV_HISTORISKA_SKAL) {
+    if (!migrationsSet.has(namn)) issues.push(`${namn} står i undantagslistan men filen finns inte längre`);
+  }
+
+  return issues;
 }
 
-// En rollback utan sin migration är antingen en felstavning eller en halvt borttagen
-// migration. Båda gör att nästa person tror att något går att backa som inte finns.
-const migrationsSet = new Set(migrationer);
-for (const namn of rollbacks) {
-  if (!migrationsSet.has(namn)) klagomal(`${namn}_ROLLBACK.sql saknar sin ${namn}.sql`);
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const filer = readdirSync(dir);
+  const issues = findMigrationFileIssues(filer);
+  for (const issue of issues) console.error(`  FEL   ${issue}`);
+  if (issues.length) {
+    console.error(`\n${issues.length} problem i supabase/migrations.`);
+    process.exit(1);
+  }
+  const migrations = filer.filter((f) => f.endsWith(".sql") && !f.endsWith("_ROLLBACK.sql"));
+  const rollbacks = filer.filter((f) => f.endsWith("_ROLLBACK.sql"));
+  console.log(`Alla kontroller klara — ${migrations.length} migrationer, ${rollbacks.length} rollbacks.`);
 }
-
-// Ingen kontroll av att datumprefixen är unika. Flera oberoende migrationer kan
-// behöva skapas samma dag, och att döpa om redan körda migrationer för att
-// blidka en kontroll är sämre än att låta bli.
-
-// Namn som står kvar i undantagslistan men vars fil är borta betyder att listan har
-// ruttnat. Den ska krympa när gamla migrationer städas, aldrig växa av sig själv.
-for (const namn of UTAN_ROLLBACK_AV_HISTORISKA_SKAL) {
-  if (!migrationsSet.has(namn)) klagomal(`${namn} står i undantagslistan men filen finns inte längre`);
-}
-
-if (fel) {
-  console.error(`\n${fel} problem i supabase/migrations.`);
-  process.exit(1);
-}
-console.log(`Alla kontroller klara — ${migrationer.length} migrationer, ${rollbacks.size} rollbacks.`);

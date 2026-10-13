@@ -1,4 +1,5 @@
 import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
+import { readFile } from "node:fs/promises";
 /* P.E.R:s introduktion (js/per-onboarding.js).
  *
  * Användning:  node tests/frontend/per-onboarding.test.mjs
@@ -16,6 +17,8 @@ import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
 const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 const R = report("per-onboarding");
+const onboardingSource = await readFile(new URL("../../js/per-onboarding.js", import.meta.url), "utf8");
+R.ok("skip state is account-scoped by the server, not shared localStorage", !/exgen_onboarding_dismissed|SKIP_KEY/.test(onboardingSource));
 const browser = await chromium.launch();
 
 /* Fångar varje anrop till check-role och svarar per action. Sista registrerade

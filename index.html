@@ -1,12 +1,14 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
   <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – AI-driven studieapp för elever och studenter</title>
   <meta name="description" content="ExGen är studieplattformen för grundskolan och gymnasiet. Klistra in ditt material och få ett prov med rättning, modellsvar och förklaring på varje fråga — plus en felbank som visar exakt vad du behöver träna på." />
   <meta property="og:title" content="ExGen – AI-driven studieapp för elever och studenter" />
@@ -1201,7 +1203,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
 <!-- VISITOR BOTTOM NAV — hidden by shared.js when user is logged in -->
 <!-- JOIN CTA — appears after scrolling past hero -->
-<div id="joinCta" class="joinCta" aria-hidden="true" role="complementary">
+<div id="joinCta" class="joinCta" aria-hidden="true" inert role="complementary">
   <span class="joinCtaTxt">Gratis att starta<br>Inget kort krävs</span>
   <button class="joinCtaBtn" id="joinCtaBtn" type="button">Skapa konto</button>
 </div>
@@ -1224,6 +1226,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
       shown = past;
       jc.classList.toggle('show', shown);
       jc.setAttribute('aria-hidden', shown ? 'false' : 'true');
+      jc.inert = !shown;
       document.body.classList.toggle('joincta-on', shown);  // lift P.E.R bubble clear of the bar
     }
   }
@@ -1237,7 +1240,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
     document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: 'register' } }));
   });
 
-  document.addEventListener('proviaNavReady', function(){ if (jc) { jc.style.display = 'none'; document.body.classList.remove('joincta-on'); } });
+  document.addEventListener('proviaNavReady', function(){ if (jc) { jc.style.display = 'none'; jc.inert = true; jc.setAttribute('aria-hidden', 'true'); document.body.classList.remove('joincta-on'); } });
 })();
 </script>
 </body>

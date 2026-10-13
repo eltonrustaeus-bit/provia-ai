@@ -110,9 +110,35 @@ async function toExam(page) {
   ok("T1b unika id i grade-payload", uniq.size === answers.length, JSON.stringify(answers.map(a => a.id)));
   ok("T1c svaren hamnade rätt", answers[0]?.answer === "A" && answers[1]?.answer === "svar på fråga två" && answers[2]?.answer === "C",
     JSON.stringify(answers.map(a => a.answer)));
+  const trainHref = await page.locator("#xf .xf-next-actions a").getAttribute("href");
+  ok("T1e nästa träning går till appens pilotkompatibla #train-flöde", trainHref === "app.html#train", String(trainHref));
+  const savedMistakesHref = await page.locator("#xf .xf-act a").getAttribute("href");
+  ok("T1f sparade misstag stannar i appens elevflöde", savedMistakesHref === "app.html#train", String(savedMistakesHref));
   ok("T1d inga konsolfel", errs.length === 0, errs.join(" | "));
   await page.screenshot({ path: SHOT + "/t1-result.png" });
   await ctx.close();
+}
+
+// ── T1e: objektliknande modell-id bevaras genom signerad rättning ──────────
+{
+  const originalIds = EXAM.questions.map(q => q.id);
+  EXAM.questions.forEach((q, i) => { q.id = ["constructor", "toString", "__proto__"][i]; });
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "prototype-ids");
+    await toExam(page);
+    await page.click(".xf-mc-opt >> nth=0"); await page.waitForTimeout(500);
+    await page.fill(".xf-answer", "syntetiskt svar");
+    await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
+    await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const ids = (lastGradePayload?.answers || []).map(a => a.id);
+    const expectedIds = ["constructor", "toString", "__proto__"];
+    ok("T1e fråge-id med inbyggda objektnamn behålls exakt", JSON.stringify(ids) === JSON.stringify(expectedIds), JSON.stringify(ids));
+  } finally {
+    EXAM.questions.forEach((q, i) => { q.id = originalIds[i]; });
+    await ctx.close();
+  }
 }
 
 // ── T2: hjälpflaggan sätts inte utan att panelen öppnas ────────────────────

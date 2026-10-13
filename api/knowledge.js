@@ -15,8 +15,10 @@
 // aktivering, senare faser).
 
 import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "./_supabase-server-key.cjs";
 import { requireAuth } from "./_auth.js";
 import { flagsEnabled as sharedFlagsEnabled } from "./_flags.js";
+import pilotScope from "./_pilot-scope.cjs";
 // DYNAMISK import, inte statisk. package.json saknar "type": "module", så Vercel kompilerar
 // api/*.js till CommonJS medan .mjs-filerna förblir äkta ESM. En statisk import blir då ett
 // require() av ESM och kraschar hela funktionen vid inladdning:
@@ -49,7 +51,8 @@ async function laddaModuler() {
   return _mod;
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const { createSupabaseServerClient } = supabaseKeys;
+const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
 
 // Codex-granskning 2026-07-27 (CR-PER-008, ACCEPTERAD): flaggkontrollen läste bara `enabled` och
 // ignorerade `allowed_user_ids`, trots att kolumnen finns i schemat sedan Fas 1 just för att kunna
@@ -64,28 +67,40 @@ async function flagsEnabled(keys, userId = null) {
   return sharedFlagsEnabled(supabase, keys, userId);
 }
 
-// Enkel, självständig daglig kvot (oberoende av PLAN_RULES i api/_provia-rules.js — den filen är
-// delad med resten av produkten och rörs inte här; en egen, konservativ gräns räcker för denna
-// fas eftersom endpointen ändå är feature-flag-inert). Codex HIGH-fynd (CR-2026-07-2X-007):
-// utan detta kan valfri autentiserad användare trigga obegränsat många AI-anrop per dag.
+// Separat atomär kvot för skapade genereringsjobb. Funktionen räknade tidigare jobb
+// före insert, vilket lät parallella anrop passera samma gräns.
 const MAX_JOBS_PER_USER_PER_DAY = 20;
-async function underDailyJobLimit(userId) {
-  const since = new Date();
-  since.setUTCHours(0, 0, 0, 0);
-  const { count, error } = await supabase
-    .from("generation_jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", since.toISOString());
-  if (error) return false; // fail-closed vid osäkerhet — hellre neka än läcka kostnad
-  return (count ?? 0) < MAX_JOBS_PER_USER_PER_DAY;
+const JOB_QUOTA_FEATURE = "legal_exam_generation";
+async function consumeJobQuota(userId) {
+  try {
+    const { data, error } = await supabase.rpc("per_consume_daily_quota", {
+      p_user_id: userId,
+      p_feature: JOB_QUOTA_FEATURE,
+      p_limit: MAX_JOBS_PER_USER_PER_DAY,
+    });
+    if (error || typeof data?.allowed !== "boolean") return "unavailable";
+    return data.allowed ? "allowed" : "exhausted";
+  } catch {
+    return "unavailable";
+  }
+}
+
+async function refundJobQuota(userId) {
+  try {
+    await supabase.rpc("per_refund_daily_quota", {
+      p_user_id: userId,
+      p_feature: JOB_QUOTA_FEATURE,
+    });
+  } catch {
+    // A failed refund can consume one slot, but must not turn a failed job into success.
+  }
 }
 
 const MAX_QUESTION_COUNT = 100;
 
 async function opBlueprint(req, res, user) {
   const { subject, course, level, question_count, question_mix, source_material_ref } = req.body || {};
-  if (!subject || !level || !question_count || question_count <= 0) {
+  if (typeof subject !== "string" || !subject.trim() || !level || !Number.isInteger(question_count) || question_count <= 0) {
     return res.status(400).json({ error: "subject, level och question_count (>0) krävs" });
   }
   if (!["E", "C", "A"].includes(level)) {
@@ -94,52 +109,63 @@ async function opBlueprint(req, res, user) {
   if (question_count > MAX_QUESTION_COUNT) {
     return res.status(400).json({ error: `question_count får max vara ${MAX_QUESTION_COUNT}` });
   }
-  if (!(await underDailyJobLimit(user.id))) {
+  const quota = await consumeJobQuota(user.id);
+  if (quota === "unavailable") {
+    return res.status(503).json({ error: "Genereringstjänsten är tillfälligt otillgänglig." });
+  }
+  if (quota === "exhausted") {
     return res.status(429).json({ error: "Daglig gräns för antal genereringsjobb nådd" });
   }
 
-  const { data: blueprint, error: blueprintError } = await supabase
-    .from("exam_blueprints")
-    .insert({
-      user_id: user.id,
-      subject,
-      course: course ?? null,
-      level,
-      question_count,
-      question_mix: question_mix ?? null,
-      source_material_ref: source_material_ref ?? null,
-      status: "draft",
-      pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
-    })
-    .select()
-    .single();
-  if (blueprintError) return res.status(500).json({ error: "Kunde inte skapa exam_blueprint" });
+  let jobInsertStarted = false;
+  try {
+    const { data: blueprint, error: blueprintError } = await supabase
+      .from("exam_blueprints")
+      .insert({
+        user_id: user.id,
+        subject: subject.trim().slice(0, 120),
+        course: typeof course === "string" ? course.trim().slice(0, 120) || null : null,
+        level,
+        question_count,
+        question_mix: question_mix ?? null,
+        source_material_ref: typeof source_material_ref === "string" ? source_material_ref.trim().slice(0, 200) || null : null,
+        status: "draft",
+        pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
+      })
+      .select()
+      .single();
+    if (blueprintError) {
+      await refundJobQuota(user.id);
+      return res.status(500).json({ error: "Kunde inte skapa exam_blueprint" });
+    }
 
-  const idempotencyKey = req.body?.idempotency_key || `${user.id}:${blueprint.id}:blueprint`;
-  const { data: job, error: jobError } = await supabase
-    .from("generation_jobs")
-    .insert({
-      user_id: user.id,
-      job_type: "legal_exam_generation",
-      status: "queued",
-      progress_total: question_count,
-      idempotency_key: idempotencyKey,
-      pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
-      prompt_version: (await laddaModuler()).PROMPT_VERSION,
-      input_json: { blueprint_id: blueprint.id, subject, course, level, question_count },
-    })
-    .select()
-    .single();
-  if (jobError) {
-    // Fas 2-tabellerna har ingen FK-kaskad mellan exam_blueprints och generation_jobs (de är
-    // fristående), så en misslyckad jobb-insert skulle annars lämna blueprinten övergiven som
-    // 'draft' för alltid (Codex MEDIUM-fynd). Markera den explicit som failed istället för att
-    // bara läcka en orphaned rad.
-    await supabase.from("exam_blueprints").update({ status: "failed" }).eq("id", blueprint.id);
-    return res.status(500).json({ error: "Kunde inte skapa generation_job" });
+    const idempotencyKey = req.body?.idempotency_key || `${user.id}:${blueprint.id}:blueprint`;
+    jobInsertStarted = true;
+    const { data: job, error: jobError } = await supabase
+      .from("generation_jobs")
+      .insert({
+        user_id: user.id,
+        job_type: "legal_exam_generation",
+        status: "queued",
+        progress_total: question_count,
+        idempotency_key: idempotencyKey,
+        pipeline_version: (await laddaModuler()).PIPELINE_VERSION,
+        prompt_version: (await laddaModuler()).PROMPT_VERSION,
+        input_json: { blueprint_id: blueprint.id, subject, course, level, question_count },
+      })
+      .select()
+      .single();
+    if (jobError) {
+      await supabase.from("exam_blueprints").update({ status: "failed" }).eq("id", blueprint.id);
+      await refundJobQuota(user.id);
+      return res.status(500).json({ error: "Kunde inte skapa generation_job" });
+    }
+
+    return res.status(200).json({ blueprint_id: blueprint.id, job_id: job.id });
+  } catch {
+    if (!jobInsertStarted) await refundJobQuota(user.id);
+    return res.status(500).json({ error: "Kunde inte skapa genereringsjobbet." });
   }
-
-  return res.status(200).json({ blueprint_id: blueprint.id, job_id: job.id });
 }
 
 async function opGenerate(req, res, user) {
@@ -422,6 +448,7 @@ const LEARNER_OPS = {
 };
 
 export default async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

@@ -10,7 +10,7 @@ i sin egen röst. Fångar **buggar, UX-friktion, oklarheter och konverterings-si
 - ❌ Presentera ALDRIG dessa konton som riktiga användare för jury/investerare. Det är vilseledande.
 
 ## Krav
-- `.env.local` med `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (finns redan).
+- `.env.local` med `OPENAI_API_KEY`, `SUPABASE_URL` och servernyckeln `SUPABASE_SECRET_KEY` (föredras) eller äldre `SUPABASE_SERVICE_ROLE_KEY`.
 - Playwright-browsers: `npx playwright install chromium`
 
 ## Kör

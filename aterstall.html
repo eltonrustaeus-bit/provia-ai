@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Återställ lösenord – ExGen</title>
@@ -97,9 +99,9 @@
 
 <script>
 (function () {
-  var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-  var SUPA_ANON = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
-  var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+  var SUPA_URL  = window.ExGenRuntime.supabaseUrl;
+  var SUPA_ANON = window.ExGenRuntime.publishableKey;
+  var SUPA_LS   = window.ExGenRuntime.authStorageKey;
 
   var $ = function (id) { return document.getElementById(id); };
   function view(id) {

@@ -1,12 +1,14 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
   <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – Mitt konto</title>
   <!-- Privat kontosida. Ska aldrig ligga i ett sökresultat. -->
   <meta name="robots" content="noindex, follow" />
@@ -29,6 +31,16 @@
   <!-- Mobilmenyns bindning. Låg tidigare inline i fem kopior. -->
     <style>
   /* ── KONTO PAGE ── */
+  html[data-exgen-environment="pilot"] #upgradeCard,
+  html[data-exgen-environment="pilot"] #manageCard,
+  html[data-exgen-environment="pilot"] #teacherCard,
+  html[data-exgen-environment="pilot"] #myClassesCard,
+  html[data-exgen-environment="pilot"] #adminCard,
+  html[data-exgen-environment="pilot"] #accountDeletionCopy,
+  html[data-exgen-environment="pilot"] #deleteAccountBtn,
+  html[data-exgen-environment="pilot"] .xg-footer a[href="pricing.html"]{display:none!important}
+  html[data-exgen-environment="pilot"] #improveAccountLink{display:none!important}
+  html[data-exgen-environment="pilot"] #pilotDeletionNotice{display:block!important}
   .kontoWrap{max-width:560px;margin:0 auto;padding:32px 20px 40px}
   @media(max-width:480px){.kontoWrap{padding:24px 16px 32px}}
   #authGate{padding:48px 24px 32px}
@@ -158,7 +170,7 @@
   <!-- AUTH GATE -->
   <div id="authGate">
     <div class="agTitle">Logga in för att se ditt konto</div>
-    <div class="agSub">Du behöver vara inloggad för att hantera din prenumeration.</div>
+    <div class="agSub" id="authGateSub">Du behöver vara inloggad för att hantera ditt konto.</div>
     <!-- Opens the shared modal in place. This used to link to app.html, which
          sent someone who asked for their account page to the exam tool and
          left them there after logging in. -->
@@ -288,8 +300,8 @@
         <p class="kHelpText">Har du fått en klasskod av din lärare? Gå med här så kan läraren följa dina framsteg.</p>
         <p class="kPrivacyNote" style="margin-top:0;margin-bottom:12px">
           <strong style="color:var(--t2)">Det här ser läraren om du går med:</strong>
-          din e-postadress, dina prov med datum och resultat, ditt snitt per kurs och vilka
-          områden du har svårast för. Läraren ser <em>inte</em> dina chattar med P.E.R.
+          din klasspecifika etikett, dina prov med datum och resultat, ditt snitt per kurs och vilka
+          områden du har svårast för. Läraren ser <em>inte</em> din e-postadress eller dina chattar med P.E.R.
           Du kan lämna klassen när du vill — då slutar läraren se dig direkt.
         </p>
         <div id="myClasses" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
@@ -313,7 +325,7 @@
       <div class="kCardBody">
         <div class="kBtnRow">
           <a class="kBtn kBtnOutline" href="app.html">Mockprov</a>
-          <a class="kBtn kBtnOutline" href="förbättring.html">Min utveckling</a>
+          <a class="kBtn kBtnOutline" href="förbättring.html" id="improveAccountLink">Min utveckling</a>
         </div>
       </div>
     </div>
@@ -382,7 +394,10 @@
         </div>
       </div>
       <div class="kCardBody">
+        <p class="kHelpText" id="accountDeletionCopy">Självservice är endast tillgänglig för kostnadsfria elevkonton utan betalningskoppling eller lärarklasser. När servern bekräftar begäran tas Auth-kontot bort; radering av relaterade data, leverantörsloggar och lokal data på andra enheter är inte verifierad här och kan kräva separat hantering.</p>
+        <p class="kPrivacyNote" id="pilotDeletionNotice" style="display:none">Kontoradering är avstängd i pilotläget eftersom en fullständig raderingsprocess ännu inte är verifierad. Använd inte riktiga elevkonton innan skolan och ExGen har godkänt raderings- och supportvägen.</p>
         <div class="kBtnRow">
+          <button class="kBtn kBtnDanger" id="deleteAccountBtn">Radera konto</button>
           <button class="kBtn kBtnDanger" id="logoutBtn">Logga ut</button>
         </div>
       </div>
@@ -412,8 +427,13 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (async function(){
-  const SUPA_URL="https://mnmotdluigzeehdjbhbu.supabase.co";
-  const SUPA_KEY="sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN";
+  const pilotMode=window.ExGenRuntime.environment==="pilot";
+  if(pilotMode){
+    const gateCopy=document.getElementById("authGateSub");
+    if(gateCopy)gateCopy.textContent="Logga in för att se kontoinställningarna.";
+  }
+  const SUPA_URL=window.ExGenRuntime.supabaseUrl;
+  const SUPA_KEY=window.ExGenRuntime.publishableKey;
   const sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
 
   const ROLE_LABELS={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium",teacher:"Lärare"};
@@ -538,7 +558,20 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   async function loadMyClasses(){
     try{ const {classes}=await callRole("student_classes"); renderMyClasses(classes||[]); }
-    catch(e){ /* silent — card still usable for joining */ }
+    catch(e){
+      const wrap=document.getElementById("myClasses");
+      wrap.replaceChildren();
+      const status=document.createElement("p");
+      status.className="kPrivacyNote";
+      status.setAttribute("role","status");
+      status.textContent="Klassanslutningar kunde inte hämtas just nu.";
+      const retry=document.createElement("button");
+      retry.className="kBtn kBtnOutline";
+      retry.type="button";
+      retry.textContent="Försök igen";
+      retry.addEventListener("click",loadMyClasses);
+      wrap.append(status,retry);
+    }
   }
 
   async function joinClass(){
@@ -564,7 +597,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   document.getElementById("joinBtn")?.addEventListener("click",joinClass);
   document.getElementById("joinCode")?.addEventListener("keydown",e=>{ if(e.key==="Enter") joinClass(); });
-  loadMyClasses();
+  if(!pilotMode)loadMyClasses();
 
   /* Show upgrade or manage card */
   if(role==="gratis"){
@@ -715,6 +748,42 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     }
   });
 
+  document.getElementById("deleteAccountBtn")?.addEventListener("click",async()=>{
+    const typed=window.prompt("Skriv kontots e-postadress för att bekräfta raderingen:");
+    if(!typed||typed.trim().toLowerCase()!==(user.email||"").trim().toLowerCase()){
+      if(typed!==null)showMsg("E-postadressen stämde inte. Kontot raderades inte.","err");
+      return;
+    }
+    if(!window.confirm("Begär radering av ExGen-kontot? Självservice gäller bara kostnadsfria elevkonton utan betalningskoppling eller lärarklasser. Relaterad data hos externa leverantörer och andra enheter kan kräva separat hantering."))return;
+    const btn=document.getElementById("deleteAccountBtn");
+    btn.disabled=true;btn.textContent="Raderar…";
+    try{
+      const r=await fetch("/api/check-role",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({action:"delete_account",confirmationEmail:typed.trim()})
+      });
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok||data.ok!==true){
+        if(data.refreshSessionsRevoked===true){
+          await sb.auth.signOut({scope:"local"}).catch(()=>{});
+          try{localStorage.clear();sessionStorage.clear();}catch{}
+          window.location.replace("index.html?accountDeletion=unconfirmed");
+          return;
+        }
+        showMsg(data.error||"Kontoraderingen kunde inte bekräftas.","err");
+        btn.disabled=false;btn.textContent="Radera konto";
+        return;
+      }
+      await sb.auth.signOut({scope:"local"}).catch(()=>{});
+      try{localStorage.clear();sessionStorage.clear();}catch{}
+      window.location.replace("index.html");
+    }catch{
+      showMsg("Nätverksfel. Kontakta support om raderingsstatusen är oklar.","err");
+      btn.disabled=false;btn.textContent="Radera konto";
+    }
+  });
+
   /* LOGOUT */
   /* #xgLogout renderas av js/exgen-shell.js. Knappen hette tidigare
      #logoutBtn och låg i sidans egen meny.
@@ -726,6 +795,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("xgLogout").addEventListener("click",async()=>{
     await sb.auth.signOut();
+    window.ExGenLocalDataBoundary?.clearForSignOut();
     window.location.href="index.html";
   });
   });

@@ -59,13 +59,48 @@ handskrivna migrationer.
 
 ## Konvention
 
-- Filnamn: `ÅÅÅÅMMDD_snake_case.sql`
-- Varje migration har en `_ROLLBACK.sql` bredvid sig. Undantagen är tre migrationer från innan
-  konventionen infördes; de står uppräknade i `scripts/check-migration-files.mjs` och listan
+- Filnamn: befintliga filer kan ha `ÅÅÅÅMMDD_snake_case.sql`; nya filer ska behålla Supabase CLI:s unika
+  `ÅÅÅÅMMDDHHMMSS_snake_case.sql`-version så migrations-ID:n inte kolliderar.
+- Varje migration har en `_ROLLBACK.sql` bredvid sig. Den ska antingen reversera ändringen
+  med dokumenterade konsekvenser eller avsiktligt avbryta om en reversering skulle återöppna
+  en verifierad säkerhetslucka eller bygga på okänt live-schema. En sådan spärr är inte en
+  reversering; den hindrar att en generisk rollback-åtgärd tyst återinför risken. De tre
+  historiska migrationerna utan rollback står i `scripts/check-migration-files.mjs`; listan
   ska aldrig växa.
+- De två RLS-migrationerna från 2026-10-12 har spärrade rollbackfiler: direkt klass-join skulle
+  återöppna den kända vägen runt klasskodskontrollen, och tidigare `user_exams`-policies är
+  inte verifierade. Ändra inte spärren innan ett säkert alternativ har granskats och testats.
+- `20261012103939_harden_idempotent_mock_mastery.sql` är lokal och inte live-verifierad. Dess rollback tar
+  bara bort funktionen/tabellen när ingen mastery-händelse har skrivits; efter första användning
+  avbryter rollbacken hellre än att kasta idempotensnycklar och göra replay möjlig.
+- `20261012103949_restrict_direct_class_joins.sql` och `20261012103946_restrict_anon_rate_limit_table_access.sql`
+  är lokala säkerhetsutkast baserade på read-only live-policy-/grantinspektion 2026-10-12.
+  De är inte applicerade. Verifiera båda i isolerad staging med syntetiska konton och kontrollera
+  service-role-flöden innan en separat appliceringsbekräftelse. Deras rollbackar är avsiktligt spärrade.
+- `20261012103951_restrict_exam_count_rpc_access.sql` är ett separat lokalt utkast från live-inspektion
+  av funktionsdefinitioner/ACL. Det tar bort klientexekvering och låser sökvägen men bevarar
+  `service_role`; externa konsumenter är okända. Argumentnamn/returtyp/ägare har verifierats
+  read-only efter oberoende granskning. Ej applicerat; kräver stagingtest av grants, PostgREST,
+  tidsgränser och serverkonsumenter samt separat appliceringsgodkännande. Rollback är spärrad.
+- `20261012103944_refund_failed_mock_exam_quota.sql` är ett lokalt utkast efter QA-fynd om att felad
+  provgenerering annars förbrukar en slot. `reserve_mock_exam_quota` ökar kvoten och skapar en
+  request-bunden reservation atomärt; timeout kan därför säkert reconcileras. Fel återbetalas en
+  gång, lyckad leverans markeras `consumed`, och reservationer som hängt kvar över två minuter
+  återbetalas när samma användare startar nästa reservation. Avslutade kvitton äldre än 30 dagar
+  städas vid nästa reservation; Auth-radering kaskaderar användarbindningen. Inte applicerad
+  eller live/Postgres-testad. Staging ska testa samtidiga reservationer, dubbel anrop/timeout,
+  dubbel refund/commit, periodbyte, avbruten provider, stale reaping och RPC-fel innan separat
+  appliceringsgodkännande. Lokalt mocktest simulerar också att reserve-commit sker men HTTP-svaret
+  tappas. Rollback är spärrad medan reservationer är aktiva; ingen SQL/Postgres-runtime har körts.
 - Historiska migrationer skrivs inte om. En rättelse blir en ny fil.
 - Kör migrationer via Supabase MCP `apply_migration` eller CLI, **inte** via SQL Editor — annars
   hamnar de inte i ledgern och nästa genomgång får leta i schemat i stället.
+
+### Restrict direct client profile inserts — local draft only
+
+`20261012222700_restrict_profiles_client_insert.sql` was drafted from read-only production catalog metadata on 2026-10-12: `profiles_insert_own` checks only `auth.uid() = id`, anon/authenticated have table INSERT grants, and an Auth trigger already creates the default profile via SECURITY DEFINER. The client-side missing-profile fallback is removed. This migration revokes browser INSERT and drops the self-insert policy; rollback is intentionally blocked. It is not applied or JWT/Postgres-tested. Staging has no app schema; restore/reconcile the approved baseline, verify the trigger/policy and synthetic signup/login behavior, then obtain separate apply approval.
+
+The 2026-10-13 local verification confirms the missing-profile app path signs out and fails closed; `tests/frontend/profile-bootstrap.test.mjs` covers it. The migration remains a draft only: staging `public` and migration ledger are both empty. Do not apply until the authoritative staging schema is restored and a separate DDL approval is recorded.
 
 ## Kontrollera drift
 

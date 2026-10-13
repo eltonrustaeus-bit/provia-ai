@@ -1,6 +1,9 @@
-﻿import { createClient } from "@supabase/supabase-js";
+﻿import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import { BRAND_NAME, SITE_ORIGIN, MAIL_FROM } from "./_site.js";
 import { requireAuth } from "./_auth.js";
+import supabaseKeys from "./_supabase-server-key.cjs";
+import pilotScope from "./_pilot-scope.cjs";
 
 function escapeHtml(str) {
   return String(str)
@@ -117,9 +120,23 @@ function buildWelcomeHtml(email) {
 </html>`;
 }
 
-const supabase = createClient(
+function buildVerificationHtml(email, actionLink) {
+  return `<!DOCTYPE html>
+<html lang="sv"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:32px 16px;background:#F8FAFC;font-family:Inter,'DM Sans',Arial,sans-serif;color:#1B2430">
+  <main style="max-width:520px;margin:0 auto;padding:32px;background:#FFFFFF;border:1px solid #E4E7EC;border-radius:8px">
+    <p style="margin:0 0 20px;font-size:20px;font-weight:800">${BRAND_NAME}</p>
+    <h1 style="margin:0 0 14px;font-size:24px;line-height:1.3">Bekräfta din e-post</h1>
+    <p style="font-size:15px;line-height:1.6;color:#667085">Bekräfta att du har tillgång till ${escapeHtml(email)} för att slutföra registreringen.</p>
+    <p style="margin:24px 0"><a href="${escapeHtml(actionLink)}" style="display:inline-block;background:#00768F;color:#FFFFFF;padding:13px 22px;border-radius:6px;text-decoration:none;font-weight:700">Bekräfta e-post</a></p>
+    <p style="font-size:12px;line-height:1.5;color:#667085">Om du inte skapade ett konto kan du ignorera det här mejlet.</p>
+  </main>
+</body></html>`;
+}
+
+const supabase = supabaseKeys.createSupabaseServerClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 function sendMail(payload) {
@@ -133,21 +150,6 @@ function sendMail(payload) {
   });
 }
 
-function adminNoticeHtml(email, userId, via) {
-  return `
-    <div style="font-family:sans-serif;max-width:480px">
-      <h2 style="color:#00768F;margin:0 0 16px">Ny registrering</h2>
-      <table style="width:100%;border-collapse:collapse">
-        <tr><td style="padding:6px 0;color:#666">Email</td><td><b>${escapeHtml(email)}</b></td></tr>
-        <tr><td style="padding:6px 0;color:#666">Anv\u00e4ndar-ID</td><td style="font-size:12px;font-family:monospace">${escapeHtml(userId)}</td></tr>
-        <tr><td style="padding:6px 0;color:#666">Roll</td><td><b>gratis</b></td></tr>
-        <tr><td style="padding:6px 0;color:#666">Via</td><td><b>${escapeHtml(via)}</b></td></tr>
-        <tr><td style="padding:6px 0;color:#666">Registrerad</td><td>${new Date().toLocaleString("sv-SE", { timeZone: "Europe/Stockholm" })}</td></tr>
-      </table>
-    </div>
-  `;
-}
-
 /* OAuth (Google) completion — reached as POST /api/signup with { op: "oauth" }
  * and a Bearer token, not as its own route.
  *
@@ -158,7 +160,7 @@ function adminNoticeHtml(email, userId, via) {
  * it shares.
  *
  * Supabase creates the user itself on the OAuth path, so the signup branch
- * below never runs and nothing would send the welcome mail or notify the admin.
+ * below never runs and nothing would send the welcome mail.
  * profiles.welcome_sent_at is the idempotency guard: the row already exists by
  * the time we run (the on_auth_user_created trigger inserts it with
  * approved = true), so a null timestamp is what marks a first sign-in. That
@@ -205,12 +207,6 @@ async function completeOAuth(req, res) {
       subject: `V\u00e4lkommen till ${BRAND_NAME}!`,
       html: buildWelcomeHtml(email)
     });
-    await sendMail({
-      from: MAIL_FROM,
-      to: "elton.rustaeus@gmail.com",
-      subject: `Ny anv\u00e4ndare p\u00e5 ${BRAND_NAME} \u2014 ${escapeHtml(email)}`,
-      html: adminNoticeHtml(email, user.id, "Google")
-    });
   } catch (e) {
     // Email failure never blocks the sign-in.
   }
@@ -218,7 +214,38 @@ async function completeOAuth(req, res) {
   return res.status(200).json({ isNew: true });
 }
 
+async function consumeSignupQuota(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = String(Array.isArray(forwarded) ? forwarded[0] : forwarded || "").split(",")[0].trim();
+  if (!isIP(ip)) return { unavailable: true };
+
+  const bucket = createHash("sha256").update(ip).digest("hex");
+  try {
+    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/consume_anon_rate`, {
+      method: "POST",
+      headers: {
+        ...supabaseKeys.getSupabaseAdminHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_bucket: `signup:${bucket}`,
+        p_window_key: new Date().toISOString().slice(0, 13),
+        p_limit: 5,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const quota = response.ok ? await response.json() : null;
+    if (!quota || typeof quota.ok !== "boolean") return { unavailable: true };
+    return { limited: quota.ok === false };
+  } catch {
+    return { unavailable: true };
+  }
+}
+
+const SIGNUP_ACCEPTED = "Om adressen kan registreras skickar vi en verifieringslänk. Kontrollera inkorgen och skräpposten.";
+
 export default async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") return res.status(405).end();
 
   if ((req.body || {}).op === "oauth") return completeOAuth(req, res);
@@ -236,46 +263,45 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Password must be 8–200 characters" });
   }
 
-  // Create user via admin API (auto-confirms email)
-  const { data: userData, error } = await supabase.auth.admin.createUser({
-    email: emailStr,
-    password,
-    email_confirm: true
-  });
-
-  if (error) return res.status(400).json({ error: error.message });
-
-  // Sign in to get session tokens
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email: emailStr, password });
-  if (signInError) return res.status(400).json({ error: signInError.message });
-
-  // Send notification to admin (server-side, guaranteed). Same helpers the
-  // OAuth branch uses, so the two paths cannot drift apart.
-  try {
-    await sendMail({
-      from: MAIL_FROM,
-      to: "elton.rustaeus@gmail.com",
-      subject: `Ny anv\u00e4ndare p\u00e5 ${BRAND_NAME} \u2014 ${escapeHtml(email)}`,
-      html: adminNoticeHtml(email, userData.user.id, "E-post")
-    });
-    // Send welcome email to the new user
-    await sendMail({
-      from: MAIL_FROM,
-      to: email,
-      subject: `V\u00e4lkommen till ${BRAND_NAME}!`,
-      html: buildWelcomeHtml(email)
-    });
-  } catch (e) {
-    // Email failure never blocks signup
+  if (!process.env.SUPABASE_URL || !supabaseKeys.getSupabaseServerKey() || !process.env.RESEND_API_KEY) {
+    return res.status(503).json({ error: "Registrering är tillfälligt otillgänglig." });
   }
 
-  /* Mark the welcome as sent so linking a Google identity to this address
-     later does not trigger a second one from the OAuth branch. */
-  await supabase
-    .from("profiles")
-    .update({ welcome_sent_at: new Date().toISOString() })
-    .eq("id", userData.user.id)
-    .is("welcome_sent_at", null);
+  const quota = await consumeSignupQuota(req);
+  if (quota.unavailable) return res.status(503).json({ error: "Registrering är tillfälligt otillgänglig." });
+  if (quota.limited) return res.status(429).json({ error: "För många registreringsförsök. Försök igen senare." });
 
-  return res.status(200).json({ session: signInData.session, user: signInData.user });
+  let createdUserId = null;
+  try {
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: "signup",
+      email: emailStr,
+      password,
+      options: { redirectTo: `${SITE_ORIGIN}/app.html` },
+    });
+    createdUserId = data?.user?.id || null;
+    const actionLink = data?.properties?.action_link;
+    if (error || !createdUserId || !actionLink) {
+      if (createdUserId) await supabase.auth.admin.deleteUser(createdUserId);
+      return res.status(202).json({ message: SIGNUP_ACCEPTED });
+    }
+
+    const mailResponse = await sendMail({
+      from: MAIL_FROM,
+      to: emailStr,
+      subject: `Bekr\u00e4fta din e-post f\u00f6r ${BRAND_NAME}`,
+      html: buildVerificationHtml(emailStr, actionLink),
+    });
+    if (!mailResponse.ok) {
+      await supabase.auth.admin.deleteUser(createdUserId);
+      return res.status(202).json({ message: SIGNUP_ACCEPTED });
+    }
+  } catch {
+    if (createdUserId) {
+      try { await supabase.auth.admin.deleteUser(createdUserId); } catch {}
+    }
+    return res.status(202).json({ message: SIGNUP_ACCEPTED });
+  }
+
+  return res.status(202).json({ message: SIGNUP_ACCEPTED });
 }

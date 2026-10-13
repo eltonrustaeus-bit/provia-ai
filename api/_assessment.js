@@ -11,11 +11,12 @@
 // Adding a subject = add one entry to PROFILES. The core never needs a rewrite.
 
 const crypto = require("crypto");
+const graphAnswers = require("./_graph.js");
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
-// Server-only secret; falls back to the service-role key so it works with no new env.
+// Keep question-integrity keys independent from database credentials.
 function signingSecret() {
-  return process.env.EXAM_SIGNING_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  return process.env.EXAM_SIGNING_SECRET || "";
 }
 function answerKeyString(q) {
   const id = String(q && q.id != null ? q.id : "");
@@ -33,7 +34,7 @@ function signAnswerKey(q, secret) {
 function verifyAnswerKey(q, sig, secret) {
   if (!sig) return true; // unsigned question → backward-compatible, no assertion
   const expected = signAnswerKey(q, secret);
-  if (!expected) return true; // server has no secret → cannot verify, don't punish user
+  if (!expected) return false; // a signed answer key cannot be trusted without the signing secret
   // constant-time compare
   const a = Buffer.from(String(sig));
   const b = Buffer.from(expected);
@@ -365,9 +366,12 @@ function hasUnbalancedDelimiters(code) {
 const PROFILES = {
   generic: { key: "generic", allowedTypes: ["mc", "short"], extraIssues: () => [] },
   mathematics: {
-    key: "mathematics", allowedTypes: ["mc", "short"],
+    key: "mathematics", allowedTypes: ["mc", "short", "graph"],
     extraIssues(q) {
       const issues = [];
+      if (q.type === "graph" && !graphAnswers.isValidSpec(q.graph_spec)) {
+        issues.push("graph_spec_invalid");
+      }
       // two MC options that are the SAME number (e.g. "4" and "4.0") → ambiguous.
       // Options that are not single values (prose, "0 och 4", expressions) are
       // skipped rather than coerced — see parseMathValue.
@@ -471,6 +475,7 @@ const BLOCKING = new Set([
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
+  "graph_spec_invalid",
 ]);
 // Non-blocking issues are flagged (soft warnings) but the question is kept —
 // they describe a weak or suspicious question, not an unanswerable one, and

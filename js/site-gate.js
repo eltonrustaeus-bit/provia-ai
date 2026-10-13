@@ -23,6 +23,10 @@
   var PASS_KEY = "exgen_gate_pass";
   var BACK_KEY = "exgen_gate_back";
 
+  // A pilot build is a separately scoped student application, not the public
+  // maintenance-gated site. Production continues through the server-owned gate.
+  if (window.ExGenRuntime && window.ExGenRuntime.environment === "pilot") return;
+
   // Undvik omdirigeringsloop om skriptet råkar hamna på målsidan.
   if (location.pathname.replace(/\/+$/, "") === TARGET.replace(/\/+$/, "")) return;
 
@@ -90,7 +94,7 @@
      fördröjning grinden ska undvika. Nyckeln är samma som shared.js använder. */
   function storedToken() {
     try {
-      var s = JSON.parse(localStorage.getItem("sb-mnmotdluigzeehdjbhbu-auth-token") || "{}");
+      var s = JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || "{}");
       return s && s.access_token ? s.access_token : "";
     } catch (_) { return ""; }
   }

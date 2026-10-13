@@ -36,9 +36,10 @@
  * 4. shared.js showWelcomeAnim() lägger #proviaWelcome över sidan och tar bort
  *    den med setTimeout 2400+500 ms — inte med en animation, så *{animation:none}
  *    biter inte heller där.
- * 5. syncFromAccount() skriver ALLTID över proviaai_history och
- *    proviaai_mistakes med vad Supabase svarade. Att seeda dem i localStorage
- *    ger en tom sida — seeda via user_exams i stället.
+ * 5. loadExamsFromAccountToLocal() bygger den aktiva historiken från kontots
+ *    molnrader plus en användarspecifik lokal reservkö. För att testa sparad
+ *    molnhistorik ska user_exams-rader mockas; global localStorage-seed ersätts
+ *    av kontosynken.
  * 6. Fasta portnummer krockar. Två filer stod båda på 4621, och en körning av
  *    hela sviten dog mitt i. serve() binder därför port 0 och läser ut den
  *    tilldelade porten.
@@ -200,16 +201,19 @@ export async function seed(page, {
  * över allt ovanför — det är där ett test lägger sina egna svar. */
 export async function mockApis(page, {
   role = "premium", approved = true, allow = true,
-  restRows = [], profiles = null, extra = [],
+  restRows = [], profiles = undefined, extra = [],
 } = {}) {
   await page.route("**/api/**", r => r.fulfill({ json: { ok: true } }));
   // EFTER den generella. Fälla 1.
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow, ok: true, role, approved } }));
   await page.route("**/auth/v1/**", r => r.fulfill({ json: { id: "u1", email: "t@t.se" } }));
   await page.route("**/rest/v1/**", r => r.fulfill({ json: restRows }));
-  if (profiles) {
+  const profileRows = profiles === undefined
+    ? [{ id: "u1", approved, role }]
+    : profiles;
+  if (profileRows) {
     // EFTER den generella rest-rutten, annars äter den upp den här.
-    await page.route("**/rest/v1/profiles**", r => r.fulfill({ json: profiles }));
+    await page.route("**/rest/v1/profiles**", r => r.fulfill({ json: profileRows }));
   }
   for (const [glob, handler] of extra) await page.route(glob, handler);
 }

@@ -305,13 +305,13 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
-      "id": "tabell:user_profiles",
-      "etikett": "user_profiles",
+      "id": "tabell:classes",
+      "etikett": "classes",
       "typ": "tabell"
     },
     {
-      "id": "tabell:classes",
-      "etikett": "classes",
+      "id": "tabell:user_profiles",
+      "etikett": "user_profiles",
       "typ": "tabell"
     }
   ],
@@ -578,19 +578,23 @@ export const PER_GRAPH = {
     },
     {
       "från": "check-role",
+      "till": "tabell:classes"
+    },
+    {
+      "från": "check-role",
       "till": "tabell:user_profiles"
     },
     {
       "från": "check-role",
-      "till": "tabell:classes"
-    },
-    {
-      "från": "explain",
-      "till": "tabell:feature_flags"
+      "till": "tabell:mock_results"
     },
     {
       "från": "explain",
       "till": "tabell:profiles"
+    },
+    {
+      "från": "explain",
+      "till": "tabell:feature_flags"
     },
     {
       "från": "explain",
@@ -599,6 +603,10 @@ export const PER_GRAPH = {
     {
       "från": "explain",
       "till": "tabell:user_profiles"
+    },
+    {
+      "från": "teacher-report",
+      "till": "tabell:user_exams"
     }
   ]
 };

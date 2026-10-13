@@ -84,8 +84,12 @@ export function supabaseStore(supabase) {
       return data || null;
     },
     async markRecoveryUsed(userId) {
-      await supabase.from("admin_recovery_codes")
-        .update({ used_at: new Date().toISOString() }).eq("user_id", userId);
+      const { data, error } = await supabase.from("admin_recovery_codes")
+        .update({ used_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .is("used_at", null)
+        .select("user_id");
+      return { used: !error && Array.isArray(data) && data.length === 1, error: !!error };
     },
   };
 }

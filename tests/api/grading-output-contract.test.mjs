@@ -1,0 +1,143 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { Readable } from "node:stream";
+
+const require = createRequire(import.meta.url);
+const grade = require("../../api/grade.js");
+const tasks = require("../../api/_grade-task.js");
+const { validateNonMcGradeOutput } = grade;
+const source = await readFile(new URL("../../api/grade.js", import.meta.url), "utf8");
+const expected = [{ id: "q1" }, { id: "q2" }];
+const row = (id) => ({
+  id,
+  points: 1,
+  max_points: 2,
+  feedback: "Feedback",
+  model_answer: "Answer",
+  concept_tag: "Begrepp",
+  error_tags: [],
+});
+
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), row("q2")] }, expected), true,
+  "one well-formed model result per expected question is accepted");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1")] }, expected), false,
+  "missing model results cannot become scored zeroes");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), row("q1")] }, expected), false,
+  "duplicate model IDs are rejected");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), row("q3")] }, expected), false,
+  "unexpected question IDs are rejected");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), { ...row("q2"), points: "1" }] }, expected), false,
+  "malformed numeric scores are rejected");
+const guardIndex = source.indexOf("if (!validateNonMcGradeOutput(graded, nonMcPack))");
+const persistIndex = source.indexOf("persistGradedSubmission({", guardIndex);
+assert.ok(guardIndex >= 0 && persistIndex > guardIndex,
+  "invalid model output is rejected before result persistence");
+
+const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "EXAM_SIGNING_SECRET", "OPENAI_API_KEY"];
+const oldEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+const oldFetch = globalThis.fetch;
+const origin = "https://grading-output.synthetic.invalid";
+const userId = "33333333-3333-4333-8333-333333333333";
+const signingSecret = "synthetic-invalid-output-secret";
+let providerOutput = "";
+const calls = [];
+Object.assign(process.env, {
+  SUPABASE_URL: origin,
+  SUPABASE_SERVICE_ROLE_KEY: "synthetic-server-key",
+  EXAM_SIGNING_SECRET: signingSecret,
+  OPENAI_API_KEY: "synthetic-provider-key",
+});
+delete process.env.SUPABASE_SECRET_KEY;
+
+globalThis.fetch = async (input) => {
+  const url = String(input);
+  calls.push(url);
+  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
+  if (url.includes("/rest/v1/feature_flags") || url.includes("/rest/v1/user_profiles")) return Response.json([]);
+  if (url === "https://api.openai.com/v1/responses") {
+    return Response.json({ output_text: providerOutput });
+  }
+  throw new Error(`Unexpected synthetic request: ${url}`);
+};
+
+function invoke(body) {
+  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  req.method = "POST";
+  req.headers = { authorization: "Bearer synthetic-user-token", "content-type": "application/json" };
+  return new Promise((resolve, reject) => {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      setHeader(name, value) { this.headers[name] = value; },
+      end(raw) {
+        try { resolve({ status: this.statusCode, body: JSON.parse(raw) }); }
+        catch (error) { reject(error); }
+      },
+    };
+    Promise.resolve(grade(req, res)).catch(reject);
+  });
+}
+
+try {
+  const course = "Samhällskunskap 1b";
+  const material = "Demokrati bygger på fria val och medborgerliga rättigheter.";
+  const questions = expected.map((item, index) => {
+    const question = {
+      id: item.id,
+      type: "short",
+      points: 2,
+      question: `Förklara begrepp ${index + 1}.`,
+      options: [],
+      rubric: "Ge en kort förklaring med stöd i materialet.",
+      model_answer: "En kort beskrivning.",
+      concept_tag: "demokrati",
+    };
+    return {
+      id: question.id,
+      type: question.type,
+      points: question.points,
+      question: question.question,
+      options: [],
+      grade_task: tasks.sealQuestion(question, signingSecret, tasks.hashContext(material, course, userId)),
+    };
+  });
+  const body = {
+    lang: "sv",
+    course,
+    pastedText: material,
+    questions,
+    answers: expected.map((item) => ({ id: item.id, answer: "Ett syntetiskt elevsvar." })),
+  };
+  const validRows = expected.map((item) => row(item.id));
+  const invalidOutputs = [
+    JSON.stringify({ per_question: [validRows[0]] }),
+    JSON.stringify({ per_question: [validRows[0], row("q1")] }),
+    JSON.stringify({ per_question: [validRows[0], row("q3")] }),
+    JSON.stringify({ per_question: [validRows[0], { ...row("q2"), points: "1" }] }),
+    "not json",
+  ];
+
+  for (const output of invalidOutputs) {
+    providerOutput = output;
+    calls.length = 0;
+    const response = await invoke(body);
+    assert.equal(response.status, 502);
+    assert.equal(response.body.ok, false);
+    assert.equal(response.body.error, "grading_response_invalid");
+    assert.ok(calls.includes("https://api.openai.com/v1/responses"));
+    assert.equal(calls.some((url) => url.includes("/rest/v1/mock_results")), false,
+      "invalid provider output cannot be saved as a score or zero result");
+    assert.equal(calls.some((url) => url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
+      "invalid provider output cannot update mastery");
+  }
+} finally {
+  globalThis.fetch = oldFetch;
+  for (const [key, value] of Object.entries(oldEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
+console.log("grading output contract: validator and actual handler reject incomplete, duplicate, foreign, malformed and unparsable results before persistence");

@@ -14,9 +14,8 @@
 (function () {
   "use strict";
 
-  var SESSION_KEY = "sb-mnmotdluigzeehdjbhbu-auth-token";
+  var SESSION_KEY = window.ExGenRuntime.authStorageKey;
   var CATALOG_URL = "/config/education-catalog.web.json";
-  var SKIP_KEY = "exgen_onboarding_dismissed";
 
   function token() {
     try {
@@ -182,7 +181,6 @@
     }
 
     function skip() {
-      try { localStorage.setItem(SKIP_KEY, "1"); } catch (_) {}
       /* Ett överhoppat svar är också ett svar: onboarded_at sätts, så
          introduktionen inte möter samma person vid varje inloggning.
          Inga värden skickas med. */
@@ -577,7 +575,6 @@
 
   function boot() {
     if (!token()) return;
-    try { if (localStorage.getItem(SKIP_KEY)) return; } catch (_) {}
     api("onboarding_state").then(function (d) {
       if (d && d.show === true) start();
     }).catch(function () { /* introduktionen är aldrig värd att fela på */ });
