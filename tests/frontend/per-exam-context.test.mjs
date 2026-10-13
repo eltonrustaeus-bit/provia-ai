@@ -206,7 +206,7 @@ ok("T8b sidan svarar fortfarande", await page.evaluate(() => typeof window.PER?.
 // manifestet. Eleven som lämnade in ett prov och stod på resultatskärmen och
 // frågade "varför fick jag så lågt?" fick svar om provets sista fråga i
 // stället för om resultatet, eftersom __perManifest fortfarande pekade dit.
-await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: "synthetic-completion-proof", result: {
+await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"d".repeat(32)}.syntheticCompletionProof`, result: {
   total_points: 4, max_points: 6,
   per_question: [
     { id: "q1", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" },
@@ -251,7 +251,7 @@ await page.click("#xf .xf-screen[data-screen='result'] .xf-item button:has-text(
 await page.waitForTimeout(350);
 ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
    lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
-   lastExplain?.examProof?.questions?.length === 3 && lastExplain?.examProof?.receipt === "synthetic-completion-proof",
+   lastExplain?.examProof?.questions?.length === 3 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
    JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
@@ -278,7 +278,7 @@ await mockApis(page2, {
   extra: [
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM_SHORT)), meta: { quota: { enforced: false } } } })],
     ["**/api/explain", r => r.fulfill({ json: { ok: true, answer: "Svar." } })],
-    ["**/api/grade", r => r.fulfill({ json: { ok: true, result: {
+    ["**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"e".repeat(32)}.syntheticShortProof`, result: {
       total_points: 6, max_points: 6,
       per_question: [
         { id: "s1", points: 2, max_points: 2, feedback: "bra", model_answer: "svar" },

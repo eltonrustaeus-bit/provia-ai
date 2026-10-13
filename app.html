@@ -1002,7 +1002,7 @@ async function postJson(path,payload,opts){
   try{
     return await Promise.race([
       (async()=>{
-        const token=await getAccessToken(); const headers={"Content-Type":"application/json"};
+        const token=opts?.token??await getAccessToken(); const headers={"Content-Type":"application/json"};
         if(token) headers["Authorization"]=`Bearer ${token}`;
         const resp=await fetch(path,{method:"POST",headers,body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined});
         const raw=await resp.text(); let data=null; try{data=JSON.parse(raw);}catch{}
@@ -1040,34 +1040,46 @@ function pendingExamKey(userId){return LS_PENDING_EXAMS_PREFIX+String(userId||""
 function readPendingExams(userId){try{const v=JSON.parse(localStorage.getItem(pendingExamKey(userId))||"[]");return Array.isArray(v)?v:[];}catch{return[];}}
 function writePendingExams(userId,rows){try{const key=pendingExamKey(userId);localStorage.setItem(key,JSON.stringify(rows));return JSON.stringify(JSON.parse(localStorage.getItem(key)||"null"))===JSON.stringify(rows);}catch{return false;}}
 function newLocalExamId(){try{return crypto.randomUUID();}catch{return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}}
+function submissionIdFromProof(proof){const match=typeof proof==="string"?proof.match(/^v2\.([a-f0-9]{32})\.[A-Za-z0-9_-]+$/):null;return match?match[1]:null;}
 function queuePendingExam(row){const rows=readPendingExams(row.user_id);if(rows.some(x=>x.local_id===row.local_id))return true;if(rows.length>=100)return false;rows.push(row);return writePendingExams(row.user_id,rows);}
 function removePendingExam(userId,localId){const rows=readPendingExams(userId).filter(x=>x.local_id!==localId);return writePendingExams(userId,rows);}
 function stableJSON(value){if(Array.isArray(value))return"["+value.map(stableJSON).join(",")+"]";if(value&&typeof value==="object")return"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stableJSON(value[k])).join(",")+"}";return JSON.stringify(value);}
-function sameSavedExam(a,b){return String(a.created_at||"")===String(b.created_at||"")&&String(a.course||"")===String(b.course||"")&&String(a.level||"")===String(b.level||"")&&String(a.qtype||"")===String(b.qtype||"")&&String(a.material||"")===String(b.material||"")&&stableJSON(a.exam||null)===stableJSON(b.exam||null)&&stableJSON(a.answers||null)===stableJSON(b.answers||null)&&stableJSON(a.result||null)===stableJSON(b.result||null);}
+function sameSavedExam(a,b){if(a.submission_id&&b.submission_id)return a.submission_id===b.submission_id;return String(a.created_at||"")===String(b.created_at||"")&&String(a.course||"")===String(b.course||"")&&String(a.level||"")===String(b.level||"")&&String(a.qtype||"")===String(b.qtype||"")&&String(a.material||"")===String(b.material||"")&&stableJSON(a.exam||null)===stableJSON(b.exam||null)&&stableJSON(a.answers||null)===stableJSON(b.answers||null)&&stableJSON(a.result||null)===stableJSON(b.result||null);}
 async function saveExamToAccount(record,{checkExisting=false}={}){
   if(!db)return{ok:false,attempted:false,error:"Supabase not configured"};
   const userId=await getUserId(); if(!userId)return{ok:false,attempted:false,error:"Not logged in"};
   if(record.user_id&&record.user_id!==userId)return{ok:false,attempted:false,error:"Account changed"};
-  const row={user_id:userId,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam:record.exam||null,answers:record.answers||null,result:record.result||null,created_at:record.created_at||new Date().toISOString()};
-  const columns="id,created_at,course,level,qtype,material,exam,answers,result";
+  const row={user_id:userId,submission_id:record.submission_id||null,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam:record.exam||null,answers:record.answers||null,result:record.result||null,created_at:record.created_at||new Date().toISOString()};
+  const columns="id,submission_id,created_at,course,level,qtype,material,exam,answers,result";
   const receipt=typeof row.exam?.submission_receipt==="string"?row.exam.submission_receipt:"";
   const existingQuery=()=>{
     const query=db.from("user_exams").select(columns).eq("user_id",userId);
-    return receipt?query.contains("exam",{submission_receipt:receipt}).limit(5):query.eq("created_at",row.created_at).limit(5);
+    return row.submission_id?query.eq("submission_id",row.submission_id).limit(1):query.eq("created_at",row.created_at).limit(5);
   };
-  const alreadySaved=(saved)=>receipt
-    ?saved?.exam?.submission_receipt===receipt
+  const alreadySaved=(saved)=>row.submission_id
+    ?saved?.submission_id===row.submission_id
     :sameSavedExam(saved,row);
-  if(checkExisting){
+  const findSaved=async()=>{
     const existing=await existingQuery();
+    if(existing.error)return{error:existing.error,saved:false};
+    if((existing.data||[]).some(alreadySaved))return{saved:true};
+    if(row.submission_id&&receipt){
+      const legacy=await db.from("user_exams").select(columns).eq("user_id",userId).is("submission_id",null).contains("exam",{submission_receipt:receipt}).limit(5);
+      if(legacy.error)return{error:legacy.error,saved:false};
+      if((legacy.data||[]).some(saved=>saved?.exam?.submission_receipt===receipt))return{saved:true};
+    }
+    return{saved:false};
+  };
+  if(checkExisting){
+    const existing=await findSaved();
     if(existing.error)return{ok:false,attempted:true,error:"Could not verify existing save"};
-    if((existing.data||[]).some(alreadySaved))return{ok:true,attempted:true,alreadySaved:true};
+    if(existing.saved)return{ok:true,attempted:true,alreadySaved:true};
   }
   const{data,error}=await db.from("user_exams").insert([row]).select("id");
   if(error){
-    if(checkExisting){
-      const verify=await existingQuery();
-      if(!verify.error&&(verify.data||[]).some(alreadySaved))return{ok:true,attempted:true,alreadySaved:true};
+    if(checkExisting||error.code==="23505"){
+      const verify=await findSaved();
+      if(!verify.error&&verify.saved)return{ok:true,attempted:true,alreadySaved:true};
     }
     return{ok:false,attempted:true,error:error.message||String(error)};
   }
@@ -1111,7 +1123,7 @@ function mergeMistakesFromExamRows(rows){
 
 async function loadExamsFromAccountToLocal(){
   if(!db)return; const uid=await getUserId(); if(!uid)return;
-  const{data,error}=await db.from("user_exams").select("id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
+  const{data,error}=await db.from("user_exams").select("id,submission_id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
   if(error)return;
   const remote=data||[]; const queued=readPendingExams(uid);
   const pending=queued.filter(local=>!remote.some(saved=>sameSavedExam(saved,local)));
@@ -1896,6 +1908,13 @@ try{
     }
     const pastedText=(pastedTextEl()?.value||"").trim();
     const payload={lang:LANG,course:(courseEl()?.value||"").trim(),pastedText,questions:currentExam.questions,answers,exam_manifest:currentExam.exam_manifest};
+    let gradingSession=null;
+    try{const snapshot=await db?.auth.getSession();if(!snapshot?.error)gradingSession=snapshot?.data?.session||null;}catch{}
+    const gradingOwnerId=gradingSession?.user?.id||"";
+    if(!gradingOwnerId||!gradingSession?.access_token){
+      const msg=LANG==="sv"?"Logga in igen innan du lämnar in provet. Dina svar finns kvar.":"Sign in again before submitting the exam. Your answers are still here.";
+      setStatus(msg,"bad");return {ok:false,error:msg};
+    }
     isGrading=true;
     setBusy(true,t.gradeWorking);setStatus(t.gradeWorking,"");
     // Den P.E.R-ledda ytan visar sin egen rättningsskärm. Två överlägg ovanpå
@@ -1905,7 +1924,7 @@ try{
     try{
       // Sit just above the 60s server maxDuration (vercel.json) so a server-side
       // error/504 reaches us before the client aborts. grade.js aborts OpenAI at 45s.
-      res=await postJson("/api/grade",payload,{timeoutMs:62000});
+      res=await postJson("/api/grade",payload,{timeoutMs:62000,token:gradingSession.access_token});
     }finally{
       if(!answersOverride)hideGradingOverlay();
     }
@@ -1960,6 +1979,20 @@ try{
         setStatus(msg,"bad");showToast(msg,"bad");return {ok:false,error:msg};
       }
       const examProof=res.data.exam_proof||null;
+      const submissionId=submissionIdFromProof(examProof);
+      if(!submissionId){
+        const msg=LANG==="sv"?"Provets sparnyckel saknas. Resultatet visas inte förrän det kan verifieras; dina svar finns kvar.":"The exam save key is missing. The result is hidden until it can be verified; your answers are still here.";
+        setStatus(msg,"bad");showToast(msg,"bad");return {ok:false,error:msg};
+      }
+      if((await getUserId().catch(()=>""))!==gradingOwnerId||currentExam?.exam_manifest!==payload.exam_manifest){
+        const msg=LANG==="sv"?"Kontot eller provet ändrades medan rättningen pågick. Resultatet visades inte här. Gå tillbaka till rätt konto.":"The account or exam changed while grading. The result was not shown here. Return to the correct account.";
+        setStatus(msg,"bad");return {ok:false,error:msg};
+      }
+      try{await ensureUserProfileRow();}catch{}
+      if((await getUserId().catch(()=>""))!==gradingOwnerId){
+        const msg=LANG==="sv"?"Kontot ändrades medan resultatet hämtades. Inget sparades här.":"The account changed while retrieving the result. Nothing was saved here.";
+        setStatus(msg,"bad");return {ok:false,error:msg};
+      }
       const previous=lsGetObj(LS_LAST);
       if(examProof&&previous?.examProof===examProof){
         renderResult(result);
@@ -1981,14 +2014,13 @@ try{
         return {ok:true,result,examProof,persistence:{accountSaveFailed}};
       }
       renderResult(result);
-      /* Profilraden skapas fortfarande här; mastery skrivs av api/grade.js. */
-      try{await ensureUserProfileRow();}catch{}
+      /* Mastery skrivs av api/grade.js; resultatet visas först efter ägarkontroll. */
       const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
       const courseName=(courseEl()?.value||"").trim();
       const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
-      const userId=await getUserId().catch(()=>"");
+      const userId=gradingOwnerId;
       const localId=newLocalExamId();
-      const accountRecord={local_id:localId,user_id:userId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
+      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
       let accountSaveFailed=!db||!userId,localCopySaved=false;
       if(userId){
         localCopySaved=queuePendingExam(accountRecord);

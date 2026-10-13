@@ -66,7 +66,7 @@ async function öppna(exam, ämne) {
       ["**/api/grade", async r => {
         let b = {}; try { b = JSON.parse(r.request().postData() || "{}"); } catch {}
         const qs = b.questions || [];
-        return r.fulfill({ json: { ok: true, result: {
+        return r.fulfill({ json: { ok: true, exam_proof: `v2.${"c".repeat(32)}.syntheticMathProof`, result: {
           total_points: 2, max_points: 4 * qs.length,
           per_question: qs.map(x => ({
             id: String(x.id), points: 2, max_points: 4,

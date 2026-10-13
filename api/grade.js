@@ -218,9 +218,11 @@ async function perFlags() {
    recordAttempt() i learner-model.mjs vill ha en klient, så här är en, skapad
    EN gång och återanvänd. Dynamisk import av samma skäl som ovan: filen
    kompileras till CJS. */
-function withAttemptAnswers(per, answerMap) {
+function withAttemptAnswers(per, answerMap, questions) {
+  const trustedTypes = new Map(questions.map((question) => [String(question.id), question.type]));
   return per.map((item) => ({
     ...item,
+    type: trustedTypes.get(String(item.id)) || "short",
     student_answer: String(answerMap.get(String(item.id)) ?? "").slice(0, 4000),
   }));
 }
@@ -717,7 +719,7 @@ module.exports = async function handler(req, res) {
     if (nonMcPack.length === 0) {
       // Output in original question order
       const per = questions.map((q) => perById.get(String(q.id ?? ""))).filter(Boolean);
-      const attemptRows = withAttemptAnswers(per, answerMap);
+      const attemptRows = withAttemptAnswers(per, answerMap, questions);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const persistence = await persistGradedSubmission({
         userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
@@ -936,7 +938,7 @@ module.exports = async function handler(req, res) {
       const per = questions
         .map((q) => perById.get(String(q.id ?? "")) || null)
         .filter(Boolean);
-      const attemptRows = withAttemptAnswers(per, answerMap);
+      const attemptRows = withAttemptAnswers(per, answerMap, questions);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
       const persistence = await persistGradedSubmission({

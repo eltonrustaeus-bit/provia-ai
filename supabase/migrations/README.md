@@ -124,10 +124,17 @@ automatically regrading an uncertain attempt. The student can then explicitly ab
 generate a fresh exam from retained material. Before enabling this flow, staging must verify
 that stale workers cannot commit and that a concurrent new exam cannot expose an older exam's
 answer-bearing response. The client deduplicates repeated receipts locally and checks the
-account for an existing receipt on recovery, but there is not yet a database uniqueness
-constraint on `user_exams` for that receipt. A crash between saving `mock_results` and writing
-learning attempts can still leave those secondary records incomplete. Treat these as open
-pilot-review items, not guarantees supplied by the local tests.
+account for an existing receipt on recovery. The separate, unapplied
+`20261013093828_user_exam_submission_identity.sql` draft adds a nullable, 32-character
+submission ID and a unique `(user_id, submission_id)` index to `user_exams` so concurrent
+devices cannot create two account rows for the same official exam. The ID comes from the
+server-issued completion receipt. Existing historical rows remain nullable and are not
+backfilled from unverified browser data. The client-side insert remains owner-scoped but is
+not proof that a stored score was produced by the server; teacher-report provenance needs
+its own reviewed contract. Verify the index, two-account RLS, duplicate-insert and deletion
+behavior in staging before deployment. A crash between saving `mock_results` and writing
+learning attempts can still leave those secondary records incomplete. Treat this as an open
+pilot-review item, not a guarantee supplied by the local tests.
 The adjacent rollback file intentionally aborts: dropping the table while the application
 uses it would remove the server-side exam guard. Applying this migration or enabling the
 corresponding app routes requires a separate approval and an isolated deployment plan.

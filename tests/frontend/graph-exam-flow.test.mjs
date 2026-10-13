@@ -9,6 +9,8 @@ let rejectFirstGraphGeneration = true;
 let failAccountSave = true, accountSaveAttempts = 0;
 let releaseDeferredGraphRetry = null;
 const savedExamRows = [];
+const graphProof = `v2.${"a".repeat(32)}.syntheticGraphProof`;
+const practiceProof = `v2.${"b".repeat(32)}.syntheticPracticeProof`;
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mockApis(page, { profiles: { id: "u1", approved: true, role: "premium" }, extra: [
@@ -70,7 +72,7 @@ try {
       }
       if (body.questions?.[0]?.id === "practice-1") {
         trainingGradeBody = body;
-        await route.fulfill({ json: { ok: true, result: { total_points: 1, max_points: 1, per_question: [{
+        await route.fulfill({ json: { ok: true, exam_proof: practiceProof, result: { total_points: 1, max_points: 1, per_question: [{
           id: "practice-1", points: 1, max_points: 1,
           feedback: "Bra: du identifierade lutningen.",
           model_answer: "Lutningen visar hur mycket y ändras när x ökar med ett."
@@ -78,7 +80,7 @@ try {
         return;
       }
       gradeBody = body;
-      await route.fulfill({ json: { ok: true, exam_proof: "synthetic-graded-graph-proof", result: { total_points: 1, max_points: 2, per_question: [{
+      await route.fulfill({ json: { ok: true, exam_proof: graphProof, result: { total_points: 1, max_points: 2, per_question: [{
         id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.", model_answer: ""
       }] } } });
     }],
@@ -243,7 +245,7 @@ try {
   const retryBox = await page.locator(".xf-graph-retry").boundingBox();
   assert.ok(retryBox && retryBox.x >= 0 && retryBox.x + retryBox.width <= 390, "retry control stays within the viewport");
   assert.equal(retryBody?.mode, "graph_practice_retry");
-  assert.equal(retryBody?.examProof?.receipt, "synthetic-graded-graph-proof");
+  assert.equal(retryBody?.examProof?.receipt, graphProof);
   assert.equal(graphRetryAttempts, 3, "retry succeeds after a transient failure and a stale response");
   assert.deepEqual(retryBody?.answers, [{ id: "graph-1", answer: JSON.stringify({ type: "line", points: [{ x: 0, y: 1 }, { x: 2, y: 5 }] }) }]);
   assert.equal(retryBody?.questions?.[0]?.grade_task, "opaque-test-task");
