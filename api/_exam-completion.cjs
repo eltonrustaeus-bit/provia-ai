@@ -15,6 +15,18 @@ function submissionId(userId, course, questions) {
     .slice(0, 32);
 }
 
+function answerFingerprint(userId, course, questions, answerMap) {
+  const id = submissionId(userId, course, questions);
+  if (!id || !(answerMap instanceof Map) || answerMap.size !== questions.length) return null;
+  const entries = questions.map((question) => {
+    const questionId = String(question?.id ?? "");
+    return answerMap.has(questionId) ? [questionId, answerMap.get(questionId)] : null;
+  });
+  if (entries.some((entry) => !entry || typeof entry[1] !== "string")) return null;
+  entries.sort(([a], [b]) => a.localeCompare(b));
+  return crypto.createHash("sha256").update(JSON.stringify([userId, id, entries])).digest("hex");
+}
+
 function issueExamManifest(userId, course, material, questions) {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) return null;
   const secret = getExamSigningSecret();
@@ -79,4 +91,4 @@ function verifyCompletion(proof, userId) {
   return selected ? { question: selected, submissionId: id } : null;
 }
 
-module.exports = { submissionId, issueExamManifest, verifyExamManifest, issueCompletion, verifyCompletion };
+module.exports = { submissionId, answerFingerprint, issueExamManifest, verifyExamManifest, issueCompletion, verifyCompletion };

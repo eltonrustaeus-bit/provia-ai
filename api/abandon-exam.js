@@ -36,5 +36,6 @@ export default async function handler(req, res) {
   const state = await examIssuance.abandonExam(user.id, submissionId);
   if (state === null) return res.status(503).json({ ok: false, error: "EXAM_STATE_UNAVAILABLE" });
   if (state === "abandoned") return res.json({ ok: true, abandoned: true });
+  if (state === "grading") return res.status(409).json({ ok: false, error: "EXAM_GRADING_IN_PROGRESS" });
   return res.status(409).json({ ok: false, error: state === "completed" ? "EXAM_ALREADY_GRADED" : "EXAM_NOT_ACTIVE" });
 }

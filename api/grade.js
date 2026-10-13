@@ -159,7 +159,7 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
-function buildMockPayload(userId, course, per, total, maxTotal, attemptId) {
+function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint) {
   const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
   const conceptTags = [...new Set(
     per.map(q => q.concept_tag).filter(c => c && c !== "Okänt" && c !== "Unknown")
@@ -167,7 +167,12 @@ function buildMockPayload(userId, course, per, total, maxTotal, attemptId) {
   const errorTags = [...new Set(
     per.flatMap(q => q.error_tags || []).filter(Boolean)
   )].slice(0, 20);
-  return { user_id: userId, submission_id: attemptId, course: (course || "").slice(0, 100), percent: pct, num_questions: per.length, concept_tags: conceptTags, error_tags: errorTags };
+  return {
+    user_id: userId, submission_id: attemptId, answer_fingerprint: fingerprint,
+    course: (course || "").slice(0, 100), percent: pct, num_questions: per.length,
+    concept_tags: conceptTags, error_tags: errorTags,
+    result_payload: { total_points: total, max_points: maxTotal, per_question: per },
+  };
 }
 
 /* Elevens kunskapsprofil per begrepp.
@@ -334,11 +339,11 @@ async function saveMockResult(payload) {
   return examIssuance.persistExamResult(payload);
 }
 
-async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, level, attemptRows }) {
+async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, fingerprint, level, attemptRows }) {
   const state = await examIssuance.examState(userId, attemptId);
   if (!state) return "state_error";
-  if (state !== "active") return state === "completed" ? "duplicate" : "inactive";
-  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId));
+  if (state !== "grading") return state === "completed" ? "duplicate" : "inactive";
+  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint));
   if (saved === "duplicate") return "duplicate";
   if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
@@ -432,69 +437,7 @@ module.exports = async function handler(req, res) {
     if (new Set(questions.map((q) => q.id)).size !== questions.length) {
       return json(res, 400, { ok: false, error: "Duplicate question IDs" });
     }
-    if (p.mode !== "graph_practice_retry") {
-      if (!p.exam_manifest) {
-        return json(res, 409, { ok: false, error: "EXAM_MANIFEST_REQUIRED" });
-      }
-      if (!examCompletion.verifyExamManifest(p.exam_manifest, user.id, contextCourse, pastedText, submittedQuestions)) {
-        return json(res, 400, { ok: false, error: "EXAM_MANIFEST_INVALID" });
-      }
-      const state = await examIssuance.examState(
-        user.id, examCompletion.submissionId(user.id, contextCourse, submittedQuestions)
-      );
-      if (!state) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-      if (state === "completed") return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
-      if (state !== "active") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
-    } else {
-      const activeCount = await examIssuance.activeExamCount(user.id);
-      if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-      if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
-    }
-    const practiceCompletion = p.mode === "graph_practice_retry"
-      ? examCompletion.verifyCompletion(p.examProof, user.id)
-      : null;
-    if (p.mode === "graph_practice_retry" &&
-        (!practiceCompletion || questions.length !== 1 || questions[0].type !== "graph" ||
-         p.examProof.questions.find((q) => q.id === questions[0].id)?.grade_task !== submittedQuestions[0].grade_task)) {
-      return json(res, 403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
-    }
     const answersArr = Array.isArray(p.answers) ? p.answers : [];
-
-    const history = sanitizeHistory(p.history);
-    const mistakesCtx = sanitizeMistakes(p.mistakes);
-    const course = contextCourse || history[history.length - 1]?.course || "";
-    // Nivån styr svårighetsviktningen i mastery. Faller tillbaka på senaste provet.
-    const level = safeString(p.level, 10) || history[history.length - 1]?.level || "C";
-
-    const quotaClient = await supabaseClient();
-    if (!quotaClient) return json(res, 503, { ok: false, error: "Grading is temporarily unavailable" });
-    if (practiceCompletion) {
-      try {
-        const { data, error } = await quotaClient.from("mock_results")
-          .select("submission_id,num_questions")
-          .eq("user_id", user.id)
-          .eq("submission_id", practiceCompletion.submissionId)
-          .maybeSingle();
-        if (error) return json(res, 503, { ok: false, error: "Graded exam could not be checked" });
-        if (data?.num_questions !== p.examProof.questions.length) {
-          return json(res, 403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
-        }
-      } catch {
-        return json(res, 503, { ok: false, error: "Graded exam could not be checked" });
-      }
-    }
-    try {
-      const { data: quota, error } = await quotaClient.rpc("consume_anon_rate", {
-        p_bucket: "grade:" + user.id,
-        p_window_key: new Date().toISOString().slice(0, 13),
-        p_limit: 20,
-      });
-      if (error || !quota) return json(res, 503, { ok: false, error: "Grading is temporarily unavailable" });
-      if (quota.ok === false) return json(res, 429, { ok: false, error: "Too many grading requests. Try again later." });
-    } catch {
-      return json(res, 503, { ok: false, error: "Grading is temporarily unavailable" });
-    }
-
     const answerMap = new Map();
     let answerChars = 0;
     const questionIds = new Set(questions.map((q) => q.id));
@@ -512,7 +455,6 @@ module.exports = async function handler(req, res) {
     if (answerMap.size !== questions.length) {
       return json(res, 400, { ok: false, error: "Exactly one answer entry is required for each question" });
     }
-
     for (const question of questions) {
       if (question.type !== "graph") continue;
       if (!graphAnswers.isValidSpec(question.graph_spec)) {
@@ -522,10 +464,113 @@ module.exports = async function handler(req, res) {
         return json(res, 400, { ok: false, error: "GRAPH_ANSWER_INVALID" });
       }
     }
+    if (p.mode !== "graph_practice_retry") {
+      if (!p.exam_manifest) {
+        return json(res, 409, { ok: false, error: "EXAM_MANIFEST_REQUIRED" });
+      }
+      if (!examCompletion.verifyExamManifest(p.exam_manifest, user.id, contextCourse, pastedText, submittedQuestions)) {
+        return json(res, 400, { ok: false, error: "EXAM_MANIFEST_INVALID" });
+      }
+      const state = await examIssuance.examState(
+        user.id, examCompletion.submissionId(user.id, contextCourse, submittedQuestions)
+      );
+      if (!state) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (!["active", "grading", "completed"].includes(state)) {
+        return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      }
+    } else {
+      const activeCount = await examIssuance.activeExamCount(user.id);
+      if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
+    }
+    const practiceCompletion = p.mode === "graph_practice_retry"
+      ? examCompletion.verifyCompletion(p.examProof, user.id)
+      : null;
+    if (p.mode === "graph_practice_retry" &&
+        (!practiceCompletion || questions.length !== 1 || questions[0].type !== "graph" ||
+         p.examProof.questions.find((q) => q.id === questions[0].id)?.grade_task !== submittedQuestions[0].grade_task)) {
+      return json(res, 403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
+    }
+    const history = sanitizeHistory(p.history);
+    const mistakesCtx = sanitizeMistakes(p.mistakes);
+    const course = practiceCompletion ? (contextCourse || history[history.length - 1]?.course || "") : contextCourse;
+    // Nivån styr svårighetsviktningen i mastery. Faller tillbaka på senaste provet.
+    const level = safeString(p.level, 10) || history[history.length - 1]?.level || "C";
+
+    let claimed = null;
+    async function fail(status, payload) {
+      if (claimed) {
+        const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint);
+        claimed = null;
+        if (released === "completed") return json(res, 503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
+        if (released !== "released") return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      }
+      return json(res, status, payload);
+    }
+
+    if (!practiceCompletion) {
+      const submissionId = examCompletion.submissionId(user.id, course, submittedQuestions);
+      const fingerprint = examCompletion.answerFingerprint(user.id, course, submittedQuestions, answerMap);
+      if (!submissionId || !fingerprint) return json(res, 400, { ok: false, error: "EXAM_ANSWERS_INVALID" });
+      const claim = await examIssuance.claimExamGrading(user.id, submissionId, fingerprint);
+      if (!claim) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (claim === "pending") return json(res, 409, { ok: false, error: "EXAM_GRADING_IN_PROGRESS" });
+      if (claim === "stale") return json(res, 409, { ok: false, error: "EXAM_GRADING_INTERRUPTED" });
+      if (claim === "conflict") return json(res, 409, { ok: false, error: "EXAM_ANSWERS_CONFLICT" });
+      if (claim === "completed") {
+        const activeCount = await examIssuance.activeExamCount(user.id);
+        if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+        if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
+        const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
+        if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+        if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
+        const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
+        if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
+          return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+        }
+        return json(res, 200, {
+          ok: true, recovered: true, result: recovered.result,
+          exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
+          persistence: { mock_result_saved: true },
+        });
+      }
+      if (claim !== "claimed") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      claimed = { id: submissionId, fingerprint };
+    }
+
+    try {
+    const quotaClient = await supabaseClient();
+    if (!quotaClient) return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
+    if (practiceCompletion) {
+      try {
+        const { data, error } = await quotaClient.from("mock_results")
+          .select("submission_id,num_questions")
+          .eq("user_id", user.id)
+          .eq("submission_id", practiceCompletion.submissionId)
+          .maybeSingle();
+        if (error) return fail(503, { ok: false, error: "Graded exam could not be checked" });
+        if (data?.num_questions !== p.examProof.questions.length) {
+          return fail(403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
+        }
+      } catch {
+        return fail(503, { ok: false, error: "Graded exam could not be checked" });
+      }
+    }
+    try {
+      const { data: quota, error } = await quotaClient.rpc("consume_anon_rate", {
+        p_bucket: "grade:" + user.id,
+        p_window_key: new Date().toISOString().slice(0, 13),
+        p_limit: 20,
+      });
+      if (error || !quota) return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
+      if (quota.ok === false) return fail(429, { ok: false, error: "Too many grading requests. Try again later." });
+    } catch {
+      return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
+    }
 
     if (p.mode === "graph_practice_retry") {
       if (questions.length !== 1 || questions[0].type !== "graph" || answersArr.length !== 1) {
-        return json(res, 400, { ok: false, error: "Graph practice retry requires one verified graph question" });
+        return fail(400, { ok: false, error: "Graph practice retry requires one verified graph question" });
       }
       const question = questions[0];
       const graded = graphAnswers.gradeAnswer(answerMap.get(question.id) || "", question.graph_spec, lang);
@@ -675,25 +720,28 @@ module.exports = async function handler(req, res) {
       const attemptRows = withAttemptAnswers(per, answerMap);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
       });
       if (persistence === "duplicate") {
-        return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
+        return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
       }
-      if (persistence === "inactive") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
-      if (persistence !== "saved") return json(res, 503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
-      const mockResultSaved = true;
+      if (persistence === "inactive") return fail(409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      if (persistence !== "saved") return fail(503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
+      claimed = null;
+      const activeCount = await examIssuance.activeExamCount(user.id);
+      if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
       return json(res, 200, {
         ok: true,
-        exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
-        persistence: { mock_result_saved: mockResultSaved },
+        exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
+        persistence: { mock_result_saved: true },
         result: { total_points: total, max_points: maxTotal, per_question: per }
       });
     }
 
-    if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
+    if (!apiKey) return fail(500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
-    if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText for open questions" });
+    if (!pastedText.trim()) return fail(400, { ok: false, error: "Missing pastedText for open questions" });
 
     const model = pickModel();
     const responseFormat = buildNonMcGradeSchema();
@@ -800,8 +848,7 @@ module.exports = async function handler(req, res) {
       items: nonMcPack
     };
 
-    try {
-      const payload = {
+    const payload = {
         model,
         input: [
           { role: "system", content: lang === "sv"
@@ -821,7 +868,7 @@ module.exports = async function handler(req, res) {
           signal: AbortSignal.timeout(45_000)
         });
       } catch {
-        return json(res, 502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
       }
 
       const raw = await r.text();
@@ -829,24 +876,24 @@ module.exports = async function handler(req, res) {
       try {
         data = JSON.parse(raw);
       } catch {
-        return json(res, 502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
       }
-      if (!r.ok) return json(res, 502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+      if (!r.ok) return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
 
       const outputText = extractOutputText(data);
       if (!outputText) {
-        return json(res, 502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
       }
 
       let graded;
       try {
         graded = JSON.parse(outputText);
       } catch {
-        return json(res, 502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
       }
 
       if (!validateNonMcGradeOutput(graded, nonMcPack)) {
-        return json(res, 502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again." });
+        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again." });
       }
 
       const byId = new Map();
@@ -893,18 +940,21 @@ module.exports = async function handler(req, res) {
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
       });
       if (persistence === "duplicate") {
-        return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
+        return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
       }
-      if (persistence === "inactive") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
-      if (persistence !== "saved") return json(res, 503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
-      const mockResultSaved = true;
+      if (persistence === "inactive") return fail(409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      if (persistence !== "saved") return fail(503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
+      claimed = null;
+      const activeCount = await examIssuance.activeExamCount(user.id);
+      if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
       return json(res, 200, {
         ok: true,
-        exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
-        persistence: { mock_result_saved: mockResultSaved },
+        exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
+        persistence: { mock_result_saved: true },
         result: {
           total_points: total,
           max_points: maxTotal,
@@ -912,7 +962,7 @@ module.exports = async function handler(req, res) {
         }
       });
     } catch {
-      return json(res, 500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+      return fail(500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
     }
   });
 };

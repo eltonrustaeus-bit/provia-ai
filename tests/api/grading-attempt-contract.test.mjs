@@ -30,6 +30,12 @@ assert.match(api, /examIssuance\.persistExamResult\(payload\)/,
   "result writes use the issuance-aware database transaction");
 assert.match(issuanceMigration, /persist_graded_exam_result[\s\S]*?for update;[\s\S]*?on conflict \(user_id, submission_id\) do nothing/i,
   "the result insert serializes with abandonment and remains idempotent");
+assert.match(issuanceMigration, /claim_exam_grading[\s\S]*?for update;[\s\S]*?grading_started_at = now\(\), answer_fingerprint = p_answer_fingerprint/i,
+  "one database claim precedes grading for a signed answer set");
+assert.match(issuanceMigration, /persist_graded_exam_result[\s\S]*?insert into public\.mock_results[\s\S]*?set result_payload = p_result_payload, result_expires_at = now\(\) \+ interval '7 days'/i,
+  "the full recovery payload is saved with the result summary in one transaction");
+assert.match(issuanceMigration, /create function public\.purge_expired_exam_issuances\(\)[\s\S]*?delete from public\.exam_issuances/i,
+  "the draft defines a physical cleanup path, pending a reviewed schedule");
 assert.match(resultMigration, /ADD COLUMN IF NOT EXISTS submission_id text/i);
 assert.match(resultMigration, /CREATE UNIQUE INDEX IF NOT EXISTS mock_results_user_submission_id_uidx[\s\S]*?\(user_id, submission_id\)/i,
   "the database enforces one aggregate result per user and signed submission");

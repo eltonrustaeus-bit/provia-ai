@@ -48,6 +48,7 @@ const questions = [
 let activeQuestions = questions;
 let emptyGenerationResponse = false;
 let generationTextOverride = null;
+let gradingState = "active";
 
 function outputResponse(value) {
   return Response.json({ output: [{ content: [{ type: "output_text", text: JSON.stringify(value) }] }] });
@@ -68,9 +69,20 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) return Response.json({ ok: true });
-  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json("active");
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(gradingState);
+  if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
+    gradingState = "grading";
+    return Response.json("claimed");
+  }
+  if (url.endsWith("/rest/v1/rpc/release_exam_grading")) {
+    gradingState = "active";
+    return Response.json("released");
+  }
   if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(0);
-  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) return Response.json("saved");
+  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) {
+    gradingState = "completed";
+    return Response.json("saved");
+  }
   if (url.includes("/rest/v1/exam_issuances")) return method === "POST"
     ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
     : new Response(null, { status: 204 });

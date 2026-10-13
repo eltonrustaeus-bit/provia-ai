@@ -1050,16 +1050,24 @@ async function saveExamToAccount(record,{checkExisting=false}={}){
   if(record.user_id&&record.user_id!==userId)return{ok:false,attempted:false,error:"Account changed"};
   const row={user_id:userId,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam:record.exam||null,answers:record.answers||null,result:record.result||null,created_at:record.created_at||new Date().toISOString()};
   const columns="id,created_at,course,level,qtype,material,exam,answers,result";
+  const receipt=typeof row.exam?.submission_receipt==="string"?row.exam.submission_receipt:"";
+  const existingQuery=()=>{
+    const query=db.from("user_exams").select(columns).eq("user_id",userId);
+    return receipt?query.contains("exam",{submission_receipt:receipt}).limit(5):query.eq("created_at",row.created_at).limit(5);
+  };
+  const alreadySaved=(saved)=>receipt
+    ?saved?.exam?.submission_receipt===receipt
+    :sameSavedExam(saved,row);
   if(checkExisting){
-    const existing=await db.from("user_exams").select(columns).eq("user_id",userId).eq("created_at",row.created_at).limit(5);
+    const existing=await existingQuery();
     if(existing.error)return{ok:false,attempted:true,error:"Could not verify existing save"};
-    if((existing.data||[]).some(saved=>sameSavedExam(saved,row)))return{ok:true,attempted:true,alreadySaved:true};
+    if((existing.data||[]).some(alreadySaved))return{ok:true,attempted:true,alreadySaved:true};
   }
   const{data,error}=await db.from("user_exams").insert([row]).select("id");
   if(error){
     if(checkExisting){
-      const verify=await db.from("user_exams").select(columns).eq("user_id",userId).eq("created_at",row.created_at).limit(5);
-      if(!verify.error&&(verify.data||[]).some(saved=>sameSavedExam(saved,row)))return{ok:true,attempted:true,alreadySaved:true};
+      const verify=await existingQuery();
+      if(!verify.error&&(verify.data||[]).some(alreadySaved))return{ok:true,attempted:true,alreadySaved:true};
     }
     return{ok:false,attempted:true,error:error.message||String(error)};
   }
@@ -1112,7 +1120,7 @@ async function loadExamsFromAccountToLocal(){
   const history=filtered.map(r=>({ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",total_points:r.result?.total_points??0,max_points:r.result?.max_points??0,percent:(r.result?.max_points>0)?Math.round((r.result.total_points/r.result.max_points)*100):0,accountSaved:!r.local_only}));
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
-  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
+  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
   else{try{localStorage.removeItem(LS_LAST);}catch{}}
   lsSet(LS_MISTAKES,mergeMistakesFromExamRows(filtered));
 }
@@ -1909,8 +1917,26 @@ try{
         const inactiveExam = res?.data?.error === "EXAM_NOT_ACTIVE";
         const unsavedResult = res?.data?.error === "EXAM_RESULT_NOT_SAVED";
         const stateUnavailable = res?.data?.error === "EXAM_STATE_UNAVAILABLE";
+        const gradingPending = res?.data?.error === "EXAM_GRADING_IN_PROGRESS";
+        const gradingInterrupted = res?.data?.error === "EXAM_GRADING_INTERRUPTED";
+        const answerConflict = res?.data?.error === "EXAM_ANSWERS_CONFLICT";
+        const recoveryRequired = res?.data?.error === "EXAM_RESULT_RECOVERY_REQUIRED";
+        const resultExpired = res?.data?.error === "EXAM_RESULT_EXPIRED";
+        const anotherExamActive = res?.data?.error === "EXAM_ACTIVE";
         const msg = alreadyGraded
           ? (LANG==="sv"?"Det här provet har redan rättats. Inget nytt resultat visades. Kontrollera provhistoriken eller kontakta support om det saknas.":"This exam has already been graded. No new result was shown. Check your history or contact support if it is missing.")
+          : gradingPending
+          ? (LANG==="sv"?"Rättningen pågår redan. Vänta en stund och försök hämta resultatet igen. Dina svar finns kvar.":"Grading is already in progress. Wait a moment, then try to retrieve the result again. Your answers are still here.")
+          : gradingInterrupted
+          ? (LANG==="sv"?"Rättningen avbröts utan bekräftat resultat. Avsluta provet och skapa ett nytt av ditt material; de här svaren rättas inte automatiskt igen.":"Grading was interrupted without a confirmed result. Close the exam and create a new one from your material; these answers will not be graded automatically again.")
+          : answerConflict
+          ? (LANG==="sv"?"Provet har redan lämnats in med andra svar. De här svaren kan inte ersätta inlämningen.":"This exam was submitted with different answers. These answers cannot replace that submission.")
+          : recoveryRequired
+          ? (LANG==="sv"?"Resultatet kan redan ha sparats. Dina svar finns kvar; försök hämta samma resultat igen.":"The result may already be saved. Your answers are still here; try to retrieve the same result again.")
+          : resultExpired
+          ? (LANG==="sv"?"Resultatet kan inte längre hämtas här. Kontrollera provhistoriken eller kontakta support.":"This result can no longer be retrieved here. Check your exam history or contact support.")
+          : anotherExamActive
+          ? (LANG==="sv"?"Ett annat prov pågår. Avsluta det innan du visar resultat och facit här.":"Another exam is active. Finish it before viewing this result and its answers.")
           : inactiveExam
           ? (LANG==="sv"?"Det här provet är inte längre aktivt och kan inte lämnas in. Avsluta det och skapa ett nytt prov av ditt material.":"This exam is no longer active and cannot be submitted. Close it and create a new exam from your material.")
           : unsavedResult
@@ -1933,6 +1959,27 @@ try{
         const msg=LANG==="sv"?"Rättningssvaret var ofullständigt. Dina svar finns kvar på sidan — försök igen.":"The grading response was incomplete. Your answers are still on this page — try again.";
         setStatus(msg,"bad");showToast(msg,"bad");return {ok:false,error:msg};
       }
+      const examProof=res.data.exam_proof||null;
+      const previous=lsGetObj(LS_LAST);
+      if(examProof&&previous?.examProof===examProof){
+        renderResult(result);
+        currentExamProof=examProof;
+        let accountSaveFailed=!previous.accountSaved;
+        if(accountSaveFailed){
+          const userId=await getUserId().catch(()=>"");
+          const queued=userId?readPendingExams(userId).find(row=>row.exam?.submission_receipt===examProof):null;
+          if(queued){
+            const retry=await retryPendingExamSave(queued.local_id).catch(()=>({ok:false}));
+            accountSaveFailed=!retry.ok;
+            if(retry.ok)lsSet(LS_LAST,{...previous,accountSaved:true});
+          }
+        }
+        setWizardStep(3);
+        setStatus(accountSaveFailed
+          ? (LANG==="sv"?"Resultatet visas, men kontosparningen behöver fortfarande bekräftas.":"The result is shown, but account saving still needs confirmation.")
+          : t.gradeDone,accountSaveFailed?"bad":"ok");
+        return {ok:true,result,examProof,persistence:{accountSaveFailed}};
+      }
       renderResult(result);
       /* Profilraden skapas fortfarande här; mastery skrivs av api/grade.js. */
       try{await ensureUserProfileRow();}catch{}
@@ -1941,19 +1988,19 @@ try{
       const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
       const userId=await getUserId().catch(()=>"");
       const localId=newLocalExamId();
-      const accountRecord={local_id:localId,user_id:userId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},answers,result,created_at:new Date(ts).toISOString()};
+      const accountRecord={local_id:localId,user_id:userId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
       let accountSaveFailed=!db||!userId,localCopySaved=false;
       if(userId){
         localCopySaved=queuePendingExam(accountRecord);
         currentUnsavedAccountExam=accountRecord;
         let accountSave;
-        try{accountSave=await saveExamToAccount(accountRecord);}catch{accountSave={ok:false,attempted:true};}
+        try{accountSave=await saveExamToAccount(accountRecord,{checkExisting:!!res.data.recovered});}catch{accountSave={ok:false,attempted:true};}
         accountSaveFailed=!accountSave?.ok;
         if(accountSave?.ok){removePendingExam(userId,localId);currentUnsavedAccountExam=null;}
       }
       attempt.accountSaved=!!userId&&!accountSaveFailed;
       const history=lsGetArray(LS_HISTORY);history.push(attempt);while(history.length>60)history.shift();lsSet(LS_HISTORY,history);
-      lsSet(LS_LAST,{ts,attempt,exam:accountRecord.exam,result,accountSaved:!!userId&&!accountSaveFailed});
+      lsSet(LS_LAST,{ts,attempt,exam:accountRecord.exam,result,examProof,accountSaved:!!userId&&!accountSaveFailed});
       const mistakes=lsGetArray(LS_MISTAKES);
       // Samma id-fallback som rendering och rättning använder. Med bara String(q.id??"")
       // kollapsade alla frågor utan id på tom sträng, och felbanken sparade då
@@ -1969,7 +2016,7 @@ try{
       const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
       const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
       setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
-      currentExamProof=res.data.exam_proof||null;
+      currentExamProof=examProof;
       return {ok:true,result,examProof:currentExamProof,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
     }catch(err){
       const msg=LANG==="sv"?"Ett oväntat fel uppstod efter rättningen. Kontrollera om resultatet sparats innan du skickar in igen.":"An unexpected error occurred after grading. Check whether the result was saved before submitting again.";
@@ -2086,6 +2133,11 @@ try{
       }, { timeoutMs: 10000 });
       const alreadyInactive = response?.status === 409 &&
         ["EXAM_ALREADY_GRADED", "EXAM_NOT_ACTIVE"].includes(response.data?.error);
+      if (response?.data?.error === "EXAM_GRADING_IN_PROGRESS") {
+        return { ok: false, error: LANG === "sv"
+          ? "Rättningen pågår. Vänta tills den är klar innan du avslutar provet."
+          : "Grading is in progress. Wait for it to finish before closing the exam." };
+      }
       if (!alreadyInactive && (!response?.ok || !response.data?.ok || !response.data?.abandoned)) {
         return { ok: false, error: "Provet kunde inte avslutas säkert. Försök igen när anslutningen fungerar." };
       }

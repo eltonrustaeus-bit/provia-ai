@@ -104,14 +104,30 @@ The 2026-10-13 local verification confirms the missing-profile app path signs ou
 
 ### Active exam issuance — local draft only
 
-`20261013082230_guard_active_exams.sql` adds server-owned issuance records and atomic
-grade/abandon RPCs so an active exam cannot receive answer-bearing P.E.R help. It has **not**
+`20261013082230_guard_active_exams.sql` adds server-owned issuance records, an atomic
+grading claim, and grade/abandon RPCs so an active exam cannot receive answer-bearing P.E.R help.
+The result summary and full recovery payload are saved in one database transaction. A retry
+with identical answers can read the saved result without a second provider call or mastery
+update; changed answers are rejected. Recovery is limited to seven days. A service-only
+`purge_expired_exam_issuances()` function removes expired issuance rows and recovery payloads,
+but a reviewed recurring invocation must be configured and verified before a pilot; logical
+expiry alone does **not** physically delete data. It has **not**
 been applied or tested in PostgreSQL. The staging database still lacks the app schema; do not
 run a blanket migration command against it. First restore and reconcile the approved schema,
 including the actual `mock_results` columns, unique constraint and permissions. Then test the
 RPCs with synthetic users, concurrent grade/abandon requests, PostgREST access as
 `anon`/`authenticated`/`service_role`, account and exam-history deletion, and lost-response
-retries. Define and verify a bounded retention process for issuance metadata before a pilot.
+retries. Verify the scheduled cleanup, seven-day recovery boundary, account deletion and
+retention against the school's approved policy before a pilot.
+If a worker disappears after claiming, the draft returns `stale` after two minutes instead of
+automatically regrading an uncertain attempt. The student can then explicitly abandon it and
+generate a fresh exam from retained material. Before enabling this flow, staging must verify
+that stale workers cannot commit and that a concurrent new exam cannot expose an older exam's
+answer-bearing response. The client deduplicates repeated receipts locally and checks the
+account for an existing receipt on recovery, but there is not yet a database uniqueness
+constraint on `user_exams` for that receipt. A crash between saving `mock_results` and writing
+learning attempts can still leave those secondary records incomplete. Treat these as open
+pilot-review items, not guarantees supplied by the local tests.
 The adjacent rollback file intentionally aborts: dropping the table while the application
 uses it would remove the server-side exam guard. Applying this migration or enabling the
 corresponding app routes requires a separate approval and an isolated deployment plan.

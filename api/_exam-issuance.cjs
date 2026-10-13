@@ -47,7 +47,7 @@ async function examState(userId, submissionId) {
   if (!response?.ok) return null;
   try {
     const state = await response.json();
-    return ["active", "completed", "abandoned", "expired", "missing"].includes(state) ? state : null;
+    return ["active", "grading", "completed", "abandoned", "expired", "missing"].includes(state) ? state : null;
   } catch {
     return null;
   }
@@ -69,25 +69,81 @@ async function activeExamCount(userId) {
   }
 }
 
+async function claimExamGrading(userId, submissionId, fingerprint) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
+  const response = await request("rpc/claim_exam_grading", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const state = await response.json();
+    return ["claimed", "pending", "stale", "completed", "conflict", "missing", "abandoned", "expired"].includes(state) ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+async function releaseExamGrading(userId, submissionId, fingerprint) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
+  const response = await request("rpc/release_exam_grading", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const state = await response.json();
+    return ["released", "completed", "missing", "conflict"].includes(state) ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+async function recoverExamResult(userId, submissionId, fingerprint) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
+  const response = await request("rpc/recover_graded_exam_result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint }),
+  });
+  if (!response?.ok) return null;
+  try {
+    const result = await response.json();
+    if (result === null) return { status: "expired" };
+    if (result && typeof result === "object" && !Array.isArray(result) &&
+        Array.isArray(result.per_question) && Number.isFinite(result.total_points) && Number.isFinite(result.max_points)) {
+      return { status: "saved", result };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function persistExamResult(payload) {
-  if (!payload?.user_id || !/^[a-f0-9]{32}$/.test(payload.submission_id || "")) return "error";
+  if (!payload?.user_id || !/^[a-f0-9]{32}$/.test(payload.submission_id || "") ||
+      !/^[a-f0-9]{64}$/.test(payload.answer_fingerprint || "")) return "error";
   const response = await request("rpc/persist_graded_exam_result", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       p_user_id: payload.user_id,
       p_submission_id: payload.submission_id,
+      p_answer_fingerprint: payload.answer_fingerprint,
       p_course: payload.course,
       p_percent: payload.percent,
       p_num_questions: payload.num_questions,
       p_concept_tags: payload.concept_tags,
       p_error_tags: payload.error_tags,
+      p_result_payload: payload.result_payload,
     }),
   });
   if (!response?.ok) return "error";
   try {
     const outcome = await response.json();
-    return ["saved", "duplicate", "missing", "abandoned", "expired"].includes(outcome) ? outcome : "error";
+    return ["saved", "duplicate", "missing", "abandoned", "expired", "unclaimed", "invalid"].includes(outcome) ? outcome : "error";
   } catch {
     return "error";
   }
@@ -103,7 +159,7 @@ async function abandonExam(userId, submissionId) {
   if (!response?.ok) return null;
   try {
     const state = await response.json();
-    return ["abandoned", "completed", "expired", "missing"].includes(state) ? state : null;
+    return ["abandoned", "grading", "completed", "expired", "missing"].includes(state) ? state : null;
   } catch {
     return null;
   }
@@ -134,4 +190,7 @@ async function removeUndeliveredExam(userId, submissionId) {
   return Boolean(response?.ok);
 }
 
-module.exports = { issueExam, examState, activeExamCount, persistExamResult, abandonExam, abandonAllActiveExams, removeUndeliveredExam };
+module.exports = {
+  issueExam, examState, activeExamCount, claimExamGrading, releaseExamGrading,
+  recoverExamResult, persistExamResult, abandonExam, abandonAllActiveExams, removeUndeliveredExam,
+};

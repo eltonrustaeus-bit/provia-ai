@@ -22,6 +22,8 @@ let savedResultPresent = true;
 let learnerLoopEnabled = false;
 let issuanceState = "active";
 let activeExamCount = 0;
+let savedCanonicalResult = null;
+let savedFingerprint = null;
 
 process.env.SUPABASE_URL = origin;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-only-service-role";
@@ -38,9 +40,31 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url === `${origin}/rest/v1/rpc/exam_issuance_state`) return Response.json(issuanceState);
   if (url === `${origin}/rest/v1/rpc/active_exam_count`) return Response.json(activeExamCount);
+  if (url === `${origin}/rest/v1/rpc/claim_exam_grading`) {
+    const fingerprint = JSON.parse(init.body).p_answer_fingerprint;
+    if (issuanceState === "completed") return Response.json(fingerprint === savedFingerprint ? "completed" : "conflict");
+    if (issuanceState === "grading") return Response.json(fingerprint === savedFingerprint ? "pending" : "conflict");
+    if (issuanceState !== "active") return Response.json(issuanceState);
+    savedFingerprint = fingerprint;
+    issuanceState = "grading";
+    return Response.json("claimed");
+  }
+  if (url === `${origin}/rest/v1/rpc/release_exam_grading`) {
+    if (issuanceState === "completed") return Response.json("completed");
+    issuanceState = "active";
+    savedFingerprint = null;
+    return Response.json("released");
+  }
+  if (url === `${origin}/rest/v1/rpc/recover_graded_exam_result`) return Response.json(savedCanonicalResult);
   if (url === `${origin}/rest/v1/rpc/persist_graded_exam_result`) {
     if (mockResultMode === "error") return new Response(null, { status: 500 });
-    return Response.json(mockResultMode === "duplicate" ? "duplicate" : "saved");
+    if (mockResultMode === "duplicate") {
+      issuanceState = "completed";
+      return Response.json("duplicate");
+    }
+    savedCanonicalResult = JSON.parse(init.body).p_result_payload;
+    issuanceState = "completed";
+    return Response.json("saved");
   }
   if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
     ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
@@ -174,6 +198,9 @@ try {
   }, userId)?.question?.id, question.id, "the proof opens only for the graded signed question");
   assert.equal(validWrongGraph.body.result.per_question[0].points, 1,
     "the valid horizontal line gets credit for its correct y-intercept only");
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
 
   const malformedGraphAnswers = [
     "",
@@ -204,14 +231,15 @@ try {
   }
 
   calls.length = 0;
-  const official = await invoke({
+  const officialRequest = {
     lang: "sv",
     course,
     pastedText: material,
     exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
-  });
+  };
+  const official = await invoke(officialRequest);
   assert.equal(official.status, 200);
   assert.equal(official.body.persistence.mock_result_saved, true);
   assert.deepEqual(official.body.result, {
@@ -238,15 +266,49 @@ try {
     p_num_questions: 1,
     p_concept_tags: ["linjära funktioner"],
     p_error_tags: [],
+    p_answer_fingerprint: savedPayload.p_answer_fingerprint,
+    p_result_payload: official.body.result,
   });
   assert.match(savedPayload.p_submission_id, /^[a-f0-9]{32}$/);
+  assert.match(savedPayload.p_answer_fingerprint, /^[a-f0-9]{64}$/);
   const resultWriteIndex = calls.indexOf(saved);
   const masteryWriteIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once"));
   assert.ok(masteryWriteIndex > resultWriteIndex,
     "mastery is applied only after the official result has been persisted");
   assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic official graph grading does not call the AI provider");
 
-  for (const [state, expectedError] of [["completed", "EXAM_ALREADY_GRADED"], ["abandoned", "EXAM_NOT_ACTIVE"], [null, "EXAM_STATE_UNAVAILABLE"]]) {
+  calls.length = 0;
+  const recovered = await invoke(officialRequest);
+  assert.equal(recovered.status, 200, "a lost response can be recovered from the saved canonical result");
+  assert.equal(recovered.body.recovered, true);
+  assert.deepEqual(recovered.body.result, official.body.result);
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")), false,
+    "recovery does not charge another grading request");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")), false,
+    "recovery cannot rewrite the official score");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
+    "recovery cannot reapply mastery");
+
+  calls.length = 0;
+  const changedAnswers = await invoke({ ...officialRequest, answers: [{ id: question.id,
+    answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }] });
+  assert.equal(changedAnswers.status, 409);
+  assert.equal(changedAnswers.body.error, "EXAM_ANSWERS_CONFLICT");
+  assert.equal(changedAnswers.body.result, undefined);
+
+  activeExamCount = 1;
+  const blockedRecovery = await invoke(officialRequest);
+  assert.equal(blockedRecovery.status, 409);
+  assert.equal(blockedRecovery.body.error, "EXAM_ACTIVE", "another active exam blocks facit even after saving");
+  activeExamCount = 0;
+
+  issuanceState = "grading";
+  const pending = await invoke(officialRequest);
+  assert.equal(pending.status, 409);
+  assert.equal(pending.body.error, "EXAM_GRADING_IN_PROGRESS");
+  issuanceState = "completed";
+
+  for (const [state, expectedError] of [["abandoned", "EXAM_NOT_ACTIVE"], [null, "EXAM_STATE_UNAVAILABLE"]]) {
     issuanceState = state;
     calls.length = 0;
     const blocked = await invoke({
@@ -275,14 +337,15 @@ try {
 
   mockResultMode = "duplicate";
   learnerLoopEnabled = true;
+  issuanceState = "active";
   calls.length = 0;
   const conflictingReplay = await invoke({
     lang: "sv", course, pastedText: material, exam_manifest: manifest,
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
   });
-  assert.equal(conflictingReplay.status, 409, "a changed answer cannot replace or display a second official score");
-  assert.equal(conflictingReplay.body.error, "EXAM_ALREADY_GRADED");
+  assert.equal(conflictingReplay.status, 503, "an uncertain duplicate write cannot display a new score");
+  assert.equal(conflictingReplay.body.error, "EXAM_RESULT_RECOVERY_REQUIRED");
   assert.equal(conflictingReplay.body.result, undefined, "the conflicting score is never returned");
   assert.equal(conflictingReplay.body.exam_proof, undefined, "a duplicate cannot mint another completion proof");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
@@ -292,6 +355,8 @@ try {
 
   mockResultMode = "error";
   learnerLoopEnabled = true;
+  issuanceState = "active";
+  savedFingerprint = null;
   calls.length = 0;
   const replay = await invoke({
     lang: "sv",
@@ -316,6 +381,7 @@ try {
     "replaying the same signed exam uses the same idempotency key");
 
   mockResultMode = "insert";
+  issuanceState = "active";
   calls.length = 0;
   const recoveredReplay = await invoke({
     lang: "sv",
