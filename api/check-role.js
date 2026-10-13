@@ -74,25 +74,9 @@ async function getRole(userId) {
   return normalizeRole(data?.role);
 }
 
-// Mockprov score from a user_exams.result ({ total_points, max_points, per_question[] }).
-function examPercent(result) {
-  const t = Number(result?.total_points || 0);
-  const m = Number(result?.max_points || 0);
-  return m > 0 ? Math.round((t / m) * 100) : 0;
-}
-
-// Concept tags the student got wrong in one exam (per_question points < max_points).
-function examFailConcepts(result) {
-  const pq = Array.isArray(result?.per_question) ? result.per_question : [];
-  return pq
-    .filter((q) => Number(q.points || 0) < Number(q.max_points || 0))
-    .map((q) => q.concept_tag)
-    .filter((c) => c && c !== "Okänt" && c !== "Unknown");
-}
-
 // Top weak concepts across a student's mockprov — the subject topics they keep missing.
 function weakConceptsFromExams(exams, limit = 3) {
-  const freq = {};
+  const freq = Object.create(null);
   for (const e of exams) for (const c of e.failConcepts || []) freq[c] = (freq[c] || 0) + 1;
   return Object.entries(freq)
     .sort(([, a], [, b]) => b - a)
@@ -100,38 +84,78 @@ function weakConceptsFromExams(exams, limit = 3) {
     .map(([concept, n]) => ({ concept, count: n }));
 }
 
-// Normalize a user_exams row → compact mockprov record.
+// Only server-verified mock_results are teacher-facing evidence.
 function normalizeExam(r) {
+  if (!Number.isInteger(r.percent) || r.percent < 0 || r.percent > 100 ||
+      !Number.isInteger(r.num_questions) || r.num_questions < 1 || r.num_questions > 20) return null;
   return {
     course: r.course || null,
-    percent: examPercent(r.result),
-    num_questions: Array.isArray(r.result?.per_question) ? r.result.per_question.length : null,
-    failConcepts: examFailConcepts(r.result),
+    percent: r.percent,
+    num_questions: r.num_questions,
+    failConcepts: Array.isArray(r.weak_concept_tags) ? r.weak_concept_tags.slice(0, 20).filter((c) => typeof c === "string" && c && c !== "Okänt" && c !== "Unknown").map((c) => c.slice(0, 80)) : [],
     created_at: r.created_at,
   };
 }
 
 // Aggregate per-student mockprov progress for a class.
-// Source: user_exams (the populated mockprov table; mock_results is not reliably written).
 // Bulk queries — no N+1.
 async function getStudentSummaries(classId) {
-  const { data: members, error: membersError } = await supabase
-    .from("class_members")
-    .select("student_id, joined_at")
-    .eq("class_id", classId);
-  if (membersError) throw new Error("Kunde inte läsa klassmedlemmar");
-  const ids = (members || []).map((m) => m.student_id).sort();
+  const members = [];
+  let memberCount = null;
+  while (memberCount === null || members.length < memberCount) {
+    if (members.length >= 2000) throw new Error("För många klassmedlemmar för en fullständig översikt");
+    const page = await supabase
+      .from("class_members")
+      .select("student_id", { count: "exact" })
+      .eq("class_id", classId)
+      .order("student_id", { ascending: true })
+      .range(members.length, members.length + 499);
+    if (page.error || !Number.isInteger(page.count) || page.count < 0 || page.count > 2000 ||
+        !Array.isArray(page.data) || (!page.data.length && members.length < page.count) ||
+        (memberCount !== null && page.count !== memberCount)) {
+      throw new Error("Kunde inte läsa alla klassmedlemmar");
+    }
+    if (memberCount === null) memberCount = page.count;
+    members.push(...page.data);
+  }
+  const ids = members.map((m) => m.student_id).sort();
+  if (new Set(ids).size !== memberCount) throw new Error("Klassmedlemmarna ändrades under hämtningen");
   if (!ids.length) return [];
 
-  const examsRes = await supabase
-    .from("user_exams")
-    .select("user_id, course, result, created_at")
-    .in("user_id", ids)
-    .order("created_at", { ascending: false });
-  if (examsRes.error) throw new Error("Kunde inte läsa elevresultat");
+  const examRows = [];
+  for (let start = 0; start < ids.length; start += 100) {
+    const batch = [];
+    let expectedCount = null;
+    while (expectedCount === null || batch.length < expectedCount) {
+      if (examRows.length + batch.length >= 10000) throw new Error("För många elevresultat för en fullständig översikt");
+      const page = await supabase
+        .from("mock_results")
+        .select("id, user_id, course, percent, num_questions, weak_concept_tags, created_at", { count: "exact" })
+        .in("user_id", ids.slice(start, start + 100))
+        .not("verified_at", "is", null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(batch.length, batch.length + 499);
+      if (page.error || !Number.isInteger(page.count) || page.count < 0 || page.count > 10000 ||
+          !Array.isArray(page.data) || (!page.data.length && batch.length < page.count) ||
+          (expectedCount !== null && page.count !== expectedCount)) {
+        throw new Error("Kunde inte läsa alla elevresultat");
+      }
+      if (expectedCount === null) expectedCount = page.count;
+      batch.push(...page.data);
+    }
+    if (new Set(batch.map((row) => row.id)).size !== expectedCount) {
+      throw new Error("Elevresultaten ändrades under hämtningen");
+    }
+    examRows.push(...batch);
+  }
+  examRows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || String(b.id).localeCompare(String(a.id)));
 
-  const byId = {};
-  for (const r of examsRes.data || []) (byId[r.user_id] ||= []).push(normalizeExam(r));
+  const byId = Object.create(null);
+  for (const r of examRows) {
+    const exam = normalizeExam(r);
+    if (exam) (byId[r.user_id] ||= []).push(exam);
+  }
 
   return ids.map((id, index) => {
     const exams = byId[id] || []; // already newest-first
@@ -628,17 +652,18 @@ export default async function handler(req, res) {
         if (!mem) return res.status(404).json({ error: "Eleven finns inte i klassen." });
 
         const resultsRes = await supabase
-          .from("user_exams")
-          .select("course, result, created_at")
+          .from("mock_results")
+          .select("course, percent, num_questions, weak_concept_tags, created_at")
           .eq("user_id", studentId)
+          .not("verified_at", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
         if (resultsRes.error) return res.status(500).json({ error: "Kunde inte hämta elevens provhistorik." });
 
-        const exams = (resultsRes.data || []).map(normalizeExam);
+        const exams = (resultsRes.data || []).map(normalizeExam).filter(Boolean);
 
         // Per-course (subject) aggregation — weakest first
-        const courseMap = {};
+        const courseMap = Object.create(null);
         for (const e of exams) {
           const c = e.course || "Okänd kurs";
           (courseMap[c] ||= []).push(e.percent);

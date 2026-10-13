@@ -270,11 +270,6 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
-      "id": "tabell:user_exams",
-      "etikett": "user_exams",
-      "typ": "tabell"
-    },
-    {
       "id": "tabell:per_sessions",
       "etikett": "per_sessions",
       "typ": "tabell"
@@ -317,6 +312,11 @@ export const PER_GRAPH = {
     {
       "id": "tabell:exam_issuances",
       "etikett": "exam_issuances",
+      "typ": "tabell"
+    },
+    {
+      "id": "tabell:user_exams",
+      "etikett": "user_exams",
       "typ": "tabell"
     }
   ],
@@ -535,10 +535,6 @@ export const PER_GRAPH = {
     },
     {
       "från": "per-memory",
-      "till": "tabell:user_exams"
-    },
-    {
-      "från": "per-memory",
       "till": "tabell:per_sessions"
     },
     {
@@ -579,7 +575,7 @@ export const PER_GRAPH = {
     },
     {
       "från": "check-role",
-      "till": "tabell:user_exams"
+      "till": "tabell:mock_results"
     },
     {
       "från": "check-role",
@@ -595,7 +591,7 @@ export const PER_GRAPH = {
     },
     {
       "från": "check-role",
-      "till": "tabell:mock_results"
+      "till": "tabell:user_exams"
     },
     {
       "från": "explain",
@@ -623,7 +619,7 @@ export const PER_GRAPH = {
     },
     {
       "från": "teacher-report",
-      "till": "tabell:user_exams"
+      "till": "tabell:mock_results"
     }
   ]
 };

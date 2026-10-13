@@ -130,8 +130,19 @@ submission ID and a unique `(user_id, submission_id)` index to `user_exams` so c
 devices cannot create two account rows for the same official exam. The ID comes from the
 server-issued completion receipt. Existing historical rows remain nullable and are not
 backfilled from unverified browser data. The client-side insert remains owner-scoped but is
-not proof that a stored score was produced by the server; teacher-report provenance needs
-its own reviewed contract. Verify the index, two-account RLS, duplicate-insert and deletion
+not proof that a stored score was produced by the server. The unapplied active-exam migration
+now revokes browser access to `mock_results` and adds a nullable `verified_at` marker, set
+only when its service-only grading RPC saves the official result. Existing rows stay
+unverified. The student report and teacher roster/detail/class-insight routes read only
+marked `mock_results` rows; missing older results are shown as unavailable, never as zero.
+`weak_concept_tags` comes from the server-persisted graded question rows but remains a
+preliminary AI signal, not a validated diagnosis. Read-only production metadata on
+2026-10-13 showed `anon`/`authenticated` INSERT grants and an owner `ALL` policy on
+`mock_results`; the draft revoke is therefore essential, not merely defense in depth.
+P.E.R's exam-derived memory now reads only marked rows; student chat and session hints
+remain unverified self-reports and must not be presented as official results.
+Verify effective grants, RPC execute ACL, marker provenance, forged owner inserts,
+two-account RLS, duplicate-insert and deletion
 behavior in staging before deployment. A crash between saving `mock_results` and writing
 learning attempts can still leave those secondary records incomplete. Treat this as an open
 pilot-review item, not a guarantee supplied by the local tests.

@@ -333,8 +333,7 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
   await ctx.close();
 }
 
-// F18: rapporten säger varför den inte går än, i stället för att bara spärra
-// knappen.
+// F18: lokal historik får inte låsa en rapport som servern kan verifiera.
 {
   const { ctx, page } = await open("#rapport", { nExams: 2 });
   const v = await page.evaluate(() => ({
@@ -342,8 +341,8 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
     status: (document.getElementById("reportStatus") || {}).textContent,
     av: (document.getElementById("genReportBtn") || {}).disabled,
   }));
-  ok("F18 rapporten säger varför den inte går än",
-    /3|tre/.test(v.sub) && /3/.test(v.status) && v.av === true, JSON.stringify(v));
+  ok("F18 rapporten låter servern avgöra vilka prov som är verifierade",
+    /3|tre/.test(v.sub) && /3/.test(v.status) && v.av === false, JSON.stringify(v));
   await ctx.close();
 }
 

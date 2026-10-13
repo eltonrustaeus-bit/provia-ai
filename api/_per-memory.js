@@ -123,52 +123,36 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
   return signals.slice(0, 10).join("\n");
 }
 
-// Fetch real school-study signals from Supabase — mock_results + user_exams
+// Exam-derived signals come only from server-verified grading; chat/session
+// signals below remain the student's unverified account of their learning.
 export async function enrichMemoryFromExamData(supabase, userId) {
   try {
-    const [mockRes, examRes] = await Promise.all([
-      supabase
-        .from("mock_results")
-        .select("course, percent, concept_tags, error_tags")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10),
-      supabase
-        .from("user_exams")
-        .select("course, result")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
+    const { data, error } = await supabase
+      .from("mock_results")
+      .select("course, percent, error_tags, weak_concept_tags")
+      .eq("user_id", userId)
+      .not("verified_at", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (error) throw error;
 
-    // Mockprov signals — concept_tags from low-scoring exams
-    const mockRows         = mockRes.data || [];
+    const mockRows = (data || []).filter(r => Number.isInteger(r.percent) && r.percent >= 0 && r.percent <= 100);
     const mockRecentScores = mockRows.slice(0, 5).map(r => r.percent);
     const mockWeakConcepts = [...new Set(
       mockRows
-        .filter(r => r.percent < 70)
-        .flatMap(r => (r.concept_tags || []).filter(Boolean))
+        .flatMap(r => Array.isArray(r.weak_concept_tags) ? r.weak_concept_tags : [])
+        .filter(Boolean)
         .map(t => cleanMemoryText(t, 60))
     )].slice(0, 8);
 
-    // Felbank signals — per_question failures from user_exams (app.html mockprov)
-    const examRows = examRes.data || [];
-    const failedItems = examRows.flatMap(r =>
-      (r.result?.per_question || [])
-        .filter(q => Number(q.points || 0) < Number(q.max_points || 0))
-        .map(q => ({ concept_tag: q.concept_tag, error_tags: q.error_tags, course: r.course }))
-    );
-    const felBankWeakConcepts = [...new Set(
-      failedItems
-        .map(q => q.concept_tag)
-        .filter(c => c && c !== "Okänt" && c !== "Unknown")
-        .map(t => cleanMemoryText(t, 60))
-    )].slice(0, 8);
+    const felBankWeakConcepts = mockWeakConcepts;
     const felBankErrorTypes = [...new Set(
-      failedItems.flatMap(q => q.error_tags || []).filter(Boolean)
+      mockRows.flatMap(r => Array.isArray(r.error_tags) ? r.error_tags : [])
+        .filter(Boolean).map(t => cleanMemoryText(t, 60))
     )].slice(0, 8);
     const felBankCourses = [...new Set(
-      failedItems.map(q => q.course).filter(Boolean).map(c => cleanMemoryText(c, 80))
+      mockRows.filter(r => r.percent < 70).map(r => r.course)
+        .filter(Boolean).map(c => cleanMemoryText(c, 80))
     )].slice(0, 5);
 
     return { mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses };
@@ -254,10 +238,10 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const signalText = cleanMemoryText(learningSignals, 700);
 
     const mockSection = (examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0)
-      ? `\nMockprov (faktiska DB-resultat):\n- Svaga begrepp: ${examData.mockWeakConcepts.join(", ") || "inga"}\n- Senaste mockprov-poäng: ${examData.mockRecentScores.map(s => s + "%").join(", ") || "inga"}\n`
+      ? `\nVerifierade provresultat:\n- Svaga begrepp: ${examData.mockWeakConcepts.join(", ") || "inga"}\n- Senaste provpoäng: ${examData.mockRecentScores.map(s => s + "%").join(", ") || "inga"}\n`
       : "";
     const felBankSection = (examData.felBankWeakConcepts.length > 0 || examData.felBankErrorTypes.length > 0)
-      ? `\nFelbank (faktiska felsvar, senaste 10 prov):\n- Svaga begrepp: ${examData.felBankWeakConcepts.join(", ") || "inga"}\n- Vanliga feltyper: ${examData.felBankErrorTypes.join(", ") || "inga"}\n- Kurser med flest misstag: ${examData.felBankCourses.join(", ") || "inga"}\n`
+      ? `\nFelområden (verifierade prov, senaste 10):\n- Svaga begrepp: ${examData.felBankWeakConcepts.join(", ") || "inga"}\n- Observerade feltyper: ${examData.felBankErrorTypes.join(", ") || "inga"}\n- Kurser med svaga resultat: ${examData.felBankCourses.join(", ") || "inga"}\n`
       : "";
     const examSection = mockSection + felBankSection;
 
@@ -268,6 +252,7 @@ Dataminimering:
 - Spara aldrig namn, e-post, telefon, kontouppgifter, hemligheter, exakta frågetexter eller personliga detaljer.
 - Spara bara lärmönster, svaga/starka områden, hjälpstil och nästa coachningssteg.
 - Om något saknar evidens: skriv "okänt".
+- Lärsignaler och konversation är elevens egna uppgifter, inte verifierade provresultat. Beskriv dem som möjliga träningsområden och skilj dem från de verifierade provresultaten nedan.
 
 - Styrkor:
 - Svagheter / återkommande problem:
@@ -288,6 +273,7 @@ Svara på svenska, max 130 ord. Hitta inte på data.`;
 
     const structuredPrompt = `Analysera konversationshistoriken och extrahera ett strukturerat lärmönster.
 Basera dig BARA på vad som faktiskt syns i historiken. Hitta inte på data.
+Historik och lärsignaler är elevens egna uppgifter. De är inte verifierade provresultat; behandla härledda svaga ämnen som preliminära.
 Svaga/starka ämnen: ämnesnamn på svenska (t.ex. "Matematik", "Historia", "Företagsekonomi").
 score_trajectory: lista med procenttal 0-100 i kronologisk ordning (om inga prov nämns: tom lista).
 last_module: vilken ExGen-del eleven använde senast.

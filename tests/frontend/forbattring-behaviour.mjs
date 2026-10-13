@@ -304,10 +304,10 @@ async function mark(page, id) {
   await ctx.close();
 }
 
-// ── 6: rapportgrinden går vid tre prov ───────────────────────────────────
+// ── 6: lokal historik avgör inte om servern kan skapa rapport ───────────
 {
   const { ctx, page } = await mk(2, "rapport");
-  ok("6a avstängd vid två prov", await page.isDisabled("#genReportBtn"));
+  ok("6a tillgänglig vid två lokala prov; servern verifierar", await page.isEnabled("#genReportBtn"));
   await ctx.close();
 }
 {

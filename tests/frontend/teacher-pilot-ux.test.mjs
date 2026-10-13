@@ -16,7 +16,9 @@ assert.match(page, /querySelectorAll\('button, a\[href\], input, select, textare
 assert.match(page, /drilldownReturnFocus\.focus\(\)/, "closing the dialog restores focus");
 assert.match(page, /stLabel[\s\S]*?student_label/, "teacher roster displays class-scoped labels instead of student email");
 assert.doesNotMatch(page, /st\.email|student\.email|ddEmail|stEmail/, "teacher UI does not render student email addresses");
-assert.match(page, /träningssignal, inte ett betyg eller en säker kunskapsbedömning/i, "teacher dashboard frames low self-selected mock scores cautiously");
+assert.match(page, /Resultaten och träningsområdena är signaler, inte betyg eller säkra kunskapsbedömningar/i, "teacher dashboard frames verified practice scores cautiously");
+assert.match(page, /localStorage\.removeItem\(k\)/, "old persistent class insights are cleared on load");
+assert.doesNotMatch(page, /localStorage\.setItem\(insightKey/, "class insight is not persisted beyond current view");
 assert.match(api, /Beskriv låga resultat som möjliga träningsbehov, inte som säkra brister eller betyg/, "AI class insight avoids treating mock exams as validated diagnosis");
 assert.match(admin, /setAttribute\('aria-disabled', 'true'\)/, "unauthorized admin content announces its disabled state");
 assert.doesNotMatch(admin, /style\.opacity\s*=\s*'0\.4'/, "admin access gate does not wash out page text");
@@ -24,6 +26,10 @@ assert.match(improvement, /setAttribute\('aria-disabled','true'\)/, "unauthorize
 assert.doesNotMatch(improvement, /style\.opacity\s*=\s*'0\.55'/, "improvement access gate does not wash out page text");
 assert.match(konto, /Klassanslutningar kunde inte hämtas just nu\.[\s\S]*?Försök igen[\s\S]*?loadMyClasses/, "class membership load failures remain visible and retryable");
 assert.match(konto, /klasspecifika etikett[\s\S]*?Läraren ser <em>inte<\/em> din e-postadress/, "account copy matches the privacy-minimized teacher API response");
+assert.match(improvement, /localStorage\.removeItem\(LS_TEACHER_REPORT_CACHE\)/, "old client-history reports are cleared");
+assert.doesNotMatch(improvement, /setReportCache\(/, "new verified reports are not persistently cached");
+assert.match(improvement, /onAuthStateChange\?\.\(\(_event,session\)=>\{[\s\S]*?session\?\.user\?\.id!==reportOwner\)renderReportState\(\)/, "visible report clears on account switch");
+assert.match(improvement, /current\?\.session\?\.user\?\.id!==reportOwner\)\{renderReportState\(\);return;\}/, "copy action rechecks report owner");
 assert.doesNotMatch(signup, /elton\.rustaeus@gmail\.com|adminNoticeHtml/, "signup does not send student identifiers to a private admin mailbox");
 assert.match(signup, /to: emailStr,[\s\S]*?buildVerificationHtml\(emailStr, actionLink\)/, "verification link is emailed only to the submitted address");
 assert.match(signup, /admin\.generateLink\([\s\S]*?type: "signup"[\s\S]*?redirectTo: `\$\{SITE_ORIGIN\}\/app\.html`/, "password signup requires the Supabase verification link before a session is issued");

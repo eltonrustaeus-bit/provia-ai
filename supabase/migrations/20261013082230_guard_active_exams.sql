@@ -11,6 +11,18 @@ begin
 end;
 $$;
 
+-- Existing owner-only RLS still let a browser invent its own result row.
+-- Old rows remain unverified; only the service-only grading RPC below marks
+-- new results as verified in the same transaction as the issued exam.
+alter table public.mock_results
+  add column verified_at timestamptz
+    check (verified_at is null or submission_id is not null),
+  add column weak_concept_tags text[] not null default '{}'::text[];
+
+revoke all on table public.mock_results from public, anon, authenticated;
+grant select, insert, update, delete on table public.mock_results to service_role;
+drop policy if exists users_own_mock_results on public.mock_results;
+
 create table public.exam_issuances (
   user_id uuid not null references auth.users(id) on delete cascade,
   submission_id text not null check (submission_id ~ '^[a-f0-9]{32}$'),
@@ -197,9 +209,22 @@ begin
   if jsonb_array_length(p_result_payload -> 'per_question') <> p_num_questions then return 'invalid'; end if;
 
   insert into public.mock_results
-    (user_id, submission_id, course, percent, num_questions, concept_tags, error_tags)
+    (user_id, submission_id, course, percent, num_questions, concept_tags,
+     error_tags, weak_concept_tags, verified_at)
   values
-    (p_user_id, p_submission_id, p_course, p_percent, p_num_questions, p_concept_tags, p_error_tags)
+    (p_user_id, p_submission_id, p_course, p_percent, p_num_questions, p_concept_tags,
+     p_error_tags,
+     array(
+       select distinct left(item ->> 'concept_tag', 80) as concept
+       from jsonb_array_elements(p_result_payload -> 'per_question') item
+       where jsonb_typeof(item -> 'points') = 'number'
+         and jsonb_typeof(item -> 'max_points') = 'number'
+         and (item ->> 'points')::numeric < (item ->> 'max_points')::numeric
+         and nullif(trim(item ->> 'concept_tag'), '') is not null
+         and item ->> 'concept_tag' not in ('Okänt', 'Unknown')
+       order by concept
+       limit 20
+     ), now())
   on conflict (user_id, submission_id) do nothing
   returning submission_id into v_saved_id;
   if v_saved_id is null then return 'duplicate'; end if;

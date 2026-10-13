@@ -670,8 +670,9 @@
     }
 
     /* ── TEACHER REPORT ── */
-    function getReportCache(){const o=lsObj(LS_TEACHER_REPORT_CACHE);return(o&&typeof o==='object')?o:{};}
-    function setReportCache(c){lsSet(LS_TEACHER_REPORT_CACHE,c);}
+    try{localStorage.removeItem(LS_TEACHER_REPORT_CACHE);}catch{}
+    let reportCount=0;
+    let reportOwner=null;
     /* Vilken kurs eleven tittar på. Väljaren bor i felbank-skärmen, men alla
        fem skärmar ritas av renderAll() så elementet finns i DOM:en oavsett
        vilken som är framme. Beroendet är osynligt och därför samlat här och
@@ -679,13 +680,18 @@
        tyst börja omfatta alla kurser om felbanken en dag ritas lazily. */
     function currentCourse(){ return String($('courseFilter')?.value||'').trim(); }
     window.__reportScopeForTest=()=>currentCourse();
-    function reportCacheKey(){return currentCourse()||'__all__';}
     async function fetchReport(payload){
       const{data:sd}=await db.auth.getSession();
       const token=sd?.session?.access_token||'';
+      const owner=sd?.session?.user?.id||'';
       if(!token)throw new Error('Logga in igen för att skapa rapporten.');
       const res=await fetch('/api/teacher-report',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)});
-      const data=await res.json();if(!res.ok)throw new Error(data?.error||'failed');return String(data?.report||data?.tips||'');
+      const{data:current}=await db.auth.getSession();
+      if(!owner||current?.session?.user?.id!==owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+      const data=await res.json();if(!res.ok)throw new Error(data?.error||'Kunde inte skapa rapport.');
+      const{data:afterRead}=await db.auth.getSession();
+      if(afterRead?.session?.user?.id!==owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+      return {text:String(data?.report||''),count:Number(data?.exams_count||0),owner};
     }
     function setReportText(t){const b=$('reportBox');if(b)b.textContent=t;}
     function setReportStatus(t,c){const s=$('reportStatus');if(!s)return;s.textContent=t;s.className='statusText'+(c?' '+c:'');}
@@ -937,40 +943,36 @@
     }
 
     /* ── TEACHER REPORT STATE ── */
-    function renderReportState(h){
-      const n=Array.isArray(h)?h.length:0;
-      if(n<3){setReportStatus(`Minst 3 prov krävs. Du har ${n}.`,'warn');setGenEnabled(false);setCopyEnabled(false);setReportPill('',false);setReportText('—');return;}
-      setReportStatus(`Redo – ${n} prov`,'ok');setGenEnabled(true);
-      const cache=getReportCache(),key=reportCacheKey(),cached=cache[key];
-      if(cached&&typeof cached.text==='string'&&cached.text.trim()){setReportText(cached.text);setCopyEnabled(true);setReportPill(`${Number(cached.n||n)} prov`,true);}
-      else{setReportText('—');setCopyEnabled(false);setReportPill('',false);}
+    function renderReportState(){
+      setReportStatus('Rapporten kräver minst 3 verifierat rättade övningsprov.','');setGenEnabled(true);
+      reportCount=0;reportOwner=null;setReportText('—');setCopyEnabled(false);setReportPill('',false);
     }
 
     /* ── GENERATE REPORT ── */
     async function generateReport(){
-      const h=lsArr(LS_HISTORY),m=lsArr(LS_MISTAKES),n=h.length;
-      if(n<3){setReportStatus(`Minst 3 prov krävs. Du har ${n}.`,'warn');setReportText('—');setCopyEnabled(false);setReportPill('',false);return;}
+      reportCount=0;reportOwner=null;
       setGenEnabled(false);setCopyEnabled(false);setReportStatus('Skapar rapport…','');setReportText('');setReportPill('',false);showLoad();
       const course=currentCourse();
-      const fH=course?h.filter(x=>String(x.course||'').trim()===course):h;
-      const fM=course?m.filter(x=>String(x.course||'').trim()===course):m;
-      const rN=fH.length;
-      if(rN<3){setReportStatus(`Minst 3 prov krävs. Du har ${rN}.`,'warn');setReportText('—');setGenEnabled(true);hideLoad();return;}
       try{
-        const text=await fetchReport({course:course||''});
-        const norm=String(text||'').trim();
-        if(!norm){setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');setGenEnabled(true);return;}
-        const cache=getReportCache(),key=reportCacheKey();cache[key]={ts:Date.now(),n:rN,text:norm};setReportCache(cache);
-        setReportStatus(`Redo – ${rN} prov`,'ok');setReportText(norm);setCopyEnabled(true);setReportPill(`${rN} prov`,true);
-      }catch{setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');}
+        const report=await fetchReport({course:course||''});
+        const{data:current}=await db.auth.getSession();
+        if(current?.session?.user?.id!==report.owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+        const norm=report.text.trim();
+        if(!norm||report.count<3){setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');return;}
+        reportCount=report.count;
+        reportOwner=report.owner;
+        setReportStatus(`Redo – ${report.count} verifierade prov`,'ok');setReportText(norm);setCopyEnabled(true);setReportPill(`${report.count} prov`,true);
+      }catch(e){setReportStatus(e?.message||'Kunde inte skapa rapport.','bad');setReportText('—');}
       finally{hideLoad();setGenEnabled(true);}
     }
     async function copyReport(){
+      const{data:current}=await db.auth.getSession();
+      if(!reportOwner||current?.session?.user?.id!==reportOwner){renderReportState();return;}
       const text=String($('reportBox')?.textContent||'').trim();
       if(!text||text==='—')return;
       try{
         await navigator.clipboard.writeText(text);setReportPill('Kopierad ✓',true);
-        setTimeout(()=>{const cache=getReportCache(),key=reportCacheKey(),cached=cache[key],based=cached?.n?Number(cached.n):lsArr(LS_HISTORY).length;if(based>=3)setReportPill(`${based} prov`,true);else setReportPill('',false);},1400);
+        setTimeout(()=>{if(reportCount>=3)setReportPill(`${reportCount} prov`,true);else setReportPill('',false);},1400);
       }catch{}
     }
 
@@ -1153,8 +1155,8 @@
           small:isCoachCacheFresh(cache)?'analys från senaste dygnet':'ny analys av din historik',
           av:!h.length },
         { go:'rapport', label:'Rapport till läraren',
-          small:h.length>=3?`${h.length} prov · redo`:`kräver 3 prov, du har ${h.length}`,
-          av:h.length<3 }
+          small:'minst 3 verifierat rättade prov',
+          av:false }
       ].forEach(v=>{
         const b=document.createElement('button');
         b.type='button'; b.className='xf-opt'; b.dataset.go=v.go; b.disabled=!!v.av;
@@ -1336,10 +1338,8 @@
 
     /* ── LÄRARRAPPORT ── */
     function renderRapport(){
-      const d=data(), n=d.h.length;
-      flow.say('rapport','Rapport till läraren', n>=3
-        ? `En sammanfattning av ${n} prov som du kan kopiera och visa.`
-        : `Kräver minst tre rättade prov. Du har ${n}.`);
+      flow.say('rapport','Rapport till läraren',
+        'En sammanfattning av verifierat rättade övningsprov som du kan kopiera och visa. Minst tre krävs.');
 
       const body=flow.body('rapport');
       backBtn(body);
@@ -1366,7 +1366,7 @@
         '<div class="xf-card reportBox" id="reportBox">—</div>';
       body.appendChild(wrap);
 
-      renderReportState(d.h);
+      renderReportState();
       $('genReportBtn').addEventListener('click',()=>generateReport());
       $('copyReportBtn').addEventListener('click',()=>copyReport());
     }
@@ -1402,6 +1402,7 @@
          finns ingen väg tillbaka ut. */
       window.__perManifestForTest={targets:PER_TARGETS};
     }
+    document.addEventListener('DOMContentLoaded',pushPerContext,{once:true});
 
     function renderAll(){
       renderHem(); renderFelbank(); renderProv(); renderCoach(); renderRapport();
@@ -1417,6 +1418,9 @@
     /* Skärmen som just öppnades ska visa aktuell data — annars står coachen
        kvar på siffror från innan senaste synk. */
     flow.on(()=>renderAll());
+    db?.auth?.onAuthStateChange?.((_event,session)=>{
+      if(reportOwner&&session?.user?.id!==reportOwner)renderReportState();
+    });
 
     /* ── RENSA ALL DATA ──
        Knappen kommer från window.XG_MENU_EXTRA och renderas av
