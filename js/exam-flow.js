@@ -399,6 +399,14 @@
 
   function draftKey() { return LS_DRAFT_BASE + "_" + uid(); }
 
+  function questionState(source) {
+    var state = Object.create(null);
+    if (source && typeof source === "object" && !Array.isArray(source)) {
+      Object.keys(source).forEach(function (key) { state[key] = source[key]; });
+    }
+    return state;
+  }
+
   // ── Tillstånd ────────────────────────────────────────────────────────────
 
   var S = {
@@ -409,8 +417,8 @@
     nonGraphNum: 12,
     material: "",
     exam: null,
-    answers: {},   // qid -> svar
-    helped: {},    // qid -> true om P.E.R öppnades på just den frågan
+    answers: questionState(),   // qid -> svar
+    helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
     idx: 0,
     startedAt: 0,
     nudges: 0,
@@ -616,8 +624,8 @@
         S.material = draft.material || "";
         if (legacyDraft) { stepMaterial(); return; }
         S.exam = draft.exam;
-        S.answers = draft.answers || {};
-        S.helped = draft.helped || {};
+        S.answers = questionState(draft.answers);
+        S.helped = questionState(draft.helped);
         S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
         S.submitting = false;
         // Motorn måste känna till provet igen — den startade om med sidan och
@@ -1246,8 +1254,8 @@
         return;
       }
       S.exam = normalizeIds(r.exam);
-      S.answers = {};
-      S.helped = {};
+      S.answers = questionState();
+      S.helped = questionState();
       S.idx = 0;
       S.nudges = 0;
       S.lastNudge = 0;
@@ -1458,6 +1466,72 @@
     return String(raw || "").trim().length > 0;
   }
 
+  function renderGraphUnavailable(sheet, lang) {
+    var en = lang === "en";
+    var wrap = el("div", "xf-graph-unavailable");
+    var error = el("p", "xf-photo-note bad", en
+      ? "The graph tool did not load. You can retry without leaving the exam."
+      : "Grafverktyget kunde inte laddas. Försök igen utan att lämna provet.");
+    error.setAttribute("role", "alert");
+
+    var retry = el("button", "xf-btn ghost", en ? "Retry graph tool" : "Försök igen");
+    retry.type = "button";
+    var status = el("p", "xf-graph-retry-status");
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+
+    retry.addEventListener("click", function () {
+      if (retry.disabled) return;
+      retry.disabled = true;
+      error.hidden = true;
+      status.textContent = en ? "Loading the graph tool…" : "Laddar grafverktyget…";
+
+      var script = document.createElement("script");
+      script.src = "/js/graph-answer.js?retry=" + Date.now();
+      var retryTimer = null;
+      var settled = false;
+
+      function failed(timedOut) {
+        if (settled) return;
+        settled = true;
+        if (retryTimer) window.clearTimeout(retryTimer);
+        script.onload = null;
+        script.onerror = null;
+        script.remove();
+        error.textContent = timedOut
+          ? (en ? "Loading the graph tool took too long. Check your connection and retry."
+            : "Det tog för lång tid att ladda grafverktyget. Kontrollera anslutningen och försök igen.")
+          : (en ? "The graph tool still could not load. Check your connection and retry."
+            : "Grafverktyget kunde fortfarande inte laddas. Kontrollera anslutningen och försök igen.");
+        error.hidden = false;
+        status.textContent = "";
+        retry.disabled = false;
+      }
+
+      script.onload = function () {
+        if (settled) return;
+        if (typeof window.ExGenGraphAnswer !== "function") {
+          failed(false);
+          return;
+        }
+        settled = true;
+        if (retryTimer) window.clearTimeout(retryTimer);
+        script.remove();
+        renderQuestion();
+        var firstInput = $(".graph-answer input:not([type=hidden])", UI.sheetWrap);
+        if (firstInput) firstInput.focus();
+      };
+      script.onerror = function () { failed(false); };
+      retryTimer = window.setTimeout(function () { failed(true); }, 10000);
+      document.head.appendChild(script);
+    });
+
+    wrap.appendChild(error);
+    wrap.appendChild(retry);
+    wrap.appendChild(status);
+    sheet.appendChild(wrap);
+  }
+
   /* Fritextsvar skickas 500 ms efter senaste tangenttryck. Varje tecken hade
      annars blivit ett nytt manifest. */
   function publishSoon() {
@@ -1527,10 +1601,10 @@
       });
       sheet.appendChild(group);
     } else if (q.type === "graph") {
+      var lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en" ? "en" : "sv";
       if (!window.ExGenGraphAnswer) {
-        sheet.appendChild(el("p", "xf-photo-note bad", "Grafverktyget kunde inte laddas. Ladda om sidan och försök igen."));
+        renderGraphUnavailable(sheet, lang);
       } else {
-        var lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en" ? "en" : "sv";
         window.ExGenGraphAnswer(sheet, S.answers[id] || "", function (value) {
           S.answers[id] = value;
           saveDraftSoon(); publishSoon(); armStuck();
@@ -1699,8 +1773,8 @@
       closeExam();
       lsDel(draftKey());
       S.exam = null;
-      S.answers = {};
-      S.helped = {};
+      S.answers = questionState();
+      S.helped = questionState();
       S.submitting = false;
       stepStart();
     }).catch(function () {
@@ -2098,7 +2172,7 @@
     var fresh = el("button", "xf-btn quiet", "Nytt ämne");
     fresh.type = "button";
     fresh.addEventListener("click", function () {
-      S.exam = null; S.answers = {}; S.helped = {}; S.material = "";
+      S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";
       S.submitting = false;
       // Eleven har uttryckligen övergett provet. Låg utkastet kvar erbjöds det
       // tillbaka vid nästa sidladdning som "Fortsätt provet du började".

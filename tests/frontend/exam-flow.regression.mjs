@@ -68,7 +68,7 @@ async function mk(opts = {}, gradeOk = true) {
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
     const qs = lastGradePayload?.questions || [];
-    r.fulfill({ json: { ok: true, result: {
+    return r.fulfill({ json: { ok: true, exam_proof: `v2.${"f".repeat(32)}.syntheticRegressionProof`, persistence: { mock_result_saved: true }, result: {
       total_points: 5, max_points: 8,
       per_question: qs.map((q, i) => ({ id: String(q.id), points: i === 1 ? 1 : 2, max_points: q.points, feedback: "fb" + i, model_answer: "ma" + i }))
     } } });
@@ -79,7 +79,11 @@ async function mk(opts = {}, gradeOk = true) {
 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
-const signIn = (page, uid) => seed(page, { user: { id: uid, email: uid + "@t.se" } });
+const signIn = async (page, uid) => {
+  await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
+  await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role: "premium" }] }));
+  await seed(page, { user: { id: uid, email: uid + "@t.se" } });
+};
 
 async function toExam(page) {
   await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
@@ -140,7 +144,7 @@ async function toExam(page) {
 {
   const originalIds = EXAM.questions.map(q => q.id);
   EXAM.questions.forEach((q, i) => { q.id = ["constructor", "toString", "__proto__"][i]; });
-  const { ctx, page } = await mk();
+  const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "prototype-ids");
     await toExam(page);
@@ -150,9 +154,11 @@ async function toExam(page) {
     await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
     await page.click(".xf-exam-nav .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
-    const ids = (lastGradePayload?.answers || []).map(a => a.id);
+    const gradedAnswers = lastGradePayload?.answers || [];
+    const ids = gradedAnswers.map(a => a.id);
     const expectedIds = ["constructor", "toString", "__proto__"];
     ok("T1e fråge-id med inbyggda objektnamn behålls exakt", JSON.stringify(ids) === JSON.stringify(expectedIds), JSON.stringify(ids));
+    ok("T1e svar på __proto__ lagras som elevens val", gradedAnswers[2]?.answer === "C", JSON.stringify(gradedAnswers[2]));
   } finally {
     EXAM.questions.forEach((q, i) => { q.id = originalIds[i]; });
     await ctx.close();

@@ -111,6 +111,13 @@ try {
   await seed(page);
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  let graphAssetMode = "fail";
+  let hangingGraphRoute = null;
+  await page.route("**/js/graph-answer.js**", (route) => {
+    if (graphAssetMode === "available") return route.continue();
+    if (graphAssetMode === "hang") { hangingGraphRoute = route; return; }
+    return route.abort();
+  });
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on");
   await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([{
@@ -160,7 +167,42 @@ try {
   assert.equal(await page.locator("#pastedText").inputValue(), "Funktionen beskriver sambandet mellan x och y. Variabeln x är ett reellt tal. Linjens lutning visar hur mycket y förändras per steg i x. Den räta linjen ges av y = 2x + 1. Y-skärningen är konstanttermen.",
     "the submitted material is preserved for retry");
   await page.getByRole("button", { name: "Skapa provet" }).click();
+  await page.waitForSelector(".xf-exam.on .xf-graph-unavailable");
+  const graphLoadError = page.locator(".xf-graph-unavailable [role=alert]");
+  assert.match(await graphLoadError.innerText(), /kunde inte laddas/i);
+  assert.equal(await graphLoadError.count(), 1, "graph loading failure is announced to assistive technology");
+  await page.waitForFunction(() => !document.getElementById("proviaWelcome"));
+  await page.waitForFunction(() => Number(getComputedStyle(document.querySelector(".xf-sheet")).opacity) === 1);
+  await page.screenshot({ path: "/tmp/exgen-graph-tool-recovery-mobile.png" });
+  const mobileSheet = await page.locator(".xf-sheet").boundingBox();
+  assert.ok(mobileSheet && mobileSheet.x >= 0 && mobileSheet.x + mobileSheet.width <= 390,
+    "graph error and retry fit inside the mobile viewport");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: "/tmp/exgen-graph-tool-recovery-desktop.png" });
+  const desktopSheet = await page.locator(".xf-sheet").boundingBox();
+  assert.ok(desktopSheet && desktopSheet.x >= 0 && desktopSheet.x + desktopSheet.width <= 1280,
+    "graph error and retry fit inside the desktop viewport");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const retryGraph = page.getByRole("button", { name: "Försök igen" });
+  await retryGraph.click();
+  await page.waitForFunction(() => document.querySelector(".xf-graph-unavailable [role=alert]")?.textContent.includes("fortfarande inte laddas"));
+  assert.equal(await retryGraph.isEnabled(), true, "a failed retry leaves a usable retry button");
+  graphAssetMode = "hang";
+  await retryGraph.click();
+  await page.waitForFunction(() => document.querySelector(".xf-graph-unavailable [role=alert]")?.textContent.includes("för lång tid"), { timeout: 12000 });
+  assert.equal(await retryGraph.isEnabled(), true, "a timed-out retry leaves a usable retry button");
+  if (hangingGraphRoute) await hangingGraphRoute.abort();
+  graphAssetMode = "available";
+  await retryGraph.click();
   await page.waitForSelector(".xf-exam.on .graph-answer");
+  const recoveredFocus = await page.evaluate(() => ({
+    tag: document.activeElement?.tagName,
+    label: document.activeElement?.getAttribute("aria-label"),
+    insideGraph: Boolean(document.activeElement?.closest(".graph-answer")),
+    graphInputs: document.querySelectorAll(".graph-answer input:not([type=hidden])").length,
+  }));
+  assert.equal(recoveredFocus.label, "Punkt A, x-koordinat",
+    `successful recovery focuses the first coordinate input: ${JSON.stringify(recoveredFocus)}`);
   assert.equal(await page.locator("#proviaWelcome").count(), 0, "welcome overlay is dismissed before the exam can be obscured");
   await page.evaluate(() => window.showWelcome("Test", false));
   assert.equal(await page.locator("#proviaWelcome").count(), 0, "a delayed welcome callback cannot cover an active exam");
