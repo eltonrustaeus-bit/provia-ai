@@ -71,7 +71,42 @@ try {
   await page.getByRole("button", { name: "Visa fullpoängssvar" }).click();
   assert.equal(await page.locator(".xf-graph-retry .xf-item-model").isVisible(), true,
     "the verified graph answer can be requested after grading");
-  console.log("graph partial submission: skipped grading, mistake isolation and optional answer passed");
+
+  await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
+  await page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary").click();
+  await page.locator("#xf .xf-screen[data-screen='subject'] .xf-input").fill("Matematik 1b");
+  await page.locator("#xf .xf-screen[data-screen='subject'] .xf-btn.primary").click();
+  await page.getByRole("button", { name: "Ändra" }).click();
+  await page.getByRole("button", { name: "Interaktiv graf" }).click();
+  await page.locator("#xf .xf-screen[data-screen='aim'] .xf-btn.primary").click();
+  await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").fill(
+    "Vi studerar den rata linjen y = x. Lutningen ar 1 och skarningen med y-axeln ar 0. Nar x okar ett steg okar y ett steg. Sambandet kan kontrolleras i en tabell: x = 0 ger y = 0, x = 1 ger y = 1 och x = 2 ger y = 2."
+  );
+  await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").click();
+  await page.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
+  await page.waitForSelector(".xf-exam.on .graph-answer");
+  for (const [label, value] of [
+    ["Punkt A, x-koordinat", "0"], ["Punkt A, y-koordinat", "0"],
+    ["Punkt B, x-koordinat", "1"], ["Punkt B, y-koordinat", "1"],
+  ]) await page.getByRole("spinbutton", { name: label }).fill(value);
+  await page.waitForFunction(() => {
+    const key = Object.keys(localStorage).find((name) => name.startsWith("exgen_flow_draft_"));
+    const answer = JSON.parse(localStorage.getItem(key) || "null")?.answers?.["graph-1"];
+    return answer && JSON.parse(answer).points.every((point) => point.x !== null && point.y !== null);
+  });
+  const blockGraph = (route) => route.abort();
+  await page.route("**/js/graph-answer.js**", blockGraph);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+  await page.waitForSelector(".xf-exam.on .xf-graph-unavailable");
+  gradeBody = null;
+  await page.getByRole("button", { name: "Lämna in" }).click();
+  assert.equal(gradeBody, null, "a saved complete graph is never silently graded as blank when its tool fails");
+  assert.match(await page.locator(".xf-nudge").innerText(), /sparade grafsvar finns kvar/);
+  await page.unroute("**/js/graph-answer.js**", blockGraph);
+  await page.getByRole("button", { name: "Försök igen", exact: true }).click();
+  await page.waitForSelector(".xf-exam.on .graph-answer");
+  console.log("graph submission: partial skip, optional answer and saved-answer recovery passed");
 } finally {
   await browser.close();
   await server.close();

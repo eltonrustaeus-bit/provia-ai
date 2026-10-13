@@ -1828,6 +1828,19 @@
     S.submitting = true;
 
     var qs = S.exam.questions;
+    var graphWithoutTool = qs.findIndex(function (q, n) {
+      return q.type === "graph" && String(S.answers[qid(q, n)] || "").trim()
+        && !window.ExGenGraphAnswer;
+    });
+    if (graphWithoutTool >= 0) {
+      S.submitting = false;
+      S.idx = graphWithoutTool;
+      renderQuestion();
+      nudge(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en"
+        ? "Your saved graph answer is still here, but the graph tool could not load. Retry the graph tool before submitting."
+        : "Ditt sparade grafsvar finns kvar, men grafverktyget kunde inte laddas. Försök ladda grafverktyget igen innan du lämnar in.", true);
+      return;
+    }
     var blank = qs.filter(function (q, n) {
       return !isAnswerComplete(q, S.answers[qid(q, n)]);
     }).length;
