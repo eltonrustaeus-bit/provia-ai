@@ -28,17 +28,23 @@ let activeUser = studentId;
 let aiCalls = 0;
 let lastPrompt = "";
 let historyReads = 0;
+const usageEvents = [];
 
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" ? input : input.url);
   if (url.origin === "https://api.openai.com") {
     aiCalls++;
     lastPrompt = JSON.stringify(JSON.parse(init.body).input);
-    return Response.json({ output: [{ content: [{ type: "output_text", text: "Baserad på 3 prov\nÖversikt: Övningssignal." }] }] });
+    return Response.json({ model: "measured-teacher-model", usage: { input_tokens: 80, output_tokens: 22 },
+      output: [{ content: [{ type: "output_text", text: "Baserad på 3 prov\nÖversikt: Övningssignal." }] }] });
   }
   assert.equal(url.origin, "https://synthetic.supabase.invalid");
   if (url.pathname === "/auth/v1/user") return Response.json({ id: activeUser, email: "student@example.invalid" });
   if (url.pathname === "/rest/v1/rpc/consume_anon_rate") return Response.json({ ok: true });
+  if (url.pathname === "/rest/v1/ai_usage_events") {
+    usageEvents.push(JSON.parse(init.body));
+    return new Response(null, { status: 201 });
+  }
   if (url.pathname === "/rest/v1/profiles") return Response.json({ role: "teacher" });
   if (url.pathname === "/rest/v1/classes") return Response.json({ id: classId, name: "Syntetisk klass", teacher_id: teacherId });
   if (url.pathname === "/rest/v1/class_members") {
@@ -89,6 +95,11 @@ assert.equal(enough.statusCode, 200);
 assert.equal(enough.body.exams_count, 3);
 assert.equal(aiCalls, 1);
 assert.ok(!lastPrompt.includes(forged.created_at), "forged result never reaches the model");
+assert.equal(usageEvents.length, 1);
+assert.equal(usageEvents[0][0].feature, "teacher_report");
+assert.equal(usageEvents[0][0].model, "measured-teacher-model");
+assert.equal(usageEvents[0][0].input_tokens, 80);
+assert.doesNotMatch(JSON.stringify(usageEvents[0]), /Baserad på|Övningssignal|Fysik 1/);
 
 activeUser = teacherId;
 const roster = response();
@@ -140,5 +151,31 @@ await role({ method: "POST", headers: { authorization: "Bearer synthetic-teacher
   body: { action: "teacher_students", classId } }, largeRoster);
 assert.equal(largeRoster.statusCode, 200);
 assert.equal(largeRoster.body.students.length, 1001, "roster includes members beyond the first API page");
+
+const insightStudentIds = [
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5",
+];
+members.splice(0, members.length, ...insightStudentIds.map((id) => ({ student_id: id })));
+verified.splice(0, verified.length, ...insightStudentIds.map((id, index) => ({
+  id: `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb${index + 1}`, user_id: id, course: "Matematik 1b",
+  percent: 50 + index * 10, num_questions: 4, concept_tags: [], error_tags: [],
+  weak_concept_tags: ["Bråk"], created_at: `2026-10-13T0${index}:00:00Z`, verified_at: "2026-10-13T08:00:00Z",
+})));
+activeUser = teacherId;
+const insight = response();
+await role({ method: "POST", headers: { authorization: "Bearer synthetic-teacher-token" },
+  body: { action: "teacher_class_insight", classId } }, insight);
+assert.equal(insight.statusCode, 200);
+assert.equal(insight.body.students_with_data, 5);
+assert.equal(usageEvents.length, 3);
+assert.equal(usageEvents[2][0].feature, "teacher_class_insight");
+assert.equal(usageEvents[2][0].subscription_tier, "teacher");
+assert.equal(usageEvents[2][0].model, "measured-teacher-model");
+assert.equal(usageEvents[2][0].output_tokens, 22);
+assert.doesNotMatch(JSON.stringify(usageEvents[2]), /Klassläge|Bråk|Övningssignal/);
 
 console.log("teacher provenance: forged owner row excluded from report, roster, and detail");

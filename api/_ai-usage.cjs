@@ -2,7 +2,7 @@ const { getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-s
 
 const MAX_DB_INTEGER = 2_147_483_647;
 const STEPS = new Set(["generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
-const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory", "ocr"]);
+const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory", "ocr", "teacher_report", "teacher_class_insight"]);
 const TIERS = new Set(["gratis", "basic", "premium", "admin", "teacher"]);
 
 function measuredTokens(usage) {

@@ -1,10 +1,13 @@
 ﻿import { requireAuth } from "./_auth.js";
-import { callAI } from "./_per-core.js";
+import { callAIRaw } from "./_per-core.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
 import pilotScope from "./_pilot-scope.cjs";
+import aiUsage from "./_ai-usage.cjs";
 
+import { randomUUID } from "node:crypto";
 import { perRole } from "./_per-name.js";
 const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
+const { logAiUsage } = aiUsage;
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 async function consumeReportQuota(userId) {
@@ -134,13 +137,19 @@ ${JSON.stringify(last10, null, 2)}
 
 Skriv rapporten enligt formatet och kraven.`;
 
-    const text = await callAI(
+    const startedAt = Date.now();
+    const result = await callAIRaw(
       [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
       { model: MODEL, timeout: 45_000 }
     );
+    await logAiUsage({
+      userId: user.id, requestId: randomUUID(), feature: "teacher_report", step: "generate",
+      model: result.model, usage: result.usage, latencyMs: Date.now() - startedAt,
+    }, { timeoutMs: 750 });
+    const text = result.text;
 
     if (!text) {
       return res.status(500).json({ ok: false, error: "Empty report" });

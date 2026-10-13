@@ -7,11 +7,14 @@ import { flagsEnabled } from "./_flags.js";
 import { PERSONAS } from "./_education.js";
 import { loadProfile, saveFacts, forgetFact, forgetAllFacts, profileForDisplay } from "./_learner-profile.js";
 import { nextFocusForDisplay, masteryForDisplay } from "./_mastery-view.js";
-import { callAI } from "./_per-core.js";
+import { randomUUID } from "node:crypto";
+import { callAIRaw } from "./_per-core.js";
+import aiUsage from "./_ai-usage.cjs";
 import { SITE_ORIGIN } from "./_site.js";
 import { MAINTENANCE, maintenanceAllows } from "./_maintenance.js";
 import pilotScope from "./_pilot-scope.cjs";
 const { isPilotActionAllowed, isPilotMode } = pilotScope;
+const { logAiUsage } = aiUsage;
 
 import { perRole } from "./_per-name.js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -741,13 +744,19 @@ Begrepp som återkommer hos minst tre elever: ${topWeak.join(", ") || "inga åte
 
 Skriv rapporten enligt formatet.`;
 
-        const insight = await callAI(
+        const startedAt = Date.now();
+        const result = await callAIRaw(
           [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           { timeout: 45_000 }
         );
+        await logAiUsage({
+          userId: user.id, requestId: randomUUID(), tier: "teacher", feature: "teacher_class_insight", step: "generate",
+          model: result.model, usage: result.usage, latencyMs: Date.now() - startedAt,
+        }, { timeoutMs: 750 });
+        const insight = result.text;
         if (!insight) return res.status(500).json({ error: "Tom rapport." });
         return res.status(200).json({
           ok: true,

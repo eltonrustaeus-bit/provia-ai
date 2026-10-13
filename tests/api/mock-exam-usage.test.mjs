@@ -30,6 +30,8 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(usageEvent({ ...sample, feature: "per_chat", step: "validate" }).feature, "per_chat");
   assert.equal(usageEvent({ ...sample, feature: "per_landing", userId: null }).user_id, null);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", userId: null }), null);
+  assert.equal(usageEvent({ ...sample, feature: "teacher_report" }).feature, "teacher_report");
+  assert.equal(usageEvent({ ...sample, feature: "teacher_class_insight", tier: "teacher" }).subscription_tier, "teacher");
   assert.equal(usageEvent({ ...sample, feature: "unknown_feature" }), null);
 });
 
