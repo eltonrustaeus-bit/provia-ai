@@ -70,7 +70,7 @@
   .btn.ghost{background:transparent;color:var(--t);border-color:var(--l2)}
   .btn.ghost:hover{border-color:rgba(0,183,217,.4);color:var(--a);background:rgba(0,183,217,.05)}
   .btn.per{font-size:12.5px;padding:0 14px}
-  .btn:focus-visible,.classCard:focus-visible,.codePill:focus-visible,.delClass:focus-visible,
+  .btn:focus-visible,.classOpen:focus-visible,.codePill:focus-visible,.delClass:focus-visible,
   .stTable tr.clickable:focus-visible,.ddClose:focus-visible,.linkBtn:focus-visible{outline:2px solid var(--a);outline-offset:2px}
 
   /* create row */
@@ -86,8 +86,9 @@
     transition:border-color .15s,background .15s;position:relative}
   .classCard:hover{border-color:rgba(0,183,217,.3);background:rgba(0,183,217,.03)}
   .classCard.active{border-color:rgba(0,183,217,.5);box-shadow:0 0 0 1px rgba(0,183,217,.4) inset}
+  .classOpen{display:block;width:100%;padding:0;border:0;background:none;text-align:left;cursor:pointer;font:inherit}
   .className{font-size:15px;font-weight:600;color:var(--t);margin-bottom:10px;letter-spacing:-.01em;
-    padding-right:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    padding-right:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
   .classMeta{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .memberCount{font-family:var(--mono);font-size:10.5px;color:var(--t3)}
   .codePill{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--a);background:rgba(0,183,217,.07);
@@ -96,6 +97,7 @@
   .delClass{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:var(--exgen-radius-md);border:none;background:transparent;
     color:var(--t3);cursor:pointer;font-size:15px;line-height:1;opacity:0;transition:opacity .14s,color .14s}
   .classCard:hover .delClass,.classCard:focus-within .delClass{opacity:1}
+  @media(hover:none){.delClass{opacity:1}}
   .delClass:hover{color:#ff6b6b}
 
   /* students header inside kCardHead */
@@ -341,12 +343,12 @@ function renderClasses(){
   const grid=document.getElementById('classGrid');
   if(!CLASSES.length){ grid.innerHTML='<div class="empty">Inga klasser än. Skapa din första klass ovan.</div>'; return; }
   grid.innerHTML = CLASSES.map(c=>`
-    <div class="classCard${c.id===activeClassId?' active':''}" data-id="${esc(c.id)}" role="button" tabindex="0">
-      <button class="delClass" data-del="${esc(c.id)}" title="Radera klass" aria-label="Radera klass">×</button>
-      <div class="className">${esc(c.name)}</div>
+    <div class="classCard${c.id===activeClassId?' active':''}">
+      <button class="delClass" type="button" data-del="${esc(c.id)}" title="Radera klass" aria-label="Radera klass ${esc(c.name)}">×</button>
+      <button class="classOpen" type="button" data-id="${esc(c.id)}" aria-label="Öppna klass ${esc(c.name)}"><span class="className">${esc(c.name)}</span></button>
       <div class="classMeta">
         <span class="memberCount">${c.member_count} elev${c.member_count===1?'':'er'}</span>
-        <span class="codePill" data-code="${esc(c.join_code)}" title="Kopiera klasskod">${esc(c.join_code)}</span>
+        <button class="codePill" type="button" data-code="${esc(c.join_code)}" aria-label="Kopiera klasskod ${esc(c.join_code)}" title="Kopiera klasskod">${esc(c.join_code)}</button>
       </div>
     </div>`).join('');
 }
@@ -597,14 +599,9 @@ document.getElementById('classGrid').addEventListener('click',e=>{
   if(del){ e.stopPropagation(); deleteClass(del.getAttribute('data-del')); return; }
   const code=e.target.closest('[data-code]');
   if(code){ e.stopPropagation(); copyCode(code.getAttribute('data-code')); return; }
+  const open=e.target.closest('.classOpen');
   const card=e.target.closest('.classCard');
-  if(card) openClass(card.getAttribute('data-id'));
-});
-document.getElementById('classGrid').addEventListener('keydown',e=>{
-  if(e.key!=='Enter' && e.key!==' ') return;
-  if(e.target.closest('button')) return;
-  const card=e.target.closest('.classCard');
-  if(card){ e.preventDefault(); openClass(card.getAttribute('data-id')); }
+  if(open || card) openClass((open || card.querySelector('.classOpen')).getAttribute('data-id'));
 });
 
 // Student row → drilldown

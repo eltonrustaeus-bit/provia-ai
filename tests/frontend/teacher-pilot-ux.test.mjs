@@ -7,7 +7,9 @@ const admin = await readFile(new URL("../../admin.html", import.meta.url), "utf8
 const improvement = await readFile(new URL("../../förbättring.html", import.meta.url), "utf8");
 const konto = await readFile(new URL("../../konto.html", import.meta.url), "utf8");
 const signup = await readFile(new URL("../../api/signup.js", import.meta.url), "utf8");
-assert.match(page, /if\(e\.target\.closest\('button'\)\) return;/, "nested delete button keyboard action is not hijacked by the class card");
+assert.match(page, /<button class="classOpen"[^>]*data-id=/, "opening a class uses a native button");
+assert.match(page, /<button class="codePill"[^>]*data-code=/, "copying a class code uses a native button");
+assert.doesNotMatch(page, /classCard[^>]*role="button"/, "class card does not nest interactive controls inside a button role");
 assert.match(page, /drilldownReturnFocus = document\.activeElement/, "student detail dialog remembers the invoking control");
 assert.match(page, /document\.getElementById\('ddClose'\)\.focus\(\)/, "student detail dialog receives initial focus");
 assert.match(page, /querySelectorAll\('button, a\[href\], input, select, textarea/, "student detail dialog traps keyboard focus");
