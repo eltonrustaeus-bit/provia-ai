@@ -495,6 +495,115 @@ async function toExam(page) {
   }
 }
 
+// ── T13: kvotfel bevarar det signerade provet och sparar svar separat ───────
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "quota-user");
+  await toExam(page);
+  const baseBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_quota-user")));
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "exgen_flow_draft_quota-user") {
+        const next = JSON.parse(value);
+        if (Object.values(next.answers || {}).some(Boolean)) {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+      }
+      return original.call(this, key, value);
+    };
+  });
+
+  await page.click(".xf-mc-opt >> nth=1");
+  await page.waitForTimeout(350);
+  await page.fill(".xf-answer", "mitt svar ska överleva omladdning");
+  await page.waitForTimeout(1000);
+  const stored = await page.evaluate(() => ({
+    base: JSON.parse(localStorage.getItem("exgen_flow_draft_quota-user")),
+    progress: JSON.parse(localStorage.getItem("exgen_flow_progress_quota-user") || "null")
+  }));
+  ok("T13a kvotfel skriver inte över helt prov och källmaterial",
+    stored.base?.exam?.exam_manifest === baseBefore.exam.exam_manifest
+      && stored.base?.material === baseBefore.material
+      && stored.base.exam.questions.length === baseBefore.exam.questions.length,
+    "signerat basutkast bevarat");
+  ok("T13b reservposten innehåller bara svar kopplade till exakt manifest",
+    stored.progress?.examManifest === baseBefore.exam.exam_manifest
+      && Object.values(stored.progress?.answers || {}).includes("B")
+      && Object.values(stored.progress?.answers || {}).includes("mitt svar ska överleva omladdning")
+      && !("exam" in (stored.progress || {})) && !("material" in (stored.progress || {})),
+    JSON.stringify(stored.progress));
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+  const resume = page.getByRole("button", { name: "Fortsätt provet du började" });
+  ok("T13c återupptagning erbjuds efter kvotfel", await resume.count() === 1);
+  await resume.click();
+  await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+  ok("T13d fritextsvaret återställs efter omladdning",
+    await page.locator(".xf-answer").inputValue() === "mitt svar ska överleva omladdning");
+  await page.click(".xf-dot >> nth=0");
+  ok("T13e flervalsvaret återställs efter omladdning",
+    await page.locator(".xf-mc-opt.sel").count() === 1
+      && await page.locator(".xf-mc-opt.sel").textContent().then(text => text.includes("Matrix")));
+  await ctx.close();
+}
+
+// A delta for another or a different signed exam must never affect recovery.
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "mismatch-user");
+  await toExam(page);
+  await page.evaluate(() => localStorage.setItem("exgen_flow_progress_mismatch-user", JSON.stringify({
+    ts: Date.now(), uid: "mismatch-user", examManifest: "different-signed-exam",
+    answers: { dup: "forged answer" }, helped: {}, idx: 1
+  })));
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+  await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+  await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+  await page.click(".xf-dot >> nth=0");
+  ok("T13f svar från avvikande manifest ignoreras och tas bort",
+    await page.locator(".xf-mc-opt.sel").count() === 0
+      && await page.evaluate(() => localStorage.getItem("exgen_flow_progress_mismatch-user") === null));
+  await ctx.close();
+}
+
+// When even the small progress record cannot be written, keep the last valid
+// exam and tell the student precisely that the newest answer was not saved.
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "full-quota-user");
+  await toExam(page);
+  const baseBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_full-quota-user")));
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "exgen_flow_progress_full-quota-user") {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      }
+      if (key === "exgen_flow_draft_full-quota-user") {
+        const next = JSON.parse(value);
+        if (Object.values(next.answers || {}).some(Boolean)) {
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await page.click(".xf-mc-opt >> nth=0");
+  const baseAfter = await page.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_full-quota-user")));
+  const warning = await page.locator(".xf-nudge").textContent();
+  ok("T13g dubbelt kvotfel bevarar senaste kompletta basutkastet",
+    baseAfter?.exam?.exam_manifest === baseBefore.exam.exam_manifest
+      && baseAfter?.material === baseBefore.material
+      && await page.evaluate(() => localStorage.getItem("exgen_flow_progress_full-quota-user") === null));
+  ok("T13h dubbelt kvotfel förklaras utan falskt löfte",
+    /senast sparade prov finns kvar/.test(warning || "")
+      && /senaste svaren kunde inte sparas/.test(warning || ""), String(warning));
+  await ctx.close();
+}
+
 await browser.close();
 await srv.close();
 

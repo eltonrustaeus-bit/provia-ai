@@ -4,6 +4,7 @@
   var AUTH_KEY = global.ExGenRuntime.authStorageKey;
   var OWNER_KEY = "exgen_local_data_owner";
   var EXAM_DRAFT_PREFIX = "exgen_flow_draft_";
+  var EXAM_PROGRESS_PREFIX = "exgen_flow_progress_";
   var PILOT_PENDING_QUESTION_KEY = "exgen_pilot_pending_per_question";
   var PILOT_REAUTH_REQUIRED_KEY = "exgen_pilot_reauth_required";
   var PRIVATE_KEYS = [
@@ -26,10 +27,12 @@
 
   function clearOtherAccountDrafts(activeUserId) {
     var keepKey = activeUserId ? EXAM_DRAFT_PREFIX + String(activeUserId) : "";
+    var keepProgressKey = activeUserId ? EXAM_PROGRESS_PREFIX + String(activeUserId) : "";
     var staleDrafts = [];
     for (var i = 0; i < localStorage.length; i++) {
       var key = localStorage.key(i);
-      if (key && key.indexOf(EXAM_DRAFT_PREFIX) === 0 && key !== keepKey) staleDrafts.push(key);
+      var isExamState = key && (key.indexOf(EXAM_DRAFT_PREFIX) === 0 || key.indexOf(EXAM_PROGRESS_PREFIX) === 0);
+      if (isExamState && key !== keepKey && key !== keepProgressKey) staleDrafts.push(key);
     }
     staleDrafts.forEach(function (key) { localStorage.removeItem(key); });
   }

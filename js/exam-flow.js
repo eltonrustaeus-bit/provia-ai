@@ -24,6 +24,7 @@
      skrivna svar. uid läggs dessutom i objektet och kontrolleras vid läsning,
      så att en nyckel som råkar överleva ett kontobyte ändå avvisas. */
   var LS_DRAFT_BASE = "exgen_flow_draft";
+  var LS_PROGRESS_BASE = "exgen_flow_progress";
   var LS_HISTORY = "proviaai_history";
   var LS_MISTAKES = "proviaai_mistakes";
   var LS_TRAIN_PICK = "proviaai_train_pick";
@@ -398,6 +399,11 @@
   }
 
   function draftKey() { return LS_DRAFT_BASE + "_" + uid(); }
+  function progressKey() { return LS_PROGRESS_BASE + "_" + uid(); }
+  function clearDraft() {
+    lsDel(draftKey());
+    lsDel(progressKey());
+  }
 
   function questionState(source) {
     var state = Object.create(null);
@@ -656,7 +662,7 @@
             recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
             return;
           }
-          lsDel(draftKey());
+          clearDraft();
           stepStart();
         }).catch(function () {
           recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
@@ -1354,7 +1360,7 @@
     /* Samma felklass, en rad ovanför löste den för manifestet: saveDraftSoon()
        (längre ner i filen) har en egen debouncad timer på 800ms. Fyller eleven
        sista kortsvarsfältet och trycker "Lämna in" hinner den timern schemaläggas
-       precis innan closeExam() körs. lsDel(draftKey()) tar bort utkastet så fort
+       precis innan closeExam() körs. clearDraft() tar bort utkastet så fort
        rättningen kommer tillbaka — men saveDraft() bryr sig bara om !S.exam, och
        S.exam nollställs först vid "Nytt ämne". Otömd brinner draftTimer under
        maskinytans animation och skriver tillbaka utkastet, så eleven erbjuds
@@ -1777,7 +1783,7 @@
         return;
       }
       closeExam();
-      lsDel(draftKey());
+      clearDraft();
       S.exam = null;
       S.answers = questionState();
       S.helped = questionState();
@@ -1847,7 +1853,7 @@
         return;
       }
       // Rättningen är i hamn: utkastet får försvinna först nu.
-      lsDel(draftKey());
+      clearDraft();
       stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof); });
     }).catch(function (e) {
       /* Utan den här grenen blir ett oväntat avslag från motorn en mörk skärm
@@ -2191,7 +2197,7 @@
       S.submitting = false;
       // Eleven har uttryckligen övergett provet. Låg utkastet kvar erbjöds det
       // tillbaka vid nästa sidladdning som "Fortsätt provet du började".
-      lsDel(draftKey());
+      clearDraft();
       stepSubject();
     });
     act.appendChild(fresh);
@@ -2206,29 +2212,36 @@
   function saveDraft() {
     clearTimeout(draftTimer);
     if (!S.exam) return;
-    var ok = lsSet(draftKey(), {
+    var draft = {
       ts: Date.now(),
       uid: uid(),
       startedAt: S.startedAt,
       course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
       material: S.material, exam: S.exam,
       answers: S.answers, helped: S.helped, idx: S.idx
-    });
+    };
 
-    /* Utrymmet tog slut. Att spara utan frågorna är betydligt mindre och räcker
-       för att svaren ska överleva — provet självt går att bygga om, men det
-       eleven har skrivit går inte att återskapa. Först om även det misslyckas
-       får eleven veta att löftet inte håller. */
-    if (!ok) {
-      var slim = lsSet(draftKey(), {
-        ts: Date.now(), uid: uid(), startedAt: S.startedAt,
-        course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
-        answers: S.answers, helped: S.helped, idx: S.idx
-      });
-      if (!slim && !S.warnedStorage) {
-        S.warnedStorage = true;
-        nudge("Minnet i webbläsaren är fullt, så jag kan inte spara provet åt dig. Lämna in innan du stänger fliken.");
-      }
+    if (lsSet(draftKey(), draft)) {
+      lsDel(progressKey());
+      return;
+    }
+
+    /* Keep the signed exam/material snapshot intact. The small progress record
+       is usable only alongside that exact snapshot and can never replace it. */
+    var saved = lsGet(draftKey(), null);
+    var resumableBase = saved && String(saved.uid || "") === uid()
+      && saved.exam && Array.isArray(saved.exam.questions) && saved.exam.questions.length
+      && typeof saved.material === "string"
+      && saved.exam.exam_manifest
+      && saved.exam.exam_manifest === S.exam.exam_manifest;
+    var progressSaved = resumableBase && lsSet(progressKey(), {
+      ts: Date.now(), uid: uid(), startedAt: S.startedAt,
+      examManifest: S.exam.exam_manifest,
+      answers: S.answers, helped: S.helped, idx: S.idx
+    });
+    if (!progressSaved && !S.warnedStorage) {
+      S.warnedStorage = true;
+      nudge("Minnet i webbläsaren är fullt. Ditt senast sparade prov finns kvar, men de senaste svaren kunde inte sparas. Lämna in innan du stänger eller laddar om fliken.", true);
     }
   }
 
@@ -2238,14 +2251,40 @@
     draftTimer = setTimeout(saveDraft, DRAFT_DEBOUNCE_MS);
   }
 
-  /* Läser utkastet och avvisar det som inte hör hemma: fel användare, för
-     gammalt, eller sparat i det bantade läget utan frågor (då finns inget prov
-     att återuppta). */
+  /* Progress is merged only into the exact signed exam snapshot it belongs to. */
   function readDraft() {
     var d = lsGet(draftKey(), null);
-    if (!d || !d.exam || !Array.isArray(d.exam.questions) || !d.exam.questions.length) return null;
-    if (String(d.uid || "") !== uid()) return null;
-    if (d.ts && Date.now() - Number(d.ts) > DRAFT_MAX_AGE_MS) { lsDel(draftKey()); return null; }
+    if (!d || String(d.uid || "") !== uid() || !d.exam
+        || !Array.isArray(d.exam.questions) || !d.exam.questions.length) {
+      lsDel(progressKey());
+      return null;
+    }
+
+    var progress = lsGet(progressKey(), null);
+    var progressTs = Number(progress && progress.ts);
+    var progressIdx = Number(progress && progress.idx);
+    var progressMatches = progress && String(progress.uid || "") === uid()
+      && progress.examManifest && progress.examManifest === d.exam.exam_manifest
+      && Number.isFinite(progressTs) && progressTs > 0
+      && progressTs <= Date.now() + 5 * 60 * 1000
+      && Date.now() - progressTs <= DRAFT_MAX_AGE_MS
+      && progress.answers && typeof progress.answers === "object" && !Array.isArray(progress.answers)
+      && progress.helped && typeof progress.helped === "object" && !Array.isArray(progress.helped)
+      && Number.isInteger(progressIdx) && progressIdx >= 0 && progressIdx < d.exam.questions.length;
+    if (progressMatches) {
+      d.answers = progress.answers;
+      d.helped = progress.helped;
+      d.idx = progress.idx;
+      d.startedAt = Number(progress.startedAt) || Number(d.startedAt) || 0;
+      d.ts = progressTs;
+    } else if (progress) {
+      lsDel(progressKey());
+    }
+
+    if (d.ts && Date.now() - Number(d.ts) > DRAFT_MAX_AGE_MS) {
+      clearDraft();
+      return null;
+    }
     return d;
   }
 

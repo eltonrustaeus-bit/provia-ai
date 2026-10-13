@@ -16,6 +16,8 @@ try {
         "proviaai_pending_exams:account-b": [{ user_id: "account-b", local_id: "offline-b" }],
         "exgen_flow_draft_account-a": { course: "A-private draft" },
         "exgen_flow_draft_account-b": { course: "B-private draft" },
+        "exgen_flow_progress_account-a": { answers: { q: "A-private answer" } },
+        "exgen_flow_progress_account-b": { answers: { q: "B-private answer" } },
         proviaai_lang: "sv"
       }
     }
@@ -28,6 +30,8 @@ try {
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     draftA: localStorage.getItem("exgen_flow_draft_account-a"),
     draftB: localStorage.getItem("exgen_flow_draft_account-b"),
+    progressA: localStorage.getItem("exgen_flow_progress_account-a"),
+    progressB: localStorage.getItem("exgen_flow_progress_account-b"),
     language: localStorage.getItem("proviaai_lang")
   }));
   assert.equal(initial.owner, "account-a");
@@ -36,6 +40,8 @@ try {
   assert.ok(initial.pendingA, "account-scoped failed-save queue is preserved");
   assert.ok(initial.draftA, "the active account can resume its own draft");
   assert.equal(initial.draftB, null, "other-account drafts are cleared before the active page uses storage");
+  assert.ok(initial.progressA, "the active account can recover its own saved progress");
+  assert.equal(initial.progressB, null, "other-account progress is cleared before the active page uses storage");
   assert.equal(initial.language, "sv", "non-personal preferences are preserved");
 
   await page.evaluate((authKey) => {
@@ -43,6 +49,7 @@ try {
     localStorage.setItem("proviaai_per_history", JSON.stringify([{ content: "A-private" }]));
     localStorage.setItem("proviaai_teacher_insight_class-a", JSON.stringify({ insight: "A-private class report", ts: Date.now() }));
     localStorage.setItem("exgen_flow_draft_account-b", JSON.stringify({ course: "B-private draft" }));
+    localStorage.setItem("exgen_flow_progress_account-b", JSON.stringify({ answers: { q: "B-private answer" } }));
     localStorage.setItem(authKey, JSON.stringify({
       access_token: "opaque",
       user: { id: "account-b" }
@@ -56,7 +63,9 @@ try {
     teacherInsight: localStorage.getItem("proviaai_teacher_insight_class-a"),
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     draftA: localStorage.getItem("exgen_flow_draft_account-a"),
-    draftB: localStorage.getItem("exgen_flow_draft_account-b")
+    draftB: localStorage.getItem("exgen_flow_draft_account-b"),
+    progressA: localStorage.getItem("exgen_flow_progress_account-a"),
+    progressB: localStorage.getItem("exgen_flow_progress_account-b")
   }));
   assert.equal(switched.owner, "account-b");
   assert.equal(switched.history, null, "account switch clears the previous account's exam summary");
@@ -65,6 +74,8 @@ try {
   assert.ok(switched.pendingA, "the failed-save queue remains UID-scoped rather than being merged");
   assert.equal(switched.draftA, null, "account switching removes the previous account's exam draft");
   assert.ok(switched.draftB, "the newly active account can resume only its own draft");
+  assert.equal(switched.progressA, null, "account switching removes the previous account's progress");
+  assert.ok(switched.progressB, "the newly active account keeps only its own progress");
 
   const pendingB = await page.evaluate(() => localStorage.getItem("proviaai_pending_exams:account-b"));
   assert.equal(JSON.parse(pendingB)[0].user_id, "account-b", "account B can only address its own queue key");
@@ -96,6 +107,8 @@ try {
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     draftA: localStorage.getItem("exgen_flow_draft_account-a"),
     draftB: localStorage.getItem("exgen_flow_draft_account-b"),
+    progressA: localStorage.getItem("exgen_flow_progress_account-a"),
+    progressB: localStorage.getItem("exgen_flow_progress_account-b"),
     pendingQuestion: sessionStorage.getItem("exgen_pilot_pending_per_question"),
     reauth: sessionStorage.getItem("exgen_pilot_reauth_required")
   }));
@@ -105,6 +118,8 @@ try {
   assert.ok(signedOut.pendingA, "per-account recovery data stays in its isolated key");
   assert.equal(signedOut.draftA, null, "sign-out removes the account's unfinished exam draft");
   assert.equal(signedOut.draftB, null, "sign-out removes every remaining local exam draft");
+  assert.equal(signedOut.progressA, null, "sign-out removes the account's saved exam progress");
+  assert.equal(signedOut.progressB, null, "sign-out removes all saved exam progress");
   assert.equal(signedOut.pendingQuestion, null, "sign-out clears a transient PER question draft");
   assert.equal(signedOut.reauth, null, "sign-out clears the pilot reauthentication marker");
   await close();
