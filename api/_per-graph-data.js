@@ -313,6 +313,11 @@ export const PER_GRAPH = {
       "id": "tabell:user_profiles",
       "etikett": "user_profiles",
       "typ": "tabell"
+    },
+    {
+      "id": "tabell:exam_issuances",
+      "etikett": "exam_issuances",
+      "typ": "tabell"
     }
   ],
   "kanter": [
@@ -583,6 +588,10 @@ export const PER_GRAPH = {
     {
       "från": "check-role",
       "till": "tabell:user_profiles"
+    },
+    {
+      "från": "check-role",
+      "till": "tabell:exam_issuances"
     },
     {
       "från": "check-role",

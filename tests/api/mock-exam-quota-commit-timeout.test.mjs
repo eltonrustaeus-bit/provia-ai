@@ -58,6 +58,10 @@ global.fetch = async (url, init = {}) => {
     reservationStatus = "refunded";
     return Response.json({ refunded: true, duplicate: false });
   }
+  if (target.includes("/rest/v1/exam_issuances")) {
+    if (init.method === "POST") return Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 });
+    if (init.method === "DELETE") return new Response(null, { status: 204 });
+  }
   if (target.includes("api.openai.com")) {
     if (JSON.parse(init.body || "{}").stream) {
       const events = [

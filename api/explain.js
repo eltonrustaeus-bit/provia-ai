@@ -25,6 +25,7 @@ import { PER_FULL } from "./_per-name.js";
 import { cacheEnabled, lookupCached, storeAnswer } from "./_per-cache.js";
 import pilotScope from "./_pilot-scope.cjs";
 import examCompletion from "./_exam-completion.cjs";
+import examIssuance from "./_exam-issuance.cjs";
 import graphAnswers from "./_graph.js";
 const { createSupabaseServerClient } = supabaseKeys;
 const { denyOutOfScopePilotRoute, isPilotExplainRequestAllowed, isPilotMode } = pilotScope;
@@ -125,9 +126,7 @@ function pickCourseGuide(courseName) {
 - Håll det kort, konkret och lätt att imitera.`;
 }
 
-async function handleTipsMode(req, res, body) {
-  const user = await requireAuth(req, res);
-  if (!user) return;
+async function handleTipsMode(req, res, body, user) {
   if (!process.env.OPENAI_API_KEY) return res.status(500).json({ ok: false, error: "Missing OPENAI_API_KEY" });
 
   const q = sanitize(String(body.question || ""), 2000);
@@ -350,11 +349,40 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan }) {
   } catch { return null; }
 }
 
+async function gateActiveExam(req, res, body, user) {
+  const activeCount = await examIssuance.activeExamCount(user.id);
+  if (activeCount === null) {
+    res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    return true;
+  }
+  if (activeCount === 0) return false;
+
+  const type = body.pageContext?.currentQuestion?.type;
+  const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+  const hints = en
+    ? {
+      mc: "Read what the question asks, then compare the options one at a time. Which claim can you support from your material, and why can you rule out another?",
+      graph: "First identify what each axis represents. Choose two x-values in the grid and work out their y-values. How can you check whether the line you drew matches the relationship?",
+      short: "Identify the concept or relationship the question is testing. Find a supporting point in your material, then explain it in your own words. What step is still missing?",
+    }
+    : {
+      mc: "Läs vad frågan faktiskt ber om och jämför alternativen ett i taget. Vilket påstående kan du stödja med ditt material, och varför kan du utesluta ett annat?",
+      graph: "Börja med att se vad axlarna visar. Välj två x-värden i rutnätet och räkna fram deras y-värden. Hur kan du kontrollera att din linje stämmer med sambandet?",
+      short: "Identifiera vilket begrepp eller samband frågan prövar. Hitta stöd i ditt material och förklara med egna ord. Vilket steg behöver du fortfarande visa?",
+    };
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ answer: hints[type] || hints.short, helpCap: 0, helpLevelUsed: 0, examActive: true });
+  return true;
+}
+
 export default async function handler(req, res) {
   // GET — return stored PER history for the authenticated user
   if (req.method === "GET") {
     const user = await requireAuth(req, res);
     if (!user) return;
+    const activeCount = await examIssuance.activeExamCount(user.id);
+    if (activeCount === null) return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    if (activeCount > 0) return res.status(409).json({ error: "EXAM_ACTIVE" });
     const messages = await loadPerHistory(user.id);
     return res.json({ ok: true, history: messages });
   }
@@ -371,11 +399,12 @@ export default async function handler(req, res) {
     return res.status(413).json({ ok: false, error: "Question is too long" });
   }
 
-  // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
-  if (body.tipsMode === true) return handleTipsMode(req, res, body);
-
   // ── LANDING MODE — unauthenticated visitors on index/pricing ──
   if (body.landingMode === true) {
+    if (req.headers?.authorization) {
+      const landingUser = await requireAuth(req, res);
+      if (!landingUser || await gateActiveExam(req, res, body, landingUser)) return;
+    }
     const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
     if (!question) return res.status(400).json({ error: 'No question' });
 
@@ -445,6 +474,10 @@ export default async function handler(req, res) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+  if (await gateActiveExam(req, res, body, user)) return;
+
+  // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
+  if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
 
   if (body.examReview === true) return handleExamReview(res, body, user);
 

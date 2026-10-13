@@ -102,6 +102,20 @@ handskrivna migrationer.
 
 The 2026-10-13 local verification confirms the missing-profile app path signs out and fails closed; `tests/frontend/profile-bootstrap.test.mjs` covers it. The migration remains a draft only: staging `public` and migration ledger are both empty. Do not apply until the authoritative staging schema is restored and a separate DDL approval is recorded.
 
+### Active exam issuance — local draft only
+
+`20261013082230_guard_active_exams.sql` adds server-owned issuance records and atomic
+grade/abandon RPCs so an active exam cannot receive answer-bearing P.E.R help. It has **not**
+been applied or tested in PostgreSQL. The staging database still lacks the app schema; do not
+run a blanket migration command against it. First restore and reconcile the approved schema,
+including the actual `mock_results` columns, unique constraint and permissions. Then test the
+RPCs with synthetic users, concurrent grade/abandon requests, PostgREST access as
+`anon`/`authenticated`/`service_role`, account and exam-history deletion, and lost-response
+retries. Define and verify a bounded retention process for issuance metadata before a pilot.
+The adjacent rollback file intentionally aborts: dropping the table while the application
+uses it would remove the server-side exam guard. Applying this migration or enabling the
+corresponding app routes requires a separate approval and an isolated deployment plan.
+
 ## Kontrollera drift
 
 Filkontrollerna är maskinella och ingår i testsviten:

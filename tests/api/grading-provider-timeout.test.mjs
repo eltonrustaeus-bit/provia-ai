@@ -26,6 +26,7 @@ globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
   calls.push({ url, method: init.method || "GET" });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json("active");
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.includes("/rest/v1/feature_flags") || url.includes("/rest/v1/user_profiles")) return Response.json([]);
   if (url === "https://api.openai.com/v1/responses") throw new DOMException("Synthetic timeout", "AbortError");

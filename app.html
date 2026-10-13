@@ -1906,8 +1906,17 @@ try{
       if(!res||!res.ok||!res.data||!res.data.ok){
         const providerUnavailable = res?.data?.error === "grading_provider_unavailable";
         const alreadyGraded = res?.data?.error === "EXAM_ALREADY_GRADED";
+        const inactiveExam = res?.data?.error === "EXAM_NOT_ACTIVE";
+        const unsavedResult = res?.data?.error === "EXAM_RESULT_NOT_SAVED";
+        const stateUnavailable = res?.data?.error === "EXAM_STATE_UNAVAILABLE";
         const msg = alreadyGraded
           ? (LANG==="sv"?"Det här provet har redan rättats. Inget nytt resultat visades. Kontrollera provhistoriken eller kontakta support om det saknas.":"This exam has already been graded. No new result was shown. Check your history or contact support if it is missing.")
+          : inactiveExam
+          ? (LANG==="sv"?"Det här provet är inte längre aktivt och kan inte lämnas in. Avsluta det och skapa ett nytt prov av ditt material.":"This exam is no longer active and cannot be submitted. Close it and create a new exam from your material.")
+          : unsavedResult
+          ? (LANG==="sv"?"Resultatet kunde inte sparas. Inget facit visades och dina svar finns kvar. Försök igen.":"The result could not be saved. No answer key was shown and your answers are still here. Try again.")
+          : stateUnavailable
+          ? (LANG==="sv"?"Provstatus kunde inte kontrolleras. Dina svar finns kvar. Försök igen när anslutningen fungerar.":"Exam status could not be checked. Your answers are still here. Try again when the connection works.")
           : res&&res.timedOut
           ? (LANG==="sv"?"Rättningen tog för lång tid och avbröts. Dina svar finns kvar på sidan — försök igen.":"Grading timed out. Your answers are still on this page — try again.")
           : res&&res.networkError
@@ -2065,6 +2074,53 @@ try{
     },
     generate() { return runGenerate(); },
     grade(answers) { return runGrade(answers); },
+    async abandonExam() {
+      if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
+        return { ok: false, error: "Provet kan inte verifieras. Ladda om sidan och försök igen." };
+      }
+      const response = await postJson("/api/abandon-exam", {
+        course: (courseEl()?.value || "").trim(),
+        pastedText: (pastedTextEl()?.value || "").trim(),
+        questions: currentExam.questions,
+        exam_manifest: currentExam.exam_manifest,
+      }, { timeoutMs: 10000 });
+      const alreadyInactive = response?.status === 409 &&
+        ["EXAM_ALREADY_GRADED", "EXAM_NOT_ACTIVE"].includes(response.data?.error);
+      if (!alreadyInactive && (!response?.ok || !response.data?.ok || !response.data?.abandoned)) {
+        return { ok: false, error: "Provet kunde inte avslutas säkert. Försök igen när anslutningen fungerar." };
+      }
+      currentExam = null;
+      currentExamProof = null;
+      const grade = $("gradeBtn");
+      if (grade) grade.disabled = true;
+      return { ok: true };
+    },
+    async activeExamCount() {
+      const token = await getAccessToken();
+      if (!token) return null;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const response = await fetch("/api/abandon-exam", {
+          headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+        });
+        const data = await response.json();
+        return response.ok && data?.ok && Number.isSafeInteger(data.active_count)
+          ? data.active_count : null;
+      } catch { return null; }
+      finally { clearTimeout(timer); }
+    },
+    async abandonAllActiveExams() {
+      const response = await postJson("/api/abandon-exam", { abandon_all: true }, { timeoutMs: 10000 });
+      if (!response?.ok || !response.data?.ok || !Number.isSafeInteger(response.data.abandoned_count)) {
+        return { ok: false };
+      }
+      currentExam = null;
+      currentExamProof = null;
+      const grade = $("gradeBtn");
+      if (grade) grade.disabled = true;
+      return { ok: true, count: response.data.abandoned_count };
+    },
     retryAccountSave(localId) { return retryPendingExamSave(localId); },
     getPendingAccountSaves() { return getPendingAccountSaves(); },
     async gradeGraphRetry(questionId, answer) {

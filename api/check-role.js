@@ -503,6 +503,8 @@ export default async function handler(req, res) {
   // P.E.R chat history and long-term memory are cleared separately.
   if (action === "delete_exams") {
     try {
+      const issuanceResult = await supabase.from("exam_issuances").delete().eq("user_id", user.id);
+      if (issuanceResult?.error) return res.status(500).json({ error: "Delete failed" });
       const [examResult, summaryResult] = await Promise.all([
         supabase.from("user_exams").delete().eq("user_id", user.id),
         supabase.from("mock_results").delete().eq("user_id", user.id),

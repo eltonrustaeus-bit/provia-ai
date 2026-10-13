@@ -14,6 +14,7 @@ const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
+const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 
 function json(res, status, obj) {
@@ -329,31 +330,17 @@ async function applyMockMastery(userId, level, per, attemptId) {
 }
 
 // Returns a promise — callers MUST await before sending the response.
-// On Vercel the lambda freezes once res is sent, so an un-awaited POST here
-// gets killed mid-flight (this is why mock_results stayed empty). Never throws.
 async function saveMockResult(payload) {
-  if (!payload?.submission_id) return "error";
-  try {
-    const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results?on_conflict=user_id,submission_id&select=submission_id", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getSupabaseAdminHeaders(),
-        "Prefer": "resolution=ignore-duplicates,return=representation"
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!response.ok) return "error";
-    const rows = await response.json();
-    if (!Array.isArray(rows)) return "error";
-    if (rows.length === 0) return "duplicate";
-    return rows.length === 1 && rows[0]?.submission_id === payload.submission_id ? "saved" : "error";
-  } catch { return "error"; }
+  return examIssuance.persistExamResult(payload);
 }
 
 async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, level, attemptRows }) {
+  const state = await examIssuance.examState(userId, attemptId);
+  if (!state) return "state_error";
+  if (state !== "active") return state === "completed" ? "duplicate" : "inactive";
   const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId));
+  if (saved === "duplicate") return "duplicate";
+  if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
 
   await Promise.all([
@@ -452,6 +439,16 @@ module.exports = async function handler(req, res) {
       if (!examCompletion.verifyExamManifest(p.exam_manifest, user.id, contextCourse, pastedText, submittedQuestions)) {
         return json(res, 400, { ok: false, error: "EXAM_MANIFEST_INVALID" });
       }
+      const state = await examIssuance.examState(
+        user.id, examCompletion.submissionId(user.id, contextCourse, submittedQuestions)
+      );
+      if (!state) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (state === "completed") return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
+      if (state !== "active") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+    } else {
+      const activeCount = await examIssuance.activeExamCount(user.id);
+      if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+      if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
     }
     const practiceCompletion = p.mode === "graph_practice_retry"
       ? examCompletion.verifyCompletion(p.examProof, user.id)
@@ -683,7 +680,9 @@ module.exports = async function handler(req, res) {
       if (persistence === "duplicate") {
         return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
       }
-      const mockResultSaved = persistence === "saved";
+      if (persistence === "inactive") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      if (persistence !== "saved") return json(res, 503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
+      const mockResultSaved = true;
       return json(res, 200, {
         ok: true,
         exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
@@ -899,7 +898,9 @@ module.exports = async function handler(req, res) {
       if (persistence === "duplicate") {
         return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
       }
-      const mockResultSaved = persistence === "saved";
+      if (persistence === "inactive") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
+      if (persistence !== "saved") return json(res, 503, { ok: false, error: "EXAM_RESULT_NOT_SAVED" });
+      const mockResultSaved = true;
       return json(res, 200, {
         ok: true,
         exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,

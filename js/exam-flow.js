@@ -632,6 +632,40 @@
     }
 
     b.appendChild(act);
+    if ((!draft || !draft.exam.exam_manifest) && window.ExGenEngine && window.ExGenEngine.activeExamCount) {
+      var recovery = el("div", "xf-err xf-exam-recovery");
+      recovery.hidden = true;
+      recovery.setAttribute("role", "status");
+      var recoveryText = el("p");
+      var reset = el("button", "xf-btn ghost", "Avsluta tidigare prov");
+      reset.type = "button";
+      reset.addEventListener("click", function () {
+        if (!window.confirm("Avsluta alla pågående prov på ditt konto? De kan då inte lämnas in, även om de är öppna på en annan enhet.")) return;
+        reset.disabled = true;
+        window.ExGenEngine.abandonAllActiveExams().then(function (result) {
+          if (!result || !result.ok) {
+            recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
+            return;
+          }
+          lsDel(draftKey());
+          stepStart();
+        }).catch(function () {
+          recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
+        }).finally(function () { reset.disabled = false; });
+      });
+      recovery.appendChild(recoveryText);
+      recovery.appendChild(reset);
+      b.appendChild(recovery);
+      window.ExGenEngine.activeExamCount().then(function (count) {
+        if (renderVersion !== startVersion || !UI.screens.start.classList.contains("on")) return;
+        if (count > 0) {
+          recovery.hidden = false;
+          recoveryText.textContent = count === 1
+            ? "Ett prov finns kvar på ditt konto men inte på den här enheten. Du kan avsluta det här om du inte kan fortsätta det."
+            : count + " prov finns kvar på ditt konto men inte på den här enheten. Avsluta dem bara om du inte behöver fortsätta på en annan enhet.";
+        }
+      }).catch(function () {});
+    }
     if (window.ExGenEngine && window.ExGenEngine.getPendingAccountSaves) {
       var pendingBox = el("div", "xf-err xf-save-warning xf-pending-saves");
       pendingBox.hidden = true;
@@ -1651,6 +1685,29 @@
 
   // ── Inlämning ────────────────────────────────────────────────────────────
 
+  function abandon() {
+    if (S.submitting || UI.exit.disabled) return;
+    if (!window.confirm("Avsluta provet utan rättning? Dina svar tas bort och provet kan inte lämnas in senare.")) return;
+    UI.exit.disabled = true;
+    window.ExGenEngine.abandonExam().then(function (result) {
+      if (!result || !result.ok) {
+        nudge((result && result.error) || "Provet kunde inte avslutas säkert. Försök igen.");
+        return;
+      }
+      closeExam();
+      lsDel(draftKey());
+      S.exam = null;
+      S.answers = {};
+      S.helped = {};
+      S.submitting = false;
+      stepStart();
+    }).catch(function () {
+      nudge("Provet kunde inte avslutas säkert. Försök igen.");
+    }).finally(function () {
+      UI.exit.disabled = false;
+    });
+  }
+
   function submit() {
     /* Flervalsklick på sista frågan schemalägger next() om 260 ms, och next()
        på sista frågan lämnar in. Hann eleven trycka "Lämna in" däremellan kördes
@@ -2136,10 +2193,16 @@
     var top = el("div", "xf-exam-top");
     UI.count = el("span", null, "Fråga 1");
     UI.dots = el("div", "xf-exam-dots");
-    UI.time = el("span", null, "00:00");
+    UI.time = el("span", "xf-exam-time", "00:00");
+    UI.exit = el("button", "xf-exam-exit", "×");
+    UI.exit.type = "button";
+    UI.exit.title = "Avbryt prov";
+    UI.exit.setAttribute("aria-label", "Avbryt prov");
+    UI.exit.addEventListener("click", abandon);
     top.appendChild(UI.count);
     top.appendChild(UI.dots);
     top.appendChild(UI.time);
+    top.appendChild(UI.exit);
     UI.exam.appendChild(top);
 
     UI.sheetWrap = el("div", "xf-sheet-wrap");

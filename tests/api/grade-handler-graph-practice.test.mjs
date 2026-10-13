@@ -20,6 +20,8 @@ const calls = [];
 let mockResultMode = "insert";
 let savedResultPresent = true;
 let learnerLoopEnabled = false;
+let issuanceState = "active";
+let activeExamCount = 0;
 
 process.env.SUPABASE_URL = origin;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-only-service-role";
@@ -34,16 +36,16 @@ globalThis.fetch = async (input, init = {}) => {
   if (url === `${origin}/rest/v1/rpc/consume_anon_rate`) {
     return Response.json({ ok: true, count: 1, limit: 20 });
   }
+  if (url === `${origin}/rest/v1/rpc/exam_issuance_state`) return Response.json(issuanceState);
+  if (url === `${origin}/rest/v1/rpc/active_exam_count`) return Response.json(activeExamCount);
+  if (url === `${origin}/rest/v1/rpc/persist_graded_exam_result`) {
+    if (mockResultMode === "error") return new Response(null, { status: 500 });
+    return Response.json(mockResultMode === "duplicate" ? "duplicate" : "saved");
+  }
   if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
     ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
     : []);
-  if (url.includes("/rest/v1/mock_results")) {
-    if (init.method !== "POST") return Response.json(savedResultPresent ? { num_questions: 1 } : null);
-    if (mockResultMode === "error") return new Response(null, { status: 500 });
-    return Response.json(mockResultMode === "duplicate"
-      ? []
-      : [{ submission_id: JSON.parse(init.body).submission_id }], { status: mockResultMode === "duplicate" ? 200 : 201 });
-  }
+  if (url.includes("/rest/v1/mock_results")) return Response.json(savedResultPresent ? { num_questions: 1 } : null);
   if (url.includes("/rest/v1/concepts")) {
     return init.method === "POST"
       ? Response.json([{ id: "22222222-2222-4222-8222-222222222222" }], { status: 201 })
@@ -225,27 +227,51 @@ try {
       error_tags: [],
     }],
   });
-  const saved = calls.find((call) => call.url.startsWith(`${origin}/rest/v1/mock_results?`));
+  const saved = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(saved, "the official graph submission writes its result through the persistence path");
-  assert.match(saved.url, /on_conflict=user_id,submission_id/);
   const savedPayload = JSON.parse(saved.body);
-  assert.deepEqual({ ...savedPayload, submission_id: undefined }, {
-    user_id: userId,
-    submission_id: undefined,
-    course,
-    percent: 100,
-    num_questions: 1,
-    concept_tags: ["linjära funktioner"],
-    error_tags: [],
+  assert.deepEqual({ ...savedPayload, p_submission_id: undefined }, {
+    p_user_id: userId,
+    p_submission_id: undefined,
+    p_course: course,
+    p_percent: 100,
+    p_num_questions: 1,
+    p_concept_tags: ["linjära funktioner"],
+    p_error_tags: [],
   });
-  assert.match(savedPayload.submission_id, /^[a-f0-9]{32}$/);
-  assert.equal(saved.headers.Prefer, "resolution=ignore-duplicates,return=representation");
-  assert.match(saved.url, /select=submission_id/);
+  assert.match(savedPayload.p_submission_id, /^[a-f0-9]{32}$/);
   const resultWriteIndex = calls.indexOf(saved);
   const masteryWriteIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once"));
   assert.ok(masteryWriteIndex > resultWriteIndex,
     "mastery is applied only after the official result has been persisted");
   assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic official graph grading does not call the AI provider");
+
+  for (const [state, expectedError] of [["completed", "EXAM_ALREADY_GRADED"], ["abandoned", "EXAM_NOT_ACTIVE"], [null, "EXAM_STATE_UNAVAILABLE"]]) {
+    issuanceState = state;
+    calls.length = 0;
+    const blocked = await invoke({
+      lang: "sv", course, pastedText: material, exam_manifest: manifest,
+      questions: [publicQuestion],
+      answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+    });
+    assert.equal(blocked.body.error, expectedError);
+    assert.equal(blocked.body.result, undefined);
+    assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")), false,
+      "inactive and unknown issuance are rejected before grading quota");
+  }
+  issuanceState = "active";
+
+  activeExamCount = 1;
+  calls.length = 0;
+  const blockedPractice = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(blockedPractice.status, 409);
+  assert.equal(blockedPractice.body.error, "EXAM_ACTIVE");
+  assert.equal(blockedPractice.body.result, undefined);
+  activeExamCount = 0;
 
   mockResultMode = "duplicate";
   learnerLoopEnabled = true;
@@ -261,8 +287,8 @@ try {
   assert.equal(conflictingReplay.body.exam_proof, undefined, "a duplicate cannot mint another completion proof");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false);
-  const duplicateWrite = calls.find((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST");
-  assert.equal(JSON.parse(duplicateWrite.body).submission_id, savedPayload.submission_id);
+  const duplicateWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.equal(JSON.parse(duplicateWrite.body).p_submission_id, savedPayload.p_submission_id);
 
   mockResultMode = "error";
   learnerLoopEnabled = true;
@@ -275,17 +301,18 @@ try {
     questions: [publicQuestion],
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
   });
-  assert.equal(replay.status, 200);
-  assert.equal(replay.body.persistence.mock_result_saved, false,
-    "a failed idempotent persistence response is reported instead of being treated as saved");
-  assert.equal(replay.body.exam_proof, null, "failed persistence cannot mint a post-exam proof");
+  assert.equal(replay.status, 503);
+  assert.equal(replay.body.error, "EXAM_RESULT_NOT_SAVED",
+    "failed persistence cannot be shown as a completed exam result");
+  assert.equal(replay.body.exam_proof, undefined, "failed persistence cannot mint a post-exam proof");
+  assert.equal(replay.body.result, undefined, "failed persistence cannot reveal model answers");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
     "a failed result write cannot create mastery without a persisted result");
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false,
     "a failed result write cannot create learner-loop attempts without a persisted result");
-  const savedRows = calls.filter((call) => call.url.startsWith(`${origin}/rest/v1/mock_results?`));
+  const savedRows = calls.filter((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.equal(savedRows.length, 1, "a replay makes one bounded persistence attempt");
-  assert.equal(JSON.parse(savedRows[0].body).submission_id, savedPayload.submission_id,
+  assert.equal(JSON.parse(savedRows[0].body).p_submission_id, savedPayload.p_submission_id,
     "replaying the same signed exam uses the same idempotency key");
 
   mockResultMode = "insert";
@@ -302,7 +329,7 @@ try {
     "a later successful idempotent write is acknowledged");
   assert.ok(recoveredReplay.body.exam_proof, "confirmed persistence restores post-exam review");
   assert.ok(calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) >
-    calls.findIndex((call) => call.url.startsWith(`${origin}/rest/v1/mock_results?`)),
+    calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")),
   "a recovered result write enables mastery only after persistence succeeds");
   assert.ok(calls.some((call) => call.url.includes("/rest/v1/student_attempts")),
     "a recovered result write enables learner-loop attempt persistence");

@@ -39,6 +39,8 @@ const EXAM = {
 };
 
 let lastGradePayload = null;
+let lastAbandonPayload = null;
+let activeExamCountResponse = 0;
 const pass = [], fail = [];
 const ok = (n, c, d = "") => (c ? pass : fail).push(n + (d ? " — " + d : ""));
 
@@ -53,6 +55,14 @@ async function mk(opts = {}, gradeOk = true) {
   // Baslagret från _harness.mjs; provgenereringen och rättningen ligger i
   // `extra` som registreras sist och därmed vinner.
   await mockApis(page, { extra: [
+    ["**/api/abandon-exam", r => {
+      if (r.request().method() === "GET") return r.fulfill({ json: { ok: true, active_count: activeExamCountResponse } });
+      const payload = JSON.parse(r.request().postData() || "{}");
+      lastAbandonPayload = payload;
+      return r.fulfill({ json: payload.abandon_all === true
+        ? { ok: true, abandoned_count: 1 }
+        : { ok: true, abandoned: true } });
+    }],
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
     ["**/api/grade", async r => {
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
@@ -300,7 +310,7 @@ async function toExam(page) {
     await page.evaluate(() => Array.from(document.querySelectorAll(".xf-btn")).find(b => /Fortsätt provet/.test(b.textContent)).click());
     await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
     await page.waitForTimeout(300);
-    const clock = await page.textContent(".xf-exam-top span:last-child");
+    const clock = await page.textContent(".xf-exam-time");
     ok("T7b klockan fortsätter, nollställs inte", clock !== "00:00", "klocka: " + clock);
     page.on("dialog", d => d.accept().catch(() => {}));
     await page.evaluate(() => {
@@ -365,6 +375,45 @@ async function toExam(page) {
   ok("T8c använt tillstånd är oförändrat", used.text === "✦ P.E.R hjälpte dig här" && used.cls === "xf-ask used",
     JSON.stringify(used));
   await ctx.close();
+}
+
+// ── T9: explicit avbrytning lämnar inget rättningsbart utkast ───────────────
+{
+  const { ctx, page } = await mk();
+  await signIn(page, "u1");
+  await toExam(page);
+  const exit = page.locator(".xf-exam-exit");
+  const size = await exit.boundingBox();
+  ok("T9a avbryt har tydlig 44 px klickyta", size?.width >= 44 && size?.height >= 44);
+  page.on("dialog", d => d.accept().catch(() => {}));
+  lastAbandonPayload = null;
+  await exit.click();
+  await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+  ok("T9b avbryt verifieras mot samma provmanifest", lastAbandonPayload?.exam_manifest === EXAM.exam_manifest);
+  ok("T9c avbrutet prov lämnar inget lokalt utkast",
+    await page.evaluate(() => localStorage.getItem("exgen_flow_draft_u1") === null));
+  ok("T9d provytan är stängd", await page.locator(".xf-exam.on").count() === 0);
+  await ctx.close();
+}
+
+// ── T10: en ny enhet kan rensa ett aktivt prov utan lokalt utkast ───────────
+{
+  activeExamCountResponse = 1;
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "u1");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    const recovery = page.locator(".xf-exam-recovery");
+    await recovery.waitFor({ state: "visible", timeout: 8000 });
+    ok("T10a förlorat prov kan upptäckas utan lokalt utkast", await recovery.textContent().then(text => /Ett prov finns kvar/.test(text)));
+    page.on("dialog", d => d.accept().catch(() => {}));
+    lastAbandonPayload = null;
+    await recovery.getByRole("button", { name: "Avsluta tidigare prov" }).click();
+    ok("T10b återställning använder explicit avbryt-allt", lastAbandonPayload?.abandon_all === true);
+  } finally {
+    activeExamCountResponse = 0;
+    await ctx.close();
+  }
 }
 
 await browser.close();

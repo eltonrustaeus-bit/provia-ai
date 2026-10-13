@@ -8,6 +8,7 @@ import pilotScope from "../../api/_pilot-scope.cjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const inScope = new Set([
+  "abandon-exam.js",
   "check-role.js",
   "explain.js",
   "generate-exam.js",

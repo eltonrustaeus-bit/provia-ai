@@ -6,6 +6,7 @@ const completion = await readFile(new URL("../../api/_exam-completion.cjs", impo
 const migration = await readFile(new URL("../../supabase/migrations/20261012103939_harden_idempotent_mock_mastery.sql", import.meta.url), "utf8");
 const resultMigration = await readFile(new URL("../../supabase/migrations/20261012120017_mock_result_submission_idempotency.sql", import.meta.url), "utf8");
 const resultRollback = await readFile(new URL("../../supabase/migrations/20261012120017_mock_result_submission_idempotency_ROLLBACK.sql", import.meta.url), "utf8");
+const issuanceMigration = await readFile(new URL("../../supabase/migrations/20261013082230_guard_active_exams.sql", import.meta.url), "utf8");
 
 assert.match(api, /answerMap\.size !== questions\.length[\s\S]*?Exactly one answer entry is required/,
   "explicitly blank answers are allowed, but omitted question IDs are rejected");
@@ -24,9 +25,11 @@ assert.match(migration, /primary key \(user_id, submission_id, concept\)/,
 assert.match(migration, /on conflict do nothing[\s\S]*?apply_mock_mastery\(/,
   "the event claim and mastery update run in one database transaction");
 assert.match(api, /submission_id:\s*attemptId/,
-  "the best-effort result row includes the stable identity of its signed exam submission");
-assert.match(api, /mock_results\?on_conflict=user_id,submission_id[\s\S]*?resolution=ignore-duplicates/,
-  "replayed result writes request conflict-safe insertion");
+  "the official result row includes the stable identity of its signed exam submission");
+assert.match(api, /examIssuance\.persistExamResult\(payload\)/,
+  "result writes use the issuance-aware database transaction");
+assert.match(issuanceMigration, /persist_graded_exam_result[\s\S]*?for update;[\s\S]*?on conflict \(user_id, submission_id\) do nothing/i,
+  "the result insert serializes with abandonment and remains idempotent");
 assert.match(resultMigration, /ADD COLUMN IF NOT EXISTS submission_id text/i);
 assert.match(resultMigration, /CREATE UNIQUE INDEX IF NOT EXISTS mock_results_user_submission_id_uidx[\s\S]*?\(user_id, submission_id\)/i,
   "the database enforces one aggregate result per user and signed submission");

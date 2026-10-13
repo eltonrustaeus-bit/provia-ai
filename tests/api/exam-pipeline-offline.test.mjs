@@ -68,9 +68,13 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) return Response.json({ ok: true });
-  if (url.includes("/rest/v1/mock_results")) return Response.json([
-    { submission_id: JSON.parse(init.body).submission_id },
-  ], { status: 201 });
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json("active");
+  if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(0);
+  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) return Response.json("saved");
+  if (url.includes("/rest/v1/exam_issuances")) return method === "POST"
+    ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
+    : new Response(null, { status: 204 });
+  if (url.includes("/rest/v1/mock_results")) return Response.json({ num_questions: 1 });
   if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
 
@@ -313,7 +317,7 @@ try {
   assert.equal(graphGraded.body.result.per_question[0].points, 2);
   assert.equal(graphGraded.body.result.per_question[0].max_points, 2);
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")));
-  assert.ok(calls.some((call) => call.url.includes("/rest/v1/mock_results")));
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")));
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")));
 
   calls.length = 0;
@@ -372,7 +376,7 @@ try {
     `${origin}/rest/v1/rpc/refund_mock_exam_quota`,
     `${origin}/rest/v1/rpc/consume_anon_rate`,
     `${origin}/rest/v1/rpc/apply_mock_mastery_once`,
-    `${origin}/rest/v1/mock_results?on_conflict=user_id,submission_id`,
+      `${origin}/rest/v1/rpc/persist_graded_exam_result`,
     `${origin}/rest/v1/feature_flags?select=key%2Cenabled%2Callowed_user_ids&key=in.%28per_learner_loop_enabled%29`,
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),

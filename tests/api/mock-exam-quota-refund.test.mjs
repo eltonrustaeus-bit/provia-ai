@@ -150,13 +150,14 @@ assert.equal(reconciledRefund?.p_period_key, lostReservationRequest?.p_period_ke
 
 const quotaStart = source.indexOf("const quotaRequestId = crypto.randomUUID()");
 const quotaSuccess = source.indexOf("if (!quota.ok)", quotaStart);
+const failStart = source.indexOf("async function fail(status, payload)", quotaSuccess);
+const cleanupRefund = source.indexOf("refundMockExamQuota(user.id, quotaPeriod, quotaRequestId)", failStart);
+const failureResponse = source.indexOf("return json(res, status, payload)", failStart);
 const generateStart = source.indexOf("const model = pickModel", quotaSuccess);
-const successResponse = source.indexOf("delivered = true", generateStart);
-const finallyBlock = source.indexOf("} finally {", successResponse);
 assert.ok(quotaStart >= 0 && quotaSuccess > quotaStart && generateStart > quotaSuccess);
-assert.ok(successResponse > generateStart && finallyBlock > successResponse);
-assert.match(source.slice(finallyBlock), /if \(!delivered && quota\.enforced && !quota\.unlimited\)/);
-assert.match(source.slice(finallyBlock), /refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\)/);
+assert.ok(failStart > quotaSuccess && cleanupRefund > failStart && failureResponse > cleanupRefund,
+  "undelivered exam cleanup and quota refund finish before the HTTP error response");
+assert.match(source.slice(failStart, failureResponse), /removeUndeliveredExam\(user\.id, issuedSubmissionId\)/);
 assert.match(source, /catch \{\s*await refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\)/,
   "an ambiguous reserve timeout is reconciled by request ID");
 assert.match(source, /reserve_mock_exam_quota/);

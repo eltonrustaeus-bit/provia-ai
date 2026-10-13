@@ -11,6 +11,7 @@ const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
+const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 
 function cognitiveVerbHint(lang) {
@@ -828,7 +829,7 @@ module.exports = async function handler(req, res) {
   const quotaRequestId = crypto.randomUUID();
   const quotaPeriod = rules.currentPeriodKey(mockLimit.period);
   let quota;
-  let delivered = false;
+  let issuedSubmissionId = null;
   try {
     quota = await consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId);
   } catch {
@@ -848,6 +849,22 @@ module.exports = async function handler(req, res) {
       limit: quota.limit,
       period: quota.period
     });
+  }
+
+  let cleaned = false;
+  async function fail(status, payload) {
+    if (!cleaned) {
+      cleaned = true;
+      if (issuedSubmissionId) {
+        const removed = await examIssuance.removeUndeliveredExam(user.id, issuedSubmissionId);
+        if (!removed) console.warn(JSON.stringify({ event: "undelivered_exam_issuance_cleanup_failed" }));
+      }
+      if (quota.enforced && !quota.unlimited) {
+        const refunded = await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
+        if (!refunded) console.warn(JSON.stringify({ event: "mock_exam_quota_refund_failed", period: quota.period }));
+      }
+    }
+    return json(res, status, payload);
   }
 
   try {
@@ -876,7 +893,7 @@ module.exports = async function handler(req, res) {
     // expensive generation if the remaining function time cannot accommodate it.
     const canVerify = budget.remaining() >= MIN_GENERATION_MS + VERIFIER_RESERVE_MS;
     if (!canVerify && qType !== "graph") {
-      return json(res, 503, {
+      return fail(503, {
         ok: false,
         error: "quality_review_unavailable",
         message: lang === "en"
@@ -888,7 +905,7 @@ module.exports = async function handler(req, res) {
 
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget });
     if (!gen.ok) {
-      return json(res, 502, { ok: false, error: "OpenAI error", status: gen.status, details: gen.details });
+      return fail(502, { ok: false, error: "OpenAI error", status: gen.status, details: gen.details });
     }
 
     const salvage = salvageExamJson(gen.text);
@@ -898,7 +915,7 @@ module.exports = async function handler(req, res) {
     if (!exam) {
       // Nothing usable arrived before the deadline. Say so plainly instead of a
       // generic 500 — the student can retry with fewer questions and succeed.
-      return json(res, 504, {
+      return fail(504, {
         ok: false,
         error: "Provet hann inte genereras",
         message: "Generatorn hann inte färdigt inom tidsgränsen. Försök igen, gärna med färre frågor.",
@@ -908,19 +925,19 @@ module.exports = async function handler(req, res) {
     }
 
     if (!Array.isArray(exam.questions) || exam.questions.length === 0) {
-      return json(res, 500, { ok: false, error: "Schema mismatch", exam });
+      return fail(500, { ok: false, error: "Schema mismatch", exam });
     }
     if (truncated) {
       exam.questions = keepQuestionsWithValidIds(exam.questions);
     } else if (!normalizeUniqueQuestionIds(exam.questions)) {
-      return json(res, 500, {
+      return fail(500, {
         ok: false,
         error: "GENERATION_QUESTION_IDS_INVALID",
         message: "Provet kunde inte färdigställas. Försök igen.",
       });
     }
     if (exam.questions.length === 0) {
-      return json(res, 500, {
+      return fail(500, {
         ok: false,
         error: "GENERATION_QUESTION_IDS_INVALID",
         message: "Provet kunde inte färdigställas. Försök igen.",
@@ -929,7 +946,7 @@ module.exports = async function handler(req, res) {
     // A complete response must still match the requested count exactly; a
     // salvaged one is short by construction and that is the point.
     if (!truncated && exam.questions.length !== numQuestions) {
-      return json(res, 500, { ok: false, error: "Schema mismatch", exam });
+      return fail(500, { ok: false, error: "Schema mismatch", exam });
     }
 
     // Server-side guard: inga essay + fixa short-regler.
@@ -938,7 +955,7 @@ module.exports = async function handler(req, res) {
     // so bad questions are dropped rather than discarding the whole exam.
     const guardFail = (reason, detail) => truncated
       ? null
-      : json(res, 500, { ok: false, error: reason, ...detail });
+      : fail(500, { ok: false, error: reason, ...detail });
     const keptQuestions = [];
     for (const q of exam.questions) {
       if (q?.type !== "mc" && q?.type !== "short" && q?.type !== "graph") {
@@ -997,7 +1014,7 @@ module.exports = async function handler(req, res) {
     }
     exam.questions = keptQuestions;
     if (exam.questions.length === 0) {
-      return json(res, 504, {
+      return fail(504, {
         ok: false,
         error: "Provet hann inte genereras",
         message: "Generatorn hann inte färdigt inom tidsgränsen. Försök igen, gärna med färre frågor.",
@@ -1185,7 +1202,7 @@ module.exports = async function handler(req, res) {
         // equation and graded deterministically, so their limited path can stand
         // on that narrower contract if the optional model review is unavailable.
         if (qType !== "graph") {
-          return json(res, 503, {
+          return fail(503, {
             ok: false,
             error: "quality_review_unavailable",
             message: lang === "en"
@@ -1202,7 +1219,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (exam.questions.length > 0 && verifierSkipped && qType !== "graph") {
-      return json(res, 503, {
+      return fail(503, {
         ok: false,
         error: "quality_review_unavailable",
         message: lang === "en"
@@ -1212,7 +1229,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (exam.questions.length === 0) {
-      return json(res, 502, {
+      return fail(502, {
         ok: false,
         error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.",
         gate: { profile: subjectProfile, dropped: gate.dropped },
@@ -1265,12 +1282,15 @@ module.exports = async function handler(req, res) {
     };
     clientExam.exam_manifest = examCompletion.issueExamManifest(user.id, course, pastedText, clientExam.questions);
     if (!clientExam.exam_manifest) throw new Error("Exam manifest unavailable");
+    issuedSubmissionId = examCompletion.submissionId(user.id, course, clientExam.questions);
+    if (!await examIssuance.issueExam(user.id, issuedSubmissionId)) {
+      throw new Error("Exam issuance unavailable");
+    }
 
     if (quota.enforced && !quota.unlimited) {
       const committed = await commitMockExamQuota(user.id, quotaPeriod, quotaRequestId);
       if (!committed) throw new Error("Mock quota finalization unavailable");
     }
-    delivered = true;
     return json(res, 200, {
       ok: true,
       exam: clientExam,
@@ -1297,18 +1317,11 @@ module.exports = async function handler(req, res) {
       }
     });
   } catch (e) {
-    return json(res, 500, {
+    return fail(500, {
       ok: false,
       error: "exam_generation_failed",
       message: "Provet kunde inte färdigställas. Försök igen."
     });
-  } finally {
-    if (!delivered && quota.enforced && !quota.unlimited) {
-      const refunded = await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
-      if (!refunded) {
-        console.warn(JSON.stringify({ event: "mock_exam_quota_refund_failed", period: quota.period }));
-      }
-    }
   }
 };
 

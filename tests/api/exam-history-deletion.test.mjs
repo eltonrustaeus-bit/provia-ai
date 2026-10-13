@@ -22,7 +22,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.pathname === "/auth/v1/user") {
     return Response.json({ id: userId, email: "student@example.test" });
   }
-  if (url.pathname === "/rest/v1/user_exams" || url.pathname === "/rest/v1/mock_results") {
+  if (["/rest/v1/exam_issuances", "/rest/v1/user_exams", "/rest/v1/mock_results"].includes(url.pathname)) {
     requests.push({ table: url.pathname.split("/").at(-1), method, userId: url.searchParams.get("user_id") });
     if (requests.at(-1).table === failTable) return Response.json({ message: "synthetic table failure" }, { status: 503 });
     return new Response(null, { status: 204 });
@@ -50,13 +50,16 @@ async function invoke() {
 }
 
 try {
-  for (const failedTable of ["", "user_exams", "mock_results"]) {
+  for (const failedTable of ["", "exam_issuances", "user_exams", "mock_results"]) {
     failTable = failedTable;
     requests.length = 0;
     const response = await invoke();
-    assert.deepEqual(requests.map((request) => request.table).sort(), ["mock_results", "user_exams"]);
+    assert.deepEqual(requests.map((request) => request.table).sort(), failedTable === "exam_issuances"
+      ? ["exam_issuances"]
+      : ["exam_issuances", "mock_results", "user_exams"]);
+    assert.equal(requests[0].table, "exam_issuances", "issuance rows are removed before results can be deleted");
     assert.ok(requests.every((request) => request.method === "DELETE" && request.userId === `eq.${userId}`),
-      "both deletes are scoped to the verified user's UUID");
+      "all deletes are scoped to the verified user's UUID");
     if (failedTable) {
       assert.equal(response.statusCode, 500, `${failedTable} failure must not claim success`);
       assert.deepEqual(response.body, { error: "Delete failed" });
@@ -78,4 +81,4 @@ try {
   }
 }
 
-console.log("exam history deletion: both account-scoped tables and partial failures passed");
+console.log("exam history deletion: issuance and result deletion order, account scope and partial failures passed");

@@ -142,6 +142,28 @@ body.xf-grading .xf-progress { display: none; }
   flex: 1;
 }
 
+.xf-exam-exit {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--xf-line);
+  border-radius: var(--exgen-radius-sm);
+  background: transparent;
+  color: var(--xf-ink-2);
+  font: 22px/1 "DM Sans", sans-serif;
+  cursor: pointer;
+}
+
+.xf-exam-exit:hover, .xf-exam-exit:focus-visible { color: var(--xf-ink); border-color: var(--xf-ink-2); }
+.xf-exam-exit:disabled { opacity: .5; cursor: wait; }
+
+@media (max-width: 600px) {
+  .xf-exam-top { gap: 8px; padding: 10px 12px; }
+}
+
 .xf-dot {
   position: relative;
   width: 7px;
