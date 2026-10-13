@@ -83,7 +83,9 @@ for (const file of pages) {
       const accept = [...document.querySelectorAll("button")].find(b => /acceptera alla/i.test(b.textContent || ""));
       if (accept) accept.click();
     }).catch(() => {});
-    await page.waitForTimeout(350);
+    // Removing the in-flow cookie panel can move reveal elements into view;
+    // let their opacity transition finish before axe samples text contrast.
+    await page.waitForTimeout(1000);
     const result = await runAxe(page);
     console.log(`${file} — console errors: ${consoleErrors.length}, axe violations: ${result.length}`);
     consoleErrors.forEach(e => console.log("  " + e));
