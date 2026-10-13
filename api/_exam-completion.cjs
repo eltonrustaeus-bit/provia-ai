@@ -88,7 +88,7 @@ function verifyCompletion(proof, userId) {
     seen.add(question.id);
     if (question.id === selectedQuestionId) selected = question;
   }
-  return selected ? { question: selected, submissionId: id } : null;
+  return selected ? { question: selected, submissionId: id, course, material } : null;
 }
 
 module.exports = { submissionId, answerFingerprint, issueExamManifest, verifyExamManifest, issueCompletion, verifyCompletion };

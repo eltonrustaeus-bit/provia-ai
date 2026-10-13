@@ -51,6 +51,8 @@ test("a graded full set authorizes only its signed question for its owner", () =
   const checked = completion.verifyCompletion(proof(), userId);
   assert.equal(checked?.question?.id, "q1");
   assert.equal(checked?.question?.model_answer, "Lutningen");
+  assert.equal(checked?.course, course);
+  assert.equal(checked?.material, material);
   assert.match(checked?.submissionId || "", /^[a-f0-9]{32}$/);
 });
 
