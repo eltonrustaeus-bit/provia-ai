@@ -13,6 +13,8 @@ async function runWithResults(results, questions = [question("q1"), question("q2
   globalThis.fetch = async () => {
     fetchCalls++;
     return Response.json({
+      model: "measured-review-model",
+      usage: { input_tokens: 31, output_tokens: 7 },
       output: [{ content: [{ type: "output_text", text: JSON.stringify({ results }) }] }],
     });
   };
@@ -27,6 +29,8 @@ const valid = await runWithResults([result("q1", true), result("q2", false)]);
 assert.equal(valid.outcome.callOk, true, "an exact one-to-one result set is accepted");
 assert.equal(valid.outcome.perQuestion.size, 2);
 assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
+assert.equal(valid.outcome.model, "measured-review-model");
+assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
 
 for (const results of [
   [result("q1", false), result("q1", true)],
@@ -35,6 +39,7 @@ for (const results of [
   const duplicate = await runWithResults(results);
   assert.equal(duplicate.outcome.callOk, false, "duplicate reviewer IDs fail closed regardless of order");
   assert.equal(duplicate.outcome.perQuestion.size, 0, "failed output exposes no partial decisions");
+  assert.equal(duplicate.outcome.usage.input_tokens, 31, "a paid but invalid review retains usage metadata");
 }
 
 for (const results of [

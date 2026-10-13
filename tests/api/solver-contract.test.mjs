@@ -69,6 +69,8 @@ try {
     ["invalid verdict shape", [result("q1", { confidence: 2 }), valid[1]]],
   ]) {
     globalThis.fetch = async () => new Response(JSON.stringify({
+      model: "measured-solver-model",
+      usage: { input_tokens: 44, output_tokens: 9 },
       output_text: JSON.stringify({ results }),
     }), { status: 200, headers: { "content-type": "application/json" } });
     const outcome = await solver.solveQuestions(questions, {
@@ -81,6 +83,8 @@ try {
       assert.equal(outcome.callOk, false, name);
       assert.equal(outcome.perQuestion.size, 0, name);
     }
+    assert.equal(outcome.model, "measured-solver-model", name);
+    assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
   }
 } finally {
   globalThis.fetch = originalFetch;

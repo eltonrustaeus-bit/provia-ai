@@ -164,10 +164,11 @@ async function verifyQuestions(questions, opts) {
   }));
 
   const reviewModel = verifierModel(model);
-  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel };
+  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel, usage: null, latencyMs: 0 };
   const expectedIds = new Set(items.map((item) => item.id));
   if (items.length === 0 || items.some((item) => !item.id.trim()) || expectedIds.size !== items.length) return failed;
 
+  const startedAt = Date.now();
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -186,6 +187,9 @@ async function verifyQuestions(questions, opts) {
     const raw = await r.text();
     let data;
     try { data = JSON.parse(raw); } catch { return failed; }
+    failed.usage = data?.usage || null;
+    failed.model = data?.model || reviewModel;
+    failed.latencyMs = Date.now() - startedAt;
     const outputText = extractOutputText(data);
     if (!outputText) return failed;
     let parsed;
@@ -201,9 +205,9 @@ async function verifyQuestions(questions, opts) {
       perQuestion.set(res.id, res);
     }
     if (perQuestion.size !== expectedIds.size) return failed;
-    return { perQuestion, callOk: true, model: reviewModel };
+    return { perQuestion, callOk: true, model: failed.model, usage: failed.usage, latencyMs: failed.latencyMs };
   } catch {
-    return { perQuestion: new Map(), callOk: false, model: reviewModel };
+    return failed;
   }
 }
 

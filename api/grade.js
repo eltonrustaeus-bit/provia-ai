@@ -16,6 +16,7 @@ const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
+const { logMockExamUsage } = require("./_ai-usage.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -791,6 +792,7 @@ module.exports = async function handler(req, res) {
       };
 
       let r;
+      const gradingStartedAt = Date.now();
       try {
         r = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -809,6 +811,14 @@ module.exports = async function handler(req, res) {
       } catch {
         return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
       }
+      await logMockExamUsage({
+        userId: user.id,
+        requestId: claimed?.id,
+        step: "grade",
+        model: data?.model || model,
+        usage: data?.usage,
+        latencyMs: Date.now() - gradingStartedAt,
+      });
       if (!r.ok) return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
 
       const outputText = extractOutputText(data);

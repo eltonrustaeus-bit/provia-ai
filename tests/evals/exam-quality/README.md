@@ -78,9 +78,10 @@ question. The runner prints a warning when p95 crosses that line.
 <https://developers.openai.com/api/docs/pricing> on 2026-08-01). Reasoning
 tokens are reported separately, since they bill as output and are the reason a
 reasoning model costs more than a naive input/output estimate suggests.
-The verifier's own token use is **not** captured — `verifyQuestions()` does not
-return it — so the printed cost is the generator's only. Do not read it as the
-total.
+The verifier and solver now return provider usage and the runner reports their
+tokens separately, including how many calls had measured usage. The price table
+is historical, and the displayed cost is still the generator's only. Do not
+read it as current pricing or a total production cost.
 
 ## First finding: subject routing was wrong before any model was swapped
 

@@ -42,6 +42,7 @@ const userId = "33333333-3333-4333-8333-333333333333";
 const signingSecret = "synthetic-invalid-output-secret";
 let providerOutput = "";
 const calls = [];
+const usageBatches = [];
 Object.assign(process.env, {
   SUPABASE_URL: origin,
   SUPABASE_SERVICE_ROLE_KEY: "synthetic-server-key",
@@ -50,7 +51,7 @@ Object.assign(process.env, {
 });
 delete process.env.SUPABASE_SECRET_KEY;
 
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
   calls.push(url);
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
@@ -59,8 +60,12 @@ globalThis.fetch = async (input) => {
   if (url.endsWith("/rest/v1/rpc/release_exam_grading")) return Response.json("released");
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.includes("/rest/v1/feature_flags") || url.includes("/rest/v1/user_profiles")) return Response.json([]);
+  if (url.endsWith("/rest/v1/ai_usage_events")) {
+    usageBatches.push(JSON.parse(init.body || "[]"));
+    return new Response(null, { status: 201 });
+  }
   if (url === "https://api.openai.com/v1/responses") {
-    return Response.json({ output_text: providerOutput });
+    return Response.json({ model: "measured-grade-model", usage: { input_tokens: 55, output_tokens: 13 }, output_text: providerOutput });
   }
   throw new Error(`Unexpected synthetic request: ${url}`);
 };
@@ -135,6 +140,8 @@ try {
       "invalid provider output cannot be saved as a score or zero result");
     assert.equal(calls.some((url) => url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
       "invalid provider output cannot update mastery");
+    assert.equal(usageBatches.at(-1)?.[0]?.pipeline_step, "grade", "even invalid paid grading is measured");
+    assert.equal(usageBatches.at(-1)?.[0]?.input_tokens, 55);
   }
 } finally {
   globalThis.fetch = oldFetch;

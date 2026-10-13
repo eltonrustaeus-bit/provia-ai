@@ -51,7 +51,11 @@ let generationTextOverride = null;
 let gradingState = "active";
 
 function outputResponse(value) {
-  return Response.json({ output: [{ content: [{ type: "output_text", text: JSON.stringify(value) }] }] });
+  return Response.json({
+    model: "measured-review-model",
+    usage: { input_tokens: 41, output_tokens: 12 },
+    output: [{ content: [{ type: "output_text", text: JSON.stringify(value) }] }],
+  });
 }
 
 globalThis.fetch = async (input, init = {}) => {
@@ -89,13 +93,18 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/mock_results")) return Response.json({ num_questions: 1 });
   if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
+  if (url.endsWith("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
 
   if (url === "https://api.openai.com/v1/responses") {
     const body = JSON.parse(init.body || "{}");
     if (body.stream) {
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
       const event = { type: "response.output_text.delta", delta: generationTextOverride || JSON.stringify({ title: "Syntetiskt prov", level: "C", questions: activeQuestions }) };
-      return new Response(`data: ${JSON.stringify(event)}\n\ndata: [DONE]\n\n`);
+      const completed = { type: "response.completed", response: {
+        model: "measured-generator-model",
+        usage: { input_tokens: 120, output_tokens: 40 },
+      } };
+      return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
     const schemaName = body.text?.format?.name;
     if (schemaName === "exam_verifier_schema") {
@@ -175,6 +184,12 @@ try {
   }
   assert.equal(generated.body.meta.verifier.approved, 3);
   assert.equal(generated.body.meta.solver.checked, 3);
+  const usageWrite = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
+  assert.ok(usageWrite, "the complete provider chain writes one metrics batch");
+  assert.deepEqual(usageWrite.body.map((event) => event.pipeline_step), ["generate", "verify_compare", "verify_blind"]);
+  assert.deepEqual(usageWrite.body.map((event) => event.input_tokens), [120, 41, 41]);
+  assert.equal(usageWrite.body[0].model, "measured-generator-model");
+  assert.doesNotMatch(JSON.stringify(usageWrite.body), /Syntetiskt prov|Grundläggande räkning|Vad är 2/);
 
   const missingManifest = await invoke(gradeExam, {
     lang: "sv", course, pastedText, level: "C",
@@ -430,6 +445,7 @@ try {
     `${origin}/rest/v1/rpc/consume_anon_rate`,
     `${origin}/rest/v1/rpc/try_replay_mock_learning_job`,
     `${origin}/rest/v1/rpc/persist_graded_exam_result`,
+    `${origin}/rest/v1/ai_usage_events`,
     `${origin}/rest/v1/feature_flags?select=key%2Cenabled%2Callowed_user_ids&key=in.%28per_learner_loop_enabled%29`,
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),

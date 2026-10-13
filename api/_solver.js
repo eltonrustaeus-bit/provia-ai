@@ -213,7 +213,7 @@ async function solveQuestions(questions, opts) {
   const mcs = (questions || []).filter(
     q => q && q.type === "mc" && Array.isArray(q.options) && q.options.length >= 2
   );
-  const empty = { perQuestion: new Map(), callOk: false, solved: 0, model: solverModel(model) };
+  const empty = { perQuestion: new Map(), callOk: false, solved: 0, model: solverModel(model), usage: null, latencyMs: 0 };
   if (!mcs.length) return { ...empty, callOk: true };
 
   // Stem and options only. correct_index, model_answer, rubric and
@@ -222,6 +222,7 @@ async function solveQuestions(questions, opts) {
   const items = mcs.map(q => ({ id: String(q.id), question: q.question, options: q.options }));
   const trimmedMaterial = String(material || "").slice(0, MATERIAL_CHAR_CAP);
 
+  const startedAt = Date.now();
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -240,13 +241,16 @@ async function solveQuestions(questions, opts) {
     const raw = await r.text();
     let data;
     try { data = JSON.parse(raw); } catch { return empty; }
+    empty.usage = data?.usage || null;
+    empty.model = data?.model || empty.model;
+    empty.latencyMs = Date.now() - startedAt;
     const outputText = extractOutputText(data);
     if (!outputText) return empty;
     let parsed;
     try { parsed = JSON.parse(outputText); } catch { return empty; }
     const perQuestion = parseSolverResults(parsed.results, mcs);
     if (!perQuestion) return empty;
-    return { perQuestion, callOk: true, solved: mcs.length, model: solverModel(model) };
+    return { perQuestion, callOk: true, solved: mcs.length, model: empty.model, usage: empty.usage, latencyMs: empty.latencyMs };
   } catch {
     return empty;
   }

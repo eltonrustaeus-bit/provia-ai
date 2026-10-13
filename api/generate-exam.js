@@ -13,6 +13,7 @@ const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { logMockExamUsage } = require("./_ai-usage.cjs");
 
 function cognitiveVerbHint(lang) {
   const v = assessment.COGNITIVE_VERBS;
@@ -540,6 +541,7 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   let text = "";
   let cutShort = false;
   let usage = null;
+  let providerModel = null;
 
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
@@ -569,7 +571,10 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
           let ev;
           try { ev = JSON.parse(payloadLine); } catch { continue; }
           if (ev.type === "response.output_text.delta" && typeof ev.delta === "string") text += ev.delta;
-          else if (ev.type === "response.completed" && ev.response && ev.response.usage) usage = ev.response.usage;
+          else if (ev.type === "response.completed" && ev.response) {
+            usage = ev.response.usage || null;
+            providerModel = ev.response.model || null;
+          }
         }
       }
     } catch (e) {
@@ -581,13 +586,13 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   } catch (e) {
     clearTimeout(timer);
     if (e && (e.name === "AbortError" || controller.signal.aborted)) {
-      return { ok: true, text, cutShort: true, usage, latencyMs: Date.now() - t0 };
+      return { ok: true, text, cutShort: true, usage, model: providerModel, latencyMs: Date.now() - t0 };
     }
     return { ok: false, status: 0, details: String(e), latencyMs: Date.now() - t0 };
   }
 
   clearTimeout(timer);
-  return { ok: true, text, cutShort, usage, latencyMs: Date.now() - t0 };
+  return { ok: true, text, cutShort, usage, model: providerModel, latencyMs: Date.now() - t0 };
 }
 
 function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "" }) {
@@ -873,6 +878,16 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  const usageEvents = [];
+  let usageFlushed = false;
+  function recordUsage(step, model, usage, latencyMs) {
+    usageEvents.push({ userId: user.id, requestId: quotaRequestId, tier: role, step, model, usage, latencyMs });
+  }
+  async function flushUsage() {
+    if (usageFlushed) return;
+    usageFlushed = true;
+    await logMockExamUsage(usageEvents);
+  }
   let cleaned = false;
   async function fail(status, payload) {
     if (!cleaned) {
@@ -886,6 +901,7 @@ module.exports = async function handler(req, res) {
         if (!refunded) console.warn(JSON.stringify({ event: "mock_exam_quota_refund_failed", period: quota.period }));
       }
     }
+    await flushUsage();
     return json(res, status, payload);
   }
 
@@ -926,6 +942,7 @@ module.exports = async function handler(req, res) {
     const generationBudget = budget.remaining() - (canVerify ? VERIFIER_RESERVE_MS : 0);
 
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget });
+    recordUsage("generate", gen.model || model, gen.usage, gen.latencyMs);
     if (!gen.ok) {
       return fail(502, { ok: false, error: "OpenAI error", status: gen.status, details: gen.details });
     }
@@ -1110,6 +1127,8 @@ module.exports = async function handler(req, res) {
           timeoutMs: Math.max(1000, budget.remaining() - RESPONSE_RESERVE_MS),
         }),
       ]);
+      recordUsage("verify_compare", v1.model, v1.usage, v1.latencyMs);
+      recordUsage("verify_blind", s1.model, s1.usage, s1.latencyMs);
       solverOutcome.callOk = s1.callOk;
       solverOutcome.model = s1.model;
       verifierOutcome.callOk = v1.callOk;
@@ -1175,6 +1194,7 @@ module.exports = async function handler(req, res) {
           // questions are what actually ships.
           const round1Gate = gate;
           let regenerationSucceeded = false;
+          const regenStartedAt = Date.now();
           const r2 = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -1183,6 +1203,7 @@ module.exports = async function handler(req, res) {
           });
           const raw2 = await r2.text();
           let data2; try { data2 = JSON.parse(raw2); } catch { data2 = null; }
+          recordUsage("repair", data2?.model || model, data2?.usage, Date.now() - regenStartedAt);
           if (r2.ok && data2) {
             const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
             let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
@@ -1192,6 +1213,7 @@ module.exports = async function handler(req, res) {
               const regatedQuestions = gate.questions;
               if (regatedQuestions.length > 0) {
                 const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang });
+                recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
                 if (v2.callOk) {
                   const kept = [];
                   const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: true };
@@ -1336,6 +1358,7 @@ module.exports = async function handler(req, res) {
       const committed = await commitMockExamQuota(user.id, quotaPeriod, quotaRequestId);
       if (!committed) throw new Error("Mock quota finalization unavailable");
     }
+    await flushUsage();
     return json(res, 200, {
       ok: true,
       exam: clientExam,
