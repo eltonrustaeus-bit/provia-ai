@@ -1,8 +1,7 @@
 // src/per/usage.mjs — kostnads-, token- och latencyloggning för P.E.R:s elevloop.
 //
-// Skillnad mot logUsage() i src/generation/legal-generation.mjs (som loggar 0 tokens överallt):
-// här läses OpenAI-svarets faktiska usage-objekt via callAIRaw() i api/_per-core.js. Tokens är
-// alltså UPPMÄTTA, inte uppskattade.
+// OpenAI-svarets faktiska usage-objekt läses via callAIRaw() i api/_per-core.js.
+// Tokens är alltså UPPMÄTTA, inte uppskattade; legal-generation använder samma loggning.
 //
 // estimated_cost lämnas NULL tills config/model-pricing.json är ifylld och verified=true.
 // docs/provia-knowledge-engine/05-cost-baseline.md är uttrycklig: priser får inte hämtas ur en
