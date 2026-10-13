@@ -30,7 +30,29 @@ try {
   assert.equal(english.clear, "Clear points");
   assert.ok(await page.getByText("−5", { exact: true }).count() >= 2, "both graph axes are numbered");
 
-  const svg = page.locator("svg");
+  const scatterUi = { mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)" };
+  await page.evaluate((ui) => {
+    const root = document.createElement("div"); root.id = "scatter"; document.body.appendChild(root);
+    window.ExGenGraphAnswer(root, "", () => {}, "sv", ui);
+  }, scatterUi);
+  const scatterRoot = page.locator("#scatter");
+  assert.equal(await scatterRoot.locator(".graph-point-tabs button").count(), 3, "scatter mode exposes exactly three independently selectable observations");
+  assert.equal(await scatterRoot.locator(".graph-coordinate-fields input").count(), 6, "all three x/y pairs have keyboard-entry controls");
+  assert.deepEqual(await scatterRoot.locator(".graph-axis-captions span").allTextContents(), ["x · Tid (min)", "y · Syrehalt (mg/L)"]);
+  assert.equal(await scatterRoot.locator(".graph-student-line").getAttribute("visibility"), "hidden", "measured points are not incorrectly joined as a line");
+  const scatterSvg = scatterRoot.locator("svg");
+  const scatterBox = await scatterSvg.boundingBox();
+  for (const [px, py] of [[132, 36], [156, 60], [180, 108]]) {
+    await page.touchscreen.tap(scatterBox.x + scatterBox.width * px / 264, scatterBox.y + scatterBox.height * py / 264);
+  }
+  const scatterAnswer = await scatterRoot.locator("input.graphAnswer").inputValue();
+  assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [scatterAnswer, scatterUi]), true);
+  assert.deepEqual(JSON.parse(scatterAnswer), { type: "scatter", points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }] },
+    "touch interaction records each measured pair without revealing target values");
+  assert.equal(await scatterRoot.evaluate((root) => root.scrollWidth <= root.clientWidth), true, "axis labels and three controls do not overflow the mobile viewport");
+  await scatterRoot.evaluate((root) => root.remove());
+
+  const svg = page.locator("#graph svg");
   await page.evaluate(() => {
     const target = document.querySelector("svg"), rect = target.getBoundingClientRect();
     for (const [x, y] of [[2, 2], [11, 132], [253, 132], [132, 11], [132, 253]]) {
@@ -39,22 +61,22 @@ try {
       }));
     }
   });
-  assert.equal(await page.locator("input.graphAnswer").inputValue(), "", "SVG margin clicks do not create points");
+  assert.equal(await page.locator("#graph input.graphAnswer").inputValue(), "", "SVG margin clicks do not create points");
 
   let answer;
   const mobileGrid = await svg.boundingBox();
   await page.touchscreen.tap(mobileGrid.x + mobileGrid.width * 156 / 264, mobileGrid.y + mobileGrid.height * 156 / 264);
   await page.touchscreen.tap(mobileGrid.x + mobileGrid.width * 204 / 264, mobileGrid.y + mobileGrid.height * 108 / 264);
-  answer = await page.locator("input.graphAnswer").inputValue();
+  answer = await page.locator("#graph input.graphAnswer").inputValue();
   assert.deepEqual(JSON.parse(answer).points, [{ x: 1, y: -1 }, { x: 3, y: 1 }], "mobile touch taps map to the intended graph coordinates");
   await page.getByRole("button", { name: "Rensa punkter" }).click();
 
   await svg.click({ position: { x: 180, y: 180 } });
-  await page.locator("svg").click({ position: { x: 245, y: 114 } });
-  answer = await page.locator("input.graphAnswer").inputValue();
+  await page.locator("#graph svg").click({ position: { x: 245, y: 114 } });
+  answer = await page.locator("#graph input.graphAnswer").inputValue();
   assert.equal(await page.evaluate((v) => window.ExGenGraphAnswer.isComplete(v), answer), true);
   assert.deepEqual(JSON.parse(answer).points, [{ x: 0, y: 0 }, { x: 2, y: 2 }]);
-  const pointAButton = page.getByRole("button", { name: /^Punkt A/ });
+  const pointAButton = page.locator("#graph").getByRole("button", { name: /^Punkt A/ });
   await pointAButton.focus();
   await pointAButton.press("Enter");
   assert.equal(await pointAButton.evaluate((e) => document.activeElement === e), true, "keyboard point selection keeps focus on the activated button");
@@ -63,20 +85,20 @@ try {
   assert.deepEqual(line, ["12", "252"], "the plotted line extends across the visible grid");
 
   for (const y of [-5, 5]) {
-    await page.getByRole("button", { name: "Rensa punkter" }).click();
+    await page.locator("#graph").getByRole("button", { name: "Rensa punkter" }).click();
     for (const [label, value] of [["Punkt A, x-koordinat", "-5"], ["Punkt A, y-koordinat", String(y)], ["Punkt B, x-koordinat", "5"], ["Punkt B, y-koordinat", String(y)]]) {
-      await page.getByRole("spinbutton", { name: label }).fill(value);
+      await page.locator("#graph").getByRole("spinbutton", { name: label }).fill(value);
     }
     const boundaryLine = page.locator(".graph-student-line");
     const endpoints = await boundaryLine.evaluate((e) => ["x1", "y1", "x2", "y2"].map((name) => e.getAttribute(name)));
     assert.deepEqual(endpoints, ["12", String(12 + (5 - y) * 24), "252", String(12 + (5 - y) * 24)], `horizontal boundary y=${y} stays finite and spans the graph`);
   }
 
-  await page.getByRole("button", { name: "Rensa punkter" }).click();
-  const pointAX = page.getByRole("spinbutton", { name: "Punkt A, x-koordinat" });
+  await page.locator("#graph").getByRole("button", { name: "Rensa punkter" }).click();
+  const pointAX = page.locator("#graph").getByRole("spinbutton", { name: "Punkt A, x-koordinat" });
   await pointAX.pressSequentially("-2");
   assert.equal(await pointAX.inputValue(), "-2", "negative sign survives sequential keyboard entry");
-  answer = await page.locator("input.graphAnswer").inputValue();
+  answer = await page.locator("#graph input.graphAnswer").inputValue();
   assert.ok(answer, "a partial coordinate is serialized instead of clearing the saved answer");
   assert.equal(await page.evaluate((v) => window.ExGenGraphAnswer.isComplete(v), answer), false);
   assert.deepEqual(JSON.parse(answer).points, [{ x: -2, y: null }, null]);

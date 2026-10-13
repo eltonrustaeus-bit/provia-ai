@@ -28,6 +28,35 @@ assert.deepEqual(graph.parseLinearEquations("y = 2x + 1.5"), [], "decimal interc
 assert.deepEqual(graph.parseLinearEquations("y = 1.5x + 1"), [], "decimal slopes are not accepted as integer lines");
 assert.equal(graph.sourceContainsSpec("y = 2x + 1", q.graph_spec), true);
 assert.equal(graph.sourceContainsSpec("y = 3x + 1", q.graph_spec), false);
+const table = "Tid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n1 | 3\n2 | 1";
+const scatterData = {
+  points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }],
+  x_label: "Tid (min)", y_label: "Syrehalt (mg/L)"
+};
+const scatterSpec = { kind: "scatter", slope: null, intercept: null, ...scatterData };
+assert.deepEqual(graph.parsePointTable(table), scatterData);
+assert.equal(graph.sourceContainsSpec(table, scatterSpec), true);
+assert.equal(graph.parsePointTable(`${table}\n3 | 0`), null, "extra rows are not silently dropped");
+assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n1 | 3\n1 | 1"), null, "repeated x-values are rejected");
+assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1"), null, "decimal values are not rounded");
+assert.equal(graph.isValidSpec(scatterSpec), true);
+assert.deepEqual(graph.displaySpec(scatterSpec), {
+  mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)"
+});
+assert.equal(graph.isValidDisplaySpec(graph.displaySpec(scatterSpec), scatterSpec), true);
+assert.equal(graph.isValidDisplaySpec({ ...graph.displaySpec(scatterSpec), point_count: 2 }, scatterSpec), false);
+const scatterAnswer = JSON.stringify({ type: "scatter", points: [
+  { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 3 }
+] });
+assert.equal(graph.answerIsComplete(scatterAnswer, scatterSpec), true);
+assert.equal(graph.gradeAnswer(scatterAnswer, scatterSpec).points, 3, "point order does not affect deterministic scoring");
+const scatterPartial = JSON.stringify({ type: "scatter", points: [
+  { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 }
+] });
+assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).points, 2);
+assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).max_points, 3);
+assert.equal(graph.questionText(scatterSpec), "Placera de här tre mätpunkterna: (0, 4), (1, 3), (2, 1). Använd Tid (min) på x-axeln och Syrehalt (mg/L) på y-axeln.");
+assert.equal(graph.modelAnswer(scatterSpec), "Mätpunkterna är (0, 4), (1, 3), (2, 1).");
 assert.equal(graph.isValidSpec({ slope: 0, intercept: 6 }), false);
 assert.equal(graph.questionText(q.graph_spec, "sv"), "Rita grafen till y = 2x + 1. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.");
 assert.equal(graph.questionText(q.graph_spec, "en"), "Draw the graph of y = 2x + 1. Mark two clear points. Points are awarded for the correct slope and y-intercept.");
@@ -65,10 +94,16 @@ const question = {
 assert.deepEqual(assessment.gateExam({ questions: [question] }, { profile: "mathematics", secret }).questions.length, 1);
 assert.deepEqual(assessment.gateExam({ questions: [question] }, { profile: "generic", secret }).questions.length, 0);
 assert.deepEqual(assessment.gateExam({ questions: [{ ...question, graph_spec: { slope: 6, intercept: 1 } }] }, { profile: "mathematics", secret }).questions.length, 0);
+assert.equal(assessment.gateExam({ questions: [{ ...question, points: 3, graph_spec: q.graph_spec }] }, { profile: "natural_sciences", secret }).questions.length, 0,
+  "natural-sciences gates do not accept mathematics-only line tasks");
+assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "natural_sciences", secret }).questions.length, 1);
+assert.equal(graph.sourceContainsSpec("Tid | Halt\n0 | 4\n1 | 3\n2 | 1", scatterSpec), false,
+  "a scatter task cannot claim it came from a table whose headers differ");
 
 const schemaQuestion = generator.buildMockExamSchema(1).schema.properties.questions.items;
 assert.ok(schemaQuestion.required.includes("graph_spec"));
 assert.deepEqual(schemaQuestion.properties.type.enum, ["mc", "short", "graph"]);
+assert.deepEqual(schemaQuestion.properties.graph_spec.required, ["kind", "slope", "intercept", "points", "x_label", "y_label"]);
 for (const lang of ["sv", "en"]) {
   const prompt = generator.buildExamPrompts({ lang, level: "C", course: "Matematik 2b", qType: "short", numQuestions: 2, pastedText: "test material" });
   assert.match(prompt.systemPrompt, lang === "sv"
@@ -91,6 +126,20 @@ assert.equal(gradeTasks.openQuestion(publicMc, sealed + "x", secret, ctxHash), n
 assert.equal(gradeTasks.openQuestion(publicMc, sealed, "different-secret", ctxHash), null);
 assert.equal(gradeTasks.openQuestion(publicMc, sealed, secret, gradeTasks.hashContext("changed", "Matematik", "user-1")), null);
 assert.equal(gradeTasks.openQuestion(publicMc, sealed, secret, gradeTasks.hashContext("material", "Matematik", "user-2")), null);
+const scatterQuestion = {
+  id: "science-graph", type: "graph", points: 3,
+  question: graph.questionText(scatterSpec), options: [], graph_spec: scatterSpec,
+  graph_ui: graph.displaySpec(scatterSpec), model_answer: graph.modelAnswer(scatterSpec)
+};
+const scatterContext = gradeTasks.hashContext(table, "Biologi 1", "user-1");
+const scatterSealed = gradeTasks.sealQuestion(scatterQuestion, secret, scatterContext);
+assert.ok(scatterSealed, "scatter graph and UI configuration are signed together");
+const publicScatter = { id: scatterQuestion.id, type: "graph", points: 3, question: scatterQuestion.question,
+  options: [], graph_ui: scatterQuestion.graph_ui };
+assert.deepEqual(gradeTasks.openQuestion(publicScatter, scatterSealed, secret, scatterContext),
+  { ...scatterQuestion, grade_context_hash: scatterContext });
+assert.equal(gradeTasks.openQuestion({ ...publicScatter, graph_ui: { ...scatterQuestion.graph_ui, y_label: "other" } }, scatterSealed, secret, scatterContext), null,
+  "client-visible graph settings cannot be changed independently of the sealed grading task");
 const gradeSource = require("node:fs").readFileSync(new URL("../../api/grade.js", import.meta.url), "utf8");
 const source = require("node:fs").readFileSync(new URL("../../api/generate-exam.js", import.meta.url), "utf8");
 assert.match(source, /clientQuestion\.grade_task = gradeTasks\.sealQuestion\(q, undefined, gradeTasks\.hashContext\(pastedText, course, user\.id\)\)/);

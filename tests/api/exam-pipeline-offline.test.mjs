@@ -144,16 +144,16 @@ try {
   });
   assert.equal(unsupportedGraph.status, 400);
   assert.equal(unsupportedGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraph.body.message, /m och b måste vara heltal mellan −5 och 5/i);
-  assert.match(unsupportedGraph.body.message, /minst två punkter ska synas i rutnätet/i);
+  assert.match(unsupportedGraph.body.message, /naturvetenskaplig tabell/i);
+  assert.match(unsupportedGraph.body.message, /exakt tre heltalsrader/i);
   const unsupportedGraphEn = await invoke(generateExam, {
     lang: "en", level: "C", course: "Mathematics 2b", pastedText: "The parabola is y = x^2.",
     qType: "graph", numQuestions: 1,
   });
   assert.equal(unsupportedGraphEn.status, 400);
   assert.equal(unsupportedGraphEn.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraphEn.body.message, /m and b must be integers from −5 to 5/i);
-  assert.match(unsupportedGraphEn.body.message, /at least two visible grid points/i);
+  assert.match(unsupportedGraphEn.body.message, /natural-sciences table/i);
+  assert.match(unsupportedGraphEn.body.message, /exactly three integer rows/i);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
     "unsupported graph types are rejected before model traffic");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
@@ -331,6 +331,47 @@ try {
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")));
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")));
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")));
+
+  const scienceCourse = "Biologi 1";
+  const scienceMaterial = "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n1 | 3\n2 | 1";
+  const scienceSpecFromModel = {
+    kind: "scatter", slope: null, intercept: null,
+    points: [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }],
+    x_label: "Fel", y_label: "Fel"
+  };
+  activeQuestions = [{
+    id: "science-graph", type: "graph", points: 3,
+    question: "Rita ett diagram.", options: [], correct_index: -1, rubric: "En poäng per rätt punkt.",
+    model_answer: "Model output is replaced by the source table.", topic: "Vattenprov", subtopic: "Mätserie",
+    concept_tag: "Mätdata", learning_objective: "Avläsa och återge en mätserie.",
+    source_references: ["Mätserie"], cognitive_level: "tillämpa", accepted_answers: [],
+    estimated_answer_length: "none", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
+    graph_spec: scienceSpecFromModel,
+  }];
+  const scienceGenerated = await invoke(generateExam, {
+    lang: "sv", level: "C", course: scienceCourse, pastedText: scienceMaterial, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(scienceGenerated.status, 200, JSON.stringify(scienceGenerated.body));
+  const scienceQuestion = scienceGenerated.body.exam.questions[0];
+  assert.deepEqual(scienceQuestion.graph_ui, {
+    mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)"
+  }, "server derives the visible graph setup from the exact source table, not model-provided labels");
+  assert.match(scienceQuestion.question, /Tid \(min\).*Syrehalt \(mg\/L\)/);
+  assert.equal(Object.hasOwn(scienceQuestion, "graph_spec"), false);
+  assert.equal(Object.hasOwn(scienceQuestion, "model_answer"), false);
+  gradingState = "active";
+  const scienceGraded = await invoke(gradeExam, {
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    exam_manifest: scienceGenerated.body.exam.exam_manifest,
+    questions: [scienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 },
+    ] }) }],
+  });
+  assert.equal(scienceGraded.status, 200, JSON.stringify(scienceGraded.body));
+  assert.equal(scienceGraded.body.result.total_points, 2);
+  assert.equal(scienceGraded.body.result.max_points, 3);
+  assert.equal(scienceGraded.body.result.per_question[0].feedback, "2 av 3 mätpunkter stämmer med tabellen.");
 
   calls.length = 0;
   emptyGenerationResponse = true;

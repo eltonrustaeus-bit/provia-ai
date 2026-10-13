@@ -164,10 +164,23 @@ function buildMockExamSchema(numQuestions) {
               graph_spec: {
                 type: ["object", "null"],
                 additionalProperties: false,
-                required: ["slope", "intercept"],
+                required: ["kind", "slope", "intercept", "points", "x_label", "y_label"],
                 properties: {
-                  slope: { type: "integer", minimum: -5, maximum: 5 },
-                  intercept: { type: "integer", minimum: -5, maximum: 5 }
+                  kind: { type: "string", enum: ["line", "scatter"] },
+                  slope: { type: ["integer", "null"], minimum: -5, maximum: 5 },
+                  intercept: { type: ["integer", "null"], minimum: -5, maximum: 5 },
+                  points: {
+                    type: "array", minItems: 0, maxItems: 3,
+                    items: {
+                      type: "object", additionalProperties: false, required: ["x", "y"],
+                      properties: {
+                        x: { type: "integer", minimum: -5, maximum: 5 },
+                        y: { type: "integer", minimum: -5, maximum: 5 }
+                      }
+                    }
+                  },
+                  x_label: { type: "string", maxLength: 32 },
+                  y_label: { type: "string", maxLength: 32 }
                 }
               }
             }
@@ -577,7 +590,7 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   return { ok: true, text, cutShort, usage, latencyMs: Date.now() - t0 };
 }
 
-function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, focusInstruction = "" }) {
+function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "" }) {
   const systemSvBase =
     "Du skapar ett realistiskt mockprov som en svensk gymnasielärare. " +
     "Du MÅSTE följa JSON-schemat exakt och bara returnera JSON. " +
@@ -587,7 +600,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "1) type får vara 'mc', 'short' eller 'graph' (INTE essä). graph används bara när frågetyp-valet är graph. " +
     "2) Om type=='mc': options ska ha 3–5 alternativ och correct_index ska vara 0..(options.length-1). " +
     "3) Om type=='short': options ska vara [] och correct_index ska vara -1. " +
-    "3b) Om type=='graph': graph_spec ska ha heltalen slope och intercept för en uttryckligen given linjär funktion i materialet; options ska vara [] och correct_index ska vara -1. " +
+    "3b) Om type=='graph': graph_spec ska följa det valda grafunderlaget: line använder kind='line', heltalen slope/intercept, tom points och tomma x_label/y_label; scatter använder kind='scatter', null slope/intercept och exakt tre källpunkter med axelrubriker från tabellen. options ska vara [] och correct_index ska vara -1. " +
     "3c) Alla andra frågetyper ska ha graph_spec=null. " +
     "4) rubric ska vara kort och poängfokuserad. " +
     "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. " +
@@ -654,7 +667,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "1) type may be 'mc', 'short' or 'graph' (NO essays). Use graph only when the selected question type is graph. " +
     "2) If type=='mc': options must have 3–5 choices and correct_index must be 0..(options.length-1). " +
     "3) If type=='short': options must be [] and correct_index must be -1. " +
-    "3b) If type=='graph': graph_spec must contain integer slope and intercept for a linear function explicitly present in the material; options must be [] and correct_index must be -1. " +
+    "3b) If type=='graph': graph_spec must match the selected source: line uses kind='line', integer slope/intercept, empty points and empty x_label/y_label; scatter uses kind='scatter', null slope/intercept and exactly three source points with axis labels from the table. options must be [] and correct_index must be -1. " +
     "3c) All other question types must have graph_spec=null. " +
     "4) rubric must be short and point-focused. " +
     "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. " +
@@ -713,7 +726,9 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
       : qType === "short"
         ? "Gör ALLA frågor som kortsvar (short)."
         : qType === "graph"
-          ? "Gör ALLA frågor som grafuppgifter av typen graph. Använd endast explicita räta linjer y=kx+m som finns i materialet. För varje fråga: skriv en kort instruktion, sätt type='graph', ange graph_spec.slope och graph_spec.intercept exakt enligt samma ekvation, options=[], correct_index=-1 och två poäng. Rita inte andra graf-/kurvtyper."
+          ? graphMode === "scatter"
+            ? "Gör en enda punktgrafuppgift av typen graph utifrån den enda stödda tabellen med exakt tre numeriska rader i materialet. Använd dess exakta x/y-värden och rubriker; graph_spec.kind='scatter', slope=null, intercept=null, points exakt enligt tabellen, x_label/y_label exakt från tabellhuvudet. options=[], correct_index=-1. Hitta inte på, avrunda eller omordna värden."
+            : "Gör ALLA frågor som grafuppgifter av typen graph. Använd endast explicita räta linjer y=kx+m som finns i materialet. Sätt graph_spec.kind='line', ange graph_spec.slope och graph_spec.intercept exakt enligt samma ekvation, points=[], x_label='', y_label='', options=[], correct_index=-1 och två poäng. Rita inte andra graf-/kurvtyper."
         : "Gör en blandning av 'mc' och 'short' (ungefär hälften/hälften).";
 
   const mixRuleEn =
@@ -722,7 +737,9 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
       : qType === "short"
         ? "Make ALL questions short answer (short)."
         : qType === "graph"
-          ? "Make ALL questions graph tasks of type graph. Use only explicit straight-line equations y=kx+b found in the material. For each question, provide a short instruction, set type='graph', set graph_spec.slope and graph_spec.intercept to match that exact equation, options=[], correct_index=-1 and two points. Do not use any other graph or curve type."
+          ? graphMode === "scatter"
+            ? "Make one scatter-plot task from the single supported table with exactly three numeric rows in the material. Use its exact x/y values and headers; graph_spec.kind='scatter', slope=null, intercept=null, points exactly from the table, x_label/y_label exactly from the header. options=[], correct_index=-1. Do not invent, round, or reorder values."
+            : "Make ALL questions graph tasks of type graph. Use only explicit straight-line equations y=kx+b found in the material. Set graph_spec.kind='line', set slope and intercept to match that exact equation, points=[], x_label='', y_label='', options=[], correct_index=-1 and two points. Do not use any other graph or curve type."
         : "Make a mix of 'mc' and 'short' (about half/half).";
 
   /* Fokusinstruktionen står FÖRE materialet, inte efter. Materialet är det
@@ -802,15 +819,20 @@ module.exports = async function handler(req, res) {
   if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText" });
 
   const isMath = looksLikeMath(course, pastedText);
+  const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
   const graphLines = graphAnswers.parseLinearEquations(`${course}\n${pastedText}`);
   const uniqueGraphLines = new Map(graphLines.map((line) => [`${line.slope}|${line.intercept}`, line]));
-  if (qType === "graph" && (!isMath || uniqueGraphLines.size !== 1)) {
+  const pointTable = graphAnswers.parsePointTable(pastedText);
+  const graphMode = isMath && uniqueGraphLines.size === 1
+    ? "line"
+    : subjectProfile === "natural_sciences" && pointTable ? "scatter" : null;
+  if (qType === "graph" && !graphMode) {
     return json(res, 400, {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd gäller just nu exakt en funktion av formen y = mx + b. m och b måste vara heltal mellan −5 och 5, och minst två punkter ska synas i rutnätet. Skriv funktionen i materialet, till exempel y = 2x + 1."
-        : "Graph support currently handles exactly one function in the form y = mx + b. m and b must be integers from −5 to 5, with at least two visible grid points. Include the function in your material, for example y = 2x + 1."
+        ? "Grafstöd kräver antingen exakt en synlig heltalsfunktion y = mx + b (matematik) eller en naturvetenskaplig tabell med två rubriker, avdelad med |, och exakt tre heltalsrader inom −5 till 5."
+        : "Graph support requires either one visible integer line y = mx + b (mathematics) or a natural-sciences table with two headers, separated by |, and exactly three integer rows within −5 to 5."
     });
   }
 
@@ -877,7 +899,7 @@ module.exports = async function handler(req, res) {
     const focusInstruction = await buildAdaptiveFocus(user.id, { numQuestions, lang });
 
     const { systemPrompt, userPrompt } = buildExamPrompts({
-      lang, level, course, qType, numQuestions, pastedText, isMath, focusInstruction
+      lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction
     });
 
     const payload = {
@@ -974,7 +996,10 @@ module.exports = async function handler(req, res) {
           continue;
         }
       } else if (q.type === "graph") {
-        if (qType !== "graph" || !isMath || !graphAnswers.isValidSpec(q.graph_spec) || !graphAnswers.sourceContainsSpec(`${course}\n${pastedText}`, q.graph_spec)) {
+        const graphSpecValid = graphMode === "scatter"
+          ? Boolean(pointTable)
+          : isMath && graphAnswers.isValidSpec(q.graph_spec) && graphAnswers.sourceContainsSpec(`${course}\n${pastedText}`, q.graph_spec);
+        if (qType !== "graph" || !graphSpecValid) {
           const bail = guardFail("GRAPH_GENERATION_REJECTED", {
             message: lang === "en"
               ? "The generated graph did not match a supported line in your material. Check the graph requirements and try again."
@@ -985,18 +1010,39 @@ module.exports = async function handler(req, res) {
         }
         q.options = [];
         q.correct_index = -1;
+        if (graphMode === "scatter") {
+          q.graph_spec = { kind: "scatter", slope: null, intercept: null, ...pointTable };
+          q.points = graphAnswers.SCATTER_POINT_COUNT;
+          q.rubric = lang === "en" ? "One point for each correctly plotted measured value." : "En poäng för varje korrekt placerad mätpunkt.";
+          q.scoring_rubric = {
+            parts: pointTable.points.map((_, index) => ({ description: `${lang === "en" ? "Measured point" : "Mätpunkt"} ${index + 1}`, points: 1 })),
+            full_score_requirements: lang === "en"
+              ? "All three measured points match the exact coordinates in the table."
+              : "Alla tre mätpunkter är placerade på tabellens exakta koordinater.",
+            partial_credit_notes: lang === "en"
+              ? "Award one point per correctly plotted measured point; misplaced or duplicate points earn no point."
+              : "Ge en poäng per korrekt mätpunkt; felplacerade och dubblerade punkter ger ingen poäng."
+          };
+        } else {
+          q.graph_spec = { kind: "line", slope: q.graph_spec.slope, intercept: q.graph_spec.intercept, points: [], x_label: "", y_label: "" };
+          q.points = 2;
+          q.rubric = lang === "en" ? "1 point for the correct slope and 1 point for the correct y-intercept." : "1 p för rätt lutning och 1 p för rätt skärning med y-axeln.";
+          q.scoring_rubric = {
+            parts: [
+              { description: lang === "en" ? "Slope" : "Lutning", points: 1 },
+              { description: lang === "en" ? "Y-intercept" : "Skärning med y-axeln", points: 1 }
+            ],
+            full_score_requirements: lang === "en"
+              ? "The graph has the correct slope and crosses the y-axis at the correct value."
+              : "Grafen har rätt lutning och skär y-axeln vid rätt värde.",
+            partial_credit_notes: lang === "en"
+              ? "Award one point each for the correct slope and y-intercept."
+              : "Ge en poäng för vardera korrekt lutning och korrekt skärning med y-axeln."
+          };
+        }
+        q.graph_ui = graphAnswers.displaySpec(q.graph_spec);
         q.question = graphAnswers.questionText(q.graph_spec, lang);
-        q.points = 2;
-        q.rubric = "1 p för rätt lutning och 1 p för rätt skärning med y-axeln.";
-        q.model_answer = graphAnswers.modelAnswer(q.graph_spec);
-        q.scoring_rubric = {
-          parts: [
-            { description: "Lutning", points: 1 },
-            { description: "Skärning med y-axeln", points: 1 }
-          ],
-          full_score_requirements: "Grafen har rätt lutning och skär y-axeln vid rätt värde.",
-          partial_credit_notes: "Ge en poäng för vardera korrekt lutning och korrekt skärning med y-axeln."
-        };
+        q.model_answer = graphAnswers.modelAnswer(q.graph_spec, lang);
       } else {
         if (!Array.isArray(q.options) || q.options.length < 3) {
           const bail = guardFail("MC options invalid", { question: q });
@@ -1024,7 +1070,6 @@ module.exports = async function handler(req, res) {
     }
 
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
-    const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
     let gate = assessment.gateExam(exam, { profile: subjectProfile });
     if (truncated) {
       const seenIds = new Set();

@@ -129,15 +129,16 @@ try {
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "1 grafuppgift",
     "a graph-only result in history still yields a one-question graph contract");
   await page.getByRole("button", { name: "Ändra" }).click();
-  await page.getByRole("button", { name: "Grafer · räta linjer" }).click();
+  await page.getByRole("button", { name: "Interaktiv graf" }).click();
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "1 grafuppgift");
   const graphHint = page.locator("#xf .xf-screen[data-screen='aim'] .xf-card .xf-graph-limit-note");
   assert.equal(await graphHint.isVisible(), true, "graph limits are visible as soon as graph mode is selected");
   assert.match(await graphHint.innerText(), /en uttrycklig rät linje y = mx \+ b/i);
-  assert.match(await graphHint.innerText(), /heltal mellan −5 och 5/i);
+  assert.match(await graphHint.innerText(), /naturvetenskap.*avdelad med \|/i);
+  assert.match(await graphHint.innerText(), /exakt tre rader.*−5 och 5/i);
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await graphHint.isVisible(), false, "graph-only constraints are hidden for other question types");
-  await page.getByRole("button", { name: "Grafer · räta linjer" }).click();
+  await page.getByRole("button", { name: "Interaktiv graf" }).click();
   const countChips = page.locator("#xf .xf-screen[data-screen='aim'] .xf-chips").nth(2);
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "12",
@@ -145,12 +146,12 @@ try {
   assert.equal(await countChips.getByRole("button", { name: "1", exact: true }).isDisabled(), true,
     "one-question count is unavailable for non-graph exams");
   await countChips.getByRole("button", { name: "6", exact: true }).click();
-  await page.getByRole("button", { name: "Grafer · räta linjer" }).click();
+  await page.getByRole("button", { name: "Interaktiv graf" }).click();
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "6",
     "switching back restores the learner's selected general exam size");
   assert.equal(await countChips.getByRole("button", { name: "6", exact: true }).getAttribute("class").then((value) => value.includes("sel")), true);
-  await page.getByRole("button", { name: "Grafer · räta linjer" }).click();
+  await page.getByRole("button", { name: "Interaktiv graf" }).click();
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "1 grafuppgift");
   await page.locator("#xf .xf-screen[data-screen='aim'] .xf-btn.primary").click();
   await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").fill("Funktionen beskriver sambandet mellan x och y. Variabeln x är ett reellt tal. Linjens lutning visar hur mycket y förändras per steg i x. Den räta linjen ges av y = 2x + 1. Y-skärningen är konstanttermen.");

@@ -390,7 +390,7 @@ module.exports = async function handler(req, res) {
       if (!graphAnswers.isValidSpec(question.graph_spec)) {
         return json(res, 400, { ok: false, error: "GRAPH_TASK_INVALID" });
       }
-      if (!graphAnswers.answerIsComplete(answerMap.get(String(question.id)))) {
+      if (!graphAnswers.answerIsComplete(answerMap.get(String(question.id)), question.graph_spec)) {
         return json(res, 400, { ok: false, error: "GRAPH_ANSWER_INVALID" });
       }
     }

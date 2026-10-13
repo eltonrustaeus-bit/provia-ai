@@ -5,6 +5,47 @@ const { getExamSigningSecret } = require("./_exam-signing-secret.cjs");
 
 const GRID_MIN = -5;
 const GRID_MAX = 5;
+const SCATTER_POINT_COUNT = 3;
+
+function isGridPoint(point) {
+  return point && Number.isInteger(point.x) && Number.isInteger(point.y)
+    && point.x >= GRID_MIN && point.x <= GRID_MAX
+    && point.y >= GRID_MIN && point.y <= GRID_MAX;
+}
+
+function safeAxisLabel(value) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= 32
+    && /\p{L}/u.test(value) && !/[<>\p{C}]/u.test(value);
+}
+
+function parsePointTable(text) {
+  const candidates = [];
+  const rows = String(text || "").split(/\r?\n/).map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed.includes("|")) return null;
+    const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    return cells.length === 2 ? cells : null;
+  });
+  for (let i = 0; i < rows.length; i++) {
+    const header = rows[i];
+    if (!header || !header.every(safeAxisLabel)) continue;
+    const points = [];
+    let j = i + 1;
+    while (j < rows.length && rows[j]) {
+      const row = rows[j];
+      if (row.every((cell) => /^:?-{3,}:?$/.test(cell))) { j++; continue; }
+      if (!row.every((cell) => /^-?\d+$/.test(cell))) break;
+      const point = { x: Number(row[0]), y: Number(row[1]) };
+      if (!isGridPoint(point)) { points.length = 0; break; }
+      points.push(point);
+      j++;
+    }
+    if (points.length !== SCATTER_POINT_COUNT || new Set(points.map((p) => p.x)).size !== points.length
+      || new Set(points.map((p) => `${p.x}|${p.y}`)).size !== points.length) continue;
+    candidates.push({ points, x_label: header[0], y_label: header[1] });
+  }
+  return candidates.length === 1 ? candidates[0] : null;
+}
 
 function signingSecret() {
   return getExamSigningSecret();
@@ -48,6 +89,17 @@ function openSpec(q, token, secret) {
 
 function isValidSpec(spec) {
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) return false;
+  if (spec.kind === "scatter") {
+    return spec.slope === null && spec.intercept === null
+      && Array.isArray(spec.points) && spec.points.length === SCATTER_POINT_COUNT
+      && spec.points.every(isGridPoint)
+      && new Set(spec.points.map((point) => point.x)).size === spec.points.length
+      && new Set(spec.points.map((point) => `${point.x}|${point.y}`)).size === spec.points.length
+      && safeAxisLabel(spec.x_label) && safeAxisLabel(spec.y_label);
+  }
+  if (spec.kind != null && spec.kind !== "line") return false;
+  if (spec.kind === "line" && (!Array.isArray(spec.points) || spec.points.length !== 0
+    || spec.x_label !== "" || spec.y_label !== "")) return false;
   if (!Number.isInteger(spec.slope) || spec.slope < -5 || spec.slope > 5) return false;
   if (!Number.isInteger(spec.intercept) || spec.intercept < -5 || spec.intercept > 5) return false;
   let visiblePoints = 0;
@@ -56,6 +108,18 @@ function isValidSpec(spec) {
     if (y >= GRID_MIN && y <= GRID_MAX) visiblePoints++;
   }
   return visiblePoints >= 2;
+}
+
+function displaySpec(spec) {
+  if (!isValidSpec(spec)) return null;
+  return spec.kind === "scatter"
+    ? { mode: "scatter", point_count: SCATTER_POINT_COUNT, x_label: spec.x_label, y_label: spec.y_label }
+    : { mode: "line", point_count: 2, x_label: "x", y_label: "y" };
+}
+
+function isValidDisplaySpec(value, spec) {
+  const expected = displaySpec(spec);
+  return expected != null && JSON.stringify(value) === JSON.stringify(expected);
 }
 
 function parseLinearEquations(text) {
@@ -79,35 +143,60 @@ function parseLinearEquations(text) {
 }
 
 function sourceContainsSpec(text, spec) {
+  if (spec?.kind === "scatter") {
+    const parsed = parsePointTable(text);
+    return Boolean(parsed && JSON.stringify(parsed) === JSON.stringify({
+      points: spec.points, x_label: spec.x_label, y_label: spec.y_label
+    }));
+  }
   return isValidSpec(spec) && parseLinearEquations(text).some((line) =>
     line.slope === spec.slope && line.intercept === spec.intercept);
 }
 
-function parseAnswer(raw) {
+function parseAnswer(raw, spec) {
   let value = raw;
   if (typeof value === "string") {
     try { value = JSON.parse(value); } catch { return null; }
   }
-  if (!value || typeof value !== "object" || value.type !== "line" || !Array.isArray(value.points)) return null;
-  if (value.points.length !== 2) return null;
+  const scatter = spec?.kind === "scatter";
+  if (!value || typeof value !== "object" || value.type !== (scatter ? "scatter" : "line") || !Array.isArray(value.points)) return null;
+  if (value.points.length !== (scatter ? SCATTER_POINT_COUNT : 2)) return null;
   const points = value.points.map((point) => ({ x: point?.x, y: point?.y }));
-  if (points.some((point) => !Number.isInteger(point.x) || !Number.isInteger(point.y)
-    || point.x < GRID_MIN || point.x > GRID_MAX || point.y < GRID_MIN || point.y > GRID_MAX)) return null;
-  if (points[0].x === points[1].x) return null;
+  if (points.some((point) => !isGridPoint(point))) return null;
+  if (scatter) {
+    if (new Set(points.map((point) => point.x)).size !== points.length
+      || new Set(points.map((point) => `${point.x}|${point.y}`)).size !== points.length) return null;
+  } else if (points[0].x === points[1].x) return null;
   return points;
 }
 
-function answerIsComplete(raw) {
-  return Boolean(parseAnswer(raw));
+function answerIsComplete(raw, spec) {
+  return Boolean(parseAnswer(raw, spec));
 }
 
 function gradeAnswer(raw, spec, lang = "sv") {
   const english = lang === "en";
-  const points = parseAnswer(raw);
+  const points = parseAnswer(raw, spec);
   if (!points || !isValidSpec(spec)) {
-    return { points: 0, max_points: 2, feedback: english
-      ? "Plot two points with different x-values on the straight line."
-      : "Markera två punkter med olika x-värden på den räta linjen.", error_tags: ["graph_answer_incomplete"] };
+    return spec?.kind === "scatter"
+      ? { points: 0, max_points: SCATTER_POINT_COUNT, feedback: english
+        ? "Plot all three table values once."
+        : "Placera alla tre tabellvärden en gång.", error_tags: ["graph_answer_incomplete"] }
+      : { points: 0, max_points: 2, feedback: english
+        ? "Plot two points with different x-values on the straight line."
+        : "Markera två punkter med olika x-värden på den räta linjen.", error_tags: ["graph_answer_incomplete"] };
+  }
+  if (spec.kind === "scatter") {
+    const expected = new Set(spec.points.map((point) => `${point.x}|${point.y}`));
+    const correct = points.filter((point) => expected.has(`${point.x}|${point.y}`)).length;
+    return {
+      points: correct,
+      max_points: SCATTER_POINT_COUNT,
+      feedback: lang === "en"
+        ? `${correct} of ${SCATTER_POINT_COUNT} measured points match the table.`
+        : `${correct} av ${SCATTER_POINT_COUNT} mätpunkter stämmer med tabellen.`,
+      error_tags: correct === SCATTER_POINT_COUNT ? [] : ["graph_data_points_incorrect"],
+    };
   }
   const slope = (points[1].y - points[0].y) / (points[1].x - points[0].x);
   const intercept = points[0].y - slope * points[0].x;
@@ -148,6 +237,12 @@ function equation(spec) {
 }
 
 function questionText(spec, lang = "sv") {
+  if (spec?.kind === "scatter" && isValidSpec(spec)) {
+    const values = spec.points.map((point) => `(${point.x}, ${point.y})`).join(", ");
+    return lang === "en"
+      ? `Plot these three measured points: ${values}. Use ${spec.x_label} on the x-axis and ${spec.y_label} on the y-axis.`
+      : `Placera de här tre mätpunkterna: ${values}. Använd ${spec.x_label} på x-axeln och ${spec.y_label} på y-axeln.`;
+  }
   const target = equation(spec);
   if (!target) return "";
   return lang === "en"
@@ -157,6 +252,12 @@ function questionText(spec, lang = "sv") {
 
 function modelAnswer(spec, lang = "sv") {
   if (!isValidSpec(spec)) return "";
+  if (spec.kind === "scatter") {
+    const values = spec.points.map((point) => `(${point.x}, ${point.y})`).join(", ");
+    return lang === "en"
+      ? `The measured points are ${values}.`
+      : `Mätpunkterna är ${values}.`;
+  }
   const points = [];
   for (let x = GRID_MIN; x <= GRID_MAX; x++) {
     const y = spec.slope * x + spec.intercept;
@@ -169,4 +270,4 @@ function modelAnswer(spec, lang = "sv") {
     : `Grafen till ${equation(spec)} går till exempel genom punkterna (${first.x}, ${first.y}) och (${last.x}, ${last.y}).`;
 }
 
-module.exports = { GRID_MIN, GRID_MAX, isValidSpec, parseLinearEquations, sourceContainsSpec, sealSpec, openSpec, parseAnswer, answerIsComplete, gradeAnswer, equation, questionText, modelAnswer };
+module.exports = { GRID_MIN, GRID_MAX, SCATTER_POINT_COUNT, isValidSpec, displaySpec, isValidDisplaySpec, parsePointTable, parseLinearEquations, sourceContainsSpec, sealSpec, openSpec, parseAnswer, answerIsComplete, gradeAnswer, equation, questionText, modelAnswer };

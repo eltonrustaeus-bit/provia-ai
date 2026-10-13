@@ -284,7 +284,7 @@
     root.appendChild(card);
   }
 
-  function buildGraphRetry(item) {
+  function buildGraphRetry(item, graphUi) {
     var english = Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
     var copy = english ? {
       answer: "Check the graph and show the full-score answer", retry: "Try the graph again", check: "Check new attempt",
@@ -313,7 +313,7 @@
     status.setAttribute("aria-live", "polite");
     var check = el("button", "xf-btn primary", copy.check);
     check.type = "button";
-    check.disabled = !window.ExGenGraphAnswer || !window.ExGenGraphAnswer.isComplete(answer);
+    check.disabled = !window.ExGenGraphAnswer || !window.ExGenGraphAnswer.isComplete(answer, graphUi);
     var checking = false;
     var answerRevision = 0;
     var model = el("div", "xf-item-model");
@@ -325,17 +325,17 @@
       window.ExGenGraphAnswer(graph, answer, function (value) {
         answer = value;
         answerRevision++;
-        check.disabled = checking || !window.ExGenGraphAnswer.isComplete(value);
+        check.disabled = checking || !window.ExGenGraphAnswer.isComplete(value, graphUi);
         status.textContent = "";
         model.hidden = true;
         check.hidden = false;
-      }, english ? "en" : "sv");
+      }, english ? "en" : "sv", graphUi);
     } else {
       graph.appendChild(el("p", "xf-photo-note bad", copy.unavailable));
     }
 
     check.addEventListener("click", function () {
-      if (checking || !window.ExGenGraphAnswer || !window.ExGenGraphAnswer.isComplete(answer)) return;
+      if (checking || !window.ExGenGraphAnswer || !window.ExGenGraphAnswer.isComplete(answer, graphUi)) return;
       checking = true;
       check.disabled = true;
       status.textContent = copy.pending;
@@ -343,7 +343,7 @@
       if (!engine || typeof engine.gradeGraphRetry !== "function") {
         checking = false;
         status.textContent = copy.noEngine;
-        check.disabled = !window.ExGenGraphAnswer.isComplete(answer);
+        check.disabled = !window.ExGenGraphAnswer.isComplete(answer, graphUi);
         return;
       }
       var submittedRevision = answerRevision;
@@ -369,7 +369,7 @@
         status.textContent = copy.network;
       }).finally(function () {
         checking = false;
-        if (!check.hidden) check.disabled = !window.ExGenGraphAnswer.isComplete(answer);
+        if (!check.hidden) check.disabled = !window.ExGenGraphAnswer.isComplete(answer, graphUi);
       });
     });
 
@@ -910,7 +910,7 @@
     }
 
     var levelText = { E: "E — visa att du kan grunderna", C: "C — förklara och tillämpa", A: "A — analysera och värdera" };
-    var typeText = { mix: "Blandat", mc: "Bara flerval", short: "Bara kortsvar", graph: "Grafer · räta linjer" };
+    var typeText = { mix: "Blandat", mc: "Bara flerval", short: "Bara kortsvar", graph: "Interaktiv graf" };
 
     var rLevel = row("Nivå", S.level, levelText[S.level]);
     var rType = row("Frågetyp", typeText[S.qType], null);
@@ -920,7 +920,7 @@
     dl.appendChild(rNum);
     card.appendChild(dl);
     var graphHint = el("p", "xf-graph-limit-note",
-      "Grafprov stöder en uttrycklig rät linje y = mx + b i materialet. m och b ska vara heltal mellan −5 och 5, och minst två punkter ska synas i rutnätet. Kurvor, flera linjer och decimal- eller bråktal stöds inte ännu.");
+      "Matematik: en uttrycklig rät linje y = mx + b med heltalsvärden. Naturvetenskap: en tabell på egna rader, avdelad med |, med två rubriker och exakt tre rader med heltal mellan −5 och 5. Andra graf- och diagramformat stöds inte ännu.");
     graphHint.hidden = S.qType !== "graph";
     card.appendChild(graphHint);
     b.appendChild(card);
@@ -1179,7 +1179,7 @@
     dl.appendChild(row("Kurs", S.course));
     dl.appendChild(row("Nivå", S.level));
     dl.appendChild(row("Omfattning", S.num + " frågor",
-      S.qType === "mc" ? "Flervalsfrågor" : S.qType === "short" ? "Kortsvar" : S.qType === "graph" ? "Graf · rät linje" : "Blandat flerval och kortsvar"));
+      S.qType === "mc" ? "Flervalsfrågor" : S.qType === "short" ? "Kortsvar" : S.qType === "graph" ? "Interaktiv graf" : "Blandat flerval och kortsvar"));
     dl.appendChild(row("Tar ungefär", "~" + mins + " min", "Räknat på din svarstid, inte på lästid"));
     if (misses > 0) {
       dl.appendChild(row("Extra vikt", misses + " tidigare fel", "Från din felbank i " + S.course));
@@ -1462,7 +1462,7 @@
   }
 
   function isAnswerComplete(q, raw) {
-    if (q && q.type === "graph") return Boolean(window.ExGenGraphAnswer && window.ExGenGraphAnswer.isComplete(raw));
+    if (q && q.type === "graph") return Boolean(window.ExGenGraphAnswer && window.ExGenGraphAnswer.isComplete(raw, q.graph_ui));
     return String(raw || "").trim().length > 0;
   }
 
@@ -1608,7 +1608,7 @@
         window.ExGenGraphAnswer(sheet, S.answers[id] || "", function (value) {
           S.answers[id] = value;
           saveDraftSoon(); publishSoon(); armStuck();
-        }, lang);
+        }, lang, q.graph_ui);
       }
     } else {
       var ta = el("textarea", "xf-answer");
@@ -1956,10 +1956,12 @@
       if (q.type === "graph") {
         try {
           var points = JSON.parse(answer).points;
-          if (Array.isArray(points) && points.length === 2 && points.every(function (p) {
+          if (Array.isArray(points) && points.length >= 2 && points.every(function (p) {
             return p && Number.isInteger(p.x) && Number.isInteger(p.y);
           })) {
-            return "Punkt A (" + points[0].x + ", " + points[0].y + ") · punkt B (" + points[1].x + ", " + points[1].y + ")";
+            return points.map(function (p, index) {
+              return "Punkt " + String.fromCharCode(65 + index) + " (" + p.x + ", " + p.y + ")";
+            }).join(" · ");
           }
         } catch (_) {}
         return "Ingen fullständig graf angiven";
@@ -2102,7 +2104,7 @@
       if (fb) it.appendChild(el("div", "xf-item-fb", fb));
 
       if (q.type === "graph") {
-        it.appendChild(buildGraphRetry(item));
+        it.appendChild(buildGraphRetry(item, q.graph_ui));
       } else if (item.model_answer) {
         var mo = el("div", "xf-item-model");
         mo.appendChild(el("em", null, "Fullpoängssvar"));

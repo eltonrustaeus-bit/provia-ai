@@ -8,7 +8,7 @@ const FIELDS = [
   "id", "type", "points", "question", "options", "correct_index", "rubric", "model_answer",
   "topic", "subtopic", "concept_tag", "learning_objective", "source_references",
   "cognitive_level", "accepted_answers", "estimated_answer_length", "scoring_rubric",
-  "graph_spec", "akey_sig",
+  "graph_spec", "graph_ui", "akey_sig",
 ];
 
 function secret() {
@@ -27,13 +27,17 @@ function hashContext(material, course, userId) {
 }
 
 function projection(question) {
-  return {
+  const result = {
     id: String(question?.id ?? ""),
     type: String(question?.type || ""),
     points: Number(question?.points) || 0,
     question: String(question?.question || ""),
     options: Array.isArray(question?.options) ? question.options : [],
   };
+  // Preserve the original AAD bytes for already-issued line-graph and other
+  // tasks while binding the new public chart configuration when present.
+  if (question?.graph_ui !== undefined) result.graph_ui = question.graph_ui;
+  return result;
 }
 
 function isBoundTo(publicQuestion, trustedQuestion) {
@@ -60,7 +64,9 @@ function validQuestion(question) {
     return question.options.length >= 2 && Number.isInteger(question.correct_index)
       && question.correct_index >= 0 && question.correct_index < question.options.length;
   }
-  if (question.type === "graph") return graph.isValidSpec(question.graph_spec);
+  if (question.type === "graph") return graph.isValidSpec(question.graph_spec)
+    && (question.graph_ui === undefined || graph.isValidDisplaySpec(question.graph_ui, question.graph_spec))
+    && (question.graph_spec.kind !== "scatter" || question.graph_ui !== undefined);
   return typeof question.model_answer === "string" && question.model_answer.length <= 12000;
 }
 

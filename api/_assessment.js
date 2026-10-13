@@ -416,9 +416,12 @@ const PROFILES = {
     },
   },
   natural_sciences: {
-    key: "natural_sciences", allowedTypes: ["mc", "short"],
+    key: "natural_sciences", allowedTypes: ["mc", "short", "graph"],
     extraIssues(q) {
       const issues = [];
+      if (q.type === "graph" && (!graphAnswers.isValidSpec(q.graph_spec) || q.graph_spec.kind !== "scatter")) {
+        issues.push("graph_spec_invalid");
+      }
       // Same value AND same unit in two options ("5,0 N" vs "5 N") → ambiguous.
       // Options that aren't quantities are skipped, so a prose item is never
       // affected. Requires the unit to match, unlike the maths overlay.
