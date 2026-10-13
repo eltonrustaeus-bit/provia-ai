@@ -7,6 +7,7 @@
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href]');
     if (!a) return;
+    if (a.hasAttribute('data-pv-auth')) return;
     var href = a.getAttribute('href');
     if (!href) return;
     if (href.charAt(0) === '#') return;
@@ -2082,6 +2083,7 @@ function finalizeMsg(div, text) {
     var _open     = false;
     var _returnFocus = null;
     var _closeTimer = null;
+    var _backgroundInert = [];
 
     /* Set the first time an account is created or signed into on this device.
        Used to decide whether the dialog should open on "Skapa konto" or on
@@ -2171,12 +2173,13 @@ function finalizeMsg(div, text) {
         /* Scrim is ExGen navy, not the near-black green (rgba(3,8,6,.82)) left
            over from the dark ProviaAI theme, which read as a murky grey-green
            haze over a light turquoise site. */
-        '#pvModal{position:fixed;inset:0;z-index:13000;background:rgba(14,27,42,.60);backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);display:none;align-items:center;justify-content:center;padding:18px;opacity:0;transition:opacity .22s ease}',
+        '#pvModal{position:fixed;inset:0;z-index:13000;background:rgba(14,27,42,.60);backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);display:none;align-items:center;justify-content:center;padding:18px;overflow-y:auto;opacity:0;transition:opacity .22s ease}',
         '#pvModal.pv-on{opacity:1}',
-        '#pvCard{position:relative;background:linear-gradient(180deg,#ffffff,var(--s2,#f8fafc));border:1px solid rgba(0,183,217,.18);border-radius:18px;width:min(412px,100%);overflow:hidden;box-shadow:0 30px 80px -20px rgba(14,27,42,.35);transform:translateY(16px) scale(.96);transition:transform .26s cubic-bezier(.22,.61,.36,1)}',
+        '#pvCard{position:relative;background:linear-gradient(180deg,#ffffff,var(--s2,#f8fafc));border:1px solid rgba(0,183,217,.18);border-radius:18px;width:min(412px,100%);max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;box-shadow:0 30px 80px -20px rgba(14,27,42,.35);transform:translateY(16px) scale(.96);transition:transform .26s cubic-bezier(.22,.61,.36,1)}',
         '#pvModal.pv-on #pvCard{transform:none}',
         '#pvCard::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--a,#00768F),transparent);opacity:.7}',
         '.pv-hd{padding:30px 26px 18px;text-align:center;position:relative}',
+        '@media(max-height:500px){.pv-hd{position:sticky;top:0;z-index:2;padding:10px 18px 8px;background:#fff;border-bottom:1px solid rgba(14,27,42,.1)}.pv-hd img{height:18px!important;margin-bottom:4px!important}.pv-ti{font-size:18px;margin-bottom:2px}.pv-sb{font-size:9px}.pv-cl{top:10px;right:12px}.pv-bd{padding:8px 18px 18px}#pvCard{scroll-padding-top:85px}}',
         /* White-on-white borders here were invisible: the close button is drawn
            on a white card, so it needs dark hairlines, not the light ones the
            dark theme used. */
@@ -2400,6 +2403,13 @@ function finalizeMsg(div, text) {
       buildModal();
       _open = true;
       var el = document.getElementById('pvModal');
+      if (!_backgroundInert.length) {
+        _backgroundInert = Array.from(document.body.children).filter(function(node) { return node !== el; }).map(function(node) {
+          var previous = node.inert;
+          node.inert = true;
+          return { node: node, previous: previous };
+        });
+      }
       if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
       switchView(view || 'register');
       if (!({ register:1, login:1, forgot:1 })[view || 'register']) {
@@ -2413,13 +2423,15 @@ function finalizeMsg(div, text) {
       var el = document.getElementById('pvModal');
       if (_closeTimer) clearTimeout(_closeTimer);
       if (el) el.classList.remove('pv-on');
-      document.body.style.overflow = '';
       var returnFocus = _returnFocus;
       _returnFocus = null;
       _closeTimer = setTimeout(function() {
         _closeTimer = null;
         if (_open) return;
         if (el) el.style.display = 'none';
+        document.body.style.overflow = '';
+        _backgroundInert.forEach(function(entry) { if (entry.node.isConnected) entry.node.inert = entry.previous; });
+        _backgroundInert = [];
         if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
           try { returnFocus.focus({ preventScroll: true }); } catch (_) { returnFocus.focus(); }
         }
@@ -2448,7 +2460,7 @@ function finalizeMsg(div, text) {
 
     function doRegister() {
       var email = (document.getElementById('pvRE').value || '').trim();
-      var pass  = (document.getElementById('pvRP').value || '').trim();
+      var pass  = document.getElementById('pvRP').value || '';
       var errEl = document.getElementById('pvRE2');
       var btn   = document.getElementById('pvRBtn');
       errEl.textContent = '';
@@ -2501,7 +2513,7 @@ function finalizeMsg(div, text) {
 
     function doLogin() {
       var email = (document.getElementById('pvLE').value || '').trim();
-      var pass  = (document.getElementById('pvLP').value || '').trim();
+      var pass  = document.getElementById('pvLP').value || '';
       var errEl = document.getElementById('pvLE2');
       var btn   = document.getElementById('pvLBtn');
       errEl.textContent = '';
@@ -2510,7 +2522,7 @@ function finalizeMsg(div, text) {
       supaPost('token?grant_type=password', { email: email, password: pass }).then(function(d) {
         saveSession(d); closeModal();
         if (window.triggerWelcome) window.triggerWelcome(email, false);
-        location.reload();
+        pvAfterAuth();
       }).catch(function(e) {
         errEl.textContent = svError(e.message, 'Fel e-post eller lösenord.');
         btn.disabled = false; btn.textContent = 'Logga in';

@@ -39,12 +39,16 @@ try {
   assert.equal(await page.evaluate(() => document.activeElement?.id), "pvCl", "focus moved outside is returned to the dialog");
 
   await page.keyboard.press("Escape");
+  assert.equal(await page.evaluate(() => document.querySelector("main")?.inert), true,
+    "background stays inert during the close transition");
   await page.waitForFunction(() => {
     const modal = document.querySelector("#pvModal");
     return !!modal && getComputedStyle(modal).display === "none";
   });
+  assert.equal(await page.evaluate(() => document.querySelector("main")?.inert), false,
+    "background is restored after the dialog is hidden");
   assert.equal(await opener.evaluate(el => el === document.activeElement), true, "closing restores focus to the opener");
-  console.log("auth-modal-focus: 4 ok, 0 fail");
+  console.log("auth-modal-focus: 6 ok, 0 fail");
   await close();
 } finally {
   await browser.close();
