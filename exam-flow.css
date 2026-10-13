@@ -347,6 +347,8 @@ body.xf-grading .xf-progress { display: none; }
 .graph-answer--scatter .graph-coordinate-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .graph-coordinate-fields label { display: grid; gap: 5px; color: var(--xf-ink-2); font-size: 12px; }
 .graph-coordinate-fields input { width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; border: 1px solid var(--xf-line); border-radius: var(--exgen-radius-sm); padding: 8px; color: var(--xf-ink); background: var(--s); font: inherit; }
+.graph-coordinate-fields input[aria-invalid="true"] { border-color: var(--danger); }
+.graph-validation-message { margin: 0 0 10px; color: var(--danger); font-size: var(--exgen-text-sm); line-height: var(--exgen-leading-relaxed); }
 .graph-clear { font-size: var(--exgen-text-sm); }
 
 .xf-ask {

@@ -40,6 +40,7 @@
       lineHint: "Choose A or B and click the graph. You can also enter coordinates.",
       scatterHint: "Choose a point, then click the graph or enter its coordinates. Plot each table row once.",
       point: "Point ", x: "x-coordinate", y: "y-coordinate", clear: "Clear points",
+      coordinateError: "Enter a whole number from -5 to 5 for each coordinate.",
       keyboard: "Use arrow keys to move and Enter or Space to plot the selected point.",
       cursor: "cursor", placed: "plotted", selected: "selected"
     } : {
@@ -48,6 +49,7 @@
       lineHint: "Välj A eller B och tryck på grafen. Du kan också skriva koordinaterna.",
       scatterHint: "Välj en punkt och tryck i grafen eller skriv koordinaterna. Placera varje tabellrad en gång.",
       point: "Punkt ", x: "x-koordinat", y: "y-koordinat", clear: "Rensa punkter",
+      coordinateError: "Ange heltal mellan −5 och 5 för varje koordinat.",
       keyboard: "Flytta med piltangenterna och placera vald punkt med Enter eller mellanslag.",
       cursor: "markör", placed: "placerad", selected: "vald"
     };
@@ -130,6 +132,7 @@
     root.appendChild(tabs); root.appendChild(svg);
     var fields = document.createElement("div"); fields.className = "graph-coordinate-fields";
     var inputs = [];
+    var invalidInputIndices = new Set();
     draft.forEach(function (_, pointIndex) {
       ["x", "y"].forEach(function (axis, axisIndex) {
         var inputIndex = pointIndex * 2 + axisIndex;
@@ -141,8 +144,19 @@
       });
     });
     root.appendChild(fields);
+    var validation = document.createElement("p");
+    validation.className = "graph-validation-message";
+    validation.setAttribute("role", "alert");
+    validation.hidden = true;
+    root.appendChild(validation);
     var clear = document.createElement("button"); clear.type = "button"; clear.className = "graph-clear"; clear.textContent = text.clear;
-    clear.addEventListener("click", function () { points = Array.from({ length: config.count }, function () { return null; }); draft = emptyDraft(config.count); active = 0; paint(); }); root.appendChild(clear); root.appendChild(hidden);
+    clear.addEventListener("click", function () {
+      points = Array.from({ length: config.count }, function () { return null; });
+      draft = emptyDraft(config.count); invalidInputIndices.clear(); active = 0;
+      validation.hidden = true; validation.textContent = "";
+      inputs.forEach(function (input) { input.removeAttribute("aria-invalid"); });
+      paint();
+    }); root.appendChild(clear); root.appendChild(hidden);
 
     function emit() {
       var hasDraft = draft.some(function (p) { return p.x != null || p.y != null; });
@@ -154,7 +168,22 @@
     }
     function updatePoint(index, axis, raw, inputIndex) {
       var value = raw === "" ? null : Number(raw);
-      draft[index][axis] = value != null && Number.isInteger(value) && value >= MIN && value <= MAX ? value : null;
+      var validInput = raw === "" || (Number.isInteger(value) && value >= MIN && value <= MAX);
+      if (!validInput) {
+        inputs[inputIndex].value = "";
+        inputs[inputIndex].setAttribute("aria-invalid", "true");
+        invalidInputIndices.add(inputIndex);
+        validation.textContent = text.coordinateError;
+        validation.hidden = false;
+      } else {
+        inputs[inputIndex].removeAttribute("aria-invalid");
+        invalidInputIndices.delete(inputIndex);
+        if (!invalidInputIndices.size) {
+          validation.textContent = "";
+          validation.hidden = true;
+        }
+      }
+      draft[index][axis] = validInput ? value : null;
       points[index] = validPoint(draft[index]) ? { x: draft[index].x, y: draft[index].y } : null;
       if (index === active && points[index]) cursor = { x: points[index].x, y: points[index].y };
       paint(inputIndex);

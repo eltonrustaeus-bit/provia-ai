@@ -188,6 +188,27 @@ try {
   assert.equal(restoredX, "-2", "a saved partial coordinate is restored on remount");
 
   await page.getByRole("button", { name: "Rensa punkter" }).click();
+  const invalidX = page.locator("#graph").getByRole("spinbutton", { name: "Punkt A, x-koordinat" });
+  for (const value of ["6", "1.5"]) {
+    await invalidX.fill(value);
+    assert.equal(await invalidX.inputValue(), "", `invalid coordinate ${value} is not left visible as though it were saved`);
+    assert.equal(await invalidX.getAttribute("aria-invalid"), "true");
+    assert.match(await page.locator("#graph .graph-validation-message").textContent(), /Ange heltal mellan/);
+    assert.equal(await page.locator("#graph input.graphAnswer").inputValue(), "", "invalid input is excluded from the serialized answer");
+    const restoredInvalid = await page.evaluate((raw) => {
+      const root = document.createElement("div"); document.body.appendChild(root);
+      window.ExGenGraphAnswer(root, raw, () => {});
+      const result = root.querySelector('[aria-label="Punkt A, x-koordinat"]').value;
+      root.remove();
+      return result;
+    }, await page.locator("#graph input.graphAnswer").inputValue());
+    assert.equal(restoredInvalid, "", "restoring the saved draft cannot resurrect an invalid coordinate");
+  }
+  await invalidX.fill("5");
+  assert.equal(await invalidX.inputValue(), "5", "a corrected coordinate is accepted");
+  assert.equal(await invalidX.getAttribute("aria-invalid"), null);
+  assert.equal(await page.locator("#graph .graph-validation-message").isHidden(), true);
+  await page.getByRole("button", { name: "Rensa punkter" }).click();
   for (const [label, value] of [["Punkt A, x-koordinat", "0"], ["Punkt A, y-koordinat", "1"], ["Punkt B, x-koordinat", "2"], ["Punkt B, y-koordinat", "5"]]) {
     await page.getByRole("spinbutton", { name: label }).fill(value);
   }
