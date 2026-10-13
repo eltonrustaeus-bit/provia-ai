@@ -46,7 +46,7 @@ const ok = (n, c, d = "") => (c ? pass : fail).push(n + (d ? " — " + d : ""));
 
 const browser = await chromium.launch();
 
-async function mk(opts = {}, gradeOk = true) {
+async function mk(opts = {}, gradeOk = true, gradeResult = null) {
   const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 860 } }, opts));
   const page = await ctx.newPage();
   const errs = [];
@@ -68,9 +68,12 @@ async function mk(opts = {}, gradeOk = true) {
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
     const qs = lastGradePayload?.questions || [];
-    return r.fulfill({ json: { ok: true, exam_proof: `v2.${"f".repeat(32)}.syntheticRegressionProof`, persistence: { mock_result_saved: true }, result: {
+    const result = gradeResult ? gradeResult(qs, lastGradePayload?.answers || []) : {
       total_points: 5, max_points: 8,
       per_question: qs.map((q, i) => ({ id: String(q.id), points: i === 1 ? 1 : 2, max_points: q.points, feedback: "fb" + i, model_answer: "ma" + i }))
+    };
+    return r.fulfill({ json: { ok: true, exam_proof: `v2.${"f".repeat(32)}.syntheticRegressionProof`, persistence: { mock_result_saved: true }, result: {
+      ...result
     } } });
     }],
   ] });
@@ -98,6 +101,35 @@ async function toExam(page) {
   await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
   await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
   await page.waitForTimeout(300);
+}
+
+// Ett självtest får lämnas in blankt, men frånvaro av försök är inte bevis
+// för en kunskapslucka och får inte bli ett falskt gratulationskort.
+{
+  const { ctx, page, errs } = await mk({}, true, (qs) => ({
+    total_points: 0,
+    max_points: qs.reduce((sum, q) => sum + q.points, 0),
+    per_question: qs.map((q) => ({
+      id: String(q.id), points: 0, max_points: q.points,
+      feedback: "Obesvarad.", model_answer: String(q.model_answer || ""),
+      concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+    })),
+  }));
+  await signIn(page, "blank-student");
+  await toExam(page);
+  let confirmText = "";
+  page.on("dialog", async (dialog) => { confirmText = dialog.message(); await dialog.accept(); });
+  await page.locator(".xf-exam-nav .xf-btn.primary").click();
+  await page.locator(".xf-exam-nav .xf-btn.primary").click();
+  await page.locator(".xf-exam-nav .xf-btn.primary").click();
+  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+  ok("tomt prov visar följderna före inlämning", /0 poäng/.test(confirmText) && /facit/.test(confirmText) && /kan inte ändras/.test(confirmText), confirmText);
+  ok("samtliga obesvarade svar skickas som tomma", (lastGradePayload?.answers || []).length === 3 && lastGradePayload.answers.every(a => a.answer === ""));
+  const nextText = await page.locator(".xf-next").innerText();
+  ok("nästa steg kallar inte obesvarat för uppmätt kunskapslucka", /Pröva det du lämnade obesvarat/.test(nextText) && !/inga tydliga luckor/.test(nextText), nextText.slice(0, 180));
+  ok("obesvarade ämnen markeras inte som svaga", await page.locator(".xf-cov .weak").count() === 0);
+  ok("inga konsolfel vid blank inlämning", errs.length === 0, errs.join(" | "));
+  await ctx.close();
 }
 
 // ── T1: dubbletter av fråge-id separeras ───────────────────────────────────

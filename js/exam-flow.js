@@ -205,11 +205,12 @@
           got: got,
           max: max,
           ratio: max > 0 ? got / max : 1,
+          unanswered: item.unanswered === true,
           concept: String(q.concept_tag || q.topic || q.subtopic || "").trim(),
           feedback: String(item.feedback || "").trim()
         };
       })
-      .filter(function (item) { return item.max > 0 && item.got < item.max; })
+      .filter(function (item) { return !item.unanswered && item.max > 0 && item.got < item.max; })
       .sort(function (a, b) {
         if (a.ratio !== b.ratio) return a.ratio - b.ratio;
         return (b.max - b.got) - (a.max - a.got);
@@ -218,11 +219,15 @@
 
   function addNextTrainingCard(root, result, questionsById) {
     var weak = weakResultItems(result, questionsById);
+    var skipped = (result && Array.isArray(result.per_question) ? result.per_question : [])
+      .filter(function (item) { return item.unanswered === true; }).length;
     if (!weak.length) {
       var clean = el("div", "xf-next");
       clean.appendChild(el("div", "xf-next-k", "Nästa träning"));
-      clean.appendChild(el("h3", null, "Bra: inga tydliga luckor i det här provet"));
-      clean.appendChild(el("p", null, "Gör ett nytt prov på samma material med högre nivå eller fler frågor för att se om det sitter även när frågorna vrids om."));
+      clean.appendChild(el("h3", null, skipped ? "Pröva det du lämnade obesvarat" : "Bra: inga tydliga luckor i det här provet"));
+      clean.appendChild(el("p", null, skipped
+        ? "Du fick 0 poäng på de obesvarade frågorna, men de visar inte vad du kan ännu. Skapa ett nytt prov på samma material och försök själv innan du tittar på facit."
+        : "Gör ett nytt prov på samma material med högre nivå eller fler frågor för att se om det sitter även när frågorna vrids om."));
       root.appendChild(clean);
       return;
     }
@@ -1813,8 +1818,8 @@
     if (blank > 0) {
       var ok = window.confirm(
         blank === 1
-          ? "Du har 1 obesvarad fråga. Lämna in ändå?"
-          : "Du har " + blank + " obesvarade frågor. Lämna in ändå?"
+          ? "Du har 1 obesvarad fråga. Den får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?"
+          : "Du har " + blank + " obesvarade frågor. De får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?"
       );
       if (!ok) {
         S.submitting = false;
@@ -2075,9 +2080,14 @@
       var q = byId[String(item.id)] || {};
       var t = String(q.topic || "").trim();
       if (!t) return;
-      if (!topics[t]) topics[t] = { got: 0, max: 0 };
+      if (!topics[t]) topics[t] = { got: 0, max: 0, attemptedGot: 0, attemptedMax: 0, skipped: 0 };
       topics[t].got += Number(item.points) || 0;
       topics[t].max += Number(item.max_points) || 0;
+      if (item.unanswered === true) topics[t].skipped += 1;
+      else {
+        topics[t].attemptedGot += Number(item.points) || 0;
+        topics[t].attemptedMax += Number(item.max_points) || 0;
+      }
     });
     var tKeys = Object.keys(topics);
     if (tKeys.length) {
@@ -2085,8 +2095,9 @@
       var cov = el("div", "xf-cov");
       tKeys.forEach(function (t) {
         var o = topics[t];
-        var ratio = o.max > 0 ? o.got / o.max : 1;
-        var chip = el("span", ratio < 0.6 ? "weak" : null, t + " " + o.got + "/" + o.max);
+        var ratio = o.attemptedMax > 0 ? o.attemptedGot / o.attemptedMax : 1;
+        var note = o.skipped ? " · " + o.skipped + " obesvarad" + (o.skipped === 1 ? "" : "e") : "";
+        var chip = el("span", ratio < 0.6 ? "weak" : null, t + " " + o.got + "/" + o.max + note);
         cov.appendChild(chip);
       });
       b.appendChild(cov);

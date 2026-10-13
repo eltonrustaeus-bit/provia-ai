@@ -391,7 +391,8 @@ module.exports = async function handler(req, res) {
       if (!graphAnswers.isValidSpec(question.graph_spec)) {
         return json(res, 400, { ok: false, error: "GRAPH_TASK_INVALID" });
       }
-      if (!graphAnswers.answerIsComplete(answerMap.get(String(question.id)), question.graph_spec)) {
+      const graphAnswer = answerMap.get(String(question.id));
+      if (graphAnswer.trim() && !graphAnswers.answerIsComplete(graphAnswer, question.graph_spec)) {
         return json(res, 400, { ok: false, error: "GRAPH_ANSWER_INVALID" });
       }
     }
@@ -542,6 +543,7 @@ module.exports = async function handler(req, res) {
       maxTotal += maxP;
 
       const userAns = answerMap.get(id) ?? "";
+      const unanswered = !userAns.trim();
 
       if (type === "mc") {
         const correctIndex = Number.isInteger(q.correct_index) ? q.correct_index : -999;
@@ -603,7 +605,7 @@ module.exports = async function handler(req, res) {
            heller, så taggen blev tom — 42 av 72 rättade frågor i produktion
            gav noll kunskapsdata. Frågan bär begreppet i subtopic/topic; det
            räddas här. */
-        const conceptTag = (await conceptTags()).resolveConceptTag(q).slice(0, 60);
+        const conceptTag = unanswered ? "" : (await conceptTags()).resolveConceptTag(q).slice(0, 60);
 
         perById.set(id, {
           id,
@@ -612,7 +614,8 @@ module.exports = async function handler(req, res) {
           feedback: fb,
           model_answer: String(q.model_answer || q.rubric || ""),
           concept_tag: conceptTag,
-          error_tags: pts === maxP ? [] : ["mc_wrong"]
+          error_tags: unanswered ? ["unanswered"] : pts === maxP ? [] : ["mc_wrong"],
+          ...(unanswered ? { unanswered: true } : {}),
         });
       } else if (type === "graph") {
         const spec = q.graph_spec;
@@ -620,12 +623,24 @@ module.exports = async function handler(req, res) {
         total += graded.points;
         perById.set(id, {
           id, points: Math.min(maxP, graded.points), max_points: maxP,
-          feedback: graded.feedback,
+          feedback: unanswered
+            ? lang === "sv" ? "Obesvarad. Du placerade inga punkter." : "Not answered. You did not plot any points."
+            : graded.feedback,
           model_answer: "",
-          concept_tag: (await conceptTags()).resolveConceptTag(q).slice(0, 60),
-          error_tags: graded.error_tags
+          concept_tag: unanswered ? "" : (await conceptTags()).resolveConceptTag(q).slice(0, 60),
+          error_tags: unanswered ? ["unanswered"] : graded.error_tags,
+          ...(unanswered ? { unanswered: true } : {}),
         });
       } else {
+        if (unanswered) {
+          perById.set(id, {
+            id, points: 0, max_points: maxP,
+            feedback: lang === "sv" ? "Obesvarad. Inget svar att bedöma." : "Not answered. There is no response to grade.",
+            model_answer: String(q.model_answer || q.rubric || ""),
+            concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+          });
+          continue;
+        }
         const hasStructuredRubric = q.scoring_rubric && Array.isArray(q.scoring_rubric.parts) && q.scoring_rubric.parts.length > 0;
         /* Originalfrågan sparas vid sidan om. nonMcPack går till modellen och
            ska bara innehålla det den behöver för att rätta — topic och subtopic

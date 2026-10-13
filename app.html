@@ -1114,7 +1114,7 @@ function mergeMistakesFromExamRows(rows){
     const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
     per.forEach(item=>{
       const got=Number(item.points||0),mx=Number(item.max_points||0);
-      if(mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
+      if(item.unanswered!==true&&mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
         out.push({ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
     });
   });
@@ -2041,7 +2041,7 @@ try{
       const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
       (result.per_question||[]).forEach(item=>{
         const got=Number(item.points||0),m=Number(item.max_points||0);
-        if(m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
+        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
       try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}

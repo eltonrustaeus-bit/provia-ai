@@ -206,8 +206,57 @@ try {
   savedCanonicalResult = null;
   savedFingerprint = null;
 
+  calls.length = 0;
+  const blankGraph = await invoke({
+    lang: "sv", course, pastedText: material, exam_manifest: manifest,
+    questions: [publicQuestion], answers: [{ id: question.id, answer: "" }],
+  });
+  assert.equal(blankGraph.status, 200, "a deliberately unanswered graph can finish the exam");
+  assert.equal(blankGraph.body.result.total_points, 0);
+  assert.deepEqual(blankGraph.body.result.per_question[0], {
+    id: question.id, points: 0, max_points: 2,
+    feedback: "Obesvarad. Du placerade inga punkter.", model_answer: "",
+    concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+  });
+  const blankWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.ok(blankWrite, "the blank submission is persisted as an official result");
+  const blankPayload = JSON.parse(blankWrite.body);
+  assert.equal(blankPayload.p_concept_tags.length, 0, "skipping is not a concept attempt");
+  assert.equal(blankPayload.p_learning_payload.rows[0].concept_key, "", "skipping cannot lower mastery");
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+
+  for (const skippedQuestion of [
+    { id: "mc-blank", type: "mc", points: 1, question: "Vad är lutning?", options: ["Ändring i y per x", "Skärning"], correct_index: 0, model_answer: "Ändring i y per x", concept_tag: "lutning" },
+    { id: "short-blank", type: "short", points: 2, question: "Beskriv lutning.", options: [], model_answer: "Ändringen i y när x ökar ett steg.", concept_tag: "lutning" },
+  ]) {
+    const signed = {
+      id: skippedQuestion.id, type: skippedQuestion.type, points: skippedQuestion.points,
+      question: skippedQuestion.question, options: skippedQuestion.options,
+      grade_task: tasks.sealQuestion(skippedQuestion, secret, contextHash),
+    };
+    assert.ok(signed.grade_task);
+    calls.length = 0;
+    const skipped = await invoke({
+      lang: "sv", course, pastedText: material,
+      exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, [signed]),
+      questions: [signed], answers: [{ id: skippedQuestion.id, answer: "   " }],
+    });
+    assert.equal(skipped.status, 200, `${skippedQuestion.type} can be submitted blank`);
+    assert.equal(skipped.body.result.total_points, 0);
+    assert.equal(skipped.body.result.per_question[0].unanswered, true);
+    assert.equal(skipped.body.result.per_question[0].concept_tag, "");
+    assert.deepEqual(skipped.body.result.per_question[0].error_tags, ["unanswered"]);
+    assert.ok(calls.every((call) => !call.url.includes("openai.com")), "blank answers do not need AI grading");
+    const write = JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body);
+    assert.equal(write.p_learning_payload.rows[0].concept_key, "", "blank answers do not affect mastery");
+    issuanceState = "active";
+    savedCanonicalResult = null;
+    savedFingerprint = null;
+  }
+
   const malformedGraphAnswers = [
-    "",
     "not-json",
     JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }] }),
     JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: -1, y: 1 }] }),
