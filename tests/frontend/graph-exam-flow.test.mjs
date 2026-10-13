@@ -81,7 +81,8 @@ try {
       }
       gradeBody = body;
       await route.fulfill({ json: { ok: true, exam_proof: graphProof, result: { total_points: 1, max_points: 2, per_question: [{
-        id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.", model_answer: ""
+        id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.",
+        model_answer: "Grafen till y = 2x + 1 går genom (0, 1) och (2, 5)."
       }] } } });
     }],
     ["**/api/explain", async (route) => {
@@ -248,7 +249,8 @@ try {
   await page.screenshot({ path: "/tmp/exgen-save-warning-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.getByRole("button", { name: "Försök spara till kontot igen" }).count(), 1, "failed account persistence is visible and retryable");
-  assert.equal(await page.getByText("Fullpoängssvar", { exact: true }).count(), 0, "full answer is withheld after the first graph attempt");
+  assert.equal(await page.getByRole("button", { name: "Visa fullpoängssvar" }).count(), 0,
+    "the full answer stays inside the optional graph review panel");
   await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
   const perResultContext = await page.evaluate(() => window.__perTestCtx());
   assert.equal(perResultContext.page, "resultat");
@@ -265,6 +267,8 @@ try {
     "P.E.R receives the actual failed graph item, not the student's submitted answer");
   await page.locator("#perBubble").click();
   await page.getByRole("button", { name: "Försök igen på grafen" }).click();
+  await page.getByRole("button", { name: "Visa fullpoängssvar" }).click();
+  await page.locator(".xf-graph-retry .xf-item-model span").getByText("Grafen till y = 2x + 1 går genom (0, 1) och (2, 5).").waitFor();
   await page.getByRole("spinbutton", { name: "Punkt B, y-koordinat" }).fill("5");
   const retryButton = page.getByRole("button", { name: "Kontrollera nytt försök" });
   await retryButton.click();
@@ -279,7 +283,8 @@ try {
   assert.equal(typeof releaseDeferredGraphRetry, "function", "the synthetic response is held until the graph changes");
   await releaseDeferredGraphRetry();
   await page.waitForFunction(() => document.querySelector(".xf-graph-retry button.primary")?.disabled === false);
-  assert.equal(await page.getByText("Fullpoängssvar", { exact: true }).count(), 0, "a stale full-score response cannot reveal an answer for the edited graph");
+  assert.equal(await page.getByText("Fullpoängssvar", { exact: true }).isVisible(), false,
+    "a stale full-score response cannot reveal an answer for the edited graph");
   assert.equal(await page.locator(".xf-graph-retry-status").innerText(), "", "a stale response cannot replace feedback for the edited graph");
   await page.getByRole("spinbutton", { name: "Punkt B, y-koordinat" }).fill("5");
   await retryButton.click();

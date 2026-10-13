@@ -614,7 +614,7 @@ module.exports = async function handler(req, res) {
           feedback: fb,
           model_answer: String(q.model_answer || q.rubric || ""),
           concept_tag: conceptTag,
-          error_tags: unanswered ? ["unanswered"] : pts === maxP ? [] : ["mc_wrong"],
+          error_tags: unanswered ? [] : pts === maxP ? [] : ["mc_wrong"],
           ...(unanswered ? { unanswered: true } : {}),
         });
       } else if (type === "graph") {
@@ -626,9 +626,9 @@ module.exports = async function handler(req, res) {
           feedback: unanswered
             ? lang === "sv" ? "Obesvarad. Du placerade inga punkter." : "Not answered. You did not plot any points."
             : graded.feedback,
-          model_answer: "",
+          model_answer: graphAnswers.modelAnswer(spec, lang),
           concept_tag: unanswered ? "" : (await conceptTags()).resolveConceptTag(q).slice(0, 60),
-          error_tags: unanswered ? ["unanswered"] : graded.error_tags,
+          error_tags: unanswered ? [] : graded.error_tags,
           ...(unanswered ? { unanswered: true } : {}),
         });
       } else {
@@ -637,7 +637,7 @@ module.exports = async function handler(req, res) {
             id, points: 0, max_points: maxP,
             feedback: lang === "sv" ? "Obesvarad. Inget svar att bedöma." : "Not answered. There is no response to grade.",
             model_answer: String(q.model_answer || q.rubric || ""),
-            concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+            concept_tag: "", error_tags: [], unanswered: true,
           });
           continue;
         }

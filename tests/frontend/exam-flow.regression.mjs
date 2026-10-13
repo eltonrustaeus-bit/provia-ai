@@ -112,7 +112,7 @@ async function toExam(page) {
     per_question: qs.map((q) => ({
       id: String(q.id), points: 0, max_points: q.points,
       feedback: "Obesvarad.", model_answer: String(q.model_answer || ""),
-      concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+      concept_tag: "", error_tags: [], unanswered: true,
     })),
   }));
   await signIn(page, "blank-student");

@@ -296,12 +296,14 @@
       answer: "Check the graph and show the full-score answer", retry: "Try the graph again", check: "Check new attempt",
       unavailable: "The graph tool could not load. Reload the page and try again.", pending: "Checking the graph…",
       noEngine: "Graph retry is unavailable. Your exam score is unchanged.", failed: "Could not check the graph. Try again.",
-      checked: "Attempt checked.", network: "Network error. Try again; your exam score is unchanged.", full: "Full-score answer"
+      checked: "Attempt checked.", network: "Network error. Try again; your exam score is unchanged.", full: "Full-score answer",
+      reveal: "Show full-score answer"
     } : {
       answer: "Kontrollera grafen och visa fullpoängssvaret", retry: "Försök igen på grafen", check: "Kontrollera nytt försök",
       unavailable: "Grafverktyget kunde inte laddas. Ladda om sidan och försök igen.", pending: "Kontrollerar grafen…",
       noEngine: "Omförsöket är inte tillgängligt. Dina provpoäng påverkas inte.", failed: "Kunde inte kontrollera grafen. Försök igen.",
-      checked: "Försöket har kontrollerats.", network: "Nätverksfel. Försök igen; ditt provresultat påverkas inte.", full: "Fullpoängssvar"
+      checked: "Försöket har kontrollerats.", network: "Nätverksfel. Försök igen; ditt provresultat påverkas inte.", full: "Fullpoängssvar",
+      reveal: "Visa fullpoängssvar"
     };
     var wrap = el("div", "xf-graph-retry");
     var open = el("button", "xf-btn ghost", Number(item.points) >= Number(item.max_points)
@@ -326,6 +328,18 @@
     model.hidden = true;
     model.appendChild(el("em", null, copy.full));
     var modelText = el("span", null, "");
+    var reveal = item.model_answer ? el("button", "xf-btn quiet", copy.reveal) : null;
+    if (reveal) {
+      reveal.type = "button";
+      reveal.addEventListener("click", function () {
+        modelText.textContent = item.model_answer;
+        if (!modelText.parentNode) model.appendChild(modelText);
+        model.hidden = false;
+        if (!model.parentNode) panel.appendChild(model);
+        renderMathIn(model);
+        reveal.hidden = true;
+      });
+    }
 
     if (window.ExGenGraphAnswer) {
       window.ExGenGraphAnswer(graph, answer, function (value) {
@@ -335,6 +349,7 @@
         status.textContent = "";
         model.hidden = true;
         check.hidden = false;
+        if (reveal) reveal.hidden = false;
       }, english ? "en" : "sv", graphUi);
     } else {
       graph.appendChild(el("p", "xf-photo-note bad", copy.unavailable));
@@ -367,6 +382,7 @@
           panel.appendChild(model);
           renderMathIn(model);
           check.hidden = true;
+          if (reveal) reveal.hidden = true;
         } else {
           check.disabled = false;
         }
@@ -386,6 +402,7 @@
     });
     panel.appendChild(graph);
     panel.appendChild(check);
+    if (reveal) panel.appendChild(reveal);
     panel.appendChild(status);
     wrap.appendChild(open);
     wrap.appendChild(panel);
@@ -1836,7 +1853,8 @@
 
     var answers = qs.map(function (q, n) {
       var id = qid(q, n);
-      return { id: id, answer: String(S.answers[id] || "").trim() };
+      return { id: id, answer: isAnswerComplete(q, S.answers[id])
+        ? String(S.answers[id] || "").trim() : "" };
     });
 
     // Rättningen föll — lämna tillbaka eleven till provet med svaren kvar i

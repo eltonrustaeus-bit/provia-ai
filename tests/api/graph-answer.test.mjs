@@ -150,6 +150,7 @@ assert.match(gradeSource, /gradeTasks\.openQuestion\(submitted, submitted\?\.gra
 assert.match(gradeSource, /consume_anon_rate/);
 assert.match(gradeSource, /p\.mode === "graph_practice_retry"/, "retry mode is an explicit endpoint branch");
 assert.ok(gradeSource.indexOf('p.mode === "graph_practice_retry"') < gradeSource.lastIndexOf("persistGradedSubmission({"), "graph retry returns before exam-history and mastery persistence");
-assert.match(gradeSource, /model_answer: ""/, "the first graph grade does not reveal the full-score answer");
+assert.match(gradeSource, /model_answer: graphAnswers\.modelAnswer\(spec, lang\)/,
+  "the official graph result carries a verified answer for post-exam review");
 
 console.log("graph-answer: all assertions passed");

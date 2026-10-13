@@ -215,13 +215,15 @@ try {
   assert.equal(blankGraph.body.result.total_points, 0);
   assert.deepEqual(blankGraph.body.result.per_question[0], {
     id: question.id, points: 0, max_points: 2,
-    feedback: "Obesvarad. Du placerade inga punkter.", model_answer: "",
-    concept_tag: "", error_tags: ["unanswered"], unanswered: true,
+    feedback: "Obesvarad. Du placerade inga punkter.",
+    model_answer: "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).",
+    concept_tag: "", error_tags: [], unanswered: true,
   });
   const blankWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(blankWrite, "the blank submission is persisted as an official result");
   const blankPayload = JSON.parse(blankWrite.body);
   assert.equal(blankPayload.p_concept_tags.length, 0, "skipping is not a concept attempt");
+  assert.deepEqual(blankPayload.p_error_tags, [], "skipping is not an observed error type");
   assert.equal(blankPayload.p_learning_payload.rows[0].concept_key, "", "skipping cannot lower mastery");
   issuanceState = "active";
   savedCanonicalResult = null;
@@ -247,9 +249,10 @@ try {
     assert.equal(skipped.body.result.total_points, 0);
     assert.equal(skipped.body.result.per_question[0].unanswered, true);
     assert.equal(skipped.body.result.per_question[0].concept_tag, "");
-    assert.deepEqual(skipped.body.result.per_question[0].error_tags, ["unanswered"]);
+    assert.deepEqual(skipped.body.result.per_question[0].error_tags, []);
     assert.ok(calls.every((call) => !call.url.includes("openai.com")), "blank answers do not need AI grading");
     const write = JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body);
+    assert.deepEqual(write.p_error_tags, [], "unanswered is not forwarded to P.E.R or teacher error summaries");
     assert.equal(write.p_learning_payload.rows[0].concept_key, "", "blank answers do not affect mastery");
     issuanceState = "active";
     savedCanonicalResult = null;
@@ -304,7 +307,7 @@ try {
       points: 2,
       max_points: 2,
       feedback: "Grafen stämmer. Både lutningen och skärningen med y-axeln är rätt.",
-      model_answer: "",
+      model_answer: "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).",
       concept_tag: "linjära funktioner",
       error_tags: [],
     }],
