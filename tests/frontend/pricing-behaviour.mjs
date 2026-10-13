@@ -55,12 +55,23 @@ const inWeek = n => Array.from({ length: n }, (_, i) => ({ ts: weekStart + 3600e
    _harness.mjs; det som står kvar här är sidans egna data. */
 async function mk(s = {}) {
   const signedIn = !!s.session || !!s.role || !!s.history?.length;
+  const extra = s.backendDisabled ? [
+    ["**/js/exgen-runtime.js", route => route.fulfill({
+      contentType: "application/javascript",
+      body: `window.ExGenRuntime = Object.freeze({ environment: "pilot", projectRef: "", supabaseUrl: "", publishableKey: "", appOrigin: "http://localhost", authStorageKey: "exgen-test-auth-token" });`,
+    })],
+    ["**/supabase.min.js", route => route.fulfill({
+      contentType: "application/javascript",
+      body: "window.supabase = { createClient() { throw new Error('client created without runtime config'); } };",
+    })],
+  ] : [];
   return openPage(browser, `${srv.url}/pricing.html`, {
     width: s.width || 1280, height: 900, reducedMotion: "reduce", settle: 900,
     mocks: {
       role: s.role || "gratis",
       // Registreras efter den generella **/rest/v1/**, annars äts den upp.
       profiles: s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
+      extra,
     },
     state: {
       signedIn,
@@ -75,6 +86,19 @@ const PLANS = [
   { id: "plan-basic", name: "Basic", amount: "29" },
   { id: "plan-premium", name: "Premium", amount: "79" },
 ];
+
+// Public pricing must remain readable in isolated previews without backend credentials.
+{
+  const { ctx, page } = await mk({ backendDisabled: true });
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.waitForTimeout(100);
+  const content = await page.locator("main").innerText();
+  ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
+  ok("0f backend-avstängd plansida släpper laddaren", await page.locator("#ldr").evaluate(el => el.classList.contains("out")));
+  ok("0g backend-avstängd plansida initierar ingen Supabase-klient", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
 
 // Priset utan att veta vilket element som bär det. Sidan renderar "0 kr för
 // alltid" respektive "29 kr / månad"; kontrollen är att beloppet står i

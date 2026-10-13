@@ -463,10 +463,9 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
-  const SUPABASE_URL = window.ExGenRuntime.supabaseUrl;
-  const SUPABASE_ANON_KEY = window.ExGenRuntime.publishableKey;
-  const sb = window.supabase && window.supabase.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  const runtime = window.ExGenRuntime || {};
+  const sb = runtime.supabaseUrl && runtime.publishableKey && window.supabase && window.supabase.createClient
+    ? window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey)
     : null;
 
   window.startCheckout = async function(plan) {
@@ -515,10 +514,9 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 
 // Show manage-subscription section for paying users
 (async function() {
-  if (!window.supabase) return;
-  const SUPABASE_URL = window.ExGenRuntime.supabaseUrl;
-  const SUPABASE_ANON_KEY = window.ExGenRuntime.publishableKey;
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const runtime = window.ExGenRuntime || {};
+  if (!window.supabase || !runtime.supabaseUrl || !runtime.publishableKey) return;
+  const sb = window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey);
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
   const { data: prof } = await sb.from("profiles").select("role").eq("id", session.user.id).maybeSingle();
