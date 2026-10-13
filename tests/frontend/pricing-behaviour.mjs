@@ -54,6 +54,7 @@ const inWeek = n => Array.from({ length: n }, (_, i) => ({ ts: weekStart + 3600e
    Servern, mockarna, sessionen och splash-förbikopplingen kommer från
    _harness.mjs; det som står kvar här är sidans egna data. */
 async function mk(s = {}) {
+  const signedIn = !!s.session || !!s.role || !!s.history?.length;
   return openPage(browser, `${srv.url}/pricing.html`, {
     width: s.width || 1280, height: 900, reducedMotion: "reduce", settle: 900,
     mocks: {
@@ -62,9 +63,9 @@ async function mk(s = {}) {
       profiles: s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
     },
     state: {
-      signedIn: !!s.session,
+      signedIn,
       role: s.role || null,
-      storage: { proviaai_history: s.history || [] },
+      storage: { proviaai_history: s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
     },
   });
 }
@@ -168,6 +169,7 @@ const voiceOf = page => page.evaluate(() => {
   const { ctx, page } = await mk({ history: inWeek(3) });
   const t = await voiceOf(page);
   ok("2d vid taket sägs det rakt ut", /slagit i taket/i.test(t), t.slice(0, 200));
+  ok("2d Basic beskrivs med sin faktiska månadsgräns", /Basic ger 30 prov i månaden för 29 kr\/månad/i.test(t), t.slice(0, 240));
   await ctx.close();
 }
 {
