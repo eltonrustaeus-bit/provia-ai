@@ -494,6 +494,7 @@
     if (!line) return;
     if (typing) { clearInterval(typing); typing = null; }
 
+    line.setAttribute("aria-label", text);
     subEl.textContent = "";
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1517,9 +1518,10 @@
           saveDraft();
           publish();
           armStuck();
-          // Ett flervalssvar är ett avslut — gå vidare av sig själv, men först
-          // efter att markeringen hunnit synas.
-          setTimeout(function () { if (S.idx === i) next(); }, 260);
+          // Sista frågan kräver ett uttryckligt klick på Lämna in.
+          if (i < S.exam.questions.length - 1) {
+            setTimeout(function () { if (S.idx === i) next(); }, 260);
+          }
         });
         group.appendChild(btn);
       });
@@ -1870,6 +1872,27 @@
     var byId = {};
     qs.forEach(function (q, n) { byId[qid(q, n)] = q; });
 
+    function answerText(q, raw) {
+      var answer = String(raw || "").trim();
+      if (!answer) return "Inget svar";
+      if (q.type === "mc") {
+        var option = Array.isArray(q.options) ? q.options[answer.charCodeAt(0) - 65] : null;
+        return option ? answer + ". " + option : answer;
+      }
+      if (q.type === "graph") {
+        try {
+          var points = JSON.parse(answer).points;
+          if (Array.isArray(points) && points.length === 2 && points.every(function (p) {
+            return p && Number.isInteger(p.x) && Number.isInteger(p.y);
+          })) {
+            return "Punkt A (" + points[0].x + ", " + points[0].y + ") · punkt B (" + points[1].x + ", " + points[1].y + ")";
+          }
+        } catch (_) {}
+        return "Ingen fullständig graf angiven";
+      }
+      return answer;
+    }
+
     var total = Number(r.total_points) || 0;
     var max = Number(r.max_points) || 0;
 
@@ -1991,6 +2014,11 @@
       it.appendChild(head);
 
       if (q.question) it.appendChild(el("div", "xf-item-q", q.question));
+
+      var own = el("div", "xf-item-own");
+      own.appendChild(el("span", "xf-item-label", "Ditt svar"));
+      own.appendChild(el("span", null, answerText(q, S.answers[String(item.id)])));
+      it.appendChild(own);
 
       /* Modellen inleder ofta sin återkoppling med "Poäng: 0/1." — samma
          siffra som redan står i rubriken en rad ovanför. Prefixet stryks här

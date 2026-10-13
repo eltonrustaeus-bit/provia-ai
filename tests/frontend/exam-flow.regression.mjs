@@ -114,12 +114,19 @@ async function toExam(page) {
   await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
   await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
 
+  ok("T1g sista flervalsvalet lämnar inte in automatiskt", await page.locator(".xf-exam.on").count() === 1);
+  await page.click(".xf-exam-nav .xf-btn.primary");
+
   await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
   const answers = (lastGradePayload?.answers || []);
   const uniq = new Set(answers.map(a => a.id));
   ok("T1b unika id i grade-payload", uniq.size === answers.length, JSON.stringify(answers.map(a => a.id)));
   ok("T1c svaren hamnade rätt", answers[0]?.answer === "A" && answers[1]?.answer === "svar på fråga två" && answers[2]?.answer === "C",
     JSON.stringify(answers.map(a => a.answer)));
+  const ownAnswers = await page.locator(".xf-item-own").allTextContents();
+  ok("T1h resultatet visar elevens egna svar", ownAnswers.length === 3 &&
+    ownAnswers[0].includes("A. Cytoplasman") && ownAnswers[1].includes("svar på fråga två") && ownAnswers[2].includes("C. 100"),
+    JSON.stringify(ownAnswers));
   const trainHref = await page.locator("#xf .xf-next-actions a").getAttribute("href");
   ok("T1e nästa träning går till appens pilotkompatibla #train-flöde", trainHref === "app.html#train", String(trainHref));
   const savedMistakesHref = await page.locator("#xf .xf-act a").getAttribute("href");
@@ -141,6 +148,7 @@ async function toExam(page) {
     await page.fill(".xf-answer", "syntetiskt svar");
     await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
     await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
+    await page.click(".xf-exam-nav .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
     const ids = (lastGradePayload?.answers || []).map(a => a.id);
     const expectedIds = ["constructor", "toString", "__proto__"];
@@ -211,6 +219,7 @@ async function toExam(page) {
   await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
   page.on("dialog", d => d.accept().catch(() => {}));
   await page.click(".xf-mc-opt >> nth=1");
+  await page.click(".xf-exam-nav .xf-btn.primary");
   await page.waitForTimeout(3500);
   const st = await page.evaluate(() => ({
     exam: document.querySelector(".xf-exam").classList.contains("on"),
@@ -247,8 +256,14 @@ async function toExam(page) {
 
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
   await page.waitForTimeout(60);
-  const focNow = await page.evaluate(() => ({ cls: document.activeElement?.className || "" }));
+  const focNow = await page.evaluate(() => ({
+    cls: document.activeElement?.className || "",
+    fullLabel: document.activeElement?.getAttribute("aria-label"),
+    visibleText: document.activeElement?.textContent
+  }));
   ok("T5e fokus flyttas direkt till nya skärmens rubrik", /xf-say/.test(focNow.cls), JSON.stringify(focNow));
+  ok("T5g fokuserad rubrik har hela texten under animation", Boolean(focNow.fullLabel) &&
+    focNow.fullLabel.length > (focNow.visibleText || "").length, JSON.stringify(focNow));
   // Ämnesskärmen flyttar sedan fokus till fältet med flit — kontrollera att det
   // aldrig lämnar den aktiva skärmen.
   await page.waitForTimeout(500);

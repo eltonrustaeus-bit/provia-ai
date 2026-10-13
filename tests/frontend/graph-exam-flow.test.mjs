@@ -311,6 +311,9 @@ try {
   assert.equal(trainingGenerateBody?.qType, "mix");
   assert.match(trainingGenerateBody?.pastedText || "", /Rita grafen till y = 2x \+ 1/);
   await page.locator("#xf .xf-mc-opt").first().click();
+  await page.waitForTimeout(350);
+  assert.equal(await page.locator(".xf-exam.on").count(), 1, "last multiple-choice answer must not submit the exam");
+  await page.locator(".xf-exam-nav .xf-btn.primary").click();
   await page.waitForSelector("#xf .xf-screen[data-screen='result'].on");
   assert.equal(trainingGradeBody?.course, "Matematik 1b");
   assert.equal(trainingGradeBody?.questions?.[0]?.grade_task, "opaque-practice-task");

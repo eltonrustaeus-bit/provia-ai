@@ -675,6 +675,24 @@ body.xf-in-exam.xf-per-open #perWidget {
   margin-bottom: 10px;
 }
 
+.xf-item-own {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.xf-item-label {
+  color: var(--xf-ink-2);
+  font-family: var(--exgen-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--exgen-tracking-wide);
+}
+
 .xf-item-fb {
   font-size: var(--exgen-text-sm);
   line-height: var(--exgen-leading-relaxed);

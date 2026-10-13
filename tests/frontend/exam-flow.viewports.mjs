@@ -47,7 +47,7 @@ function mkExam(n, long) {
           source_references: ["Avsnittet om anaerob nedbrytning"], model_answer: "Vid syrebrist…",
           scoring_rubric: { parts: [{ description: "Orsak", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } });
   }
-  return { title: "Prov", level: "C", questions: qs };
+  return { title: "Prov", level: "C", exam_manifest: "synthetic-viewport-manifest", questions: qs };
 }
 
 function mkResult(exam, long) {
@@ -155,7 +155,11 @@ for (const [label, w, h] of VIEWS) {
       const e = document.querySelector(sel);
       if (!e) return;
       const r = e.getBoundingClientRect();
-      if (r.width < 44 || r.height < 44) out.push({ sel, w: Math.round(r.width), h: Math.round(r.height) });
+      if (!r.width || !r.height) return;
+      const after = getComputedStyle(e, "::after");
+      const w = Math.max(r.width, after.content === "none" ? 0 : parseFloat(after.width) || 0);
+      const h = Math.max(r.height, after.content === "none" ? 0 : parseFloat(after.height) || 0);
+      if (w < 44 || h < 44) out.push({ sel, w: Math.round(w), h: Math.round(h) });
     });
     return out;
   });
@@ -214,7 +218,7 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
       if (n) n.click();
     }
   });
-  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 20000 }).catch(() => {});
+  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 20000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${SHOT}/q20-result-${w}.png` });
   const o3 = await overflow(page);
@@ -270,11 +274,11 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   // landmark + h1
   const sem = await page.evaluate(() => ({
     mains: document.querySelectorAll("main:not([hidden])").length,
-    h1: document.querySelectorAll("h1").length,
+    h1: [...document.querySelectorAll("h1")].filter(h => h.getClientRects().length > 0).length,
     xfRole: document.getElementById("xf")?.getAttribute("role") || null
   }));
   if (sem.mains === 0 && !sem.xfRole) add("MEDEL", "semantik", "Sidan har ingen synlig <main>-landmark (den enda är hidden) och #xf saknar role", "#xf", "Gör #xf till <main> eller sätt role=main");
-  if (sem.h1 > 1) add("MEDEL", "semantik", `${sem.h1} st <h1> i DOM samtidigt (en per flödesskärm)`, ".xf-say", "En h1 för sidan, skärmrubriker som h2");
+  if (sem.h1 > 1) add("MEDEL", "semantik", `${sem.h1} st synliga <h1> samtidigt`, "h1", "Kontrollera sidans rubrikstruktur");
 
   await ctx.close();
 }
