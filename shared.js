@@ -1956,8 +1956,9 @@ function finalizeMsg(div, text) {
 
     var s = document.createElement('style');
     s.textContent =
-      '#proviaCookieBanner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9500;' +
+      '#proviaCookieBanner{position:relative;z-index:2;' +
       'width:calc(100% - 24px);max-width:560px;' +
+      'margin:12px auto;' +
       /* Was rgba(243,248,245,.98) with a teal border — green-tinted white
          from the pre-ExGen palette, missed by earlier colour sweeps because
          it is an rgba triplet rather than a searched-for hex. */
@@ -1965,9 +1966,9 @@ function finalizeMsg(div, text) {
       'border:1px solid var(--l2,#E4E7EC);border-radius:14px;' +
       'padding:18px 20px;box-shadow:0 8px 40px rgba(14,27,42,.18);' +
       'font-family:"DM Sans",sans-serif;animation:cookieSlideUp .35s cubic-bezier(.22,.61,.36,1) forwards}' +
-      '@keyframes cookieSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}' +
+      '@keyframes cookieSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}' +
       '#proviaCookieBanner.dismiss{animation:cookieSlideDown .25s ease forwards}' +
-      '@keyframes cookieSlideDown{to{opacity:0;transform:translateX(-50%) translateY(20px)}}' +
+      '@keyframes cookieSlideDown{to{opacity:0;transform:translateY(12px)}}' +
       '.ckRow{display:flex;align-items:flex-start;gap:14px}' +
       '.ckIcon{font-size:22px;flex-shrink:0;line-height:1;padding-top:2px}' +
       '.ckBody{flex:1;min-width:0}' +
@@ -1979,7 +1980,7 @@ function finalizeMsg(div, text) {
       '.ckAccept:hover{background:#00647A;transform:translateY(-1px)}' +
       '.ckDecline{padding:8px 16px;background:none;color:#667085;border:1px solid rgba(0,183,217,.3);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s}' +
       '.ckDecline:hover{color:#1B2430;border-color:rgba(0,183,217,.5)}' +
-      '@media(max-width:480px){.ckBtns{flex-direction:column}.ckAccept,.ckDecline{width:100%;text-align:center}}' +
+      '@media(max-width:480px){#proviaCookieBanner{padding:12px 14px}.ckRow{gap:8px}.ckIcon{font-size:18px}.ckTitle{font-size:13px;margin-bottom:3px}.ckText{font-size:11px;line-height:1.4;margin-bottom:8px}.ckBtns{flex-direction:row;gap:6px}.ckAccept,.ckDecline{width:auto;flex:1 1 0;text-align:center;padding:8px 6px;font-size:11px;white-space:nowrap}}' +
       '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}}';
     document.head.appendChild(s);
 
@@ -2008,7 +2009,9 @@ function finalizeMsg(div, text) {
       setTimeout(function () { banner.remove(); }, 280);
     }
 
-    document.body.appendChild(banner);
+    var main = document.querySelector('main');
+    if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
+    else document.body.insertBefore(banner, document.body.firstElementChild);
     document.getElementById('ckAcceptBtn').addEventListener('click', function () { dismiss('accepted'); });
     document.getElementById('ckDeclineBtn').addEventListener('click', function () { dismiss('necessary'); });
   }
