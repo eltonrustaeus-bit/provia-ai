@@ -333,6 +333,9 @@ body.xf-grading .xf-progress { display: none; }
 }
 .graph-point-tabs button.active { border-color: var(--xf-accent); color: var(--xf-accent); background: var(--xf-accent-soft); }
 .graph-answer svg { display: block; width: 100%; max-width: 360px; margin: 0 auto; background: var(--s); border: 1px solid var(--xf-line); border-radius: var(--exgen-radius-sm); touch-action: manipulation; cursor: crosshair; }
+.graph-answer svg:focus-visible { outline: 3px solid var(--xf-accent); outline-offset: 3px; }
+.graph-cursor circle { fill: none; stroke: var(--xf-accent); stroke-width: 2; pointer-events: none; }
+.graph-sr-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .graph-grid line { stroke: var(--xf-line); stroke-width: .7; }
 .graph-axes line { stroke: var(--xf-ink-2); stroke-width: 1.6; }
 .graph-tick-labels text { fill: var(--xf-ink-2); font: 6.5px var(--exgen-font-mono); pointer-events: none; }

@@ -39,31 +39,42 @@
       scatterGraph: "Coordinate grid from minus five to five. Choose point A, B or C and plot each table value.",
       lineHint: "Choose A or B and click the graph. You can also enter coordinates.",
       scatterHint: "Choose a point, then click the graph or enter its coordinates. Plot each table row once.",
-      point: "Point ", x: "x-coordinate", y: "y-coordinate", clear: "Clear points"
+      point: "Point ", x: "x-coordinate", y: "y-coordinate", clear: "Clear points",
+      keyboard: "Use arrow keys to move and Enter or Space to plot the selected point.",
+      cursor: "cursor", placed: "plotted", selected: "selected"
     } : {
       lineGraph: "Koordinatsystem från minus fem till fem. Välj punkt A eller B och tryck i grafen.",
       scatterGraph: "Koordinatsystem från minus fem till fem. Välj punkt A, B eller C och placera varje tabellvärde.",
       lineHint: "Välj A eller B och tryck på grafen. Du kan också skriva koordinaterna.",
       scatterHint: "Välj en punkt och tryck i grafen eller skriv koordinaterna. Placera varje tabellrad en gång.",
-      point: "Punkt ", x: "x-koordinat", y: "y-koordinat", clear: "Rensa punkter"
+      point: "Punkt ", x: "x-koordinat", y: "y-koordinat", clear: "Rensa punkter",
+      keyboard: "Flytta med piltangenterna och placera vald punkt med Enter eller mellanslag.",
+      cursor: "markör", placed: "placerad", selected: "vald"
     };
     var scatter = config.mode === "scatter";
     var description = scatter ? text.scatterGraph : text.lineGraph;
     var draft = read(initial, config);
     var points = draft.map(function (p) { return validPoint(p) ? { x: p.x, y: p.y } : null; });
     var active = 0;
+    var cursor = { x: 0, y: 0 };
     var hidden = document.createElement("input");
     hidden.type = "hidden"; hidden.className = "graphAnswer"; hidden.value = initial || "";
 
     var tabs = document.createElement("div"); tabs.className = "graph-point-tabs";
     var pointButtons = draft.map(function (_, i) {
       var button = document.createElement("button"); button.type = "button";
-      button.addEventListener("click", function () { active = i; paint(); });
+      button.addEventListener("click", function () {
+        active = i;
+        if (points[i]) cursor = { x: points[i].x, y: points[i].y };
+        paint();
+        announce(text.point + letter(i) + " " + text.selected + ". " + cursorText());
+      });
       tabs.appendChild(button); return button;
     });
     var svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", "0 0 264 264"); svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", description);
+    svg.setAttribute("viewBox", "0 0 264 264"); svg.setAttribute("role", "button");
+    svg.setAttribute("tabindex", "0");
+    svg.setAttribute("aria-label", description + " " + text.keyboard);
     var grid = document.createElementNS(NS, "g"); grid.setAttribute("class", "graph-grid");
     for (var n = MIN; n <= MAX; n++) {
       var x = 12 + (n - MIN) * 24, y = 12 + (MAX - n) * 24;
@@ -99,10 +110,17 @@
       var label = document.createElementNS(NS, "text"); label.textContent = letter(i); g.appendChild(label);
       svg.appendChild(g); return g;
     });
+    var cursorMark = document.createElementNS(NS, "g"); cursorMark.setAttribute("class", "graph-cursor");
+    cursorMark.setAttribute("visibility", "hidden");
+    var cursorRing = document.createElementNS(NS, "circle"); cursorRing.setAttribute("r", "8");
+    cursorMark.appendChild(cursorRing); svg.appendChild(cursorMark);
     root.classList.add("graph-answer");
     if (scatter) root.classList.add("graph-answer--scatter");
     var hint = document.createElement("p"); hint.className = "graph-answer-hint"; hint.textContent = scatter ? text.scatterHint : text.lineHint;
     root.appendChild(hint);
+    var status = document.createElement("span"); status.className = "graph-sr-status";
+    status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
+    root.appendChild(status);
     if (scatter) {
       var captions = document.createElement("div"); captions.className = "graph-axis-captions";
       var xCaption = document.createElement("span"); xCaption.textContent = "x · " + config.xLabel;
@@ -138,7 +156,23 @@
       var value = raw === "" ? null : Number(raw);
       draft[index][axis] = value != null && Number.isInteger(value) && value >= MIN && value <= MAX ? value : null;
       points[index] = validPoint(draft[index]) ? { x: draft[index].x, y: draft[index].y } : null;
+      if (index === active && points[index]) cursor = { x: points[index].x, y: points[index].y };
       paint(inputIndex);
+    }
+    function cursorText() {
+      return text.point + letter(active) + ", " + text.cursor + " (" + cursor.x + ", " + cursor.y + ").";
+    }
+    function announce(message) { status.textContent = message; }
+    function paintCursor() {
+      cursorMark.setAttribute("transform", "translate(" + (12 + (cursor.x - MIN) * 24) + " " + (12 + (MAX - cursor.y) * 24) + ")");
+    }
+    function placePoint(x, y) {
+      var placed = active;
+      draft[active] = { x: x, y: y }; points[active] = { x: x, y: y };
+      cursor = { x: x, y: y };
+      active = (active + 1) % config.count;
+      paint();
+      announce(text.point + letter(placed) + " " + text.placed + " (" + x + ", " + y + "). " + text.point + letter(active) + " " + text.selected + ".");
     }
     function clippedEndpoints(a, b) {
       var slope = (b.y - a.y) / (b.x - a.x), intercept = a.y - slope * a.x, candidates = [];
@@ -171,18 +205,39 @@
         segment.setAttribute("x1", 12 + (ends[0].x - MIN) * 24); segment.setAttribute("y1", 12 + (MAX - ends[0].y) * 24);
         segment.setAttribute("x2", 12 + (ends[1].x - MIN) * 24); segment.setAttribute("y2", 12 + (MAX - ends[1].y) * 24);
       } else segment.setAttribute("visibility", "hidden");
+      paintCursor();
       emit();
     }
     svg.addEventListener("click", function (event) {
-      var rect = svg.getBoundingClientRect();
-      var px = (event.clientX - rect.left) * 264 / rect.width;
-      var py = (event.clientY - rect.top) * 264 / rect.height;
+      var matrix = svg.getScreenCTM();
+      if (!matrix) return;
+      var location = svg.createSVGPoint();
+      location.x = event.clientX;
+      location.y = event.clientY;
+      var local = location.matrixTransform(matrix.inverse());
+      var px = local.x, py = local.y;
       if (px < 12 || px > 252 || py < 12 || py > 252) return;
       var gx = Math.round((px - 12) / 24) + MIN, gy = MAX - Math.round((py - 12) / 24);
       if (gx < MIN || gx > MAX || gy < MIN || gy > MAX) return;
-      draft[active] = { x: gx, y: gy }; points[active] = { x: gx, y: gy };
-      active = scatter ? (active + 1) % config.count : active === 0 ? 1 : 0;
-      paint();
+      placePoint(gx, gy);
+    });
+    svg.addEventListener("focus", function () {
+      cursorMark.setAttribute("visibility", "visible");
+      announce(cursorText());
+    });
+    svg.addEventListener("blur", function () { cursorMark.setAttribute("visibility", "hidden"); });
+    svg.addEventListener("keydown", function (event) {
+      var move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
+      if (move) {
+        event.preventDefault();
+        cursor.x = Math.max(MIN, Math.min(MAX, cursor.x + move[0]));
+        cursor.y = Math.max(MIN, Math.min(MAX, cursor.y + move[1]));
+        paintCursor();
+        announce(cursorText());
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        placePoint(cursor.x, cursor.y);
+      }
     });
     paint();
     return hidden;

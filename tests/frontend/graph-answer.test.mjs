@@ -5,9 +5,19 @@ import { resolve } from "node:path";
 
 const script = resolve("js/graph-answer.js");
 const browser = await chromium.launch({ headless: true });
+async function screenPoint(svg, x, y) {
+  return svg.evaluate((element, coordinates) => {
+    const point = element.createSVGPoint();
+    point.x = coordinates.x;
+    point.y = coordinates.y;
+    const screen = point.matrixTransform(element.getScreenCTM());
+    return { x: screen.x, y: screen.y };
+  }, { x, y });
+}
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
   await page.setContent('<main style="width:min(360px, calc(100vw - 32px))"><div id="graph"></div></main>');
+  await page.addStyleTag({ path: resolve("exam-flow.css") });
   await page.addScriptTag({ path: script });
   await page.evaluate(() => window.ExGenGraphAnswer(document.querySelector("#graph"), "", () => {}));
   const english = await page.evaluate(() => {
@@ -41,16 +51,81 @@ try {
   assert.deepEqual(await scatterRoot.locator(".graph-axis-captions span").allTextContents(), ["x · Tid (min)", "y · Syrehalt (mg/L)"]);
   assert.equal(await scatterRoot.locator(".graph-student-line").getAttribute("visibility"), "hidden", "measured points are not incorrectly joined as a line");
   const scatterSvg = scatterRoot.locator("svg");
-  const scatterBox = await scatterSvg.boundingBox();
+  await scatterSvg.scrollIntoViewIfNeeded();
   for (const [px, py] of [[132, 36], [156, 60], [180, 108]]) {
-    await page.touchscreen.tap(scatterBox.x + scatterBox.width * px / 264, scatterBox.y + scatterBox.height * py / 264);
+    const point = await screenPoint(scatterSvg, px, py);
+    await page.touchscreen.tap(point.x, point.y);
   }
   const scatterAnswer = await scatterRoot.locator("input.graphAnswer").inputValue();
   assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [scatterAnswer, scatterUi]), true);
   assert.deepEqual(JSON.parse(scatterAnswer), { type: "scatter", points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }] },
     "touch interaction records each measured pair without revealing target values");
   assert.equal(await scatterRoot.evaluate((root) => root.scrollWidth <= root.clientWidth), true, "axis labels and three controls do not overflow the mobile viewport");
+  await page.setViewportSize({ width: 320, height: 700 });
+  assert.equal(await scatterRoot.evaluate((root) => root.scrollWidth <= root.clientWidth), true,
+    "three-point scatter controls still fit a 320px phone");
+  await page.setViewportSize({ width: 390, height: 844 });
   await scatterRoot.evaluate((root) => root.remove());
+
+  await page.evaluate((ui) => {
+    const root = document.createElement("div"); root.id = "scatterKeyboard"; document.body.appendChild(root);
+    window.ExGenGraphAnswer(root, "", () => {}, "sv", ui);
+  }, scatterUi);
+  const scatterKeyboard = page.locator("#scatterKeyboard");
+  const scatterGrid = scatterKeyboard.locator("svg");
+  await scatterGrid.focus();
+  assert.equal(await scatterGrid.getAttribute("role"), "button", "keyboard graph is exposed as an interactive control");
+  assert.equal(await scatterGrid.locator(".graph-cursor").getAttribute("visibility"), "visible");
+  await scatterGrid.press("Enter");
+  await scatterGrid.press("ArrowRight");
+  await scatterGrid.press("ArrowUp");
+  await scatterGrid.press("Space");
+  await scatterGrid.press("ArrowRight");
+  await scatterGrid.press("ArrowUp");
+  await scatterGrid.press("Enter");
+  const keyboardScatterAnswer = await scatterKeyboard.locator("input.graphAnswer").inputValue();
+  assert.deepEqual(JSON.parse(keyboardScatterAnswer).points, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }],
+    "scatter task can be completed entirely by keyboard");
+  assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [keyboardScatterAnswer, scatterUi]), true);
+  assert.match(await scatterKeyboard.locator("[role=status]").innerText(), /Punkt C placerad \(2, 2\).*Punkt A vald/,
+    "live status identifies the placed coordinate and next active point");
+  await scatterGrid.blur();
+  assert.equal(await scatterGrid.locator(".graph-cursor").getAttribute("visibility"), "hidden");
+  await scatterKeyboard.evaluate((root) => root.remove());
+
+  await page.evaluate(() => {
+    const root = document.createElement("div"); root.id = "lineKeyboard"; document.body.appendChild(root);
+    window.ExGenGraphAnswer(root, "", () => {});
+  });
+  const lineKeyboard = page.locator("#lineKeyboard");
+  const lineGrid = lineKeyboard.locator("svg");
+  await lineGrid.focus();
+  await lineGrid.press("ArrowLeft");
+  assert.equal(await lineKeyboard.locator("input.graphAnswer").inputValue(), "", "moving the cursor does not save an answer");
+  await lineGrid.press("ArrowRight");
+  await lineGrid.press("Enter");
+  await lineGrid.press("ArrowRight");
+  await lineGrid.press("ArrowUp");
+  await lineGrid.press("Space");
+  const keyboardLineAnswer = await lineKeyboard.locator("input.graphAnswer").inputValue();
+  assert.deepEqual(JSON.parse(keyboardLineAnswer).points, [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    "line task can be completed entirely by keyboard");
+  assert.equal(await page.evaluate((raw) => window.ExGenGraphAnswer.isComplete(raw), keyboardLineAnswer), true);
+  await lineKeyboard.evaluate((root) => root.remove());
+
+  await page.evaluate(() => {
+    const root = document.createElement("div"); root.id = "wideGrid"; document.body.appendChild(root);
+    window.ExGenGraphAnswer(root, "", () => {});
+    root.querySelector("svg").style.cssText = "width:300px;height:150px;max-width:none";
+  });
+  const wideGrid = page.locator("#wideGrid svg");
+  await wideGrid.scrollIntoViewIfNeeded();
+  const widePoint = await screenPoint(wideGrid, 204, 108);
+  await page.touchscreen.tap(widePoint.x, widePoint.y);
+  const wideAnswer = await page.locator("#wideGrid input.graphAnswer").inputValue();
+  assert.deepEqual(JSON.parse(wideAnswer).points[0], { x: 3, y: 1 },
+    "touch uses the drawn SVG coordinate grid even when its viewport is not square");
+  await page.locator("#wideGrid").evaluate((root) => root.remove());
 
   const svg = page.locator("#graph svg");
   await page.evaluate(() => {
@@ -64,9 +139,10 @@ try {
   assert.equal(await page.locator("#graph input.graphAnswer").inputValue(), "", "SVG margin clicks do not create points");
 
   let answer;
-  const mobileGrid = await svg.boundingBox();
-  await page.touchscreen.tap(mobileGrid.x + mobileGrid.width * 156 / 264, mobileGrid.y + mobileGrid.height * 156 / 264);
-  await page.touchscreen.tap(mobileGrid.x + mobileGrid.width * 204 / 264, mobileGrid.y + mobileGrid.height * 108 / 264);
+  const firstTap = await screenPoint(svg, 156, 156);
+  const secondTap = await screenPoint(svg, 204, 108);
+  await page.touchscreen.tap(firstTap.x, firstTap.y);
+  await page.touchscreen.tap(secondTap.x, secondTap.y);
   answer = await page.locator("#graph input.graphAnswer").inputValue();
   assert.deepEqual(JSON.parse(answer).points, [{ x: 1, y: -1 }, { x: 3, y: 1 }], "mobile touch taps map to the intended graph coordinates");
   await page.getByRole("button", { name: "Rensa punkter" }).click();
@@ -131,6 +207,7 @@ try {
     "Shift+Tab returns from point B to point A");
   for (const [label, description] of [
     ["Punkt B", "point B"],
+    ["Koordinatsystem", "keyboard graph"],
     ["Punkt A, x-koordinat", "A x-coordinate"],
     ["Punkt A, y-koordinat", "A y-coordinate"],
     ["Punkt B, x-koordinat", "B x-coordinate"],
@@ -138,7 +215,7 @@ try {
   ]) {
     await page.keyboard.press("Tab");
     const focusedLabel = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") || document.activeElement?.textContent?.trim() || "");
-    assert.equal(label === "Punkt B" ? focusedLabel.startsWith(label) : focusedLabel === label, true,
+    assert.equal(label === "Punkt B" || label === "Koordinatsystem" ? focusedLabel.startsWith(label) : focusedLabel === label, true,
       `Tab reaches ${description} in order`);
   }
   await page.keyboard.press("Tab");
@@ -147,7 +224,7 @@ try {
 
   await page.setViewportSize({ width: 320, height: 700 });
   assert.ok(await page.locator("svg").evaluate((e) => e.getBoundingClientRect().width <= 288), "graph fits a narrow phone viewport");
-  assert.ok(await page.getByRole("button", { name: "Punkt A" }).isVisible());
+  assert.ok(await page.locator("#graph .graph-point-tabs").getByRole("button", { name: "Punkt A" }).isVisible());
   await page.addScriptTag({ content: await readFile(resolve("node_modules/axe-core/axe.min.js"), "utf8") });
   const violations = await page.evaluate(async () => (await axe.run(document.querySelector("#graph"), {
     runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] }
