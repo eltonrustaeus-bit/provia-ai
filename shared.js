@@ -1993,7 +1993,8 @@ function finalizeMsg(div, text) {
       '<span class="ckIcon" aria-hidden="true">🍪</span>' +
       '<div class="ckBody">' +
       '<div class="ckTitle">Vi använder cookies</div>' +
-      '<p class="ckText">ExGen sparar din inloggning, progress och inställningar lokalt på din enhet. ' +
+      '<p class="ckText">Vi använder webbläsarlagring för inloggning, inställningar och viss provdata. ' +
+      'Provresultat och studieprogress kan också sparas på ditt konto när du är inloggad. ' +
       'Vi använder inga spårningscookies eller annonsverktyg. ' +
       '<a href="/integritetspolicy.html">Läs mer</a></p>' +
       '<div class="ckBtns">' +

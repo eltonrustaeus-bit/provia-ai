@@ -12,6 +12,10 @@ try {
   await page.addInitScript(() => sessionStorage.setItem("pi_splash_shown", "1"));
   await page.goto(`${server.url}/index.html`, { waitUntil: "networkidle" });
   await page.locator("#proviaCookieBanner").waitFor();
+  const storageNotice = await page.locator("#proviaCookieBanner .ckText").innerText();
+  result.ok("cookie notice distinguishes browser storage from account data",
+    /webbläsarlagring/.test(storageNotice) && /Provresultat och studieprogress/.test(storageNotice) &&
+    !/progress.*lokalt på din enhet/i.test(storageNotice), storageNotice);
 
   for (const [width, height] of [[320, 720], [390, 844], [844, 390], [1440, 900]]) {
     await page.setViewportSize({ width, height });
