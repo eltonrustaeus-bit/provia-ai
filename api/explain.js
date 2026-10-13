@@ -263,7 +263,14 @@ async function handleLegalMode(req, res, body, user) {
     // CommonJS-bundle Vercel bygger av denna .js-fil — en statisk import här kraschade HELA
     // funktionen (även för vanlig P.E.R-chatt som aldrig når legalMode) redan vid kallstart.
     const { retrieveChunks } = await import("../src/retrieval/legal-retrieval.mjs");
-    retrieved = await retrieveChunks(supabase, question, { matchCount: 4, includePending: false });
+    retrieved = await retrieveChunks(supabase, question, {
+      matchCount: 4,
+      includePending: false,
+      onEmbeddingUsage: ({ model, usage, latencyMs }) => logAiUsage({
+        userId: user.id, requestId: randomUUID(), feature: "per_chat", step: "embed",
+        model, usage, latencyMs,
+      }, { timeoutMs: 750 }),
+    });
   } catch (e) {
     return res.status(502).json({ error: "Kunde inte söka i källmaterialet" });
   }
@@ -505,6 +512,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         lane: 'landing',
         fields: { question },
         targets: landingPageContext.targets || [],
+        onEmbeddingUsage: ({ model, usage, latencyMs }) => logAiUsage({
+          userId: landingUser.id, requestId: randomUUID(), feature: "per_landing", step: "embed",
+          model, usage, latencyMs,
+        }, { timeoutMs: 750 }),
       });
       cacheKey = key;
       if (cached) return res.json({ answer: cached, cached: true });

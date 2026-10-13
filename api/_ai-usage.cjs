@@ -1,7 +1,7 @@
 const { getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
 
 const MAX_DB_INTEGER = 2_147_483_647;
-const STEPS = new Set(["generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
+const STEPS = new Set(["embed", "generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
 const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory", "ocr", "teacher_report", "teacher_class_insight"]);
 const TIERS = new Set(["gratis", "basic", "premium", "admin", "teacher"]);
 
@@ -15,9 +15,19 @@ function measuredTokens(usage) {
   return { input_tokens: input, cached_input_tokens: cached, output_tokens: output };
 }
 
+function measuredEmbeddingTokens(usage) {
+  const tokens = usage?.total_tokens ?? usage?.prompt_tokens ?? usage?.input_tokens;
+  if (!Number.isInteger(tokens) || tokens <= 0 || tokens > MAX_DB_INTEGER) return null;
+  for (const key of ["total_tokens", "prompt_tokens", "input_tokens"]) {
+    if (Object.hasOwn(usage || {}, key) && (!Number.isInteger(usage[key]) || usage[key] !== tokens)) return null;
+  }
+  return tokens;
+}
+
 function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, model, usage, latencyMs }) {
-  const tokens = measuredTokens(usage);
-  if (!tokens || !STEPS.has(step) || !FEATURES.has(feature) || (!userId && feature !== "per_landing") || !model) return null;
+  const embeddingTokens = step === "embed" ? measuredEmbeddingTokens(usage) : null;
+  const tokens = step === "embed" ? null : measuredTokens(usage);
+  if ((step === "embed" ? embeddingTokens === null : !tokens) || !STEPS.has(step) || !FEATURES.has(feature) || (!userId && feature !== "per_landing") || !model) return null;
   return {
     request_id: typeof requestId === "string" ? requestId : null,
     user_id: userId || null,
@@ -26,7 +36,7 @@ function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, mode
     pipeline_step: step,
     provider: "openai",
     model: String(model).slice(0, 120),
-    ...tokens,
+    ...(tokens || { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, embedding_tokens: embeddingTokens }),
     latency_ms: Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0,
   };
 }
@@ -49,4 +59,4 @@ async function logAiUsage(inputs, { env = process.env, fetchImpl = globalThis.fe
 
 const logMockExamUsage = logAiUsage;
 
-module.exports = { measuredTokens, usageEvent, logAiUsage, logMockExamUsage };
+module.exports = { measuredTokens, measuredEmbeddingTokens, usageEvent, logAiUsage, logMockExamUsage };

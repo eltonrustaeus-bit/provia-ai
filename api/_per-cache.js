@@ -58,12 +58,12 @@ async function loadEmbedder() {
 
 // getEmbedding har ingen egen timeout. Ett hängande embeddinganrop skulle annars göra cachen
 // långsammare än det anrop den ska ersätta — alltså sämre än ingen cache alls.
-async function embedWithTimeout(text) {
+async function embedWithTimeout(text, onUsage) {
   const getEmbedding = await loadEmbedder();
   let timer;
   try {
     return await Promise.race([
-      getEmbedding(text),
+      getEmbedding(text, { onUsage }),
       new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error("embedding timeout")), EMBED_TIMEOUT_MS);
       }),
@@ -87,7 +87,7 @@ async function embedWithTimeout(text) {
  *                         per_cache_match hinner nås, så spärren och nyckelbristen ser likadana
  *                         ut utifrån. Samma mönster som getEmbedding(text, { fetchImpl }).
  */
-export async function lookupCached(supabase, { lane, fields, targets = [], embedFn = embedWithTimeout }) {
+export async function lookupCached(supabase, { lane, fields, targets = [], embedFn = embedWithTimeout, onEmbeddingUsage = null }) {
   const question = String(fields?.question ?? "");
   const key = { lane, allowed: false, fingerprint: null, payloadHash: null, question: "", embedding: null };
 
@@ -131,7 +131,7 @@ export async function lookupCached(supabase, { lane, fields, targets = [], embed
 
   // 3. Vektor — bara på landningsbanan, bara mot godkända rader.
   try {
-    key.embedding = await embedFn(key.question);
+    key.embedding = await embedFn(key.question, onEmbeddingUsage);
     const { data } = await supabase.rpc("per_cache_match", {
       p_lane: lane, p_fingerprint: key.fingerprint, p_embedding: key.embedding,
       p_min_similarity: NEAR_MISS_FLOOR, p_limit: 5,

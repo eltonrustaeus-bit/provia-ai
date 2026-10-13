@@ -393,6 +393,17 @@ check("trasig databas ger cacheEnabled false, inte kastat fel",
   const s2 = stub();
   await cache.lookupCached(s2, { lane: "landing", fields: landingFields, embedFn: falskEmbedding });
   check("landningsbanan vektorsöker vid miss", s2.spar.rpc.includes("per_cache_match"));
+
+  let usage;
+  const meterEmbed = async (_question, onUsage) => {
+    await onUsage({ model: "text-embedding-3-small", usage: { prompt_tokens: 7, total_tokens: 7 }, latencyMs: 12 });
+    return new Array(1536).fill(0.01);
+  };
+  await cache.lookupCached(stub(), {
+    lane: "landing", fields: landingFields, embedFn: meterEmbed,
+    onEmbeddingUsage: (event) => { usage = event; },
+  });
+  check("landningscache vidarebefordrar endast embeddingens kostnadsmetadata", usage?.model === "text-embedding-3-small" && usage.usage.total_tokens === 7 && !("text" in usage) && !("embedding" in usage));
 }
 
 // Slot-guarden måste neka INNAN tröskeln ens övervägs. En kandidat över 0.95 med fel plannamn

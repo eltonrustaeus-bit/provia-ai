@@ -3,7 +3,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { measuredTokens, usageEvent, logMockExamUsage } = require("../../api/_ai-usage.cjs");
+const { measuredTokens, measuredEmbeddingTokens, usageEvent, logMockExamUsage } = require("../../api/_ai-usage.cjs");
 
 const sample = {
   userId: "00000000-0000-4000-8000-000000000001",
@@ -35,6 +35,23 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(usageEvent({ ...sample, feature: "unknown_feature" }), null);
 });
 
+test("embedding events use only measured embedding tokens", () => {
+  const event = usageEvent({ ...sample, feature: "per_landing", step: "embed", usage: { prompt_tokens: 16, total_tokens: 16 } });
+  assert.equal(measuredEmbeddingTokens({ prompt_tokens: 16, total_tokens: 16 }), 16);
+  assert.equal(measuredEmbeddingTokens({ prompt_tokens: 16, total_tokens: 17 }), null);
+  assert.equal(measuredEmbeddingTokens({ prompt_tokens: "16", total_tokens: 16 }), null);
+  assert.equal(measuredEmbeddingTokens({ total_tokens: 0 }), null);
+  assert.equal(measuredEmbeddingTokens({ total_tokens: 2_147_483_648 }), null);
+  assert.deepEqual({
+    step: event.pipeline_step,
+    feature: event.feature,
+    embedding_tokens: event.embedding_tokens,
+    input_tokens: event.input_tokens,
+    output_tokens: event.output_tokens,
+  }, { step: "embed", feature: "per_landing", embedding_tokens: 16, input_tokens: 0, output_tokens: 0 });
+  assert.equal(usageEvent({ ...sample, step: "embed", usage: { total_tokens: -1 } }), null);
+});
+
 test("batch insert contains only whitelisted metrics and uses the server key", async () => {
   const requests = [];
   const env = { SUPABASE_URL: "https://synthetic.supabase.invalid", SUPABASE_SECRET_KEY: "sb_secret_synthetic" };
@@ -45,6 +62,7 @@ test("batch insert contains only whitelisted metrics and uses the server key", a
   const result = await logMockExamUsage([
     sample,
     { ...sample, step: "grade", usage: { prompt_tokens: 30, completion_tokens: 8 } },
+    { ...sample, userId: null, feature: "per_landing", step: "embed", usage: { prompt_tokens: 18, total_tokens: 18 } },
     { ...sample, step: "repair", usage: null },
   ], { env, fetchImpl });
   assert.equal(result, true);
@@ -55,12 +73,15 @@ test("batch insert contains only whitelisted metrics and uses the server key", a
   const body = requests[0].init.body;
   assert.doesNotMatch(body, /PRIVATE_STUDY_MATERIAL|PRIVATE_STUDENT_ANSWER/);
   const rows = JSON.parse(body);
-  assert.equal(rows.length, 2);
-  assert.deepEqual(rows.map((row) => row.pipeline_step), ["generate", "grade"]);
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map((row) => row.pipeline_step), ["generate", "grade", "embed"]);
   assert.equal(rows[0].subscription_tier, "basic");
   assert.equal(rows[0].latency_ms, 42);
   assert.equal(rows[0].estimated_cost, undefined);
   assert.equal(rows[1].input_tokens, 30);
+  assert.equal(rows[2].user_id, null);
+  assert.equal(rows[2].embedding_tokens, 18);
+  assert.equal(rows[2].input_tokens, 0);
 });
 
 test("telemetry failure is fail-open and cannot fabricate a zero-cost row", async () => {
