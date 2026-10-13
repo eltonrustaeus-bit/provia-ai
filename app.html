@@ -1949,7 +1949,7 @@ try{
       const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
       const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
       setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
-      return {ok:true,result,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
+      return {ok:true,result,examProof:res.data.exam_proof||null,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
     }catch(err){
       const msg=LANG==="sv"?"Ett oväntat fel uppstod efter rättningen. Kontrollera om resultatet sparats innan du skickar in igen.":"An unexpected error occurred after grading. Check whether the result was saved before submitting again.";
       setStatus(msg,"bad");showToast(msg,"bad");showDebug(String(err&&err.message||err));

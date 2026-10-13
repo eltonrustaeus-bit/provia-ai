@@ -1406,9 +1406,7 @@
         answered: answered,
         remaining: qs.length - answered,
         elapsed: (UI.time && UI.time.textContent) || "",
-        /* Signalen servern räknar hjälptaket ur. Så länge den här funktionen
-           kör står eleven i ett pågående prov, och då når hjälpen högst
-           "visa metoden" — aldrig facit. Se stepResult() för motsatsen. */
+        /* Visningsfas för P.E.R. Servern litar inte på den som rättningsbevis. */
         phase: "exam"
       }
     });
@@ -1705,7 +1703,7 @@
       }
       // Rättningen är i hamn: utkastet får försvinna först nu.
       lsDel(draftKey());
-      stopMachine().then(function () { stepResult(r.result, r.persistence); });
+      stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof); });
     }).catch(function (e) {
       /* Utan den här grenen blir ett oväntat avslag från motorn en mörk skärm
          med låst scroll, utan knappar, som bara går att lämna med omladdning —
@@ -1797,17 +1795,11 @@
 
   // ── Resultat ─────────────────────────────────────────────────────────────
 
-  function stepResult(r, persistence) {
+  function stepResult(r, persistence, examProof) {
     var b = mount("result");
 
-    /* closeExam() har redan nollställt manifestet — frågan som stod på skärmen
-       hör inte hit. Men "inget manifest" säger bara att P.E.R inte vet var
-       eleven är, och servern tolkar okänt läge strängt: taket fastnar på
-       "visa metoden" trots att provet är inlämnat och rättat.
-
-       Här är det inlämnat. Ingen focus, inga targets — de gällde frågorna —
-       men phase sägs rakt ut, så att hjälpen öppnas för att den ska öppnas och
-       inte för att servern råkar sakna en fråga att hålla igen på. */
+    /* Resultatsidan har ingen aktiv provfråga. En separat signerad proof från
+       rättningen krävs när eleven ber om en fullständig frågeförklaring. */
     if (window.PER && window.PER.describe) {
       window.PER.describe({ page: "resultat", state: { phase: "result" } });
     }
@@ -1951,6 +1943,31 @@
         mo.appendChild(el("em", null, "Fullpoängssvar"));
         mo.appendChild(el("span", null, item.model_answer));
         it.appendChild(mo);
+      }
+
+      if (examProof && q.grade_task && window.PER && window.PER.send) {
+        var review = el("button", "xf-btn quiet xf-review-action", "✦ Be P.E.R förklara");
+        review.type = "button";
+        review.addEventListener("click", function () {
+          window.PER.describe({
+            page: "resultat",
+            focus: { kind: "question", number: n + 1, text: q.question, options: q.options || [] },
+            state: { phase: "result" }
+          });
+          var bubble = document.getElementById("perBubble");
+          if (bubble && !bubble.classList.contains("per-open")) bubble.click();
+          window.PER.send("Förklara fråga " + (n + 1) + " steg för steg", {
+            helpLevel: 3,
+            examProof: {
+              receipt: examProof,
+              course: S.course,
+              material: S.material.slice(0, 3000),
+              questions: qs,
+              selectedQuestionId: String(item.id)
+            }
+          });
+        });
+        it.appendChild(review);
       }
 
       /* Rättningsvyn bär tre texter som kan innehålla matematik: frågan,

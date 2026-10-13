@@ -13,7 +13,8 @@ const PILOT_EXPLAIN_MODES = new Set(["feynman", "quiz"]);
 
 function isPilotExplainRequestAllowed(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
-  if (body.landingMode === true || body.legalMode === true || body.tipsMode === true || Array.isArray(body.scores)) return false;
+  if (body.landingMode === true || body.legalMode === true || body.tipsMode === true || Array.isArray(body.scores) ||
+      body.question != null || body.correct != null) return false;
   return body.mode == null || PILOT_EXPLAIN_MODES.has(body.mode);
 }
 

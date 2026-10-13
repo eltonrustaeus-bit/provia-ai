@@ -2,11 +2,8 @@
  *
  * Varför filen finns.
  *
- * Spärren som håller tillbaka facit under prov var trasig i produktion, och
- * 137 gröna kontroller missade det. `phase` stod inte i examState-whitelisten i
- * api/_per-context.js och föll bort på vägen in — före helpCapFor() någonsin
- * såg den. Följden: taket 1 ("prov pågår, inget försök") var oåtkomligt, och
- * ## STUDIETEKNIK kunde aldrig byggas efter ett rättat prov.
+ * Klientens phase överlever saneringen, men får inte ensam öppna facit.
+ * En rättad fråga kräver ett separat signerat bevis från rättningsservern.
  *
  * Varje test låg på fel sida om gränsen:
  *
@@ -38,9 +35,9 @@ const ok = (namn, villkor, detalj = "") => {
 };
 
 /* Hela vägen: rå klientkropp in, tak ut. */
-const tak = råPageContext => {
+const tak = (råPageContext, options) => {
   const { pageContext } = buildPERContextPack({ rawPageContext: råPageContext });
-  return { tak: helpCapFor(pageContext), pageContext };
+  return { tak: helpCapFor(pageContext, options), pageContext };
 };
 
 /* Kropparna nedan är formade som js/exam-flow.js:publish() och shared.js
@@ -60,38 +57,35 @@ const tak = råPageContext => {
   ok("G1 prov pågår utan försök ger tak 1", r.tak === 1, `tak ${r.tak}, phase ${JSON.stringify(r.pageContext?.examState?.phase)}`);
 }
 
-// ── G2: prov pågår, eleven har skrivit något → 2. ─────────────────────────
+// ── G2: ett påbörjat svar ger fortfarande inte rätt till lösningen. ────────
 {
   const r = tak({
     page: "prov",
     currentQuestion: { text: "Vad är derivatan av x²?", number: 3, answered: true },
     examState: { answered: 3, remaining: 9, elapsed: "05:01", phase: "exam" },
   });
-  ok("G2 prov pågår med försök ger tak 2", r.tak === 2, `tak ${r.tak}`);
+  ok("G2 prov pågår med försök ger tak 1", r.tak === 1, `tak ${r.tak}`);
 }
 
-// ── G3: resultatskärmen → 3, OCH av rätt skäl. ────────────────────────────
+// ── G3: klienten kan inte själv hävda att provet är rättat. ───────────────
 //        closeExam() nollställer manifestet, så skärmen skickar bara phase.
-//        Rad 167 krävde tidigare answered/remaining/elapsed för att behålla
-//        examState — hela objektet slängdes alltså, och 3 kom ur att en fråga
-//        saknades i stället för att provet var inlämnat.
+//        Fasfältet överlever saneringen, men är fortfarande klientdata.
 {
   const r = tak({ page: "resultat", examState: { phase: "result" } });
-  ok("G3 resultatskärmen ger tak 3", r.tak === 3, `tak ${r.tak}`);
+  ok("G3 påstådd resultatskärm utan bevis ger tak 1", r.tak === 1, `tak ${r.tak}`);
   ok("G3 och phase överlever saneringen", r.pageContext?.examState?.phase === "result",
     JSON.stringify(r.pageContext?.examState));
 }
 
-// ── G4: inlämnat prov SOM BÄR EN FRÅGA. Det är läget etapp 4:s ────────────
-//        felgenomgång pekar mot ("förklara fråga 4 som du fick fel på"), och
-//        det är där skillnaden mellan "ingen fråga" och "inlämnat" blir verklig.
+// ── G4: påstått inlämnat prov SOM BÄR EN FRÅGA. ───────────────────────────
+//        Även med en fråga i fokus måste klientpåståendet förbli otillräckligt.
 {
   const r = tak({
     page: "resultat",
     currentQuestion: { text: "Vad är derivatan av x²?", number: 4 },
     examState: { phase: "result" },
   });
-  ok("G4 inlämnat prov med en fråga i fokus ger tak 3", r.tak === 3, `tak ${r.tak}`);
+  ok("G4 påstått inlämnat prov med fråga ger tak 1", r.tak === 1, `tak ${r.tak}`);
 }
 
 // ── G5: saneringen släpper bara de två tillåtna värdena. ──────────────────
@@ -109,7 +103,7 @@ const tak = råPageContext => {
       currentQuestion: { text: "q", answered: true },
       examState: { phase },
     });
-    ok(`G5 phase "${namn}" faller till säkert tak`, r.tak === 2 && r.pageContext?.examState?.phase === undefined,
+    ok(`G5 phase "${namn}" faller till säkert tak`, r.tak === 1 && r.pageContext?.examState?.phase === undefined,
       `tak ${r.tak}, phase ${JSON.stringify(r.pageContext?.examState?.phase)}`);
   }
 }
@@ -134,6 +128,11 @@ const tak = råPageContext => {
   ok("G7 fri fråga ger fullt tak", r.tak === 3, `tak ${r.tak}`);
   ok("G7 och inget examState uppfinns", r.pageContext?.examState === undefined,
     JSON.stringify(r.pageContext?.examState));
+}
+
+{
+  const r = tak({ page: "förbättring" }, { pilotMode: true });
+  ok("G8 pilot utan provkontext ger inte direktfacit", r.tak === 1, `tak ${r.tak}`);
 }
 
 console.log(`\nper-context-cap: ${pass} ok, ${fail.length} fail`);

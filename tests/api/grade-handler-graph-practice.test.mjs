@@ -99,6 +99,7 @@ try {
   assert.equal(response.status, 200);
   assert.equal(response.body.ok, true);
   assert.equal(response.body.practice, true);
+  assert.equal(response.body.exam_proof, undefined, "a graph retry cannot mint a completion proof");
   assert.equal(response.body.result.correct, true);
   assert.equal(response.body.result.points, 2);
   assert.equal(response.body.result.model_answer, "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).");
@@ -128,6 +129,14 @@ try {
     answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
   });
   assert.equal(validWrongGraph.status, 200, "a complete but incorrect graph is still a valid scored attempt");
+  assert.ok(validWrongGraph.body.exam_proof, "official grading mints a completion proof");
+  assert.equal(require("../../api/_exam-completion.cjs").verifyCompletion({
+    receipt: validWrongGraph.body.exam_proof,
+    course,
+    material,
+    questions: [publicQuestion],
+    selectedQuestionId: question.id,
+  }, userId)?.question?.id, question.id, "the proof opens only for the graded signed question");
   assert.equal(validWrongGraph.body.result.per_question[0].points, 1,
     "the valid horizontal line gets credit for its correct y-intercept only");
 
@@ -215,6 +224,7 @@ try {
   assert.equal(replay.status, 200);
   assert.equal(replay.body.persistence.mock_result_saved, false,
     "a failed idempotent persistence response is reported instead of being treated as saved");
+  assert.equal(replay.body.exam_proof, null, "failed persistence cannot mint a post-exam proof");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
     "a failed result write cannot create mastery without a persisted result");
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false,
@@ -235,6 +245,7 @@ try {
   });
   assert.equal(recoveredReplay.body.persistence.mock_result_saved, true,
     "a later successful idempotent write is acknowledged");
+  assert.ok(recoveredReplay.body.exam_proof, "confirmed persistence restores post-exam review");
   assert.ok(calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) >
     calls.findIndex((call) => call.url.startsWith(`${origin}/rest/v1/mock_results?`)),
   "a recovered result write enables mastery only after persistence succeeds");

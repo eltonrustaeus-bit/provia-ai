@@ -594,6 +594,10 @@ export const PER_GRAPH = {
     },
     {
       "från": "explain",
+      "till": "tabell:mock_results"
+    },
+    {
+      "från": "explain",
       "till": "tabell:feature_flags"
     },
     {

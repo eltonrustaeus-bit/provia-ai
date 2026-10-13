@@ -13,6 +13,7 @@
 const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
+const examCompletion = require("./_exam-completion.cjs");
 const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 
 function json(res, status, obj) {
@@ -211,24 +212,6 @@ async function perFlags() {
    recordAttempt() i learner-model.mjs vill ha en klient, så här är en, skapad
    EN gång och återanvänd. Dynamisk import av samma skäl som ovan: filen
    kompileras till CJS. */
-/* INLÄMNINGENS ID.
- *
- * Rättningsanropet bär inget prov-id — det får frågor och svar, inget mer.
- * Idempotensnyckeln byggs därför av inlämningen själv: samma elev, samma kurs,
- * samma signerade uppgifter ger samma id oavsett svaren.
- *
- * Samma signerade provuppsättning räknas bara en gång, även om ett API-replay
- * skickar ändrade svar. En nygenerering har nya signerade uppgifter och räknas
- * som ett nytt övningstillfälle.
- */
-async function submissionId(userId, course, submittedQuestions) {
-  try {
-    const { createHash } = await import("node:crypto");
-    const frö = [userId, course || "", ...submittedQuestions.map(q => String(q?.grade_task || "")).sort()].join("|");
-    return createHash("sha256").update(frö).digest("hex").slice(0, 32);
-  } catch { return null; }
-}
-
 function withAttemptAnswers(per, answerMap) {
   return per.map((item) => ({
     ...item,
@@ -658,12 +641,13 @@ module.exports = async function handler(req, res) {
       // Output in original question order
       const per = questions.map((q) => perById.get(String(q.id ?? ""))).filter(Boolean);
       const attemptRows = withAttemptAnswers(per, answerMap);
-      const attemptId = await submissionId(user.id, course, submittedQuestions);
+      const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const mockResultSaved = await persistGradedSubmission({
         userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
       });
       return json(res, 200, {
         ok: true,
+        exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
         persistence: { mock_result_saved: mockResultSaved },
         result: { total_points: total, max_points: maxTotal, per_question: per }
       });
@@ -868,13 +852,14 @@ module.exports = async function handler(req, res) {
         .map((q) => perById.get(String(q.id ?? "")) || null)
         .filter(Boolean);
       const attemptRows = withAttemptAnswers(per, answerMap);
-      const attemptId = await submissionId(user.id, course, submittedQuestions);
+      const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
       const mockResultSaved = await persistGradedSubmission({
         userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
       });
       return json(res, 200, {
         ok: true,
+        exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
         persistence: { mock_result_saved: mockResultSaved },
         result: {
           total_points: total,

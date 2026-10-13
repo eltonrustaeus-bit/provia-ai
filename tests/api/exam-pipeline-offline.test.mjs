@@ -164,6 +164,13 @@ try {
   });
   assert.equal(graded.status, 200, JSON.stringify(graded.body));
   assert.equal(graded.body.ok, true);
+  assert.equal(require("../../api/_exam-completion.cjs").verifyCompletion({
+    receipt: graded.body.exam_proof,
+    course,
+    material: pastedText,
+    questions: generated.body.exam.questions,
+    selectedQuestionId: "q-2",
+  }, userId)?.question?.id, "q-2", "the official generated and graded set permits review of its signed question");
   assert.deepEqual(graded.body.result, {
     total_points: 2,
     max_points: 3,

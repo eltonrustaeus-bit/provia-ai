@@ -17,7 +17,8 @@ const EXAM = {
     question: "Fråga nummer " + (n + 1) + " om cellandning",
     options: ["Alfa", "Beta", "Gamma", "Delta"], correct_index: 1,
     topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
-    model_answer: "Beta", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
+    model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
+    scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
   }))
 };
 
@@ -205,7 +206,7 @@ ok("T8b sidan svarar fortfarande", await page.evaluate(() => typeof window.PER?.
 // manifestet. Eleven som lämnade in ett prov och stod på resultatskärmen och
 // frågade "varför fick jag så lågt?" fick svar om provets sista fråga i
 // stället för om resultatet, eftersom __perManifest fortfarande pekade dit.
-await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, result: {
+await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: "synthetic-completion-proof", result: {
   total_points: 4, max_points: 6,
   per_question: [
     { id: "q1", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" },
@@ -244,6 +245,14 @@ const t9state = afterSubmit.examState || {};
 ok("T9c examState bär phase result på resultatskärmen", t9state.phase === "result", JSON.stringify(afterSubmit.examState));
 ok("T9c2 inga kvarlämnade provsiffror i examState", Object.keys(t9state).join(",") === "phase", JSON.stringify(afterSubmit.examState));
 ok("T9d targets är borta på resultatskärmen", !afterSubmit.targets, JSON.stringify(afterSubmit.targets));
+
+lastExplain = null;
+await page.click("#xf .xf-screen[data-screen='result'] .xf-item button:has-text('Be P.E.R förklara') >> nth=1");
+await page.waitForTimeout(350);
+ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
+   lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
+   lastExplain?.examProof?.questions?.length === 3 && lastExplain?.examProof?.receipt === "synthetic-completion-proof",
+   JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid

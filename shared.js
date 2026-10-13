@@ -254,12 +254,8 @@
       if (typeof m.state.answered === 'number') st.answered = m.state.answered;
       if (typeof m.state.remaining === 'number') st.remaining = m.state.remaining;
       if (typeof m.state.elapsed === 'string') st.elapsed = m.state.elapsed.slice(0, 12);
-      /* phase avgör hur mycket hjälp servern släpper fram (api/explain.js
-         helpCapFor): "exam" håller taket nere, "result" öppnar det helt.
-         Därför godtas bara de två värdena — en okänd sträng faller igenom som
-         "saknas", och saknad phase tolkas serversidigt som prov pågår, alltså
-         det strängaste. Ett fält som styr en spärr får inte kunna bära ett
-         värde ingen har en gren för. */
+      /* Fasen hjälper P.E.R att beskriva sidan. Den öppnar aldrig facit utan
+         rättningsbevis från servern. */
       if (m.state.phase === 'exam' || m.state.phase === 'result') st.phase = m.state.phase;
     }
     _perManifest = {
@@ -1213,6 +1209,10 @@ function finalizeMsg(div, text) {
         } catch (_) {}
 
         var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply };
+        if (opts && opts.examProof) {
+          fetchBodyObj.examReview = true;
+          fetchBodyObj.examProof = opts.examProof;
+        }
         var fetchHdrs = { 'Content-Type': 'application/json' };
         if (isLandingMode) {
           fetchBodyObj.landingMode = true;

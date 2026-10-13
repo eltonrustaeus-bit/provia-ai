@@ -47,6 +47,7 @@ test("pilot P.E.R allows only authenticated teaching requests and supported stud
     { userQuestion: "Hur löser jag ekvationen?", topic: "Matematik" },
     { userQuestion: "Förklara", mode: "feynman" },
     { userQuestion: "Testa mig", mode: "quiz" },
+    { examReview: true, examProof: {} },
     { history: [{ role: "user", content: "Hjälp" }] },
   ]) assert.equal(isPilotExplainRequestAllowed(body), true);
 
@@ -56,6 +57,7 @@ test("pilot P.E.R allows only authenticated teaching requests and supported stud
     { landingMode: true },
     { legalMode: true, userQuestion: "Fråga" },
     { tipsMode: true, question: "Fråga" },
+    { question: "Pågående provfråga", correct: "Facit" },
     { scores: [0.7, 0.8, 0.9] },
     { mode: "unsupported" },
   ]) assert.equal(isPilotExplainRequestAllowed(body), false);
@@ -89,6 +91,7 @@ test("pilot P.E.R rejects non-pilot modes before Supabase or provider requests",
     { landingMode: true, userQuestion: "Hello" },
     { legalMode: true, userQuestion: "Test" },
     { tipsMode: true, question: "Test" },
+    { question: "Pågående provfråga", correct: "Facit" },
     { scores: [0.7, 0.8, 0.9] },
     { mode: "unsupported", userQuestion: "Test" },
   ]) {
