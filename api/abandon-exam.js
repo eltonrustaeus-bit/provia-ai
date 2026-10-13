@@ -11,6 +11,16 @@ export default async function handler(req, res) {
 
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "GET") {
+    const submissionId = String(req.query?.submission_id || "");
+    if (submissionId) {
+      if (!/^[a-f0-9]{32}$/.test(submissionId)) {
+        return res.status(400).json({ ok: false, error: "EXAM_ID_INVALID" });
+      }
+      const state = await examIssuance.examState(user.id, submissionId);
+      return state === null
+        ? res.status(503).json({ ok: false, error: "EXAM_STATE_UNAVAILABLE" })
+        : res.json({ ok: true, exam_state: state });
+    }
     const count = await examIssuance.activeExamCount(user.id);
     return count === null
       ? res.status(503).json({ ok: false, error: "EXAM_STATE_UNAVAILABLE" })

@@ -11,7 +11,7 @@ const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
-  title: "Prov", level: "C", exam_manifest: "synthetic-biology-manifest",
+  title: "Prov", level: "C", exam_manifest: `v2.${"a".repeat(32)}.synthetic`,
   questions: Array.from({ length: 3 }, (_, n) => ({
     id: "q" + (n + 1), type: n === 2 ? "graph" : "mc", points: n === 2 ? 3 : 2,
     question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen" : "Fråga nummer " + (n + 1) + " om cellandning",
@@ -65,6 +65,7 @@ ok("T1b targets finns för alla frågor", t1.targets?.length === 3 && t1.targets
 // Saknas den tolkas provet som pågående med taket 2 — vilket ser rimligt ut och
 // därför aldrig märks. Den måste finnas, och den måste vara "exam" här.
 ok("T1c phase är exam under provet", t1.examState?.phase === "exam", JSON.stringify(t1.examState));
+ok("T1c1 aktivt provs id finns i det serverbundna sammanhanget", t1.examState?.submissionId === "a".repeat(32), JSON.stringify(t1.examState));
 ok("T1d answered är falskt innan eleven rört frågan", t1.currentQuestion?.answered === false,
    String(t1.currentQuestion?.answered));
 
@@ -104,6 +105,8 @@ ok("T4e provstatus i kroppen", typeof lastExplain?.pageContext?.examState?.answe
 // och SLÄNGER okända nycklar — glöms whitelisten försvinner phase tyst här,
 // och bara här.
 ok("T4f phase följer med ut på nätverket", lastExplain?.pageContext?.examState?.phase === "exam",
+   JSON.stringify(lastExplain?.pageContext?.examState));
+ok("T4g provets submission-id följer med till servern", lastExplain?.pageContext?.examState?.submissionId === "a".repeat(32),
    JSON.stringify(lastExplain?.pageContext?.examState));
 
 // ── T5: påhittat id ritar ingen knapp ─────────────────────────────────────

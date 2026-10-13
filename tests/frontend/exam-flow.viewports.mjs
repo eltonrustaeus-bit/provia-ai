@@ -47,7 +47,7 @@ function mkExam(n, long) {
           source_references: ["Avsnittet om anaerob nedbrytning"], model_answer: "Vid syrebrist…",
           scoring_rubric: { parts: [{ description: "Orsak", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } });
   }
-  return { title: "Prov", level: "C", exam_manifest: "synthetic-viewport-manifest", questions: qs };
+  return { title: "Prov", level: "C", exam_manifest: `v2.${"b".repeat(32)}.synthetic`, questions: qs };
 }
 
 function mkResult(exam, long) {

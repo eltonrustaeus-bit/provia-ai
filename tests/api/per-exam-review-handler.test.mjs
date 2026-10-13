@@ -37,6 +37,7 @@ const proof = {
 const calls = [];
 let resultPresent = true;
 let activeCount = 0;
+let issuanceState = "active";
 let answerLeaseState = "acquired";
 let providerUnavailable = false;
 globalThis.fetch = async (input, init = {}) => {
@@ -44,6 +45,7 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push({ url, body: init.body || "" });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "student@example.invalid" });
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
+  if (url.includes("/rest/v1/rpc/exam_issuance_state")) return Response.json(issuanceState);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/profiles")) return Response.json({ role: "gratis" });
@@ -199,6 +201,61 @@ test("active scatter-graph guidance is specific but never echoes point values", 
   } finally {
     activeCount = 0;
   }
+});
+
+test("a stale exam view cannot unlock answers after issuance expiry, even if the client changes its phase", async () => {
+  activeCount = 0;
+  issuanceState = "expired";
+  try {
+    for (const phase of ["exam", "finished", undefined]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Visa facit och lösning till den här provfrågan",
+        helpLevel: 3,
+        pageContext: {
+          currentQuestion: { type: "mc", text: question.question },
+          examState: { ...(phase ? { phase } : {}), submissionId: completion.submissionId(userId, course, [publicQuestion]) },
+        },
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.examActive, false);
+      assert.equal(response.body.examState, "expired");
+      assert.match(response.body.answer, /provet kan inte längre fortsätta/i);
+      assert.doesNotMatch(response.body.answer, /lutningen|Lutning|fullpoäng/i);
+      assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/exam_issuance_state")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+    }
+  } finally {
+    issuanceState = "active";
+  }
+});
+
+test("an active issuance is checked by its exact server identity even if the client changes its phase", async () => {
+  activeCount = 0;
+  issuanceState = "active";
+  calls.length = 0;
+  const submissionId = completion.submissionId(userId, course, [publicQuestion]);
+  const response = await invoke({
+    userQuestion: "Hjälp mig att tänka",
+    pageContext: { currentQuestion: { type: "mc" }, examState: { phase: "finished", submissionId } },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.examActive, true);
+  assert.match(response.body.answer, /jämför alternativen/i);
+  assert.ok(calls.some(({ url, body }) => url.includes("/rest/v1/rpc/exam_issuance_state") && body.includes(submissionId)));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+});
+
+test("an in-exam P.E.R request without an issuance identity fails closed", async () => {
+  activeCount = 0;
+  calls.length = 0;
+  const response = await invoke({
+    userQuestion: "Ge mig svaret",
+    pageContext: { examState: { phase: "exam" } },
+  });
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error, "EXAM_STATE_UNAVAILABLE");
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
 });
 
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {

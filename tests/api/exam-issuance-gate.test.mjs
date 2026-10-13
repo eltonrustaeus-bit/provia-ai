@@ -58,14 +58,14 @@ globalThis.fetch = async (input, init = {}) => {
 
 const abandonHandler = (await import("../../api/abandon-exam.js?exam-issuance-gate-test")).default;
 
-async function invokeAbandon(payload, method = "POST") {
+async function invokeAbandon(payload, method = "POST", query = {}) {
   const response = {
     statusCode: 200,
     status(code) { this.statusCode = code; return this; },
     json(value) { this.body = value; return this; },
     setHeader() {},
   };
-  await abandonHandler({ method, headers: { authorization: "Bearer synthetic" }, body: payload }, response);
+  await abandonHandler({ method, headers: { authorization: "Bearer synthetic" }, body: payload, query }, response);
   return response;
 }
 
@@ -113,6 +113,15 @@ test("fresh-browser recovery counts and abandons undelivered active exams", asyn
   try {
     const found = await invokeAbandon(undefined, "GET");
     assert.deepEqual(found.body, { ok: true, active_count: 2 });
+    const exact = await invokeAbandon(undefined, "GET", { submission_id: submissionId });
+    assert.deepEqual(exact.body, { ok: true, exam_state: "active" });
+    state = "expired";
+    const expired = await invokeAbandon(undefined, "GET", { submission_id: submissionId });
+    assert.deepEqual(expired.body, { ok: true, exam_state: "expired" });
+    state = "active";
+    const malformed = await invokeAbandon(undefined, "GET", { submission_id: "not-an-id" });
+    assert.equal(malformed.statusCode, 400);
+    assert.equal(malformed.body.error, "EXAM_ID_INVALID");
     const cleared = await invokeAbandon({ abandon_all: true });
     assert.deepEqual(cleared.body, { ok: true, abandoned_count: 2 });
   } finally {

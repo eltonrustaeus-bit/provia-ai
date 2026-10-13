@@ -30,7 +30,7 @@ fs.mkdirSync(SHOT, { recursive: true });
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
-  title: "Prov", level: "C", exam_manifest: "synthetic-resume-manifest",
+  title: "Prov", level: "C", exam_manifest: `v2.${"f".repeat(32)}.syntheticRegressionProof`,
   questions: [
     { id: "dup", type: "mc", points: 2, question: "Fråga A — var sker citronsyracykeln?", options: ["Cytoplasman", "Matrix", "Kärnan", "Ribosomen"], correct_index: 1, topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.4"], model_answer: "Matrix", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "dup", type: "short", points: 4, question: "Fråga B — förklara jäsning.", options: [], correct_index: -1, topic: "Jäsning", cognitive_level: "tillämpa", source_references: ["s.7"], model_answer: "Vid syrebrist…", scoring_rubric: { parts: [{ description: "Orsak", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } },
@@ -41,6 +41,7 @@ const EXAM = {
 let lastGradePayload = null;
 let lastAbandonPayload = null;
 let activeExamCountResponse = 0;
+let examIssuanceStateResponse = "active";
 const pass = [], fail = [];
 const ok = (n, c, d = "") => (c ? pass : fail).push(n + (d ? " — " + d : ""));
 
@@ -55,8 +56,14 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null) {
   // Baslagret från _harness.mjs; provgenereringen och rättningen ligger i
   // `extra` som registreras sist och därmed vinner.
   await mockApis(page, { extra: [
-    ["**/api/abandon-exam", r => {
-      if (r.request().method() === "GET") return r.fulfill({ json: { ok: true, active_count: activeExamCountResponse } });
+    ["**/api/abandon-exam*", r => {
+      if (r.request().method() === "GET") {
+        const url = new URL(r.request().url());
+        if (url.searchParams.has("submission_id")) {
+          return r.fulfill({ json: { ok: true, exam_state: examIssuanceStateResponse } });
+        }
+        return r.fulfill({ json: { ok: true, active_count: activeExamCountResponse } });
+      }
       const payload = JSON.parse(r.request().postData() || "{}");
       lastAbandonPayload = payload;
       return r.fulfill({ json: payload.abandon_all === true
@@ -101,6 +108,36 @@ async function toExam(page) {
   await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
   await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
   await page.waitForTimeout(300);
+}
+
+// ── T1f: a fresh local save cannot revive an expired server issuance ──────
+{
+  examIssuanceStateResponse = "expired";
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "stale-resume");
+    await toExam(page);
+    const oldStart = Date.now() - 8 * 24 * 60 * 60 * 1000;
+    await page.evaluate((startedAt) => {
+      const key = Object.keys(localStorage).find((name) => name.startsWith("exgen_flow_draft_"));
+      const draft = JSON.parse(localStorage.getItem(key));
+      draft.startedAt = startedAt;
+      draft.ts = Date.now();
+      localStorage.setItem(key, JSON.stringify(draft));
+    }, oldStart);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
+    await page.getByText(/har avslutats eller gått ut/).waitFor({ timeout: 5000 });
+    ok("T1f utgånget prov öppnas inte trots ett färskt utkast", !(await page.locator(".xf-exam.on").isVisible()));
+    ok("T1f gammalt provutkast tas bort", await page.evaluate(() => !Object.keys(localStorage).some((name) => name.startsWith("exgen_flow_draft_"))));
+    await page.getByRole("button", { name: "Skapa nytt prov av materialet" }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+    ok("T1f elevens material följer med till ett nytt prov", (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Cellandning sker i mitokondrien"));
+  } finally {
+    examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
 }
 
 // Ett självtest får lämnas in blankt, men frånvaro av försök är inte bevis

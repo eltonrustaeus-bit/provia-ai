@@ -371,7 +371,20 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId 
   } catch { return null; }
 }
 
-function sendActiveExamGuidance(req, res, body) {
+function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
+  if (issuanceState !== "active") {
+    const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+    res.setHeader("Cache-Control", "no-store");
+    const grading = issuanceState === "grading";
+    return res.json({
+      answer: grading
+        ? (en ? "Your exam is being graded. The review will be available when grading is complete." : "Provet håller på att rättas. Genomgången blir tillgänglig när rättningen är klar.")
+        : (en
+          ? "This exam can no longer be continued. Keep your study material and create a new exam before asking for its answers."
+          : "Det här provet kan inte längre fortsätta. Materialet finns kvar; skapa ett nytt prov innan du ber om facit."),
+      helpCap: 0, helpLevelUsed: 0, examActive: false, examState: issuanceState,
+    });
+  }
   if (body.examReview === true) {
     const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
     res.setHeader("Cache-Control", "no-store");
@@ -405,6 +418,22 @@ function sendActiveExamGuidance(req, res, body) {
 }
 
 async function gateActiveExam(req, res, body, user) {
+  const examState = body.pageContext?.examState;
+  const submissionId = String(examState?.submissionId || "");
+  const hasSubmissionId = /^[a-f0-9]{32}$/.test(submissionId);
+  if (hasSubmissionId) {
+    const state = await examIssuance.examState(user.id, submissionId);
+    if (state === null) {
+      res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+      return true;
+    }
+    sendActiveExamGuidance(req, res, body, state);
+    return true;
+  }
+  if (examState?.phase === "exam") {
+    res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    return true;
+  }
   const activeCount = await examIssuance.activeExamCount(user.id);
   if (activeCount === null) {
     res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });

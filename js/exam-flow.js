@@ -643,14 +643,43 @@
       }
       var back = el("button", "xf-btn ghost", legacyDraft ? "Skapa nytt prov av materialet" : "Fortsätt provet du började");
       back.type = "button";
-      back.addEventListener("click", function () {
+      var resumeStatus = el("p", "xf-sub");
+      resumeStatus.hidden = true;
+      resumeStatus.setAttribute("role", "status");
+      if (!legacyDraft) act.appendChild(resumeStatus);
+      back.addEventListener("click", async function () {
+        if (!legacyDraft && back.dataset.expired !== "true") {
+          back.disabled = true;
+          resumeStatus.hidden = false;
+          resumeStatus.textContent = "Kontrollerar att provet fortfarande är aktivt…";
+          var issuanceState = await window.ExGenEngine.examState(draft.exam.exam_manifest);
+          if (issuanceState !== "active") {
+            back.disabled = false;
+            if (issuanceState === null) {
+              resumeStatus.textContent = "Provet kunde inte verifieras just nu. Kontrollera anslutningen och försök igen.";
+              return;
+            }
+            if (issuanceState === "grading") {
+              resumeStatus.textContent = "Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.";
+              return;
+            }
+            clearDraft();
+            S.material = draft.material || "";
+            back.textContent = "Skapa nytt prov av materialet";
+            resumeStatus.textContent = issuanceState === "completed"
+              ? "Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt."
+              : "Det tidigare provet har avslutats eller gått ut. Materialet finns kvar; skapa ett nytt prov för att fortsätta.";
+            back.dataset.expired = "true";
+            return;
+          }
+        }
         S.course = draft.course || "";
         S.level = draft.level || "C";
         S.qType = draft.qType || "mix";
         S.num = draft.num || 12;
         S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 3, 20);
         S.material = draft.material || "";
-        if (legacyDraft) { stepMaterial(); return; }
+        if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
         S.answers = questionState(draft.answers);
         S.helped = questionState(draft.helped);
@@ -1484,6 +1513,7 @@
         answered: answered,
         remaining: qs.length - answered,
         elapsed: (UI.time && UI.time.textContent) || "",
+        submissionId: (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
         /* Visningsfas för P.E.R. Servern litar inte på den som rättningsbevis. */
         phase: "exam"
       }

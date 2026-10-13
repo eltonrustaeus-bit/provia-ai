@@ -9,9 +9,15 @@ let gradeBody = null;
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mockApis(page, { profiles: { id: "partial-graph-student", approved: true, role: "premium" }, extra: [
+    ["**/api/abandon-exam*", (route) => {
+      const url = new URL(route.request().url());
+      return route.fulfill({ json: url.searchParams.has("submission_id")
+        ? { ok: true, exam_state: "active" }
+        : { ok: true, active_count: 0 } });
+    }],
     ["**/api/generate-exam", (route) => route.fulfill({ json: {
       ok: true,
-      exam: { title: "Grafprov", level: "C", exam_manifest: "synthetic-partial-graph", questions: [{
+      exam: { title: "Grafprov", level: "C", exam_manifest: `v2.${"c".repeat(32)}.syntheticPartialGraph`, questions: [{
         id: "graph-1", type: "graph", points: 2, topic: "Linjar funktion",
         question: "Rita grafen till y = x. Markera tva punkter.",
         grade_task: "opaque-synthetic-task", options: [],

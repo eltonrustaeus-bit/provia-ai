@@ -199,7 +199,7 @@
      Fyra tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
      försvinna. Instansen var focus; klassen är tyst nyckelkassering. */
   var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state'];
-  var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase'];
+  var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase', 'submissionId'];
   var _perManifest = null;
 
   /* Hjälpstegen. Nivån är ett ÖNSKEMÅL som skickas med varje anrop; servern
@@ -255,6 +255,9 @@
       if (typeof m.state.answered === 'number') st.answered = m.state.answered;
       if (typeof m.state.remaining === 'number') st.remaining = m.state.remaining;
       if (typeof m.state.elapsed === 'string') st.elapsed = m.state.elapsed.slice(0, 12);
+      if (typeof m.state.submissionId === 'string' && /^[a-f0-9]{32}$/.test(m.state.submissionId)) {
+        st.submissionId = m.state.submissionId;
+      }
       /* Fasen hjälper P.E.R att beskriva sidan. Den öppnar aldrig facit utan
          rättningsbevis från servern. */
       if (m.state.phase === 'exam' || m.state.phase === 'result') st.phase = m.state.phase;
