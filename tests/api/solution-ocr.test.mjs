@@ -58,8 +58,14 @@ function makeRes() {
 /* modelOut: vad den påhittade modellen svarar. role: elevens roll.
    Returnerar även den systemprompt som faktiskt skickades, så tester kan
    granska vad modellen fick se. */
-function stubFetch({ modelOut, role = "premium", openAiStatus = 200 }) {
-  const seen = { system: null, payload: null, profileHeaders: null };
+function stubFetch({
+  modelOut,
+  role = "premium",
+  openAiStatus = 200,
+  providerUsage = { input_tokens: 41, output_tokens: 9, input_tokens_details: { cached_tokens: 3 } },
+  usageWriteStatus = 201,
+}) {
+  const seen = { system: null, payload: null, profileHeaders: null, usageEvents: [] };
   global.fetch = async (url, opts) => {
     const u = String(url);
     if (u.includes("/auth/v1/user")) {
@@ -72,10 +78,18 @@ function stubFetch({ modelOut, role = "premium", openAiStatus = 200 }) {
     if (u.includes("/rest/v1/rpc/consume_anon_rate")) {
       return { ok: true, json: async () => ({ ok: true }) };
     }
+    if (u.endsWith("/rest/v1/ai_usage_events")) {
+      seen.usageEvents.push(...JSON.parse(opts.body));
+      return { ok: usageWriteStatus >= 200 && usageWriteStatus < 300, status: usageWriteStatus, text: async () => "" };
+    }
     if (u.includes("openai.com")) {
       seen.payload = JSON.parse(opts.body);
       seen.system = seen.payload.input.find((m) => m.role === "system")?.content || "";
-      const out = { output: [{ content: [{ type: "output_text", text: JSON.stringify(modelOut) }] }] };
+      const out = {
+        model: "provider-model",
+        usage: providerUsage,
+        output: [{ content: [{ type: "output_text", text: JSON.stringify(modelOut) }] }],
+      };
       return { ok: openAiStatus === 200, status: openAiStatus, text: async () => JSON.stringify(out) };
     }
     throw new Error("oväntad fetch: " + u);
@@ -109,6 +123,12 @@ console.log("\n— MATERIALVÄGEN ÄR ORÖRD —");
     seen.profileHeaders?.Authorization === "Bearer svc" && seen.profileHeaders?.apikey === "svc",
     JSON.stringify(Object.keys(seen.profileHeaders || {})));
   check("T1 materialvägens prompt är oförändrad OCR-prompt", /Du är OCR/.test(seen.system), seen.system);
+  check("T1 material-OCR mäter provider usage utan materialinnehåll",
+    seen.usageEvents.length === 1 && seen.usageEvents[0].feature === "ocr" &&
+    seen.usageEvents[0].user_id === "u1" && seen.usageEvents[0].subscription_tier === "premium" &&
+    seen.usageEvents[0].input_tokens === 41 && seen.usageEvents[0].output_tokens === 9 &&
+    !JSON.stringify(seen.usageEvents).includes(PNG) && !JSON.stringify(seen.usageEvents).includes("Extract text."),
+    JSON.stringify(seen.usageEvents));
 }
 
 console.log("\n— KONTRAKTET —");
@@ -132,6 +152,22 @@ console.log("\n— KONTRAKTET —");
   );
   check("T7 gratisroll nekas", status === 403, `${status} ${JSON.stringify(data)}`);
 }
+{
+  const { status, data, seen } = await run(
+    { imageDataUrl: PNG, lang: "sv" },
+    { modelOut: { ignored: true }, providerUsage: null }
+  );
+  check("saknad OCR usage ger inget falskt noll-event men OCR lyckas",
+    status === 200 && typeof data?.text === "string" && seen.usageEvents.length === 0,
+    `${status} ${JSON.stringify(seen.usageEvents)}`);
+}
+{
+  const { status, data } = await run(
+    { imageDataUrl: PNG, lang: "sv" },
+    { modelOut: { ignored: true }, usageWriteStatus: 503 }
+  );
+  check("telemetrifel blockerar inte OCR-resultatet", status === 200 && typeof data?.text === "string", String(status));
+}
 
 console.log("\n— ELEVENS FEL BEVARAS —");
 {
@@ -143,6 +179,18 @@ console.log("\n— ELEVENS FEL BEVARAS —");
   );
   check("T3 elevens felaktiga steg finns kvar i svaret", /x = 8/.test(data?.text || ""), JSON.stringify(data?.text));
   check("T3 svaret rättas INTE till facit", !/x = 5/.test(data?.text || ""), JSON.stringify(data?.text));
+}
+{
+  const { seen } = await run(
+    { mode: "solution", imageDataUrl: PNG, lang: "sv", questionText: "Lös uppgiften" },
+    { modelOut: READABLE }
+  );
+  check("lösnings-OCR mäter usage men exkluderar bild och elevtext",
+    seen.usageEvents.length === 1 && seen.usageEvents[0].feature === "ocr" &&
+    seen.usageEvents[0].pipeline_step === "generate" &&
+    !JSON.stringify(seen.usageEvents).includes(PNG) &&
+    !JSON.stringify(seen.usageEvents).includes("Lös uppgiften"),
+    JSON.stringify(seen.usageEvents));
 }
 {
   const { seen } = await run(

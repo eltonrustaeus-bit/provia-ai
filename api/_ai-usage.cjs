@@ -1,14 +1,17 @@
 const { getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
 
+const MAX_DB_INTEGER = 2_147_483_647;
 const STEPS = new Set(["generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
-const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory"]);
+const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory", "ocr"]);
 const TIERS = new Set(["gratis", "basic", "premium", "admin", "teacher"]);
 
 function measuredTokens(usage) {
   const input = usage?.input_tokens ?? usage?.prompt_tokens;
   const output = usage?.output_tokens ?? usage?.completion_tokens;
   const cached = usage?.input_tokens_details?.cached_tokens ?? usage?.prompt_tokens_details?.cached_tokens ?? 0;
-  if (![input, output, cached].every(Number.isInteger) || input < 0 || output < 0 || cached < 0 || cached > input) return null;
+  if (![input, output, cached].every(Number.isInteger) ||
+      input < 0 || output < 0 || cached < 0 ||
+      input > MAX_DB_INTEGER || output > MAX_DB_INTEGER || cached > input) return null;
   return { input_tokens: input, cached_input_tokens: cached, output_tokens: output };
 }
 

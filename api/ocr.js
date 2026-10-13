@@ -2,6 +2,7 @@
 // Extract text from imageDataUrl using OpenAI (multimodal)
 const { getSupabaseServerKey, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const pilotScope = require("./_pilot-scope.cjs");
+const { logAiUsage } = require("./_ai-usage.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -47,7 +48,7 @@ async function requireAuth(req) {
  * med readable:false. Klienten skiljer på "jag kunde inte tyda bilden" och
  * "något gick sönder", och eleven ska aldrig se ett tekniskt fel för att de
  * fotade i dålig belysning. */
-async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey }) {
+async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey, userId, tier }) {
   const S = require("./_solution-ocr.js");
   const sanitize = await import("../src/per/sanitize.mjs");
 
@@ -75,6 +76,7 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey })
   };
 
   let data;
+  const startedAt = Date.now();
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -90,6 +92,11 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey })
   } catch (e) {
     return json(res, 500, { ok: false, error: "Server error" });
   }
+
+  await logAiUsage({
+    userId, tier, feature: "ocr", step: "generate",
+    model: data?.model || model, usage: data?.usage, latencyMs: Date.now() - startedAt,
+  }, { timeoutMs: 750 });
 
   const parsed = S.parseSolutionResponse(data);
   if (!parsed.readable) {
@@ -120,6 +127,7 @@ module.exports = async function handler(req, res) {
   if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
 
   // OCR requires Basic or higher
+  let role = "gratis";
   try {
     const profRes = await fetch(
       process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + user.id,
@@ -131,7 +139,7 @@ module.exports = async function handler(req, res) {
       }
     );
     const profData = await profRes.json();
-    const role = String(profData?.[0]?.role || "gratis");
+    role = String(profData?.[0]?.role || "gratis");
     if (!["basic", "premium", "admin", "user"].includes(role)) {
       return json(res, 403, { ok: false, error: "OCR requires Basic or Premium" });
     }
@@ -208,7 +216,7 @@ module.exports = async function handler(req, res) {
        Egen gren, eget kontrakt. Utan mode gäller materialvägen nedan exakt
        som förut — app.html skickar inget mode och påverkas därför inte. */
     if (p.mode === "solution") {
-      return handleSolution(res, { imageDataUrl, lang, questionText: p.questionText, apiKey });
+      return handleSolution(res, { imageDataUrl, lang, questionText: p.questionText, apiKey, userId: user.id, tier: role });
     }
 
     const model = pickModel();
@@ -218,6 +226,7 @@ module.exports = async function handler(req, res) {
         ? "Du är OCR. Extrahera all text exakt från bilden. Returnera bara ren text utan extra förklaringar."
         : "You are OCR. Extract all text exactly from the image. Return only plain text with no extra commentary.";
 
+    const startedAt = Date.now();
     try {
       const payload = {
         model,
@@ -246,6 +255,11 @@ module.exports = async function handler(req, res) {
         return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
       }
       if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status });
+
+      await logAiUsage({
+        userId: user.id, tier: role, feature: "ocr", step: "generate",
+        model: data?.model || model, usage: data?.usage, latencyMs: Date.now() - startedAt,
+      }, { timeoutMs: 750 });
 
       const text =
         (Array.isArray(data.output) &&

@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 let pricingCache;
+const MAX_DB_INTEGER = 2_147_483_647;
 function pricing() {
   if (pricingCache !== undefined) return pricingCache;
   try {
@@ -48,12 +49,14 @@ export function estimateCost({ model, inputTokens = 0, cachedInputTokens = 0, ou
 
 /** Normaliserar OpenAI:s usage-objekt (fältnamnen skiljer sig mellan API-ytor). */
 export function normalizeUsage(usage) {
-  if (!usage) return { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 };
-  return {
-    inputTokens: usage.input_tokens ?? usage.prompt_tokens ?? 0,
-    cachedInputTokens: usage.input_tokens_details?.cached_tokens ?? 0,
-    outputTokens: usage.output_tokens ?? usage.completion_tokens ?? 0,
-  };
+  if (!usage || typeof usage !== "object") return null;
+  const inputTokens = usage.input_tokens ?? usage.prompt_tokens;
+  const outputTokens = usage.output_tokens ?? usage.completion_tokens;
+  const cachedInputTokens = usage.input_tokens_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens ?? 0;
+  if (![inputTokens, outputTokens, cachedInputTokens].every(Number.isSafeInteger) ||
+      inputTokens > MAX_DB_INTEGER || outputTokens > MAX_DB_INTEGER || cachedInputTokens > MAX_DB_INTEGER) return null;
+  if (inputTokens < 0 || outputTokens < 0 || cachedInputTokens < 0 || cachedInputTokens > inputTokens) return null;
+  return { inputTokens, cachedInputTokens, outputTokens };
 }
 
 /**
@@ -68,7 +71,8 @@ export async function logUsage(supabase, {
   if (!supabase) return;
   try {
     const t = normalizeUsage(usage);
-    await supabase.from("ai_usage_events").insert({
+    if (!t) return;
+    const { error } = await supabase.from("ai_usage_events").insert({
       job_id: jobId ?? null,
       user_id: userId ?? null,
       subscription_tier: subscriptionTier ?? null,
@@ -89,6 +93,7 @@ export async function logUsage(supabase, {
       verification_passed: verificationPassed ?? null,
       estimated_cost: estimateCost({ model, ...t }),
     });
+    if (error) return;
   } catch {
     /* aldrig blockera elevflödet på loggning */
   }
