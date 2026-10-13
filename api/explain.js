@@ -4,6 +4,7 @@ import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
 import { callAI, callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import aiUsage from "./_ai-usage.cjs";
+import publicGuide from "./_per-public-guide.cjs";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
@@ -31,6 +32,7 @@ import examIssuance from "./_exam-issuance.cjs";
 import graphAnswers from "./_graph.js";
 const { createSupabaseServerClient } = supabaseKeys;
 const { logAiUsage } = aiUsage;
+const { publicGuideAnswer } = publicGuide;
 const { denyOutOfScopePilotRoute, isPilotExplainRequestAllowed, isPilotMode } = pilotScope;
 const { verifyCompletion } = examCompletion;
 const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplöst|omöjligt|förvirrad|inte alls|ingen koll|jag fattar|hjälp mig|wtf|ugh/i;
@@ -473,6 +475,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     } catch {
       return res.status(503).json({ error: 'P.E.R är tillfälligt otillgänglig. Försök igen senare.' });
     }
+
+    // Without an account, exam state cannot be checked. Keep public guidance
+    // useful for onboarding, but never send an anonymous study question to AI.
+    if (!landingUser) return res.json({ answer: publicGuideAnswer(question), publicGuide: true });
 
     // Sidmål (t.ex. prissidans #gratis/#basic/#premium-kort) går genom samma sanering som den
     // inloggade vägen — cleanTargets i _per-context.js — aldrig råa ur HTTP-kroppen. Landningsläget

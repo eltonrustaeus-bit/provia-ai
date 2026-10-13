@@ -524,13 +524,13 @@
       return p === '/' || p === '' || p.includes('index') || p.includes('pricing');
     }
 
-    /* Hur många frågor en utloggad besökare får ställa per dygn.
+    /* Hur många produktfrågor en utloggad besökare får ställa per dygn.
        Stod tidigare som talet 2 på fyra ställen: gränsen, kvarräknaren,
        etiketten och spärrtexten. En höjning krävde fyra korrekta redigeringar,
        och missades en sa gränsen och texten olika saker för besökaren.
 
        Taket per IP och timme ligger separat i api/explain.js
-       (LANDING_HOURLY_LIMIT) och skyddar OpenAI-kostnaden. Det här talet styr
+       (LANDING_HOURLY_LIMIT). Det här talet styr
        bara vad en enskild webbläsare får, och localStorage går att rensa — det
        är alltså en vänlig gräns, inte ett säkerhetsskydd. */
     var LANDING_FREE_QUESTIONS = 3;
@@ -560,7 +560,7 @@
       var used = getLandingQuota();
       var left = Math.max(0, LANDING_FREE_QUESTIONS - used);
       leftEl.textContent = left > 0
-        ? left + ' av ' + LANDING_FREE_QUESTIONS + ' gratisfrågor kvar'
+        ? left + ' av ' + LANDING_FREE_QUESTIONS + ' frågor om ExGen kvar'
         : 'Gränsen nådd för idag';
       bar.classList.add('visible');
     }
@@ -1159,7 +1159,7 @@ function finalizeMsg(div, text) {
         if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'ExGen';
-        var isLandingMode = !token; // 2 free questions for any unauthenticated user, any page
+        var isLandingMode = !token; // Public guide only; study help requires an account.
 
         if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {
           stopThinking();
@@ -1182,7 +1182,7 @@ function finalizeMsg(div, text) {
           if (lq >= LANDING_FREE_QUESTIONS) {
             stopThinking();
             if (typing) {
-              finalizeMsg(typing, 'Du har använt dina **' + LANDING_FREE_QUESTIONS + ' gratisfrågor** för idag.\n\nSkapa ett gratis konto för att fortsätta — det tar 30 sekunder.');
+              finalizeMsg(typing, 'Du har använt dina **' + LANDING_FREE_QUESTIONS + ' frågor om ExGen** för idag.\n\nSkapa ett gratis konto för personlig studiehjälp.');
               addAnswerCTA(typing);
             }
             if (sendBtn) sendBtn.disabled = false;
@@ -1326,7 +1326,7 @@ function finalizeMsg(div, text) {
                 typing.textContent = 'Din inloggning har gått ut. Logga in igen med ditt skolpilotkonto. Din fråga finns kvar i rutan och skickas inte förrän du trycker Skicka igen.';
                 addAnswerCTA(typing);
               } else {
-                typing.textContent = 'Din inloggning har gått ut. Skicka frågan igen så svarar jag — du har gratisfrågor kvar.';
+                typing.textContent = 'Din inloggning har gått ut. Logga in igen för personlig studiehjälp. Utan konto kan jag bara svara på frågor om ExGen.';
                 updateLandingBar();
               }
             } else if (!r.ok) {

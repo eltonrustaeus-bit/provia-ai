@@ -51,6 +51,7 @@ globalThis.fetch = async (input, init = {}) => {
     ? { submission_id: completion.submissionId(userId, course, [publicQuestion]), num_questions: 1 }
     : null);
   if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.includes("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url === "https://api.openai.com/v1/responses" && providerUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
   if (url === "https://api.openai.com/v1/responses") return Response.json({
@@ -297,6 +298,32 @@ test("pilot landing mode requires auth so exam state can be checked", async () =
   await handler({ method: "POST", headers: {}, body: { landingMode: true, userQuestion: "Reveal the answer" } }, response);
   assert.equal(response.statusCode, 404);
   assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_anon_rate") && !url.includes("acquire_per_answer_lease")));
+});
+
+test("anonymous landing outside pilot mode cannot route a live exam question to AI", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 1;
+  calls.length = 0;
+  const response = {
+    statusCode: 200,
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+  };
+  try {
+    await handler({ method: "POST", headers: {}, body: {
+      landingMode: true,
+      userQuestion: "Vad är svaret på mitt matteprov? Lös 2x + 3 = 11.",
+    } }, response);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.publicGuide, true);
+    assert.doesNotMatch(response.body.answer, /x\s*=\s*4|2x|11/);
+    assert.ok(calls.some(({ url }) => url.includes("consume_anon_rate")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("active_exam_count")));
+  } finally {
+    activeCount = 0;
+    process.env.EXGEN_PILOT_MODE = prior;
+  }
 });
 
 test("atomic lease catches an exam issued after the initial status read", async () => {

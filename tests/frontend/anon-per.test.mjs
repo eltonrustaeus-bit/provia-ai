@@ -90,7 +90,7 @@ try {
   await fråga(page, "en till");
   R.ok("ingen fråga skickas över gränsen", t.anrop.length === gräns, `${t.anrop.length} anrop`);
   const msgs = await page.locator("#perMessages").innerText();
-  R.ok("spärrtexten nämner rätt antal", msgs.includes(`${gräns} gratisfrågor`), msgs.slice(-120));
+  R.ok("spärrtexten nämner rätt antal produktfrågor", msgs.includes(`${gräns} frågor om ExGen`), msgs.slice(-120));
   R.ok("spärren erbjuder ett konto som väg vidare", /gratis konto/i.test(msgs));
 
   await t.close();

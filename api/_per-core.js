@@ -516,7 +516,7 @@ ${getProviaFaq()}${alleskolanRelevant(userQuestion) ? '\n\n' + buildAlleskolanCo
 ${identityBlocks(userQuestion)}
 
 ## DITT UPPDRAG
-Besökaren är utloggad och har två frågor i dygnet. De har inte bestämt sig än.
+Besökaren är inloggad men frågar från startsidan eller prissidan. De har kanske inte bestämt sig än.
 
 Din uppgift är att få dem att förstå att ExGen kan hjälpa DEM — och det gör du
 genom att faktiskt hjälpa, inte genom att beskriva att du skulle kunna.

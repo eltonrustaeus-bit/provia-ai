@@ -52,6 +52,7 @@ const landingEnd = explainApi.indexOf("const user = await requireAuth", landingS
 const landingRoute = explainApi.slice(landingStart, landingEnd);
 assert.match(landingRoute, /rateError \|\| !rl \|\| typeof rl\.ok !== 'boolean'/, "anonymous P.E.R fails closed when rate-limit response is missing or malformed");
 assert.match(landingRoute, /catch \{\s*return res\.status\(503\)/, "anonymous P.E.R fails closed when the rate-limit RPC throws");
+assert.match(landingRoute, /if \(!landingUser\) return res\.json\(\{ answer: publicGuideAnswer\(question\), publicGuide: true \}\)/, "anonymous landing guidance does not call AI");
 assert.ok(landingRoute.indexOf("consume_anon_rate") < landingRoute.indexOf("callMeasuredPerAI("), "rate limiting precedes anonymous AI invocation");
 assert.match(roleApi, /teacher-class-insight:" \+ user\.id/, "teacher class insights are rate limited per account");
 const insightStart = roleApi.indexOf('if (action === "teacher_class_insight")');
