@@ -332,25 +332,29 @@ async function applyMockMastery(userId, level, per, attemptId) {
 // On Vercel the lambda freezes once res is sent, so an un-awaited POST here
 // gets killed mid-flight (this is why mock_results stayed empty). Never throws.
 async function saveMockResult(payload) {
-  if (!payload?.submission_id) return false;
+  if (!payload?.submission_id) return "error";
   try {
-    const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results?on_conflict=user_id,submission_id", {
+    const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/mock_results?on_conflict=user_id,submission_id&select=submission_id", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...getSupabaseAdminHeaders(),
-        "Prefer": "resolution=ignore-duplicates,return=minimal"
+        "Prefer": "resolution=ignore-duplicates,return=representation"
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(5000)
     });
-    return response.ok;
-  } catch { return false; }
+    if (!response.ok) return "error";
+    const rows = await response.json();
+    if (!Array.isArray(rows)) return "error";
+    if (rows.length === 0) return "duplicate";
+    return rows.length === 1 && rows[0]?.submission_id === payload.submission_id ? "saved" : "error";
+  } catch { return "error"; }
 }
 
 async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, level, attemptRows }) {
   const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId));
-  if (!saved) return false;
+  if (saved !== "saved") return saved;
 
   await Promise.all([
     applyMockMastery(userId, level, per, attemptId),
@@ -359,7 +363,7 @@ async function persistGradedSubmission({ userId, course, per, total, maxTotal, a
       await recordAttempts(sb, userId, level, attemptRows, attemptId, course);
     })().catch(() => {}),
   ]);
-  return true;
+  return "saved";
 }
 
 async function requireAuth(req) {
@@ -673,9 +677,13 @@ module.exports = async function handler(req, res) {
       const per = questions.map((q) => perById.get(String(q.id ?? ""))).filter(Boolean);
       const attemptRows = withAttemptAnswers(per, answerMap);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
-      const mockResultSaved = await persistGradedSubmission({
+      const persistence = await persistGradedSubmission({
         userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
       });
+      if (persistence === "duplicate") {
+        return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
+      }
+      const mockResultSaved = persistence === "saved";
       return json(res, 200, {
         ok: true,
         exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,
@@ -885,9 +893,13 @@ module.exports = async function handler(req, res) {
       const attemptRows = withAttemptAnswers(per, answerMap);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
-      const mockResultSaved = await persistGradedSubmission({
+      const persistence = await persistGradedSubmission({
         userId: user.id, course, per, total, maxTotal, attemptId, level, attemptRows,
       });
+      if (persistence === "duplicate") {
+        return json(res, 409, { ok: false, error: "EXAM_ALREADY_GRADED" });
+      }
+      const mockResultSaved = persistence === "saved";
       return json(res, 200, {
         ok: true,
         exam_proof: mockResultSaved ? examCompletion.issueCompletion(user.id, course, submittedQuestions) : null,

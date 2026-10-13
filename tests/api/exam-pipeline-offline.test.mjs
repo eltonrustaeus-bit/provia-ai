@@ -68,7 +68,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")) return Response.json({ ok: true });
-  if (url.includes("/rest/v1/mock_results")) return new Response(null, { status: 204 });
+  if (url.includes("/rest/v1/mock_results")) return Response.json([
+    { submission_id: JSON.parse(init.body).submission_id },
+  ], { status: 201 });
   if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
 

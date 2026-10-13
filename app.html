@@ -1905,7 +1905,10 @@ try{
     try{
       if(!res||!res.ok||!res.data||!res.data.ok){
         const providerUnavailable = res?.data?.error === "grading_provider_unavailable";
-        const msg = res&&res.timedOut
+        const alreadyGraded = res?.data?.error === "EXAM_ALREADY_GRADED";
+        const msg = alreadyGraded
+          ? (LANG==="sv"?"Det här provet har redan rättats. Inget nytt resultat visades. Kontrollera provhistoriken eller kontakta support om det saknas.":"This exam has already been graded. No new result was shown. Check your history or contact support if it is missing.")
+          : res&&res.timedOut
           ? (LANG==="sv"?"Rättningen tog för lång tid och avbröts. Dina svar finns kvar på sidan — försök igen.":"Grading timed out. Your answers are still on this page — try again.")
           : res&&res.networkError
             ? (LANG==="sv"?"Nätverksfel vid rättning. Dina svar finns kvar på sidan — försök igen.":"Network error while grading. Your answers are still on this page — try again.")

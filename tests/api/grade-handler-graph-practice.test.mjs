@@ -17,7 +17,7 @@ const userId = "11111111-1111-4111-8111-111111111111";
 const origin = "https://grade-handler.test";
 const secret = "local-only-signing-secret";
 const calls = [];
-let mockResultStatus = 204;
+let mockResultMode = "insert";
 let savedResultPresent = true;
 let learnerLoopEnabled = false;
 
@@ -37,9 +37,13 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
     ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
     : []);
-  if (url.includes("/rest/v1/mock_results")) return init.method === "POST"
-    ? new Response(null, { status: mockResultStatus })
-    : Response.json(savedResultPresent ? { num_questions: 1 } : null);
+  if (url.includes("/rest/v1/mock_results")) {
+    if (init.method !== "POST") return Response.json(savedResultPresent ? { num_questions: 1 } : null);
+    if (mockResultMode === "error") return new Response(null, { status: 500 });
+    return Response.json(mockResultMode === "duplicate"
+      ? []
+      : [{ submission_id: JSON.parse(init.body).submission_id }], { status: mockResultMode === "duplicate" ? 200 : 201 });
+  }
   if (url.includes("/rest/v1/concepts")) {
     return init.method === "POST"
       ? Response.json([{ id: "22222222-2222-4222-8222-222222222222" }], { status: 201 })
@@ -235,14 +239,32 @@ try {
     error_tags: [],
   });
   assert.match(savedPayload.submission_id, /^[a-f0-9]{32}$/);
-  assert.equal(saved.headers.Prefer, "resolution=ignore-duplicates,return=minimal");
+  assert.equal(saved.headers.Prefer, "resolution=ignore-duplicates,return=representation");
+  assert.match(saved.url, /select=submission_id/);
   const resultWriteIndex = calls.indexOf(saved);
   const masteryWriteIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once"));
   assert.ok(masteryWriteIndex > resultWriteIndex,
     "mastery is applied only after the official result has been persisted");
   assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic official graph grading does not call the AI provider");
 
-  mockResultStatus = 500;
+  mockResultMode = "duplicate";
+  learnerLoopEnabled = true;
+  calls.length = 0;
+  const conflictingReplay = await invoke({
+    lang: "sv", course, pastedText: material, exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
+  });
+  assert.equal(conflictingReplay.status, 409, "a changed answer cannot replace or display a second official score");
+  assert.equal(conflictingReplay.body.error, "EXAM_ALREADY_GRADED");
+  assert.equal(conflictingReplay.body.result, undefined, "the conflicting score is never returned");
+  assert.equal(conflictingReplay.body.exam_proof, undefined, "a duplicate cannot mint another completion proof");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false);
+  assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false);
+  const duplicateWrite = calls.find((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST");
+  assert.equal(JSON.parse(duplicateWrite.body).submission_id, savedPayload.submission_id);
+
+  mockResultMode = "error";
   learnerLoopEnabled = true;
   calls.length = 0;
   const replay = await invoke({
@@ -266,7 +288,7 @@ try {
   assert.equal(JSON.parse(savedRows[0].body).submission_id, savedPayload.submission_id,
     "replaying the same signed exam uses the same idempotency key");
 
-  mockResultStatus = 204;
+  mockResultMode = "insert";
   calls.length = 0;
   const recoveredReplay = await invoke({
     lang: "sv",
