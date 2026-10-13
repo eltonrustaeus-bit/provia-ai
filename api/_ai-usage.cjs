@@ -1,6 +1,7 @@
 const { getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
 
-const STEPS = new Set(["generate", "verify_compare", "verify_blind", "repair", "grade"]);
+const STEPS = new Set(["generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
+const FEATURES = new Set(["mock_exam", "per_chat", "per_landing", "per_memory"]);
 const TIERS = new Set(["gratis", "basic", "premium", "admin", "teacher"]);
 
 function measuredTokens(usage) {
@@ -11,14 +12,14 @@ function measuredTokens(usage) {
   return { input_tokens: input, cached_input_tokens: cached, output_tokens: output };
 }
 
-function usageEvent({ userId, requestId, tier, step, model, usage, latencyMs }) {
+function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, model, usage, latencyMs }) {
   const tokens = measuredTokens(usage);
-  if (!tokens || !STEPS.has(step) || !userId || !model) return null;
+  if (!tokens || !STEPS.has(step) || !FEATURES.has(feature) || (!userId && feature !== "per_landing") || !model) return null;
   return {
     request_id: typeof requestId === "string" ? requestId : null,
-    user_id: userId,
+    user_id: userId || null,
     subscription_tier: TIERS.has(tier) ? tier : null,
-    feature: "mock_exam",
+    feature,
     pipeline_step: step,
     provider: "openai",
     model: String(model).slice(0, 120),
@@ -27,7 +28,7 @@ function usageEvent({ userId, requestId, tier, step, model, usage, latencyMs }) 
   };
 }
 
-async function logMockExamUsage(inputs, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+async function logAiUsage(inputs, { env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 1500 } = {}) {
   const events = (Array.isArray(inputs) ? inputs : [inputs]).map(usageEvent).filter(Boolean);
   if (!events.length || !env.SUPABASE_URL || !getSupabaseServerKey(env)) return false;
   try {
@@ -35,7 +36,7 @@ async function logMockExamUsage(inputs, { env = process.env, fetchImpl = globalT
       method: "POST",
       headers: { ...getSupabaseAdminHeaders(env), "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify(events),
-      signal: AbortSignal.timeout(1500),
+      signal: AbortSignal.timeout(Math.max(100, Math.min(1500, timeoutMs))),
     });
     if (response.ok) return true;
   } catch {}
@@ -43,4 +44,6 @@ async function logMockExamUsage(inputs, { env = process.env, fetchImpl = globalT
   return false;
 }
 
-module.exports = { measuredTokens, usageEvent, logMockExamUsage };
+const logMockExamUsage = logAiUsage;
+
+module.exports = { measuredTokens, usageEvent, logAiUsage, logMockExamUsage };

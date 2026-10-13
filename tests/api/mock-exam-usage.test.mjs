@@ -24,6 +24,10 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(usageEvent({ ...sample, usage: null }), null);
   assert.equal(usageEvent({ ...sample, usage: { input_tokens: 10, output_tokens: 5, input_tokens_details: { cached_tokens: 11 } } }), null);
   assert.equal(usageEvent({ ...sample, step: "unknown" }), null);
+  assert.equal(usageEvent({ ...sample, feature: "per_chat", step: "validate" }).feature, "per_chat");
+  assert.equal(usageEvent({ ...sample, feature: "per_landing", userId: null }).user_id, null);
+  assert.equal(usageEvent({ ...sample, feature: "per_chat", userId: null }), null);
+  assert.equal(usageEvent({ ...sample, feature: "unknown_feature" }), null);
 });
 
 test("batch insert contains only whitelisted metrics and uses the server key", async () => {

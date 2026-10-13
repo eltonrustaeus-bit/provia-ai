@@ -22,16 +22,16 @@ assert.match(explain, /function rejectPerChatQuota[\s\S]*?res\.status\(429\)[\s\
   "quota exhaustion and quota service errors are distinct client states");
 
 const tips = section("async function handleTipsMode", "// ── LEGAL MODE");
-assert.ok(tips.indexOf("consumePerChatQuota(user)") < tips.indexOf("callAI("), "tips quota runs before provider call");
+assert.ok(tips.indexOf("consumePerChatQuota(user)") < tips.indexOf("callMeasuredPerAI("), "tips quota runs before provider call");
 const legal = section("async function handleLegalMode", "// GET — return stored PER history");
 assert.ok(legal.indexOf("consumePerChatQuota(user)") < legal.indexOf("retrieveChunks("), "legal P.E.R quota runs before retrieval/provider work");
 const readiness = section("// ── READINESS SCORE MODE", "// ── TEACH MODE");
-assert.ok(readiness.indexOf("consumePerChatQuota(user)") < readiness.indexOf("callAI("), "readiness quota runs before provider call");
+assert.ok(readiness.indexOf("consumePerChatQuota(user)") < readiness.indexOf("callMeasuredPerAI("), "readiness quota runs before provider call");
 assert.match(readiness, /body\.scores\.length > 50/, "readiness input is bounded before processing");
 const teach = section("// ── TEACH MODE", "// ── EXPLAIN MODE");
 assert.match(teach, /consumePerChatQuota\(user, prof\?\.role\)/, "chat uses the shared atomic quota decision");
 const explanation = explain.slice(explain.indexOf("// ── EXPLAIN MODE"));
-assert.ok(explanation.indexOf("consumePerChatQuota(user)") < explanation.indexOf("callAI("), "answer explanation quota runs before provider call");
+assert.ok(explanation.indexOf("consumePerChatQuota(user)") < explanation.indexOf("callMeasuredPerAI("), "answer explanation quota runs before provider call");
 assert.match(explanation, /question = sanitize\(body\.question \|\| "", 2000\)/);
 assert.match(explanation, /Explanation input is too long/);
 assert.match(explanation, /role: "system", content: .*opålitligt innehåll/s,
