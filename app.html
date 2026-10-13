@@ -545,7 +545,7 @@ white-space:nowrap;
 </div>
 </div>
 
-<!-- QUOTA BANNER — visas när användaren är nära eller vid gränsen -->
+<!-- QUOTA BANNER — reserverad för serverbekräftade kvotbesked -->
 <div class="quotaBanner" id="quotaBanner">
 <div class="quotaBannerTxt" id="quotaBannerTxt"></div>
 <a class="quotaBannerLink" href="pricing.html">Uppgradera →</a>
@@ -921,14 +921,6 @@ async function bumpQuotaCount() {
   localStorage.setItem(key, String(cur + 1));
 }
 
-// Returnerar { allowed: bool, count: number, limit: number, period: string }
-async function checkQuota() {
-  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
-  if (cfg.limit === Infinity) return { allowed: true, count: 0, limit: Infinity, period: cfg.period };
-  const count = await readQuotaCount();
-  return { allowed: count < cfg.limit, count, limit: cfg.limit, period: cfg.period };
-}
-
 function quotaLimitMessage(period) {
   const pilot = window.ExGenRuntime.environment === "pilot";
   const copy = T[LANG];
@@ -940,7 +932,6 @@ function quotaLimitMessage(period) {
 async function refreshQuotaUi() {
   const ms = $("miniState");
   const banner = $("quotaBanner");
-  const bannerTxt = $("quotaBannerTxt");
   const rp = $("rolePill");
 
   // Uppdatera roll-pill i menyn
@@ -962,32 +953,17 @@ async function refreshQuotaUi() {
   }
 
   const count = await readQuotaCount();
-  const left = Math.max(cfg.limit - count, 0);
   const periodLabel = cfg.period === "week"
     ? (LANG === "sv" ? "vecka" : "week")
     : (LANG === "sv" ? "månad" : "month");
 
   if (ms) {
     ms.textContent = LANG === "sv"
-      ? `PROV DENNA ${periodLabel.toUpperCase()}: ${count}/${cfg.limit} · KVAR: ${left}`
-      : `EXAMS THIS ${periodLabel.toUpperCase()}: ${count}/${cfg.limit} · LEFT: ${left}`;
+      ? `SENAST KÄNDA PROV DENNA ${periodLabel.toUpperCase()}: ${count} · SERVERN KONTROLLERAR KVOTEN VID SKAPANDE`
+      : `LAST KNOWN EXAMS THIS ${periodLabel.toUpperCase()}: ${count} · SERVER CHECKS QUOTA WHEN CREATING`;
   }
 
-  // Visa banner när ≤ 1 kvar eller vid gränsen
-  if (banner && bannerTxt) {
-    if (left === 0) {
-      const msg = quotaLimitMessage(cfg.period);
-      bannerTxt.innerHTML = `<strong>${LANG === "sv" ? "Gränsen nådd." : "Limit reached."}</strong> ${msg}`;
-      banner.classList.add("show");
-    } else if (left === 1) {
-      bannerTxt.innerHTML = LANG === "sv"
-        ? `<strong>1 prov kvar</strong> denna ${periodLabel}.${window.ExGenRuntime.environment === "pilot" ? " Nya prov blir tillgängliga när perioden börjar om." : " Uppgradera för mer."}`
-        : `<strong>1 exam left</strong> this ${periodLabel}.${window.ExGenRuntime.environment === "pilot" ? " More exams become available when the period resets." : " Upgrade for more."}`;
-      banner.classList.add("show");
-    } else {
-      banner.classList.remove("show");
-    }
-  }
+  if (banner) banner.classList.remove("show");
 }
 
 function showDebug(txt){ const w=$("debugWrap"),p=$("debug"); if(!w||!p)return; w.style.display="block"; p.textContent=txt||""; }
@@ -1833,16 +1809,6 @@ try{
     const pastedText=(pastedTextEl()?.value||"").trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
 
-    // ── QUOTA CHECK (klientside) ──────────────────────────────────────
-    const quota = await checkQuota();
-    if(!quota.allowed){
-      const msg = quotaLimitMessage(ROLE_LIMITS[currentRole]?.period);
-      setStatus(msg, "bad");
-      await refreshQuotaUi();
-      return {ok:false,error:msg,quota:true};
-    }
-    // ─────────────────────────────────────────────────────────────────
-
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
     const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12)};
@@ -1852,7 +1818,7 @@ try{
     const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
     if(res.status===429&&res.data?.error==="Quota exceeded"){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
-      const msg = quotaLimitMessage(ROLE_LIMITS[currentRole]?.period);
+      const msg = quotaLimitMessage(res.data.period || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }

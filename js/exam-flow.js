@@ -1303,10 +1303,9 @@
               " som inte höll måttet. Du får " + got + " — hellre färre och rätt.", true);
       }
     }).catch(function (e) {
-      /* generate() går via runGenerate i app.html. postJson kastar aldrig, men
-         kvotkontrollen på vägen dit gör det: checkQuota → getUserId →
-         db.auth.getUser() avvisar när Supabase inte svarar. Utan den här
-         grenen blir knappen kvar på "Bygger…" för alltid, utan felmeddelande. */
+      /* generate() går via runGenerate i app.html. postJson kastar aldrig,
+         men andra auth-/UI-anrop kan göra det. Återställ alltid knappen så att
+         ett tillfälligt klientfel inte låser eleven ute från ett nytt försök. */
       done();
       err.textContent = "Något gick fel på vägen. Kontrollera uppkopplingen och försök igen.";
       say("Det gick inte den här gången.", "Försök igen om en stund.");

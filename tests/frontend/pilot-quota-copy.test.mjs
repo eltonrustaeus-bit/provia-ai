@@ -21,16 +21,14 @@ try {
     return {
       week: quotaLimitMessage("week"),
       month: quotaLimitMessage("month"),
-      banner: document.getElementById("quotaBannerTxt")?.innerText || "",
-      linkVisible: getComputedStyle(document.querySelector(".quotaBannerLink")).display !== "none",
     };
   });
   assert.match(copy.week, /på måndag/);
   assert.match(copy.month, /nästa månad/);
-  assert.match(copy.banner, /Kontakta den som bjöd in dig/);
-  assert.doesNotMatch(copy.banner, /Uppgradera/);
-  assert.equal(copy.linkVisible, false, "pilot does not present a dead checkout link");
-  console.log("pilot quota copy: reset timing and inviter support replace unavailable checkout");
+  assert.match(copy.week, /Kontakta den som bjöd in dig/);
+  assert.match(copy.month, /Kontakta den som bjöd in dig/);
+  assert.doesNotMatch(copy.week + copy.month, /Uppgradera/);
+  console.log("pilot quota copy: confirmed denials give accurate reset timing and inviter support");
 } finally {
   await browser.close();
   await server.close();
