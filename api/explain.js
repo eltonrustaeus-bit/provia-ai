@@ -365,6 +365,16 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId 
 }
 
 function sendActiveExamGuidance(req, res, body) {
+  if (body.examReview === true) {
+    const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({
+      answer: en
+        ? "Review of a completed exam is available after your current exam is submitted. During this exam, P.E.R can help you think through the question without showing answers."
+        : "Genomgången av ett tidigare prov öppnas när du har lämnat in ditt pågående prov. Under tiden kan P.E.R hjälpa dig att tänka kring frågan utan att visa facit.",
+      helpCap: 0, helpLevelUsed: 0, examActive: true, reviewDeferred: true,
+    });
+  }
   const currentQuestion = body.pageContext?.currentQuestion;
   const type = currentQuestion?.type;
   const graphMode = type === "graph" && currentQuestion?.graphMode === "scatter" ? "scatter" : "line";

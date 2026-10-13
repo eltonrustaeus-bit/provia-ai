@@ -145,11 +145,18 @@ test("a second active exam blocks post-grade review of an earlier exam", async (
     const response = await invoke({ examReview: true, examProof: proof });
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.examActive, true);
+    assert.equal(response.body.reviewDeferred, true);
+    assert.match(response.body.answer, /Genomgången av ett tidigare prov öppnas när du har lämnat in/);
     assert.doesNotMatch(response.body.answer, /lutningen/i);
     assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/mock_results") && !url.includes("openai.com")));
   } finally {
     activeCount = 0;
   }
+  calls.length = 0;
+  const resumed = await invoke({ examReview: true, examProof: proof });
+  assert.equal(resumed.statusCode, 200);
+  assert.match(resumed.body.answer, /lutningen/i);
+  assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results")));
 });
 
 test("direct chat calls during an exam get method guidance before quota, cache or streaming", async () => {
