@@ -126,6 +126,9 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
     ["gratis att börja", /gratis/i],
   ];
   for (const [name, re] of CLAIMS) ok(`1 löftet finns: ${name}`, re.test(t), t.slice(0, 0));
+  ok("1 P.E.R beskriver stöd utan att garantera felfrihet",
+    /återkopplingen tar stöd i dina svar och det material som finns tillgängligt/i.test(t) &&
+    !/aldrig (på )?gissningar/i.test(t));
   await ctx.close();
 }
 
