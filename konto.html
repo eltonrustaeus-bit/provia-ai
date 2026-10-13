@@ -143,6 +143,7 @@
   #authGate{display:none;text-align:center;padding:60px 24px}
   #authGate .agTitle{font-weight:700;font-size:20px;color:var(--t);letter-spacing:-.03em;margin:0 0 8px}
   #authGate .agSub{font-size:14px;color:var(--t2);margin-bottom:24px}
+  #accountLoadError{display:none;text-align:center;padding:40px 24px}
 
   /* Loading skeleton */
   .kSkel{height:16px;background:rgba(0,183,217,.06);border-radius:var(--exgen-radius-sm);animation:skel 1.4s ease-in-out infinite}
@@ -176,6 +177,12 @@
          left them there after logging in. -->
     <button class="btn btnP" type="button" data-pv-auth="login" style="height:44px;padding:0 28px">Logga in →</button>
   </div>
+
+  <section id="accountLoadError" class="kCard" role="alert" aria-labelledby="accountLoadErrorTitle" aria-describedby="accountLoadErrorText">
+    <h1 class="agTitle" id="accountLoadErrorTitle">Kontot kunde inte läsas in</h1>
+    <p class="agSub" id="accountLoadErrorText">Anslutningen till kontotjänsten saknas just nu. Dina sparade uppgifter har inte ändrats. Kontrollera anslutningen och försök igen.</p>
+    <button class="kBtn kBtnPrimary" id="accountLoadRetry" type="button">Försök igen</button>
+  </section>
 
   <!-- KONTO CONTENT -->
   <div id="kontoContent" style="display:none">
@@ -428,14 +435,28 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (async function(){
-  const pilotMode=window.ExGenRuntime.environment==="pilot";
+  function showAccountLoadError(){
+    document.getElementById("accountLoadError").style.display="block";
+    document.getElementById("accountLoadRetry").addEventListener("click",()=>window.location.reload(),{once:true});
+  }
+
+  const runtime=window.ExGenRuntime||{};
+  const pilotMode=runtime.environment==="pilot";
   if(pilotMode){
     const gateCopy=document.getElementById("authGateSub");
     if(gateCopy)gateCopy.textContent="Logga in för att se kontoinställningarna.";
   }
-  const SUPA_URL=window.ExGenRuntime.supabaseUrl;
-  const SUPA_KEY=window.ExGenRuntime.publishableKey;
-  const sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+  const SUPA_URL=runtime.supabaseUrl;
+  const SUPA_KEY=runtime.publishableKey;
+  if(!SUPA_URL||!SUPA_KEY||!window.supabase?.createClient){
+    showAccountLoadError();
+    return;
+  }
+  let sb;
+  try{sb=window.supabase.createClient(SUPA_URL,SUPA_KEY)}catch{
+    showAccountLoadError();
+    return;
+  }
 
   const ROLE_LABELS={gratis:"Gratis",basic:"Basic",premium:"Premium",admin:"Admin",user:"Premium",teacher:"Lärare"};
   const ROLE_DESCS={
