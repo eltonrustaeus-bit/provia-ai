@@ -863,11 +863,18 @@ document.getElementById("yr").textContent=new Date().getFullYear();
             : days < 60 ? Math.round(days / 7) + " veckor"
             : Math.round(days / 30) + " månader";
 
-    var recent = hist.slice(-5);
-    var avg = Math.round(recent.reduce(function (a, x) { return a + (Number(x.percent) || 0); }, 0) / recent.length);
+    var scored = hist.map(function (x) {
+      var value = x && x.percent;
+      if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null;
+      var percent = Number(value);
+      return Number.isFinite(percent) && percent >= 0 && percent <= 100 ? percent : null;
+    }).filter(function (percent) { return percent !== null; }).slice(-5);
+    var summary = scored.length
+      ? ". Du ligger på " + Math.round(scored.reduce(function (sum, percent) { return sum + percent; }, 0) / scored.length) +
+        " % över dina senaste " + scored.length + " poängsatta prov."
+      : ". Poängunderlag saknas för att räkna ut ett snitt ännu.";
 
-    el.textContent = hist.length + (hist.length === 1 ? " prov" : " prov") + " på " + age +
-      ". Du ligger på " + avg + " % över dina senaste " + recent.length + ".";
+    el.textContent = hist.length + (hist.length === 1 ? " prov" : " prov") + " på " + age + summary;
   };
   // Kör direkt också, ifall kontouppgifterna redan hunnit renderas.
   if (document.readyState !== "loading") window.setKontoVoice();

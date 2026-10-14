@@ -41,10 +41,18 @@ assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n1 | 3\n1 | 1"), null, "re
 assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1"), null, "decimal values are not rounded");
 assert.equal(graph.isValidSpec(scatterSpec), true);
 assert.deepEqual(graph.displaySpec(scatterSpec), {
-  mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)"
+  mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
+  source_table: {
+    headers: ["Tid (min)", "Syrehalt (mg/L)"],
+    rows: [[0, 4], [1, 3], [2, 1]],
+  },
 });
 assert.equal(graph.isValidDisplaySpec(graph.displaySpec(scatterSpec), scatterSpec), true);
 assert.equal(graph.isValidDisplaySpec({ ...graph.displaySpec(scatterSpec), point_count: 2 }, scatterSpec), false);
+assert.equal(graph.isValidDisplaySpec({
+  ...graph.displaySpec(scatterSpec),
+  source_table: { headers: ["Tid (min)", "Syrehalt (mg/L)"], rows: [[0, 0], [1, 1], [2, 2]] },
+}, scatterSpec), false, "displayed source table is bound to the signed grading values");
 const scatterAnswer = JSON.stringify({ type: "scatter", points: [
   { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 3 }
 ] });
@@ -55,7 +63,9 @@ const scatterPartial = JSON.stringify({ type: "scatter", points: [
 ] });
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).points, 2);
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).max_points, 3);
-assert.equal(graph.questionText(scatterSpec), "Placera de här tre mätpunkterna: (0, 4), (1, 3), (2, 1). Använd Tid (min) på x-axeln och Syrehalt (mg/L) på y-axeln.");
+assert.equal(graph.questionText(scatterSpec), "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.");
+assert.doesNotMatch(graph.questionText(scatterSpec), /\(0, 4\)|\(1, 3\)|\(2, 1\)/,
+  "the task instruction no longer repeats the answer coordinates");
 assert.equal(graph.modelAnswer(scatterSpec), "Mätpunkterna är (0, 4), (1, 3), (2, 1).");
 assert.equal(graph.isValidSpec({ slope: 0, intercept: 6 }), false);
 assert.equal(graph.questionText(q.graph_spec, "sv"), "Rita grafen till y = 2x + 1. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.");
@@ -140,6 +150,11 @@ assert.deepEqual(gradeTasks.openQuestion(publicScatter, scatterSealed, secret, s
   { ...scatterQuestion, grade_context_hash: scatterContext });
 assert.equal(gradeTasks.openQuestion({ ...publicScatter, graph_ui: { ...scatterQuestion.graph_ui, y_label: "other" } }, scatterSealed, secret, scatterContext), null,
   "client-visible graph settings cannot be changed independently of the sealed grading task");
+assert.equal(gradeTasks.openQuestion({
+  ...publicScatter,
+  graph_ui: { ...scatterQuestion.graph_ui, source_table: { ...scatterQuestion.graph_ui.source_table, rows: [[0, 0], [1, 1], [2, 2]] } },
+}, scatterSealed, secret, scatterContext), null,
+"the learner-facing table cannot be changed independently of the sealed grading task");
 const gradeSource = require("node:fs").readFileSync(new URL("../../api/grade.js", import.meta.url), "utf8");
 const source = require("node:fs").readFileSync(new URL("../../api/generate-exam.js", import.meta.url), "utf8");
 assert.match(source, /clientQuestion\.grade_task = gradeTasks\.sealQuestion\(q, undefined, gradeTasks\.hashContext\(pastedText, course, user\.id\)\)/);

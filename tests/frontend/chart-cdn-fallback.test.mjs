@@ -84,6 +84,8 @@ test("history chart exposes the same result values when Chart.js loads", async (
       { total: "   ", maximum: 2 },
       { total: null, maximum: 2 },
       { total: false, maximum: 2 },
+      { total: -1, maximum: 2 },
+      { total: 3, maximum: 2 },
     ].map((score, index) => ({
       id: `chart-accessible-${index}`,
       created_at: `2026-10-${String(index + 1).padStart(2, "0")}T10:00:00.000Z`,
@@ -114,24 +116,27 @@ test("history chart exposes the same result values when Chart.js loads", async (
         ] },
       });
       try {
-        await page.waitForSelector("#chartDataRows tr:nth-child(5)", { state: "attached" });
+        await page.waitForSelector("#chartDataRows tr:nth-child(7)", { state: "attached" });
         assert.equal(await page.evaluate(() => typeof Chart), "function");
         assert.equal(await page.locator("#chartFallback").count(), 0);
         assert.equal(await page.locator("#progressChart").getAttribute("role"), "img");
-        assert.match(await page.locator("#progressChart").getAttribute("aria-label"), /5 prov/);
+        assert.match(await page.locator("#progressChart").getAttribute("aria-label"), /7 prov/);
         assert.match(await page.locator("#chartSummary").innerText(), /Öppna tabellen/);
-        assert.match(await page.locator("#chartDataRows").textContent(), /50%[\s\S]*100%[\s\S]*Resultat saknas[\s\S]*Resultat saknas[\s\S]*Resultat saknas/);
+        assert.match(await page.locator("#chartDataRows").textContent(), /50%[\s\S]*100%[\s\S]*Resultat saknas[\s\S]*Resultat saknas[\s\S]*Resultat saknas[\s\S]*Resultat saknas[\s\S]*Resultat saknas/);
         assert.match(await page.locator("#chartDataRows").textContent(), /2026/);
         assert.match(await page.locator("#examList").innerText(), /Resultat saknas/);
-        assert.deepEqual(await page.evaluate(() => window.__chartConfig.data.datasets[0].data), [50, 100, null, null, null]);
-        await page.waitForFunction(() => Math.abs((window.__perTestCtx()?.userScore ?? -1) - 0.75) < 1e-9);
-        assert.ok(Math.abs(await page.evaluate(() => window.__perTestCtx().userScore) - 0.75) < 1e-9,
-          "P.E.R average excludes synced attempts without usable scores");
+        assert.deepEqual(await page.evaluate(() => window.__chartConfig.data.datasets[0].data), [50, 100, null, null, null, null, null]);
+        await page.waitForFunction(() => window.__perTestCtx()?.page === "förbättring");
+        const perContext = await page.evaluate(() => ({
+          context: window.__perTestCtx(), history: JSON.parse(localStorage.getItem("proviaai_history") || "[]"),
+        }));
+        assert.ok(Math.abs(perContext.context.userScore - 0.75) < 1e-9,
+          `P.E.R average excludes invalid synced attempts: ${JSON.stringify(perContext)}`);
         assert.equal(await page.locator(".chartData").getAttribute("open"), null);
         await page.locator(".chartData summary").focus();
         await page.keyboard.press("Enter");
         assert.equal(await page.locator(".chartData").getAttribute("open"), "");
-        assert.equal(await page.locator("#chartDataRows tr").count(), 5);
+        assert.equal(await page.locator("#chartDataRows tr").count(), 7);
         assert.equal(await page.locator(".chartData caption").textContent(), "Provresultat i samma ordning som grafen");
         assert.deepEqual(await page.locator(".chartData th").evaluateAll(headers => headers.map(header => ({
           label: header.textContent,

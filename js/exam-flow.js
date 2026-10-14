@@ -467,6 +467,13 @@
      felbank som förbättringssidan redan bygger på. Ingen ny lagring, inget
      nytt API. Kallstart hanteras genom att erkännas, inte döljas. */
 
+  function historyPercent(value) {
+    if ((typeof value !== "number" && typeof value !== "string")
+      || (typeof value === "string" && value.trim() === "")) return null;
+    var percent = Number(value);
+    return Number.isFinite(percent) && percent >= 0 && percent <= 100 ? percent : null;
+  }
+
   function dna() {
     var hist = lsGet(LS_HISTORY, []) || [];
     var miss = lsGet(LS_MISTAKES, []) || [];
@@ -474,9 +481,11 @@
     if (!Array.isArray(miss)) miss = [];
 
     var last = hist.length ? hist[hist.length - 1] : null;
-    var recent = hist.slice(-5);
+    var scored = hist.map(function (x) { return historyPercent(x && x.percent); })
+      .filter(function (percent) { return percent !== null; });
+    var recent = scored.slice(-5);
     var avg = recent.length
-      ? Math.round(recent.reduce(function (a, x) { return a + (Number(x.percent) || 0); }, 0) / recent.length)
+      ? Math.round(recent.reduce(function (sum, percent) { return sum + percent; }, 0) / recent.length)
       : null;
 
     // Kurser i fallande aktualitet, utan dubbletter.
@@ -495,7 +504,7 @@
        snittet 64 och inget lyft trots två raka toppresultat, medan 80 följt av
        92 gav snittet 86 och ett lyft trots att bara ett prov nådde gränsen. */
     var lvl = last ? String(last.level || "C") : "C";
-    var lastTwo = hist.slice(-2).map(function (x) { return Number(x.percent) || 0; });
+    var lastTwo = scored.slice(-2);
     if (lastTwo.length === 2) {
       var bothHigh = lastTwo[0] >= 85 && lastTwo[1] >= 85;
       var bothLow = lastTwo[0] < 50 && lastTwo[1] < 50;
@@ -1652,6 +1661,39 @@
     sheet.appendChild(wrap);
   }
 
+  function renderGraphSourceTable(sheet, graphUi, lang) {
+    var source = graphUi && graphUi.mode === "scatter" ? graphUi.source_table : null;
+    if (!source || !Array.isArray(source.headers) || source.headers.length !== 2
+      || !Array.isArray(source.rows) || source.rows.length !== 3
+      || !source.headers.every(function (value) { return typeof value === "string" && value.length <= 32; })
+      || !source.rows.every(function (row) {
+        return Array.isArray(row) && row.length === 2 && row.every(Number.isInteger);
+      })) return;
+
+    var wrap = el("div", "xf-source-table-wrap");
+    var table = el("table", "xf-source-table");
+    table.appendChild(el("caption", null, lang === "en" ? "Measurements from your material" : "Mätvärden från materialet"));
+    var thead = el("thead");
+    var headerRow = el("tr");
+    source.headers.forEach(function (label) {
+      var header = el("th", null, label);
+      header.scope = "col";
+      headerRow.appendChild(header);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    var tbody = el("tbody");
+    source.rows.forEach(function (row) {
+      var tr = el("tr");
+      row.forEach(function (value) { tr.appendChild(el("td", null, value)); });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    sheet.appendChild(wrap);
+  }
+
   /* Fritextsvar skickas 500 ms efter senaste tangenttryck. Varje tecken hade
      annars blivit ett nytt manifest. */
   function publishSoon() {
@@ -1727,6 +1769,7 @@
       if (!window.ExGenGraphAnswer) {
         renderGraphUnavailable(sheet, lang);
       } else {
+        renderGraphSourceTable(sheet, q.graph_ui, lang);
         window.ExGenGraphAnswer(sheet, S.answers[id] || "", function (value) {
           S.answers[id] = value;
           saveDraftSoon(); publishSoon(); armStuck();
@@ -2543,6 +2586,9 @@
     window.__xfActive = true;
     buildDom(root);
     stepStart();
+    window.addEventListener("exgen:history-updated", function () {
+      if (UI.screens.start && UI.screens.start.classList.contains("on")) stepStart();
+    });
 
     document.addEventListener("keydown", function (e) {
       if (!UI.exam.classList.contains("on")) return;

@@ -261,6 +261,43 @@ body.xf-grading .xf-progress { display: none; }
   outline-offset: 4px;
 }
 
+.xf-source-table-wrap {
+  margin: -4px 0 22px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.xf-source-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--xf-ink);
+  font-size: var(--exgen-text-base);
+  line-height: var(--exgen-leading-normal);
+  text-align: left;
+}
+
+.xf-source-table caption {
+  padding: 0 0 8px;
+  color: var(--xf-ink-2);
+  font-size: var(--exgen-text-sm);
+  text-align: left;
+}
+
+.xf-source-table th,
+.xf-source-table td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--xf-line);
+  overflow-wrap: anywhere;
+}
+
+.xf-source-table th {
+  font-weight: var(--exgen-weight-medium);
+}
+
+.xf-source-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--xf-line);
+}
+
 .xf-mc { display: grid; gap: 9px; }
 
 .xf-mc-opt {

@@ -408,9 +408,9 @@
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
-            var scored = hist.slice(-5).map(function(x) {
+            var scored = hist.map(function(x) {
               return validPercent(x && x.percent);
-            }).filter(function(percent) { return percent !== null; });
+            }).filter(function(percent) { return percent !== null; }).slice(-5);
             if (scored.length) {
               var avg = scored.reduce(function(s, percent) { return s + percent; }, 0) / scored.length;
               ctx.userScore = avg / 100;
@@ -429,7 +429,7 @@
     if ((typeof value !== 'number' && typeof value !== 'string') ||
         (typeof value === 'string' && value.trim() === '')) return null;
     var percent = Number(value);
-    return Number.isFinite(percent) ? percent : null;
+    return Number.isFinite(percent) && percent >= 0 && percent <= 100 ? percent : null;
   }
 
   /* Bakåtkompatibel ingång. app.html:1474 och förbättring.html:1258 anropar

@@ -718,13 +718,13 @@ async function handleExplainRequest(req, res, perAnswerLease) {
   if (Array.isArray(body.scores)) {
     const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
     if (body.scores.length > 50) return res.status(413).json({ error: "Too many exam scores" });
-    const rawScores = body.scores.filter(s => typeof s === 'number' && Number.isFinite(s)).map(s => clamp(s, 0, 1));
+    const rawScores = body.scores.filter(s => typeof s === 'number' && Number.isFinite(s) && s >= 0 && s <= 1);
     if (rawScores.length < 3) return res.status(400).json({ error: 'Minst 3 prov krävs.', examsProvided: rawScores.length });
     const quota = await consumePerChatQuota(user);
     const quotaDenied = rejectPerChatQuota(res, quota);
     if (quotaDenied) return quotaDenied;
     const rawAreas = Array.isArray(body.weakAreas) ? body.weakAreas.slice(0, 10).map(a => String(a).slice(0, 80)) : [];
-    const examsCount = typeof body.examsCount === 'number' ? body.examsCount : rawScores.length;
+    const examsCount = rawScores.length;
     const recent5 = rawScores.slice(-5);
     const avgRecent = recent5.reduce((a, b) => a + b, 0) / recent5.length;
     const avgAll = rawScores.reduce((a, b) => a + b, 0) / rawScores.length;

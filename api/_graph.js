@@ -113,7 +113,16 @@ function isValidSpec(spec) {
 function displaySpec(spec) {
   if (!isValidSpec(spec)) return null;
   return spec.kind === "scatter"
-    ? { mode: "scatter", point_count: SCATTER_POINT_COUNT, x_label: spec.x_label, y_label: spec.y_label }
+    ? {
+      mode: "scatter",
+      point_count: SCATTER_POINT_COUNT,
+      x_label: spec.x_label,
+      y_label: spec.y_label,
+      source_table: {
+        headers: [spec.x_label, spec.y_label],
+        rows: spec.points.map((point) => [point.x, point.y]),
+      },
+    }
     : { mode: "line", point_count: 2, x_label: "x", y_label: "y" };
 }
 
@@ -238,10 +247,9 @@ function equation(spec) {
 
 function questionText(spec, lang = "sv") {
   if (spec?.kind === "scatter" && isValidSpec(spec)) {
-    const values = spec.points.map((point) => `(${point.x}, ${point.y})`).join(", ");
     return lang === "en"
-      ? `Plot these three measured points: ${values}. Use ${spec.x_label} on the x-axis and ${spec.y_label} on the y-axis.`
-      : `Placera de här tre mätpunkterna: ${values}. Använd ${spec.x_label} på x-axeln och ${spec.y_label} på y-axeln.`;
+      ? "Use the measurements in the table to plot all three points on the graph."
+      : "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.";
   }
   const target = equation(spec);
   if (!target) return "";

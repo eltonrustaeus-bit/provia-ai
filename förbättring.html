@@ -540,7 +540,8 @@
 
     /* ── COACH LOGIC ── */
     function avgPct(arr){const a=(arr||[]).map(x=>chartPercent(x?.percent)).filter(n=>n!==null);if(!a.length)return null;return Math.round(a.reduce((s,n)=>s+n,0)/a.length);}
-    function computeTrend(h){if(h.length<2||chartPercent(h[h.length-1]?.percent)===null)return null;const recent=avgPct(h.slice(-3)),previous=avgPct(h.slice(-6,-3));if(recent===null)return null;if(previous!==null)return{delta:recent-previous};const values=h.map(x=>chartPercent(x?.percent)).filter(n=>n!==null);return values.length>1?{delta:values[values.length-1]-values[0]}:null;}
+    function scoredHistory(h){return(h||[]).filter(x=>chartPercent(x?.percent)!==null);}
+    function computeTrend(h){const scores=scoredHistory(h);if(scores.length<2)return null;const recent=scores.slice(-3),previous=scores.slice(-6,-3);if(previous.length)return{delta:avgPct(recent)-avgPct(previous)};const values=scores.map(x=>chartPercent(x.percent));return{delta:values[values.length-1]-values[0]};}
     function mostMistakeCourse(m){const map=new Map();(m||[]).forEach(x=>{const c=String(x.course||'').trim();if(c)map.set(c,(map.get(c)||0)+1);});let best={course:'',n:0};for(const[c,n]of map.entries())if(n>best.n)best={course:c,n};return best;}
 
     /* Etiketter för grade.js:s error_tags. Bodde i i18n-tabellen tills den
@@ -640,7 +641,7 @@
       const token=sd?.session?.access_token||'';
       if(!token) return null;
 
-      const avg5=avgPct(h.slice(-5));
+      const avg5=avgPct(scoredHistory(h).slice(-5));
       const courseFreq={};
       m.slice(-30).forEach(x=>{const c=String(x.course||'').trim();if(c)courseFreq[c]=(courseFreq[c]||0)+1;});
       const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
@@ -745,7 +746,7 @@
     function chartPercent(value){
       if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&value.trim()===''))return null;
       const percent=Number(value);
-      return Number.isFinite(percent)?percent:null;
+      return Number.isFinite(percent)&&percent>=0&&percent<=100?percent:null;
     }
     function renderChartTable(data){
       const rows=$('chartDataRows');if(!rows)return;
@@ -1065,8 +1066,8 @@
       const h=rows.map(row=>{
         const totalRaw=row.result?.total_points,maxRaw=row.result?.max_points;
         const total=Number(totalRaw),maximum=Number(maxRaw);
-        const hasScore=(typeof totalRaw==='number'||typeof totalRaw==='string')&&!(typeof totalRaw==='string'&&totalRaw.trim()==='')&&(typeof maxRaw==='number'||typeof maxRaw==='string')&&!(typeof maxRaw==='string'&&maxRaw.trim()==='')&&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0;
-        return {ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:hasScore?total:0,max_points:hasScore?maximum:0,percent:hasScore?Math.round((total/maximum)*100):null};
+        const hasScore=(typeof totalRaw==='number'||typeof totalRaw==='string')&&!(typeof totalRaw==='string'&&totalRaw.trim()==='')&&(typeof maxRaw==='number'||typeof maxRaw==='string')&&!(typeof maxRaw==='string'&&maxRaw.trim()==='')&&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
+        return {ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null};
       });
       lsSet(LS_HISTORY,h);
       const last2=rows.length?rows[rows.length-1]:null;
@@ -1184,8 +1185,7 @@
        ta säger varför — en spärrad knapp utan skäl är en återvändsgränd. */
     function renderHem(){
       const {h,m}=data();
-      const recent=h.slice(-5);
-      const scoredRecent=recent.filter(x=>chartPercent(x.percent)!==null);
+      const scoredRecent=scoredHistory(h).slice(-5);
       const avg=avgPct(scoredRecent);
 
       if(!h.length){
@@ -1460,7 +1460,7 @@
         return acc;
       },{});
       const weakAreas=Object.keys(areaCounts).sort((a,b)=>areaCounts[b]-areaCounts[a]).slice(0,5);
-      const recentAverage=avgPct(h.slice(-5));
+      const recentAverage=avgPct(scoredHistory(h).slice(-5));
       window.setPerContext({
         page:'förbättring',
         userScore:recentAverage===null?undefined:recentAverage/100,

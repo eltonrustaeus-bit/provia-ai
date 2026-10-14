@@ -452,6 +452,10 @@ test("verified completed exams route each answer type's signed answer to post-gr
       graph_ui: {
         mode: "scatter", point_count: 3,
         x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
+        source_table: {
+          headers: ["Tid (min)", "Syrehalt (mg/L)"],
+          rows: [[0, 4], [1, 3], [2, 1]],
+        },
       },
       marker: "(0, 4)",
       expected: "Spridningsgrafsförklaringsmock: mätpunkterna ändras över tid",

@@ -1091,7 +1091,7 @@ async function retryPendingExamSave(localId){
   if(!saved.ok)return saved;
   removePendingExam(userId,localId);
   if(currentUnsavedAccountExam?.local_id===localId)currentUnsavedAccountExam=null;
-  await loadExamsFromAccountToLocal();
+  await loadExamsFromAccountToLocal(false);
   return{ok:true};
 }
 async function getPendingAccountSaves(){
@@ -1117,7 +1117,7 @@ function mergeMistakesFromExamRows(rows){
   while(out.length>200)out.shift(); return out;
 }
 
-async function loadExamsFromAccountToLocal(){
+async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   if(!db)return; const uid=await getUserId(); if(!uid)return;
   const{data,error}=await db.from("user_exams").select("id,submission_id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
   if(error)return;
@@ -1125,12 +1125,21 @@ async function loadExamsFromAccountToLocal(){
   const pending=queued.filter(local=>!remote.some(saved=>sameSavedExam(saved,local)));
   if(pending.length!==queued.length)writePendingExams(uid,pending);
   const filtered=[...remote,...pending.map(row=>({...row,local_only:true}))].sort((a,b)=>(Date.parse(a.created_at)||0)-(Date.parse(b.created_at)||0));
-  const history=filtered.map(r=>({ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",total_points:r.result?.total_points??0,max_points:r.result?.max_points??0,percent:(r.result?.max_points>0)?Math.round((r.result.total_points/r.result.max_points)*100):0,accountSaved:!r.local_only}));
+  const history=filtered.map(r=>{
+    const totalRaw=r.result?.total_points,maxRaw=r.result?.max_points;
+    const total=Number(totalRaw),maximum=Number(maxRaw);
+    const hasScore=(typeof totalRaw==="number"||typeof totalRaw==="string")&&!(typeof totalRaw==="string"&&totalRaw.trim()==="")
+      &&(typeof maxRaw==="number"||typeof maxRaw==="string")&&!(typeof maxRaw==="string"&&maxRaw.trim()==="")
+      &&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
+    return{ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",
+      total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null,accountSaved:!r.local_only};
+  });
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
   if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
   else{try{localStorage.removeItem(LS_LAST);}catch{}}
   lsSet(LS_MISTAKES,mergeMistakesFromExamRows(filtered));
+  if(notifyHistoryUpdate)window.dispatchEvent(new Event("exgen:history-updated"));
 }
 
 async function ensureUserProfileRow(){

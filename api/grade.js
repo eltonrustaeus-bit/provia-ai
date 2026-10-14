@@ -17,6 +17,7 @@ const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
+const { sanitizeHistory } = require("./_student-history.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -125,17 +126,6 @@ function buildNonMcGradeSchema() {
       }
     }
   };
-}
-
-function sanitizeHistory(x) {
-  if (!Array.isArray(x)) return [];
-  return x.slice(-3).map((a) => ({
-    ts: Number(a?.ts || 0) || 0,
-    course: typeof a?.course === "string" ? a.course.slice(0, 80) : "",
-    level: typeof a?.level === "string" ? a.level.slice(0, 10) : "",
-    qType: typeof a?.qType === "string" ? a.qType.slice(0, 20) : "",
-    percent: Number(a?.percent || 0) || 0
-  }));
 }
 
 function sanitizeMistakes(x) {

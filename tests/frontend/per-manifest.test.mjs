@@ -199,16 +199,17 @@ ok("T14b knappen ger besked i stället för en tyst no-op", t14.disabled === tru
 const t15 = await page.evaluate(() => {
   window.clearPerContext();
   localStorage.setItem("proviaai_history", JSON.stringify([
-    { percent: 80 }, { percent: null }, { percent: "" }, { percent: "saknas" }
+    { percent: 20 }, { percent: 40 }, { percent: 60 }, { percent: 80 }, { percent: 100 },
+    { percent: null }, { percent: -1 }, { percent: 101 }, { percent: "" }
   ]));
   return window.__perTestCtx();
 });
-ok("T15 endast giltiga prov ingår i snittet", Math.abs((t15.userScore ?? 0) - 0.8) < 1e-9, String(t15.userScore));
+ok("T15 snittet använder de fem senaste poängsatta proven", Math.abs((t15.userScore ?? 0) - 0.6) < 1e-9, String(t15.userScore));
 
 const t16 = await page.evaluate(() => {
   window.clearPerContext();
   localStorage.setItem("proviaai_history", JSON.stringify([
-    { percent: null }, { percent: "" }, { percent: "saknas" }, { percent: false }
+    { percent: null }, { percent: "" }, { percent: "saknas" }, { percent: false }, { percent: -1 }, { percent: 101 }
   ]));
   return window.__perTestCtx();
 });

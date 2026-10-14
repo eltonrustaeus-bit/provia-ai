@@ -370,9 +370,14 @@ try {
   assert.equal(scienceGenerated.status, 200, JSON.stringify(scienceGenerated.body));
   const scienceQuestion = scienceGenerated.body.exam.questions[0];
   assert.deepEqual(scienceQuestion.graph_ui, {
-    mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)"
+    mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
+    source_table: {
+      headers: ["Tid (min)", "Syrehalt (mg/L)"],
+      rows: [[0, 4], [1, 3], [2, 1]],
+    },
   }, "server derives the visible graph setup from the exact source table, not model-provided labels");
-  assert.match(scienceQuestion.question, /Tid \(min\).*Syrehalt \(mg\/L\)/);
+  assert.match(scienceQuestion.question, /mätvärdena i tabellen/i);
+  assert.doesNotMatch(scienceQuestion.question, /\(0, 4\)|\(1, 3\)|\(2, 1\)/);
   assert.equal(Object.hasOwn(scienceQuestion, "graph_spec"), false);
   assert.equal(Object.hasOwn(scienceQuestion, "model_answer"), false);
   gradingState = "active";
