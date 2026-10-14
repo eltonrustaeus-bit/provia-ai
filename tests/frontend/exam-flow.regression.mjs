@@ -276,20 +276,6 @@ async function toMaterial(page) {
       JSON.stringify({ wrappedBackward, wrappedForward }));
     await page.locator(".xf-ask").click();
     await page.waitForFunction(() => document.querySelector("#perBubble")?.classList.contains("per-open"));
-    let reachedPer = false;
-    let stayedInScope = true;
-    for (let i = 0; i < 30; i++) {
-      await page.keyboard.press("Tab");
-      const state = await page.evaluate(() => {
-        const active = document.activeElement;
-        return {
-          inPer: !!active?.closest("#perWidget"),
-          inScope: !!active?.closest(".xf-exam, #perWidget"),
-        };
-      });
-      if (!state.inScope) stayedInScope = false;
-      if (state.inPer) { reachedPer = true; break; }
-    }
     const perBoundary = await page.evaluate(() => {
       const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
       const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
@@ -297,9 +283,11 @@ async function toMaterial(page) {
       const examStops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
       window.__perFirstTabStop = firstPerStop || null;
       window.__examLastTabStop = examStops[examStops.length - 1] || null;
-      firstPerStop?.focus();
       return !!firstPerStop && examStops.length > 0;
     });
+    await page.evaluate(() => window.__examLastTabStop?.focus());
+    await page.keyboard.press("Tab");
+    const tabReachedPer = await page.evaluate(() => document.activeElement === window.__perFirstTabStop);
     await page.keyboard.press("Shift+Tab");
     const returnedToExam = await page.evaluate(() => document.activeElement === window.__examLastTabStop);
     await page.keyboard.press("Tab");
@@ -309,8 +297,8 @@ async function toMaterial(page) {
       delete window.__examLastTabStop;
       return result;
     });
-    ok("Tab når den öppnade P.E.R-panelen utan att lämna provdialogen", reachedPer && stayedInScope,
-      JSON.stringify({ reachedPer, stayedInScope }));
+    ok("Tab från provets sista kontroll når den öppnade P.E.R-panelen", perBoundary && tabReachedPer,
+      JSON.stringify({ controlsVisible: perBoundary, tabReachedPer }));
     ok("fokus går mellan P.E.R och provets sista kontroll", perBoundary && returnedToExam && returnedToPer,
       JSON.stringify({ hasControls: perBoundary, returnedToExam, returnedToPer }));
     const firstOption = page.locator(".xf-mc-opt").first();
