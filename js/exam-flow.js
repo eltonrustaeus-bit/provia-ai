@@ -456,6 +456,8 @@
   };
 
   var UI = {};          // cache av noder
+  var examReturnFocus = null;
+  var examInertState = null;
   var typing = null;    // pågående skrivanimation
   var startVersion = 0;
   var stuckTimer = null;
@@ -1188,10 +1190,12 @@
     ocrBtn.addEventListener("click", function () { file.click(); });
     file.addEventListener("change", function () {
       if (!file.files || !file.files[0]) return;
+      var selectedFile = file.files[0];
+      file.value = "";
       ocrBtn.disabled = true;
       ocrBtn.textContent = "Läser bilden…";
       busy(true);
-      window.ExGenEngine.ocr(file.files[0]).then(function (r) {
+      window.ExGenEngine.ocr(selectedFile).then(function (r) {
         busy(false);
         ocrBtn.disabled = false;
         ocrBtn.textContent = "Fota en sida i stället";
@@ -1428,23 +1432,85 @@
     }
   }
 
+  function setExamBackgroundInert(on) {
+    if (on) {
+      if (examInertState) return;
+      var root = UI.exam && UI.exam.parentElement;
+      var per = document.getElementById("perWidget");
+      var nodes = [];
+      Array.prototype.forEach.call(root ? root.children : [], function (node) {
+        if (node !== UI.exam) nodes.push(node);
+      });
+      Array.prototype.forEach.call(document.body.children, function (node) {
+        if (node !== root && node !== per && !/^(SCRIPT|STYLE)$/.test(node.tagName)) nodes.push(node);
+      });
+      examInertState = nodes.map(function (node) {
+        return [node, node.inert, node.getAttribute("aria-hidden")];
+      });
+      examInertState.forEach(function (entry) {
+        entry[0].inert = true;
+        entry[0].setAttribute("aria-hidden", "true");
+      });
+      return;
+    }
+    (examInertState || []).forEach(function (entry) {
+      entry[0].inert = entry[1];
+      if (entry[2] === null) entry[0].removeAttribute("aria-hidden");
+      else entry[0].setAttribute("aria-hidden", entry[2]);
+    });
+    examInertState = null;
+  }
+
+  function examTabStops() {
+    var selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    var stops = Array.prototype.filter.call(UI.exam.querySelectorAll(selector), function (node) {
+      return node.getClientRects().length > 0 && !node.closest('[inert]');
+    });
+    var per = document.getElementById("perWidget");
+    if (per && per.getClientRects().length > 0) {
+      stops = stops.concat(Array.prototype.filter.call(per.querySelectorAll(selector), function (node) {
+        return node.getClientRects().length > 0 && !node.disabled;
+      }));
+    }
+    return stops;
+  }
+
   function openExam(resumedAt) {
     if (window.dismissWelcome) window.dismissWelcome();
     // Vid återupptagning behålls den tid provet redan pågått. Att nollställa
     // klockan hade dolt att eleven redan suttit en halvtimme och gjort både
     // tidsangivelsen och tempo-varningen missvisande.
     S.startedAt = typeof resumedAt === "number" && resumedAt > 0 ? resumedAt : Date.now();
+    if (!examReturnFocus && document.activeElement && document.activeElement !== document.body) {
+      examReturnFocus = document.activeElement;
+    }
+    setExamBackgroundInert(true);
+    UI.exam.inert = false;
+    UI.exam.removeAttribute("aria-hidden");
+    UI.exam.setAttribute("aria-modal", "true");
+    UI.exam.setAttribute("aria-owns", "perWidget");
     UI.exam.classList.add("on");
     document.body.classList.add("xf-in-exam");
     lockScroll(true);
-    renderQuestion();
+    renderQuestion(true);
     tick();
     watchKeyboard(true);
   }
 
-  function closeExam() {
+  function closeExam(restoreFocus) {
     UI.exam.classList.remove("on");
+    UI.exam.setAttribute("aria-hidden", "true");
+    UI.exam.removeAttribute("aria-modal");
+    UI.exam.removeAttribute("aria-owns");
     document.body.classList.remove("xf-in-exam", "xf-per-open");
+    if (restoreFocus === false) {
+      UI.exam.inert = true;
+      UI.machine.inert = false;
+      UI.machine.removeAttribute("aria-hidden");
+    } else {
+      setExamBackgroundInert(false);
+      UI.exam.inert = false;
+    }
     lockScroll(false);
     clearTimeout(stuckTimer);
     clearTimeout(UI.nudgeTimer);
@@ -1474,6 +1540,11 @@
        mitt på resultatskärmen — exakt den felklass branchen finns för att
        döda, bara flyttad hit. */
     if (window.PER && window.PER.describe) window.PER.describe(null);
+    if (restoreFocus !== false && examReturnFocus) {
+      var target = examReturnFocus;
+      examReturnFocus = null;
+      if (target.isConnected && typeof target.focus === "function") target.focus({ preventScroll: true });
+    }
   }
 
   /* Det virtuella tangentbordet på mobil läggs ovanpå sidan utan att ändra
@@ -1736,7 +1807,9 @@
     sheet.appendChild(head);
 
     var qText = el("h2", "xf-q-text", q.question || "");
+    qText.id = "xf-current-question";
     qText.tabIndex = -1;
+    UI.exam.setAttribute("aria-labelledby", qText.id);
     sheet.appendChild(qText);
     renderMathIn(qText);
 
@@ -1997,7 +2070,7 @@
     }
 
     var resumeAt = S.startedAt;
-    closeExam();
+    closeExam(false);
     machine();
 
     var answers = qs.map(function (q, n) {
@@ -2064,6 +2137,7 @@
   function machine() {
     machineShownAt = Date.now();
     UI.machine.classList.add("on");
+    UI.log.focus({ preventScroll: true });
     document.body.classList.add("xf-grading");
     /* lockScroll(true), inte en direkt tilldelning. Att sätta stilen här utan
        att gå genom lockScroll lämnade prevOverflow som null, och lockScroll(false)
@@ -2110,6 +2184,7 @@
         clearInterval(UI.pepTimer);
         UI.machine.classList.remove("on");
         document.body.classList.remove("xf-grading");
+        setExamBackgroundInert(false);
         lockScroll(false);
         done();
       }, left);
@@ -2525,6 +2600,10 @@
 
     // Provläget
     UI.exam = el("div", "xf-exam");
+    UI.exam.setAttribute("role", "dialog");
+    UI.exam.setAttribute("aria-modal", "false");
+    UI.exam.setAttribute("aria-hidden", "true");
+    UI.exam.tabIndex = -1;
     var top = el("div", "xf-exam-top");
     UI.count = el("span", null, "Fråga 1");
     UI.dots = el("div", "xf-exam-dots");
@@ -2568,8 +2647,15 @@
 
     // Maskinytan
     UI.machine = el("div", "xf-machine");
+    UI.machine.setAttribute("role", "region");
+    UI.machine.setAttribute("aria-label", "Rättningen pågår");
+    UI.machine.tabIndex = -1;
     UI.machine.appendChild(el("div", "xf-orb"));
     UI.log = el("div", "xf-log");
+    UI.log.setAttribute("role", "status");
+    UI.log.setAttribute("aria-live", "polite");
+    UI.log.setAttribute("aria-atomic", "true");
+    UI.log.tabIndex = -1;
     UI.machine.appendChild(UI.log);
     UI.pep = el("div", "xf-pep");
     UI.machine.appendChild(UI.pep);
@@ -2592,6 +2678,28 @@
 
     document.addEventListener("keydown", function (e) {
       if (!UI.exam.classList.contains("on")) return;
+      if (e.key === "Tab") {
+        var stops = examTabStops();
+        if (!stops.length) {
+          e.preventDefault();
+          UI.exam.focus();
+          return;
+        }
+        var first = stops[0];
+        var last = stops[stops.length - 1];
+        var active = document.activeElement;
+        if (!UI.exam.contains(active) && !document.getElementById("perWidget")?.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && (active === first || !stops.includes(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
       if (e.target && /^(TEXTAREA|INPUT)$/.test(e.target.tagName)) return;
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
       // Utan detta scrollar arket i sidled samtidigt som frågan byts.

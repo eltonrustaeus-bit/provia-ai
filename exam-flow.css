@@ -101,10 +101,12 @@
 body.xf-in-exam .xg-header,
 body.xf-in-exam .xg-utility-bar,
 body.xf-in-exam #betaBanner,
+body.xf-in-exam #proviaGlobalNav,
 body.xf-in-exam .xg-footer,
 body.xf-grading .xg-header,
 body.xf-grading .xg-utility-bar,
 body.xf-grading #betaBanner,
+body.xf-grading #proviaGlobalNav,
 body.xf-grading .xg-footer { display: none !important; }
 
 /* Under rättningen finns inget att fråga om — provet är inlämnat och svaren

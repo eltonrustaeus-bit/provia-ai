@@ -144,6 +144,39 @@ async function toMaterial(page) {
   }
 }
 
+// The same photo can be selected again after an OCR error.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "ocr-retry");
+    await toMaterial(page);
+    let ocrCalls = 0;
+    await page.route("**/api/ocr", route => {
+      ocrCalls++;
+      return route.fulfill({ json: ocrCalls === 1
+        ? { ok: false, error: "Synthetic OCR failure" }
+        : { ok: true, text: "Syntetiskt OCR-underlag" } });
+    });
+    const input = page.locator("#xf .xf-screen[data-screen='material'] input[type='file']");
+    const image = { name: "sida.png", mimeType: "image/png", buffer: Buffer.from("synthetic test image") };
+    await input.setInputFiles(image);
+    await page.waitForFunction(() => /Kunde inte läsa bilden/.test(
+      document.querySelector("#xf .xf-screen[data-screen='material'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    const clearedAfterFailure = await input.inputValue() === "";
+    await input.setInputFiles(image);
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='material'] .xf-area")
+      ?.value.includes("Syntetiskt OCR-underlag"), null, { timeout: 5000 });
+    ok("samma bild kan väljas igen efter OCR-fel", clearedAfterFailure && ocrCalls === 2,
+      JSON.stringify({ clearedAfterFailure, ocrCalls }));
+    ok("lyckad OCR-återförsök lägger till text i redigerbart material", await page.locator(
+      "#xf .xf-screen[data-screen='material'] .xf-area").inputValue() === "Syntetiskt OCR-underlag");
+  } catch (e) {
+    ok("OCR kan återförsökas med samma bild", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // ── T1f: a fresh local save cannot revive an expired server issuance ──────
 {
   examIssuanceStateResponse = "expired";
@@ -209,6 +242,38 @@ async function toMaterial(page) {
   try {
     await signIn(page, "keyboard-focus");
     await toExam(page);
+    const modal = await page.evaluate(() => {
+      const exam = document.querySelector(".xf-exam");
+      return {
+        role: exam?.getAttribute("role"),
+        modal: exam?.getAttribute("aria-modal"),
+        label: exam?.getAttribute("aria-labelledby"),
+        labelledQuestion: exam?.getAttribute("aria-labelledby") === document.querySelector(".xf-q-text")?.id,
+        focusInside: exam?.contains(document.activeElement),
+        backgroundInert: [...document.querySelectorAll("#xf .xf-screen")].every(screen => screen.inert),
+        outsideInert: [...document.body.children].filter(node => node.id !== "xf" && node.id !== "perWidget"
+          && !/^(SCRIPT|STYLE)$/.test(node.tagName)).every(node => node.inert),
+        perAvailable: !document.getElementById("perWidget")?.inert,
+        perOwned: exam?.getAttribute("aria-owns") === "perWidget"
+      };
+    });
+    ok("provytan är en namngiven modal med bakgrunden spärrad", modal.role === "dialog" && modal.modal === "true"
+      && modal.labelledQuestion && modal.focusInside && modal.backgroundInert && modal.outsideInert,
+      JSON.stringify(modal));
+    ok("P.E.R inkluderas i dialogens tillgängliga innehåll", modal.perOwned && modal.perAvailable, JSON.stringify(modal));
+    await page.locator(".xf-exam .xf-dot").first().focus();
+    await page.keyboard.press("Shift+Tab");
+    const wrappedBackward = await page.evaluate(() => {
+      const exam = document.querySelector(".xf-exam");
+      const per = document.getElementById("perWidget");
+      const firstDot = document.querySelector(".xf-exam .xf-dot");
+      return document.activeElement !== firstDot
+        && (exam?.contains(document.activeElement) || per?.contains(document.activeElement));
+    });
+    await page.keyboard.press("Tab");
+    const wrappedForward = await page.evaluate(() => document.activeElement?.matches(".xf-exam .xf-dot:first-child"));
+    ok("tangentbordsfokus stannar i provdialogen", wrappedBackward && wrappedForward,
+      JSON.stringify({ wrappedBackward, wrappedForward }));
     const firstOption = page.locator(".xf-mc-opt").first();
     await firstOption.focus();
     await page.keyboard.press("Enter");
@@ -225,6 +290,41 @@ async function toMaterial(page) {
     await page.screenshot({ path: `${SHOT}/exam-keyboard-focus-next-question-mobile.png` });
     ok("Enter auto-advance moves focus to the next question", focus.onNextQuestion && focus.visible, JSON.stringify(focus));
     ok("keyboard focus on the next question is visibly indicated", focus.focusVisible, JSON.stringify(focus));
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Grading announces its changing status and owns focus until the result screen.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "grading-status");
+    await toExam(page);
+    page.on("dialog", dialog => dialog.accept().catch(() => {}));
+    const next = page.locator(".xf-exam-nav .xf-btn.primary").last();
+    await next.click();
+    await next.click();
+    await next.click();
+    await page.waitForFunction(() => {
+      const status = document.querySelector(".xf-log");
+      return status?.getAttribute("role") === "status" && document.activeElement === status;
+    }, null, { timeout: 5000 });
+    const state = await page.evaluate(() => ({
+      live: document.querySelector(".xf-log")?.getAttribute("aria-live"),
+      firstStep: document.querySelector(".xf-log")?.textContent,
+      gradingRegion: document.querySelector(".xf-machine")?.getAttribute("aria-label"),
+      focused: document.activeElement === document.querySelector(".xf-log"),
+      backgroundInert: [...document.querySelectorAll("#xf .xf-screen")].every(screen => screen.inert)
+        && [...document.body.children].filter(node => node.id !== "xf" && node.id !== "perWidget"
+          && !/^(SCRIPT|STYLE)$/.test(node.tagName)).every(node => node.inert),
+    }));
+    ok("rättningen meddelas som status och får fokus", state.live === "polite" && state.focused
+      && /läser dina svar/.test(state.firstStep) && state.gradingRegion === "Rättningen pågår" && state.backgroundInert,
+      JSON.stringify(state));
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 12000 });
+    const resultFocus = await page.evaluate(() => !!document.activeElement?.closest(".xf-screen[data-screen='result']"));
+    ok("fokus lämnar rättningen till resultatsidan", resultFocus);
   } finally {
     await ctx.close();
   }

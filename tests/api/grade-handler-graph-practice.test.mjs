@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const grade = require("../../api/grade.js");
 const tasks = require("../../api/_grade-task.js");
+const graphTasks = require("../../api/_graph.js");
 
 const oldEnv = {
   SUPABASE_URL: process.env.SUPABASE_URL,
@@ -475,6 +476,59 @@ try {
   assert.equal(JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body)
     .p_learning_payload.learner_loop_enabled, true,
     "the eventual worker retains eligible learner-loop attempts in the durable snapshot");
+
+  const scienceCourse = "Biologi 1";
+  const scienceMaterial = "Tid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n1 | 3\n2 | 1";
+  const scienceSpec = {
+    kind: "scatter", slope: null, intercept: null,
+    points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }],
+    x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
+  };
+  const scienceQuestion = {
+    id: "science-graph-1", type: "graph", points: 3,
+    question: graphTasks.questionText(scienceSpec), options: [],
+    concept_tag: "tolka mätdata", graph_spec: scienceSpec,
+    graph_ui: graphTasks.displaySpec(scienceSpec),
+    model_answer: graphTasks.modelAnswer(scienceSpec),
+  };
+  const scienceContextHash = tasks.hashContext(scienceMaterial, scienceCourse, userId);
+  const publicScienceQuestion = {
+    id: scienceQuestion.id, type: scienceQuestion.type, points: scienceQuestion.points,
+    question: scienceQuestion.question, options: [], graph_ui: scienceQuestion.graph_ui,
+    grade_task: tasks.sealQuestion(scienceQuestion, secret, scienceContextHash),
+  };
+  assert.ok(publicScienceQuestion.grade_task, "the source-bound science graph is signed");
+  const scienceManifest = require("../../api/_exam-completion.cjs")
+    .issueExamManifest(userId, scienceCourse, scienceMaterial, [publicScienceQuestion]);
+  const scienceAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 3 },
+  ] });
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+  mockResultMode = "insert";
+  learnerLoopEnabled = false;
+  calls.length = 0;
+  const officialScience = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    exam_manifest: scienceManifest, questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceAnswer }],
+  });
+  assert.equal(officialScience.status, 200, "the official handler accepts a valid non-math scatter task");
+  assert.deepEqual(officialScience.body.result, {
+    total_points: 3, max_points: 3,
+    per_question: [{
+      id: scienceQuestion.id, points: 3, max_points: 3,
+      feedback: "3 av 3 mätpunkter stämmer med tabellen.",
+      model_answer: "Mätpunkterna är (0, 4), (1, 3), (2, 1).",
+      concept_tag: "tolka mätdata", error_tags: [],
+    }],
+  }, "the non-math graph is deterministically scored against its signed source table");
+  const scienceWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.ok(scienceWrite, "the official science score follows the canonical persistence path");
+  assert.deepEqual(JSON.parse(scienceWrite.body).p_result_payload, officialScience.body.result);
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "deterministic science graph grading does not call the AI provider");
 
   console.log("grade handler graph: signed task, server quota, deterministic score, retry isolation, and official persistence passed");
 } finally {

@@ -142,6 +142,21 @@ for (const [label, w, h] of VIEWS) {
   if (chrome.header) add("HÖG", label, "Sidhuvudet syns fortfarande i provläget", ".xg-header", "body.xf-in-exam-regeln träffar inte");
   if (chrome.util || chrome.beta) add("MEDEL", label, "Utility-bar eller betabanner syns i provläget", ".xg-utility-bar/#betaBanner", "Samma regel");
 
+  const legacyNavHidden = await page.evaluate(() => {
+    const nav = document.createElement("nav");
+    nav.id = "proviaGlobalNav";
+    document.body.appendChild(nav);
+    const hiddenInExam = getComputedStyle(nav).display === "none";
+    document.body.classList.remove("xf-in-exam");
+    document.body.classList.add("xf-grading");
+    const hiddenInGrading = getComputedStyle(nav).display === "none";
+    document.body.classList.remove("xf-grading");
+    document.body.classList.add("xf-in-exam");
+    nav.remove();
+    return hiddenInExam && hiddenInGrading;
+  });
+  if (!legacyNavHidden) add("HÖG", label, "Den globala mobilmenyn visas över prov eller rättning", "#proviaGlobalNav", "Dölj menyn i båda lägena");
+
   // fasta element som överlappar
   const boxes = await page.evaluate(() => {
     const g = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === "none") return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, b: r.bottom, r: r.right }; };
