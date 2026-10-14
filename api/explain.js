@@ -477,6 +477,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   }
   const currentQuestion = body.pageContext?.currentQuestion;
   const type = currentQuestion?.type;
+  const hasDraft = currentQuestion?.answered === true;
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
   if (currentQuestion?.graph_ui && Object.hasOwn(currentQuestion.graph_ui, "mode")) declaredGraphModes.push(currentQuestion.graph_ui.mode);
@@ -539,16 +540,72 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Kontrollera att svaret förklarar sambandet och stöder det med ett belägg. Vilken del av frågan har du ännu inte besvarat?",
       ],
     };
+  const draftChecks = en
+    ? {
+      mc: [
+        "If you have chosen an option, restate its claim in your own words. What idea from your material could support it?",
+        "Find one detail in your material that supports or challenges your choice. Which alternative does that evidence rule out?",
+        "Compare every option against evidence from your material. Which claim is best supported, and why?",
+      ],
+      line: [
+        "If you have plotted points, check that your chosen x-values match the relationship in the question.",
+        "Substitute each point you plotted into the relationship. Which coordinate, if any, needs another check?",
+        "Check signs, axis labels and units, then explain how the points show the relationship.",
+      ],
+      scatter: [
+        "If you have placed points, compare each one with the x and y values from the same table row.",
+        "Check one point's labels and units against its row. What changes if its coordinates are reversed?",
+        "Compare the first and last observations, then describe the trend without assuming every point lies on a line.",
+      ],
+      genericGraph: [
+        "If you have made a mark on the graph, explain what that mark represents using the axes.",
+        "Check one feature against its label and units. What does it show in relation to the question?",
+        "Review the graph against all labels and evidence; describe your interpretation in your own words.",
+      ],
+      short: [
+        "If you have written a draft, state its main claim in one sentence. Which concept from your material is relevant?",
+        "Find one specific detail in your material that supports your claim. Have you explained the link?",
+        "Check that you addressed every part of the question and linked your evidence to a conclusion.",
+      ],
+    }
+    : {
+      mc: [
+        "Om du har valt ett alternativ, skriv om dess påstående med egna ord. Vilken idé i materialet kan stödja det?",
+        "Hitta en detalj i materialet som stöder eller talar emot ditt val. Vilket annat alternativ motsäger den?",
+        "Jämför alla alternativ med belägg ur materialet. Vilket påstående har starkast stöd, och varför?",
+      ],
+      line: [
+        "Om du har placerat ut punkter, kontrollera att dina x-värden passar sambandet i frågan.",
+        "Sätt in varje punkt du ritat i sambandet. Vilken koordinat behöver i så fall kontrolleras igen?",
+        "Kontrollera tecken, axelrubriker och enheter. Förklara sedan hur punkterna visar sambandet.",
+      ],
+      scatter: [
+        "Om du har placerat ut punkter, jämför varje punkt med x- och y-värdet från samma tabellrad.",
+        "Kontrollera en punkts rubriker och enheter mot tabellraden. Vad ändras om koordinaterna byter plats?",
+        "Jämför första och sista observationen och beskriv trenden utan att anta att alla punkter ligger på en linje.",
+      ],
+      genericGraph: [
+        "Om du har markerat något i grafen, förklara vad markeringen visar med hjälp av axlarna.",
+        "Kontrollera en del mot dess rubrik och enhet. Vad visar den i relation till frågan?",
+        "Granska grafen mot alla rubriker och belägg. Beskriv tolkningen med egna ord.",
+      ],
+      short: [
+        "Om du har skrivit ett utkast, sammanfatta huvudpoängen i en mening. Vilket begrepp i materialet hör ihop med den?",
+        "Hitta en konkret detalj i materialet som stöder din poäng. Har du förklarat sambandet?",
+        "Kontrollera att du besvarat varje del av frågan och kopplat belägget till en slutsats.",
+      ],
+    };
   const requestedLevel = Number.isInteger(body.helpLevel)
     ? Math.min(2, Math.max(0, body.helpLevel))
     : 0;
   res.setHeader("Cache-Control", "no-store");
+  const ladder = hasDraft ? draftChecks : hints;
   const sequence = type === "graph"
-    ? (graphMode === "line" || graphMode === "scatter" ? hints[graphMode] : hints.genericGraph)
-    : hints[type];
+    ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
+    : ladder[type];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   res.json({
-    answer: sequence?.[requestedLevel] || hints.short[requestedLevel],
+    answer: sequence?.[requestedLevel] || ladder.short[requestedLevel],
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: true,
