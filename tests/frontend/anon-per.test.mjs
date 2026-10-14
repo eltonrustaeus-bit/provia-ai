@@ -20,7 +20,7 @@ const browser = await chromium.launch();
 
 /* Utloggad: ingen session seedas. Anropen mockas så testet varken kostar
    OpenAI-pengar eller beror på nätet. */
-async function öppna() {
+async function öppna(lang = "sv") {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   const anrop = [];
@@ -31,7 +31,10 @@ async function öppna() {
     return r.fulfill({ json: { answer: "Ett svar." } });
   });
   await page.evaluate?.(() => {});
-  await page.addInitScript(() => { try { sessionStorage.setItem("pi_splash_shown", "1"); } catch {} });
+  await page.addInitScript(language => {
+    try { sessionStorage.setItem("pi_splash_shown", "1"); } catch {}
+    localStorage.setItem("proviaai_lang", language);
+  }, lang);
   await page.goto(`${srv.url}/index.html`, { waitUntil: "networkidle" });
   await page.evaluate(() => { for (const id of ["proviaWelcome", "pageLoader"]) document.getElementById(id)?.remove(); });
   await page.waitForTimeout(700);
@@ -94,6 +97,22 @@ try {
   R.ok("spärren erbjuder ett konto som väg vidare", /gratis konto/i.test(msgs));
 
   await t.close();
+
+  const en = await öppna("en");
+  const englishBar = {
+    quota: (await en.page.locator("#perLandingLeft").innerText()).trim(),
+    link: (await en.page.locator("#perLandingBar a").textContent()).trim(),
+  };
+  R.ok("engelsk P.E.R-rad översätter kvot och kontolänk",
+    englishBar.quota.includes("3 of 3 ExGen questions left")
+      && englishBar.link === "Create a free account →", JSON.stringify(englishBar));
+  await en.page.locator("#perClearBtn").click();
+  R.ok("rensningsbesked följer det engelska landningsspråket",
+    (await en.page.locator("#perMessages").innerText()).includes("The conversation was cleared from this device"));
+  R.ok("engelska P.E.R-verktyg behåller rätt åtkomstnamn efter öppning",
+    await en.page.locator("#perQuizBtn").getAttribute("aria-label") === "Let P.E.R quiz me"
+      && await en.page.locator("#perClearBtn").getAttribute("aria-label") === "Clear conversation on this device");
+  await en.close();
 } catch (e) {
   process.exitCode = R.finish(e);
   await browser.close(); srv.close(); process.exit(process.exitCode);

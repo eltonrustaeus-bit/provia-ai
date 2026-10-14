@@ -1721,7 +1721,7 @@
       targets: qs.map(function (qq, n) {
         return {
           id: "q" + (n + 1),
-          label: "Fråga " + (n + 1),
+          label: tx("Fråga " + (n + 1), "Question " + (n + 1)),
           hint: String(qq.question || "").slice(0, 90),
           go: function () { S.idx = n; renderQuestion(); }
         };
@@ -1746,6 +1746,21 @@
     var qs = (S.exam && S.exam.questions) || [];
     var english = Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
     UI.dots.setAttribute("aria-label", english ? "Exam question navigation" : "Provfrågor");
+    if (UI.count) UI.count.textContent = (english ? "Question " : "Fråga ") + (S.idx + 1) + " / " + qs.length;
+    if (UI.prev) UI.prev.textContent = english ? "Previous" : "Föregående";
+    if (UI.next) UI.next.textContent = S.exam && S.idx === qs.length - 1
+      ? (english ? "Submit" : "Lämna in")
+      : (english ? "Next" : "Nästa");
+    if (UI.exit) {
+      UI.exit.title = english ? "End exam" : "Avbryt prov";
+      UI.exit.setAttribute("aria-label", UI.exit.title);
+    }
+    var askButton = UI.sheetWrap && UI.sheetWrap.querySelector(".xf-ask");
+    if (askButton && S.exam) {
+      askButton.textContent = S.helped[qid(S.exam.questions[S.idx], S.idx)]
+        ? (english ? "✦ P.E.R opened here" : "✦ P.E.R öppnades här")
+        : (english ? "✦ Ask P.E.R about question " : "✦ Fråga P.E.R om fråga ") + (S.idx + 1);
+    }
     Array.prototype.forEach.call(UI.dots.children, function (dot, n) {
       var answered = isAnswerComplete(qs[n], S.answers[qid(qs[n], n)]);
       var current = n === S.idx;
@@ -1890,7 +1905,7 @@
     });
     updateQuestionDotLabels();
 
-    UI.count.textContent = "Fråga " + (i + 1) + " / " + qs.length;
+    UI.count.textContent = tx("Fråga ", "Question ") + (i + 1) + " / " + qs.length;
 
     var sheet = el("div", "xf-sheet");
 
@@ -1965,7 +1980,8 @@
        den "fråga 7" vet eleven att det är den frågan som gäller utan att
        behöva fråga. */
     var ask = el("button", "xf-ask" + (S.helped[id] ? " used" : ""),
-      S.helped[id] ? "✦ P.E.R öppnades här" : "✦ Fråga P.E.R om fråga " + (i + 1));
+      S.helped[id] ? tx("✦ P.E.R öppnades här", "✦ P.E.R opened here")
+        : tx("✦ Fråga P.E.R om fråga ", "✦ Ask P.E.R about question ") + (i + 1));
     ask.type = "button";
     ask.addEventListener("click", function () {
       /* This local marker records that the P.E.R panel opened for this question,
@@ -1973,7 +1989,7 @@
       if (!askPer()) return;
       S.helped[id] = true;
       ask.className = "xf-ask used";
-      ask.textContent = "✦ P.E.R öppnades här";
+      ask.textContent = tx("✦ P.E.R öppnades här", "✦ P.E.R opened here");
       saveDraft();
     });
     sheet.appendChild(ask);
@@ -1984,7 +2000,7 @@
     if (focusQuestion) qText.focus({ preventScroll: true });
 
     UI.prev.disabled = i === 0;
-    UI.next.textContent = i === S.exam.questions.length - 1 ? "Lämna in" : "Nästa";
+    UI.next.textContent = i === S.exam.questions.length - 1 ? tx("Lämna in", "Submit") : tx("Nästa", "Next");
 
     armStuck();
     pace();
@@ -2099,11 +2115,14 @@
 
   function abandon() {
     if (S.submitting || UI.exit.disabled) return;
-    if (!window.confirm("Avsluta provet utan rättning? Dina svar tas bort och provet kan inte lämnas in senare.")) return;
+    if (!window.confirm(tx(
+      "Avsluta provet utan rättning? Dina svar tas bort och provet kan inte lämnas in senare.",
+      "End the exam without grading? Your answers will be deleted, and you will not be able to submit it later."
+    ))) return;
     UI.exit.disabled = true;
     window.ExGenEngine.abandonExam().then(function (result) {
       if (!result || !result.ok) {
-        nudge((result && result.error) || "Provet kunde inte avslutas säkert. Försök igen.");
+        nudge((result && result.error) || tx("Provet kunde inte avslutas säkert. Försök igen.", "The exam could not be ended safely. Please try again."));
         return;
       }
       closeExam();
@@ -2114,7 +2133,7 @@
       S.submitting = false;
       stepStart();
     }).catch(function () {
-      nudge("Provet kunde inte avslutas säkert. Försök igen.");
+      nudge(tx("Provet kunde inte avslutas säkert. Försök igen.", "The exam could not be ended safely. Please try again."));
     }).finally(function () {
       UI.exit.disabled = false;
     });
@@ -2150,8 +2169,10 @@
     if (blank > 0) {
       var ok = window.confirm(
         blank === 1
-          ? "Du har 1 obesvarad fråga. Den får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?"
-          : "Du har " + blank + " obesvarade frågor. De får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?"
+          ? tx("Du har 1 obesvarad fråga. Den får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?",
+            "You have 1 unanswered question. It will receive 0 points, and you can review the answer after grading. The exam cannot be changed. Submit anyway?")
+          : tx("Du har " + blank + " obesvarade frågor. De får 0 poäng och du kan se facit efter rättningen. Provet kan inte ändras. Lämna in ändå?",
+            "You have " + blank + " unanswered questions. They will receive 0 points, and you can review the answers after grading. The exam cannot be changed. Submit anyway?")
       );
       if (!ok) {
         S.submitting = false;
@@ -2730,7 +2751,7 @@
     UI.exam.setAttribute("aria-hidden", "true");
     UI.exam.tabIndex = -1;
     var top = el("div", "xf-exam-top");
-    UI.count = el("span", null, "Fråga 1");
+    UI.count = el("span", null, tx("Fråga 1", "Question 1"));
     UI.dots = el("div", "xf-exam-dots");
     UI.time = el("span", "xf-exam-time", "00:00");
     UI.time.dataset.elapsed = "00:00";
@@ -2739,8 +2760,8 @@
     updateExamClockLabel();
     UI.exit = el("button", "xf-exam-exit", "×");
     UI.exit.type = "button";
-    UI.exit.title = "Avbryt prov";
-    UI.exit.setAttribute("aria-label", "Avbryt prov");
+    UI.exit.title = tx("Avbryt prov", "End exam");
+    UI.exit.setAttribute("aria-label", UI.exit.title);
     UI.exit.addEventListener("click", abandon);
     top.appendChild(UI.count);
     top.appendChild(UI.dots);
@@ -2752,10 +2773,10 @@
     UI.exam.appendChild(UI.sheetWrap);
 
     var nav = el("div", "xf-exam-nav");
-    UI.prev = el("button", "xf-btn ghost", "Föregående");
+    UI.prev = el("button", "xf-btn ghost", tx("Föregående", "Previous"));
     UI.prev.type = "button";
     UI.prev.addEventListener("click", prev);
-    UI.next = el("button", "xf-btn primary", "Nästa");
+    UI.next = el("button", "xf-btn primary", tx("Nästa", "Next"));
     UI.next.type = "button";
     UI.next.addEventListener("click", next);
     nav.appendChild(UI.prev);

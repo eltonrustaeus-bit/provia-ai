@@ -89,23 +89,57 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null) {
 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
-const signIn = async (page, uid, lang = "sv") => {
+const signIn = async (page, uid, lang = "sv", storage = {}) => {
   await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
   await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role: "premium" }] }));
-  await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang });
+  await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang, storage });
 };
 
 // A persisted English preference must be applied before the first language-change event.
 {
   const { ctx, page, errs } = await mk();
   try {
-    await signIn(page, "english-first-load", "en");
+    await signIn(page, "english-first-load", "en", {
+      proviaai_per_corner: "bl",
+      proviaai_per_size: "large",
+    });
     await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     ok("P.E.R-kontrollerna är engelska redan vid första sidladdningen",
       await page.locator("#perInput").getAttribute("aria-label") === "Ask P.E.R a question"
       && await page.locator("#perSendBtn").textContent() === "Send"
       && await page.locator("#perMicBtn").getAttribute("aria-label") === "Speak to P.E.R");
+    const perToolLabels = await Promise.all(["perQuizBtn", "perCornerBtn", "perSizeBtn", "perClearBtn"]
+      .map(id => page.locator("#" + id).getAttribute("aria-label")));
+    ok("P.E.R-verktygen har engelska tillgängliga namn",
+      perToolLabels[0] === "Let P.E.R quiz me"
+      && perToolLabels[1] === "Move P.E.R to bottom right"
+      && perToolLabels[2] === "Use normal panel size"
+      && perToolLabels[3] === "Clear conversation on this device", JSON.stringify(perToolLabels));
+    await page.locator("#langBtnDesktop").click();
+    await page.waitForFunction(() => document.querySelector("#perInput")?.getAttribute("aria-label") === "Ställ en fråga till P.E.R");
+    ok("sparad P.E.R-position och storlek behåller svenska handlingsnamn efter språkbyte",
+      await page.locator("#perCornerBtn").getAttribute("aria-label") === "Flytta P.E.R till nedre högra hörnet"
+      && await page.locator("#perSizeBtn").getAttribute("aria-label") === "Återställ normal storlek");
+    await page.locator("#langBtnDesktop").click();
+    await page.waitForFunction(() => document.querySelector("#perInput")?.getAttribute("aria-label") === "Ask P.E.R a question");
+    await toExam(page);
+    ok("aktivt prov har engelska navigeringskontroller och frågerubrik",
+      await page.locator(".xf-exam-nav .xf-btn.ghost").textContent() === "Previous"
+      && await page.locator(".xf-exam-nav .xf-btn.primary").textContent() === "Next"
+      && await page.locator(".xf-exam-top > span:first-child").textContent() === "Question 1 / 3"
+      && await page.locator(".xf-exam-exit").getAttribute("aria-label") === "End exam"
+      && await page.locator(".xf-ask").textContent() === "✦ Ask P.E.R about question 1");
+    await page.locator(".xf-exam-nav .xf-btn.primary").click();
+    await page.locator(".xf-exam-nav .xf-btn.primary").click();
+    let submitConfirmation = "";
+    page.once("dialog", async dialog => { submitConfirmation = dialog.message(); await dialog.dismiss(); });
+    await page.locator(".xf-exam-nav .xf-btn.primary").click();
+    ok("obesvarad-fråga-dialogen är på engelska", /3 unanswered questions/.test(submitConfirmation) && /Submit anyway\?/.test(submitConfirmation), submitConfirmation);
+    let abandonConfirmation = "";
+    page.once("dialog", async dialog => { abandonConfirmation = dialog.message(); await dialog.dismiss(); });
+    await page.locator(".xf-exam-exit").click();
+    ok("avslutsdialogen är på engelska", /End the exam without grading/.test(abandonConfirmation), abandonConfirmation);
     ok("P.E.R:s startspråkstest saknar sidfel", errs.length === 0, errs.join(" | "));
   } finally {
     await ctx.close();

@@ -574,9 +574,16 @@
       if (!bar || !leftEl) return;
       var used = getLandingQuota();
       var left = Math.max(0, LANDING_FREE_QUESTIONS - used);
+      var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+      if (!language) {
+        try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+      }
+      var english = language === 'en';
       leftEl.textContent = left > 0
-        ? left + ' av ' + LANDING_FREE_QUESTIONS + ' frågor om ExGen kvar'
-        : 'Gränsen nådd för idag';
+        ? (english ? left + ' of ' + LANDING_FREE_QUESTIONS + ' ExGen questions left' : left + ' av ' + LANDING_FREE_QUESTIONS + ' frågor om ExGen kvar')
+        : (english ? 'Daily limit reached' : 'Gränsen nådd för idag');
+      var link = bar.querySelector('a');
+      if (link) link.textContent = english ? 'Create a free account →' : 'Skapa gratis konto →';
       bar.classList.add('visible');
     }
 
@@ -1599,7 +1606,7 @@ function finalizeMsg(div, text) {
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="app.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
-            '<div class="per-msg teacher">Vad kan jag hjälpa dig med?</div>' +
+            '<div class="per-msg teacher" id="perGreeting">Vad kan jag hjälpa dig med?</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
@@ -1613,16 +1620,32 @@ function finalizeMsg(div, text) {
           '<div id="perSees" aria-hidden="true">ser: den här sidan</div>';
       document.body.appendChild(widget);
 
-      function updatePerInputLanguage() {
+      function perWidgetUsesEnglish() {
         var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
         if (!language) {
           try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
         }
-        var english = language === 'en';
+        return language === 'en';
+      }
+
+      function updatePerInputLanguage() {
+        var english = perWidgetUsesEnglish();
         var input = document.getElementById('perInput');
         var mic = document.getElementById('perMicBtn');
         var send = document.getElementById('perSendBtn');
         var bubble = document.getElementById('perBubble');
+        var quiz = document.getElementById('perQuizBtn');
+        var corner = document.getElementById('perCornerBtn');
+        var size = document.getElementById('perSizeBtn');
+        var clear = document.getElementById('perClearBtn');
+        var greeting = document.getElementById('perGreeting');
+        var landingLink = document.querySelector('#perLandingBar a');
+        var savedCorner = 'br';
+        var savedSize = 'normal';
+        try {
+          savedCorner = localStorage.getItem(PER_CORNER_KEY) || savedCorner;
+          savedSize = localStorage.getItem(PER_SIZE_KEY) || savedSize;
+        } catch (_) {}
         input.placeholder = english ? 'Ask P.E.R…' : 'Fråga P.E.R…';
         input.setAttribute('aria-label', english ? 'Ask P.E.R a question' : 'Ställ en fråga till P.E.R');
         mic.title = english ? 'Speak to P.E.R' : 'Tala med P.E.R';
@@ -1631,6 +1654,24 @@ function finalizeMsg(div, text) {
         send.setAttribute('aria-label', english ? 'Send message to P.E.R' : 'Skicka meddelande till P.E.R');
         bubble.title = english ? 'Ask P.E.R' : 'Fråga P.E.R';
         bubble.setAttribute('aria-label', bubble.title);
+        quiz.title = english ? 'Let P.E.R quiz me' : 'Quiz – P.E.R frågar dig';
+        quiz.setAttribute('aria-label', quiz.title);
+        if (corner) {
+          corner.title = english
+            ? (savedCorner === 'bl' ? 'Move P.E.R to bottom right' : 'Move P.E.R to bottom left')
+            : (savedCorner === 'bl' ? 'Flytta P.E.R till nedre högra hörnet' : 'Flytta P.E.R till nedre vänstra hörnet');
+          corner.setAttribute('aria-label', corner.title);
+        }
+        if (size) {
+          size.title = english
+            ? (savedSize === 'large' ? 'Use normal panel size' : 'Enlarge P.E.R panel')
+            : (savedSize === 'large' ? 'Återställ normal storlek' : 'Gör P.E.R större');
+          size.setAttribute('aria-label', size.title);
+        }
+        clear.title = english ? 'Clear conversation on this device' : 'Rensa på den här enheten';
+        clear.setAttribute('aria-label', clear.title);
+        if (greeting && greeting.id === 'perGreeting') greeting.textContent = english ? 'How can I help you?' : 'Vad kan jag hjälpa dig med?';
+        if (landingLink) landingLink.textContent = english ? 'Create a free account →' : 'Skapa gratis konto →';
       }
 
       updatePerInputLanguage();
@@ -1677,7 +1718,13 @@ function finalizeMsg(div, text) {
         var sendBtn = document.getElementById('perSendBtn');
         if (sendBtn) sendBtn.disabled = false;
         var msgs = document.getElementById('perMessages');
-        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.</div>';
+        var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+        if (!language) {
+          try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+        }
+        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">' + (language === 'en'
+          ? 'The conversation was cleared from this device. Server-stored history and P.E.R memory remain.'
+          : 'Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.') + '</div>';
       };
 
       /* ── POSITION & SIZE PERSISTENCE ── */
@@ -1687,7 +1734,14 @@ function finalizeMsg(div, text) {
         if (save) try { localStorage.setItem(PER_CORNER_KEY, corner); } catch(_) {}
         w.classList.toggle('per-left', corner === 'bl');
         var btn = document.getElementById('perCornerBtn');
-        if (btn) btn.innerHTML = corner === 'bl' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+        if (btn) {
+          btn.innerHTML = corner === 'bl' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+          var english = perWidgetUsesEnglish();
+          btn.title = english
+            ? (corner === 'bl' ? 'Move P.E.R to bottom right' : 'Move P.E.R to bottom left')
+            : (corner === 'bl' ? 'Flytta P.E.R till nedre högra hörnet' : 'Flytta P.E.R till nedre vänstra hörnet');
+          btn.setAttribute('aria-label', btn.title);
+        }
       }
       function applyPerSize(size, save) {
         var p = document.getElementById('perPanel');
@@ -1695,7 +1749,12 @@ function finalizeMsg(div, text) {
         if (save) try { localStorage.setItem(PER_SIZE_KEY, size); } catch(_) {}
         p.style.width = size === 'large' ? '380px' : '';
         var btn = document.getElementById('perSizeBtn');
-        if (btn) btn.innerHTML = size === 'large' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+        if (btn) {
+          btn.innerHTML = size === 'large' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+          var english = perWidgetUsesEnglish();
+          btn.title = english ? (size === 'large' ? 'Use normal panel size' : 'Enlarge P.E.R panel') : (size === 'large' ? 'Återställ normal storlek' : 'Gör P.E.R större');
+          btn.setAttribute('aria-label', btn.title);
+        }
       }
 
       document.getElementById('perCornerBtn').onclick = function() {
@@ -1863,6 +1922,7 @@ function finalizeMsg(div, text) {
         if (_rawSess) { _hasSession = sessionIsLive(JSON.parse(_rawSess)); }
       } catch (_) {}
       if (!_hasSession) updateLandingBar();
+      window.addEventListener('exgen:languagechange', function () { if (!_hasSession) updateLandingBar(); });
 
       /* Landing pages: keep P.E.R available without taking over the first view.
          The old first-visit flow opened the full chat automatically after 3.5s.
@@ -1871,7 +1931,9 @@ function finalizeMsg(div, text) {
          remains one click away without covering the page. */
       if (isLanding()) {
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
-        if (firstMsg) firstMsg.textContent = 'Vad undrar du om ExGen?';
+        if (firstMsg) firstMsg.textContent = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en'
+          ? 'What would you like to know about ExGen?'
+          : 'Vad undrar du om ExGen?';
         if (isFirstVisit()) {
           markVisited();
           /* Intentionally stay collapsed. P.E.R is represented by the fixed
