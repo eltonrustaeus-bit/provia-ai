@@ -23,17 +23,27 @@ try {
   const english = await page.evaluate(() => {
     const root = document.createElement("div"); document.body.appendChild(root);
     window.ExGenGraphAnswer(root, "", () => {}, "en");
+    const scatterRoot = document.createElement("div"); document.body.appendChild(scatterRoot);
+    window.ExGenGraphAnswer(scatterRoot, "", () => {}, "en", {
+      mode: "scatter", point_count: 3, x_label: "Time (min)", y_label: "Oxygen level (mg/L)"
+    });
+    const scatterSvg = scatterRoot.querySelector("svg");
+    const describedBy = scatterSvg.getAttribute("aria-describedby");
     const copy = {
       svg: root.querySelector("svg").getAttribute("aria-label"),
+      scatterDescription: document.getElementById(describedBy)?.textContent,
+      scatterDescriptionId: describedBy,
       hint: root.querySelector(".graph-answer-hint").textContent,
       point: root.querySelector(".graph-point-tabs button").textContent,
       input: root.querySelector("input[type=number]").getAttribute("aria-label"),
       clear: root.querySelector(".graph-clear").textContent,
     };
-    root.remove();
+    root.remove(); scatterRoot.remove();
     return copy;
   });
   assert.match(english.svg, /^Coordinate grid/);
+  assert.equal(english.scatterDescription, "x · Time (min)y · Oxygen level (mg/L)",
+    "the English scatter graph references its visible variable labels and units");
   assert.match(english.hint, /^Choose A or B/);
   assert.equal(english.point, "Point A");
   assert.equal(english.input, "Point A, x-coordinate");
@@ -49,6 +59,11 @@ try {
   assert.equal(await scatterRoot.locator(".graph-point-tabs button").count(), 3, "scatter mode exposes exactly three independently selectable observations");
   assert.equal(await scatterRoot.locator(".graph-coordinate-fields input").count(), 6, "all three x/y pairs have keyboard-entry controls");
   assert.deepEqual(await scatterRoot.locator(".graph-axis-captions span").allTextContents(), ["x · Tid (min)", "y · Syrehalt (mg/L)"]);
+  const axisDescriptionId = await scatterRoot.locator("svg").getAttribute("aria-describedby");
+  assert.ok(axisDescriptionId, "the interactive graph describes itself with its visible axis labels");
+  assert.equal(await scatterRoot.locator(`#${axisDescriptionId}`).count(), 1, "the axis description ID resolves within its graph");
+  assert.equal(await scatterRoot.locator(`#${axisDescriptionId}`).innerText(), "x · Tid (min)\ny · Syrehalt (mg/L)");
+  assert.notEqual(axisDescriptionId, english.scatterDescriptionId, "separate graph widgets receive unique description IDs");
   assert.equal(await scatterRoot.locator(".graph-student-line").getAttribute("visibility"), "hidden", "measured points are not incorrectly joined as a line");
   const scatterSvg = scatterRoot.locator("svg");
   await scatterSvg.scrollIntoViewIfNeeded();

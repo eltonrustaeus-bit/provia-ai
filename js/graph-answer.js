@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var MIN = -5, MAX = 5, NS = "http://www.w3.org/2000/svg";
+  var MIN = -5, MAX = 5, NS = "http://www.w3.org/2000/svg", nextGraphId = 0;
 
   function configFor(value) {
     if (value && value.mode === "scatter" && value.point_count === 3
@@ -33,6 +33,9 @@
 
   window.ExGenGraphAnswer = function (root, initial, onChange, lang, displayConfig) {
     var english = lang === "en", config = configFor(displayConfig);
+    var axisCaptionId;
+    do { axisCaptionId = "graph-axis-captions-" + (++nextGraphId); }
+    while (document.getElementById(axisCaptionId));
     var letter = function (i) { return String.fromCharCode(65 + i); };
     var text = english ? {
       lineGraph: "Coordinate grid from minus five to five. Choose point A or B and click the graph.",
@@ -125,9 +128,11 @@
     root.appendChild(status);
     if (scatter) {
       var captions = document.createElement("div"); captions.className = "graph-axis-captions";
+      captions.id = axisCaptionId;
       var xCaption = document.createElement("span"); xCaption.textContent = "x · " + config.xLabel;
       var yCaption = document.createElement("span"); yCaption.textContent = "y · " + config.yLabel;
       captions.appendChild(xCaption); captions.appendChild(yCaption); root.appendChild(captions);
+      svg.setAttribute("aria-describedby", captions.id);
     }
     root.appendChild(tabs); root.appendChild(svg);
     var fields = document.createElement("div"); fields.className = "graph-coordinate-fields";
