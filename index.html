@@ -10,9 +10,9 @@
   <script src="js/exgen-modules.js"></script>
   <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – AI-driven studieapp för elever och studenter</title>
-  <meta name="description" content="ExGen är studieplattformen för grundskolan och gymnasiet. Klistra in ditt material och få ett prov med rättning, modellsvar och förklaring på varje fråga — plus en felbank som visar exakt vad du behöver träna på." />
+  <meta name="description" content="ExGen gör prov på ditt kursmaterial med rättning, modellsvar och förklaringar. Premium samlar missade begrepp i en felbank där du kan träna vidare." />
   <meta property="og:title" content="ExGen – AI-driven studieapp för elever och studenter" />
-  <meta property="og:description" content="Gör prov på ditt eget kursmaterial, få rättning med modellsvar och en felbank som visar exakt vad du behöver träna på. Gratis att starta." />
+  <meta property="og:description" content="Gör prov på ditt eget kursmaterial och få rättning med modellsvar och förklaringar. Premium samlar missade begrepp i en felbank. Gratis att starta." />
   <meta property="og:image" content="https://exgen.se/image/exgen-og.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -23,7 +23,7 @@
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="ExGen – AI-driven studieapp för elever och studenter" />
-  <meta name="twitter:description" content="Gör prov på ditt eget kursmaterial, få rättning med modellsvar och en felbank som visar exakt vad du behöver träna på. Gratis att starta." />
+  <meta name="twitter:description" content="Gör prov på ditt eget kursmaterial och få rättning med modellsvar och förklaringar. Premium samlar missade begrepp i en felbank. Gratis att starta." />
   <meta name="twitter:image" content="https://exgen.se/image/exgen-og.jpg" />
   <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
   <link rel="icon" type="image/png" sizes="192x192" href="/image/favicon-192.png" />
@@ -57,7 +57,7 @@
           "height": 131
         },
         "image": "https://exgen.se/image/exgen-og.jpg",
-        "description": "ExGen är en AI-driven studieplattform för grundskolan och gymnasiet. Eleven laddar upp sitt eget material och får ett prov med rättning, modellsvar och en felbank på begreppsnivå.",
+        "description": "ExGen är en AI-driven studieplattform för grundskolan och gymnasiet. Eleven gör prov på eget material och får rättning, modellsvar och förklaringar. Premium erbjuder en sparad felbank på begreppsnivå.",
         "areaServed": {
           "@type": "Country",
           "name": "Sverige"
@@ -333,9 +333,10 @@
                box-shadow var(--exgen-motion-fast) var(--exgen-motion-ease);
   }
   .demoArea:focus { border-color:var(--a);box-shadow:0 0 0 3px rgba(0,118,143,.07); }
+  .demoArea[readonly]{resize:none;cursor:default}
 
   @media(max-width:480px){
-    #demoMaterial{height:112px;min-height:112px}
+    #demoMaterial{height:84px;min-height:84px}
     #demoHur{max-width:calc(100% - 56px)}
   }
 
@@ -701,7 +702,7 @@
         </h1>
 
         <p class="heroSub">
-          Provet byggs på det ni faktiskt läser — inte på en färdig frågebank. Varje svar får poäng, ett modellsvar och en förklaring, och det du missar samlas i en felbank du kan träna om.
+          Provet byggs på det ni faktiskt läser — inte på en färdig frågebank. Varje svar får poäng, modellsvar och förklaring. Med Premium samlas missade begrepp i en felbank där du kan träna vidare.
         </p>
 
         <div class="heroCtas" id="heroCtas">
@@ -742,10 +743,10 @@
               <span class="demoFree">Utan konto</span>
             </div>
             <div class="demoChips" id="demoChips" role="radiogroup" aria-orientation="horizontal" aria-label="Välj exempelmaterial"></div>
-            <label class="demoLbl" for="demoMaterial">Ditt material</label>
-            <textarea class="demoArea" id="demoMaterial" rows="6" spellcheck="false"></textarea>
-            <button class="demoGo" id="demoGo" type="button">Gör ett prov på det här</button>
-            <p class="demoNote" id="demoHur">Exemplen är förskrivna, så demon svarar direkt. I appen läser P.E.R din egen text och skriver frågorna utifrån den.</p>
+            <label class="demoLbl" for="demoMaterial">Exempelmaterial</label>
+            <textarea class="demoArea" id="demoMaterial" rows="6" spellcheck="false" readonly aria-describedby="demoHur"></textarea>
+            <button class="demoGo" id="demoGo" type="button">Visa exempelfrågan</button>
+            <p class="demoNote" id="demoHur">Förskrivet exempel, rättat mot nyckelbegrepp. Prova ditt eget material i appen.</p>
           </div>
 
           <!-- Steg 2: frågan -->
@@ -812,9 +813,9 @@
 
         <div class="feat rev d2">
           <span class="featIcon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
-          <div class="featLabel">Felbank</div>
-          <div class="featT">Dina luckor samlas på ett ställe</div>
-          <div class="featD">Allt du svarar fel på sparas med begrepp och feltyp. Du kan träna om precis de frågorna — och se om det faktiskt sitter nästa gång.</div>
+          <div class="featLabel">Felbank · Premium</div>
+          <div class="featT">Träna vidare på det du missar</div>
+          <div class="featD">Premium samlar missade begrepp och feltyper, så att du kan träna vidare på rätt saker och följa om de sitter nästa gång.</div>
         </div>
 
       </div>
@@ -861,7 +862,7 @@
         <div class="step">
           <div class="stepNum stepNum--accent">03</div>
           <div class="stepT">Bygg på misstagen</div>
-          <div class="stepD">Systemet minns dina misstag och fokuserar träningen dit du behöver den mest.</div>
+          <div class="stepD">Med Premium samlas missade begrepp så att du kan träna vidare där du behöver det mest.</div>
         </div>
       </div>
     </section>
@@ -1149,10 +1150,10 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
 
     var missade = res.filter(function(r){ return !r.traff; });
     els.bank.textContent = missade.length
-      ? "Det här hade sparats som en lucka att träna om: " +
-        missade.map(function(m){ return m.term; }).join(", ") + "."
-      : "Inget att spara den här gången — allt i modellsvaret fanns med. "
-        + "I appen läggs bara det du missar i felbanken.";
+      ? "Exemplet markerar de här begreppen som missade: " +
+        missade.map(function(m){ return m.term; }).join(", ") +
+        ". I appen ingår sparad felbank och fortsatt träning i Premium."
+      : "I det här exemplet fanns nyckelbegreppen med. I appen ingår sparad felbank och fortsatt träning i Premium.";
 
     show("rattning");
     els.score.focus({ preventScroll: true });

@@ -126,6 +126,11 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
     ["gratis att börja", /gratis/i],
   ];
   for (const [name, re] of CLAIMS) ok(`1 löftet finns: ${name}`, re.test(t), t.slice(0, 0));
+  const hero = (await page.locator(".heroSub").innerText()).replace(/\s+/g, " ");
+  ok("1 felbanken anges som Premium-funktion", /Premium/.test(hero) && /felbank/i.test(hero));
+  const bankLabels = await page.locator(".featLabel").allInnerTexts();
+  ok("1 Premium-nivån märks ut i felbankssektionen",
+    bankLabels.some(label => /felbank.*premium/i.test(label)), bankLabels.join(" | "));
   ok("1 P.E.R beskriver stöd utan att garantera felfrihet",
     /återkopplingen tar stöd i dina svar och det material som finns tillgängligt/i.test(t) &&
     !/aldrig (på )?gissningar/i.test(t));
@@ -349,12 +354,24 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
     await page.locator('#demoChips [role="radio"][aria-checked="true"]').count() === 1);
   ok("12c bara valt exempel ingår i tabbordningen", await biology.getAttribute("tabindex") === "0" &&
     await history.getAttribute("tabindex") === "-1" && await math.getAttribute("tabindex") === "-1");
+  const demo = await page.evaluate(() => ({
+    label: document.querySelector("label[for='demoMaterial']")?.textContent.trim(),
+    readonly: document.querySelector("#demoMaterial")?.hasAttribute("readonly"),
+    description: document.querySelector("#demoHur")?.textContent.trim(),
+  }));
+  ok("12c2 demo anger ett förskrivet, skrivskyddat exempel",
+    demo.label === "Exempelmaterial" && demo.readonly && /förskrivet exempel/i.test(demo.description),
+    JSON.stringify(demo));
+  ok("12c3 knappen lovar att visa en exempelfråga",
+    await page.locator("#demoGo").innerText() === "Visa exempelfrågan");
 
   await biology.focus();
   await biology.press("ArrowRight");
   ok("12d högerpil väljer nästa material och flyttar fokus", await history.getAttribute("aria-checked") === "true" &&
     await history.evaluate(el => el === document.activeElement));
-  ok("12e valt material synkas till textytan", /Versaillesfreden|Tyskland/.test(await page.locator("#demoMaterial").inputValue()));
+  ok("12e valt material synkas till det skrivskyddade exempelområdet",
+    /Versaillesfreden|Tyskland/.test(await page.locator("#demoMaterial").inputValue()) &&
+    await page.locator("#demoMaterial").getAttribute("readonly") !== null);
 
   await biology.focus();
   await biology.press("ArrowLeft");
@@ -408,13 +425,16 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
   });
   ok("13e mobilens P.E.R-kontroll skymmer inte demoförklaringen", !noteOverlap);
   await page.setViewportSize({ width: 320, height: 720 });
-  const narrowNoteOverlap = await page.evaluate(() => {
+  const narrowOverlap = await page.evaluate(() => {
     const note = document.querySelector("#demoHur").getBoundingClientRect();
+    const button = document.querySelector("#demoGo").getBoundingClientRect();
     const bubble = document.querySelector("#perBubble").getBoundingClientRect();
-    return note.left < bubble.right && note.right > bubble.left &&
-      note.top < bubble.bottom && note.bottom > bubble.top;
+    const intersects = rect => rect.left < bubble.right && rect.right > bubble.left &&
+      rect.top < bubble.bottom && rect.bottom > bubble.top;
+    return { note: intersects(note), button: intersects(button) };
   });
-  ok("13f förklaringen får plats bredvid P.E.R även vid 320px", !narrowNoteOverlap);
+  ok("13f demoanteckning och knapp är fria från P.E.R vid 320px",
+    !narrowOverlap.note && !narrowOverlap.button, JSON.stringify(narrowOverlap));
 
   await page.locator("#demoGo").click();
   await page.locator("#demoBack").click();
