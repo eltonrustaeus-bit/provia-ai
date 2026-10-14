@@ -736,7 +736,7 @@
               <span class="demoEye">Prova direkt</span>
               <span class="demoFree">Utan konto</span>
             </div>
-            <div class="demoChips" id="demoChips" role="group" aria-label="Välj exempelmaterial"></div>
+            <div class="demoChips" id="demoChips" role="radiogroup" aria-orientation="horizontal" aria-label="Välj exempelmaterial"></div>
             <label class="demoLbl" for="demoMaterial">Ditt material</label>
             <textarea class="demoArea" id="demoMaterial" rows="6" spellcheck="false"></textarea>
             <button class="demoGo" id="demoGo" type="button">Gör ett prov på det här</button>
@@ -1094,9 +1094,24 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
     aktiv = ex;
     els.material.value = ex.material;
     [].forEach.call(els.chips.children, function(c){
-      c.classList.toggle("sel", c.dataset.id === ex.id);
-      c.setAttribute("aria-pressed", c.dataset.id === ex.id ? "true" : "false");
+      var selected = c.dataset.id === ex.id;
+      c.classList.toggle("sel", selected);
+      c.setAttribute("aria-checked", selected ? "true" : "false");
+      c.tabIndex = selected ? 0 : -1;
     });
+  }
+
+  function moveSelection(current, key){
+    var radios = Array.prototype.slice.call(els.chips.querySelectorAll('[role="radio"]'));
+    var index = radios.indexOf(current);
+    if (!radios.length || index < 0) return;
+    var next = key === "Home" ? 0
+      : key === "End" ? radios.length - 1
+      : (index + ((key === "ArrowRight" || key === "ArrowDown") ? 1 : radios.length - 1)) % radios.length;
+    var selected = data.filter(function(ex){ return ex.id === radios[next].dataset.id; })[0];
+    if (!selected) return;
+    valj(selected);
+    radios[next].focus();
   }
 
   function tillFraga(){
@@ -1157,9 +1172,17 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
         var b = document.createElement("button");
         b.type = "button";
         b.className = "demoChip";
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", "false");
+        b.tabIndex = -1;
         b.dataset.id = ex.id;
         b.textContent = ex.etikett;
         b.addEventListener("click", function(){ valj(ex); });
+        b.addEventListener("keydown", function(e){
+          if (["ArrowRight", "ArrowLeft", "Home", "End"].indexOf(e.key) === -1) return;
+          e.preventDefault();
+          moveSelection(b, e.key);
+        });
         els.chips.appendChild(b);
       });
       valj(data[0]);

@@ -335,6 +335,60 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
   await ctx.close();
 }
 
+// ── 12: example-material choices expose single-selection radio semantics ──
+{
+  const { ctx, page } = await mk();
+  const group = page.getByRole("radiogroup", { name: "Välj exempelmaterial" });
+  const radios = page.getByRole("radio");
+  const biology = page.getByRole("radio", { name: "Biologi" });
+  const history = page.getByRole("radio", { name: "Historia" });
+  const math = page.getByRole("radio", { name: "Matematik" });
+  ok("12a exemplen tillhör en namngiven radiogrupp", await group.count() === 1);
+  ok("12a2 radiogruppen deklarerar horisontell orientering", await group.getAttribute("aria-orientation") === "horizontal");
+  ok("12b exakt ett exempel är markerat", await radios.count() === 3 &&
+    await page.locator('#demoChips [role="radio"][aria-checked="true"]').count() === 1);
+  ok("12c bara valt exempel ingår i tabbordningen", await biology.getAttribute("tabindex") === "0" &&
+    await history.getAttribute("tabindex") === "-1" && await math.getAttribute("tabindex") === "-1");
+
+  await biology.focus();
+  await biology.press("ArrowRight");
+  ok("12d högerpil väljer nästa material och flyttar fokus", await history.getAttribute("aria-checked") === "true" &&
+    await history.evaluate(el => el === document.activeElement));
+  ok("12e valt material synkas till textytan", /Versaillesfreden|Tyskland/.test(await page.locator("#demoMaterial").inputValue()));
+
+  await biology.focus();
+  await biology.press("ArrowLeft");
+  ok("12e2 vänsterpil går runt till sista alternativet", await math.getAttribute("aria-checked") === "true" &&
+    await math.evaluate(el => el === document.activeElement));
+  await math.press("ArrowRight");
+  ok("12e3 högerpil går runt till första alternativet", await biology.getAttribute("aria-checked") === "true" &&
+    await biology.evaluate(el => el === document.activeElement));
+
+  await page.evaluate(() => {
+    window.__radioArrowDownPrevented = null;
+    document.getElementById("demoChips").addEventListener("keydown", event => {
+      if (event.key === "ArrowDown") window.__radioArrowDownPrevented = event.defaultPrevented;
+    });
+  });
+  await biology.press("ArrowDown");
+  ok("12e4 nedpil behåller sidans vanliga tangentbordsbeteende", await page.evaluate(() => window.__radioArrowDownPrevented === false) &&
+    await biology.getAttribute("aria-checked") === "true");
+
+  await math.click();
+  ok("12e5 klick uppdaterar valt radioalternativ", await math.getAttribute("aria-checked") === "true" &&
+    await math.getAttribute("tabindex") === "0");
+
+  await history.press("End");
+  ok("12f End väljer sista materialet", await math.getAttribute("aria-checked") === "true" &&
+    await math.evaluate(el => el === document.activeElement));
+  await math.press("Home");
+  ok("12g Home väljer första materialet", await biology.getAttribute("aria-checked") === "true" &&
+    await biology.evaluate(el => el === document.activeElement));
+  await biology.press("Tab");
+  ok("12h Tab går vidare till materialfältet", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
+  await ctx.close();
+}
+
 } catch (e) {
   crash = e;
 } finally {
