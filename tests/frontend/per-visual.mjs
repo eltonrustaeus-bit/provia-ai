@@ -131,7 +131,7 @@ const QUIET = `
      fanns i DOM:en med 580x270 och 580x332 pixlar. Det gör inte bara zonerna
      omätta, det gör "0 skiljande pixlar" svagare för varje sida som använder
      .reveal, eftersom osynligt mot osynligt alltid är noll. */
-  .reveal{opacity:1!important;transform:none!important}
+  .reveal,.rev,.compareWrap,.faqItem{opacity:1!important;transform:none!important}
 `;
 
 async function shot(base, page, view, tag) {
@@ -146,6 +146,13 @@ async function shot(base, page, view, tag) {
   await p.goto(`${base}/${page}`, { waitUntil: "networkidle" });
   await p.addStyleTag({ content: QUIET });
   await p.waitForTimeout(700);
+  if (page === "pricing.html") {
+    const comparisonVisible = await p.locator("#zonJamfor .compareWrap").evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return getComputedStyle(el).opacity === "1" && box.width > 0 && box.height > 0 && el.innerText.trim().length > 0;
+    });
+    if (!comparisonVisible) throw new Error("pricing comparison is not visible in visual capture");
+  }
   const file = `${OUT}/${tag}-${page.replace(/\W+/g, "_")}-${view.name}.png`;
   await p.screenshot({ path: file, fullPage: true });
   await ctx.close();

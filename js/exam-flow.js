@@ -1553,6 +1553,7 @@
   function openExam(resumedAt) {
     UI.languageRerender = null;
     if (window.dismissWelcome) window.dismissWelcome();
+    document.body.classList.remove("xf-contract");
     // Vid återupptagning behålls den tid provet redan pågått. Att nollställa
     // klockan hade dolt att eleven redan suttit en halvtimme och gjort både
     // tidsangivelsen och tempo-varningen missvisande.

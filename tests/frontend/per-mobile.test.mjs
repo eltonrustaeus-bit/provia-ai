@@ -110,6 +110,9 @@ async function run() {
     try {
       await toExam(page);
 
+      const reviewMode = await page.evaluate(() => document.body.classList.contains("xf-contract"));
+      if (reviewMode) throw new Error("sammanfattningsläget låg kvar efter att provet startade");
+
       // 1. Dold medan provet pågår
       const hidden = await page.evaluate(() => getComputedStyle(document.querySelector("#perWidget")).display === "none");
       if (!hidden) throw new Error("#perWidget är synlig under provet");
@@ -117,16 +120,21 @@ async function run() {
 
       // 2. Öppnad via .xf-ask: syns, men överlappar inget
       await page.click(".xf-ask");
-      await page.waitForTimeout(350);
+      await page.waitForFunction(() =>
+        document.body.classList.contains("xf-per-open") &&
+        document.querySelector("#perBubble")?.classList.contains("per-open") &&
+        document.querySelector("#perPanel")?.classList.contains("per-open"),
+        { timeout: 5000 }
+      );
 
-      // Panelen mäts EFTER ett utbyte, inte tom. Den växer med innehållet:
-      // 350 ms efter klicket bär den bara hälsningen och är låg nog att missa
-      // alternativen. Så fort P.E.R svarat — vilket är hela anledningen att
-      // öppna den — är den 370px hög och når upp i arket. Att mäta det tomma
-      // läget var en grön kontroll på ett tillstånd eleven aldrig ser.
+      // Panelen mäts efter ett riktigt svar, då den har sitt fulla innehåll.
       await page.fill("#perInput", "hjälp mig med frågan");
       await page.press("#perInput", "Enter");
-      await page.waitForTimeout(1200);
+      await page.waitForFunction(() =>
+        Array.from(document.querySelectorAll("#perMessages .per-msg.teacher"))
+          .some(node => node.textContent.includes("Citronsyracykeln sker i mitokondriens matrix")),
+        { timeout: 10000 }
+      );
 
       const widgetBox = await page.locator("#perWidget").boundingBox();
       if (!widgetBox || widgetBox.width < 1) throw new Error("#perWidget syns inte efter .xf-ask");
