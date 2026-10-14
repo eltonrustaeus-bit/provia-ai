@@ -556,10 +556,10 @@ async function gateActiveExam(req, res, body, user) {
     sendActiveExamGuidance(req, res, body, state);
     return true;
   }
-  if (examState?.phase === "exam") {
-    res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
-    return true;
-  }
+  // Client phase is a hint, not an issuance identity. A stale exam view must
+  // not strand study help when the server confirms there is no active exam.
+  // The answer lease below remains the race-safe authority if a new exam starts
+  // after this count is read.
   const activeCount = await examIssuance.activeExamCount(user.id);
   if (activeCount === null) {
     res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });

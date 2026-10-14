@@ -99,7 +99,7 @@ globalThis.fetch = async (input, init = {}) => {
 
 const handler = (await import("../../api/explain.js?per-exam-review-handler-test")).default;
 
-async function invoke(body, method = "POST") {
+async function invoke(body, method = "POST", accept = "text/event-stream") {
   const response = {
     statusCode: 200,
     status(code) { this.statusCode = code; return this; },
@@ -108,7 +108,7 @@ async function invoke(body, method = "POST") {
     setHeader(name, value) { this.headers[name] = value; },
     end(value) { this.body = JSON.parse(value); return this; },
   };
-  await handler({ method, headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" }, body }, response);
+  await handler({ method, headers: { authorization: "Bearer synthetic-user-token", accept }, body }, response);
   return response;
 }
 
@@ -661,16 +661,42 @@ test("non-active issuance states deny model answers with state-appropriate guida
   }
 });
 
-test("an in-exam P.E.R request without an issuance identity fails closed", async () => {
+test("a stale in-exam P.E.R view follows authoritative server state", async () => {
   activeCount = 0;
   calls.length = 0;
-  const response = await invoke({
+  const inactive = await invoke({
+    userQuestion: "Hjälp mig förstå begreppet utan att lösa en provfråga",
+    pageContext: { examState: { phase: "exam" } },
+  }, "POST", "application/json");
+  assert.equal(inactive.statusCode, 200);
+  assert.equal(inactive.body.helpCap, 1);
+  assert.equal(inactive.body.helpLevelUsed, 1);
+  assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+
+  activeCount = 1;
+  calls.length = 0;
+  const active = await invoke({
+    userQuestion: "Ge mig facit ACTIVE_ANSWER_MARKER",
+    helpLevel: 3,
+    pageContext: { currentQuestion: { type: "short", text: "ACTIVE_QUESTION_MARKER" }, examState: { phase: "exam" } },
+  });
+  assert.equal(active.statusCode, 200);
+  assert.equal(active.body.examActive, true);
+  assert.equal(active.body.helpLevelUsed, 2);
+  assert.match(active.body.answer, /Vilken del av frågan har du ännu inte besvarat/i);
+  assert.doesNotMatch(active.body.answer, /ACTIVE_(?:ANSWER|QUESTION)_MARKER/);
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+
+  activeCount = null;
+  calls.length = 0;
+  const unknown = await invoke({
     userQuestion: "Ge mig svaret",
     pageContext: { examState: { phase: "exam" } },
   });
-  assert.equal(response.statusCode, 503);
-  assert.equal(response.body.error, "EXAM_STATE_UNAVAILABLE");
+  assert.equal(unknown.statusCode, 503);
+  assert.equal(unknown.body.error, "EXAM_STATE_UNAVAILABLE");
   assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  activeCount = 0;
 });
 
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {
