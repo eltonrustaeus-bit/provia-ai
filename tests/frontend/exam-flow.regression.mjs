@@ -120,6 +120,48 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// The visual progress line also exposes the current wizard step to assistive technology.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "wizard-progress");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    const state = () => page.locator("#xf .xf-progress").evaluate(node => ({
+      role: node.getAttribute("role"), min: node.getAttribute("aria-valuemin"),
+      max: node.getAttribute("aria-valuemax"), now: node.getAttribute("aria-valuenow"),
+      label: node.getAttribute("aria-label"), text: node.getAttribute("aria-valuetext"),
+    }));
+    let p = await state();
+    ok("provskapandets startsteg har tillgänglig position", p.role === "progressbar" && p.min === "1"
+      && p.max === "6" && p.now === "1" && p.text === "Steg 1 av 6: Start", JSON.stringify(p));
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    p = await state();
+    ok("ämnessteget uppdaterar progressindikatorn", p.now === "2" && p.text === "Steg 2 av 6: Ämne", JSON.stringify(p));
+    await page.evaluate(() => document.getElementById("langBtn")?.click());
+    p = await state();
+    ok("progressetiketten följer språkbytet", p.label === "Exam creation progress"
+      && p.text === "Step 2 of 6: Subject", JSON.stringify(p));
+    await page.evaluate(() => document.getElementById("langBtn")?.click());
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
+    p = await state();
+    ok("målsteget uppdaterar progressindikatorn", p.now === "3" && p.text === "Steg 3 av 6: Mål", JSON.stringify(p));
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
+    p = await state();
+    ok("materialsteget uppdaterar progressindikatorn", p.now === "4" && p.text === "Steg 4 av 6: Material", JSON.stringify(p));
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "y = 2x + 1");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    p = await state();
+    ok("sammanfattningssteget uppdaterar progressindikatorn", p.now === "5"
+      && p.text === "Steg 5 av 6: Sammanfattning", JSON.stringify(p));
+  } catch (e) {
+    ok("progressindikatorn följer elevens steg", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // A concise, valid source such as a linear formula should not be blocked by a
 // hidden character threshold; the UI still recommends adding useful context.
 {
@@ -352,6 +394,8 @@ async function toMaterial(page) {
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 12000 });
     const resultFocus = await page.evaluate(() => !!document.activeElement?.closest(".xf-screen[data-screen='result']"));
     ok("fokus lämnar rättningen till resultatsidan", resultFocus);
+    const finishedProgress = await page.locator("#xf .xf-progress").getAttribute("aria-valuetext");
+    ok("resultatet visar att provskapandet nått sista steget", finishedProgress === "Steg 6 av 6: Resultat", finishedProgress || "saknas");
   } finally {
     await ctx.close();
   }

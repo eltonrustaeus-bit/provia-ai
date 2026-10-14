@@ -578,6 +578,25 @@
   // ── Skärmar ──────────────────────────────────────────────────────────────
 
   var STEPS = ["start", "subject", "aim", "material", "contract", "result"];
+  var STEP_LABELS = {
+    start: { sv: "Start", en: "Start" },
+    subject: { sv: "Ämne", en: "Subject" },
+    aim: { sv: "Mål", en: "Goal" },
+    material: { sv: "Material", en: "Material" },
+    contract: { sv: "Sammanfattning", en: "Review" },
+    result: { sv: "Resultat", en: "Results" },
+  };
+
+  function updateProgress(name) {
+    if (!UI.progress || !STEPS.includes(name)) return;
+    UI.progress.dataset.step = name;
+    var english = Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
+    var step = STEPS.indexOf(name) + 1;
+    UI.progress.setAttribute("aria-label", english ? "Exam creation progress" : "Framsteg i provskapandet");
+    UI.progress.setAttribute("aria-valuenow", String(step));
+    UI.progress.setAttribute("aria-valuetext",
+      (english ? "Step " : "Steg ") + step + (english ? " of " : " av ") + STEPS.length + ": " + STEP_LABELS[name][english ? "en" : "sv"]);
+  }
 
   function screen(name) {
     STEPS.forEach(function (s) {
@@ -592,6 +611,7 @@
     });
     var pct = (STEPS.indexOf(name) / (STEPS.length - 1)) * 100;
     if (UI.bar) UI.bar.style.width = pct + "%";
+    updateProgress(name);
     // "instant" är ett giltigt ScrollBehavior-värde men aldrig en egenskap på
     // window, så den gamla feature-detekteringen valde alltid "auto" och gav
     // en mjuk scroll där en omedelbar var meningen.
@@ -2553,9 +2573,16 @@
 
   function buildDom(root) {
     var prog = el("div", "xf-progress");
+    prog.setAttribute("role", "progressbar");
+    prog.setAttribute("aria-valuemin", "1");
+    prog.setAttribute("aria-valuemax", String(STEPS.length));
     UI.bar = el("i");
+    UI.progress = prog;
     prog.appendChild(UI.bar);
     root.appendChild(prog);
+    window.addEventListener("exgen:languagechange", function () {
+      updateProgress(UI.progress && UI.progress.dataset.step);
+    });
 
     /* Sidans enda h1. Skärmarnas egna rubriker är h2 — sex h1 samtidigt i
        DOM:en (en per flödessteg) gav ingen dokumentstruktur alls. Den här är
