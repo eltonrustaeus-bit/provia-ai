@@ -37,6 +37,8 @@ const scatterSpec = { kind: "scatter", slope: null, intercept: null, ...scatterD
 assert.deepEqual(graph.parsePointTable(table), scatterData);
 assert.equal(graph.sourceContainsSpec(table, scatterSpec), true);
 assert.equal(graph.parsePointTable(`${table}\n3 | 0`), null, "extra rows are not silently dropped");
+assert.equal(graph.parsePointTable(`${table}\n3 | 0.5`), null, "a trailing decimal row is not silently dropped");
+assert.equal(graph.parsePointTable(`${table}\n3 | 0.5 | extra`), null, "a malformed-width row is not silently treated as the end of the table");
 assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n1 | 3\n1 | 1"), null, "repeated x-values are rejected");
 assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1"), null, "decimal values are not rounded");
 assert.equal(graph.isValidSpec(scatterSpec), true);

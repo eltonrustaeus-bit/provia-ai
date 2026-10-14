@@ -126,6 +126,7 @@ async function run() {
         document.querySelector("#perPanel")?.classList.contains("per-open"),
         { timeout: 5000 }
       );
+      await page.locator("#perInput").waitFor({ state: "visible", timeout: 5000 });
 
       // Panelen mäts efter ett riktigt svar, då den har sitt fulla innehåll.
       await page.fill("#perInput", "hjälp mig med frågan");

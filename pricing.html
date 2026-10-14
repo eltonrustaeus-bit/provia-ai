@@ -462,28 +462,6 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 /* FAQ-dragspelet är borta — alla fyra svar står öppna. Se kommentaren i
    <style>. Ingen växlare behövs längre. */
 
-/* COUNTER ANIMATION */
-(function(){
-  if(window.matchMedia("(prefers-reduced-motion:reduce)").matches)return;
-  function countUp(el,target){
-    const dur=target>20?900:600,start=performance.now();
-    (function tick(now){
-      const p=Math.min((now-start)/dur,1);
-      const ease=1-Math.pow(1-p,3);
-      el.textContent=Math.round(ease*target);
-      if(p<1)requestAnimationFrame(tick);else el.textContent=target;
-    })(start);
-  }
-  const io=new IntersectionObserver(entries=>{
-    entries.forEach(en=>{
-      if(!en.isIntersecting)return;
-      const val=parseInt(en.target.textContent,10);
-      if(!isNaN(val)&&val>0)countUp(en.target,val);
-      io.unobserve(en.target);
-    });
-  },{threshold:.6});
-  document.querySelectorAll(".planAmt").forEach(el=>io.observe(el));
-})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>

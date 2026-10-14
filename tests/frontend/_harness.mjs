@@ -242,13 +242,14 @@ export async function mockApis(page, {
    registreras FÖRE goto, annars hinner sidans egna skript läsa ett tomt
    localStorage och fråga en omockad server. */
 export async function openPage(browser, url, {
-  width = 1280, height = 900, reducedMotion, mocks = {}, state = {},
+  width = 1280, height = 900, reducedMotion, mocks = {}, state = {}, initScript,
   waitUntil = "networkidle", settle = 700,
 } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height }, ...(reducedMotion ? { reducedMotion } : {}) });
   const page = await ctx.newPage();
   await mockApis(page, mocks);
   await seed(page, state);
+  if (initScript) await page.addInitScript(initScript);
   await page.goto(url, { waitUntil });
   // Fälla 4: välkomstöverlägget ligger kvar i ~2,9 s och tas bort av en timer,
   // inte av en animation. Det fotograferades i stället för appen i månader.

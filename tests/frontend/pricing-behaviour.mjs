@@ -56,7 +56,8 @@ async function mk(s = {}) {
     })],
   ] : [];
   return openPage(browser, `${srv.url}/pricing.html`, {
-    width: s.width || 1280, height: 900, reducedMotion: "reduce", settle: 900,
+    width: s.width || 1280, height: 900, reducedMotion: s.reducedMotion || "reduce", settle: s.settle ?? 900,
+    initScript: s.initScript,
     mocks: {
       role: s.role || "gratis",
       // Registreras efter den generella **/rest/v1/**, annars äts den upp.
@@ -93,6 +94,27 @@ const PLANS = [
   ok("0k planpriser och checkoutknappar finns kvar", await page.locator("#plan-basic .planAmt").innerText() === "29" && await page.locator("#plan-premium .planAmt").innerText() === "79" && await page.locator("#btn-basic").count() === 1 && await page.locator("#btn-premium").count() === 1);
   ok("0f backend-avstängd plansida släpper laddaren", await page.locator("#ldr").evaluate(el => el.classList.contains("out")));
   ok("0g backend-avstängd plansida initierar ingen Supabase-klient", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+// Published prices remain exact even when the visitor has not requested reduced motion.
+{
+  const { ctx, page } = await mk({
+    reducedMotion: "no-preference",
+    initScript: () => {
+      window.__planAmountSnapshots = [];
+      new MutationObserver(() => {
+        window.__planAmountSnapshots.push(...Array.from(document.querySelectorAll(".planAmt"), el => el.textContent.trim()));
+      }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+    },
+  });
+  await page.waitForTimeout(1100);
+  const values = await page.evaluate(() => [
+    ...window.__planAmountSnapshots,
+    ...Array.from(document.querySelectorAll(".planAmt"), el => el.textContent.trim()),
+  ]);
+  ok("planpriser ändras inte till mellanvärden vid normal rörelseinställning",
+    values.length > 0 && values.every(value => ["0", "29", "79"].includes(value)), JSON.stringify(values));
   await ctx.close();
 }
 

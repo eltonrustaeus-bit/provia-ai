@@ -24,17 +24,21 @@ function parsePointTable(text) {
     const trimmed = line.trim();
     if (!trimmed.includes("|")) return null;
     const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
-    return cells.length === 2 ? cells : null;
+    return { cells, validWidth: cells.length === 2 };
   });
   for (let i = 0; i < rows.length; i++) {
-    const header = rows[i];
-    if (!header || !header.every(safeAxisLabel)) continue;
+    const header = rows[i]?.cells;
+    if (!rows[i]?.validWidth || !header.every(safeAxisLabel)) continue;
     const points = [];
     let j = i + 1;
     while (j < rows.length && rows[j]) {
-      const row = rows[j];
+      if (!rows[j].validWidth) { points.length = 0; break; }
+      const row = rows[j].cells;
       if (row.every((cell) => /^:?-{3,}:?$/.test(cell))) { j++; continue; }
-      if (!row.every((cell) => /^-?\d+$/.test(cell))) break;
+      if (!row.every((cell) => /^-?\d+$/.test(cell))) {
+        points.length = 0;
+        break;
+      }
       const point = { x: Number(row[0]), y: Number(row[1]) };
       if (!isGridPoint(point)) { points.length = 0; break; }
       points.push(point);
