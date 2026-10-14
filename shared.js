@@ -2384,7 +2384,7 @@ function finalizeMsg(div, text) {
       el.id = 'pvModal';
       el.setAttribute('role', 'dialog');
       el.setAttribute('aria-modal', 'true');
-      el.setAttribute('aria-label', 'Logga in eller skapa konto');
+      el.setAttribute('aria-labelledby', 'pvTi');
       el.innerHTML = '<div id="pvCard">'
         + '<div class="pv-hd">'
           + '<button class="pv-cl" id="pvCl" aria-label="Stäng">✕</button>'

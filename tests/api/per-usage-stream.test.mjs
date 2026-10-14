@@ -4,7 +4,7 @@ import test from "node:test";
 const oldFetch = globalThis.fetch;
 const keys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PILOT_MODE", "OPENAI_MODEL"];
 const oldEnv = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-const origin = "https://per-stream.synthetic.invalid";
+const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "44444444-4444-4444-8444-444444444444";
 Object.assign(process.env, {
   SUPABASE_URL: origin,

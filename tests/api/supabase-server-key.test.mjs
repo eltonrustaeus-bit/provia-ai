@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import keys from "../../api/_supabase-server-key.cjs";
 
-const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = keys;
+const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed } = keys;
 
 test("prefers the rotatable server secret and falls back during cutover", () => {
   assert.equal(getSupabaseServerKey({ SUPABASE_SECRET_KEY: "sb_secret_new", SUPABASE_SERVICE_ROLE_KEY: "legacy" }), "sb_secret_new");
@@ -50,7 +50,7 @@ test("non-production and pilot runtimes fail closed against the production Supab
   );
   assert.throws(
     () => createSupabaseServerClient(productionUrl, {}, { ...productionSecrets, EXGEN_PILOT_MODE: "true" }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /Refusing to connect/,
   );
   assert.equal(getSupabaseServerKey({
     ...productionSecrets,
@@ -70,10 +70,72 @@ test("non-production and pilot runtimes fail closed against the production Supab
     /Refusing to connect a non-production ExGen runtime/,
   );
   assert.equal(getSupabaseServerKey({
-    SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+    SUPABASE_URL: "https://yhcinqejsocpmmetazpz.supabase.co",
     SUPABASE_SECRET_KEY: "sb_secret_synthetic",
     VERCEL_ENV: "preview",
   }), "sb_secret_synthetic");
+});
+
+test("pilot and Vercel Preview runtimes require the exact staging Supabase project", () => {
+  const stagingUrl = "https://yhcinqejsocpmmetazpz.supabase.co";
+  assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {
+    EXGEN_PILOT_MODE: "true",
+    SUPABASE_URL: stagingUrl,
+  }));
+  assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    SUPABASE_URL: stagingUrl,
+  }));
+  assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {
+    VERCEL: "1",
+    VERCEL_ENV: "production",
+    SUPABASE_URL: stagingUrl,
+  }), "an incomplete Vercel environment marker fails safe into the staging-only guard");
+  assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {
+    VERCEL_ENV: "production",
+    VERCEL_TARGET_ENV: "production",
+    SUPABASE_URL: stagingUrl,
+  }), "production labels without the Vercel runtime marker also fail safe to staging");
+  for (const flag of ["true", "TRUE", " true "]) {
+    assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {
+      EXGEN_PILOT_MODE: flag,
+      SUPABASE_URL: stagingUrl,
+    }));
+  }
+
+  for (const url of [
+    undefined,
+    "not a URL",
+    "http://yhcinqejsocpmmetazpz.supabase.co",
+    "https://yhcinqejsocpmmetazpz.supabase.co:8443",
+    "https://user:pass@yhcinqejsocpmmetazpz.supabase.co",
+    "https://yhcinqejsocpmmetazpz.supabase.co/rest/v1",
+    "https://yhcinqejsocpmmetazpz.supabase.co?redirect=other",
+    "https://yhcinqejsocpmmetazpz.supabase.co#fragment",
+    "https://abcdefghijklmnopqrst.supabase.co",
+    "https://mnmotdluigzeehdjbhbu.supabase.co",
+  ]) {
+    assert.throws(() => assertSupabaseTargetAllowed(url, {
+      EXGEN_PILOT_MODE: "true",
+      SUPABASE_URL: url,
+    }), /approved Supabase staging project|production Supabase project/);
+    assert.throws(() => assertSupabaseTargetAllowed(url, {
+      VERCEL_ENV: "preview",
+      SUPABASE_URL: url,
+    }), /approved Supabase staging project|production Supabase project/);
+    assert.throws(() => assertSupabaseTargetAllowed(url, {
+      VERCEL_ENV: "production",
+      VERCEL_TARGET_ENV: "production",
+      SUPABASE_URL: url,
+    }), /approved Supabase staging project|production Supabase project/);
+  }
+  for (const flag of ["TRUE-ish", "yes", "1", ""]) {
+    assert.throws(() => assertSupabaseTargetAllowed(stagingUrl, {
+      EXGEN_PILOT_MODE: flag,
+      SUPABASE_URL: stagingUrl,
+    }), /Invalid EXGEN_PILOT_MODE/);
+  }
 });
 
 test("uses opaque secret keys only as apikey credentials for raw REST calls", () => {

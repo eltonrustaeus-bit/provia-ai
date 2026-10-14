@@ -389,6 +389,32 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
   await ctx.close();
 }
 
+// ── 13: landing demo never leaves focus in a hidden step ──────────────────
+{
+  const { ctx, page } = await mk({ width: 390, height: 844 });
+  await page.locator("#demoMaterial").waitFor();
+  const overlap = await page.evaluate(() => {
+    const button = document.querySelector("#demoGo").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    return button.left < bubble.right && button.right > bubble.left &&
+      button.top < bubble.bottom && button.bottom > bubble.top;
+  });
+  ok("13b mobilens P.E.R-kontroll skymmer inte demoknappen", !overlap);
+
+  await page.locator("#demoGo").click();
+  await page.locator("#demoBack").click();
+  ok("13c byt material flyttar fokus till synligt materialfält", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
+  await page.locator("#demoGo").click();
+  await page.locator("#demoSvar").fill("Jag minns bara en del av svaret.");
+  await page.locator("#demoGrade").click();
+  ok("13a rättningen annonseras som status och får fokus", await page.locator("#demoScore").getAttribute("role") === "status" &&
+    await page.locator("#demoScore").evaluate(el => el === document.activeElement) &&
+    /av \d+ poäng/.test(await page.locator("#demoScore").textContent()));
+  await page.locator("#demoRestart").click();
+  ok("13d gör om flyttar fokus till synligt materialfält", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
+  await ctx.close();
+}
+
 } catch (e) {
   crash = e;
 } finally {

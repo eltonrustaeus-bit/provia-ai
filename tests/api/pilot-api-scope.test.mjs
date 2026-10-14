@@ -79,7 +79,7 @@ test("pilot P.E.R rejects non-pilot modes before Supabase or provider requests",
   process.env.EXGEN_PILOT_MODE = "true";
   process.env.VERCEL_ENV = "production";
   process.env.VERCEL_TARGET_ENV = "production";
-  process.env.SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
+  process.env.SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_synthetic-pilot-mode-test";
   globalThis.fetch = async () => {
     externalCalls += 1;

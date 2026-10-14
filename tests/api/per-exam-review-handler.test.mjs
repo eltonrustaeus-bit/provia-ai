@@ -7,7 +7,7 @@ const originalFetch = globalThis.fetch;
 const originalEnv = Object.fromEntries([
   "SUPABASE_URL", "SUPABASE_SECRET_KEY", "EXAM_SIGNING_SECRET", "OPENAI_API_KEY", "EXGEN_PILOT_MODE",
 ].map((key) => [key, process.env[key]]));
-const origin = "https://per-exam-review.test";
+const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "11111111-1111-4111-8111-111111111111";
 process.env.SUPABASE_URL = origin;
 process.env.SUPABASE_SECRET_KEY = "sb_secret_synthetic-per-review";

@@ -1,4 +1,25 @@
 const PRODUCTION_SUPABASE_REF = ["mnmotdluig", "zeehdjbhbu"].join("");
+const PILOT_SUPABASE_REF = "yhcinqejsocpmmetazpz";
+
+function isPilotRuntime(env = process.env) {
+  const rawPilotFlag = env.EXGEN_PILOT_MODE;
+  if (rawPilotFlag != null) {
+    const pilotFlag = String(rawPilotFlag).trim().toLowerCase();
+    if (pilotFlag !== "true" && pilotFlag !== "false") {
+      throw new Error("Invalid EXGEN_PILOT_MODE value; expected true or false.");
+    }
+    if (pilotFlag === "true") return true;
+  }
+  const vercelEnvironments = [env.VERCEL_ENV, env.VERCEL_TARGET_ENV]
+    .filter(Boolean)
+    .map((environment) => String(environment).trim().toLowerCase());
+  const vercelRuntime = String(env.VERCEL || "").trim() === "1";
+  const hasVercelMarker = env.VERCEL != null || env.VERCEL_ENV != null || env.VERCEL_TARGET_ENV != null;
+  const hasVerifiedProductionMarkers = String(env.VERCEL_ENV || "").trim().toLowerCase() === "production"
+    && String(env.VERCEL_TARGET_ENV || "").trim().toLowerCase() === "production";
+  return vercelEnvironments.some((environment) => environment !== "production")
+    || (hasVercelMarker && !(vercelRuntime && hasVerifiedProductionMarkers));
+}
 
 function isNonProductionTarget(env = process.env) {
   if (env.EXGEN_PILOT_MODE === "true") return true;
@@ -15,13 +36,26 @@ function isNonProductionTarget(env = process.env) {
 }
 
 function assertSupabaseTargetAllowed(url, env = process.env) {
-  let productionTarget = false;
+  let hostname = "";
+  let protocol = "";
+  let canonicalPilotOrigin = false;
   try {
-    const hostname = new URL(String(url || "")).hostname.toLowerCase().replace(/\.$/, "");
-    productionTarget = hostname === `${PRODUCTION_SUPABASE_REF}.supabase.co`;
+    const parsed = new URL(String(url || ""));
+    hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+    protocol = parsed.protocol;
+    canonicalPilotOrigin = parsed.origin === `https://${PILOT_SUPABASE_REF}.supabase.co`
+      && parsed.pathname === "/"
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.username
+      && !parsed.password;
   } catch {}
+  const productionTarget = hostname === `${PRODUCTION_SUPABASE_REF}.supabase.co`;
   if (isNonProductionTarget(env) && productionTarget) {
     throw new Error("Refusing to connect a non-production ExGen runtime to the production Supabase project.");
+  }
+  if (isPilotRuntime(env) && (protocol !== "https:" || !canonicalPilotOrigin)) {
+    throw new Error("Refusing to connect an ExGen pilot runtime outside its approved Supabase staging project.");
   }
 }
 

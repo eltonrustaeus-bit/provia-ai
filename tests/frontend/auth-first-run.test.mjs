@@ -27,6 +27,7 @@ try {
   await page.locator('a[data-pv-auth="register"]').first().click();
   await page.locator("#pvModal").waitFor({ state: "visible" });
   await page.waitForTimeout(350);
+  assert.equal(await page.getByRole("dialog", { name: "Skapa konto" }).count(), 1, "dialog name matches registration heading");
   assert.match(page.url(), /\/index\.html$/, "signup CTA stays on the landing page");
   assert.equal(await page.evaluate(() => document.querySelector("main")?.inert), true, "background is inert while dialog is open");
 
@@ -42,6 +43,10 @@ try {
   await page.locator('a[data-pv-auth="register"]').first().click();
   await page.locator("#pvModal").waitFor({ state: "visible" });
   await page.locator("#pvRBk").click();
+  assert.equal(await page.getByRole("dialog", { name: "Logga in" }).count(), 1, "dialog name follows login view");
+  await page.locator("#pvToForgot").click();
+  assert.equal(await page.getByRole("dialog", { name: "Återställ lösenord" }).count(), 1, "dialog name follows password-reset view");
+  await page.locator("#pvFBk").click();
   const geometry = await page.evaluate(() => {
     const modal = document.querySelector("#pvModal");
     const card = document.querySelector("#pvCard");

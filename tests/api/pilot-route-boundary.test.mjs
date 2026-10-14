@@ -95,7 +95,7 @@ test("every held-out route handler returns 404 before auth or external work in p
   process.env.EXGEN_PILOT_MODE = "true";
   process.env.VERCEL_ENV = "production";
   process.env.VERCEL_TARGET_ENV = "production";
-  process.env.SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
+  process.env.SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-pilot-route-test-key";
 
   for (const route of heldOut) {
