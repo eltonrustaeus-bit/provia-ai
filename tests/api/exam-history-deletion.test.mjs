@@ -6,7 +6,9 @@ const saved = {
   url: process.env.SUPABASE_URL,
   key: process.env.SUPABASE_SERVICE_ROLE_KEY,
   pilot: process.env.EXGEN_PILOT_MODE,
+  vercelRuntime: process.env.VERCEL,
   vercel: process.env.VERCEL_ENV,
+  vercelTarget: process.env.VERCEL_TARGET_ENV,
 };
 const userId = "11111111-1111-4111-8111-111111111111";
 const requests = [];
@@ -15,7 +17,9 @@ let failRpc = false;
 process.env.SUPABASE_URL = "https://exam-delete.synthetic.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-server-key";
 process.env.EXGEN_PILOT_MODE = "false";
+process.env.VERCEL = "1";
 process.env.VERCEL_ENV = "production";
+process.env.VERCEL_TARGET_ENV = "production";
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(String(input));
   const method = init.method || "GET";
@@ -70,7 +74,9 @@ try {
     ["SUPABASE_URL", saved.url],
     ["SUPABASE_SERVICE_ROLE_KEY", saved.key],
     ["EXGEN_PILOT_MODE", saved.pilot],
+    ["VERCEL", saved.vercelRuntime],
     ["VERCEL_ENV", saved.vercel],
+    ["VERCEL_TARGET_ENV", saved.vercelTarget],
   ]) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
