@@ -526,7 +526,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       scatter: [
         "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
         "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
-        "Jämför den första och sista mätningen och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
+        "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
       ],
       genericGraph: [
         "Se vad axlar och markeringar visar. Vilken del av ditt material kan hjälpa dig att tolka dem?",

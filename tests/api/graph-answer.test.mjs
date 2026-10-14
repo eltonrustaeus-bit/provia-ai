@@ -63,10 +63,11 @@ const scatterPartial = JSON.stringify({ type: "scatter", points: [
 ] });
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).points, 2);
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).max_points, 3);
-assert.equal(graph.questionText(scatterSpec), "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.");
+assert.match(graph.gradeAnswer(scatterPartial, scatterSpec).feedback, /datapunkter/);
+assert.equal(graph.questionText(scatterSpec), "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.");
 assert.doesNotMatch(graph.questionText(scatterSpec), /\(0, 4\)|\(1, 3\)|\(2, 1\)/,
   "the task instruction no longer repeats the answer coordinates");
-assert.equal(graph.modelAnswer(scatterSpec), "Mätpunkterna är (0, 4), (1, 3), (2, 1).");
+assert.equal(graph.modelAnswer(scatterSpec), "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).");
 assert.equal(graph.isValidSpec({ slope: 0, intercept: 6 }), false);
 assert.equal(graph.questionText(q.graph_spec, "sv"), "Rita grafen till y = 2x + 1. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.");
 assert.equal(graph.questionText(q.graph_spec, "en"), "Draw the graph of y = 2x + 1. Mark two clear points. Points are awarded for the correct slope and y-intercept.");
@@ -107,6 +108,10 @@ assert.deepEqual(assessment.gateExam({ questions: [{ ...question, graph_spec: { 
 assert.equal(assessment.gateExam({ questions: [{ ...question, points: 3, graph_spec: q.graph_spec }] }, { profile: "natural_sciences", secret }).questions.length, 0,
   "natural-sciences gates do not accept mathematics-only line tasks");
 assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "natural_sciences", secret }).questions.length, 1);
+assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "social_sciences", secret }).questions.length, 1,
+  "social-science tasks accept only the deterministic table-based scatter contract");
+assert.equal(assessment.gateExam({ questions: [question] }, { profile: "social_sciences", secret }).questions.length, 0,
+  "social-science tasks do not accept math line tasks");
 assert.equal(graph.sourceContainsSpec("Tid | Halt\n0 | 4\n1 | 3\n2 | 1", scatterSpec), false,
   "a scatter task cannot claim it came from a table whose headers differ");
 

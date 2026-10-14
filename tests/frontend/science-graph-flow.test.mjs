@@ -20,7 +20,7 @@ try {
         title: "Biologiprov", level: "C", exam_manifest: "synthetic-biology-graph-manifest",
         questions: [{
           id: "oxygen-graph", type: "graph", points: 3,
-          question: "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.",
+          question: "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.",
           grade_task: "opaque-biology-graph-task", options: [], topic: "Syrehalt",
           graph_ui: {
             mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
@@ -37,8 +37,8 @@ try {
       await route.fulfill({ json: { ok: true, exam_proof: examProof, result: {
         total_points: 3, max_points: 3, per_question: [{
           id: "oxygen-graph", points: 3, max_points: 3,
-          feedback: "Alla tre mätpunkter stämmer med tabellen.",
-          model_answer: "Mätpunkterna är (0, 4), (1, 3), (2, 1).",
+          feedback: "Alla tre datapunkter stämmer med tabellen.",
+          model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
           concept_tag: "Mätdata", error_tags: [],
         }],
       } } });
@@ -62,10 +62,10 @@ try {
   await page.locator("#xf .xf-exam.on .graph-answer--scatter").waitFor();
 
   const sourceTable = page.locator(".xf-exam.on .xf-source-table");
-  assert.equal(await sourceTable.locator("caption").innerText(), "Mätvärden från materialet");
+  assert.equal(await sourceTable.locator("caption").innerText(), "Värden från materialet");
   assert.deepEqual(await sourceTable.locator("thead th").allInnerTexts(), ["Tid (min)", "Syrehalt (mg/L)"]);
   assert.deepEqual(await sourceTable.locator("tbody tr").allInnerTexts(), ["0\t4", "1\t3", "2\t1"]);
-  assert.match(await page.locator(".xf-exam.on .xf-q-text").innerText(), /placera alla tre punkter/i);
+  assert.match(await page.locator(".xf-exam.on .xf-q-text").innerText(), /placera alla tre datapunkter/i);
 
   const graph = page.locator(".xf-exam.on .graph-answer svg");
   await graph.scrollIntoViewIfNeeded();

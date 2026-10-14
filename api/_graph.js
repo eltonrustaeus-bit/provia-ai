@@ -202,8 +202,8 @@ function gradeAnswer(raw, spec, lang = "sv") {
       points: correct,
       max_points: SCATTER_POINT_COUNT,
       feedback: lang === "en"
-        ? `${correct} of ${SCATTER_POINT_COUNT} measured points match the table.`
-        : `${correct} av ${SCATTER_POINT_COUNT} mätpunkter stämmer med tabellen.`,
+        ? `${correct} of ${SCATTER_POINT_COUNT} data points match the table.`
+        : `${correct} av ${SCATTER_POINT_COUNT} datapunkter stämmer med tabellen.`,
       error_tags: correct === SCATTER_POINT_COUNT ? [] : ["graph_data_points_incorrect"],
     };
   }
@@ -248,8 +248,8 @@ function equation(spec) {
 function questionText(spec, lang = "sv") {
   if (spec?.kind === "scatter" && isValidSpec(spec)) {
     return lang === "en"
-      ? "Use the measurements in the table to plot all three points on the graph."
-      : "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.";
+      ? "Use the values in the table to plot all three data points on the graph."
+      : "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.";
   }
   const target = equation(spec);
   if (!target) return "";
@@ -263,8 +263,8 @@ function modelAnswer(spec, lang = "sv") {
   if (spec.kind === "scatter") {
     const values = spec.points.map((point) => `(${point.x}, ${point.y})`).join(", ");
     return lang === "en"
-      ? `The measured points are ${values}.`
-      : `Mätpunkterna är ${values}.`;
+      ? `The data points are ${values}.`
+      : `Datapunkternas koordinater är ${values}.`;
   }
   const points = [];
   for (let x = GRID_MIN; x <= GRID_MAX; x++) {

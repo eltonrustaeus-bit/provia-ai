@@ -436,9 +436,12 @@ const PROFILES = {
     },
   },
   social_sciences: {
-    key: "social_sciences", allowedTypes: ["mc", "short"],
+    key: "social_sciences", allowedTypes: ["mc", "short", "graph"],
     extraIssues(q) {
       const issues = [];
+      if (q.type === "graph" && (!graphAnswers.isValidSpec(q.graph_spec) || q.graph_spec.kind !== "scatter")) {
+        issues.push("graph_spec_invalid");
+      }
       // Same over-categorical risk as law: social science answers are rarely
       // absolute, so "alltid/aldrig/endast" usually makes a second option
       // defensible. Non-blocking, exactly as in the law profile.

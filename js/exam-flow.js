@@ -1079,7 +1079,7 @@
     dl.appendChild(rNum);
     card.appendChild(dl);
     var graphHint = el("p", "xf-graph-limit-note",
-      tx("Matematik: en uttrycklig rät linje y = mx + b med heltalsvärden. Naturvetenskap: en tabell på egna rader, avdelad med |, med två rubriker och exakt tre rader med heltal mellan −5 och 5. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b with integer values. Science: a table on separate lines, separated by |, with two headings and exactly three rows of integers from −5 to 5. Other graph and chart formats are not supported yet.") );
+      tx("Matematik: en uttrycklig rät linje y = mx + b med heltalsvärden. Natur- och samhällsvetenskap: en tabell med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b with integer values. Natural and social sciences: a table with two headings separated by | and exactly three integer rows from −5 to 5 with distinct x-values. Other graph and chart formats are not supported yet.") );
     graphHint.hidden = S.qType !== "graph";
     card.appendChild(graphHint);
     b.appendChild(card);
@@ -1800,7 +1800,7 @@
 
     var wrap = el("div", "xf-source-table-wrap");
     var table = el("table", "xf-source-table");
-    table.appendChild(el("caption", null, lang === "en" ? "Measurements from your material" : "Mätvärden från materialet"));
+    table.appendChild(el("caption", null, lang === "en" ? "Values from your material" : "Värden från materialet"));
     var thead = el("thead");
     var headerRow = el("tr");
     source.headers.forEach(function (label) {

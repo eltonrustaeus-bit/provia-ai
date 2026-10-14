@@ -830,14 +830,14 @@ module.exports = async function handler(req, res) {
   const pointTable = graphAnswers.parsePointTable(pastedText);
   const graphMode = isMath && uniqueGraphLines.size === 1
     ? "line"
-    : subjectProfile === "natural_sciences" && pointTable ? "scatter" : null;
+    : ["natural_sciences", "social_sciences"].includes(subjectProfile) && pointTable ? "scatter" : null;
   if (qType === "graph" && !graphMode) {
     return json(res, 400, {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd kräver antingen exakt en synlig heltalsfunktion y = mx + b (matematik) eller en naturvetenskaplig tabell med två rubriker, avdelad med |, och exakt tre heltalsrader inom −5 till 5."
-        : "Graph support requires either one visible integer line y = mx + b (mathematics) or a natural-sciences table with two headers, separated by |, and exactly three integer rows within −5 to 5."
+        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en natur- eller samhällsvetenskaplig tabell med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden."
+        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a natural- or social-sciences table with two headers separated by | and exactly three integer rows from −5 to 5 with distinct x-values."
     });
   }
 
@@ -1019,8 +1019,8 @@ module.exports = async function handler(req, res) {
         if (qType !== "graph" || !graphSpecValid) {
           const bail = guardFail("GRAPH_GENERATION_REJECTED", {
             message: lang === "en"
-              ? "The generated graph did not match a supported line in your material. Check the graph requirements and try again."
-              : "Grafuppgiften kunde inte skapas utifrån en stödd linje i ditt material. Kontrollera grafkraven och försök igen."
+              ? "The graph task could not be created from the supported data in your material. Check the graph requirements and try again."
+              : "Grafuppgiften kunde inte skapas utifrån de data som stöds i materialet. Kontrollera grafkraven och försök igen."
           });
           if (bail) return bail;
           continue;
@@ -1030,15 +1030,15 @@ module.exports = async function handler(req, res) {
         if (graphMode === "scatter") {
           q.graph_spec = { kind: "scatter", slope: null, intercept: null, ...pointTable };
           q.points = graphAnswers.SCATTER_POINT_COUNT;
-          q.rubric = lang === "en" ? "One point for each correctly plotted measured value." : "En poäng för varje korrekt placerad mätpunkt.";
+          q.rubric = lang === "en" ? "One point for each correctly plotted data point." : "En poäng för varje korrekt placerad datapunkt.";
           q.scoring_rubric = {
-            parts: pointTable.points.map((_, index) => ({ description: `${lang === "en" ? "Measured point" : "Mätpunkt"} ${index + 1}`, points: 1 })),
+            parts: pointTable.points.map((_, index) => ({ description: `${lang === "en" ? "Data point" : "Datapunkt"} ${index + 1}`, points: 1 })),
             full_score_requirements: lang === "en"
-              ? "All three measured points match the exact coordinates in the table."
-              : "Alla tre mätpunkter är placerade på tabellens exakta koordinater.",
+              ? "All three data points match the exact coordinates in the table."
+              : "Alla tre datapunkter är placerade på tabellens exakta koordinater.",
             partial_credit_notes: lang === "en"
-              ? "Award one point per correctly plotted measured point; misplaced or duplicate points earn no point."
-              : "Ge en poäng per korrekt mätpunkt; felplacerade och dubblerade punkter ger ingen poäng."
+              ? "Award one point per correctly plotted data point; misplaced or duplicate points earn no point."
+              : "Ge en poäng per korrekt datapunkt; felplacerade och dubblerade punkter ger ingen poäng."
           };
         } else {
           q.graph_spec = { kind: "line", slope: q.graph_spec.slope, intercept: q.graph_spec.intercept, points: [], x_label: "", y_label: "" };

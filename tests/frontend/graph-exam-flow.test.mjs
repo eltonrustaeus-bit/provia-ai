@@ -135,8 +135,8 @@ try {
   const graphHint = page.locator("#xf .xf-screen[data-screen='aim'] .xf-card .xf-graph-limit-note");
   assert.equal(await graphHint.isVisible(), true, "graph limits are visible as soon as graph mode is selected");
   assert.match(await graphHint.innerText(), /en uttrycklig rät linje y = mx \+ b/i);
-  assert.match(await graphHint.innerText(), /naturvetenskap.*avdelad med \|/i);
-  assert.match(await graphHint.innerText(), /exakt tre rader.*−5 och 5/i);
+  assert.match(await graphHint.innerText(), /natur- och samhällsvetenskap.*avdelade med \|/i);
+  assert.match(await graphHint.innerText(), /exakt tre heltalsrader.*−5 och 5.*olika x-värden/i);
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await graphHint.isVisible(), false, "graph-only constraints are hidden for other question types");
   await page.getByRole("button", { name: "Interaktiv graf" }).click();

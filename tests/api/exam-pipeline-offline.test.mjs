@@ -153,7 +153,7 @@ try {
   });
   assert.equal(unsupportedGraph.status, 400);
   assert.equal(unsupportedGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraph.body.message, /naturvetenskaplig tabell/i);
+  assert.match(unsupportedGraph.body.message, /natur- eller samhällsvetenskaplig tabell/i);
   assert.match(unsupportedGraph.body.message, /exakt tre heltalsrader/i);
   const unsupportedGraphEn = await invoke(generateExam, {
     lang: "en", level: "C", course: "Mathematics 2b", pastedText: "The parabola is y = x^2.",
@@ -161,7 +161,7 @@ try {
   });
   assert.equal(unsupportedGraphEn.status, 400);
   assert.equal(unsupportedGraphEn.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraphEn.body.message, /natural-sciences table/i);
+  assert.match(unsupportedGraphEn.body.message, /natural- or social-sciences table/i);
   assert.match(unsupportedGraphEn.body.message, /exactly three integer rows/i);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
     "unsupported graph types are rejected before model traffic");
@@ -376,7 +376,7 @@ try {
       rows: [[0, 4], [1, 3], [2, 1]],
     },
   }, "server derives the visible graph setup from the exact source table, not model-provided labels");
-  assert.match(scienceQuestion.question, /mätvärdena i tabellen/i);
+  assert.match(scienceQuestion.question, /tabellens värden/i);
   assert.doesNotMatch(scienceQuestion.question, /\(0, 4\)|\(1, 3\)|\(2, 1\)/);
   assert.equal(Object.hasOwn(scienceQuestion, "graph_spec"), false);
   assert.equal(Object.hasOwn(scienceQuestion, "model_answer"), false);
@@ -392,7 +392,44 @@ try {
   assert.equal(scienceGraded.status, 200, JSON.stringify(scienceGraded.body));
   assert.equal(scienceGraded.body.result.total_points, 2);
   assert.equal(scienceGraded.body.result.max_points, 3);
-  assert.equal(scienceGraded.body.result.per_question[0].feedback, "2 av 3 mätpunkter stämmer med tabellen.");
+  assert.equal(scienceGraded.body.result.per_question[0].feedback, "2 av 3 datapunkter stämmer med tabellen.");
+
+  const socialCourse = "Företagsekonomi 1";
+  const socialMaterial = "Efterfrågan och pris:\nAntal | Pris (kr)\n1 | 5\n2 | 4\n3 | 3";
+  calls.length = 0;
+  const incompleteSocialTable = await invoke(generateExam, {
+    lang: "sv", level: "C", course: socialCourse,
+    pastedText: "Antal | Pris (kr)\n1 | 5\n2 | 4", qType: "graph", numQuestions: 1,
+  });
+  assert.equal(incompleteSocialTable.status, 400);
+  assert.equal(incompleteSocialTable.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "an unsupported table is rejected before provider use");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
+    "an unsupported table does not consume mock-exam quota");
+  activeQuestions = [{ ...activeQuestions[0], id: "social-graph" }];
+  const socialGenerated = await invoke(generateExam, {
+    lang: "sv", level: "C", course: socialCourse, pastedText: socialMaterial, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(socialGenerated.status, 200, JSON.stringify(socialGenerated.body));
+  const socialQuestion = socialGenerated.body.exam.questions[0];
+  assert.deepEqual(socialQuestion.graph_ui.source_table, {
+    headers: ["Antal", "Pris (kr)"], rows: [[1, 5], [2, 4], [3, 3]],
+  }, "the plotted economics values and axis labels come from the learner's exact source table");
+  assert.equal(Object.hasOwn(socialQuestion, "graph_spec"), false);
+  assert.equal(Object.hasOwn(socialQuestion, "model_answer"), false);
+  gradingState = "active";
+  const socialGraded = await invoke(gradeExam, {
+    lang: "sv", course: socialCourse, pastedText: socialMaterial,
+    exam_manifest: socialGenerated.body.exam.exam_manifest,
+    questions: [socialQuestion],
+    answers: [{ id: socialQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 1, y: 5 }, { x: 2, y: 4 }, { x: 3, y: 3 },
+    ] }) }],
+  });
+  assert.equal(socialGraded.status, 200, JSON.stringify(socialGraded.body));
+  assert.equal(socialGraded.body.result.total_points, 3);
+  assert.equal(socialGraded.body.result.max_points, 3);
 
   calls.length = 0;
   emptyGenerationResponse = true;

@@ -36,7 +36,7 @@
     var letter = function (i) { return String.fromCharCode(65 + i); };
     var text = english ? {
       lineGraph: "Coordinate grid from minus five to five. Choose point A or B and click the graph.",
-      scatterGraph: "Coordinate grid from minus five to five. Choose point A, B or C and plot each table value.",
+      scatterGraph: "Coordinate grid from minus five to five. Choose point A, B or C and plot each data point.",
       lineHint: "Choose A or B and click the graph. You can also enter coordinates.",
       scatterHint: "Choose a point, then click the graph or enter its coordinates. Plot each table row once.",
       point: "Point ", x: "x-coordinate", y: "y-coordinate", clear: "Clear points",
@@ -45,7 +45,7 @@
       cursor: "cursor", placed: "plotted", selected: "selected"
     } : {
       lineGraph: "Koordinatsystem från minus fem till fem. Välj punkt A eller B och tryck i grafen.",
-      scatterGraph: "Koordinatsystem från minus fem till fem. Välj punkt A, B eller C och placera varje tabellvärde.",
+      scatterGraph: "Koordinatsystem från minus fem till fem. Välj punkt A, B eller C och placera varje datapunkt.",
       lineHint: "Välj A eller B och tryck på grafen. Du kan också skriva koordinaterna.",
       scatterHint: "Välj en punkt och tryck i grafen eller skriv koordinaterna. Placera varje tabellrad en gång.",
       point: "Punkt ", x: "x-koordinat", y: "y-koordinat", clear: "Rensa punkter",

@@ -390,7 +390,7 @@ test("direct chat calls during an exam get method guidance before quota, cache o
         expected: [
           "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
           "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
-          "Jämför den första och sista mätningen och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
+          "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
         ],
         marker: "SCATTER_ANSWER_MARKER_73109",
       },

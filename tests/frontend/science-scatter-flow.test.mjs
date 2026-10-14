@@ -25,7 +25,7 @@ try {
         title: "Biologiprov", level: "C", exam_manifest: `v2.${"d".repeat(32)}.syntheticScienceGraph`,
         questions: [{
           id: "science-graph", type: "graph", points: 3,
-          question: "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.",
+          question: "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.",
           options: [], graph_ui: graphUi, grade_task: "opaque-science-task",
         }],
       },
@@ -49,10 +49,10 @@ try {
   await page.waitForSelector("#xf .xf-exam.on .xf-sheet");
   const prompt = page.locator("#xf .xf-exam.on .xf-q-text");
   await prompt.waitFor();
-  assert.equal(await prompt.innerText(), "Använd mätvärdena i tabellen för att placera alla tre punkter i diagrammet.");
+  assert.equal(await prompt.innerText(), "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.");
   assert.doesNotMatch(await prompt.innerText(), /\(0, 4\)|\(1, 3\)|\(2, 1\)/,
     "the task asks the learner to transfer the table, not copy coordinates from its wording");
-  const table = page.locator("#xf .xf-exam.on").getByRole("table", { name: "Mätvärden från materialet" });
+  const table = page.locator("#xf .xf-exam.on").getByRole("table", { name: "Värden från materialet" });
   assert.deepEqual(await table.locator("thead th").allTextContents(), sourceTable.headers);
   assert.deepEqual(await table.locator("tbody tr").allTextContents(), ["04", "13", "21"]);
   await page.locator("#xf .xf-exam.on .graph-answer").waitFor();

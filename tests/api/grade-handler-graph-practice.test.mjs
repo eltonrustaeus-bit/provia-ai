@@ -519,8 +519,8 @@ try {
     total_points: 3, max_points: 3,
     per_question: [{
       id: scienceQuestion.id, points: 3, max_points: 3,
-      feedback: "3 av 3 mätpunkter stämmer med tabellen.",
-      model_answer: "Mätpunkterna är (0, 4), (1, 3), (2, 1).",
+      feedback: "3 av 3 datapunkter stämmer med tabellen.",
+      model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
       concept_tag: "tolka mätdata", error_tags: [],
     }],
   }, "the non-math graph is deterministically scored against its signed source table");
