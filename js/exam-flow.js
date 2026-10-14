@@ -1233,6 +1233,8 @@
     }
 
     var err = el("div", "xf-err");
+    err.setAttribute("role", "alert");
+    err.setAttribute("aria-atomic", "true");
     b.appendChild(err);
 
     var act = el("div", "xf-act");
@@ -1331,6 +1333,8 @@
     }
 
     var err = el("div", "xf-err");
+    err.setAttribute("role", "alert");
+    err.setAttribute("aria-atomic", "true");
     b.appendChild(err);
 
     var act = el("div", "xf-act");

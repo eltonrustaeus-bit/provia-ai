@@ -204,16 +204,47 @@ async function toMaterial(page) {
     await input.setInputFiles(image);
     await page.waitForFunction(() => /Kunde inte läsa bilden/.test(
       document.querySelector("#xf .xf-screen[data-screen='material'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    const errorA11y = await page.locator("#xf .xf-screen[data-screen='material'] .xf-err")
+      .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
     const clearedAfterFailure = await input.inputValue() === "";
     await input.setInputFiles(image);
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='material'] .xf-area")
       ?.value.includes("Syntetiskt OCR-underlag"), null, { timeout: 5000 });
     ok("samma bild kan väljas igen efter OCR-fel", clearedAfterFailure && ocrCalls === 2,
       JSON.stringify({ clearedAfterFailure, ocrCalls }));
+    ok("OCR-fel annonseras som ett sammanhållet larm", errorA11y.role === "alert" && errorA11y.atomic === "true",
+      JSON.stringify(errorA11y));
     ok("lyckad OCR-återförsök lägger till text i redigerbart material", await page.locator(
       "#xf .xf-screen[data-screen='material'] .xf-area").inputValue() === "Syntetiskt OCR-underlag");
   } catch (e) {
     ok("OCR kan återförsökas med samma bild", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Provider/generation failures are announced from the active review screen.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "generation-error-a11y");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.route("**/api/generate-exam", route => route.fulfill({
+      status: 503, json: { ok: false, error: "Syntetiskt genereringsfel" },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Syntetiskt genereringsfel/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
+      .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
+    ok("genereringsfel annonseras som ett sammanhållet larm", errorA11y.role === "alert" && errorA11y.atomic === "true",
+      JSON.stringify(errorA11y));
+  } catch (e) {
+    ok("genereringsfel annonseras för hjälpmedel", false, e.message);
   } finally {
     await ctx.close();
   }
