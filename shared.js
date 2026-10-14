@@ -1503,6 +1503,7 @@ function finalizeMsg(div, text) {
         '#perWidget.per-minimized{transform:scale(.001);opacity:0;pointer-events:none;transition:transform .15s ease,opacity .15s ease}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
+        '@media(max-width:480px){#perBubble{height:40px;padding:0 8px;gap:4px;font-size:11px}#perBubble svg{width:14px;height:14px}}',
         '#perWidget.per-left{right:auto!important;left:22px!important}',
         '@media(max-width:480px){#perWidget.per-left{left:16px!important}}',
         '#perWidget.per-left #perPanel{right:auto;left:0}',

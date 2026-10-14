@@ -19,8 +19,18 @@ for (const path of ["/konto.html", "/integritetspolicy.html", "/aterstall.html",
 
 for (const path of ["/app.html", "/pricing.html"]) {
   const { ctx, page } = await openPage(browser, srv.url + path, { width: 390, height: 844, settle: 250 });
-  const widget = await page.locator("#perWidget").count();
-  R.ok(`${path}: P.E.R remains available`, widget === 1, String(widget));
+  const state = await page.locator("#perBubble").evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height,
+      label: button.getAttribute("aria-label"),
+      text: button.innerText.trim(),
+    };
+  });
+  R.ok(`${path}: P.E.R remains visibly and accessibly available`,
+    state.label === "Fråga P.E.R" && state.text === "P.E.R" && state.width <= 64 && state.height <= 44,
+    JSON.stringify(state));
   await ctx.close();
 }
 
