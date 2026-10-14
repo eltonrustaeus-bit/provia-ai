@@ -217,9 +217,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SB_URL = window.ExGenRuntime.supabaseUrl;
-const SB_KEY = window.ExGenRuntime.publishableKey;
-const db = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.ExGenRuntime.authStorageKey } });
+const runtime = window.ExGenRuntime || {};
+const SB_URL = runtime.supabaseUrl;
+const SB_KEY = runtime.publishableKey;
+const db = SB_URL && SB_KEY && window.supabase?.createClient
+  ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: runtime.authStorageKey } })
+  : null;
 
 /* LOADER */
 window.addEventListener('load', () => setTimeout(() => document.getElementById('ldr').classList.add('out'), 160));
@@ -236,6 +239,14 @@ function showStatus(msg, type) {
   bar.textContent = msg;
   bar.style.display = 'flex';
   if (type === 'ok') setTimeout(() => { bar.style.display = 'none'; }, 3000);
+}
+
+function lockAdminControls() {
+  const main = document.querySelector('main');
+  main.setAttribute('aria-disabled', 'true');
+  main.style.pointerEvents = 'none';
+  main.querySelectorAll('button, input, select, textarea').forEach(control => { control.disabled = true; });
+  main.querySelectorAll('a[href]').forEach(link => { link.tabIndex = -1; });
 }
 
 /* STATS */
@@ -386,13 +397,21 @@ async function loadUsers() {
 
 /* AUTH GATE */
 async function init() {
-  const { data: { session } } = await db.auth.getSession();
   const lbl = document.getElementById('adminLabel');
+  const main = document.querySelector('main');
+
+  if (!db) {
+    lbl.textContent = 'Lokal förhandsvisning';
+    lockAdminControls();
+    showStatus('Adminpanelen kräver en ansluten backend. Inga användardata visas i den här förhandsvisningen.', 'warn');
+    return;
+  }
+
+  const { data: { session } } = await db.auth.getSession();
 
   if (!session) {
     lbl.textContent = 'Inte inloggad';
-    document.querySelector('main').setAttribute('aria-disabled', 'true');
-    document.querySelector('main').style.pointerEvents = 'none';
+    lockAdminControls();
     showStatus('Du måste vara inloggad som admin för att se den här sidan.', 'warn');
     return;
   }
@@ -405,14 +424,13 @@ async function init() {
 
   if (data?.role !== 'admin') {
     lbl.textContent = `Ingen åtkomst (${data?.role || 'okänd roll'})`;
-    document.querySelector('main').setAttribute('aria-disabled', 'true');
-    document.querySelector('main').style.pointerEvents = 'none';
+    lockAdminControls();
     showStatus('Ingen åtkomst. Kontot saknar admin-roll.', 'err');
     return;
   }
 
-  document.querySelector('main').removeAttribute('aria-disabled');
-  document.querySelector('main').style.pointerEvents = '';
+  main.removeAttribute('aria-disabled');
+  main.style.pointerEvents = '';
   lbl.textContent = `Admin · ${session.user.email}`;
   await loadUsers();
 }

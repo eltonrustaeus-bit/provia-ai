@@ -296,9 +296,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SB_URL = window.ExGenRuntime.supabaseUrl;
-const SB_KEY = window.ExGenRuntime.publishableKey;
-const db = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.ExGenRuntime.authStorageKey } });
+const runtime = window.ExGenRuntime || {};
+const SB_URL = runtime.supabaseUrl;
+const SB_KEY = runtime.publishableKey;
+const db = SB_URL && SB_KEY && window.supabase?.createClient
+  ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: runtime.authStorageKey } })
+  : null;
 
 // Ingen hårdkodad ägar-ID längre. Den här kontrollen är bara till för att visa rätt
 // meddelande — den riktiga spärren sitter serversidan i api/check-role.js, som kräver
@@ -635,6 +638,20 @@ document.getElementById('ddOverlay').addEventListener('keydown',e=>{
 /* ── AUTH GATE ── */
 async function init(){
   const who=document.getElementById('whoLabel');
+  const main=document.getElementById('main');
+  const authGate=document.getElementById('authGate');
+  if(!db){
+    who.textContent='Lokal förhandsvisning';
+    main.style.display='none';
+    authGate.style.display='';
+    authGate.querySelector('.kCardTitle').textContent='Lärarvyn kräver en ansluten backend';
+    authGate.querySelector('p').textContent='Klassdata visas inte i den här backend-fria förhandsvisningen.';
+    const loginButton=authGate.querySelector('[data-pv-auth]');
+    loginButton.hidden=true;
+    loginButton.style.display='none';
+    showStatus('Lärarvyn är inte ansluten till en datatjänst här. Inga klass- eller elevdata har hämtats.','warn');
+    return;
+  }
   const { data:{ session } } = await db.auth.getSession();
   if(!session){
     who.textContent='Inte inloggad';
