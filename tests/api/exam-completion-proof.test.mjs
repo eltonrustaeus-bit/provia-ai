@@ -12,9 +12,10 @@ const userId = "student-a";
 const course = "Matematik 1b";
 const material = "En linjär funktion kan skrivas y = kx + m.";
 
-function examFor(owner = userId) {
+function examFor(owner = userId, count = 2) {
   const contextHash = gradeTasks.hashContext(material, course, owner);
-  return [1, 2].map((number) => {
+  return Array.from({ length: count }, (_, index) => {
+    const number = index + 1;
     const question = {
       id: `q${number}`, type: "mc", points: 2,
       question: `Vad betyder ${number === 1 ? "k" : "m"} i y = kx + m?`,
@@ -29,7 +30,9 @@ function examFor(owner = userId) {
 function proof(questions = examFor()) {
   return {
     receipt: completion.issueCompletion(userId, course, questions),
-    course, material, questions, selectedQuestionId: "q1",
+    course, material, questions,
+    answers: questions.map((question) => ({ id: question.id, answer: `answer-${question.id}` })),
+    selectedQuestionId: "q1",
   };
 }
 
@@ -53,6 +56,8 @@ test("a graded full set authorizes only its signed question for its owner", () =
   assert.equal(checked?.question?.model_answer, "Lutningen");
   assert.equal(checked?.course, course);
   assert.equal(checked?.material, material);
+  assert.equal(checked?.answerMap.get("q1"), "answer-q1");
+  assert.match(checked?.answerFingerprint || "", /^[a-f0-9]{64}$/);
   assert.match(checked?.submissionId || "", /^[a-f0-9]{32}$/);
 });
 
@@ -84,4 +89,30 @@ test("tampered and duplicate questions fail even with an authentic receipt", () 
   assert.equal(completion.verifyCompletion({ ...original, questions: tampered }, userId), null);
   assert.equal(completion.verifyCompletion({ ...original, questions: [original.questions[0], original.questions[0]] }, userId), null);
   assert.equal(completion.verifyCompletion({ ...original, receipt: original.receipt.slice(0, -1) + "x" }, userId), null);
+});
+
+test("completion answer set must exactly cover signed question IDs within grade limits", () => {
+  const original = proof();
+  assert.equal(completion.verifyCompletion({ ...original, answers: original.answers.slice(1) }, userId), null);
+  assert.equal(completion.verifyCompletion({ ...original, answers: [...original.answers, original.answers[0]] }, userId), null);
+  assert.equal(completion.verifyCompletion({ ...original, answers: [original.answers[0], { id: "extra", answer: "x" }] }, userId), null);
+  assert.equal(completion.verifyCompletion({ ...original, answers: [original.answers[0], { id: "q2", answer: 5 }] }, userId), null);
+  assert.equal(completion.verifyCompletion({ ...original, answers: [original.answers[0], { id: "q2", answer: "x".repeat(4001) }] }, userId), null);
+  const sevenQuestionProof = proof(examFor(userId, 7));
+  assert.equal(completion.verifyCompletion({
+    ...sevenQuestionProof,
+    answers: sevenQuestionProof.answers.map((entry) => ({ ...entry, answer: "x".repeat(3500) })),
+  }, userId), null);
+});
+
+test("the answer fingerprint binds exact answer text but not request list order", () => {
+  const original = proof();
+  const verified = completion.verifyCompletion(original, userId);
+  const reversed = completion.verifyCompletion({ ...original, answers: [...original.answers].reverse() }, userId);
+  const changed = completion.verifyCompletion({
+    ...original,
+    answers: original.answers.map((entry) => entry.id === "q1" ? { ...entry, answer: "different" } : entry),
+  }, userId);
+  assert.equal(reversed?.answerFingerprint, verified?.answerFingerprint);
+  assert.notEqual(changed?.answerFingerprint, verified?.answerFingerprint);
 });

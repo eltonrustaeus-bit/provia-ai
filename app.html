@@ -1319,6 +1319,7 @@ const resultMetaEl=()=>$("resultMeta"),resultBodyEl=()=>$("resultBody");
 const imageInputEl=()=>$("imageInput"),ocrStatusEl=()=>$("ocrStatus");
 let currentExam=null;
 let currentExamProof=null;
+let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
 
 function setBusy(isBusy,label){
@@ -1545,6 +1546,7 @@ function isRenderableQuestion(q){
 function renderExam(exam){
   const t=T[LANG];
   currentExamProof=null;
+  currentExamAnswers=null;
   let graphToolUnavailable=false;
   const rawQs=Array.isArray(exam.questions)?exam.questions:[];
   const qs=rawQs.filter(isRenderableQuestion);
@@ -1688,7 +1690,7 @@ function clearAll(){
   if(qTypeEl())qTypeEl().value="mix";
   if(numQuestionsEl())numQuestionsEl().value="12";
   if(imageInputEl())imageInputEl().value="";
-  setOcrStatus("");currentExam=null;currentExamProof=null;
+  setOcrStatus("");currentExam=null;currentExamProof=null;currentExamAnswers=null;
   const chk=document.getElementById("useCustomCourse"),cs=document.getElementById("courseSearch"),cc=document.getElementById("customCourse"),st=document.getElementById("coursePickerStatus");
   if(chk)chk.checked=false;if(cs)cs.value="";if(cc)cc.value="";if(st)st.textContent="";
   try{if(cc)cc.disabled=true;if(cs)cs.disabled=false;}catch{}
@@ -1981,6 +1983,7 @@ try{
         setStatus(msg,"bad");return {ok:false,error:msg};
       }
       const previous=lsGetObj(LS_LAST);
+      currentExamAnswers=payload.answers.map(a=>({id:String(a.id),answer:String(a.answer)}));
       if(examProof&&previous?.examProof===examProof){
         renderResult(result);
         currentExamProof=examProof;
@@ -2162,6 +2165,7 @@ try{
       }
       currentExam = null;
       currentExamProof = null;
+      currentExamAnswers = null;
       const grade = $("gradeBtn");
       if (grade) grade.disabled = true;
       return { ok: true };
@@ -2205,6 +2209,7 @@ try{
       }
       currentExam = null;
       currentExamProof = null;
+      currentExamAnswers = null;
       const grade = $("gradeBtn");
       if (grade) grade.disabled = true;
       return { ok: true, count: response.data.abandoned_count };
@@ -2213,7 +2218,8 @@ try{
     getPendingAccountSaves() { return getPendingAccountSaves(); },
     async gradeGraphRetry(questionId, answer) {
       const question = currentExam?.questions?.find((q) => String(q.id) === String(questionId));
-      if (!question || question.type !== "graph" || !question.grade_task || !currentExamProof) {
+      if (!question || question.type !== "graph" || !question.grade_task || !currentExamProof ||
+          !Array.isArray(currentExamAnswers) || currentExamAnswers.length !== currentExam?.questions?.length) {
         return { ok: false, error: "Grafuppgiften kunde inte verifieras. Skapa ett nytt prov." };
       }
       const payload = {
@@ -2227,6 +2233,7 @@ try{
           course: (courseEl()?.value || "").trim(),
           material: (pastedTextEl()?.value || "").trim(),
           questions: currentExam.questions,
+          answers: currentExamAnswers,
           selectedQuestionId: String(question.id),
         },
         answers: [{ id: String(question.id), answer: String(answer || "") }],
@@ -2248,6 +2255,7 @@ try{
       if (!exam || !exam.exam_manifest || !Array.isArray(exam.questions) || !exam.questions.length) return false;
       currentExam = exam;
       currentExamProof = null;
+      currentExamAnswers = null;
       const g = $("gradeBtn"); if (g) g.disabled = false;
       return true;
     },

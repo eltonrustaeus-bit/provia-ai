@@ -1921,7 +1921,7 @@
       }
       // Rättningen är i hamn: utkastet får försvinna först nu.
       clearDraft();
-      stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof); });
+      stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof, answers); });
     }).catch(function (e) {
       /* Utan den här grenen blir ett oväntat avslag från motorn en mörk skärm
          med låst scroll, utan knappar, som bara går att lämna med omladdning —
@@ -2013,7 +2013,7 @@
 
   // ── Resultat ─────────────────────────────────────────────────────────────
 
-  function stepResult(r, persistence, examProof) {
+  function stepResult(r, persistence, examProof, submittedAnswers) {
     closePerPanel();
     var b = mount("result");
 
@@ -2205,7 +2205,7 @@
       }
 
       if (examProof && q.grade_task && window.PER && window.PER.send) {
-        var review = el("button", "xf-btn quiet xf-review-action", "✦ Be P.E.R förklara");
+        var review = el("button", "xf-btn quiet xf-review-action", "✦ Förklara min rättning");
         review.type = "button";
         review.addEventListener("click", function () {
           window.PER.describe({
@@ -2215,13 +2215,14 @@
           });
           var bubble = document.getElementById("perBubble");
           if (bubble && !bubble.classList.contains("per-open")) bubble.click();
-          window.PER.send("Förklara fråga " + (n + 1) + " steg för steg", {
+          window.PER.send("Förklara min rättning på fråga " + (n + 1) + " steg för steg", {
             helpLevel: 3,
             examProof: {
               receipt: examProof,
               course: S.course,
               material: S.material.slice(0, 3000),
               questions: qs,
+              answers: submittedAnswers,
               selectedQuestionId: String(item.id)
             }
           });

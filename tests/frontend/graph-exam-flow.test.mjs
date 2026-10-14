@@ -294,6 +294,8 @@ try {
   assert.ok(retryBox && retryBox.x >= 0 && retryBox.x + retryBox.width <= 390, "retry control stays within the viewport");
   assert.equal(retryBody?.mode, "graph_practice_retry");
   assert.equal(retryBody?.examProof?.receipt, graphProof);
+  assert.deepEqual(retryBody?.examProof?.answers, gradeBody?.answers,
+    "the retry proof carries the exact answer bundle that was officially graded");
   assert.equal(graphRetryAttempts, 3, "retry succeeds after a transient failure and a stale response");
   assert.deepEqual(retryBody?.answers, [{ id: "graph-1", answer: JSON.stringify({ type: "line", points: [{ x: 0, y: 1 }, { x: 2, y: 5 }] }) }]);
   assert.equal(retryBody?.questions?.[0]?.grade_task, "opaque-test-task");

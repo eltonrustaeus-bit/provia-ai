@@ -64,10 +64,11 @@ function issueCompletion(userId, course, questions) {
 
 function verifyCompletion(proof, userId) {
   if (!proof || typeof proof !== "object" || Array.isArray(proof) || !userId) return null;
-  const { receipt, course, material, questions, selectedQuestionId } = proof;
+  const { receipt, course, material, questions, answers, selectedQuestionId } = proof;
   if (typeof course !== "string" || course.length > 200 ||
       typeof material !== "string" || material.length > 3000 ||
       !Array.isArray(questions) || questions.length < 1 || questions.length > 20 ||
+      !Array.isArray(answers) || answers.length !== questions.length ||
       typeof selectedQuestionId !== "string" || !selectedQuestionId || selectedQuestionId.length > 100 ||
       typeof receipt !== "string" || receipt.length > 150) return null;
 
@@ -81,14 +82,31 @@ function verifyCompletion(proof, userId) {
 
   const contextHash = gradeTasks.hashContext(material, course, userId);
   const seen = new Set();
+  const answerMap = new Map();
+  const openedQuestions = [];
+  let answerChars = 0;
   let selected = null;
   for (const publicQuestion of questions) {
     const question = gradeTasks.openQuestion(publicQuestion, publicQuestion?.grade_task, undefined, contextHash);
     if (!question || seen.has(question.id)) return null;
     seen.add(question.id);
+    openedQuestions.push({ id: question.id, points: question.points });
     if (question.id === selectedQuestionId) selected = question;
   }
-  return selected ? { question: selected, submissionId: id, course, material } : null;
+  for (const entry of answers) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        typeof entry.id !== "string" || !seen.has(entry.id) || answerMap.has(entry.id) ||
+        typeof entry.answer !== "string" || entry.answer.length > 4000) return null;
+    answerChars += entry.answer.length;
+    if (answerChars > 24000) return null;
+    answerMap.set(entry.id, entry.answer);
+  }
+  if (answerMap.size !== questions.length) return null;
+  const fingerprint = answerFingerprint(userId, course, questions, answerMap);
+  return selected && fingerprint
+    ? { question: selected, questions: openedQuestions, answerMap,
+        answerFingerprint: fingerprint, submissionId: id, course, material }
+    : null;
 }
 
 module.exports = { submissionId, answerFingerprint, issueExamManifest, verifyExamManifest, issueCompletion, verifyCompletion };

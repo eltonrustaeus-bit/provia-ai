@@ -127,7 +127,9 @@ try {
     .issueExamManifest(userId, course, material, [publicQuestion]);
   const examProof = {
     receipt: require("../../api/_exam-completion.cjs").issueCompletion(userId, course, [publicQuestion]),
-    course, material, questions: [publicQuestion], selectedQuestionId: question.id,
+    course, material, questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+    selectedQuestionId: question.id,
   };
 
   const beforeProof = await invoke({
@@ -198,6 +200,7 @@ try {
     course,
     material,
     questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
     selectedQuestionId: question.id,
   }, userId)?.question?.id, question.id, "the proof opens only for the graded signed question");
   assert.equal(validWrongGraph.body.result.per_question[0].points, 1,

@@ -224,6 +224,7 @@ try {
     course,
     material: pastedText,
     questions: generated.body.exam.questions,
+    answers: generated.body.exam.questions.map((q, index) => ({ id: q.id, answer: ["B", "A", "B"][index] })),
     selectedQuestionId: "q-2",
   }, userId)?.question?.id, "q-2", "the official generated and graded set permits review of its signed question");
   assert.deepEqual(graded.body.result, {
