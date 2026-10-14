@@ -1106,15 +1106,26 @@ async function getPendingAccountSaves(){
 
 function mergeMistakesFromExamRows(rows){
   const out=[];
+  const idOf=value=>typeof value==="string"?(value.trim()?value:""):typeof value==="number"&&Number.isFinite(value)?String(value):"";
+  const scoreOf=value=>{
+    if(typeof value==="number")return Number.isFinite(value)?value:null;
+    if(typeof value!=="string")return null;
+    const text=value.trim();
+    if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text))return null;
+    const number=Number(text); return Number.isFinite(number)?number:null;
+  };
   (rows||[]).forEach(r=>{
     const createdTs=Date.parse(r.created_at)||0;
     const exam=r.exam||null,result=r.result||null,answers=r.answers||null;
-    const qById=new Map(((exam&&exam.questions)?exam.questions:[]).map(q=>[String(q.id),q]));
-    const aById=new Map((Array.isArray(answers)?answers:[]).map(a=>[String(a.id),String(a.answer||"")]));
+    const qById=new Map();
+    (exam&&Array.isArray(exam.questions)?exam.questions:[]).forEach(q=>{const id=q&&typeof q==="object"?idOf(q.id):"";if(id)qById.set(id,q);});
+    const aById=new Map();
+    (Array.isArray(answers)?answers:[]).forEach(a=>{const id=a&&typeof a==="object"?idOf(a.id):"";if(id)aById.set(id,String(a.answer||""));});
     const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
     per.forEach(item=>{
-      const got=Number(item.points||0),mx=Number(item.max_points||0);
-      if(item.unanswered!==true&&mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
+      if(!item||typeof item!=="object")return;
+      const got=scoreOf(item.points),mx=scoreOf(item.max_points),qid=idOf(item.id),q=qid?qById.get(qid):null;
+      if(item.unanswered!==true&&q&&typeof q.question==="string"&&q.question.trim()&&got!==null&&mx!==null&&mx>0&&got>=0&&got<=mx&&got<mx){
         out.push({ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
     });
   });
