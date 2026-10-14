@@ -29,7 +29,7 @@ async function boot({ cachedCount, reply, viewport = { width: 390, height: 844 }
   await seed(page, { role: "gratis" });
   await page.route("**/js/exgen-runtime.js", (route) => route.fulfill({
     contentType: "text/javascript",
-    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
+    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"sb_publishable_synthetic_frontend_test_key_only_000000",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
   }));
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
