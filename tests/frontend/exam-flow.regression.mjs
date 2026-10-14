@@ -203,6 +203,33 @@ async function toMaterial(page) {
   await ctx.close();
 }
 
+// Keyboard selection auto-advances to the next question without dropping focus.
+{
+  const { ctx, page } = await mk({ viewport: { width: 390, height: 844 } });
+  try {
+    await signIn(page, "keyboard-focus");
+    await toExam(page);
+    const firstOption = page.locator(".xf-mc-opt").first();
+    await firstOption.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.querySelector(".xf-q-text")?.textContent.includes("Fråga B"));
+    const focus = await page.evaluate(() => {
+      const prompt = document.querySelector(".xf-q-text");
+      return {
+        onNextQuestion: prompt?.textContent.includes("Fråga B") && document.activeElement === prompt,
+        visible: !!prompt && prompt.getBoundingClientRect().height > 0,
+        focusVisible: !!prompt?.matches(":focus-visible")
+      };
+    });
+    await page.waitForTimeout(320);
+    await page.screenshot({ path: `${SHOT}/exam-keyboard-focus-next-question-mobile.png` });
+    ok("Enter auto-advance moves focus to the next question", focus.onNextQuestion && focus.visible, JSON.stringify(focus));
+    ok("keyboard focus on the next question is visibly indicated", focus.focusVisible, JSON.stringify(focus));
+  } finally {
+    await ctx.close();
+  }
+}
+
 // ── T1: dubbletter av fråge-id separeras ───────────────────────────────────
 {
   const { ctx, page, errs } = await mk();

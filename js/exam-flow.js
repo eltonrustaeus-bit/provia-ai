@@ -1598,7 +1598,7 @@
     publishTimer = setTimeout(publish, 500);
   }
 
-  function renderQuestion() {
+  function renderQuestion(focusQuestion) {
     var qs = S.exam.questions;
     var i = clamp(S.idx, 0, qs.length - 1);
     S.idx = i;
@@ -1631,7 +1631,8 @@
     head.appendChild(el("span", "xf-q-pts", (Number(q.points) || 0) + " p"));
     sheet.appendChild(head);
 
-    var qText = el("p", "xf-q-text", q.question || "");
+    var qText = el("h2", "xf-q-text", q.question || "");
+    qText.tabIndex = -1;
     sheet.appendChild(qText);
     renderMathIn(qText);
 
@@ -1653,7 +1654,7 @@
           armStuck();
           // Sista frågan kräver ett uttryckligt klick på Lämna in.
           if (i < S.exam.questions.length - 1) {
-            setTimeout(function () { if (S.idx === i) next(); }, 260);
+            setTimeout(function () { if (S.idx === i) next(true); }, 260);
           }
         });
         group.appendChild(btn);
@@ -1709,6 +1710,7 @@
     UI.sheetWrap.innerHTML = "";
     UI.sheetWrap.appendChild(sheet);
     UI.sheetWrap.scrollTop = 0;
+    if (focusQuestion) qText.focus({ preventScroll: true });
 
     UI.prev.disabled = i === 0;
     UI.next.textContent = i === S.exam.questions.length - 1 ? "Lämna in" : "Nästa";
@@ -1767,10 +1769,10 @@
     catch (_) { wrap.scrollTop = top; }
   }
 
-  function next() {
+  function next(focusQuestion) {
     if (S.idx >= S.exam.questions.length - 1) { submit(); return; }
     S.idx++;
-    renderQuestion();
+    renderQuestion(focusQuestion);
     saveDraft();
   }
 

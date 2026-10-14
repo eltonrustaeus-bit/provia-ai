@@ -256,6 +256,11 @@ body.xf-grading .xf-progress { display: none; }
   white-space: pre-wrap;
 }
 
+.xf-q-text:focus-visible {
+  outline: 2px solid var(--xf-accent);
+  outline-offset: 4px;
+}
+
 .xf-mc { display: grid; gap: 9px; }
 
 .xf-mc-opt {
