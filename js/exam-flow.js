@@ -1174,13 +1174,13 @@
     function onType() {
       var v = ta.value.trim();
       err.textContent = "";
-      go.disabled = v.length < 120;
+      go.disabled = !v;
 
       read.innerHTML = "";
       if (!v) return;
 
       if (v.length < 120) {
-        read.appendChild(el("span", null, "Lite kort än — " + v.length + " av minst 120 tecken"));
+        read.appendChild(el("span", null, "Kort underlag — lägg gärna till sammanhang för fler varierade frågor."));
         return;
       }
 

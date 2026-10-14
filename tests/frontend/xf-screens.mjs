@@ -234,12 +234,9 @@ async function boot(opts = {}) {
 }
 
 
-// S14: fokus flyttas till rubriken, men utan att måla en ring. Rubriken är inte
-// interaktiv — tabindex="-1" finns bara för att gå att fokusera programmatiskt
-// — men Chromium låter den ändå matcha :focus-visible och rita sin egen ram.
-// För den som ser är hela skärmbytet återkopplingen. Kontrollen kräver båda:
-// fokus MÅSTE flytta (annars tappar skärmläsaren var den är) och ringen får
-// INTE synas.
+// S14: fokus flyttas till rubriken och har en synlig markering. Rubriken är
+// inte interaktiv — tabindex="-1" finns för programmatiskt fokus — men den
+// visuella återkopplingen hjälper tangentbordsanvändare att följa skärmbytet.
 {
   const { ctx, page } = await boot();
   await page.evaluate(() => window.flow.show("a"));
@@ -247,8 +244,8 @@ async function boot(opts = {}) {
     const h = document.querySelector('[data-screen="a"] .xf-say');
     return { fokuserad: document.activeElement === h, outline: getComputedStyle(h).outlineStyle };
   });
-  ok("S14 fokus flyttas till rubriken utan att rita en ring",
-    v.fokuserad && v.outline === "none", JSON.stringify(v));
+  ok("S14 fokus flyttas till rubriken med synlig markering",
+    v.fokuserad && v.outline !== "none", JSON.stringify(v));
   await ctx.close();
 }
 

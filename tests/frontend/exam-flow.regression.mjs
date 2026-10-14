@@ -110,6 +110,40 @@ async function toExam(page) {
   await page.waitForTimeout(300);
 }
 
+async function toMaterial(page) {
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+  await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+  await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
+  await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
+  await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
+  await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+}
+
+// A concise, valid source such as a linear formula should not be blocked by a
+// hidden character threshold; the UI still recommends adding useful context.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "short-material");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "y = 2x + 1");
+    const v = await page.evaluate(() => ({
+      disabled: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-btn.primary").disabled,
+      guidance: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-read").textContent,
+    }));
+    ok("kort men icke-tomt material kan fortsätta", !v.disabled, JSON.stringify(v));
+    ok("kort material får en tydlig kvalitetsrekommendation", /lägg gärna till sammanhang/i.test(v.guidance), v.guidance);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    ok("kort material når provkontraktet", true);
+  } catch (e) {
+    ok("kort materialflöde fungerar", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // ── T1f: a fresh local save cannot revive an expired server issuance ──────
 {
   examIssuanceStateResponse = "expired";
@@ -556,7 +590,10 @@ async function toExam(page) {
     ok("T10a förlorat prov kan upptäckas utan lokalt utkast", await recovery.textContent().then(text => /Ett prov finns kvar/.test(text)));
     page.on("dialog", d => d.accept().catch(() => {}));
     lastAbandonPayload = null;
+    const abandonResponse = page.waitForResponse(response =>
+      response.url().includes("/api/abandon-exam") && response.request().method() === "POST");
     await recovery.getByRole("button", { name: "Avsluta tidigare prov" }).click();
+    await abandonResponse;
     ok("T10b återställning använder explicit avbryt-allt", lastAbandonPayload?.abandon_all === true);
   } finally {
     activeExamCountResponse = 0;
