@@ -501,7 +501,7 @@ try {
   const scienceManifest = require("../../api/_exam-completion.cjs")
     .issueExamManifest(userId, scienceCourse, scienceMaterial, [publicScienceQuestion]);
   const scienceAnswer = JSON.stringify({ type: "scatter", points: [
-    { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 3 },
+    { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 2 },
   ] });
   issuanceState = "active";
   savedCanonicalResult = null;
@@ -516,19 +516,68 @@ try {
   });
   assert.equal(officialScience.status, 200, "the official handler accepts a valid non-math scatter task");
   assert.deepEqual(officialScience.body.result, {
-    total_points: 3, max_points: 3,
+    total_points: 2, max_points: 3,
     per_question: [{
-      id: scienceQuestion.id, points: 3, max_points: 3,
-      feedback: "3 av 3 datapunkter stämmer med tabellen.",
+      id: scienceQuestion.id, points: 2, max_points: 3,
+      feedback: "2 av 3 datapunkter stämmer med tabellen.",
       model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
-      concept_tag: "tolka mätdata", error_tags: [],
+      concept_tag: "tolka mätdata", error_tags: ["graph_data_points_incorrect"],
     }],
-  }, "the non-math graph is deterministically scored against its signed source table");
+  }, "the incomplete science graph earns only its correct source-table points");
   const scienceWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(scienceWrite, "the official science score follows the canonical persistence path");
   assert.deepEqual(JSON.parse(scienceWrite.body).p_result_payload, officialScience.body.result);
   assert.ok(!calls.some((call) => call.url.includes("openai.com")),
     "deterministic science graph grading does not call the AI provider");
+
+  const scienceExamProof = {
+    receipt: officialScience.body.exam_proof,
+    course: scienceCourse,
+    material: scienceMaterial,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceAnswer }],
+    selectedQuestionId: scienceQuestion.id,
+  };
+  const scienceWrongRetryAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 },
+  ] });
+  calls.length = 0;
+  const scienceWrongRetry = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    mode: "graph_practice_retry", examProof: scienceExamProof,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceWrongRetryAnswer }],
+  });
+  assert.equal(scienceWrongRetry.status, 200);
+  assert.equal(scienceWrongRetry.body.practice, true);
+  assert.equal(scienceWrongRetry.body.result.correct, false);
+  assert.equal(scienceWrongRetry.body.result.points, 2);
+  assert.equal(scienceWrongRetry.body.result.model_answer, "", "a wrong retry does not reveal the full answer");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"),
+    "a science retry does not overwrite official results");
+  assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")),
+    "a science retry does not change mastery");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "a science retry remains deterministic");
+
+  calls.length = 0;
+  const scienceCorrectRetry = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    mode: "graph_practice_retry", examProof: scienceExamProof,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 },
+    ] }) }],
+  });
+  assert.equal(scienceCorrectRetry.status, 200);
+  assert.equal(scienceCorrectRetry.body.result.correct, true);
+  assert.equal(scienceCorrectRetry.body.result.points, 3);
+  assert.equal(scienceCorrectRetry.body.result.model_answer,
+    "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
+  "full answer appears only after the learner completes the signed scatter retry correctly");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"));
+  assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")));
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")));
 
   console.log("grade handler graph: signed task, server quota, deterministic score, retry isolation, and official persistence passed");
 } finally {

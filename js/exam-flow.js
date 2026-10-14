@@ -358,6 +358,7 @@
       });
     }
 
+    renderGraphSourceTable(panel, graphUi, english ? "en" : "sv");
     if (window.ExGenGraphAnswer) {
       window.ExGenGraphAnswer(graph, answer, function (value) {
         answer = value;

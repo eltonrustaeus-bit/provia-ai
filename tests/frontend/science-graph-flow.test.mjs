@@ -6,6 +6,8 @@ const server = await serve(ROOT, { indexFile: "app.html" });
 const browser = await chromium.launch({ headless: true });
 let generateBody = null;
 let gradeBody = null;
+let retryBody = null;
+let retryCount = 0;
 const examProof = `v2.${"c".repeat(32)}.syntheticBiologyGraphProof`;
 
 try {
@@ -33,11 +35,25 @@ try {
       }, meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async (route) => {
-      gradeBody = route.request().postDataJSON();
-      await route.fulfill({ json: { ok: true, exam_proof: examProof, result: {
-        total_points: 3, max_points: 3, per_question: [{
-          id: "oxygen-graph", points: 3, max_points: 3,
+      const body = route.request().postDataJSON();
+      if (body.mode === "graph_practice_retry") {
+        retryBody = body;
+        retryCount++;
+        await route.fulfill({ json: { ok: true, practice: true, result: retryCount === 1 ? {
+          id: "oxygen-graph", points: 2, max_points: 3, correct: false,
+          feedback: "Kontrollera den andra datapunkten igen.", model_answer: "",
+        } : {
+          id: "oxygen-graph", points: 3, max_points: 3, correct: true,
           feedback: "Alla tre datapunkter stämmer med tabellen.",
+          model_answer: "Datapunkterna är (0, 4), (1, 3) och (2, 1).",
+        } } });
+        return;
+      }
+      gradeBody = body;
+      await route.fulfill({ json: { ok: true, exam_proof: examProof, result: {
+        total_points: 2, max_points: 3, per_question: [{
+          id: "oxygen-graph", points: 2, max_points: 3,
+          feedback: "Kontrollera den andra datapunkten mot tabellen.",
           model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
           concept_tag: "Mätdata", error_tags: [],
         }],
@@ -69,7 +85,7 @@ try {
 
   const graph = page.locator(".xf-exam.on .graph-answer svg");
   await graph.scrollIntoViewIfNeeded();
-  for (const [x, y] of [[132, 36], [156, 60], [180, 108]]) {
+  for (const [x, y] of [[132, 36], [156, 84], [180, 108]]) {
     const point = await graph.evaluate((svg, coordinates) => {
       const local = svg.createSVGPoint();
       local.x = coordinates.x;
@@ -83,9 +99,9 @@ try {
     visibility: marker.getAttribute("visibility"), transform: marker.getAttribute("transform"),
   }))), [
     { visibility: "visible", transform: "translate(132 36)" },
-    { visibility: "visible", transform: "translate(156 60)" },
+    { visibility: "visible", transform: "translate(156 84)" },
     { visibility: "visible", transform: "translate(180 108)" },
-  ], "the plotted markers follow the selected table coordinates");
+  ], "the plotted markers follow the learner's initial complete attempt");
   if (process.env.EXGEN_GRAPH_SCREENSHOT) {
     await page.screenshot({ path: `${process.env.EXGEN_GRAPH_SCREENSHOT}-graph-mobile.png` });
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -114,9 +130,76 @@ try {
   assert.equal(gradeBody?.questions?.[0]?.grade_task, "opaque-biology-graph-task");
   assert.equal("graph_spec" in gradeBody.questions[0], false, "source coordinates stay inside the signed server task");
   assert.deepEqual(JSON.parse(gradeBody.answers[0].answer), {
+    type: "scatter", points: [{ x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 }],
+  });
+  assert.equal(await page.locator("#xf .xf-screen[data-screen='result'] .xf-scores .xf-score.lead b").innerText(), "2/3");
+
+  await page.getByRole("button", { name: "Försök igen på grafen" }).click();
+  const retryPanel = page.locator(".xf-graph-retry-panel");
+  const retryTable = retryPanel.locator(".xf-source-table");
+  assert.equal(await retryTable.locator("caption").innerText(), "Värden från materialet");
+  assert.deepEqual(await retryTable.locator("thead th").allInnerTexts(), ["Tid (min)", "Syrehalt (mg/L)"]);
+  assert.deepEqual(await retryTable.locator("tbody tr").allInnerTexts(), ["0\t4", "1\t3", "2\t1"]);
+  if (process.env.EXGEN_GRAPH_SCREENSHOT) {
+    await retryPanel.screenshot({ path: `${process.env.EXGEN_GRAPH_SCREENSHOT}-scatter-retry-mobile.png` });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await retryPanel.screenshot({ path: `${process.env.EXGEN_GRAPH_SCREENSHOT}-scatter-retry-desktop.png` });
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
+
+  const retryGraph = retryPanel.locator(".graph-answer svg");
+  await retryGraph.scrollIntoViewIfNeeded();
+  for (const [x, y] of [[132, 36], [156, 60], [180, 108]]) {
+    const point = await retryGraph.evaluate((svg, coordinates) => {
+      const local = svg.createSVGPoint();
+      local.x = coordinates.x;
+      local.y = coordinates.y;
+      const screen = local.matrixTransform(svg.getScreenCTM());
+      return { x: screen.x, y: screen.y };
+    }, { x, y });
+    await page.mouse.click(point.x, point.y);
+  }
+  await page.getByRole("button", { name: "Kontrollera nytt försök" }).click();
+  await page.getByText("Kontrollera den andra datapunkten igen.", { exact: true }).waitFor();
+  assert.equal(await retryPanel.locator(".xf-item-model").isVisible(), false,
+    "a wrong scatter retry keeps the full-score answer hidden");
+  assert.equal(await page.getByRole("button", { name: "Kontrollera nytt försök" }).isEnabled(), true,
+    "a wrong scatter retry remains available for another attempt");
+
+  await retryPanel.getByRole("spinbutton", { name: "Punkt B, y-koordinat" }).fill("3");
+  await page.getByRole("button", { name: "Kontrollera nytt försök" }).click();
+  await page.getByText("Datapunkterna är (0, 4), (1, 3) och (2, 1).", { exact: true }).waitFor();
+  assert.equal(retryCount, 2);
+  assert.equal(retryBody?.mode, "graph_practice_retry");
+  assert.deepEqual(JSON.parse(retryBody.answers[0].answer), {
     type: "scatter", points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }],
   });
-  assert.equal(await page.locator("#xf .xf-screen[data-screen='result'] .xf-scores .xf-score.lead b").innerText(), "3/3");
+  for (const [width, height] of [[320, 700], [390, 844], [768, 1024]]) {
+    await page.setViewportSize({ width, height });
+    const layout = await retryPanel.evaluate((panel) => {
+      const tableWrap = panel.querySelector(".xf-source-table-wrap");
+      const panelRect = panel.getBoundingClientRect();
+      const tableRect = tableWrap.getBoundingClientRect();
+      return {
+        viewport: window.innerWidth,
+        page: document.documentElement.scrollWidth,
+        panelLeft: panelRect.left,
+        panelRight: panelRect.right,
+        tableLeft: tableRect.left,
+        tableRight: tableRect.right,
+        tableClientWidth: tableWrap.clientWidth,
+        tableScrollWidth: tableWrap.scrollWidth,
+      };
+    });
+    assert.ok(layout.page <= layout.viewport, `retry does not create page overflow at ${width}px`);
+    assert.ok(layout.panelLeft >= 0 && layout.panelRight <= layout.viewport,
+      `retry panel stays within ${width}px viewport`);
+    assert.ok(layout.tableLeft >= 0 && layout.tableRight <= layout.viewport,
+      `source table wrapper stays within ${width}px viewport`);
+    assert.ok(layout.tableScrollWidth <= layout.tableClientWidth + 1,
+      `source table columns are visible without horizontal clipping at ${width}px`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
     "the science graph and result stay within the mobile viewport");
   for (const [width, height] of [[320, 700], [390, 844], [768, 1024]]) {
