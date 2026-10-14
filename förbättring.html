@@ -514,7 +514,7 @@
         const txt=await r.text();let j=null;try{j=JSON.parse(txt);}catch{}
         if(!r.ok)return{ok:false,reason:'api_error',detail:(j?.error)?String(j.error):'non-200'};
         const role=String(j?.role||'');
-        return(role==='premium'||role==='admin')?{ok:true,role}:{ok:false,reason:'no_access',role};
+        return(role==='premium'||role==='user'||role==='admin')?{ok:true,role}:{ok:false,reason:'no_access',role};
       }catch(e){return{ok:false,reason:'api_error',detail:String(e)};}
     }
     /* Åtkomstfel skrivs i P.E.R:s röst på ingången i stället för i en egen

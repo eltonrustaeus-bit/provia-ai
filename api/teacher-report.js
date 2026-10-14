@@ -3,12 +3,22 @@ import { callAIRaw } from "./_per-core.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
 import pilotScope from "./_pilot-scope.cjs";
 import aiUsage from "./_ai-usage.cjs";
+import { normalizeRole } from "./_provia-rules.js";
 
 import { randomUUID } from "node:crypto";
 import { perRole } from "./_per-name.js";
 const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 const { logAiUsage } = aiUsage;
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+async function loadReportEntitlement(userId) {
+  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return { unavailable: true };
+  const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data, error } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+  if (error) return { unavailable: true };
+  const role = normalizeRole(data?.role);
+  return { allowed: role === "premium" || role === "user" || role === "admin" };
+}
 
 async function consumeReportQuota(userId) {
   if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return { unavailable: true };
@@ -66,6 +76,16 @@ export default async function handler(req, res) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+
+  let entitlement;
+  try { entitlement = await loadReportEntitlement(user.id); }
+  catch { entitlement = { unavailable: true }; }
+  if (entitlement.unavailable) {
+    return res.status(503).json({ ok: false, error: "Åtkomsten kunde inte kontrolleras just nu. Försök igen senare." });
+  }
+  if (!entitlement.allowed) {
+    return res.status(403).json({ ok: false, error: "Lärarrapport kräver Premium." });
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ ok: false, error: "OPENAI_API_KEY not configured" });

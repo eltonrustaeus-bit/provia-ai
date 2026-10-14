@@ -25,9 +25,12 @@ const verified = [
 const forged = { ...verified[0], percent: 100, created_at: "2026-10-13T10:00:00Z", verified_at: null };
 const members = [{ student_id: studentId, joined_at: "2026-10-13T07:00:00Z" }];
 let activeUser = studentId;
+let studentRole = "gratis";
+let roleLookupFailed = false;
 let aiCalls = 0;
 let lastPrompt = "";
 let historyReads = 0;
+let reportQuotaCalls = 0;
 const usageEvents = [];
 
 globalThis.fetch = async (input, init = {}) => {
@@ -40,12 +43,18 @@ globalThis.fetch = async (input, init = {}) => {
   }
   assert.equal(url.origin, "https://synthetic.supabase.invalid");
   if (url.pathname === "/auth/v1/user") return Response.json({ id: activeUser, email: "student@example.invalid" });
-  if (url.pathname === "/rest/v1/rpc/consume_anon_rate") return Response.json({ ok: true });
+  if (url.pathname === "/rest/v1/rpc/consume_anon_rate") {
+    if (String(JSON.parse(init.body || "{}").p_bucket || "").startsWith("teacher-report:")) reportQuotaCalls++;
+    return Response.json({ ok: true });
+  }
   if (url.pathname === "/rest/v1/ai_usage_events") {
     usageEvents.push(JSON.parse(init.body));
     return new Response(null, { status: 201 });
   }
-  if (url.pathname === "/rest/v1/profiles") return Response.json({ role: "teacher" });
+  if (url.pathname === "/rest/v1/profiles") {
+    if (roleLookupFailed) return Response.json({ message: "synthetic role lookup failure" }, { status: 500 });
+    return Response.json({ role: activeUser === studentId ? studentRole : "teacher" });
+  }
   if (url.pathname === "/rest/v1/classes") return Response.json({ id: classId, name: "Syntetisk klass", teacher_id: teacherId });
   if (url.pathname === "/rest/v1/class_members") {
     return url.searchParams.has("student_id")
@@ -82,11 +91,37 @@ function response() {
     json(body) { this.body = body; return this; } };
 }
 
+const freeReport = response();
+await report({ method: "POST", headers: { authorization: "Bearer synthetic-user-token" }, body: {} }, freeReport);
+assert.equal(freeReport.statusCode, 403, "free users cannot bypass the UI entitlement gate");
+assert.equal(reportQuotaCalls, 0, "denied roles do not consume report quota");
+assert.equal(historyReads, 0, "denied roles cannot read exam history through this route");
+assert.equal(aiCalls, 0, "denied roles cannot invoke the model");
+
+studentRole = "basic";
+const basicReport = response();
+await report({ method: "POST", headers: { authorization: "Bearer synthetic-user-token" }, body: {} }, basicReport);
+assert.equal(basicReport.statusCode, 403, "basic users cannot bypass the UI entitlement gate");
+assert.equal(reportQuotaCalls, 0);
+assert.equal(historyReads, 0);
+assert.equal(aiCalls, 0);
+
+roleLookupFailed = true;
+const unavailableReport = response();
+await report({ method: "POST", headers: { authorization: "Bearer synthetic-user-token" }, body: {} }, unavailableReport);
+assert.equal(unavailableReport.statusCode, 503, "an unavailable entitlement lookup fails closed");
+assert.equal(reportQuotaCalls, 0);
+assert.equal(historyReads, 0);
+assert.equal(aiCalls, 0);
+roleLookupFailed = false;
+
+studentRole = "user";
 const insufficient = response();
 await report({ method: "POST", headers: { authorization: "Bearer synthetic-user-token" }, body: {} }, insufficient);
 assert.equal(insufficient.statusCode, 400, "two real results plus one fabricated result do not meet the report threshold");
 assert.equal(aiCalls, 0);
 
+studentRole = "premium";
 verified.push({ ...verified[0], id: "66666666-6666-4666-8666-666666666666", percent: 75,
   created_at: "2026-10-13T10:30:00Z", verified_at: "2026-10-13T10:30:00Z" });
 const enough = response();
