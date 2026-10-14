@@ -80,6 +80,9 @@
     btn.addEventListener("click", function () { file.click(); });
 
     var note = el("div", "xf-photo-note");
+    note.setAttribute("role", "status");
+    note.setAttribute("aria-live", "polite");
+    note.setAttribute("aria-atomic", "true");
     note.hidden = true;
 
     function say(text, kind) {

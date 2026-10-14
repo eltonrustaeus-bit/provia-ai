@@ -717,6 +717,11 @@ body.xf-in-exam.xf-per-open #perWidget {
 .xf-item-head b.miss { color: var(--exgen-error-text); }
 .xf-item-head b.full { color: var(--exgen-success-text); }
 
+@media (max-width: 860px) {
+  /* Leave a clear rail for the fixed P.E.R control beside result scores. */
+  #xf .xf-screen[data-screen="result"] .xf-item-head { padding-right: 112px; }
+}
+
 .xf-item-q {
   font-size: var(--exgen-text-sm);
   font-weight: var(--exgen-weight-medium);

@@ -174,6 +174,10 @@ try {
       await t.page.locator(".xf-answer").inputValue());
     const note = await t.page.locator(".xf-photo-note").innerText();
     R.ok("K5 eleven får veta varför", /kunde inte tyda/i.test(note), note);
+    R.ok("K5 OCR-felet annonseras som status",
+      await t.page.locator(".xf-photo-note").getAttribute("role") === "status" &&
+      await t.page.locator(".xf-photo-note").getAttribute("aria-live") === "polite" &&
+      await t.page.locator(".xf-photo-note").getAttribute("aria-atomic") === "true");
     await t.close();
   }
   {
