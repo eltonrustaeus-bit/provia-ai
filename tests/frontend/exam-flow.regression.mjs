@@ -274,6 +274,45 @@ async function toMaterial(page) {
     const wrappedForward = await page.evaluate(() => document.activeElement?.matches(".xf-exam .xf-dot:first-child"));
     ok("tangentbordsfokus stannar i provdialogen", wrappedBackward && wrappedForward,
       JSON.stringify({ wrappedBackward, wrappedForward }));
+    await page.locator(".xf-ask").click();
+    await page.waitForFunction(() => document.querySelector("#perBubble")?.classList.contains("per-open"));
+    let reachedPer = false;
+    let stayedInScope = true;
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press("Tab");
+      const state = await page.evaluate(() => {
+        const active = document.activeElement;
+        return {
+          inPer: !!active?.closest("#perWidget"),
+          inScope: !!active?.closest(".xf-exam, #perWidget"),
+        };
+      });
+      if (!state.inScope) stayedInScope = false;
+      if (state.inPer) { reachedPer = true; break; }
+    }
+    const perBoundary = await page.evaluate(() => {
+      const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+      const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
+      const firstPerStop = [...document.querySelectorAll("#perWidget " + selector)].find(visible);
+      const examStops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      window.__perFirstTabStop = firstPerStop || null;
+      window.__examLastTabStop = examStops[examStops.length - 1] || null;
+      firstPerStop?.focus();
+      return !!firstPerStop && examStops.length > 0;
+    });
+    await page.keyboard.press("Shift+Tab");
+    const returnedToExam = await page.evaluate(() => document.activeElement === window.__examLastTabStop);
+    await page.keyboard.press("Tab");
+    const returnedToPer = await page.evaluate(() => {
+      const result = document.activeElement === window.__perFirstTabStop;
+      delete window.__perFirstTabStop;
+      delete window.__examLastTabStop;
+      return result;
+    });
+    ok("Tab når den öppnade P.E.R-panelen utan att lämna provdialogen", reachedPer && stayedInScope,
+      JSON.stringify({ reachedPer, stayedInScope }));
+    ok("fokus går mellan P.E.R och provets sista kontroll", perBoundary && returnedToExam && returnedToPer,
+      JSON.stringify({ hasControls: perBoundary, returnedToExam, returnedToPer }));
     const firstOption = page.locator(".xf-mc-opt").first();
     await firstOption.focus();
     await page.keyboard.press("Enter");
