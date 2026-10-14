@@ -170,6 +170,21 @@
   .subRow{display:flex;align-items:center;justify-content:space-between;
     gap:16px;flex-wrap:wrap;margin-bottom:0}
 
+  /* Impact is a short editorial section, not another plan card or an implied
+     benefit attached to a purchase. */
+  .impactSection{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+    gap:var(--exgen-space-8);align-items:start;padding:var(--exgen-space-6) 0;
+    border-block:1px solid var(--xf-line)}
+  .impactTitle{margin:0;color:var(--xf-ink);font-size:var(--exgen-text-xl);
+    font-weight:var(--exgen-weight-semibold);line-height:var(--exgen-leading-tight)}
+  .impactCopy{margin:0;color:var(--xf-ink-2);font-size:var(--exgen-text-sm);
+    line-height:var(--exgen-leading-relaxed);max-width:62ch}
+  .impactStatus{margin:var(--exgen-space-4) 0 0;padding-left:var(--exgen-space-3);
+    border-left:2px solid var(--xf-accent);color:var(--xf-ink-2);
+    font-size:var(--exgen-text-xs);line-height:var(--exgen-leading-relaxed)}
+  .impactStatus strong{color:var(--xf-ink);font-weight:var(--exgen-weight-semibold)}
+  @media(max-width:600px){.impactSection{grid-template-columns:1fr;gap:var(--exgen-space-3);padding:var(--exgen-space-4) 0}}
+
   /* ── VANLIGA FRÅGOR ──
      Låg i dragspel med tre av fyra svar hopfällda. På en sida vars enda
      uppgift är att svara på "ska jag betala?" är ett gömt svar ett svar
@@ -366,6 +381,19 @@
     </table>
     </div>
     <p class="xf-note">Kontohistorik synkas när du är inloggad och sparningen lyckas. Provkvoten kontrolleras av ExGen och kan skilja sig från historiken som visas på den här enheten.</p>
+  </section>
+
+  <section class="xfZone rev" id="zonImpact" aria-labelledby="impact-title">
+    <div class="impactSection">
+      <div>
+        <div class="xf-eyebrow">ExGen Impact</div>
+        <h2 class="impactTitle" id="impact-title">Studiestöd för fler, på ett hållbart sätt</h2>
+      </div>
+      <div>
+        <p class="impactCopy">ExGen Impact är vår plan för att på sikt bredda tillgången till studiestöd via skolor. Vi vill hålla priserna så tillgängliga som möjligt och utveckla en finansieringsmodell som är hållbar för både elever och ExGen.</p>
+        <p class="impactStatus"><strong>Under utveckling.</strong> Finansiering och elevmånader är ännu inte kopplade till köp eller uppmätta. Därför redovisar vi inga Impact-siffror i nuläget.</p>
+      </div>
+    </div>
   </section>
 
   <!-- ZON 3 — DIN PRENUMERATION. Visas bara för den som betalar; skriptet

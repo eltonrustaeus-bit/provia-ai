@@ -85,6 +85,12 @@ const PLANS = [
   await page.waitForTimeout(100);
   const content = await page.locator("main").innerText();
   ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
+  const impact = await page.locator("#zonImpact").innerText();
+  const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
+  ok("0h Impact skiljer plan från nuläge", /plan för att på sikt bredda tillgången.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
+  ok("0i Impact lovar inte elevmånader eller effektresultat", /inte kopplade till köp eller uppmätta/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
+  ok("0j Impact-sektionen har en tillgänglig rubrik", impactHeading === "impact-title" && await page.locator(`#${impactHeading}`).isVisible());
+  ok("0k planpriser och checkoutknappar finns kvar", await page.locator("#plan-basic .planAmt").innerText() === "29" && await page.locator("#plan-premium .planAmt").innerText() === "79" && await page.locator("#btn-basic").count() === 1 && await page.locator("#btn-premium").count() === 1);
   ok("0f backend-avstängd plansida släpper laddaren", await page.locator("#ldr").evaluate(el => el.classList.contains("out")));
   ok("0g backend-avstängd plansida initierar ingen Supabase-klient", errors.length === 0, errors.join(" | "));
   await ctx.close();
@@ -119,6 +125,24 @@ const amountIn = (page, id) => page.evaluate(cid => {
   });
   ok("0d sidan öppnar med P.E.R:s röst", !!voice && voice.orb && voice.say.length > 0, JSON.stringify(voice));
   await ctx.close();
+}
+
+// Signed-in plan buttons retain their exact server checkout contract.
+{
+  for (const plan of ["basic", "premium"]) {
+    const { ctx, page } = await mk({ session: true, role: "gratis" });
+    let requestedPlan = null;
+    page.on("dialog", dialog => dialog.dismiss());
+    await page.route("**/api/create-checkout-session", async route => {
+      requestedPlan = route.request().postDataJSON()?.plan ?? null;
+      await route.fulfill({ json: { message: "synthetic checkout test" } });
+    });
+    const response = page.waitForResponse(res => res.url().endsWith("/api/create-checkout-session"));
+    await page.locator(`#btn-${plan}`).click();
+    await response;
+    ok(`4d inloggad ${plan}-knapp skickar rätt checkout-plan`, requestedPlan === plan, String(requestedPlan));
+    await ctx.close();
+  }
 }
 
 // ── 1: P.E.R kan skicka besökaren till en enskild plan ───────────────────
@@ -390,6 +414,17 @@ for (const width of [360, 390, 430]) {
   ok(`9a jämförelsen ryms vid ${width}px`, !t.needsScroll, JSON.stringify(t));
   ok(`9b sidan scrollar inte i sidled vid ${width}px`, !t.bodyScrolls, JSON.stringify(t));
   ok(`9c ingen cell är klippt vid ${width}px`, t.clipped.length === 0, t.clipped.join(" | "));
+  const impact = await page.locator("#zonImpact").boundingBox();
+  const impactBounds = await page.evaluate(() => {
+    const section = document.querySelector("#zonImpact");
+    const parts = [...section.querySelectorAll("h2,.impactCopy,.impactStatus")];
+    const rects = parts.map(el => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width, clipped: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 };
+    });
+    return { rects, viewport: innerWidth };
+  });
+  ok(`9d hela Impact-sektionen ryms vid ${width}px`, !!impact && impactBounds.rects.length === 3 && impactBounds.rects.every(r => r.left >= 0 && r.right <= impactBounds.viewport + 1 && r.width > 0 && !r.clipped), JSON.stringify(impactBounds));
   await ctx.close();
 }
 
