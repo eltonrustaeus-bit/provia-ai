@@ -255,6 +255,16 @@
     .chartWrap{margin-top:14px;border:1px solid var(--l);border-radius:var(--exgen-radius-sm);background:var(--s2);padding:18px 18px 14px;transition:background .28s ease,border-color .28s ease}
     .chartFallbackList{margin:10px 0 0;padding-left:22px;display:grid;gap:5px;color:var(--t2);font-size:var(--exgen-text-sm)}
     .chartLabel{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px}
+    .chartSummary{margin:-4px 0 10px;color:var(--t2);font-size:var(--exgen-text-sm);line-height:1.5}
+    .chartData{margin-top:8px;color:var(--t2);font-size:var(--exgen-text-sm)}
+    .chartData summary{width:fit-content;color:var(--a2);cursor:pointer;padding:5px 0}
+    .chartData summary:focus-visible{outline:2px solid var(--a2);outline-offset:3px}
+    .chartData table{width:100%;border-collapse:collapse;margin-top:8px;font-size:var(--exgen-text-sm)}
+    .chartData caption{text-align:left;color:var(--t3);padding-bottom:5px}
+    .chartData th,.chartData td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--l);font-weight:400}
+    .chartData th{color:var(--t3);font-weight:600}
+    .chartData th:last-child,.chartData td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+    @media(max-width:600px){.chartData[open]{padding-bottom:72px}}
 
     /* ── MISTAKE GRID ── */
     /* En kolumn. Måttet är 580px, så minmax(300px,1fr) gav ändå aldrig två —
@@ -529,8 +539,8 @@
     }
 
     /* ── COACH LOGIC ── */
-    function avgPct(arr){const a=(arr||[]).map(x=>Number(x.percent)||0).filter(n=>Number.isFinite(n));if(!a.length)return 0;return Math.round(a.reduce((s,n)=>s+n,0)/a.length);}
-    function computeTrend(h){if(h.length<2)return null;const l=h.slice(-3),p=h.slice(-6,-3),avg=a=>a.reduce((s,x)=>s+(Number(x.percent)||0),0)/Math.max(1,a.length),a1=avg(l);if(!p.length)return{delta:a1-(Number(h[0].percent)||0)};return{delta:a1-avg(p)};}
+    function avgPct(arr){const a=(arr||[]).map(x=>chartPercent(x?.percent)).filter(n=>n!==null);if(!a.length)return null;return Math.round(a.reduce((s,n)=>s+n,0)/a.length);}
+    function computeTrend(h){if(h.length<2||chartPercent(h[h.length-1]?.percent)===null)return null;const recent=avgPct(h.slice(-3)),previous=avgPct(h.slice(-6,-3));if(recent===null)return null;if(previous!==null)return{delta:recent-previous};const values=h.map(x=>chartPercent(x?.percent)).filter(n=>n!==null);return values.length>1?{delta:values[values.length-1]-values[0]}:null;}
     function mostMistakeCourse(m){const map=new Map();(m||[]).forEach(x=>{const c=String(x.course||'').trim();if(c)map.set(c,(map.get(c)||0)+1);});let best={course:'',n:0};for(const[c,n]of map.entries())if(n>best.n)best={course:c,n};return best;}
 
     /* Etiketter för grade.js:s error_tags. Bodde i i18n-tabellen tills den
@@ -630,7 +640,7 @@
       const token=sd?.session?.access_token||'';
       if(!token) return null;
 
-      const avg5=h.slice(-5).reduce((s,x)=>s+(Number(x.percent)||0),0)/Math.max(1,Math.min(5,h.length));
+      const avg5=avgPct(h.slice(-5));
       const courseFreq={};
       m.slice(-30).forEach(x=>{const c=String(x.course||'').trim();if(c)courseFreq[c]=(courseFreq[c]||0)+1;});
       const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
@@ -639,7 +649,7 @@
 
       const context=[
         `${h.length} prov gjorda.`,
-        `Snitt senaste 5: ${Math.round(avg5)}%.`,
+        avg5===null?'Resultatsnitt saknas eftersom prov saknar poängunderlag.':`Snitt av prov med poängunderlag, senaste 5: ${avg5}%.`,
         topCourses?`Mest misstag i: ${topCourses}.`:'',
         recentQ?`Senaste misstag: ${recentQ}.`:''
       ].filter(Boolean).join(' ');
@@ -715,19 +725,41 @@
       fallback.setAttribute('role','status');
       fallback.setAttribute('aria-live','polite');
       const message=document.createElement('p');
-      message.textContent='Grafen kunde inte laddas. Resultaten visas som lista.';
+      message.textContent='Grafen kunde inte laddas. Resultaten finns i den utfällbara tabellen.';
       const list=document.createElement('ol');
       list.className='chartFallbackList';
       data.slice(-5).forEach(item=>{
         const row=document.createElement('li');
-        const time=Date.parse(item.ts);
-        const date=Number.isFinite(time)?new Date(time).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'Datum saknas';
-        const percent=Number(item.percent);
-        row.textContent=`${date}: ${Number.isFinite(percent)?`${percent}%`:'Resultat saknas'}`;
+        const date=chartDate(item.ts,{month:'short',day:'numeric'});
+        const percent=chartPercent(item.percent);
+        row.textContent=`${date}: ${percent!==null?`${percent}%`:'Resultat saknas'}`;
         list.appendChild(row);
       });
       fallback.append(message,list);
       wrap.appendChild(fallback);
+    }
+    function chartDate(value,options){
+      const time=typeof value==='number'?value:Date.parse(value);
+      return Number.isFinite(time)&&time>0?new Date(time).toLocaleDateString(undefined,options):'Datum saknas';
+    }
+    function chartPercent(value){
+      if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&value.trim()===''))return null;
+      const percent=Number(value);
+      return Number.isFinite(percent)?percent:null;
+    }
+    function renderChartTable(data){
+      const rows=$('chartDataRows');if(!rows)return;
+      rows.replaceChildren();
+      data.forEach(item=>{
+        const row=document.createElement('tr');
+        const dateCell=document.createElement('td');
+        dateCell.textContent=chartDate(item.ts,{year:'numeric',month:'short',day:'numeric'});
+        const resultCell=document.createElement('td');
+        const percent=chartPercent(item.percent);
+        resultCell.textContent=percent!==null?`${percent}%`:'Resultat saknas';
+        row.append(dateCell,resultCell);
+        rows.appendChild(row);
+      });
     }
     function renderChart(h){
       const wrap=$('chartWrap'),canvas=$('progressChart');if(!wrap||!canvas)return;
@@ -736,8 +768,10 @@
       if(!h||h.length<2){wrap.style.display='none';if(_chart){_chart.destroy();_chart=null;}return;}
       wrap.style.display='block';
       const data=h.slice(-20);
-      const labels=data.map(x=>new Date(x.ts||Date.now()).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}));
-      const values=data.map(x=>Number(x.percent||0));
+      renderChartTable(data);
+      canvas.setAttribute('aria-label',`Resultatgraf med ${data.length} prov. Resultaten visas i procent över tid.`);
+      const labels=data.map(x=>chartDate(x.ts,{month:'2-digit',day:'2-digit'}));
+      const values=data.map(x=>chartPercent(x.percent));
       const grid='rgba(0,183,217,.07)',tick='#667085';
       const line='#00768F',fill='rgba(0,183,217,.08)';
       if(_chart){_chart.destroy();_chart=null;}
@@ -942,7 +976,8 @@
         // som gjorde något.
         const b=document.createElement('button');b.type='button';b.className='xf-opt';
         const date=new Date(x.ts||Date.now()).toLocaleDateString(undefined,{year:'numeric',month:'2-digit',day:'2-digit'});
-        b.innerHTML=`${esc(x.course||'Ingen kurs')}<small>${date} · ${esc(x.level||'—')} · ${Number(x.percent||0)}%</small>`;
+        const percent=chartPercent(x.percent);
+        b.innerHTML=`${esc(x.course||'Ingen kurs')}<small>${date} · ${esc(x.level||'—')} · ${percent===null?'Resultat saknas':`${percent}%`}</small>`;
         b.addEventListener('click',()=>{
           /* Kursväljaren bor i felbank-skärmen, som ritas om av skärmbytet.
              Värdet måste därför sparas i valet, inte skrivas i en select som
@@ -1027,7 +1062,12 @@
       const r=await fetchUserExams();
       if(!r.ok){if(st){st.textContent=String(r.error||'Sync error');st.className='statusText bad';}if(syncBtn)syncBtn.removeAttribute('disabled');return;}
       const rows=r.rows||[];
-      const h=rows.map(row=>({ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:row.result?.total_points??0,max_points:row.result?.max_points??0,percent:(row.result?.max_points>0)?Math.round((row.result.total_points/row.result.max_points)*100):0}));
+      const h=rows.map(row=>{
+        const totalRaw=row.result?.total_points,maxRaw=row.result?.max_points;
+        const total=Number(totalRaw),maximum=Number(maxRaw);
+        const hasScore=(typeof totalRaw==='number'||typeof totalRaw==='string')&&!(typeof totalRaw==='string'&&totalRaw.trim()==='')&&(typeof maxRaw==='number'||typeof maxRaw==='string')&&!(typeof maxRaw==='string'&&maxRaw.trim()==='')&&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0;
+        return {ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:hasScore?total:0,max_points:hasScore?maximum:0,percent:hasScore?Math.round((total/maximum)*100):null};
+      });
       lsSet(LS_HISTORY,h);
       const last2=rows.length?rows[rows.length-1]:null;
       if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')localStorage.setItem(LS_MATERIAL,last2.material);}
@@ -1145,7 +1185,8 @@
     function renderHem(){
       const {h,m}=data();
       const recent=h.slice(-5);
-      const avg=recent.length?Math.round(recent.reduce((a,x)=>a+(Number(x.percent)||0),0)/recent.length):0;
+      const scoredRecent=recent.filter(x=>chartPercent(x.percent)!==null);
+      const avg=avgPct(scoredRecent);
 
       if(!h.length){
         flow.say('hem','Här samlas det du missar.',
@@ -1154,10 +1195,11 @@
         const tally={};
         m.forEach(x=>{const c=String(x.course||'').trim();if(c)tally[c]=(tally[c]||0)+1;});
         const top=Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0];
+        const progressText=avg===null
+          ? 'Poängunderlag saknas för att räkna ut ett snitt ännu.'
+          : `Snittet är ${avg} % över dina senaste ${scoredRecent.length} prov med resultat.`;
         flow.say('hem',`Du har ${m.length} sparade fel.`,
-          (top&&tally[top]>1)
-            ? `${tally[top]} av dem i ${top}. Du ligger på ${avg} % över dina senaste prov.`
-            : `Du ligger på ${avg} % över dina senaste ${recent.length} prov.`);
+          (top&&tally[top]>1)?`${tally[top]} av dem i ${top}. ${progressText}`:progressText);
       }
 
       const body=flow.body('hem');
@@ -1167,7 +1209,7 @@
       body.appendChild(opts);
 
       const mostC=mostMistakeCourse(m);
-      const lastP=h.length?Number(h[h.length-1].percent||0):0;
+      const lastP=h.length?chartPercent(h[h.length-1].percent):null;
       const cache=getCoachCache();
 
       [
@@ -1175,7 +1217,7 @@
           small:m.length?`${m.length} fel${mostC.course?' · flest i '+mostC.course:''}`:'Inga sparade fel just nu',
           av:!m.length },
         { go:'prov', label:'Se dina prov',
-          small:h.length?`${h.length} prov · senaste ${lastP} %`:'Inga prov ännu',
+          small:h.length?`${h.length} prov · senaste ${lastP===null?'resultat saknas':`${lastP} %`}`:'Inga prov ännu',
           av:!h.length },
         { go:'coach', label:'Fråga P.E.R vad du ska göra',
           small:isCoachCacheFresh(cache)?'analys från senaste dygnet':'ny analys av din historik',
@@ -1283,7 +1325,7 @@
 
       const chart=document.createElement('div');
       chart.className='xf-card chartWrap'; chart.id='chartWrap'; chart.style.display='none';
-      chart.innerHTML='<div class="xf-eyebrow">Resultatutveckling</div><canvas id="progressChart"></canvas>';
+      chart.innerHTML='<div class="xf-eyebrow">Resultatutveckling</div><p class="chartSummary" id="chartSummary">Resultaten visas i procent över tid. Öppna tabellen för exakta datum och värden.</p><canvas id="progressChart" role="img" aria-describedby="chartSummary"></canvas><details class="chartData"><summary>Visa resultat som tabell</summary><table><caption>Provresultat i samma ordning som grafen</caption><thead><tr><th scope="col">Datum</th><th scope="col">Resultat</th></tr></thead><tbody id="chartDataRows"></tbody></table></details>';
       body.appendChild(chart);
 
       const wrap=document.createElement('div'); wrap.className='xf-opts'; wrap.id='examList';
@@ -1321,7 +1363,8 @@
 
       const lastA=(last&&last.attempt)?last.attempt:h[h.length-1];
       if(lastA){
-        $('lastText').textContent=`${Number(lastA.percent||0)} % · ${lastA.level||'—'} · `+
+        const lastPercent=chartPercent(lastA.percent);
+        $('lastText').textContent=`${lastPercent===null?'Resultat saknas':`${lastPercent} %`} · ${lastA.level||'—'} · `+
           ((lastA.course||'').trim()||'Ingen kurs');
       }
       const tr=computeTrend(h);
@@ -1417,9 +1460,10 @@
         return acc;
       },{});
       const weakAreas=Object.keys(areaCounts).sort((a,b)=>areaCounts[b]-areaCounts[a]).slice(0,5);
+      const recentAverage=avgPct(h.slice(-5));
       window.setPerContext({
         page:'förbättring',
-        userScore:avgPct(h.slice(-5))/100,
+        userScore:recentAverage===null?undefined:recentAverage/100,
         weakAreas,
         examState:{answered:h.length,remaining:0},
         targets:PER_TARGETS

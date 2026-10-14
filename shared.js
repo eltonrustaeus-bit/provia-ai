@@ -408,9 +408,13 @@
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
-            var last5 = hist.slice(-5);
-            var avg = last5.reduce(function(s, x) { return s + (Number(x.percent) || 0); }, 0) / last5.length;
-            ctx.userScore = avg / 100;
+            var scored = hist.slice(-5).map(function(x) {
+              return validPercent(x && x.percent);
+            }).filter(function(percent) { return percent !== null; });
+            if (scored.length) {
+              var avg = scored.reduce(function(s, percent) { return s + percent; }, 0) / scored.length;
+              ctx.userScore = avg / 100;
+            }
           }
         } catch (_) {}
       }
@@ -419,6 +423,13 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function validPercent(value) {
+    if ((typeof value !== 'number' && typeof value !== 'string') ||
+        (typeof value === 'string' && value.trim() === '')) return null;
+    var percent = Number(value);
+    return Number.isFinite(percent) ? percent : null;
   }
 
   /* Bakåtkompatibel ingång. app.html:1474 och förbättring.html:1258 anropar
@@ -649,11 +660,15 @@
       var now = Date.now();
       var lastWeek = hist.filter(function(e) { return e.ts && (now - Number(e.ts)) < 7 * 86400000; });
       if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med skolarbetet. Vad vill du fokusera på?';
-      var avg = Math.round(lastWeek.reduce(function(s, e) { return s + (Number(e.percent) || 0); }, 0) / lastWeek.length);
+      var scoredWeek = lastWeek.map(function(e) { return validPercent(e && e.percent); })
+        .filter(function(percent) { return percent !== null; });
+      var scoreSummary = scoredWeek.length
+        ? 'snitt ' + Math.round(scoredWeek.reduce(function(s, percent) { return s + percent; }, 0) / scoredWeek.length) + '% av ' + scoredWeek.length + ' resultat'
+        : 'poängunderlag saknas för att räkna ut ett snitt';
       var cf = {};
       lastWeek.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
       var weakest = Object.keys(cf).sort(function(a, b) { return cf[b] - cf[a]; })[0];
-      return 'Ny vecka! Förra veckan: ' + lastWeek.length + ' prov, snitt ' + avg + '%.'
+      return 'Ny vecka! Förra veckan: ' + lastWeek.length + ' prov, ' + scoreSummary + '.'
         + (weakest ? ' Fokusera extra på ' + weakest + ' idag.' : ' Fortsätt det bra arbetet!')
         + ' Vad kan jag hjälpa dig med?';
     }
@@ -716,10 +731,12 @@
         var wAreas = Array.isArray(weakCatNames) ? weakCatNames : [];
         try {
           var lsH = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
-          scores = lsH.slice(-20).map(function(e) { return (Number(e.percent)||0)/100; }).filter(function(s){ return Number.isFinite(s); });
+          scores = lsH.slice(-20).map(function(e) { var p = validPercent(e && e.percent); return p === null ? null : p / 100; })
+            .filter(function(score) { return score !== null; });
         } catch (_) {}
-        scores.push(pct / 100);
-        if (scores.length < 3) { addMsg('Kör fler prov för att se redo-score.', 'teacher'); return; }
+        var currentPercent = validPercent(pct);
+        if (currentPercent !== null) scores.push(currentPercent / 100);
+        if (scores.length < 3) { addMsg('Kör fler prov med giltigt poängunderlag för att se redo-score.', 'teacher'); return; }
         var t = addMsg('Räknar ut din redo-score…', 'teacher typing');
         getToken().then(function(tok) {
           return fetch('/api/explain', {
