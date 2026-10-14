@@ -120,6 +120,100 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// Desktop language access and wizard copy must stay usable without losing input.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "language-wizard");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    const desktopLanguage = page.locator("#langBtnDesktop");
+    ok("desktop har ett synligt språkval", await desktopLanguage.isVisible());
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
+    await desktopLanguage.click();
+    let englishSubject = await page.locator("#xf .xf-screen[data-screen='subject'] .xf-say").getAttribute("aria-label");
+    ok("språkbyte översätter ämnessteget och behåller kursnamnet",
+      /Which course is this for\?/.test(englishSubject || "") && /Biologi 1/.test(await page.locator("#xf .xf-screen[data-screen='subject'] .xf-input").inputValue()), englishSubject || "");
+    ok("tangentbordsfokus stannar på desktop språkvalet", await desktopLanguage.evaluate(node => node === document.activeElement));
+    ok("appens header följer engelskt språkval",
+      await page.locator(".xg-nav-link[href='app.html']").textContent() === "Practice exam"
+      && await page.locator(".xg-login-btn").textContent() === "My account");
+    ok("återgångsknappen översätts tillsammans med steget",
+      await page.locator("#xf .xf-screen[data-screen='subject'] .xf-btn.quiet").textContent() === "Back");
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.quiet");
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-chip", { });
+    let chosenLevel = await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row").first().textContent();
+    ok("eleven kan justera föreslagen nivå", /E — show you know the basics/.test(chosenLevel), chosenLevel);
+    await desktopLanguage.click();
+    const swedishAim = await page.locator("#xf .xf-screen[data-screen='aim']").textContent();
+    ok("målsteget visas på svenska efter byte och behåller nivåvalet", /Nivå/.test(swedishAim)
+      && /E — visa att du kan grunderna/.test(swedishAim), swedishAim);
+    await desktopLanguage.click();
+    const englishAim = await page.locator("#xf .xf-screen[data-screen='aim']").textContent();
+    ok("målstegets text visas på engelska efter nästa byte", /Level/.test(englishAim)
+      && /E — show you know the basics/.test(englishAim), englishAim);
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Photosynthesis converts light energy into chemical energy.");
+    await desktopLanguage.click();
+    const material = await page.locator("#xf .xf-screen[data-screen='material']").textContent();
+    const swedishMaterialHeading = await page.locator("#xf .xf-screen[data-screen='material'] .xf-say").getAttribute("aria-label");
+    const swedishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read").textContent();
+    ok("materialsteget översätts och behåller inklistrad text",
+      /Ge mig materialet/.test(swedishMaterialHeading || "") && /Kort underlag/.test(swedishMaterialHint || "")
+      && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), material || "");
+    await desktopLanguage.click();
+    const englishMaterial = await page.locator("#xf .xf-screen[data-screen='material']").textContent();
+    const englishMaterialHeading = await page.locator("#xf .xf-screen[data-screen='material'] .xf-say").getAttribute("aria-label");
+    const englishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read").textContent();
+    ok("materialsteget kan växla tillbaka till engelska utan dataförlust",
+      /Add your study material/.test(englishMaterialHeading || "") && /short source/i.test(englishMaterialHint || "")
+      && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), englishMaterial || "");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    const contract = await page.locator("#xf .xf-screen[data-screen='contract']").textContent();
+    const contractHeading = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-say").getAttribute("aria-label");
+    ok("provöversikten visas på engelska", /Review your exam/.test(contractHeading || "") && /Course/.test(contract || "") && /Create exam/.test(contract || ""), contract);
+    await page.locator(".welcomeAnim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.screenshot({ path: path.join(OUT, "exam-flow-language-contract-desktop.png") });
+    ok("språkflödets browserkörning saknar sidfel", errs.length === 0, errs.join(" | "));
+  } catch (e) {
+    ok("desktop språkbyte i provguiden fungerar", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Mobile keeps language switching in the menu and still refreshes the wizard.
+{
+  const { ctx, page, errs } = await mk({ viewport: { width: 390, height: 844 } });
+  try {
+    await signIn(page, "language-mobile");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    ok("desktop-språkknappen döljs på mobil", !(await page.locator("#langBtnDesktop").isVisible()));
+    await page.click(".xg-menu-btn");
+    ok("mobilens meny behåller språkvalet", await page.locator("#langBtn").isVisible());
+    await page.click("#langBtn");
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    const heading = await page.locator("#xf .xf-screen[data-screen='subject'] .xf-say").getAttribute("aria-label");
+    ok("mobilens språkval översätter provguiden", /Which course is this for\?/.test(heading || ""), heading || "");
+    ok("mobilens header följer engelskt språkval",
+      await page.locator(".xg-nav-link[href='app.html']").textContent() === "Practice exam"
+      && await page.locator(".xg-login-btn").textContent() === "My account");
+    ok("mobilens återgångsknapp visas på engelska",
+      await page.locator("#xf .xf-screen[data-screen='subject'] .xf-btn.quiet").textContent() === "Back");
+    await page.locator(".welcomeAnim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    await page.screenshot({ path: path.join(OUT, "exam-flow-language-subject-mobile.png") });
+    ok("mobilens språkflöde saknar sidfel", errs.length === 0, errs.join(" | "));
+  } catch (e) {
+    ok("mobilens språkval fungerar", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 // The visual progress line also exposes the current wizard step to assistive technology.
 {
   const { ctx, page } = await mk();
@@ -963,6 +1057,7 @@ async function toMaterial(page) {
     /senast sparade prov finns kvar/.test(warning || "")
       && /senaste svaren kunde inte sparas/.test(warning || ""), String(warning));
   await ctx.close();
+}
 }
 
 await browser.close();

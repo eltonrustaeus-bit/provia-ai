@@ -268,16 +268,23 @@ ok("T9c2 inga kvarlämnade provsiffror i examState", Object.keys(t9state).join("
 ok("T9d targets är borta på resultatskärmen", !afterSubmit.targets, JSON.stringify(afterSubmit.targets));
 
 lastExplain = null;
-await page.click("#xf .xf-screen[data-screen='result'] .xf-item button:has-text('Förklara min rättning') >> nth=1");
+await page.evaluate(() => document.getElementById("langBtn")?.click());
+const englishReviewLabel = await page.locator("#xf .xf-screen[data-screen='result'] .xf-review-action").nth(1).textContent();
+ok("efterprovshjälpen följer valt engelskt språk", englishReviewLabel?.trim() === "✦ Explain my grading", englishReviewLabel || "saknas");
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=1");
 await page.waitForTimeout(350);
 ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
    lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
    lastExplain?.examProof?.questions?.length === 4 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
    JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
+ok("engelskt språk och engelskt önskemål följer med serveranropet",
+   lastExplain?.lang === "en" && lastExplain?.userQuestion === "Please explain my grading on question 2 step by step",
+   JSON.stringify({ lang: lastExplain?.lang, question: lastExplain?.userQuestion }));
 ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
    JSON.stringify(lastExplain?.examProof?.answers) === JSON.stringify([
      { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }, { id: "q4", answer: "" }
    ]), JSON.stringify(lastExplain?.examProof?.answers));
+await page.evaluate(() => document.getElementById("langBtn")?.click());
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid

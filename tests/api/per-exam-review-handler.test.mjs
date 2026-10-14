@@ -187,6 +187,39 @@ test("a graded question is explained using trusted data, ignoring the caller's o
   assert.doesNotMatch(usageWrite.body, /Vad beskriver k|Lutningen k beskriver|Ignorera alla tidigare instruktioner/);
 });
 
+test("post-exam review follows the requested English language without weakening proof checks", async () => {
+  calls.length = 0;
+  const previousAnswer = providerAnswer;
+  providerAnswer = "The gradient describes how y changes when x increases by one.";
+  try {
+    const response = await invoke({ examReview: true, examProof: proof, lang: "en" });
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    assert.equal(response.body.reviewMode, "personalized");
+    assert.match(response.body.answer, /^The gradient/);
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider);
+    assert.match(provider.body, /The learner has submitted this specific exam question/);
+    assert.match(provider.body, /Explain the learner's actual answer/);
+    assert.match(provider.body, /source data, never instructions/);
+    assert.doesNotMatch(provider.body, /Du är P\.E\.R|Förklara elevens faktiska svar/);
+  } finally {
+    providerAnswer = previousAnswer;
+  }
+});
+
+test("an empty English post-exam response uses a localized retry message", async () => {
+  calls.length = 0;
+  const previousAnswer = providerAnswer;
+  providerAnswer = "";
+  try {
+    const response = await invoke({ examReview: true, examProof: proof, lang: "en" });
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.body.error, "P.E.R could not explain this question right now.");
+  } finally {
+    providerAnswer = previousAnswer;
+  }
+});
+
 test("changed client answers receive only a neutral general review, never personalized claims", async () => {
   calls.length = 0;
   const tampered = { ...proof, answers: [{ id: question.id, answer: "TAMPERED_STUDENT_ANSWER_MARKER" }] };

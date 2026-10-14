@@ -48,6 +48,10 @@
 /* LAYOUT */
 .wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
 @media(max-width:480px){.wrap{padding:20px 16px}}
+.xg-language-desktop{display:none;min-height:40px;align-items:center;justify-content:center;padding:0 12px;border:1px solid var(--exgen-border,#E4E7EC);border-radius:6px;background:transparent;color:var(--exgen-text,#1B2430);font:600 13px 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.xg-language-desktop:hover{background:var(--exgen-bg-secondary,#F8FAFC);border-color:var(--exgen-text-secondary,#667085)}
+.xg-language-desktop:focus-visible{outline:2px solid var(--a,#00768F);outline-offset:2px}
+@media(min-width:861px){.xg-language-desktop{display:inline-flex}}
 /* Override has-gnav padding during exam steps */
 body.exam-mode{padding-bottom:0!important}
 
@@ -1292,6 +1296,7 @@ function initCourseLibrary(){
 
 function applyLang(){
   const t=T[LANG];
+  const english=LANG==="en";
   document.documentElement.lang=LANG==="en"?"en":"sv";
   const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
   set("brandTag",t.brandTag);
@@ -1312,6 +1317,43 @@ function applyLang(){
   set("wBack1",t.wBack);set("wBack2",t.wBack);set("wBack3",t.wBack);
   set("wNext2",t.wNext2);set("wRestart",t.wRestart);
   set("heroSubText",t.heroSub);set("howtoTitle",t.howtoTitle);set("howtoText",t.howtoText);
+  const brandTag=document.querySelector(".xg-brand-tag");
+  if(brandTag)brandTag.textContent=english?"School study platform":"Studieplattform för skolan";
+  const navLabels={"index.html":english?"Home":"Hem","app.html":english?"Practice exam":"Mockprov","förbättring.html":english?"My progress":"Min utveckling","pricing.html":english?"Pricing":"Priser"};
+  document.querySelectorAll(".xg-nav-link, .xg-menu-item").forEach(item=>{
+    const href=item.getAttribute("href");
+    if(item.classList.contains("xg-nav-link")){
+      if(href&&navLabels[href])item.textContent=navLabels[href];
+      return;
+    }
+    const label=item.querySelector("span:nth-child(2)");
+    if(!label)return;
+    const scroll=item.getAttribute("data-scroll");
+    if(href&&navLabels[href])label.textContent=navLabels[href];
+    else if(item.id==="xgLogout")label.textContent=english?"Log out":"Logga ut";
+    else if(item.id==="langBtn")label.textContent=english?"Svenska":"English";
+    else if(item.id==="cancelSubBtn")label.textContent=english?"Manage subscription":"Hantera prenumeration";
+    else if(scroll){
+      const scrollLabels={"#material":english?"01 — Material":"01 — Material","#settings":english?"02 — Settings":"02 — Inställningar","#exam":english?"03 — Practice exam":"03 — Mockprov","#result":english?"04 — Grading":"04 — Rättning"};
+      if(scrollLabels[scroll])label.textContent=scrollLabels[scroll];
+    }
+  });
+  const mainNav=document.querySelector(".xg-nav");
+  if(mainNav)mainNav.setAttribute("aria-label",english?"Main navigation":"Huvudnavigation");
+  const menu=document.querySelector(".xg-menu");
+  if(menu)menu.setAttribute("aria-label",english?"Menu":"Meny");
+  const menuButton=document.querySelector(".xg-menu-btn");
+  if(menuButton)menuButton.setAttribute("aria-label",english?"Menu":"Meny");
+  const logoutPill=document.querySelector("#xgLogout .xg-menu-pill");
+  if(logoutPill)logoutPill.textContent=english?"Lock":"Lås";
+  const privacyLink=document.querySelector('.xg-utility-right a[href="integritetspolicy.html"]');
+  if(privacyLink)privacyLink.textContent=english?"Privacy policy":"Integritetspolicy";
+  const betaText=document.querySelector("#betaBanner span");
+  if(betaText)betaText.textContent=english
+    ?"ExGen is in an early stage. You may encounter small issues. We welcome your feedback and suggestions."
+    :"ExGen är i tidig fas — småfel kan förekomma. Vi vill gärna höra vad du tycker och vad du saknar!";
+  const betaClose=document.querySelector("#betaBanner button");
+  if(betaClose)betaClose.setAttribute("aria-label",english?"Dismiss":"Stäng");
   const eb=$("examBody"),rb=$("resultBody"),em=$("examMeta"),rm=$("resultMeta");
   if(em&&eb&&!eb.children.length)em.textContent=t.noExam;
   if(rm&&rb&&!rb.children.length)rm.textContent=t.noGrade;
@@ -1723,6 +1765,32 @@ try{
   initWizard();
   initCourseLibrary();
   applyLang();
+  const headerActions=document.querySelector(".xg-header-right");
+  let desktopLangBtn=null;
+  if(headerActions){
+    desktopLangBtn=document.createElement("button");
+    desktopLangBtn.type="button";
+    desktopLangBtn.id="langBtnDesktop";
+    desktopLangBtn.className="xg-language-desktop";
+    desktopLangBtn.setAttribute("aria-label",LANG==="sv"?"Switch language to English":"Byt språk till svenska");
+    desktopLangBtn.textContent=LANG==="sv"?"English":"Svenska";
+    headerActions.insertBefore(desktopLangBtn,headerActions.firstChild);
+  }
+  function changeAppLanguage(){
+    LANG=(LANG==="sv")?"en":"sv";
+    localStorage.setItem("proviaai_lang",LANG);
+    applyLang();
+    if(desktopLangBtn){
+      desktopLangBtn.textContent=LANG==="sv"?"English":"Svenska";
+      desktopLangBtn.setAttribute("aria-label",LANG==="sv"?"Switch language to English":"Byt språk till svenska");
+    }
+    const mobileLabel=document.querySelector("#langBtn span:nth-child(2)");
+    if(mobileLabel)mobileLabel.textContent=LANG==="sv"?"English":"Svenska";
+    window.dispatchEvent(new Event("exgen:languagechange"));
+    refreshQuotaUi().catch(()=>{});
+    window.XgShell&&window.XgShell.closeMenu();
+    runTrainModeIfRequested();
+  }
   initReveal();
   hidePageLoader();
   await refreshQuotaUi();
@@ -1761,7 +1829,8 @@ try{
       const el=document.querySelector(sel); if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
     });
   }
-  onClick("langBtn",async()=>{LANG=(LANG==="sv")?"en":"sv";localStorage.setItem("proviaai_lang",LANG);applyLang();window.dispatchEvent(new Event("exgen:languagechange"));await refreshQuotaUi();window.XgShell&&window.XgShell.closeMenu();runTrainModeIfRequested();});
+  onClick("langBtn",changeAppLanguage);
+  if(desktopLangBtn)desktopLangBtn.addEventListener("click",changeAppLanguage);
 
   // Show/hide account links based on login + role
   // #kontoLink är borta — kontot nås numera bara via kontoknappen i headern,

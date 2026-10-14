@@ -1235,6 +1235,7 @@ function finalizeMsg(div, text) {
         if (opts && opts.examProof) {
           fetchBodyObj.examReview = true;
           fetchBodyObj.examProof = opts.examProof;
+          fetchBodyObj.lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en' ? 'en' : 'sv';
         }
         var fetchHdrs = { 'Content-Type': 'application/json' };
         if (isLandingMode) {
@@ -2182,9 +2183,12 @@ function finalizeMsg(div, text) {
        "Mitt konto" while the login dialog is open on the same screen. */
     function syncLoginButtons() {
       var loggedIn = isLoggedIn();
+      var english = !!(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en');
       var btns = document.querySelectorAll('.xg-login-btn');
       for (var i = 0; i < btns.length; i++) {
-        btns[i].textContent = loggedIn ? 'Mitt konto' : 'Logga in';
+        btns[i].textContent = loggedIn
+          ? (english ? 'My account' : 'Mitt konto')
+          : (english ? 'Sign in' : 'Logga in');
       }
     }
 
@@ -2695,6 +2699,7 @@ function finalizeMsg(div, text) {
     } else {
       syncLoginButtons();
     }
+    window.addEventListener('exgen:languagechange', syncLoginButtons);
   })();
 
 })();

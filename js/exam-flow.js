@@ -170,6 +170,20 @@
     return n;
   }
 
+  function isEnglish() {
+    return Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
+  }
+
+  function tx(sv, en) {
+    return isEnglish() ? en : sv;
+  }
+
+  function updateReviewActionLabels() {
+    Array.prototype.forEach.call(document.querySelectorAll("#xf .xf-review-action"), function (button) {
+      button.textContent = isEnglish() ? button.dataset.labelEn : button.dataset.labelSv;
+    });
+  }
+
   function $(sel, root) { return (root || document).querySelector(sel); }
 
   function lsGet(key, fallback) {
@@ -648,20 +662,21 @@
   // ── Steg 0: start ────────────────────────────────────────────────────────
 
   function stepStart() {
+    UI.languageRerender = stepStart;
     var renderVersion = ++startVersion;
     var d = dna();
     var b = mount("start");
 
     if (d.count === 0) {
-      say("Vad ska vi plugga på?", "Klistra in ditt material så bygger jag ett prov som liknar det du faktiskt får.");
+      say(tx("Vad ska vi plugga på?", "What are we studying?"), tx("Klistra in ditt material så bygger jag ett prov som liknar det du faktiskt får.", "Add your study material and I'll build a practice exam based on it."));
     } else if (d.avg != null) {
-      say("Redo för nästa prov?", "Du ligger på " + d.avg + " % i snitt över dina senaste prov.");
+      say(tx("Redo för nästa prov?", "Ready for your next exam?"), tx("Du ligger på " + d.avg + " % i snitt över dina senaste prov.", "Your average across your latest exams is " + d.avg + "%."));
     } else {
-      say("Redo för nästa prov?", null);
+      say(tx("Redo för nästa prov?", "Ready for your next exam?"), null);
     }
 
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", "Skapa prov");
+    var go = el("button", "xf-btn primary", tx("Skapa prov", "Create an exam"));
     go.type = "button";
     go.addEventListener("click", function () { stepSubject(); });
     act.appendChild(go);
@@ -672,10 +687,10 @@
     if (draft) {
       var legacyDraft = !draft.exam.exam_manifest;
       if (legacyDraft) {
-        var legacyNote = el("p", "xf-sub", "Det här provet skapades med en äldre version och kan inte rättas säkert. Ditt material finns kvar; skapa ett nytt prov för att fortsätta.");
+        var legacyNote = el("p", "xf-sub", tx("Det här provet skapades med en äldre version och kan inte rättas säkert. Ditt material finns kvar; skapa ett nytt prov för att fortsätta.", "This exam was created with an older version and cannot be graded safely. Your material is still here; create a new exam to continue."));
         act.appendChild(legacyNote);
       }
-      var back = el("button", "xf-btn ghost", legacyDraft ? "Skapa nytt prov av materialet" : "Fortsätt provet du började");
+      var back = el("button", "xf-btn ghost", legacyDraft ? tx("Skapa nytt prov av materialet", "Create a new exam from this material") : tx("Fortsätt provet du började", "Continue your exam"));
       back.type = "button";
       var resumeStatus = el("p", "xf-sub");
       resumeStatus.hidden = true;
@@ -685,24 +700,24 @@
         if (!legacyDraft && back.dataset.expired !== "true") {
           back.disabled = true;
           resumeStatus.hidden = false;
-          resumeStatus.textContent = "Kontrollerar att provet fortfarande är aktivt…";
+          resumeStatus.textContent = tx("Kontrollerar att provet fortfarande är aktivt…", "Checking that the exam is still active…");
           var issuanceState = await window.ExGenEngine.examState(draft.exam.exam_manifest);
           if (issuanceState !== "active") {
             back.disabled = false;
             if (issuanceState === null) {
-              resumeStatus.textContent = "Provet kunde inte verifieras just nu. Kontrollera anslutningen och försök igen.";
+              resumeStatus.textContent = tx("Provet kunde inte verifieras just nu. Kontrollera anslutningen och försök igen.", "The exam could not be verified. Check your connection and try again.");
               return;
             }
             if (issuanceState === "grading") {
-              resumeStatus.textContent = "Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.";
+              resumeStatus.textContent = tx("Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.", "The exam is being graded. Wait until grading is complete before continuing.");
               return;
             }
             clearDraft();
             S.material = draft.material || "";
-            back.textContent = "Skapa nytt prov av materialet";
+            back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
             resumeStatus.textContent = issuanceState === "completed"
-              ? "Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt."
-              : "Det tidigare provet har avslutats eller gått ut. Materialet finns kvar; skapa ett nytt prov för att fortsätta.";
+              ? tx("Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt.", "This exam has already been submitted. Your material is still here if you want to create a new one.")
+              : tx("Det tidigare provet har avslutats eller gått ut. Materialet finns kvar; skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your material is still here; create a new exam to continue.");
             back.dataset.expired = "true";
             return;
           }
@@ -737,20 +752,20 @@
       recovery.hidden = true;
       recovery.setAttribute("role", "status");
       var recoveryText = el("p");
-      var reset = el("button", "xf-btn ghost", "Avsluta tidigare prov");
+      var reset = el("button", "xf-btn ghost", tx("Avsluta tidigare prov", "End previous exams"));
       reset.type = "button";
       reset.addEventListener("click", function () {
-        if (!window.confirm("Avsluta alla pågående prov på ditt konto? De kan då inte lämnas in, även om de är öppna på en annan enhet.")) return;
+        if (!window.confirm(tx("Avsluta alla pågående prov på ditt konto? De kan då inte lämnas in, även om de är öppna på en annan enhet.", "End all active exams on your account? They can no longer be submitted, even if open on another device."))) return;
         reset.disabled = true;
         window.ExGenEngine.abandonAllActiveExams().then(function (result) {
           if (!result || !result.ok) {
-            recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
+            recoveryText.textContent = tx("Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.", "The exams could not be ended. Try again when your connection is working.");
             return;
           }
           clearDraft();
           stepStart();
         }).catch(function () {
-          recoveryText.textContent = "Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.";
+          recoveryText.textContent = tx("Proven kunde inte avslutas just nu. Försök igen när anslutningen fungerar.", "The exams could not be ended. Try again when your connection is working.");
         }).finally(function () { reset.disabled = false; });
       });
       recovery.appendChild(recoveryText);
@@ -761,8 +776,8 @@
         if (count > 0) {
           recovery.hidden = false;
           recoveryText.textContent = count === 1
-            ? "Ett prov finns kvar på ditt konto men inte på den här enheten. Du kan avsluta det här om du inte kan fortsätta det."
-            : count + " prov finns kvar på ditt konto men inte på den här enheten. Avsluta dem bara om du inte behöver fortsätta på en annan enhet.";
+            ? tx("Ett prov finns kvar på ditt konto men inte på den här enheten. Du kan avsluta det här om du inte kan fortsätta det.", "One exam is active on your account but not on this device. You can end it here if you cannot resume it.")
+            : tx(count + " prov finns kvar på ditt konto men inte på den här enheten. Avsluta dem bara om du inte behöver fortsätta på en annan enhet.", count + " exams are active on your account but not on this device. End them only if you do not need to continue on another device.");
         }
       }).catch(function () {});
     }
@@ -779,33 +794,33 @@
         if (window.dismissWelcome) window.dismissWelcome();
         pendingBox.hidden = false;
         pendingIntro.textContent = rows.length === 1
-          ? "Ett prov väntar på att sparas till ditt konto. Det finns kvar på den här enheten."
-          : rows.length + " prov väntar på att sparas till ditt konto. De finns kvar på den här enheten.";
+          ? tx("Ett prov väntar på att sparas till ditt konto. Det finns kvar på den här enheten.", "One exam is waiting to be saved to your account. It is still on this device.")
+          : tx(rows.length + " prov väntar på att sparas till ditt konto. De finns kvar på den här enheten.", rows.length + " exams are waiting to be saved to your account. They are still on this device.");
         rows.forEach(function (row) {
-          var label = [String(row.course || "Prov").slice(0, 60), new Date(row.created_at).toLocaleDateString("sv-SE")].filter(Boolean).join(" · ");
-          var retry = el("button", "xf-btn quiet", "Spara " + label);
+          var label = [String(row.course || tx("Prov", "Exam")).slice(0, 60), new Date(row.created_at).toLocaleDateString(isEnglish() ? "en-GB" : "sv-SE")].filter(Boolean).join(" · ");
+          var retry = el("button", "xf-btn quiet", tx("Spara " + label, "Save " + label));
           retry.type = "button";
           retry.addEventListener("click", function () {
             if (retry.disabled) return;
             retry.disabled = true;
-            retry.textContent = "Sparar…";
+            retry.textContent = tx("Sparar…", "Saving…");
             window.ExGenEngine.retryAccountSave(row.local_id).then(function (saved) {
               if (saved && saved.ok) {
                 retry.remove();
                 var remaining = pendingList.querySelectorAll("button").length;
                 pendingIntro.textContent = remaining
-                  ? "Provet sparades till kontot. " + remaining + (remaining === 1 ? " prov väntar fortfarande." : " prov väntar fortfarande.")
-                  : "Alla väntande prov är nu sparade till kontot.";
+                  ? tx("Provet sparades till kontot. " + remaining + (remaining === 1 ? " prov väntar fortfarande." : " prov väntar fortfarande."), "The exam was saved. " + remaining + (remaining === 1 ? " exam is still waiting." : " exams are still waiting."))
+                  : tx("Alla väntande prov är nu sparade till kontot.", "All waiting exams are now saved to your account.");
                 if (!remaining) pendingBox.classList.add("saved");
               } else {
                 retry.disabled = false;
-                retry.textContent = "Försök spara " + label + " igen";
-                pendingIntro.textContent = "Kontosparningen kunde inte bekräftas. Provet finns kvar på den här enheten.";
+                retry.textContent = tx("Försök spara " + label + " igen", "Try saving " + label + " again");
+                pendingIntro.textContent = tx("Kontosparningen kunde inte bekräftas. Provet finns kvar på den här enheten.", "The save could not be confirmed. Your exam is still on this device.");
               }
             }).catch(function () {
               retry.disabled = false;
-              retry.textContent = "Försök spara " + label + " igen";
-              pendingIntro.textContent = "Kontosparningen kunde inte bekräftas. Provet finns kvar på den här enheten.";
+              retry.textContent = tx("Försök spara " + label + " igen", "Try saving " + label + " again");
+              pendingIntro.textContent = tx("Kontosparningen kunde inte bekräftas. Provet finns kvar på den här enheten.", "The save could not be confirmed. Your exam is still on this device.");
             });
           });
           pendingList.appendChild(retry);
@@ -883,13 +898,14 @@
   // ── Steg 1: ämne ─────────────────────────────────────────────────────────
 
   function stepSubject() {
+    UI.languageRerender = stepSubject;
     var d = dna();
     var b = mount("subject");
 
     if (d.courses.length) {
-      say("Samma som sist?", "Tryck på en kurs, eller skriv en annan.");
+      say(tx("Samma som sist?", "Same course as last time?"), tx("Tryck på en kurs, eller skriv en annan.", "Choose a course or type a different one."));
     } else {
-      say("Vilken kurs gäller det?", "Skriv kursens namn — t.ex. Biologi 1 eller Historia 1b.");
+      say(tx("Vilken kurs gäller det?", "Which course is this for?"), tx("Skriv kursens namn — t.ex. Biologi 1 eller Historia 1b.", "Enter the course name, for example Biology 1 or History 1b."));
     }
 
     if (d.courses.length) {
@@ -908,10 +924,10 @@
 
     var inp = el("input", "xf-input");
     inp.type = "text";
-    inp.placeholder = d.courses.length ? "…eller skriv en annan kurs" : "Kurs eller ämne";
+    inp.placeholder = d.courses.length ? tx("…eller skriv en annan kurs", "…or enter another course") : tx("Kurs eller ämne", "Course or subject");
     inp.value = S.course || "";
     inp.setAttribute("autocomplete", "off");
-    inp.setAttribute("aria-label", "Kurs eller ämne");
+    inp.setAttribute("aria-label", tx("Kurs eller ämne", "Course or subject"));
     inp.setAttribute("list", "xfCourseList");
     b.appendChild(inp);
 
@@ -947,7 +963,7 @@
         return;
       }
       if (!eduCatalog) {
-        courseNotice.textContent = "Kurslistan kunde inte kontrolleras. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.";
+        courseNotice.textContent = tx("Kurslistan kunde inte kontrolleras. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.", "The course list could not be checked. You can continue, but ExGen cannot confirm the curriculum.");
         return;
       }
       var normalized = value.toLowerCase().replace(/\s+/g, " ");
@@ -956,7 +972,7 @@
       });
       courseNotice.textContent = exactMatch
         ? ""
-        : "Kursen matchar inte kurskatalogen. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.";
+        : tx("Kursen matchar inte kurskatalogen. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.", "The course does not match the course catalogue. You can continue, but ExGen cannot confirm the curriculum.");
     }
 
     loadEduCatalog().then(function () {
@@ -974,7 +990,7 @@
     function next() {
       var v = inp.value.trim();
       if (!v) {
-        err.textContent = "Skriv vilken kurs det gäller så kan jag matcha nivån.";
+        err.textContent = tx("Skriv vilken kurs det gäller så kan jag matcha nivån.", "Enter the course so I can match the level.");
         inp.setAttribute("aria-invalid", "true");
         inp.focus();
         return;
@@ -985,6 +1001,7 @@
 
     inp.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
     inp.addEventListener("input", function () {
+      S.course = inp.value;
       err.textContent = "";
       inp.removeAttribute("aria-invalid");
       paintSuggestions();
@@ -992,7 +1009,7 @@
     });
 
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", "Vidare");
+    var go = el("button", "xf-btn primary", tx("Vidare", "Continue"));
     go.type = "button";
     go.addEventListener("click", next);
     act.appendChild(go);
@@ -1009,25 +1026,29 @@
      klar; ändringarna finns men kostar ett extra tryck att öppna. */
 
   function stepAim() {
+    var preserveSelection = arguments.length > 0 && arguments[0] === true;
+    UI.languageRerender = function () { stepAim(true); };
     var d = dna();
     var b = mount("aim");
 
-    S.level = d.level;
-    S.qType = d.qType;
-    S.nonGraphNum = d.num;
-    S.num = S.qType === "graph" ? 1 : d.num;
+    if (!preserveSelection) {
+      S.level = d.level;
+      S.qType = d.qType;
+      S.nonGraphNum = d.num;
+      S.num = S.qType === "graph" ? 1 : d.num;
+    }
 
     var misses = d.missCountFor(S.course);
 
     if (d.count === 0) {
-      say("Första provet i " + S.course + ".",
-          "Jag siktar brett den här gången och kalibrerar efter ditt resultat.");
+      say(tx("Första provet i " + S.course + ".", "Your first exam in " + S.course + "."),
+          tx("Jag siktar brett den här gången och kalibrerar efter ditt resultat.", "I'll cover a broad range and adjust future practice based on your result."));
     } else if (misses > 0) {
-      say("Jag siktar på nivå " + S.level + ".",
-          "Du har " + misses + " tidigare fel i " + S.course + " — dem viktar jag upp.");
+      say(tx("Jag siktar på nivå " + S.level + ".", "I'm aiming for level " + S.level + "."),
+          tx("Du har " + misses + " tidigare fel i " + S.course + " — dem viktar jag upp.", "You have " + misses + " earlier mistakes in " + S.course + "; I'll give those extra weight."));
     } else {
-      say("Jag siktar på nivå " + S.level + ".",
-          "Baserat på dina senaste prov. Ändra om du vill något annat.");
+      say(tx("Jag siktar på nivå " + S.level + ".", "I'm aiming for level " + S.level + "."),
+          tx("Baserat på dina senaste prov. Ändra om du vill något annat.", "Based on your recent exams. Change it if you'd prefer something else."));
     }
 
     var card = el("div", "xf-card");
@@ -1043,18 +1064,22 @@
       return r;
     }
 
-    var levelText = { E: "E — visa att du kan grunderna", C: "C — förklara och tillämpa", A: "A — analysera och värdera" };
-    var typeText = { mix: "Blandat", mc: "Bara flerval", short: "Bara kortsvar", graph: "Interaktiv graf" };
+    var levelText = isEnglish()
+      ? { E: "E — show you know the basics", C: "C — explain and apply", A: "A — analyse and evaluate" }
+      : { E: "E — visa att du kan grunderna", C: "C — förklara och tillämpa", A: "A — analysera och värdera" };
+    var typeText = isEnglish()
+      ? { mix: "Mixed", mc: "Multiple choice only", short: "Short answers only", graph: "Interactive graph" }
+      : { mix: "Blandat", mc: "Bara flerval", short: "Bara kortsvar", graph: "Interaktiv graf" };
 
-    var rLevel = row("Nivå", S.level, levelText[S.level]);
-    var rType = row("Frågetyp", typeText[S.qType], null);
-    var rNum = row("Antal frågor", S.qType === "graph" ? "1 grafuppgift" : String(S.num), null);
+    var rLevel = row(tx("Nivå", "Level"), S.level, levelText[S.level]);
+    var rType = row(tx("Frågetyp", "Question type"), typeText[S.qType], null);
+    var rNum = row(tx("Antal frågor", "Number of questions"), S.qType === "graph" ? tx("1 grafuppgift", "1 graph task") : String(S.num), null);
     dl.appendChild(rLevel);
     dl.appendChild(rType);
     dl.appendChild(rNum);
     card.appendChild(dl);
     var graphHint = el("p", "xf-graph-limit-note",
-      "Matematik: en uttrycklig rät linje y = mx + b med heltalsvärden. Naturvetenskap: en tabell på egna rader, avdelad med |, med två rubriker och exakt tre rader med heltal mellan −5 och 5. Andra graf- och diagramformat stöds inte ännu.");
+      tx("Matematik: en uttrycklig rät linje y = mx + b med heltalsvärden. Naturvetenskap: en tabell på egna rader, avdelad med |, med två rubriker och exakt tre rader med heltal mellan −5 och 5. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b with integer values. Science: a table on separate lines, separated by |, with two headings and exactly three rows of integers from −5 to 5. Other graph and chart formats are not supported yet.") );
     graphHint.hidden = S.qType !== "graph";
     card.appendChild(graphHint);
     b.appendChild(card);
@@ -1063,13 +1088,13 @@
     var tweak = el("div");
     tweak.hidden = true;
 
-    tweak.appendChild(pickerRow("Nivå", ["E", "C", "A"], S.level, function (v) {
+    tweak.appendChild(pickerRow(tx("Nivå", "Level"), ["E", "C", "A"], S.level, function (v) {
       S.level = v;
       rLevel.querySelector("dd").firstChild.nodeValue = v;
       rLevel.querySelector("small").textContent = levelText[v];
     }));
 
-    tweak.appendChild(pickerRow("Frågetyp", ["mix", "mc", "short", "graph"], S.qType, function (v) {
+    tweak.appendChild(pickerRow(tx("Frågetyp", "Question type"), ["mix", "mc", "short", "graph"], S.qType, function (v) {
       var wasGraph = S.qType === "graph";
       S.qType = v;
       rType.querySelector("dd").textContent = typeText[v];
@@ -1081,16 +1106,16 @@
         S.num = clamp(Number(S.nonGraphNum) || d.num, 3, 20);
         S.nonGraphNum = S.num;
       }
-      rNum.querySelector("dd").textContent = v === "graph" ? "1 grafuppgift" : String(S.num);
+      rNum.querySelector("dd").textContent = v === "graph" ? tx("1 grafuppgift", "1 graph task") : String(S.num);
       setGraphCountMode(v === "graph", String(S.num));
     }, function (v) { return typeText[v]; }));
 
-    var countPicker = pickerRow("Antal", ["1", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
+    var countPicker = pickerRow(tx("Antal", "Count"), ["1", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
       var count = Number(v);
       if ((S.qType === "graph" && count !== 1) || (S.qType !== "graph" && count < 3)) return;
       S.num = count;
       if (S.qType !== "graph") S.nonGraphNum = count;
-      rNum.querySelector("dd").textContent = S.qType === "graph" ? "1 grafuppgift" : v;
+      rNum.querySelector("dd").textContent = S.qType === "graph" ? tx("1 grafuppgift", "1 graph task") : v;
     });
     function setGraphCountMode(enabled, selected) {
       Array.prototype.forEach.call(countPicker.querySelectorAll(".xf-chip"), function (button) {
@@ -1106,16 +1131,16 @@
     b.appendChild(tweak);
 
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", "Stämmer — vidare");
+    var go = el("button", "xf-btn primary", tx("Stämmer — vidare", "Looks good — continue"));
     go.type = "button";
     go.addEventListener("click", stepMaterial);
     act.appendChild(go);
 
-    var adj = el("button", "xf-btn quiet", "Ändra");
+    var adj = el("button", "xf-btn quiet", tx("Ändra", "Adjust"));
     adj.type = "button";
     adj.addEventListener("click", function () {
       tweak.hidden = !tweak.hidden;
-      adj.textContent = tweak.hidden ? "Ändra" : "Dölj";
+      adj.textContent = tweak.hidden ? tx("Ändra", "Adjust") : tx("Dölj", "Hide");
     });
     act.appendChild(adj);
     act.appendChild(backBtn(stepSubject));
@@ -1185,15 +1210,16 @@
   }
 
   function stepMaterial() {
+    UI.languageRerender = stepMaterial;
     var b = mount("material");
 
-    say("Ge mig materialet.",
-        "Klistra in anteckningar, en sammanfattning eller lärarens presentation. Rubriker och punktlistor ger bättre frågor.");
+    say(tx("Ge mig materialet.", "Add your study material."),
+        tx("Klistra in anteckningar, en sammanfattning eller lärarens presentation. Rubriker och punktlistor ger bättre frågor.", "Paste notes, a summary or your teacher's slides. Headings and bullet points help create better questions."));
 
     var ta = el("textarea", "xf-area");
-    ta.placeholder = "Klistra in här…";
+    ta.placeholder = tx("Klistra in här…", "Paste your material here…");
     ta.value = S.material || "";
-    ta.setAttribute("aria-label", "Studiematerial");
+    ta.setAttribute("aria-label", tx("Studiematerial", "Study material"));
     b.appendChild(ta);
 
     var read = el("div", "xf-read");
@@ -1208,7 +1234,7 @@
     file.accept = "image/*";
     file.setAttribute("capture", "environment");
     file.style.display = "none";
-    var ocrBtn = el("button", "xf-btn ghost", "Fota en sida i stället");
+    var ocrBtn = el("button", "xf-btn ghost", tx("Fota en sida i stället", "Take a photo of a page instead"));
     ocrBtn.type = "button";
     ocrBtn.addEventListener("click", function () { file.click(); });
     file.addEventListener("change", function () {
@@ -1216,17 +1242,17 @@
       var selectedFile = file.files[0];
       file.value = "";
       ocrBtn.disabled = true;
-      ocrBtn.textContent = "Läser bilden…";
+      ocrBtn.textContent = tx("Läser bilden…", "Reading image…");
       busy(true);
       window.ExGenEngine.ocr(selectedFile).then(function (r) {
         busy(false);
         ocrBtn.disabled = false;
-        ocrBtn.textContent = "Fota en sida i stället";
+        ocrBtn.textContent = tx("Fota en sida i stället", "Take a photo of a page instead");
         if (r && r.ok && r.text) {
           ta.value = (ta.value ? ta.value + "\n\n" : "") + r.text;
           onType();
         } else {
-          err.textContent = (r && r.error) || "Kunde inte läsa bilden. Prova en tydligare bild.";
+          err.textContent = (r && r.error) || tx("Kunde inte läsa bilden. Prova en tydligare bild.", "Could not read the image. Try a clearer photo.");
         }
       });
     });
@@ -1241,7 +1267,7 @@
     b.appendChild(err);
 
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", "Klart");
+    var go = el("button", "xf-btn primary", tx("Klart", "Continue"));
     go.type = "button";
     go.disabled = true;
     go.addEventListener("click", function () {
@@ -1254,6 +1280,7 @@
 
     function onType() {
       var v = ta.value.trim();
+      S.material = ta.value;
       err.textContent = "";
       go.disabled = !v;
 
@@ -1261,12 +1288,12 @@
       if (!v) return;
 
       if (v.length < 120) {
-        read.appendChild(el("span", null, "Kort underlag — lägg gärna till sammanhang för fler varierade frågor."));
+        read.appendChild(el("span", null, tx("Kort underlag — lägg gärna till sammanhang för fler varierade frågor.", "This is a short source. Add more context for a wider range of questions.")));
         return;
       }
 
       var t = terms(v);
-      read.appendChild(el("b", null, "Läser"));
+      read.appendChild(el("b", null, tx("Hittade begrepp", "Key terms")));
       if (t.length) {
         t.forEach(function (w) {
           read.appendChild(el("span", "xf-term", w));
@@ -1275,7 +1302,7 @@
         read.appendChild(el("span", null, v.length + " tecken"));
       }
       if (v.length > MATERIAL_MAX) {
-        var warn = el("span", null, "· använder de första " + MATERIAL_MAX + " tecknen");
+        var warn = el("span", null, tx("· använder de första " + MATERIAL_MAX + " tecknen", "· using the first " + MATERIAL_MAX + " characters"));
         warn.style.color = "var(--exgen-warning-text)";
         read.appendChild(warn);
       }
@@ -1293,11 +1320,12 @@
      sekunders väntan på fel prov. */
 
   function stepContract() {
+    UI.languageRerender = stepContract;
     var d = dna();
     var b = mount("contract");
     var misses = d.missCountFor(S.course);
 
-    say("Så här blir provet.", "Titta igenom. Ändrar du något nu slipper du göra om det sen.");
+    say(tx("Så här blir provet.", "Review your exam."), tx("Titta igenom. Ändrar du något nu slipper du göra om det sen.", "Check the details. Make any changes now before you create it."));
 
     var mins = estimateMinutes(S.num, S.qType);
 
@@ -1314,13 +1342,13 @@
       return r;
     }
 
-    dl.appendChild(row("Kurs", S.course));
-    dl.appendChild(row("Nivå", S.level));
-    dl.appendChild(row("Omfattning", S.num + " frågor",
-      S.qType === "mc" ? "Flervalsfrågor" : S.qType === "short" ? "Kortsvar" : S.qType === "graph" ? "Interaktiv graf" : "Blandat flerval och kortsvar"));
-    dl.appendChild(row("Tar ungefär", "~" + mins + " min", "Räknat på din svarstid, inte på lästid"));
+    dl.appendChild(row(tx("Kurs", "Course"), S.course));
+    dl.appendChild(row(tx("Nivå", "Level"), S.level));
+    dl.appendChild(row(tx("Omfattning", "Format"), S.num + " " + tx("frågor", "questions"),
+      S.qType === "mc" ? tx("Flervalsfrågor", "Multiple choice") : S.qType === "short" ? tx("Kortsvar", "Short answer") : S.qType === "graph" ? tx("Interaktiv graf", "Interactive graph") : tx("Blandat flerval och kortsvar", "Mixed multiple choice and short answer")));
+    dl.appendChild(row(tx("Tar ungefär", "Estimated time"), "~" + mins + " " + tx("min", "min"), tx("Räknat på din svarstid, inte på lästid", "Based on answer time, not reading time")));
     if (misses > 0) {
-      dl.appendChild(row("Extra vikt", misses + " tidigare fel", "Från din felbank i " + S.course));
+      dl.appendChild(row(tx("Extra vikt", "Extra focus"), misses + " " + tx("tidigare fel", "earlier mistakes"), tx("Från din felbank i " + S.course, "From your mistake bank for " + S.course)));
     }
     card.appendChild(dl);
     b.appendChild(card);
@@ -1328,7 +1356,7 @@
     var t = terms(S.material);
     if (t.length) {
       var cov = el("div");
-      cov.appendChild(el("div", "xf-eyebrow", "Begrepp jag hittade i ditt material"));
+      cov.appendChild(el("div", "xf-eyebrow", tx("Begrepp jag hittade i ditt material", "Key terms found in your material")));
       var chips = el("div", "xf-cov");
       t.forEach(function (w) { chips.appendChild(el("span", null, w)); });
       cov.appendChild(chips);
@@ -1341,7 +1369,7 @@
     b.appendChild(err);
 
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", "Skapa provet");
+    var go = el("button", "xf-btn primary", tx("Skapa provet", "Create exam"));
     go.type = "button";
     go.addEventListener("click", function () { build(go, err); });
     act.appendChild(go);
@@ -1349,7 +1377,7 @@
     b.appendChild(act);
 
     b.appendChild(el("div", "xf-note",
-      "Frågorna byggs bara på begrepp som finns i ditt material — i nya situationer, inte med nytt stoff."));
+      tx("Frågorna byggs bara på begrepp som finns i ditt material — i nya situationer, inte med nytt stoff.", "Questions are based only on concepts in your material, applied in new situations without adding new subject matter.")));
 
     screen("contract");
   }
@@ -1369,16 +1397,16 @@
     S.generating = true;
 
     btn.disabled = true;
-    btn.textContent = "Bygger…";
+    btn.textContent = tx("Bygger…", "Building…");
     busy(true);
     err.textContent = "";
-    say("Bygger ditt prov.", "Tar oftast under en minut.");
+    say(tx("Bygger ditt prov.", "Building your exam."), tx("Tar oftast under en minut.", "This usually takes less than a minute."));
 
     function done() {
       S.generating = false;
       busy(false);
       btn.disabled = false;
-      btn.textContent = "Skapa provet";
+      btn.textContent = tx("Skapa provet", "Create exam");
     }
 
     window.ExGenEngine.setInputs({
@@ -1389,8 +1417,8 @@
     window.ExGenEngine.generate().then(function (r) {
       done();
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
-        err.textContent = (r && r.error) || "Provet kunde inte byggas. Försök igen.";
-        say("Det gick inte den här gången.", "Försök igen, gärna med färre frågor.");
+        err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
+        say(tx("Det gick inte den här gången.", "That did not work this time."), tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions."));
         return;
       }
       S.exam = normalizeIds(r.exam);
@@ -1411,16 +1439,17 @@
          kvalitetsarbete. */
       var got = S.exam.questions.length;
       if (got < S.num) {
-        nudge("Jag skrev " + S.num + " frågor men kastade " + (S.num - got) +
-              " som inte höll måttet. Du får " + got + " — hellre färre och rätt.", true);
+        nudge(tx("Jag skrev " + S.num + " frågor men kastade " + (S.num - got) +
+              " som inte höll måttet. Du får " + got + " — hellre färre och rätt.", "I drafted " + S.num + " questions but removed " + (S.num - got) +
+              " that did not meet the quality bar. You will get " + got + " instead — fewer, but better."), true);
       }
     }).catch(function (e) {
       /* generate() går via runGenerate i app.html. postJson kastar aldrig,
          men andra auth-/UI-anrop kan göra det. Återställ alltid knappen så att
          ett tillfälligt klientfel inte låser eleven ute från ett nytt försök. */
       done();
-      err.textContent = "Något gick fel på vägen. Kontrollera uppkopplingen och försök igen.";
-      say("Det gick inte den här gången.", "Försök igen om en stund.");
+      err.textContent = tx("Något gick fel på vägen. Kontrollera uppkopplingen och försök igen.", "Something went wrong. Check your connection and try again.");
+      say(tx("Det gick inte den här gången.", "That did not work this time."), tx("Försök igen om en stund.", "Please try again shortly."));
       if (window.console && console.warn) console.warn("[exam-flow] generate:", e);
     });
   }
@@ -1503,6 +1532,7 @@
   }
 
   function openExam(resumedAt) {
+    UI.languageRerender = null;
     if (window.dismissWelcome) window.dismissWelcome();
     // Vid återupptagning behålls den tid provet redan pågått. Att nollställa
     // klockan hade dolt att eleven redan suttit en halvtimme och gjort både
@@ -2412,7 +2442,10 @@
       }
 
       if (examProof && q.grade_task && window.PER && window.PER.send) {
-        var review = el("button", "xf-btn quiet xf-review-action", "✦ Förklara min rättning");
+        var review = el("button", "xf-btn quiet xf-review-action");
+        review.dataset.labelSv = "✦ Förklara min rättning";
+        review.dataset.labelEn = "✦ Explain my grading";
+        review.textContent = isEnglish() ? review.dataset.labelEn : review.dataset.labelSv;
         review.type = "button";
         review.addEventListener("click", function () {
           window.PER.describe({
@@ -2422,7 +2455,9 @@
           });
           var bubble = document.getElementById("perBubble");
           if (bubble && !bubble.classList.contains("per-open")) bubble.click();
-          window.PER.send("Förklara min rättning på fråga " + (n + 1) + " steg för steg", {
+          var english = isEnglish();
+          window.PER.send((english ? "Please explain my grading on question " : "Förklara min rättning på fråga ") +
+            (n + 1) + (english ? " step by step" : " steg för steg"), {
             helpLevel: 3,
             examProof: {
               receipt: examProof,
@@ -2570,7 +2605,7 @@
   }
 
   function backBtn(fn) {
-    var b = el("button", "xf-btn quiet", "Tillbaka");
+    var b = el("button", "xf-btn quiet", tx("Tillbaka", "Back"));
     b.type = "button";
     b.addEventListener("click", fn);
     return b;
@@ -2589,6 +2624,12 @@
     root.appendChild(prog);
     window.addEventListener("exgen:languagechange", function () {
       updateProgress(UI.progress && UI.progress.dataset.step);
+      updateReviewActionLabels();
+      var focusTarget = document.activeElement;
+      if (typeof UI.languageRerender === "function") UI.languageRerender();
+      if (focusTarget && focusTarget.isConnected && focusTarget.matches("#langBtnDesktop, #langBtn")) {
+        focusTarget.focus({ preventScroll: true });
+      }
     });
 
     /* Sidans enda h1. Skärmarnas egna rubriker är h2 — sex h1 samtidigt i

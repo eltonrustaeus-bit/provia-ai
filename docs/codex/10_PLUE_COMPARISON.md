@@ -6,6 +6,10 @@ Den publika interaktionsdemon visar en avgränsad fysikberäkning där användar
 
 Bedömningen skiljer mellan (1) Plues egna publika produktbeskrivningar, (2) Elton Rustaeus egen användarobservation av en grafuppgift och (3) verifierad ExGen-kod. Inloggade Plue-flöden och intern teknik har inte granskats.
 
+## Offentlig integritetsinformation — kontrollerad 2026-10-14
+
+PLUE:s egen [integritetspolicy](https://plue.si/privacy/) uppger att den nya tjänsten behandlar bland annat kursmaterial, AI-meddelanden och studieresultat, anger Cloudflare, Clerk och Anthropic som tjänsteleverantörer, säger att data inte används för att träna AI-modeller och beskriver krav på vårdnadshavares samtycke för elever under 16. Detta är en sammanfattning av leverantörens publika policytext, inte en oberoende säkerhets- eller juridisk bedömning och inte belägg för hur enskilda dataflöden fungerar i runtime. Uppgifterna kan vara relevanta som jämförelsepunkter när ExGen och pilotskolan fastställer egna leverantörer, ålder, rättslig grund, dataminimering och information till elever/vårdnadshavare; de kan inte ersätta de besluten.
+
 ## Vad som går att belägga
 
 | Område | Publik Plue-beskrivning / användarobservation | ExGen nuläge | Produktimplikation |
