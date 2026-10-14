@@ -1517,6 +1517,7 @@
   var publishTimer = null;
 
   function publish() {
+    updateQuestionDotLabels();
     if (!window.PER || !window.PER.describe) return;
     var qs = (S.exam && S.exam.questions) || [];
     if (!qs.length) return;
@@ -1567,6 +1568,23 @@
     if (q && q.type === "graph") return Boolean(window.ExGenGraphAnswer && window.ExGenGraphAnswer.isComplete(raw, q.graph_ui));
     return String(raw || "").trim().length > 0;
   }
+
+  function updateQuestionDotLabels() {
+    var qs = (S.exam && S.exam.questions) || [];
+    var english = Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
+    UI.dots.setAttribute("aria-label", english ? "Exam question navigation" : "Provfrågor");
+    Array.prototype.forEach.call(UI.dots.children, function (dot, n) {
+      var answered = isAnswerComplete(qs[n], S.answers[qid(qs[n], n)]);
+      var current = n === S.idx;
+      var state = current
+        ? (answered ? (english ? "current, answered" : "aktuell, besvarad") : (english ? "current, unanswered" : "aktuell, obesvarad"))
+        : (answered ? (english ? "answered" : "besvarad") : (english ? "unanswered" : "obesvarad"));
+      dot.setAttribute("aria-label", (english ? "Question " : "Fråga ") + (n + 1) + ", " + state);
+      if (current) dot.setAttribute("aria-current", "step");
+      else dot.removeAttribute("aria-current");
+    });
+  }
+  window.addEventListener("exgen:languagechange", updateQuestionDotLabels);
 
   function renderGraphUnavailable(sheet, lang) {
     var en = lang === "en";
@@ -1654,16 +1672,17 @@
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
+    UI.dots.setAttribute("role", "group");
     qs.forEach(function (qq, n) {
       var d = el("button", "xf-dot");
       d.type = "button";
       var did = qid(qq, n);
       if (n === i) d.classList.add("here");
       else if (isAnswerComplete(qq, S.answers[did])) d.classList.add("done");
-      d.setAttribute("aria-label", "Fråga " + (n + 1));
       d.addEventListener("click", function () { S.idx = n; renderQuestion(); });
       UI.dots.appendChild(d);
     });
+    updateQuestionDotLabels();
 
     UI.count.textContent = "Fråga " + (i + 1) + " / " + qs.length;
 

@@ -237,12 +237,38 @@ async function toMaterial(page) {
   await toExam(page);
   const ids = await page.evaluate(() => {
     const dots = document.querySelectorAll(".xf-dot").length;
-    return { dots };
+    const current = document.querySelector(".xf-dot[aria-current='step']");
+    return {
+      dots,
+      groupLabel: document.querySelector(".xf-exam-dots")?.getAttribute("aria-label"),
+      currentLabel: current?.getAttribute("aria-label"),
+      unansweredLabel: document.querySelector(".xf-dot:nth-child(2)")?.getAttribute("aria-label")
+    };
   });
   ok("T1a dot-rad har 3 frågor", ids.dots === 3, "fick " + ids.dots);
+  ok("T1a1 frågenavigering har en tydlig gruppetikett", ids.groupLabel === "Provfrågor", String(ids.groupLabel));
+  ok("T1a2 aktuell fråga och obesvarat tillstånd exponeras", ids.currentLabel === "Fråga 1, aktuell, obesvarad"
+    && ids.unansweredLabel === "Fråga 2, obesvarad", JSON.stringify(ids));
 
   // svara olika på de två dubblett-frågorna
   await page.click(".xf-mc-opt >> nth=0"); await page.waitForTimeout(500);   // fråga 1 = A
+  const progress = await page.locator(".xf-dot").evaluateAll(dots => dots.map(d => ({
+    label: d.getAttribute("aria-label"), current: d.getAttribute("aria-current")
+  })));
+  ok("T1a3 besvarad och aktuell status uppdateras efter svar", progress[0]?.label === "Fråga 1, besvarad"
+    && progress[0]?.current === null && progress[1]?.label === "Fråga 2, aktuell, obesvarad"
+    && progress[1]?.current === "step", JSON.stringify(progress));
+  await page.evaluate(() => document.getElementById("langBtn")?.click());
+  const englishProgress = await page.locator(".xf-dot").evaluateAll(dots => ({
+    documentLanguage: document.documentElement.lang,
+    group: document.querySelector(".xf-exam-dots")?.getAttribute("aria-label"),
+    current: dots.find(d => d.hasAttribute("aria-current"))?.getAttribute("aria-label")
+  }));
+  ok("T1a4 språkbyte uppdaterar skärmläsaretiketter och dokumentets språk", englishProgress.documentLanguage === "en"
+    && englishProgress.group === "Exam question navigation"
+    && englishProgress.current === "Question 2, current, unanswered", JSON.stringify(englishProgress));
+  await page.evaluate(() => document.getElementById("langBtn")?.click());
+  await page.waitForTimeout(200);
   await page.fill(".xf-answer", "svar på fråga två");
   await page.waitForTimeout(1100);                                            // debounce
   await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
