@@ -253,6 +253,7 @@
 
     /* ── CHART ── */
     .chartWrap{margin-top:14px;border:1px solid var(--l);border-radius:var(--exgen-radius-sm);background:var(--s2);padding:18px 18px 14px;transition:background .28s ease,border-color .28s ease}
+    .chartFallbackList{margin:10px 0 0;padding-left:22px;display:grid;gap:5px;color:var(--t2);font-size:var(--exgen-text-sm)}
     .chartLabel{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px}
 
     /* ── MISTAKE GRID ── */
@@ -706,8 +707,32 @@
 
     /* ── CHART ── */
     let _chart=null;
+    function renderChartFallback(wrap,canvas,data){
+      canvas.hidden=true;
+      const fallback=document.createElement('div');
+      fallback.id='chartFallback';
+      fallback.className='chartFallback';
+      fallback.setAttribute('role','status');
+      fallback.setAttribute('aria-live','polite');
+      const message=document.createElement('p');
+      message.textContent='Grafen kunde inte laddas. Resultaten visas som lista.';
+      const list=document.createElement('ol');
+      list.className='chartFallbackList';
+      data.slice(-5).forEach(item=>{
+        const row=document.createElement('li');
+        const time=Date.parse(item.ts);
+        const date=Number.isFinite(time)?new Date(time).toLocaleDateString(undefined,{month:'short',day:'numeric'}):'Datum saknas';
+        const percent=Number(item.percent);
+        row.textContent=`${date}: ${Number.isFinite(percent)?`${percent}%`:'Resultat saknas'}`;
+        list.appendChild(row);
+      });
+      fallback.append(message,list);
+      wrap.appendChild(fallback);
+    }
     function renderChart(h){
       const wrap=$('chartWrap'),canvas=$('progressChart');if(!wrap||!canvas)return;
+      $('chartFallback')?.remove();
+      canvas.hidden=false;
       if(!h||h.length<2){wrap.style.display='none';if(_chart){_chart.destroy();_chart=null;}return;}
       wrap.style.display='block';
       const data=h.slice(-20);
@@ -716,7 +741,8 @@
       const grid='rgba(0,183,217,.07)',tick='#667085';
       const line='#00768F',fill='rgba(0,183,217,.08)';
       if(_chart){_chart.destroy();_chart=null;}
-      _chart=new Chart(canvas,{
+      if(typeof Chart!=='function'){renderChartFallback(wrap,canvas,data);return;}
+      try{_chart=new Chart(canvas,{
         type:'line',
         data:{labels,datasets:[{data:values,borderColor:line,backgroundColor:fill,borderWidth:2,pointBackgroundColor:line,pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:3.5,pointHoverRadius:5,fill:true,tension:0.4}]},
         options:{
@@ -727,7 +753,7 @@
             y:{min:0,max:100,grid:{color:grid,drawBorder:false},ticks:{color:tick,font:{size:10,weight:'500',family:'DM Mono'},callback:v=>v+'%',stepSize:25},border:{display:false}}
           }
         }
-      });
+      });}catch{_chart=null;renderChartFallback(wrap,canvas,data);}
     }
 
     /* ── RENDER MISTAKES ── */
@@ -1264,8 +1290,8 @@
       body.appendChild(wrap);
 
       renderExamList(d.h,'');
-      renderChart(d.h);
       $('syncBtn').addEventListener('click',async()=>{await syncFromAccount();});
+      renderChart(d.h);
     }
 
     /* ── COACH ── analysen hämtas vid inträde. Den satt förut bakom en knapp
