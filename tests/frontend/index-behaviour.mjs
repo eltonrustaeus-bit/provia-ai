@@ -400,6 +400,21 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
       button.top < bubble.bottom && button.bottom > bubble.top;
   });
   ok("13b mobilens P.E.R-kontroll skymmer inte demoknappen", !overlap);
+  const noteOverlap = await page.evaluate(() => {
+    const note = document.querySelector("#demoHur").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    return note.left < bubble.right && note.right > bubble.left &&
+      note.top < bubble.bottom && note.bottom > bubble.top;
+  });
+  ok("13e mobilens P.E.R-kontroll skymmer inte demoförklaringen", !noteOverlap);
+  await page.setViewportSize({ width: 320, height: 720 });
+  const narrowNoteOverlap = await page.evaluate(() => {
+    const note = document.querySelector("#demoHur").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    return note.left < bubble.right && note.right > bubble.left &&
+      note.top < bubble.bottom && note.bottom > bubble.top;
+  });
+  ok("13f förklaringen får plats bredvid P.E.R även vid 320px", !narrowNoteOverlap);
 
   await page.locator("#demoGo").click();
   await page.locator("#demoBack").click();

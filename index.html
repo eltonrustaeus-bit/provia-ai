@@ -334,7 +334,10 @@
   }
   .demoArea:focus { border-color:var(--a);box-shadow:0 0 0 3px rgba(0,118,143,.07); }
 
-  @media(max-width:480px){ #demoMaterial{height:112px;min-height:112px} }
+  @media(max-width:480px){
+    #demoMaterial{height:112px;min-height:112px}
+    #demoHur{max-width:calc(100% - 56px)}
+  }
 
   .demoGo {
     display:flex;align-items:center;justify-content:center;
