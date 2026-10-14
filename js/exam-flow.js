@@ -616,7 +616,13 @@
   }
 
   function screen(name) {
+    if (name === "contract") {
+      var panel = document.getElementById("perPanel");
+      var bubble = document.getElementById("perBubble");
+      if (panel && panel.classList.contains("per-open") && bubble) bubble.click();
+    }
     document.body.classList.toggle("xf-result", name === "result");
+    document.body.classList.toggle("xf-contract", name === "contract");
     if (name !== "result") document.body.classList.remove("xf-result-per-open");
     STEPS.forEach(function (s) {
       var n = UI.screens[s];
@@ -1375,11 +1381,22 @@
     go.type = "button";
     go.addEventListener("click", function () { build(go, err); });
     act.appendChild(go);
+    var perButton = el("button", "xf-btn ghost xf-contract-per", tx("Fråga P.E.R", "Ask P.E.R"));
+    perButton.type = "button";
+    perButton.setAttribute("aria-expanded", "false");
+    perButton.addEventListener("click", function () {
+      var bubble = document.getElementById("perBubble");
+      var panel = document.getElementById("perPanel");
+      if (!bubble || !panel) return;
+      bubble.click();
+      perButton.setAttribute("aria-expanded", panel.classList.contains("per-open") ? "true" : "false");
+    });
     act.appendChild(backBtn(stepMaterial));
+    act.appendChild(perButton);
     b.appendChild(act);
 
     b.appendChild(el("div", "xf-note",
-      tx("Frågorna byggs bara på begrepp som finns i ditt material — i nya situationer, inte med nytt stoff.", "Questions are based only on concepts in your material, applied in new situations without adding new subject matter.")));
+      tx("AI skapar frågor med ditt material som underlag, men kan missa detaljer. Kontrollera att de passar kursen medan du arbetar igenom provet.", "AI creates questions using your material as a reference, but may miss details. Check that they fit your course as you work through the exam.")));
 
     screen("contract");
   }

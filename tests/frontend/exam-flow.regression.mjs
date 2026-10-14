@@ -170,12 +170,59 @@ async function toMaterial(page) {
     ok("materialsteget kan växla tillbaka till engelska utan dataförlust",
       /Add your study material/.test(englishMaterialHeading || "") && /short source/i.test(englishMaterialHint || "")
       && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), englishMaterial || "");
+    await page.locator("#perBubble").click();
+    await page.waitForFunction(() => document.querySelector("#perPanel")?.classList.contains("per-open"));
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    const perClosedForReview = await page.evaluate(() => ({
+      panelOpen: document.querySelector("#perPanel")?.classList.contains("per-open"),
+      actionExpanded: document.querySelector(".xf-contract-per")?.getAttribute("aria-expanded")
+    }));
+    ok("P.E.R-panelen stängs vid övergången till provöversikten",
+      perClosedForReview.panelOpen === false && perClosedForReview.actionExpanded === "false",
+      JSON.stringify(perClosedForReview));
     const contract = await page.locator("#xf .xf-screen[data-screen='contract']").textContent();
     const contractHeading = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-say").getAttribute("aria-label");
     ok("provöversikten visas på engelska", /Review your exam/.test(contractHeading || "") && /Course/.test(contract || "") && /Create exam/.test(contract || ""), contract);
+    const englishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    ok("engelsk provöversikt beskriver AI-underlaget utan garanti",
+      /using your material as a reference/i.test(englishGroundingNote || "")
+        && /may miss details/i.test(englishGroundingNote || "")
+        && /as you work through the exam/i.test(englishGroundingNote || "")
+        && !/based only on concepts/i.test(englishGroundingNote || ""), englishGroundingNote || "");
+    await desktopLanguage.click();
+    const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    ok("svensk provöversikt beskriver AI-underlaget utan garanti",
+      /med ditt material som underlag/i.test(swedishGroundingNote || "")
+        && /kan missa detaljer/i.test(swedishGroundingNote || "")
+        && /medan du arbetar igenom provet/i.test(swedishGroundingNote || "")
+        && !/byggs bara på begrepp/i.test(swedishGroundingNote || ""), swedishGroundingNote || "");
+    await desktopLanguage.click();
     await page.locator(".welcomeAnim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
     await page.screenshot({ path: path.join(OUT, "exam-flow-language-contract-desktop.png") });
+    await page.setViewportSize({ width: 390, height: 844 });
+    const noteLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").boundingBox();
+    const perActionLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-contract-per").boundingBox();
+    const contractPerState = await page.evaluate(() => ({
+      bubbleDisplay: getComputedStyle(document.querySelector("#perBubble")).display,
+      actionVisible: document.querySelector(".xf-contract-per")?.getClientRects().length > 0
+    }));
+    const mobileDocumentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    ok("AI-underlagstexten ryms inom mobilbredden",
+      !!noteLayout && noteLayout.x >= 0 && noteLayout.x + noteLayout.width <= 390 && mobileDocumentWidth <= 390,
+      JSON.stringify({ noteLayout, mobileDocumentWidth }));
+    ok("P.E.R-genvägen ligger i flödet utan att flyta över förklaringen",
+      !!noteLayout && !!perActionLayout && contractPerState.bubbleDisplay === "none"
+        && contractPerState.actionVisible
+        && perActionLayout.y + perActionLayout.height <= noteLayout.y
+        && perActionLayout.y + perActionLayout.height <= 844,
+      JSON.stringify({ noteLayout, perActionLayout, contractPerState }));
+    await page.screenshot({ path: path.join(OUT, "exam-flow-contract-390.png") });
+    const inlinePer = page.locator("#xf .xf-screen[data-screen='contract'] .xf-contract-per");
+    await inlinePer.click();
+    await page.waitForFunction(() => document.querySelector("#perPanel")?.classList.contains("per-open"));
+    ok("P.E.R kan öppnas från provöversikten", await inlinePer.getAttribute("aria-expanded") === "true");
+    await inlinePer.click();
+    ok("P.E.R kan stängas från samma genväg", await inlinePer.getAttribute("aria-expanded") === "false");
     ok("språkflödets browserkörning saknar sidfel", errs.length === 0, errs.join(" | "));
   } catch (e) {
     ok("desktop språkbyte i provguiden fungerar", false, e.message);

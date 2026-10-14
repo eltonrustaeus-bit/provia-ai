@@ -121,6 +121,12 @@ body.xf-grading #perWidget { display: none !important; }
 body.xf-result #perBubble { display: none !important; }
 body.xf-result.xf-result-per-open #perBubble { display: inline-flex !important; }
 
+/* The exam review already ends with a P.E.R action beside its guidance.
+   Keep the floating shortcut out of that narrow footer so it cannot cover
+   the last lines on mobile. */
+body.xf-contract #perBubble { display: none !important; }
+body.xf-contract .xf-contract-per { flex: 0 0 auto; }
+
 /* Stegen är slut när provet börjar; en halvfull linje överst hade bara sagt
    emot provets egen räknare. */
 body.xf-in-exam .xf-progress,
