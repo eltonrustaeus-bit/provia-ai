@@ -88,8 +88,10 @@ const PLANS = [
   ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
   const impact = await page.locator("#zonImpact").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
-  ok("0h Impact skiljer plan från nuläge", /plan för att på sikt bredda tillgången.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
-  ok("0i Impact lovar inte elevmånader eller effektresultat", /inte kopplade till köp eller uppmätta/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
+  ok("0h Impact skiljer plan från nuläge", /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
+  ok("0i Impact lovar inte elevmånader eller effektresultat", /köp är ännu inte kopplade till Impact/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
+  ok("0l Impact skiljer tillgång från läranderesultat", /tillgång för en elev under en månad, inte ett löfte om förbättrat resultat/i.test(impact) && /Finansierad, aktiverad och använd tillgång ska redovisas var för sig/i.test(impact));
+  ok("0m Impact kräver kostnadsunderlag och skolgodkännande", /AI, drift och betalningar kostar/i.test(impact) && /skolans godkännande behövs/i.test(impact));
   ok("0j Impact-sektionen har en tillgänglig rubrik", impactHeading === "impact-title" && await page.locator(`#${impactHeading}`).isVisible());
   ok("0k planpriser och checkoutknappar finns kvar", await page.locator("#plan-basic .planAmt").innerText() === "29" && await page.locator("#plan-premium .planAmt").innerText() === "79" && await page.locator("#btn-basic").count() === 1 && await page.locator("#btn-premium").count() === 1);
   ok("0f backend-avstängd plansida släpper laddaren", await page.locator("#ldr").evaluate(el => el.classList.contains("out")));

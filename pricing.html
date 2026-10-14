@@ -179,6 +179,18 @@
     font-weight:var(--exgen-weight-semibold);line-height:var(--exgen-leading-tight)}
   .impactCopy{margin:0;color:var(--xf-ink-2);font-size:var(--exgen-text-sm);
     line-height:var(--exgen-leading-relaxed);max-width:62ch}
+  .impactIntro{margin-top:var(--exgen-space-4)}
+  .impactSteps{list-style:none;margin:0;padding:0;counter-reset:impact-step}
+  .impactSteps li{display:grid;grid-template-columns:24px minmax(0,1fr);
+    gap:var(--exgen-space-3);padding:var(--exgen-space-3) 0;
+    border-bottom:1px solid var(--xf-line);counter-increment:impact-step}
+  .impactSteps li:first-child{padding-top:0}
+  .impactSteps li::before{content:counter(impact-step,decimal-leading-zero);
+    color:var(--xf-accent);font:500 var(--exgen-text-xs) var(--exgen-font-mono)}
+  .impactSteps strong{display:block;color:var(--xf-ink);font-size:var(--exgen-text-sm);
+    font-weight:var(--exgen-weight-semibold);line-height:var(--exgen-leading-normal)}
+  .impactSteps span{display:block;color:var(--xf-ink-2);font-size:var(--exgen-text-sm);
+    line-height:var(--exgen-leading-relaxed)}
   .impactStatus{margin:var(--exgen-space-4) 0 0;padding-left:var(--exgen-space-3);
     border-left:2px solid var(--xf-accent);color:var(--xf-ink-2);
     font-size:var(--exgen-text-xs);line-height:var(--exgen-leading-relaxed)}
@@ -388,10 +400,15 @@
       <div>
         <div class="xf-eyebrow">ExGen Impact</div>
         <h2 class="impactTitle" id="impact-title">Studiestöd för fler, på ett hållbart sätt</h2>
+        <p class="impactCopy impactIntro">ExGen Impact är vår plan för att fler elever ska få tillgång till personligt studiestöd via skolor. En elevmånad betyder tillgång för en elev under en månad, inte ett löfte om förbättrat resultat.</p>
       </div>
       <div>
-        <p class="impactCopy">ExGen Impact är vår plan för att på sikt bredda tillgången till studiestöd via skolor. Vi vill hålla priserna så tillgängliga som möjligt och utveckla en finansieringsmodell som är hållbar för både elever och ExGen.</p>
-        <p class="impactStatus"><strong>Under utveckling.</strong> Finansiering och elevmånader är ännu inte kopplade till köp eller uppmätta. Därför redovisar vi inga Impact-siffror i nuläget.</p>
+        <ol class="impactSteps">
+          <li><div><strong>Räkna på verklig kostnad</strong><span>Vi måste först mäta vad AI, drift och betalningar kostar innan ett abonnemang kan ge ett hållbart bidrag.</span></div></li>
+          <li><div><strong>Ge tillgång via skola</strong><span>Finansiering och skolans godkännande behövs innan en elevmånad kan aktiveras.</span></div></li>
+          <li><div><strong>Följ upp utan att överdriva</strong><span>Finansierad, aktiverad och använd tillgång ska redovisas var för sig. Läranderesultat kräver egen uppföljning.</span></div></li>
+        </ol>
+        <p class="impactStatus"><strong>Under utveckling.</strong> Kostnad per elevmånad är inte validerad och köp är ännu inte kopplade till Impact. Därför visar vi inga Impact-siffror.</p>
       </div>
     </div>
   </section>
