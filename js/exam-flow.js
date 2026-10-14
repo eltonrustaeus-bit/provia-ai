@@ -899,20 +899,63 @@
       }
     }
 
-    loadEduCatalog().then(paintSuggestions);
+    var courseNotice = el("div", "xf-note");
+    courseNotice.id = "xfCourseCatalogNotice";
+    courseNotice.setAttribute("role", "status");
+    courseNotice.setAttribute("aria-live", "polite");
+    courseNotice.setAttribute("aria-atomic", "true");
+    b.appendChild(courseNotice);
+
+    function paintCourseNotice() {
+      var value = inp.value.trim();
+      if (!value) {
+        courseNotice.textContent = "";
+        return;
+      }
+      if (!eduCatalog) {
+        courseNotice.textContent = "Kurslistan kunde inte kontrolleras. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.";
+        return;
+      }
+      var normalized = value.toLowerCase().replace(/\s+/g, " ");
+      var exactMatch = eduSuggestions(value).some(function (suggestion) {
+        return suggestion.toLowerCase().replace(/\s+/g, " ") === normalized;
+      });
+      courseNotice.textContent = exactMatch
+        ? ""
+        : "Kursen matchar inte kurskatalogen. Du kan fortsätta, men ExGen kan inte bekräfta kursplanen.";
+    }
+
+    loadEduCatalog().then(function () {
+      paintSuggestions();
+      paintCourseNotice();
+    });
 
     var err = el("div", "xf-err");
+    err.id = "xfCourseError";
+    err.setAttribute("role", "alert");
+    err.setAttribute("aria-atomic", "true");
+    inp.setAttribute("aria-describedby", err.id + " " + courseNotice.id);
     b.appendChild(err);
 
     function next() {
       var v = inp.value.trim();
-      if (!v) { err.textContent = "Skriv vilken kurs det gäller så kan jag matcha nivån."; inp.focus(); return; }
+      if (!v) {
+        err.textContent = "Skriv vilken kurs det gäller så kan jag matcha nivån.";
+        inp.setAttribute("aria-invalid", "true");
+        inp.focus();
+        return;
+      }
       S.course = v;
       stepAim();
     }
 
     inp.addEventListener("keydown", function (e) { if (e.key === "Enter") next(); });
-    inp.addEventListener("input", function () { err.textContent = ""; paintSuggestions(); });
+    inp.addEventListener("input", function () {
+      err.textContent = "";
+      inp.removeAttribute("aria-invalid");
+      paintSuggestions();
+      paintCourseNotice();
+    });
 
     var act = el("div", "xf-act");
     var go = el("button", "xf-btn primary", "Vidare");
