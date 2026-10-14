@@ -826,7 +826,7 @@ module.exports = async function handler(req, res) {
 
   const isMath = looksLikeMath(course, pastedText);
   const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
-  const graphLines = graphAnswers.parseLinearEquations(`${course}\n${pastedText}`);
+  const graphLines = graphAnswers.parseLinearEquations(pastedText);
   const uniqueGraphLines = new Map(graphLines.map((line) => [`${line.slope}|${line.intercept}`, line]));
   const pointTable = graphAnswers.parsePointTable(pastedText);
   const graphMode = isMath && uniqueGraphLines.size === 1
@@ -1016,7 +1016,7 @@ module.exports = async function handler(req, res) {
       } else if (q.type === "graph") {
         const graphSpecValid = graphMode === "scatter"
           ? Boolean(pointTable)
-          : isMath && graphAnswers.isValidSpec(q.graph_spec) && graphAnswers.sourceContainsSpec(`${course}\n${pastedText}`, q.graph_spec);
+          : isMath && graphAnswers.isValidSpec(q.graph_spec) && graphAnswers.sourceContainsSpec(pastedText, q.graph_spec);
         if (qType !== "graph" || !graphSpecValid) {
           const bail = guardFail("GRAPH_GENERATION_REJECTED", {
             message: lang === "en"

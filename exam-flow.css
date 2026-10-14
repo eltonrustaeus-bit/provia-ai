@@ -115,6 +115,12 @@ body.xf-grading .xg-footer { display: none !important; }
    kan påverka någonting. */
 body.xf-grading #perWidget { display: none !important; }
 
+/* On the results page, contextual P.E.R actions remain in the question cards.
+   Hide the floating shortcut so it cannot cover feedback or the next-practice
+   card; reveal it again while the learner has the chat open so it can be closed. */
+body.xf-result #perBubble { display: none !important; }
+body.xf-result.xf-result-per-open #perBubble { display: inline-flex !important; }
+
 /* Stegen är slut när provet börjar; en halvfull linje överst hade bara sagt
    emot provets egen räknare. */
 body.xf-in-exam .xf-progress,

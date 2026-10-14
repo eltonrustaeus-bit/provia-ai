@@ -6,9 +6,9 @@ import { Readable } from "node:stream";
 const require = createRequire(import.meta.url);
 const grade = require("../../api/grade.js");
 const tasks = require("../../api/_grade-task.js");
-const { validateNonMcGradeOutput } = grade;
+const { validateNonMcGradeOutput, normalizeChoice } = grade;
 const source = await readFile(new URL("../../api/grade.js", import.meta.url), "utf8");
-const expected = [{ id: "q1" }, { id: "q2" }];
+const expected = [{ id: "q1", max_points: 2 }, { id: "q2", max_points: 2 }];
 const row = (id) => ({
   id,
   points: 1,
@@ -29,6 +29,16 @@ assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), row("q3")] }, 
   "unexpected question IDs are rejected");
 assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), { ...row("q2"), points: "1" }] }, expected), false,
   "malformed numeric scores are rejected");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), { ...row("q2"), points: 3 }] }, expected), false,
+  "awarded points cannot exceed the signed question maximum");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), { ...row("q2"), points: -1 }] }, expected), false,
+  "negative awarded points are rejected");
+assert.equal(validateNonMcGradeOutput({ per_question: [row("q1"), { ...row("q2"), max_points: 3 }] }, expected), false,
+  "model-provided maximum must match the signed question maximum");
+assert.equal(normalizeChoice("A"), "A");
+assert.equal(normalizeChoice("F."), "F");
+assert.equal(normalizeChoice("A-not-an-answer"), "", "an option prefix cannot turn arbitrary text into a selection");
+assert.equal(normalizeChoice("answer A"), "", "only an explicit option token is accepted");
 const guardIndex = source.indexOf("if (!validateNonMcGradeOutput(graded, nonMcPack))");
 const persistIndex = source.indexOf("persistGradedSubmission({", guardIndex);
 assert.ok(guardIndex >= 0 && persistIndex > guardIndex,
@@ -125,6 +135,9 @@ try {
     JSON.stringify({ per_question: [validRows[0], row("q1")] }),
     JSON.stringify({ per_question: [validRows[0], row("q3")] }),
     JSON.stringify({ per_question: [validRows[0], { ...row("q2"), points: "1" }] }),
+    JSON.stringify({ per_question: [validRows[0], { ...row("q2"), points: 99, max_points: 999, feedback: "Poäng: 999/999." }] }),
+    JSON.stringify({ per_question: [validRows[0], { ...row("q2"), points: -1 }] }),
+    JSON.stringify({ per_question: [validRows[0], { ...row("q2"), max_points: 3 }] }),
     "not json",
   ];
 
@@ -132,7 +145,7 @@ try {
     providerOutput = output;
     calls.length = 0;
     const response = await invoke(body);
-    assert.equal(response.status, 502);
+    assert.equal(response.status, 502, JSON.stringify(response.body));
     assert.equal(response.body.ok, false);
     assert.equal(response.body.error, "grading_response_invalid");
     assert.ok(calls.includes("https://api.openai.com/v1/responses"));

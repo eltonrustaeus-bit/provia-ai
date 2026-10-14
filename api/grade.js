@@ -52,13 +52,16 @@ function clampAwardedPoints(rawPoints, trustedMaxPoints) {
 function validateNonMcGradeOutput(graded, expectedItems) {
   if (!graded || typeof graded !== "object" || !Array.isArray(graded.per_question) ||
       graded.per_question.length !== expectedItems.length) return false;
-  const expected = new Set(expectedItems.map((item) => String(item.id)));
+  const expected = new Map(expectedItems.map((item) => [String(item.id), item]));
   const seen = new Set();
   for (const item of graded.per_question) {
     if (!item || typeof item.id !== "string" || !expected.has(item.id) || seen.has(item.id) ||
         !Number.isFinite(item.points) || !Number.isFinite(item.max_points) ||
         typeof item.feedback !== "string" || typeof item.model_answer !== "string" ||
         typeof item.concept_tag !== "string" || !Array.isArray(item.error_tags)) return false;
+    const trustedMax = Number(expected.get(item.id).max_points);
+    if (!Number.isFinite(trustedMax) || trustedMax < 0 || item.max_points !== trustedMax ||
+        item.points < 0 || item.points > trustedMax) return false;
     seen.add(item.id);
   }
   return seen.size === expected.size;
@@ -67,7 +70,7 @@ function validateNonMcGradeOutput(graded, expectedItems) {
 function normalizeChoice(ans) {
   const a = String(ans || "").trim().toUpperCase();
   if (!a) return "";
-  const m = a.match(/^([A-F])/);
+  const m = a.match(/^([A-F])[.)]?$/);
   return m ? m[1] : "";
 }
 
@@ -539,6 +542,7 @@ module.exports = async function handler(req, res) {
         const correctIndex = Number.isInteger(q.correct_index) ? q.correct_index : -999;
         const chosenLetter = normalizeChoice(userAns);
         const chosenIndex = letterToIndex(chosenLetter);
+        const invalidChoice = Boolean(userAns.trim()) && !chosenLetter;
 
         let pts = 0;
         let fb = "";
@@ -570,7 +574,7 @@ module.exports = async function handler(req, res) {
               : pts === maxP
                 ? "Correct."
                 : "Incorrect.";
-        } else if (correctIndex >= 0) {
+        } else if (correctIndex >= 0 && unanswered) {
           // Facit finns, eleven svarade inte. Den här grenen delade tidigare
           // text med fallet nedan, så en elev som hoppade över en flervalsfråga
           // fick beskedet att provets facit saknades — systemet skyllde sitt
@@ -580,6 +584,11 @@ module.exports = async function handler(req, res) {
             lang === "sv"
               ? "Obesvarad. Rätt svar var " + String.fromCharCode(65 + correctIndex) + "."
               : "Not answered. The correct answer was " + String.fromCharCode(65 + correctIndex) + ".";
+        } else if (correctIndex >= 0) {
+          pts = 0;
+          fb = lang === "sv"
+            ? "Ogiltigt svar. Välj ett av alternativen."
+            : "Invalid answer. Choose one of the listed options.";
         } else {
           pts = 0;
           fb =
@@ -604,7 +613,7 @@ module.exports = async function handler(req, res) {
           feedback: fb,
           model_answer: String(q.model_answer || q.rubric || ""),
           concept_tag: conceptTag,
-          error_tags: unanswered ? [] : pts === maxP ? [] : ["mc_wrong"],
+          error_tags: unanswered ? [] : invalidChoice ? ["mc_invalid_choice"] : pts === maxP ? [] : ["mc_wrong"],
           ...(unanswered ? { unanswered: true } : {}),
         });
       } else if (type === "graph") {
@@ -915,3 +924,4 @@ module.exports = async function handler(req, res) {
 
 module.exports.clampAwardedPoints = clampAwardedPoints;
 module.exports.validateNonMcGradeOutput = validateNonMcGradeOutput;
+module.exports.normalizeChoice = normalizeChoice;

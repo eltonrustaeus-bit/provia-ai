@@ -249,6 +249,23 @@ try {
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
     "a successfully generated exam commits its reserved quota");
 
+  gradingState = "active";
+  const malformedMc = await invoke(gradeExam, {
+    lang: "sv", course, pastedText, level: "C",
+    exam_manifest: generated.body.exam.exam_manifest,
+    questions: generated.body.exam.questions,
+    answers: [
+      { id: "q-1", answer: "B-not-an-answer" },
+      { id: "q-2", answer: "A" },
+      { id: "q-3", answer: "B" },
+    ],
+  });
+  assert.equal(malformedMc.status, 200, JSON.stringify(malformedMc.body));
+  assert.equal(malformedMc.body.result.per_question[0].points, 0,
+    "a valid correct-letter prefix inside arbitrary text cannot earn MC points");
+  assert.match(malformedMc.body.result.per_question[0].feedback, /Ogiltigt svar/);
+  assert.deepEqual(malformedMc.body.result.per_question[0].error_tags, ["mc_invalid_choice"]);
+
   for (const malformed of [
     { label: "duplicate", items: [questions[0], { ...questions[1], id: "q-1" }, questions[2]] },
     { label: "missing", items: [questions[0], { ...questions[1], id: "" }, questions[2]] },
@@ -316,6 +333,14 @@ try {
 
   const graphCourse = "Matematik 2b";
   const graphMaterial = "Den räta linjen ges av y = 2x + 1.";
+  const courseOnlyGraph = await invoke(generateExam, {
+    lang: "sv", level: "C", course: "Matematik 2b y = 2x + 1",
+    pastedText: "Vi arbetar med funktioner och grafer.", qType: "graph", numQuestions: 1,
+  });
+  assert.equal(courseOnlyGraph.status, 400,
+    "a graph equation in the editable course label is not treated as study-material evidence");
+  assert.equal(courseOnlyGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
+
   activeQuestions = [{
     id: "graph-1", type: "graph", points: 2,
     question: "Rita grafen till y = 2x + 1.", options: [], correct_index: -1,

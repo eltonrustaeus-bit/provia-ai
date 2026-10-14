@@ -1392,6 +1392,9 @@ function finalizeMsg(div, text) {
       var bubble = document.getElementById('perBubble');
       if (panel) panel.classList.toggle('per-open', _open);
       if (bubble) bubble.classList.toggle('per-open', _open);
+      if (document.body && document.body.classList.contains('xf-result')) {
+        document.body.classList.toggle('xf-result-per-open', _open);
+      }
       if (_open) {
         hideNudge();
         /* Update greeting if no real user messages yet */

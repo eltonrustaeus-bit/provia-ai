@@ -881,6 +881,15 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T11c texten beskriver öppning, inte kontrafaktisk provsalspoäng", /P\.E\.R öppnades på 1 fråga/.test(resultCopy || "") && !/provsalen|utan hjälp hade/i.test(resultCopy || ""), String(resultCopy));
   ok("T11d frågeraden säger P.E.R öppnades", /P\.E\.R öppnades/.test(questionLabel || ""), String(questionLabel));
   ok("T11e P.E.R-panelen stängs på resultatsidan", panelOpen === false);
+  ok("T11f flytknappen lämnar resultattexten fri", await page.locator("#perBubble").evaluate(node => getComputedStyle(node).display === "none"));
+  await page.locator(".xf-next-actions button").click();
+  await page.waitForFunction(() => document.querySelector("#perPanel")?.classList.contains("per-open"));
+  ok("T11g kontextuell rättningshjälp öppnar P.E.R och visar stängknappen",
+    await page.locator("#perBubble").evaluate(node => getComputedStyle(node).display !== "none"));
+  await page.locator("#perBubble").click();
+  ok("T11h P.E.R kan stängas utan att flytknappen täcker text igen",
+    await page.locator("#perPanel").evaluate(node => !node.classList.contains("per-open"))
+      && await page.locator("#perBubble").evaluate(node => getComputedStyle(node).display === "none"));
   await page.screenshot({ path: SHOT + "/t11-help-separated-result.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: SHOT + "/t11-help-separated-result-mobile.png" });
@@ -958,6 +967,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const { ctx, page } = await mk();
   await signIn(page, "quota-user");
   await toExam(page);
+  ok("provmeddelanden annonseras som status för skärmläsare",
+    await page.locator(".xf-nudge").getAttribute("role") === "status"
+      && await page.locator(".xf-nudge").getAttribute("aria-live") === "polite");
   const baseBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("exgen_flow_draft_quota-user")));
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
@@ -975,7 +987,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await page.click(".xf-mc-opt >> nth=1");
   await page.waitForTimeout(350);
   await page.fill(".xf-answer", "mitt svar ska överleva omladdning");
-  await page.waitForTimeout(1000);
+  await page.reload({ waitUntil: "domcontentloaded" });
   const stored = await page.evaluate(() => ({
     base: JSON.parse(localStorage.getItem("exgen_flow_draft_quota-user")),
     progress: JSON.parse(localStorage.getItem("exgen_flow_progress_quota-user") || "null")
@@ -992,7 +1004,6 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       && !("exam" in (stored.progress || {})) && !("material" in (stored.progress || {})),
     JSON.stringify(stored.progress));
 
-  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
   const resume = page.getByRole("button", { name: "Fortsätt provet du började" });
   ok("T13c återupptagning erbjuds efter kvotfel", await resume.count() === 1);

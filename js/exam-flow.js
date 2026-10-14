@@ -616,6 +616,8 @@
   }
 
   function screen(name) {
+    document.body.classList.toggle("xf-result", name === "result");
+    if (name !== "result") document.body.classList.remove("xf-result-per-open");
     STEPS.forEach(function (s) {
       var n = UI.screens[s];
       if (!n) return;
@@ -2528,6 +2530,7 @@
 
   function saveDraft() {
     clearTimeout(draftTimer);
+    draftTimer = null;
     if (!S.exam) return;
     var draft = {
       ts: Date.now(),
@@ -2567,6 +2570,18 @@
     clearTimeout(draftTimer);
     draftTimer = setTimeout(saveDraft, DRAFT_DEBOUNCE_MS);
   }
+
+  function flushDraftSoon() {
+    if (draftTimer === null) return;
+    clearTimeout(draftTimer);
+    draftTimer = null;
+    saveDraft();
+  }
+
+  window.addEventListener("pagehide", flushDraftSoon);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") flushDraftSoon();
+  });
 
   /* Progress is merged only into the exact signed exam snapshot it belongs to. */
   function readDraft() {
@@ -2710,6 +2725,9 @@
     UI.exam.appendChild(nav);
 
     UI.nudge = el("div", "xf-nudge");
+    UI.nudge.setAttribute("role", "status");
+    UI.nudge.setAttribute("aria-live", "polite");
+    UI.nudge.setAttribute("aria-atomic", "true");
     UI.nudgeText = el("span");
     var close = el("button", null, "✕");
     close.type = "button";
