@@ -1569,8 +1569,8 @@
     UI.exam.classList.add("on");
     document.body.classList.add("xf-in-exam");
     lockScroll(true);
-    renderQuestion(true);
     tick();
+    renderQuestion(true);
     watchKeyboard(true);
   }
 
@@ -1650,13 +1650,29 @@
     }
   }
 
+  function updateExamClockLabel() {
+    if (!UI.time) return;
+    var elapsed = UI.time.dataset.elapsed || "00:00";
+    UI.time.textContent = tx("Tid hittills: " + elapsed, "Elapsed: " + elapsed);
+    UI.time.setAttribute("aria-label", tx("Tid som gått: " + elapsed, "Elapsed time: " + elapsed));
+  }
+  window.addEventListener("exgen:languagechange", updateExamClockLabel);
+
   function tick() {
     if (UI.clock) clearInterval(UI.clock);
+    var publishedMinute = null;
     // Klockan räknar uppåt. En nedräkning skapar panik utan att lära någon
     // någonting — men eleven ska ändå se att tiden går.
     function paint() {
       var s = Math.floor((Date.now() - S.startedAt) / 1000);
-      UI.time.textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+      UI.time.dataset.elapsed = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+      updateExamClockLabel();
+      var minute = Math.floor(s / 60);
+      if (publishedMinute === null) publishedMinute = minute;
+      else if (minute !== publishedMinute) {
+        publishedMinute = minute;
+        publish();
+      }
     }
     // Rita direkt, inte först vid nästa tick. Vid återupptagning står klockan
     // annars kvar på 00:00 i upp till en sekund och hoppar sedan till rätt tid,
@@ -1713,7 +1729,7 @@
       state: {
         answered: answered,
         remaining: qs.length - answered,
-        elapsed: (UI.time && UI.time.textContent) || "",
+        elapsed: (UI.time && UI.time.dataset.elapsed) || "",
         submissionId: (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
         /* Visningsfas för P.E.R. Servern litar inte på den som rättningsbevis. */
         phase: "exam"
@@ -2717,6 +2733,10 @@
     UI.count = el("span", null, "Fråga 1");
     UI.dots = el("div", "xf-exam-dots");
     UI.time = el("span", "xf-exam-time", "00:00");
+    UI.time.dataset.elapsed = "00:00";
+    UI.time.setAttribute("role", "timer");
+    UI.time.setAttribute("aria-live", "off");
+    updateExamClockLabel();
     UI.exit = el("button", "xf-exam-exit", "×");
     UI.exit.type = "button";
     UI.exit.title = "Avbryt prov";

@@ -188,6 +188,8 @@ body.xf-grading .xf-progress { display: none; }
   .xf-exam-dots { grid-area: dots; flex: none; }
 }
 
+.xf-exam-time { white-space: nowrap; }
+
 .xf-dot {
   position: relative;
   flex: none;

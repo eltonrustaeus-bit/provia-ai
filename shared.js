@@ -1613,6 +1613,29 @@ function finalizeMsg(div, text) {
           '<div id="perSees" aria-hidden="true">ser: den här sidan</div>';
       document.body.appendChild(widget);
 
+      function updatePerInputLanguage() {
+        var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+        if (!language) {
+          try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+        }
+        var english = language === 'en';
+        var input = document.getElementById('perInput');
+        var mic = document.getElementById('perMicBtn');
+        var send = document.getElementById('perSendBtn');
+        var bubble = document.getElementById('perBubble');
+        input.placeholder = english ? 'Ask P.E.R…' : 'Fråga P.E.R…';
+        input.setAttribute('aria-label', english ? 'Ask P.E.R a question' : 'Ställ en fråga till P.E.R');
+        mic.title = english ? 'Speak to P.E.R' : 'Tala med P.E.R';
+        mic.setAttribute('aria-label', mic.title);
+        send.textContent = english ? 'Send' : 'Skicka';
+        send.setAttribute('aria-label', english ? 'Send message to P.E.R' : 'Skicka meddelande till P.E.R');
+        bubble.title = english ? 'Ask P.E.R' : 'Fråga P.E.R';
+        bubble.setAttribute('aria-label', bubble.title);
+      }
+
+      updatePerInputLanguage();
+      window.addEventListener('exgen:languagechange', updatePerInputLanguage);
+
       document.getElementById('perBubble').onclick = toggle;
 
       // Never let the widget sit over a focused answer field on mobile — shrink

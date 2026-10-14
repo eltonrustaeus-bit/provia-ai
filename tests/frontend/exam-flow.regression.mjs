@@ -89,11 +89,28 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null) {
 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
-const signIn = async (page, uid) => {
+const signIn = async (page, uid, lang = "sv") => {
   await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
   await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role: "premium" }] }));
-  await seed(page, { user: { id: uid, email: uid + "@t.se" } });
+  await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang });
 };
+
+// A persisted English preference must be applied before the first language-change event.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "english-first-load", "en");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    ok("P.E.R-kontrollerna är engelska redan vid första sidladdningen",
+      await page.locator("#perInput").getAttribute("aria-label") === "Ask P.E.R a question"
+      && await page.locator("#perSendBtn").textContent() === "Send"
+      && await page.locator("#perMicBtn").getAttribute("aria-label") === "Speak to P.E.R");
+    ok("P.E.R:s startspråkstest saknar sidfel", errs.length === 0, errs.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+}
 
 async function toExam(page) {
   await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
@@ -172,6 +189,12 @@ async function toMaterial(page) {
       && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), englishMaterial || "");
     await page.locator("#perBubble").click();
     await page.waitForFunction(() => document.querySelector("#perPanel")?.classList.contains("per-open"));
+    ok("P.E.R-frågefältet har ett engelskt tillgängligt namn",
+      await page.locator("#perInput").getAttribute("aria-label") === "Ask P.E.R a question"
+      && await page.locator("#perInput").getAttribute("placeholder") === "Ask P.E.R…");
+    ok("P.E.R:s meddelandeknappar är namngivna på engelska",
+      await page.locator("#perMicBtn").getAttribute("aria-label") === "Speak to P.E.R"
+      && await page.locator("#perSendBtn").getAttribute("aria-label") === "Send message to P.E.R");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     const perClosedForReview = await page.evaluate(() => ({
       panelOpen: document.querySelector("#perPanel")?.classList.contains("per-open"),
@@ -191,6 +214,9 @@ async function toMaterial(page) {
         && !/based only on concepts/i.test(englishGroundingNote || ""), englishGroundingNote || "");
     await desktopLanguage.click();
     const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    ok("P.E.R-kontrollerna följer språkbytet tillbaka till svenska",
+      await page.locator("#perInput").getAttribute("aria-label") === "Ställ en fråga till P.E.R"
+      && await page.locator("#perSendBtn").textContent() === "Skicka");
     ok("svensk provöversikt beskriver AI-underlaget utan garanti",
       /med ditt material som underlag/i.test(swedishGroundingNote || "")
         && /kan missa detaljer/i.test(swedishGroundingNote || "")
@@ -837,11 +863,62 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const hasResume = await page.evaluate(() => !!Array.from(document.querySelectorAll(".xf-btn")).find(b => /Fortsätt provet/.test(b.textContent)));
   ok("T7a återupptagning erbjuds efter omladdning", hasResume);
   if (hasResume) {
+    await page.evaluate(() => {
+      window.__testOriginalPerDescribe = window.PER.describe;
+      window.__testPerElapsed = [];
+      window.PER.describe = function (manifest) {
+        if (manifest && manifest.page === "prov") {
+          window.__testPerElapsed.push({
+            elapsed: manifest.state && manifest.state.elapsed,
+            clock: document.querySelector(".xf-exam-time")?.dataset.elapsed
+          });
+        }
+        return window.__testOriginalPerDescribe.apply(this, arguments);
+      };
+    });
     await page.evaluate(() => Array.from(document.querySelectorAll(".xf-btn")).find(b => /Fortsätt provet/.test(b.textContent)).click());
     await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
     await page.waitForTimeout(300);
-    const clock = await page.textContent(".xf-exam-time");
-    ok("T7b klockan fortsätter, nollställs inte", clock !== "00:00", "klocka: " + clock);
+    const clock = await page.locator(".xf-exam-time").evaluate(node => ({
+      visible: node.textContent,
+      elapsed: node.dataset.elapsed,
+      role: node.getAttribute("role"),
+      ariaLabel: node.getAttribute("aria-label"),
+      live: node.getAttribute("aria-live")
+    }));
+    ok("T7b klockan fortsätter, nollställs inte", clock.elapsed !== "00:00", JSON.stringify(clock));
+    ok("T7c klockan förklarar att tiden räknar uppåt", clock.visible.startsWith("Tid hittills: ")
+      && clock.role === "timer" && clock.ariaLabel.startsWith("Tid som gått: ") && clock.live === "off", JSON.stringify(clock));
+    const firstPerElapsed = await page.evaluate(() => {
+      const value = window.__testPerElapsed && window.__testPerElapsed[0];
+      return value;
+    });
+    ok("T7 återupptagen tid publiceras korrekt till P.E.R", firstPerElapsed?.elapsed === firstPerElapsed?.clock,
+      JSON.stringify(firstPerElapsed));
+    const refreshedPerElapsed = await (async () => {
+      await page.evaluate(() => {
+        window.__testOriginalDateNow = Date.now;
+        window.__testFixedDateNow = Date.now() + 65000;
+        Date.now = () => window.__testFixedDateNow;
+      });
+      try {
+        const published = await page.waitForFunction(() => window.__testPerElapsed?.length >= 2, null, { timeout: 4000 })
+          .then(() => true).catch(() => false);
+        return published ? await page.evaluate(() => window.__testPerElapsed[window.__testPerElapsed.length - 1]) : null;
+      } finally {
+        await page.evaluate(() => { Date.now = window.__testOriginalDateNow; });
+      }
+    })();
+    ok("P.E.R:s provtid hålls aktuell när provet fortsätter", !!refreshedPerElapsed
+      && refreshedPerElapsed.elapsed === refreshedPerElapsed.clock, JSON.stringify(refreshedPerElapsed));
+    await page.evaluate(() => { window.PER.describe = window.__testOriginalPerDescribe; });
+    await page.setViewportSize({ width: 320, height: 720 });
+    const clockBounds = await page.locator(".xf-exam-time").boundingBox();
+    const exitBounds = await page.locator(".xf-exam-exit").boundingBox();
+    ok("T7d timer och avbrytknapp ryms utan överlapp på 320px",
+      !!clockBounds && !!exitBounds && clockBounds.x + clockBounds.width <= exitBounds.x
+        && exitBounds.x + exitBounds.width <= 320, JSON.stringify({ clockBounds, exitBounds }));
+    await page.setViewportSize({ width: 1280, height: 800 });
     page.on("dialog", d => d.accept().catch(() => {}));
     await page.evaluate(() => {
       for (let i = 0; i < 10; i++) {
@@ -852,7 +929,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       }
     });
     const gotResult = await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 }).then(() => true).catch(() => false);
-    ok("T7c återupptaget prov går att rätta", gotResult);
+    ok("T7e återupptaget prov går att rätta", gotResult);
     await page.screenshot({ path: SHOT + "/t7-resume.png" });
   }
   await ctx.close();
