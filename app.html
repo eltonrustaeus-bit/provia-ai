@@ -54,7 +54,7 @@
 @media(min-width:861px){.xg-language-desktop{display:inline-flex}}
 /* Override has-gnav padding during exam steps */
 body.exam-mode{padding-bottom:0!important}
-body.app-locked #xf,body.app-locked #main-content,body.app-locked #perWidget{display:none!important}
+body.app-locked #xf,body.app-locked #main-content,body.app-locked #perWidget,body.app-locked #gradingOverlay{display:none!important}
 #authGate[hidden]{display:none}
 .app-locked #authGate{display:flex}
 #authGate{min-height:calc(100vh - 220px);max-width:680px;margin:0 auto;padding:64px 24px;flex-direction:column;align-items:flex-start;justify-content:center}
@@ -819,6 +819,9 @@ sv:{
   authGateEyebrow:"Mockprov",authGateTitle:"Ditt studiematerial börjar här.",
   authGateText:"Logga in för att skapa ett prov av ditt material och fortsätta där du slutade.",
   authGateAction:"Logga in eller skapa konto",
+  authPendingEyebrow:"Kontot väntar",authPendingTitle:"Ditt konto väntar på godkännande.",
+  authPendingText:"Du kan inte skapa prov ännu. Kontakta den som bjöd in dig om du behöver hjälp.",
+  authPendingAction:"Kontrollera igen",
   m1:"01 — Material",m2:"02 — Inställningar",m3:"03 — Mockprov",m4:"04 — Rättning",
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
@@ -861,6 +864,9 @@ en:{
   authGateEyebrow:"Practice exam",authGateTitle:"Start with your study material.",
   authGateText:"Sign in to create an exam from your material and pick up where you left off.",
   authGateAction:"Sign in or create an account",
+  authPendingEyebrow:"Account pending",authPendingTitle:"Your account is awaiting approval.",
+  authPendingText:"You cannot create exams yet. Contact the person who invited you if you need help.",
+  authPendingAction:"Check again",
   m1:"01 — Material",m2:"02 — Settings",m3:"03 — Mock exam",m4:"04 — Grading",
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
@@ -1351,8 +1357,7 @@ function applyLang(){
   set("wBack1",t.wBack);set("wBack2",t.wBack);set("wBack3",t.wBack);
   set("wNext2",t.wNext2);set("wRestart",t.wRestart);
   set("heroSubText",t.heroSub);set("howtoTitle",t.howtoTitle);set("howtoText",t.howtoText);
-  set("authGateEyebrow",t.authGateEyebrow);set("authGateTitle",t.authGateTitle);
-  set("authGateText",t.authGateText);set("authGateAction",t.authGateAction);
+  renderAuthGate();
   const appSkipLink=$("appSkipLink");if(appSkipLink)appSkipLink.textContent=english?"Skip to content":"Hoppa till innehåll";
   const brandTag=document.querySelector(".xg-brand-tag");
   if(brandTag)brandTag.textContent=english?"School study platform":"Studieplattform för skolan";
@@ -1429,10 +1434,22 @@ function hideGradingOverlay(){
 function setStatus(txt,kind){ const s=statusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function setOcrStatus(txt,kind){ const s=ocrStatusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function isUnlocked(){ return localStorage.getItem(ACCESS_FLAG_KEY)==="true"; }
+let verifiedUserId=null;
+let accountPendingApproval=false;
+let relockingForAuthChange=false;
+function renderAuthGate(){
+  const t=T[LANG],prefix=accountPendingApproval?"authPending":"authGate";
+  $("authGateEyebrow").textContent=t[prefix+"Eyebrow"];
+  $("authGateTitle").textContent=t[prefix+"Title"];
+  $("authGateText").textContent=t[prefix+"Text"];
+  $("authGateAction").textContent=t[prefix+"Action"];
+}
 function showLock(){
   document.body.classList.add("app-locked");
   const gate=$("authGate");if(gate)gate.hidden=false;
   const skip=$("appSkipLink");if(skip)skip.href="#authGate";
+  renderAuthGate();
+  if(accountPendingApproval)return;
   // shared.js is deferred, so it may not have defined the opener yet. If it
   // never does, the whole shared layer (nav, cookie banner, P.E.R) is missing
   // too, so send the visitor to the landing page rather than leaving them on
@@ -1450,10 +1467,33 @@ function hideLock(){
   document.documentElement.style.overflow="";document.body.style.overflow="";
   if(window.closeProviaLogin)window.closeProviaLogin();
 }
-// Gate errors ("account pending approval", SDK failures) used to render inside
-// the removed overlay; they surface as a toast now so they are still seen.
+function authUserId(value){
+  try{return JSON.parse(value)?.user?.id||null;}catch{return null;}
+}
+function relockForAuthChange(){
+  if(!verifiedUserId||relockingForAuthChange)return;
+  relockingForAuthChange=true;
+  verifiedUserId=null;
+  document.body.classList.add("app-locked");
+  location.reload();
+}
+window.addEventListener("storage",event=>{
+  const key=window.ExGenRuntime?.authStorageKey;
+  if(!key||!verifiedUserId||(event.key!==key&&event.key!==null))return;
+  const value=event.key===null?localStorage.getItem(key):event.newValue;
+  if(authUserId(value)!==verifiedUserId)relockForAuthChange();
+});
+if(db)db.auth.onAuthStateChange((event,session)=>{
+  if(!verifiedUserId)return;
+  if(event==="SIGNED_OUT"||(event==="SIGNED_IN"&&session?.user?.id!==verifiedUserId))relockForAuthChange();
+});
+// Transient verification errors are surfaced as a toast; pending approval has
+// a persistent message in the gate instead.
 function setLockError(msg){ if(msg&&window.showToast)window.showToast(msg,"bad",5000); }
 async function logout(){
+  verifiedUserId=null;
+  accountPendingApproval=false;
+  document.body.classList.add("app-locked");
   localStorage.removeItem(ACCESS_FLAG_KEY);
   localStorage.removeItem(LS_ROLE);
   currentRole = "gratis";
@@ -1475,12 +1515,14 @@ async function checkApprovalAndUnlock(session){
     setLockError(LANG==="sv"?"Kontot kunde inte verifieras. Kontakta den som bjöd in dig.":"Your account could not be verified. Contact the person who invited you.");
     return false;
   } else {
-    if(!prof.approved){setLockError(LANG==="sv"?"Kontot väntar på godkännande.":"Account pending approval.");showLock();return false;}
+    if(!prof.approved){verifiedUserId=null;accountPendingApproval=true;showLock();return false;}
     currentRole = prof.role || "gratis";
   }
+  accountPendingApproval=false;
   localStorage.setItem(LS_ROLE, currentRole);
   await refreshServerEntitlements();
   setLockError("");
+  verifiedUserId=user.id;
   hideLock();
   if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
   /* Show welcome animation */
@@ -1488,6 +1530,19 @@ async function checkApprovalAndUnlock(session){
   const _hasPendingSave = readPendingExams(user.id).some(row => row && row.user_id === user.id);
   if (window.showWelcome && !_hasPendingSave) setTimeout(() => window.showWelcome(_wEmail), 60);
   return true;
+}
+
+async function handleAuthGateAction(){
+  if(!accountPendingApproval){window.openProviaLogin?.("register",true);return;}
+  const button=$("authGateAction");button.disabled=true;
+  try{
+    const {data,error}=await db.auth.getSession();
+    if(error)throw error;
+    if(!data?.session){accountPendingApproval=false;showLock();return;}
+    const ok=await checkApprovalAndUnlock(data.session);
+    if(ok){await loadExamsFromAccountToLocal();await refreshQuotaUi();runTrainModeIfRequested();}
+  }catch(error){setLockError(String(error?.message||error));}
+  finally{button.disabled=false;}
 }
 
 // signInEmail()/signUpEmail() lived here and drove the removed inline
@@ -1811,7 +1866,7 @@ try{
   initWizard();
   initCourseLibrary();
   applyLang();
-  $("authGateAction")?.addEventListener("click",()=>window.openProviaLogin?.("register",true));
+  $("authGateAction")?.addEventListener("click",handleAuthGateAction);
   const headerActions=document.querySelector(".xg-header-right");
   let desktopLangBtn=null;
   if(headerActions){
