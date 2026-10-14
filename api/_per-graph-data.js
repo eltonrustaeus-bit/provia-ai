@@ -477,6 +477,10 @@ export const PER_GRAPH = {
     },
     {
       "från": "teacher-report",
+      "till": "provia-rules"
+    },
+    {
+      "från": "teacher-report",
       "till": "per-name"
     },
     {
@@ -594,6 +598,10 @@ export const PER_GRAPH = {
     {
       "från": "grade",
       "till": "tabell:mock_results"
+    },
+    {
+      "från": "teacher-report",
+      "till": "tabell:profiles"
     },
     {
       "från": "teacher-report",
