@@ -1976,6 +1976,7 @@ function finalizeMsg(div, text) {
       '@keyframes cookieSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}' +
       '#proviaCookieBanner.dismiss{animation:cookieSlideDown .25s ease forwards}' +
       '@keyframes cookieSlideDown{to{opacity:0;transform:translateY(12px)}}' +
+      '#pvCard .ckInAuth{width:auto;max-width:none;margin:12px 8px 0;border-radius:10px;padding:12px 14px;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}' +
       '.ckRow{display:flex;align-items:flex-start;gap:14px}' +
       '.ckIcon{font-size:22px;flex-shrink:0;line-height:1;padding-top:2px}' +
       '.ckBody{flex:1;min-width:0}' +
@@ -1987,22 +1988,22 @@ function finalizeMsg(div, text) {
       '.ckAccept:hover{background:#00647A;transform:translateY(-1px)}' +
       '.ckDecline{padding:8px 16px;background:none;color:#667085;border:1px solid rgba(0,183,217,.3);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s}' +
       '.ckDecline:hover{color:#1B2430;border-color:rgba(0,183,217,.5)}' +
-      '@media(max-width:480px){#proviaCookieBanner{padding:12px 14px}.ckRow{gap:8px}.ckIcon{font-size:18px}.ckTitle{font-size:13px;margin-bottom:3px}.ckText{font-size:11px;line-height:1.4;margin-bottom:8px}.ckBtns{flex-direction:row;gap:6px}.ckAccept,.ckDecline{width:auto;flex:1 1 0;text-align:center;padding:8px 6px;font-size:11px;white-space:nowrap}}' +
-      '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}}';
+      '@media(max-width:480px){#proviaCookieBanner{padding:12px 14px}.ckRow{gap:8px}.ckIcon{font-size:18px}.ckTitle{font-size:13px;margin-bottom:3px}.ckText{font-size:11px;line-height:1.4;margin-bottom:8px}.ckBtns{flex-direction:row;gap:6px}.ckAccept,.ckDecline{width:auto;min-height:40px;flex:1 1 0;text-align:center;padding:8px 6px;font-size:11px;white-space:normal}}' +
+      '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}#pvCard .ckInAuth{margin:12px 0 0;padding:10px 0 12px;border-width:1px 0 0;border-radius:0;background:transparent;box-shadow:none}}';
     document.head.appendChild(s);
 
     var banner = document.createElement('div');
     banner.id = 'proviaCookieBanner';
-    banner.setAttribute('role', 'dialog');
+    banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', 'Cookie-inställningar');
     banner.innerHTML =
       '<div class="ckRow">' +
       '<span class="ckIcon" aria-hidden="true">🍪</span>' +
       '<div class="ckBody">' +
       '<div class="ckTitle">Vi använder cookies</div>' +
-      '<p class="ckText">Vi använder webbläsarlagring för inloggning, inställningar och viss provdata. ' +
-      'Provresultat och studieprogress kan också sparas på ditt konto när du är inloggad. ' +
-      'Vi använder inga spårningscookies eller annonsverktyg. ' +
+      '<p class="ckText">Webbläsarlagring används för inloggning, inställningar och viss provdata. ' +
+      'Provresultat och studieprogress kan sparas på ditt konto när du är inloggad. ' +
+      'Inga spårningscookies eller annonser används. ' +
       '<a href="/integritetspolicy.html">Läs mer</a></p>' +
       '<div class="ckBtns">' +
       '<button class="ckAccept" id="ckAcceptBtn" type="button">Acceptera alla</button>' +
@@ -2020,6 +2021,11 @@ function finalizeMsg(div, text) {
     var main = document.querySelector('main');
     if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
     else document.body.insertBefore(banner, document.body.firstElementChild);
+    var openModalBody = document.querySelector('#pvModal.pv-on .pv-bd');
+    if (openModalBody) {
+      banner.classList.add('ckInAuth');
+      openModalBody.insertBefore(banner, openModalBody.firstElementChild);
+    }
     document.getElementById('ckAcceptBtn').addEventListener('click', function () { dismiss('accepted'); });
     document.getElementById('ckDeclineBtn').addEventListener('click', function () { dismiss('necessary'); });
   }
@@ -2378,6 +2384,23 @@ function finalizeMsg(div, text) {
       });
     }
 
+    function placeCookieSettingsInModal(modal) {
+      var banner = document.getElementById('proviaCookieBanner');
+      var body = modal && modal.querySelector('.pv-bd');
+      if (!banner || !body || modal.contains(banner)) return;
+      banner.classList.add('ckInAuth');
+      body.insertBefore(banner, body.firstElementChild);
+    }
+
+    function restoreCookieSettings() {
+      var banner = document.getElementById('proviaCookieBanner');
+      if (!banner || !banner.closest('#pvModal')) return;
+      banner.classList.remove('ckInAuth');
+      var main = document.querySelector('main');
+      if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
+      else document.body.insertBefore(banner, document.body.firstElementChild);
+    }
+
     function openModal(view, force) {
       if (isLoggedIn() && !force) return;
       if (_closeTimer) { clearTimeout(_closeTimer); _closeTimer = null; }
@@ -2404,8 +2427,9 @@ function finalizeMsg(div, text) {
       var ldr = document.getElementById('pageLoader') || document.querySelector('.loader');
       if (ldr) { ldr.classList.add('done'); ldr.classList.add('out'); }
       buildModal();
-      _open = true;
       var el = document.getElementById('pvModal');
+      placeCookieSettingsInModal(el);
+      _open = true;
       if (!_backgroundInert.length) {
         _backgroundInert = Array.from(document.body.children).filter(function(node) { return node !== el; }).map(function(node) {
           var previous = node.inert;
@@ -2433,6 +2457,7 @@ function finalizeMsg(div, text) {
         if (_open) return;
         if (el) el.style.display = 'none';
         document.body.style.overflow = '';
+        restoreCookieSettings();
         _backgroundInert.forEach(function(entry) { if (entry.node.isConnected) entry.node.inert = entry.previous; });
         _backgroundInert = [];
         if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {

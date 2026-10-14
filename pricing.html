@@ -462,7 +462,7 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 (function(){
   const runtime = window.ExGenRuntime || {};
   const sb = runtime.supabaseUrl && runtime.publishableKey && window.supabase && window.supabase.createClient
-    ? window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey)
+    ? window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey, { auth: { storageKey: runtime.authStorageKey } })
     : null;
 
   window.startCheckout = async function(plan) {
@@ -514,7 +514,7 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 (async function() {
   const runtime = window.ExGenRuntime || {};
   if (!window.supabase || !runtime.supabaseUrl || !runtime.publishableKey) return;
-  const sb = window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey);
+  const sb = window.supabase.createClient(runtime.supabaseUrl, runtime.publishableKey, { auth: { storageKey: runtime.authStorageKey } });
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
   const { data: prof } = await sb.from("profiles").select("role, stripe_customer_id").eq("id", session.user.id).maybeSingle();

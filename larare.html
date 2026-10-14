@@ -298,7 +298,7 @@
 <script>
 const SB_URL = window.ExGenRuntime.supabaseUrl;
 const SB_KEY = window.ExGenRuntime.publishableKey;
-const db = window.supabase.createClient(SB_URL, SB_KEY);
+const db = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.ExGenRuntime.authStorageKey } });
 
 // Ingen hårdkodad ägar-ID längre. Den här kontrollen är bara till för att visa rätt
 // meddelande — den riktiga spärren sitter serversidan i api/check-role.js, som kräver

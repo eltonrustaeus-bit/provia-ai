@@ -96,7 +96,7 @@
 <script>
 const SB_URL = window.ExGenRuntime.supabaseUrl;
 const SB_KEY = window.ExGenRuntime.publishableKey;
-const db = window.supabase.createClient(SB_URL, SB_KEY);
+const db = window.supabase.createClient(SB_URL, SB_KEY, { auth: { storageKey: window.ExGenRuntime.authStorageKey } });
 
 window.addEventListener('load', () => setTimeout(() => document.getElementById('ldr').classList.add('out'), 160));
 

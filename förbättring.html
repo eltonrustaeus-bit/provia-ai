@@ -420,7 +420,7 @@
     const SB_URL=window.ExGenRuntime.supabaseUrl.trim();
     const SB_KEY=window.ExGenRuntime.publishableKey.trim();
     const SBG=typeof window!=='undefined'?window.supabase:null;
-    const db=(SB_URL.startsWith('http')&&SB_KEY.length>40&&SBG?.createClient)?SBG.createClient(SB_URL,SB_KEY):null;
+    const db=(SB_URL.startsWith('http')&&SB_KEY.length>40&&SBG?.createClient)?SBG.createClient(SB_URL,SB_KEY,{auth:{storageKey:window.ExGenRuntime.authStorageKey}}):null;
 
     async function getUserId(){if(!db)return null;const{data,error}=await db.auth.getUser();if(error)return null;return data?.user?.id||null;}
     async function fetchUserExams(){

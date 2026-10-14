@@ -30,6 +30,14 @@ test("student pilot account UI hides held-out actions and states deletion limita
   assert.match(account, /if\(!pilotMode\)loadMyClasses\(\)/);
 });
 
+test("P.E.R memory clearing discloses that profile facts are a separate store", async () => {
+  const account = await readFile(`${ROOT}/konto.html`, "utf8");
+  assert.match(account, /Rensar P\.E\.R:s sparade chatthistorik och långtidsminne/);
+  assert.match(account, /Sparade profiluppgifter kan finnas kvar och fortsätta anpassa svaren/);
+  assert.match(account, /granska eller ta bort dem separat under Vad P\.E\.R\. vet om mig/);
+  assert.match(account, /Profiluppgifter rensas separat under Vad P\.E\.R\. vet om mig/);
+});
+
 test("student pilot authentication is login-only for pre-provisioned test accounts", async () => {
   const shared = await readFile(`${ROOT}/shared.js`, "utf8");
   assert.match(shared, /#pvToReg,#pvVR,#pvVW \.pv-dv,#pvVL \.pv-tg:not\(\[style\]\)/);
@@ -54,7 +62,8 @@ test("pilot P.E.R requires an invited login and suppresses unvalidated readiness
 
 test("student pilot bypasses the public maintenance gate without changing Production", async () => {
   const gate = await readFile(`${ROOT}/js/site-gate.js`, "utf8");
-  assert.match(gate, /window\.ExGenRuntime && window\.ExGenRuntime\.environment === "pilot"\) return/);
+  assert.match(gate, /runtime\.environment === "pilot" \|\|[\s\S]*?runtime\.environment === "unconfigured" && localPreviewHost/);
+  assert.match(gate, /\["localhost", "127\.0\.0\.1", "::1", "\[::1\]"\]/);
   assert.match(gate, /maintenance_gate/);
   assert.match(gate, /if \(!res\.ok\) \{ settle\(deny\)/);
 });

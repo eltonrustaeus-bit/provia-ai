@@ -58,6 +58,14 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 /* Projektets Supabase-nyckel i localStorage. Står här en gång i stället för
    som en literal i åtta filer. */
 export const AUTH_KEY = "sb-mnmotdluigzeehdjbhbu-auth-token";
+const TEST_RUNTIME = `window.ExGenRuntime = Object.freeze({
+  environment: "production",
+  projectRef: "exgen-test-project",
+  supabaseUrl: "https://exgen-test-project.invalid",
+  publishableKey: "sb_publishable_synthetic_frontend_test_key_only_000000",
+  appOrigin: "http://localhost",
+  authStorageKey: "${AUTH_KEY}"
+});`;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -201,19 +209,31 @@ export async function seed(page, {
  * över allt ovanför — det är där ett test lägger sina egna svar. */
 export async function mockApis(page, {
   role = "premium", approved = true, allow = true,
-  restRows = [], profiles = undefined, extra = [],
+  restRows = [], profiles = undefined, extra = [], runtime = TEST_RUNTIME,
 } = {}) {
   await page.route("**/api/**", r => r.fulfill({ json: { ok: true } }));
   // EFTER den generella. Fälla 1.
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow, ok: true, role, approved } }));
   await page.route("**/auth/v1/**", r => r.fulfill({ json: { id: "u1", email: "t@t.se" } }));
   await page.route("**/rest/v1/**", r => r.fulfill({ json: restRows }));
+  await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2**", r => r.fulfill({
+    status: 200,
+    contentType: "application/javascript; charset=utf-8",
+    body: fs.readFileSync(join(ROOT, "node_modules/@supabase/supabase-js/dist/umd/supabase.js")),
+  }));
   const profileRows = profiles === undefined
     ? [{ id: "u1", approved, role }]
     : profiles;
   if (profileRows) {
     // EFTER den generella rest-rutten, annars äter den upp den här.
     await page.route("**/rest/v1/profiles**", r => r.fulfill({ json: profileRows }));
+  }
+  if (runtime) {
+    await page.route("**/js/exgen-runtime.js", r => r.fulfill({
+      status: 200,
+      contentType: "application/javascript; charset=utf-8",
+      body: runtime,
+    }));
   }
   for (const [glob, handler] of extra) await page.route(glob, handler);
 }

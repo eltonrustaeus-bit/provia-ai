@@ -108,6 +108,11 @@ test("browser files use the runtime config and load it before dependent scripts"
     }
   }
 
-  assert.match(combined, /environment === "production"/);
+  assert.match(runtime, /PRODUCTION_HOSTS = new Set\(\["exgen\.se"\]\)/);
+  assert.match(runtime, /location\.protocol === "https:"/);
+  assert.match(runtime, /productionOrigin \? productionConfig : unconfiguredConfig/);
+  const clientCalls = combined.match(/createClient\([\s\S]*?\)/g) || [];
+  assert.equal(clientCalls.length, 8, "all browser Supabase clients are inventoried");
+  for (const call of clientCalls) assert.match(call, /storageKey/, call);
   assert.doesNotMatch(combined, /location\.hostname\.includes\("vercel\.app"\)\)\{location\.replace\("https:\/\/exgen\.se"/);
 });

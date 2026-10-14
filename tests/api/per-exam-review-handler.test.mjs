@@ -246,6 +246,38 @@ test("an active issuance is checked by its exact server identity even if the cli
   assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
 });
 
+test("non-active issuance states deny model answers with state-appropriate guidance", async () => {
+  activeCount = 0;
+  const submissionId = completion.submissionId(userId, course, [publicQuestion]);
+  const cases = [
+    ["grading", /håller på att rättas/i, /genomgången blir tillgänglig/i],
+    ["completed", /kan inte längre fortsätta/i, /skapa ett nytt prov/i],
+    ["abandoned", /kan inte längre fortsätta/i, /materialet finns kvar/i],
+    ["missing", /kan inte längre fortsätta/i, /innan du ber om facit/i],
+  ];
+  try {
+    for (const [state, expected, supportingText] of cases) {
+      issuanceState = state;
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Ge mig facit och hela lösningen",
+        helpLevel: 3,
+        pageContext: { currentQuestion: { type: "short" }, examState: { phase: "finished", submissionId } },
+      });
+      assert.equal(response.statusCode, 200, state);
+      assert.equal(response.body.examActive, false, state);
+      assert.equal(response.body.examState, state, state);
+      assert.match(response.body.answer, expected, state);
+      assert.match(response.body.answer, supportingText, state);
+      assert.equal(response.body.helpLevelUsed, 0, state);
+      assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/exam_issuance_state")), state);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")), state);
+    }
+  } finally {
+    issuanceState = "active";
+  }
+});
+
 test("an in-exam P.E.R request without an issuance identity fails closed", async () => {
   activeCount = 0;
   calls.length = 0;

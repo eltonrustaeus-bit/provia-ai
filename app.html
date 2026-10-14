@@ -978,7 +978,7 @@ window.addEventListener("unhandledrejection",(e)=>reportErr(e.reason));
 
 const USE_SUPABASE=typeof SUPABASE_URL==="string"&&SUPABASE_URL.startsWith("http")&&typeof SUPABASE_ANON_KEY==="string"&&SUPABASE_ANON_KEY.length>40;
 const SupabaseGlobal=(typeof window!=="undefined")?window.supabase:null;
-const db=(USE_SUPABASE&&SupabaseGlobal&&typeof SupabaseGlobal.createClient==="function")?SupabaseGlobal.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+const db=(USE_SUPABASE&&SupabaseGlobal&&typeof SupabaseGlobal.createClient==="function")?SupabaseGlobal.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{storageKey:window.ExGenRuntime.authStorageKey}}):null;
 
 async function getAccessToken(){ if(!db) return ""; try{ const {data,error}=await db.auth.getSession(); if(error)return""; return data?.session?.access_token||""; }catch{return "";} }
 async function postJson(path,payload,opts){

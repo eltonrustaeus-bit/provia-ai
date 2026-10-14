@@ -388,7 +388,7 @@
         <div class="kBtnRow">
           <button class="kBtn kBtnDanger" id="clearPerMemoryBtn">Rensa P.E.R-minne</button>
         </div>
-        <div class="kPrivacyNote">Rensar P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Dina prov, resultat och felbank påverkas inte.</div>
+        <div class="kPrivacyNote">Rensar P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Sparade profiluppgifter kan finnas kvar och fortsätta anpassa svaren; granska eller ta bort dem separat under Vad P.E.R. vet om mig. Dina prov, resultat och felbank påverkas inte.</div>
       </div>
     </div>
 
@@ -453,7 +453,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     return;
   }
   let sb;
-  try{sb=window.supabase.createClient(SUPA_URL,SUPA_KEY)}catch{
+  try{sb=window.supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{storageKey:runtime.authStorageKey}})}catch{
     showAccountLoadError();
     return;
   }
@@ -745,7 +745,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   /* P.E.R MEMORY */
   document.getElementById("clearPerMemoryBtn")?.addEventListener("click",async()=>{
-    const ok=confirm("Rensa P.E.R-minnet?\n\nDetta tar bort P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Dina provresultat och felbank påverkas inte.");
+    const ok=confirm("Rensa P.E.R-minnet?\n\nDetta tar bort sparad chatthistorik och långtidsminne. Profiluppgifter rensas separat under Vad P.E.R. vet om mig. Dina provresultat och felbank påverkas inte.");
     if(!ok)return;
     const btn=document.getElementById("clearPerMemoryBtn");
     const orig=btn.textContent;

@@ -25,7 +25,11 @@
 
   // A pilot build is a separately scoped student application, not the public
   // maintenance-gated site. Production continues through the server-owned gate.
-  if (window.ExGenRuntime && window.ExGenRuntime.environment === "pilot") return;
+  var runtime = window.ExGenRuntime;
+  var localPreviewHost = ["localhost", "127.0.0.1", "::1", "[::1]"]
+    .includes(String(location.hostname || "").toLowerCase());
+  if (runtime && (runtime.environment === "pilot" ||
+      (runtime.environment === "unconfigured" && localPreviewHost))) return;
 
   // Undvik omdirigeringsloop om skriptet råkar hamna på målsidan.
   if (location.pathname.replace(/\/+$/, "") === TARGET.replace(/\/+$/, "")) return;

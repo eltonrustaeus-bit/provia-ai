@@ -10,6 +10,72 @@ test("prefers the rotatable server secret and falls back during cutover", () => 
   assert.equal(getSupabaseServerKey({}), "");
 });
 
+test("non-production and pilot runtimes fail closed against the production Supabase project", () => {
+  const productionUrl = "https://mnmotdluigzeehdjbhbu.supabase.co";
+  const productionSecrets = {
+    SUPABASE_URL: productionUrl,
+    SUPABASE_SECRET_KEY: "sb_secret_synthetic",
+  };
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "preview" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, NODE_ENV: "development" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey(productionSecrets),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, NODE_ENV: "production" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "production" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "preview", SUPABASE_URL: `${productionUrl}.` }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => getSupabaseAdminHeaders({ ...productionSecrets, VERCEL_TARGET_ENV: "staging" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.throws(
+    () => createSupabaseServerClient(productionUrl, {}, { ...productionSecrets, EXGEN_PILOT_MODE: "true" }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.equal(getSupabaseServerKey({
+    ...productionSecrets,
+    VERCEL: "1",
+    VERCEL_ENV: "production",
+    VERCEL_TARGET_ENV: "production",
+    NODE_ENV: "production",
+  }), "sb_secret_synthetic");
+  assert.throws(
+    () => getSupabaseServerKey({
+      ...productionSecrets,
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+      VERCEL_TARGET_ENV: "preview",
+      NODE_ENV: "production",
+    }),
+    /Refusing to connect a non-production ExGen runtime/,
+  );
+  assert.equal(getSupabaseServerKey({
+    SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+    SUPABASE_SECRET_KEY: "sb_secret_synthetic",
+    VERCEL_ENV: "preview",
+  }), "sb_secret_synthetic");
+});
+
 test("uses opaque secret keys only as apikey credentials for raw REST calls", () => {
   assert.deepEqual(getSupabaseAdminHeaders({ SUPABASE_SECRET_KEY: "sb_secret_new" }), { apikey: "sb_secret_new" });
   assert.deepEqual(getSupabaseAdminHeaders({ SUPABASE_SERVICE_ROLE_KEY: "legacy" }), {
