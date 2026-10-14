@@ -26,6 +26,10 @@ Plues aktuella publika produktbeskrivning presenterar en sammanhängande kursyta
 - bygg interaktiva ämnesytor runt en prediktion, en kontrollerad ändring och elevens egen förklaring; håll deras rättningsregler tydligt avgränsade;
 - skilj användning/progression från verifierade läranderesultat.
 
+Vid en direkt genomgång av de publika interaktionsdemon ändrades fysikexemplet från 2 kg till 4 kg; både beräkningen och den anslutna förklaringen ändrades till 1,5 m/s². I den adaptiva övningsdemon gav valen "On my own", "With a hint" och "Not yet" olika synliga nästa-steg-statusar. Sidorna anger samtidigt att exemplen inte sparar kursprogress eller graderar en riktig kurs. Det här verifierar de publika demonstrationernas reaktion, inte autentiserad sparning, faktisk adaptiv kvalitet eller läranderesultat.
+
+För ExGen är den konkreta principen att bevara skillnaden mellan att öppna P.E.R, få en ledtråd, svara självständigt och klara en ny kontroll. En rekommendation efter prov bör visa sin grund, exempelvis "träna detta eftersom svaret missade sambandet", och inte låta aktivitet eller en hjälpt prestation ändra provpoängen. Naturvetenskaplig grafträning kan utvecklas mot tolkning av mönster först när tolkningen härleds ur de signerade källvärdena och dess bedömning är entydig.
+
 För ExGen är den närmaste produktåtgärden att stärka kedjan försök → P.E.R-hjälp → självständigt nytt försök → rekommenderad repetition, med proven fortsatt skyddade från facitläckage. Delad whiteboard, breda kursgenererade lektioner och spaced-recall-system ska inte kopieras som paket innan elevnytta, dataskydd, kostnad och pilotens stödbehov är verifierade.
 
 ## Vad som är ändrat i ExGen
@@ -57,7 +61,7 @@ Plues publika exempel verifierar inte användarens observerade grafuppgift och k
 
 - [Plues publika startsida](https://plue.si/). Kontrollerad 2026-10-14; PLUE 2.0-positionering, publik demo, produktpåståendet "30,000+ learners" samt länkar till webbläsare och macOS. Antal användare är PLUE:s egen uppgift, inte oberoende verifierad.
 - [Your course](https://plue.si/features/your-course/), [Interactive lessons](https://plue.si/features/interactive-lessons/) och [Adaptive practice](https://plue.si/features/adaptive-practice/). Kontrollerade 2026-10-14; publika funktionsbeskrivningar och illustrativa exempel. Interactive lessons säger uttryckligen att kodexemplet inte kör godtycklig Python eller sparar konto-progress; exempelvyerna spelar inte in kursprogress.
-- [Tutor & shared board](https://plue.si/features/tutor-shared-board/). Kontrollerad 2026-10-14; publikt fysikexempel och produktbeskrivning; demon markerad illustrativ och inloggat beteende ej verifierat.
+- [Tutor & shared board](https://plue.si/features/tutor-shared-board/). Kontrollerad 2026-10-14; publikt fysikexempel med två massval och kopplad beräkning/förklaring; demon markerad illustrativ och inloggat beteende ej verifierat.
 - [Exam preparation](https://plue.si/features/exam-preparation/) och [Spaced recall](https://plue.si/features/spaced-recall/). Kontrollerade 2026-10-13; publika produktbeskrivningar, inloggade funktioner ej verifierade.
 - [Plues integritetspolicy](https://plue.si/privacy/). Kontrollerad 2026-10-13; PLUE:s egen beskrivning av datahantering, inte en oberoende säkerhetsgranskning.
 - [Plues app](https://app.plue.si/). Inloggade flöden, sparning och synk har inte granskats.

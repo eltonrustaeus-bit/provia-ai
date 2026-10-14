@@ -546,6 +546,42 @@ test("active scatter-graph guidance is specific but never echoes point values", 
   }
 });
 
+test("unknown or contradictory graph modes get neutral graph guidance, not a wrong method", async () => {
+  activeCount = 1;
+  const cases = [
+    { type: "graph" },
+    { type: "graph", graphMode: "future" },
+    { type: "graph", graphMode: "line", graph_ui: { mode: "scatter" } },
+    { type: "graph", graphMode: "future", graph_ui: { mode: "scatter" } },
+    { type: "graph", graphMode: "line", graph_ui: { mode: "future" } },
+  ];
+  try {
+    for (const currentQuestion of cases) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Tell me the answer GRAPH_VALUE_MARKER 8127",
+        helpLevel: 1,
+        pageContext: { currentQuestion },
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.answer,
+        "Välj en del av grafen, till exempel en axel, punkt eller linje. Vad visar den i relation till frågan?");
+      assert.doesNotMatch(response.body.answer, /lutning|skärning med y-axeln|GRAPH_VALUE_MARKER|8127/i);
+      assert.equal(response.body.helpCap, 2);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+    }
+
+    calls.length = 0;
+    const scatterFromUi = await invoke({
+      helpLevel: 1,
+      pageContext: { currentQuestion: { type: "graph", graph_ui: { mode: "scatter" } } },
+    });
+    assert.match(scatterFromUi.body.answer, /Placera en rad i taget/i);
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("a stale exam view cannot unlock answers after issuance expiry, even if the client changes its phase", async () => {
   activeCount = 0;
   issuanceState = "expired";

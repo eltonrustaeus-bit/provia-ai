@@ -12,11 +12,14 @@ const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
   title: "Prov", level: "C", exam_manifest: `v2.${"a".repeat(32)}.synthetic`,
-  questions: Array.from({ length: 3 }, (_, n) => ({
-    id: "q" + (n + 1), type: n === 2 ? "graph" : "mc", points: n === 2 ? 3 : 2,
-    question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen" : "Fråga nummer " + (n + 1) + " om cellandning",
-    options: n === 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n === 2 ? -1 : 1,
-    ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
+  questions: Array.from({ length: 4 }, (_, n) => ({
+    id: "q" + (n + 1), type: n >= 2 ? "graph" : "mc", points: n >= 2 ? 3 : 2,
+    question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen"
+      : n === 3 ? "Fråga nummer 4 med okänt grafmetadata"
+        : "Fråga nummer " + (n + 1) + " om cellandning",
+    options: n >= 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n >= 2 ? -1 : 1,
+    ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } }
+      : n === 3 ? { graph_ui: { mode: "future", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
     topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
     model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
     scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
@@ -60,7 +63,7 @@ await page.waitForTimeout(300);
 // ── T1: manifestet finns direkt, utan att hjälpknappen tryckts ────────────
 const t1 = await page.evaluate(() => window.__perTestCtx());
 ok("T1a fokus satt utan knapptryck", t1.currentQuestion?.number === 1, JSON.stringify(t1.currentQuestion));
-ok("T1b targets finns för alla frågor", t1.targets?.length === 3 && t1.targets[2].id === "q3", JSON.stringify(t1.targets));
+ok("T1b targets finns för alla frågor", t1.targets?.length === 4 && t1.targets[3].id === "q4", JSON.stringify(t1.targets));
 // phase är signalen servern räknar hjälptaket ur (api/explain.js helpCapFor).
 // Saknas den tolkas provet som pågående med taket 2 — vilket ser rimligt ut och
 // därför aldrig märks. Den måste finnas, och den måste vara "exam" här.
@@ -95,7 +98,7 @@ ok("T4c frågetexten i kroppen", /Fråga nummer 3/.test(lastExplain?.pageContext
 ok("T4c1 scatterläge följer med för rätt aktiv fråga", lastExplain?.pageContext?.currentQuestion?.graphMode === "scatter",
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4d targets i kroppen utan go", Array.isArray(lastExplain?.pageContext?.targets)
-   && lastExplain.pageContext.targets.length === 3
+   && lastExplain.pageContext.targets.length === 4
    && lastExplain.pageContext.targets.every(t => t.go === undefined),
    JSON.stringify(lastExplain?.pageContext?.targets));
 ok("T4e provstatus i kroppen", typeof lastExplain?.pageContext?.examState?.answered === "number",
@@ -108,6 +111,17 @@ ok("T4f phase följer med ut på nätverket", lastExplain?.pageContext?.examStat
    JSON.stringify(lastExplain?.pageContext?.examState));
 ok("T4g provets submission-id följer med till servern", lastExplain?.pageContext?.examState?.submissionId === "a".repeat(32),
    JSON.stringify(lastExplain?.pageContext?.examState));
+
+// Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
+await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);
+await page.click(".xf-ask"); await page.waitForTimeout(400);
+await page.fill("#perInput", "Hur ska jag tänka om grafen?");
+await page.click("#perSendBtn"); await page.waitForTimeout(900);
+ok("T4h okänt grafmetadata når P.E.R utan linjeantagande",
+   lastExplain?.pageContext?.currentQuestion?.graphMode === undefined,
+   JSON.stringify(lastExplain?.pageContext?.currentQuestion));
+ok("T4i frågetypen finns kvar för serverns neutrala grafvägledning",
+   lastExplain?.pageContext?.currentQuestion?.type === "graph");
 
 // ── T5: påhittat id ritar ingen knapp ─────────────────────────────────────
 await page.evaluate(() => {
@@ -213,11 +227,12 @@ ok("T8b sidan svarar fortfarande", await page.evaluate(() => typeof window.PER?.
 // frågade "varför fick jag så lågt?" fick svar om provets sista fråga i
 // stället för om resultatet, eftersom __perManifest fortfarande pekade dit.
 await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"d".repeat(32)}.syntheticCompletionProof`, result: {
-  total_points: 4, max_points: 6,
+  total_points: 4, max_points: 9,
   per_question: [
     { id: "q1", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" },
     { id: "q2", points: 0, max_points: 2, feedback: "fel", model_answer: "Beta" },
-    { id: "q3", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" }
+    { id: "q3", points: 2, max_points: 3, feedback: "delvis", model_answer: "Beta" },
+    { id: "q4", points: 0, max_points: 3, feedback: "fel", model_answer: "Beta" }
   ]
 } } }));
 
@@ -230,7 +245,7 @@ ok("T9a manifestet pekar på en fråga innan inlämning", beforeSubmit.currentQu
    JSON.stringify(beforeSubmit.currentQuestion));
 
 page.once("dialog", d => d.accept().catch(() => {}));
-await page.click(".xf-dot >> nth=2"); await page.waitForTimeout(200);
+await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(200);
 await page.click(".xf-exam-nav .xf-btn.primary"); // "Lämna in" på sista frågan, 2 obesvarade → confirm()
 await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
 await page.waitForTimeout(200);
@@ -257,11 +272,11 @@ await page.click("#xf .xf-screen[data-screen='result'] .xf-item button:has-text(
 await page.waitForTimeout(350);
 ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
    lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
-   lastExplain?.examProof?.questions?.length === 3 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
+   lastExplain?.examProof?.questions?.length === 4 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
    JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
 ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
    JSON.stringify(lastExplain?.examProof?.answers) === JSON.stringify([
-     { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }
+     { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }, { id: "q4", answer: "" }
    ]), JSON.stringify(lastExplain?.examProof?.answers));
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────

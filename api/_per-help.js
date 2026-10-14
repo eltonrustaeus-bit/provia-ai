@@ -22,13 +22,16 @@
  *
  *  0 motfråga · 1 begreppet · 2 metoden steg för steg · 3 fullständig lösning
  *
- *  | Läge                          | Tak |
- *  |-------------------------------|-----|
- *  | provkontext eller oklar pilotstatus | 1 |
- *  | fri studiefråga utanför pilot      | 3 |
+ *  | Läge                                     | Tak |
+ *  |------------------------------------------|-----|
+ *  | fri modellhjälp i prov/oklar pilotstatus | 1 |
+ *  | fast, svarsfri ledtrådsstege under prov  | 2 |
+ *  | fri studiefråga utanför pilot            | 3 |
  *
  *  Fullständig hjälp om en rättad fråga hanteras separat efter att servern
  *  verifierat ett bevis från rättningen. Klientens phase är inte ett sådant bevis.
+ *  `sendActiveExamGuidance` har en separat fast stege: nivåerna 0-2 är
+ *  fördefinierade ledtrådar utan facit och skickas inte till en modell.
  */
 export function helpCapFor(pageContext, { pilotMode = false } = {}) {
   if (pilotMode) return 1;

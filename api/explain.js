@@ -465,7 +465,12 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   }
   const currentQuestion = body.pageContext?.currentQuestion;
   const type = currentQuestion?.type;
-  const graphMode = type === "graph" && currentQuestion?.graphMode === "scatter" ? "scatter" : "line";
+  const declaredGraphModes = [];
+  if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
+  if (currentQuestion?.graph_ui && Object.hasOwn(currentQuestion.graph_ui, "mode")) declaredGraphModes.push(currentQuestion.graph_ui.mode);
+  const hasUnknownGraphMode = declaredGraphModes.some((mode) => mode !== "line" && mode !== "scatter");
+  const uniqueGraphModes = [...new Set(declaredGraphModes)];
+  const graphMode = !hasUnknownGraphMode && uniqueGraphModes.length === 1 ? uniqueGraphModes[0] : "unknown";
   const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
   const hints = en
     ? {
@@ -483,6 +488,11 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Check what each axis represents and which column belongs on each axis. What does one row become on the graph?",
         "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.",
         "Compare the first and last observations, then describe the pattern you see. Do not assume every point lies on a line.",
+      ],
+      genericGraph: [
+        "Check what the axes and symbols show. Which part of your material could help you interpret them?",
+        "Choose one feature of the graph, such as an axis, point or line. What does it show in relation to the question?",
+        "Check your interpretation against the axis labels, units and all the information shown, then state your conclusion in your own words.",
       ],
       short: [
         "Identify the concept or relationship the question is testing. What part of your material could help?",
@@ -506,6 +516,11 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
         "Jämför den första och sista mätningen och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
       ],
+      genericGraph: [
+        "Se vad axlar och markeringar visar. Vilken del av ditt material kan hjälpa dig att tolka dem?",
+        "Välj en del av grafen, till exempel en axel, punkt eller linje. Vad visar den i relation till frågan?",
+        "Kontrollera tolkningen mot axelrubriker, enheter och all information som visas. Formulera sedan slutsatsen med egna ord.",
+      ],
       short: [
         "Identifiera vilket begrepp eller samband frågan prövar. Vilken del av ditt material kan hjälpa dig?",
         "Förklara begreppet med egna ord och koppla det till en relevant del av materialet.",
@@ -516,7 +531,10 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
     ? Math.min(2, Math.max(0, body.helpLevel))
     : 0;
   res.setHeader("Cache-Control", "no-store");
-  const sequence = type === "graph" ? hints[graphMode] : hints[type];
+  const sequence = type === "graph"
+    ? (graphMode === "line" || graphMode === "scatter" ? hints[graphMode] : hints.genericGraph)
+    : hints[type];
+  // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   res.json({
     answer: sequence?.[requestedLevel] || hints.short[requestedLevel],
     helpCap: 2,
