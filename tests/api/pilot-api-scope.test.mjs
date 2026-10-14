@@ -64,7 +64,7 @@ test("pilot P.E.R allows only authenticated teaching requests and supported stud
 });
 
 test("pilot P.E.R rejects non-pilot modes before Supabase or provider requests", async (t) => {
-  const keys = ["EXGEN_PILOT_MODE", "VERCEL_ENV", "VERCEL_TARGET_ENV", "SUPABASE_URL", "SUPABASE_SECRET_KEY"];
+  const keys = ["EXGEN_PILOT_MODE", "VERCEL", "VERCEL_ENV", "VERCEL_TARGET_ENV", "SUPABASE_URL", "SUPABASE_SECRET_KEY"];
   const previous = keys.map((key) => [key, process.env[key]]);
   const originalFetch = globalThis.fetch;
   let externalCalls = 0;
@@ -77,6 +77,7 @@ test("pilot P.E.R rejects non-pilot modes before Supabase or provider requests",
   });
 
   process.env.EXGEN_PILOT_MODE = "true";
+  process.env.VERCEL = "1";
   process.env.VERCEL_ENV = "production";
   process.env.VERCEL_TARGET_ENV = "production";
   process.env.SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";

@@ -3,8 +3,9 @@ const PILOT_SUPABASE_REF = "yhcinqejsocpmmetazpz";
 
 function isPilotRuntime(env = process.env) {
   const rawPilotFlag = env.EXGEN_PILOT_MODE;
+  let pilotFlag = "";
   if (rawPilotFlag != null) {
-    const pilotFlag = String(rawPilotFlag).trim().toLowerCase();
+    pilotFlag = String(rawPilotFlag).trim().toLowerCase();
     if (pilotFlag !== "true" && pilotFlag !== "false") {
       throw new Error("Invalid EXGEN_PILOT_MODE value; expected true or false.");
     }
@@ -16,13 +17,18 @@ function isPilotRuntime(env = process.env) {
   const vercelRuntime = String(env.VERCEL || "").trim() === "1";
   const hasVercelMarker = env.VERCEL != null || env.VERCEL_ENV != null || env.VERCEL_TARGET_ENV != null;
   const hasVerifiedProductionMarkers = String(env.VERCEL_ENV || "").trim().toLowerCase() === "production"
-    && String(env.VERCEL_TARGET_ENV || "").trim().toLowerCase() === "production";
+    && String(env.VERCEL_TARGET_ENV || "").trim().toLowerCase() === "production"
+    && (!env.NODE_ENV || String(env.NODE_ENV).trim().toLowerCase() === "production");
   return vercelEnvironments.some((environment) => environment !== "production")
     || (hasVercelMarker && !(vercelRuntime && hasVerifiedProductionMarkers));
 }
 
 function isNonProductionTarget(env = process.env) {
-  if (env.EXGEN_PILOT_MODE === "true") return true;
+  const pilotFlag = env.EXGEN_PILOT_MODE == null ? "" : String(env.EXGEN_PILOT_MODE).trim().toLowerCase();
+  if (pilotFlag && pilotFlag !== "true" && pilotFlag !== "false") {
+    throw new Error("Invalid EXGEN_PILOT_MODE value; expected true or false.");
+  }
+  if (pilotFlag === "true") return true;
   const vercelEnv = String(env.VERCEL_ENV || "").trim().toLowerCase();
   const vercelTargetEnv = String(env.VERCEL_TARGET_ENV || "").trim().toLowerCase();
   const isVercelRuntime = String(env.VERCEL || "").trim() === "1";
@@ -32,26 +38,30 @@ function isNonProductionTarget(env = process.env) {
 
   // Require every Vercel deployment marker; the public NODE_ENV is not enough.
   return !isVercelRuntime || vercelEnv !== "production" || vercelTargetEnv !== "production" ||
-    targets.some((target) => target !== "production");
+    targets.some((target) => target !== "production") || isPilotRuntime(env);
 }
 
 function assertSupabaseTargetAllowed(url, env = process.env) {
   let hostname = "";
   let protocol = "";
   let canonicalPilotOrigin = false;
+  let canonicalProductionOrigin = false;
   try {
     const parsed = new URL(String(url || ""));
     hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
     protocol = parsed.protocol;
+    const canonicalPath = parsed.pathname === "/" && !parsed.search && !parsed.hash && !parsed.username && !parsed.password;
     canonicalPilotOrigin = parsed.origin === `https://${PILOT_SUPABASE_REF}.supabase.co`
-      && parsed.pathname === "/"
-      && !parsed.search
-      && !parsed.hash
-      && !parsed.username
-      && !parsed.password;
+      && canonicalPath;
+    canonicalProductionOrigin = parsed.origin === `https://${PRODUCTION_SUPABASE_REF}.supabase.co`
+      && canonicalPath;
   } catch {}
   const productionTarget = hostname === `${PRODUCTION_SUPABASE_REF}.supabase.co`;
-  if (isNonProductionTarget(env) && productionTarget) {
+  const nonProductionRuntime = isNonProductionTarget(env);
+  if (!nonProductionRuntime && !canonicalProductionOrigin) {
+    throw new Error("Refusing to connect the verified ExGen production runtime outside its approved Supabase project.");
+  }
+  if (nonProductionRuntime && productionTarget) {
     throw new Error("Refusing to connect a non-production ExGen runtime to the production Supabase project.");
   }
   if (isPilotRuntime(env) && (protocol !== "https:" || !canonicalPilotOrigin)) {
@@ -107,4 +117,4 @@ function createSupabaseServerClient(url, options = {}, env = process.env) {
   });
 }
 
-module.exports = { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed };
+module.exports = { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed, isPilotRuntime };

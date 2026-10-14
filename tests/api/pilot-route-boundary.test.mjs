@@ -53,46 +53,34 @@ test("pilot-held routes block before method checks, auth, body parsing or side e
   }
 });
 
-test("pilot mode is explicit or any non-production Vercel target", (t) => {
-  const previous = ["EXGEN_PILOT_MODE", "VERCEL_ENV", "VERCEL_TARGET_ENV"].map((key) => [key, process.env[key]]);
-  t.after(() => {
-    for (const [key, value] of previous) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  });
-
-  process.env.EXGEN_PILOT_MODE = "true";
-  delete process.env.VERCEL_ENV;
-  delete process.env.VERCEL_TARGET_ENV;
-  assert.equal(pilotScope.isPilotMode(), true, "explicit pilot mode");
-  process.env.EXGEN_PILOT_MODE = "false";
-  process.env.VERCEL_ENV = "preview";
-  assert.equal(pilotScope.isPilotMode(), true, "preview target");
-  process.env.VERCEL_ENV = "development";
-  assert.equal(pilotScope.isPilotMode(), true, "development target");
-  process.env.VERCEL_ENV = "production";
-  process.env.VERCEL_TARGET_ENV = "staging";
-  assert.equal(pilotScope.isPilotMode(), true, "custom non-production target");
-  process.env.VERCEL_TARGET_ENV = "production";
-  assert.equal(pilotScope.isPilotMode(), false, "production without explicit pilot flag");
+test("pilot routes share the fail-closed database runtime classifier", () => {
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "true" }), true, "explicit pilot mode");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: " TRUE " }), true, "normalized pilot flag");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "false", VERCEL_ENV: "preview" }), true, "Preview target");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "false", VERCEL_ENV: "development" }), true, "development target");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "false", VERCEL_ENV: "production", VERCEL_TARGET_ENV: "staging" }), true, "custom non-production target");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "false", VERCEL: "1", VERCEL_ENV: "production", VERCEL_TARGET_ENV: "production", NODE_ENV: "production" }), false, "complete Production marker set");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "false", VERCEL_ENV: "production", VERCEL_TARGET_ENV: "production" }), true, "missing VERCEL marker fails safe");
+  assert.equal(pilotScope.isPilotMode({ EXGEN_PILOT_MODE: "yes", VERCEL: "1", VERCEL_ENV: "production", VERCEL_TARGET_ENV: "production" }), true, "invalid feature flag fails closed");
 });
 
 test("every held-out route handler returns 404 before auth or external work in pilot mode", async (t) => {
   const prior = {
     pilot: process.env.EXGEN_PILOT_MODE,
+    vercelRuntime: process.env.VERCEL,
     vercel: process.env.VERCEL_ENV,
     target: process.env.VERCEL_TARGET_ENV,
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
   t.after(() => {
-    for (const [key, value] of [["EXGEN_PILOT_MODE", prior.pilot], ["VERCEL_ENV", prior.vercel], ["VERCEL_TARGET_ENV", prior.target], ["SUPABASE_URL", prior.url], ["SUPABASE_SERVICE_ROLE_KEY", prior.key]]) {
+    for (const [key, value] of [["EXGEN_PILOT_MODE", prior.pilot], ["VERCEL", prior.vercelRuntime], ["VERCEL_ENV", prior.vercel], ["VERCEL_TARGET_ENV", prior.target], ["SUPABASE_URL", prior.url], ["SUPABASE_SERVICE_ROLE_KEY", prior.key]]) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
   });
   process.env.EXGEN_PILOT_MODE = "true";
+  process.env.VERCEL = "1";
   process.env.VERCEL_ENV = "production";
   process.env.VERCEL_TARGET_ENV = "production";
   process.env.SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";

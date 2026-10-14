@@ -76,6 +76,33 @@ test("non-production and pilot runtimes fail closed against the production Supab
   }), "sb_secret_synthetic");
 });
 
+test("verified Production is pinned to the canonical production Supabase origin", () => {
+  const productionUrl = "https://mnmotdluigzeehdjbhbu.supabase.co";
+  const env = {
+    VERCEL: "1",
+    VERCEL_ENV: "production",
+    VERCEL_TARGET_ENV: "production",
+    NODE_ENV: "production",
+    SUPABASE_SECRET_KEY: "sb_secret_synthetic",
+  };
+  assert.equal(getSupabaseServerKey({ ...env, SUPABASE_URL: productionUrl }), "sb_secret_synthetic");
+
+  for (const url of [
+    "https://yhcinqejsocpmmetazpz.supabase.co",
+    "https://abcdefghijklmnopqrst.supabase.co",
+    `${productionUrl}/rest/v1`,
+    `${productionUrl}?redirect=other`,
+    "http://mnmotdluigzeehdjbhbu.supabase.co",
+    undefined,
+  ]) {
+    assert.throws(
+      () => getSupabaseServerKey({ ...env, SUPABASE_URL: url }),
+      /verified ExGen production runtime outside its approved Supabase project/,
+      String(url),
+    );
+  }
+});
+
 test("pilot and Vercel Preview runtimes require the exact staging Supabase project", () => {
   const stagingUrl = "https://yhcinqejsocpmmetazpz.supabase.co";
   assert.doesNotThrow(() => assertSupabaseTargetAllowed(stagingUrl, {

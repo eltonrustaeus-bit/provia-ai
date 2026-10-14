@@ -14,7 +14,7 @@ const userId = "11111111-1111-4111-8111-111111111111";
 const requests = [];
 let failRpc = false;
 
-process.env.SUPABASE_URL = "https://exam-delete.synthetic.supabase.co";
+process.env.SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-server-key";
 process.env.EXGEN_PILOT_MODE = "false";
 process.env.VERCEL = "1";

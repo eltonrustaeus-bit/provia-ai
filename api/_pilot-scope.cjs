@@ -10,6 +10,7 @@ const PILOT_STUDENT_ACTIONS = new Set([
   "profile_set",
 ]);
 const PILOT_EXPLAIN_MODES = new Set(["feynman", "quiz"]);
+const { isPilotRuntime } = require("./_supabase-server-key.cjs");
 
 function isPilotExplainRequestAllowed(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
@@ -19,9 +20,11 @@ function isPilotExplainRequestAllowed(body) {
 }
 
 function isPilotMode(env = process.env) {
-  const vercelEnvironments = [env.VERCEL_ENV, env.VERCEL_TARGET_ENV].filter(Boolean);
-  return env.EXGEN_PILOT_MODE === "true"
-    || vercelEnvironments.some((environment) => environment !== "production");
+  try {
+    return isPilotRuntime(env);
+  } catch {
+    return true;
+  }
 }
 
 module.exports = {
