@@ -168,13 +168,23 @@ try {
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
     "unsupported graph types do not consume a mock-exam quota");
 
+  activeQuestions = questions.map((question, index) => ({
+    ...question,
+    source_references: index === 0
+      ? ["addition, subtraktion", "Rubrik som inte finns", "ADDITION,\nSUBTRAKTION"]
+      : ["heltal"],
+  }));
   const generated = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
+  activeQuestions = questions;
 
   assert.equal(generated.status, 200, JSON.stringify(generated.body));
   assert.equal(generated.body.ok, true);
   assert.equal(generated.body.exam.questions.length, 3);
+  assert.deepEqual(generated.body.exam.questions.map((question) => question.source_references), [
+    ["addition, subtraktion"], ["heltal"], ["heltal"],
+  ], "only source excerpts that literally occur in the learner material reach the UI");
   assert.match(generated.body.exam.exam_manifest, /^v1\.3\./);
   for (const question of generated.body.exam.questions) {
     assert.ok(question.grade_task, "each delivered question has opaque signed grading material");

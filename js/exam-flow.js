@@ -2481,7 +2481,8 @@
       // Källraden — vilken del av elevens eget material frågan byggde på.
       var src = Array.isArray(q.source_references) ? q.source_references.filter(Boolean) : [];
       if (src.length) {
-        it.appendChild(el("div", "xf-src", "Bygger på ditt material: " + src.slice(0, 2).join(" · ")));
+        var sourceLabel = isEnglish() ? "Text from your material: " : "Text ur ditt material: ";
+        it.appendChild(el("div", "xf-src", sourceLabel + src.slice(0, 2).join(" · ")));
       }
 
       list.appendChild(it);

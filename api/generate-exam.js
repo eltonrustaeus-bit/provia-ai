@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
+const { filterSourceReferences } = require("./_source-references.cjs");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
@@ -1073,6 +1074,7 @@ module.exports = async function handler(req, res) {
         }
       }
       if (q.type !== "graph") q.graph_spec = null;
+      q.source_references = filterSourceReferences(pastedText, q.source_references);
       keptQuestions.push(q);
     }
     exam.questions = keptQuestions;

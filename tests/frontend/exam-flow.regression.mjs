@@ -583,6 +583,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T1h resultatet visar elevens egna svar", ownAnswers.length === 3 &&
     ownAnswers[0].includes("A. Cytoplasman") && ownAnswers[1].includes("svar på fråga två") && ownAnswers[2].includes("C. 100"),
     JSON.stringify(ownAnswers));
+  const sourceRows = await page.locator(".xf-src").allTextContents();
+  ok("T1i källtext märks som ordagrant utdrag",
+    sourceRows.length === 3 && sourceRows[0].includes("Text ur ditt material: s.4"), JSON.stringify(sourceRows));
   const trainHref = await page.locator("#xf .xf-next-actions a").getAttribute("href");
   ok("T1e nästa träning går till appens pilotkompatibla #train-flöde", trainHref === "app.html#train", String(trainHref));
   const savedMistakesHref = await page.locator("#xf .xf-act a").getAttribute("href");
