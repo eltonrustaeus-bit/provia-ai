@@ -107,14 +107,14 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     })), QUESTION);
     await page.locator("#perInput").fill("x".repeat(2001));
     await page.locator("#perSendBtn").click();
-    await page.getByText("högst 2 000 tecken").waitFor();
+    await page.locator("#perMessages").getByText("högst 2 000 tecken").waitFor();
     assert.equal(await page.locator("#perInput").inputValue(), "x".repeat(2001), "an overlong question stays intact instead of being silently truncated");
     assert.equal(JSON.parse(await page.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question"))).question, QUESTION,
       "rejecting an overlong edit does not erase the previously saved question");
     assert.equal(explainPosts, 0, "an overlong question does not reach the API");
     await page.locator("#perInput").fill(QUESTION);
     await page.locator("#perSendBtn").click();
-    await page.getByText("Din inloggning har gått ut.").waitFor();
+    await page.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
 
     const after401 = await page.evaluate(authKey => ({
       auth: localStorage.getItem(authKey),
@@ -183,7 +183,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await switchPage.locator("#perInput").waitFor({ state: "visible" });
     await switchPage.locator("#perInput").fill(QUESTION);
     await switchPage.locator("#perSendBtn").click();
-    await switchPage.getByText("Din inloggning har gått ut.").waitFor();
+    await switchPage.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
     await switchPage.locator(".per-answer-cta").click();
     await switchPage.locator("#pvLE").fill("account-b@example.test");
     await switchPage.locator("#pvLP").fill("synthetic-password");
@@ -211,7 +211,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await expiredPage.locator("#perInput").waitFor({ state: "visible" });
     await expiredPage.locator("#perInput").fill(QUESTION);
     await expiredPage.locator("#perSendBtn").click();
-    await expiredPage.getByText("Logga in för att fortsätta.").waitFor();
+    await expiredPage.locator("#perMessages").getByText("Logga in för att fortsätta.").waitFor();
     assert.equal(explainPosts, 2, "a locally expired session is stopped before the API call");
     await expiredPage.locator(".per-answer-cta").click();
     await expiredPage.locator("#pvModal").waitFor({ state: "visible" });
@@ -225,7 +225,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await tabA.locator("#perInput").waitFor({ state: "visible" });
     await tabA.locator("#perInput").fill(QUESTION);
     await tabA.locator("#perSendBtn").click();
-    await tabA.getByText("Din inloggning har gått ut.").waitFor();
+    await tabA.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
     assert.ok(await tabA.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")));
 
     const tabB = await openPilotPage(makeSession("account-a"), "account-b", sharedContext);
@@ -250,7 +250,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await networkPage.locator("#perBubble").click();
     await networkPage.locator("#perInput").fill(QUESTION);
     await networkPage.locator("#perSendBtn").click();
-    await networkPage.getByText("Nätverksfel — frågan finns kvar i rutan.").waitFor();
+    await networkPage.locator("#perMessages").getByText("Nätverksfel — frågan finns kvar i rutan.").waitFor();
     assert.equal(await networkPage.locator("#perInput").inputValue(), QUESTION,
       "network failure restores the question for the same account without resending");
     const networkDraft = JSON.parse(await networkPage.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")));
@@ -262,7 +262,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await serverErrorPage.locator("#perBubble").click();
     await serverErrorPage.locator("#perInput").fill(QUESTION);
     await serverErrorPage.locator("#perSendBtn").click();
-    await serverErrorPage.getByText("Tillfälligt fel").waitFor();
+    await serverErrorPage.locator("#perMessages").getByText("Tillfälligt fel").waitFor();
     assert.equal(await serverErrorPage.locator("#perInput").inputValue(), QUESTION,
       "HTTP failure restores the question for a deliberate retry");
 
@@ -275,7 +275,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await incompleteStreamPage.locator("#perBubble").click();
     await incompleteStreamPage.locator("#perInput").fill(QUESTION);
     await incompleteStreamPage.locator("#perSendBtn").click();
-    await incompleteStreamPage.getByText("Svaret avbröts innan det blev klart.").waitFor();
+    await incompleteStreamPage.locator("#perMessages").getByText("Svaret avbröts innan det blev klart.").waitFor();
     assert.equal(await incompleteStreamPage.locator("#perInput").inputValue(), QUESTION,
       "an SSE response without its completion event is not treated as a finished answer");
 
@@ -288,7 +288,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await completeStreamPage.locator("#perBubble").click();
     await completeStreamPage.locator("#perInput").fill(QUESTION);
     await completeStreamPage.locator("#perSendBtn").click();
-    await completeStreamPage.getByText("Steg för steg.").waitFor();
+    await completeStreamPage.locator("#perMessages").getByText("Steg för steg.").waitFor();
     assert.equal(await completeStreamPage.locator("#perInput").inputValue(), "",
       "a complete stream keeps the normal success behavior");
 
@@ -302,7 +302,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await timeoutPage.locator("#perSendBtn").click();
     await explainRequest;
     await timeoutPage.clock.fastForward(57001);
-    await timeoutPage.getByText("P.E.R tog för lång tid att svara.").waitFor();
+    await timeoutPage.locator("#perMessages").getByText("P.E.R tog för lång tid att svara.").waitFor();
     assert.equal(await timeoutPage.locator("#perInput").inputValue(), QUESTION,
       "request timeout restores the question without automatic resubmission");
 
@@ -311,7 +311,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await reviewPage.locator("#perBubble").click();
     await reviewPage.locator("#perInput").fill(QUESTION);
     await reviewPage.locator("#perSendBtn").click();
-    await reviewPage.getByText("Svar sparat.").waitFor();
+    await reviewPage.locator("#perMessages").getByText("Svar sparat.").waitFor();
     assert.equal(await reviewPage.locator(".per-rattelse").count(), 0,
       "the saved primary answer renders before the optional review correction arrives");
     await reviewPage.locator(".per-rattelse").waitFor();
@@ -328,7 +328,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       localStorage.setItem(authKey, JSON.stringify(session));
       window.__resolvePerToken("account-b-token");
     }, { authKey: PILOT_AUTH_KEY, session: makeSession("account-b") });
-    await tokenSwitchPage.getByText("Konto ändrat. P.E.R är redo för en ny fråga.").waitFor();
+    await tokenSwitchPage.locator("#perMessages").getByText("Konto ändrat. P.E.R är redo för en ny fråga.").waitFor();
     assert.equal(explainPosts, postCountBeforeSwitch,
       "a token resolved after an account change is never sent for the new account");
     assert.equal(await tokenSwitchPage.locator("#perInput").inputValue(), "");
@@ -342,11 +342,11 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await activeTabA.locator("#perBubble").click();
     await activeTabA.locator("#perInput").fill("Fråga som ska rensas");
     await activeTabA.locator("#perSendBtn").click();
-    await activeTabA.getByText("Del av svar").waitFor();
+    await activeTabA.locator("#perMessages").getByText("Del av svar").waitFor();
     await activeTabA.evaluate(({ authKey, session }) => localStorage.setItem(authKey, JSON.stringify(session)),
       { authKey: PILOT_AUTH_KEY, session: makeSession("account-b") });
-    await activeTabA.getByText("Konto ändrat. P.E.R är redo för en ny fråga.").waitFor();
-    assert.equal(await activeTabA.getByText("Del av svar").count(), 0,
+    await activeTabA.locator("#perMessages").getByText("Konto ändrat. P.E.R är redo för en ny fråga.").waitFor();
+    assert.equal(await activeTabA.locator("#perMessages").getByText("Del av svar").count(), 0,
       "account B never sees account A's already-streaming P.E.R answer");
     assert.equal(await activeTabA.locator("#perInput").inputValue(), "");
 
@@ -355,9 +355,12 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await clearPage.locator("#perBubble").click();
     await clearPage.locator("#perInput").fill("Fråga som ska rensas");
     await clearPage.locator("#perSendBtn").click();
-    await clearPage.getByText("Del av svar").waitFor();
+    await clearPage.locator("#perMessages").getByText("Del av svar").waitFor();
+    await clearPage.locator("#perAnnouncement").evaluate(el => { el.textContent = "Gammalt färdigt svar"; });
     await clearPage.locator("#perClearBtn").click();
-    await clearPage.getByText("Samtalet är rensat på den här enheten.").waitFor();
+    await clearPage.locator("#perMessages").getByText("Samtalet är rensat på den här enheten.").waitFor();
+    assert.equal(await clearPage.locator("#perAnnouncement").innerText(), "Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.",
+      "clear replaces stale screen-reader output with its confirmation");
     await clearPage.waitForTimeout(1400);
     assert.equal(await clearPage.locator("#perInput").inputValue(), "",
       "clear cancels the pending request without restoring its question");

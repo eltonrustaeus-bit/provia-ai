@@ -90,7 +90,7 @@ try {
       await route.fulfill({
         status: 200,
         headers: { "content-type": "text/event-stream; charset=utf-8" },
-        body: `data: ${JSON.stringify({ delta: "Börja med lutningen: hur mycket ändras y när x ökar med 1?" })}\n\ndata: ${JSON.stringify({ done: true, history: [] })}\n\n`
+        body: `data: ${JSON.stringify({ delta: "Börja med lutningen: " })}\n\ndata: ${JSON.stringify({ delta: "hur mycket ändras y när x ökar med 1?" })}\n\ndata: ${JSON.stringify({ done: true, history: [] })}\n\n`
       });
     }],
     ["**/rest/v1/user_exams*", async (route) => {
@@ -273,7 +273,10 @@ try {
   await page.locator("#perInput").waitFor({ state: "visible", timeout: 10_000 });
   await page.locator("#perInput").fill("Vad ska jag träna på?");
   await page.locator("#perSendBtn").click();
-  await page.getByText("Börja med lutningen: hur mycket ändras y när x ökar med 1?").waitFor();
+  await page.locator("#perMessages").getByText("Börja med lutningen: hur mycket ändras y när x ökar med 1?").waitFor();
+  await page.waitForFunction(() => document.getElementById("perAnnouncement")?.textContent.includes("Börja med lutningen: hur mycket ändras y när x ökar med 1?"));
+  assert.equal(await page.locator("#perAnnouncement").innerText(), "Börja med lutningen: hur mycket ändras y när x ökar med 1?",
+    "the completed SSE reply is announced once, without exposing its partial stream");
   assert.equal(explainBody?.userQuestion, "Vad ska jag träna på?");
   assert.equal(explainBody?.recentMistakes?.[0]?.question?.includes("Rita grafen till y = 2x + 1"), true,
     "P.E.R receives the actual failed graph item, not the student's submitted answer");

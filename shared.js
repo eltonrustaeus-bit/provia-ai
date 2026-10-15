@@ -977,6 +977,13 @@ function finalizeMsg(div, text) {
           div.appendChild(crow);
         }
       }
+
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) {
+        var spokenReply = div.cloneNode(true);
+        spokenReply.querySelectorAll('button, a, .per-chips').forEach(function (control) { control.remove(); });
+        announcement.textContent = spokenReply.innerText || spokenReply.textContent || cleanText;
+      }
     }
 
     /* Stegen under svaret.
@@ -1126,6 +1133,8 @@ function finalizeMsg(div, text) {
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
       }
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
          den mot sitt tak — den här raden är hygien, inte spärren. */
       var askLevel = (opts && typeof opts.helpLevel === 'number')
@@ -1485,6 +1494,7 @@ function finalizeMsg(div, text) {
         '#perPanel{display:none;position:absolute;bottom:64px;right:0;width:320px;background:var(--exgen-bg,#FFFFFF);border:1px solid var(--exgen-border,#E4E7EC);border-radius:var(--exgen-radius-lg,20px);box-shadow:0 16px 48px rgba(14,27,42,.28);overflow:hidden;flex-direction:column}',
         '#perPanel.per-open{display:flex;animation:perUp .2s ease}',
         '@keyframes perUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
+        '.per-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}',
         '.per-hdr{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--exgen-border,#E4E7EC);background:var(--exgen-bg-secondary,#F8FAFC)}',
         '.per-av{width:32px;height:32px;border-radius:50%;background:rgba(0,183,217,.12);border:1px solid rgba(0,183,217,.28);display:grid;place-items:center;flex-shrink:0;transition:background .2s,border-color .2s;overflow:hidden}',
         '.per-nm{font-weight:700;font-size:13px;color:var(--exgen-text,#1B2430)}',
@@ -1617,6 +1627,7 @@ function finalizeMsg(div, text) {
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
+        '<div id="perAnnouncement" class="per-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>' +
         '<button id="perBubble" title="Fråga P.E.R" aria-label="Fråga P.E.R" aria-controls="perPanel" aria-expanded="false">'+
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v10H9l-4 4V5Z"/></svg>'+
           '<span>P.E.R</span></button>'+
@@ -1721,13 +1732,17 @@ function finalizeMsg(div, text) {
         var sendBtn = document.getElementById('perSendBtn');
         if (sendBtn) sendBtn.disabled = false;
         var msgs = document.getElementById('perMessages');
+        var announcement = document.getElementById('perAnnouncement');
+        if (announcement) announcement.textContent = '';
         var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
         if (!language) {
           try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
         }
-        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">' + (language === 'en'
+        var clearMessage = language === 'en'
           ? 'The conversation was cleared from this device. Server-stored history and P.E.R memory remain.'
-          : 'Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.') + '</div>';
+          : 'Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.';
+        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">' + clearMessage + '</div>';
+        if (announcement) announcement.textContent = clearMessage;
       };
 
       /* ── POSITION & SIZE PERSISTENCE ── */

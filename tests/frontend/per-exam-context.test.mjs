@@ -92,6 +92,7 @@ await page.fill("#perInput", "hjälp mig med frågan");
 await page.click("#perSendBtn");
 await page.waitForTimeout(900);
 ok("T4a explain anropades", !!lastExplain);
+ok("T4a1 färdigt P.E.R-svar annonseras", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
 ok("T4b rätt frågenummer i kroppen", lastExplain?.pageContext?.currentQuestion?.number === 3,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4c frågetexten i kroppen", /Fråga nummer 3/.test(lastExplain?.pageContext?.currentQuestion?.text || ""));
@@ -116,7 +117,10 @@ ok("T4g provets submission-id följer med till servern", lastExplain?.pageContex
 await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);
 await page.click(".xf-ask"); await page.waitForTimeout(400);
 await page.fill("#perInput", "Hur ska jag tänka om grafen?");
-await page.click("#perSendBtn"); await page.waitForTimeout(900);
+await page.click("#perSendBtn");
+ok("T4h1 föregående svar nollställs före nästa fråga", (await page.locator("#perAnnouncement").innerText()) === "");
+await page.waitForTimeout(900);
+ok("T4h2 identiskt nytt svar annonseras igen", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
 ok("T4h okänt grafmetadata når P.E.R utan linjeantagande",
    lastExplain?.pageContext?.currentQuestion?.graphMode === undefined,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
