@@ -1156,6 +1156,7 @@
         var one = value === "1";
         button.disabled = enabled ? !one : one;
         button.classList.toggle("sel", value === selected);
+        button.setAttribute("aria-pressed", String(value === selected));
       });
     }
     tweak.appendChild(countPicker);
@@ -1187,12 +1188,19 @@
     wrap.style.marginBottom = "18px";
     wrap.appendChild(el("div", "xf-eyebrow", label));
     var chips = el("div", "xf-chips");
+    chips.setAttribute("role", "group");
+    chips.setAttribute("aria-label", label);
     values.forEach(function (v) {
       var ch = el("button", "xf-chip" + (v === current ? " sel" : ""), labeller ? labeller(v) : v);
       ch.type = "button";
+      ch.setAttribute("aria-pressed", String(v === current));
       ch.addEventListener("click", function () {
-        Array.prototype.forEach.call(chips.children, function (c) { c.classList.remove("sel"); });
+        Array.prototype.forEach.call(chips.children, function (c) {
+          c.classList.remove("sel");
+          c.setAttribute("aria-pressed", "false");
+        });
         ch.classList.add("sel");
+        ch.setAttribute("aria-pressed", "true");
         onPick(v);
       });
       chips.appendChild(ch);

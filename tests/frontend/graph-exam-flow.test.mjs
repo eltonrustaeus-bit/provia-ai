@@ -145,6 +145,10 @@ try {
     "a graph-only result in history still yields a one-question graph contract");
   await page.getByRole("button", { name: "Ändra" }).click();
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
+  const typeChips = page.locator("#xf .xf-screen[data-screen='aim'] .xf-chips").nth(1);
+  assert.equal(await typeChips.getByRole("button", { name: "Interaktiv graf" }).getAttribute("aria-pressed"), "true",
+    "the selected question type is announced as pressed");
+  assert.equal(await typeChips.getByRole("button", { name: "Blandat" }).getAttribute("aria-pressed"), "false");
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "1 grafuppgift");
   const graphHint = page.locator("#xf .xf-screen[data-screen='aim'] .xf-card .xf-graph-limit-note");
   assert.equal(await graphHint.isVisible(), true, "graph limits are visible as soon as graph mode is selected");
@@ -164,6 +168,9 @@ try {
   await page.getByRole("button", { name: "Ändra" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Blandat" }).click();
+  assert.equal(await typeChips.getByRole("button", { name: "Blandat" }).getAttribute("aria-pressed"), "true",
+    "the selected state updates when the learner changes question type");
+  assert.equal(await typeChips.getByRole("button", { name: "Interaktiv graf" }).getAttribute("aria-pressed"), "false");
   assert.equal(await graphHint.isVisible(), false, "graph-only constraints are hidden for other question types");
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
   const countChips = page.locator("#xf .xf-screen[data-screen='aim'] .xf-chips").nth(2);
@@ -173,6 +180,8 @@ try {
   assert.equal(await countChips.getByRole("button", { name: "1", exact: true }).isDisabled(), true,
     "one-question count is unavailable for non-graph exams");
   await countChips.getByRole("button", { name: "6", exact: true }).click();
+  assert.equal(await countChips.getByRole("button", { name: "6", exact: true }).getAttribute("aria-pressed"), "true",
+    "the selected question count is exposed to assistive technology");
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "6",
