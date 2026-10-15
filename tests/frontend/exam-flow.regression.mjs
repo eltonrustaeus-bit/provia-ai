@@ -1224,6 +1224,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T13e flervalsvaret återställs efter omladdning",
     await page.locator(".xf-mc-opt.sel").count() === 1
       && await page.locator('.xf-mc-opt[aria-pressed="true"]').count() === 1
+      && await page.getByRole("group", { name: "Välj ett svar" }).count() === 1
       && await page.locator(".xf-mc-opt.sel").textContent().then(text => text.includes("Matrix")));
   await ctx.close();
 }

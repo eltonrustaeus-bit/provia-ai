@@ -1449,8 +1449,8 @@
       S.exam = normalizeIds(r.exam);
       var got = S.exam.questions.length;
       S.questionCountNote = got < S.num
-        ? tx("Jag skrev " + S.num + " frågor men kastade " + (S.num - got) + " som inte höll måttet. Du får " + got + " — hellre färre och rätt.",
-            "I drafted " + S.num + " questions but removed " + (S.num - got) + " that did not meet the quality bar. You will get " + got + " instead — fewer, but better.")
+        ? tx("Du bad om " + S.num + " frågor. Det blev " + got + " " + (got === 1 ? "fråga" : "frågor") + " den här gången.",
+            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question is" : "questions are") + " ready this time.")
         : "";
       S.answers = questionState();
       S.helped = questionState();
@@ -1935,6 +1935,8 @@
 
     if (q.type === "mc" && Array.isArray(q.options) && q.options.length) {
       var group = el("div", "xf-mc");
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", tx("Välj ett svar", "Choose one answer"));
       q.options.forEach(function (opt, n) {
         var letter = String.fromCharCode(65 + n);
         var btn = el("button", "xf-mc-opt");
