@@ -18,6 +18,7 @@ const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 const R = report("per-onboarding");
 const onboardingSource = await readFile(new URL("../../js/per-onboarding.js", import.meta.url), "utf8");
+const axeSource = await readFile(new URL("../../node_modules/axe-core/axe.min.js", import.meta.url), "utf8");
 R.ok("skip state is account-scoped by the server, not shared localStorage", !/exgen_onboarding_dismissed|SKIP_KEY/.test(onboardingSource));
 const browser = await chromium.launch();
 
@@ -116,6 +117,8 @@ try {
 
     await page.waitForTimeout(400);
     R.ok("överlägget stängs när introduktionen är klar", await page.locator("#perOb").count() === 0);
+    R.ok("slutförd introduktion återför fokus till appens huvudregion",
+      await page.evaluate(() => document.activeElement === document.getElementById("xf")));
     R.ok("sidan går att scrolla igen",
       await page.evaluate(() => document.body.style.overflow) !== "hidden");
 
@@ -206,6 +209,15 @@ try {
     R.ok("inget vågrätt spill på 360 px",
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
       await page.evaluate(() => `${document.documentElement.scrollWidth} > ${window.innerWidth}`));
+    await page.evaluate(axeSource);
+    const violations = await page.evaluate(async () => {
+      const result = await window.axe.run(document.getElementById("perOb"), {
+        runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+      });
+      return result.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(" ")).join(", ")}`);
+    });
+    R.ok("öppen onboardingdialog klarar axe WCAG 2 A/AA på mobil",
+      violations.length === 0, violations.join("; "));
 
     /* Alla knappar trycks med tummen. Under 44 px går de inte att träffa
        pålitligt — hoppa över-knappen låg på ~36. */
@@ -223,6 +235,8 @@ try {
     await t.page.keyboard.press("Escape");
     await t.page.waitForTimeout(300);
     R.ok("Escape hoppar över", await t.page.locator("#perOb").count() === 0);
+    R.ok("Escape återför fokus till appens huvudregion",
+      await t.page.evaluate(() => document.activeElement === document.getElementById("xf")));
     await t.close();
   }
 

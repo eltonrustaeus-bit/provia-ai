@@ -169,6 +169,11 @@
 
     var host = el("div", { id: "perOb", role: "dialog", "aria-modal": "true", "aria-label": "Lär känna P.E.R." });
     var card = el("div", { id: "perObCard" });
+    var returnFocus = document.activeElement;
+    if (!returnFocus || returnFocus === document.getElementById("xf")
+        || !returnFocus.closest || !returnFocus.closest("#xf")) {
+      returnFocus = document.getElementById("xf");
+    }
     host.appendChild(card);
     document.body.appendChild(host);
 
@@ -178,6 +183,10 @@
       document.documentElement.classList.remove("perOb-lock");
       document.removeEventListener("keydown", onKey);
       host.remove();
+      var target = returnFocus && returnFocus.isConnected && returnFocus.getClientRects().length
+        ? returnFocus
+        : document.getElementById("xf");
+      if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
     }
 
     function skip() {

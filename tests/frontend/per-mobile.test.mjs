@@ -25,6 +25,7 @@
 // chromium saknas.
 
 import { ROOT, serve, rectsOverlap, mockApis, seed } from "./_harness.mjs";
+import { readFile } from "node:fs/promises";
 
 let chromium;
 try {
@@ -35,6 +36,7 @@ try {
 }
 
 const WIDTHS = [320, 375, 390, 430];
+const axeSource = await readFile(`${ROOT}/node_modules/axe-core/axe.min.js`, "utf8");
 let failures = 0;
 const ok = (name) => console.log(`  PASS  ${name}`);
 const fail = (name, err) => { failures++; console.error(`  FAIL  ${name}\n        ${err?.message || err}`); };
@@ -136,6 +138,20 @@ async function run() {
           .some(node => node.textContent.includes("Citronsyracykeln sker i mitokondriens matrix")),
         { timeout: 10000 }
       );
+
+      if (width === 390) {
+        await page.waitForTimeout(250);
+        await page.evaluate(axeSource);
+        const violations = await page.evaluate(async () => {
+          const result = await window.axe.run(document.getElementById("perWidget"), {
+            runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+          });
+          return result.violations.map(v => `${v.id}: ${v.nodes.map(n =>
+            `${n.target.join(" ")} (${n.failureSummary?.replace(/\s+/g, " ").slice(0, 180) || ""})`).join(", ")}`);
+        });
+        if (violations.length) throw new Error(`P.E.R-panelen har axe-fynd: ${violations.join("; ")}`);
+        ok("öppen P.E.R-panel klarar axe WCAG 2 A/AA vid 390px");
+      }
 
       const widgetBox = await page.locator("#perWidget").boundingBox();
       if (!widgetBox || widgetBox.width < 1) throw new Error("#perWidget syns inte efter .xf-ask");
