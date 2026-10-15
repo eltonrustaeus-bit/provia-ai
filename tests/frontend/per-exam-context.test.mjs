@@ -28,6 +28,12 @@ const EXAM = {
 
 let lastExplain = null;
 let examStateUnavailable = false;
+let activeExamCount = 0;
+const activeExamCountCalls = [];
+const SAVED_PER_HISTORY = [
+  { role: "user", content: "Explain my old practice result." },
+  { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42." },
+];
 const R = report("per-exam-context");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
@@ -40,6 +46,13 @@ const page = await ctx.newPage();
 await mockApis(page, {
   extra: [
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+    ["**/api/abandon-exam**", r => {
+      activeExamCountCalls.push({ method: r.request().method(), url: r.request().url() });
+      const url = new URL(r.request().url());
+      r.fulfill({ json: url.searchParams.has("submission_id")
+        ? { ok: true, exam_state: "active" }
+        : { ok: true, active_count: activeExamCount } });
+    }],
     ["**/api/explain", r => {
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
       if (examStateUnavailable) r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
@@ -51,6 +64,12 @@ await seed(page);
 
 await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null, null, { timeout: 5000 });
+await page.evaluate(history => {
+  localStorage.setItem("proviaai_per_history", JSON.stringify(history));
+  window.PER.setExamHistoryMasked(true);
+  window.PER.setExamHistoryMasked(false);
+}, SAVED_PER_HISTORY);
 await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
 await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
 await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);
@@ -61,6 +80,27 @@ await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); awai
 await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 await page.waitForTimeout(300);
+const historyDuringExam = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+}));
+ok("P.E.R hides cached full solutions after an exam opens", !historyDuringExam.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")
+  && /dolt|hidden/i.test(historyDuringExam.visible));
+ok("hiding exam history preserves the original local transcript", JSON.stringify(historyDuringExam.stored) === JSON.stringify(SAVED_PER_HISTORY), JSON.stringify(historyDuringExam.stored));
+ok("active exam history mask persists for same-browser navigation", historyDuringExam.mask === "1");
+
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+const historyBeforeResume = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+}));
+ok("reload keeps historical solutions hidden until the active exam is verified", historyBeforeResume.mask === "1"
+  && !historyBeforeResume.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"), JSON.stringify(historyBeforeResume));
+await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.ghost");
+await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+ok("verified exam resume keeps the old solution hidden", await page.locator("#perMessages").innerText().then(text => !text.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")));
 
 // ── T1: manifestet finns direkt, utan att hjälpknappen tryckts ────────────
 const t1 = await page.evaluate(() => window.__perTestCtx());
@@ -94,6 +134,8 @@ await page.fill("#perInput", "hjälp mig med frågan");
 await page.click("#perSendBtn");
 await page.waitForTimeout(900);
 ok("T4a explain anropades", !!lastExplain);
+ok("T4a1 active exam requests do not include prior P.E.R transcripts", Array.isArray(lastExplain?.history) && lastExplain.history.length === 0,
+  JSON.stringify(lastExplain?.history));
 ok("T4a1 färdigt P.E.R-svar annonseras", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
 ok("T4b rätt frågenummer i kroppen", lastExplain?.pageContext?.currentQuestion?.number === 3,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
@@ -172,6 +214,10 @@ ok("T5c svarstexten står kvar", /Här är svaret/.test(t5.html));
 
 // ── T6: giltigt id ger en knapp som navigerar ─────────────────────────────
 await page.evaluate(() => {
+  document.body.classList.add("xf-per-open");
+  document.getElementById("perPanel")?.classList.add("per-open");
+});
+await page.evaluate(() => {
   const msgs = document.getElementById("perMessages");
   const div = document.createElement("div");
   msgs.appendChild(div);
@@ -182,7 +228,7 @@ const t6label = await page.evaluate(() => {
   return ctas.length ? ctas[ctas.length - 1].textContent : "";
 });
 ok("T6a knapp med målets etikett", t6label === "Fråga 1 →", t6label);
-await page.click("#perMessages .per-nav-cta >> nth=-1");
+await page.locator("#perMessages .per-nav-cta").last().click({ force: true });
 await page.waitForTimeout(300);
 const t6 = await page.evaluate(() => window.__perTestCtx());
 ok("T6b klicket flyttade till fråga 1", t6.currentQuestion?.number === 1, String(t6.currentQuestion?.number));
@@ -280,6 +326,16 @@ await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(200);
 await page.click(".xf-exam-nav .xf-btn.primary"); // "Lämna in" på sista frågan, 2 obesvarade → confirm()
 await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
 await page.waitForTimeout(200);
+await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null
+  && (document.getElementById("perMessages")?.innerText || "").includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"), null, { timeout: 5000 }).catch(() => null);
+const historyAfterGrade = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+}));
+ok("P.E.R restores the preserved transcript only after server confirms no active exams",
+  historyAfterGrade.mask === null && historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
+  JSON.stringify({ mask: historyAfterGrade.mask, visible: historyAfterGrade.visible, calls: activeExamCountCalls }));
 const afterSubmit = await page.evaluate(() => window.__perTestCtx());
 ok("T9b currentQuestion är borta på resultatskärmen", !afterSubmit.currentQuestion, JSON.stringify(afterSubmit.currentQuestion));
 /* T9c löd tidigare "examState är borta på resultatskärmen" och krävde att hela

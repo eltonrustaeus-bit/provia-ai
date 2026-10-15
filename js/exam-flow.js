@@ -680,6 +680,13 @@
 
   // ── Steg 0: start ────────────────────────────────────────────────────────
 
+  function releasePerHistoryIfNoActiveExams() {
+    if (!window.ExGenEngine || !window.ExGenEngine.activeExamCount || !window.PER || !window.PER.setExamHistoryMasked) return;
+    window.ExGenEngine.activeExamCount().then(function (count) {
+      if (count === 0) window.PER.setExamHistoryMasked(false);
+    }).catch(function () {});
+  }
+
   function stepStart(focusHeading = true) {
     UI.languageRerender = stepStart;
     var renderVersion = ++startVersion;
@@ -703,6 +710,9 @@
     // Ett halvfärdigt prov ska aldrig gå förlorat för att mobilen låste sig
     // eller täckningen försvann på bussen.
     var draft = readDraft();
+    if (draft && draft.exam && draft.exam.exam_manifest && window.PER && window.PER.setExamHistoryMasked) {
+      window.PER.setExamHistoryMasked(true);
+    }
     if (draft) {
       var legacyDraft = !draft.exam.exam_manifest;
       if (legacyDraft) {
@@ -733,6 +743,7 @@
             }
             clearDraft();
             S.material = draft.material || "";
+            releasePerHistoryIfNoActiveExams();
             back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
             resumeStatus.textContent = issuanceState === "completed"
               ? tx("Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt.", "This exam has already been submitted. Your material is still here if you want to create a new one.")
@@ -791,12 +802,15 @@
       recovery.appendChild(reset);
       b.appendChild(recovery);
       window.ExGenEngine.activeExamCount().then(function (count) {
+        if (count > 0 && window.PER && window.PER.setExamHistoryMasked) window.PER.setExamHistoryMasked(true);
         if (renderVersion !== startVersion || !UI.screens.start.classList.contains("on")) return;
         if (count > 0) {
           recovery.hidden = false;
           recoveryText.textContent = count === 1
             ? tx("Ett prov finns kvar på ditt konto men inte på den här enheten. Du kan avsluta det här om du inte kan fortsätta det.", "One exam is active on your account but not on this device. You can end it here if you cannot resume it.")
             : tx(count + " prov finns kvar på ditt konto men inte på den här enheten. Avsluta dem bara om du inte behöver fortsätta på en annan enhet.", count + " exams are active on your account but not on this device. End them only if you do not need to continue on another device.");
+        } else if (count === 0 && window.PER && window.PER.setExamHistoryMasked) {
+          window.PER.setExamHistoryMasked(false);
         }
       }).catch(function () {});
     }
@@ -1585,6 +1599,7 @@
   }
 
   function openExam(resumedAt) {
+    if (window.PER && window.PER.setExamHistoryMasked) window.PER.setExamHistoryMasked(true);
     UI.languageRerender = null;
     if (window.dismissWelcome) window.dismissWelcome();
     document.body.classList.remove("xf-contract");
@@ -2364,6 +2379,7 @@
 
   function stepResult(r, persistence, examProof, submittedAnswers) {
     closePerPanel();
+    releasePerHistoryIfNoActiveExams();
     var b = mount("result");
 
     /* Resultatsidan har ingen aktiv provfråga. En separat signerad proof från

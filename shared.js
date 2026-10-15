@@ -120,12 +120,23 @@
 
   /* ── P.E.R FLOATING WIDGET ── */
   var PER_HIST_KEY = 'proviaai_per_history';
+  var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
   var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
+
+  function isExamWorkspacePage() {
+    var page = String(window.location.pathname || '').toLowerCase().split('/').pop();
+    return page === 'app.html' || page === 'app';
+  }
+
+  var _examHistoryMasked = isExamWorkspacePage();
+  try {
+    if (localStorage.getItem(PER_EXAM_HISTORY_MASK_KEY) === '1') _examHistoryMasked = true;
+  } catch (_) {}
 
   function currentPilotAccountId() {
     try {
@@ -475,8 +486,88 @@
     try { return JSON.parse(localStorage.getItem(PER_HIST_KEY) || '[]'); } catch (_) { return []; }
   }
   function perSaveHist(h) {
+    if (_examHistoryMasked) return;
     try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
   }
+
+  function renderPerHistory(history) {
+    var msgs = document.getElementById('perMessages');
+    if (!msgs) return;
+    msgs.innerHTML = '';
+    (Array.isArray(history) ? history : []).forEach(function (msg) {
+      if (!msg || typeof msg.content !== 'string' || (msg.role !== 'user' && msg.role !== 'assistant')) return;
+      var div = document.createElement('div');
+      div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
+      div.textContent = msg.content;
+      msgs.appendChild(div);
+    });
+    if (!msgs.children.length) {
+      var greeting = document.createElement('div');
+      greeting.className = 'per-msg teacher';
+      greeting.textContent = getContextGreeting();
+      msgs.appendChild(greeting);
+    }
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function perHistoryUsesEnglish() {
+    var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+    if (!language) {
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+    }
+    return language === 'en';
+  }
+
+  function setExamHistoryMasked(masked, persist) {
+    var next = Boolean(masked);
+    var shouldPersist = arguments.length < 2 || Boolean(persist);
+    if (next === _examHistoryMasked && !next) return;
+    var msgs = document.getElementById('perMessages');
+    var current = [];
+    if (!next && msgs) {
+      Array.prototype.forEach.call(msgs.querySelectorAll('.per-msg'), function (node) {
+        if (node.classList.contains('per-history-mask-notice') || node.classList.contains('typing')) return;
+        var text = node.textContent.trim();
+        if (!text) return;
+        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text });
+      });
+    }
+    _examHistoryMasked = next;
+    if (shouldPersist) {
+      try {
+        if (next) localStorage.setItem(PER_EXAM_HISTORY_MASK_KEY, '1');
+        else localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
+      } catch (_) {}
+    }
+    if (next) {
+      if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = '';
+      if (msgs) {
+        msgs.innerHTML = '';
+        var notice = document.createElement('div');
+        notice.className = 'per-msg teacher per-history-mask-notice';
+        notice.setAttribute('role', 'status');
+        notice.textContent = perHistoryUsesEnglish()
+          ? 'Earlier P.E.R. conversation is hidden while an exam may be active.'
+          : 'Tidigare P.E.R-samtal är dolt medan ett prov kan vara aktivt.';
+        msgs.appendChild(notice);
+      }
+      return;
+    }
+    var history = perGetHist();
+    if (current.length) history = history.concat(current).slice(-PER_MAX_HIST);
+    if (current.length) {
+      try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(history)); } catch (_) {}
+    }
+    renderPerHistory(history);
+  }
+
+  window.addEventListener('storage', function (event) {
+    if (event.key !== PER_EXAM_HISTORY_MASK_KEY) return;
+    if (event.newValue === '1') setExamHistoryMasked(true);
+    else if (event.newValue === null) setExamHistoryMasked(false);
+  });
 
   window.PER = (function () {
     var _getToken = null;
@@ -1205,7 +1296,7 @@ function finalizeMsg(div, text) {
       var typing = addMsg('', 'teacher typing');
       var stopThinking = startThinking(typing, ctxForThinking);
 
-      var hist = perGetHist();
+      var hist = _examHistoryMasked ? [] : perGetHist();
       var requestTimedOut = false;
       var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var requestState = { cancelled: false, controller: requestController, accountId: requestAccountId, cancel: null };
@@ -2004,21 +2095,10 @@ function finalizeMsg(div, text) {
         });
       }
 
-      /* Restore previous history — localStorage first, then sync from Supabase */
+      /* Restore previous history — never expose it while an exam may be active. */
       var hist = perGetHist();
-      if (hist.length > 0) {
-        var msgs = document.getElementById('perMessages');
-        if (msgs) {
-          msgs.innerHTML = '';
-          hist.forEach(function (msg) {
-            var div = document.createElement('div');
-            div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
-            div.textContent = msg.content;
-            msgs.appendChild(div);
-          });
-          msgs.scrollTop = msgs.scrollHeight;
-        }
-      }
+      if (_examHistoryMasked) setExamHistoryMasked(true, false);
+      else if (hist.length > 0) renderPerHistory(hist);
 
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try {
@@ -2053,6 +2133,7 @@ function finalizeMsg(div, text) {
           if (!r.ok) return null;
           return r.json();
         }).then(function(data) {
+          if (_examHistoryMasked) return;
           if (!data || !Array.isArray(data.history) || data.history.length <= hist.length) return;
           perSaveHist(data.history);
           /* Only update UI if chat is closed and user hasn't started a new conversation */
@@ -2130,7 +2211,7 @@ function finalizeMsg(div, text) {
       initWidget();
     }
 
-    return { register: register, send: send, describe: perDescribe, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
+    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
   /* ── GLOBAL BOTTOM NAV (inloggad) ── */
