@@ -186,6 +186,8 @@ ok("T4l skärmläsarregionen annonserar samma besked", await page.locator("#perA
 await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
 ok("språkbyte under prov bevarar öppna P.E.R-panelen", await page.locator("#perPanel").isVisible()
   && await page.locator("#perBubble").getAttribute("aria-expanded") === "true");
+ok("språkbyte bevarar elevens oskickade P.E.R-fråga", await page.locator("#perInput").inputValue() === "Hur ska jag tänka?");
+await page.locator("#perInput").waitFor({ state: "visible" });
 const englishRetry = "I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.";
 await page.fill("#perInput", "How should I think about this?");
 await page.click("#perSendBtn");

@@ -695,6 +695,48 @@ try {
   assert.equal(scienceGraded.body.result.max_points, 3);
   assert.equal(scienceGraded.body.result.per_question[0].feedback, "2 av 3 datapunkter stämmer med tabellen.");
 
+  const physicsCourse = "Fysik 1a";
+  const physicsMaterial = "En vagns hastighet under en mätning:\nTid (s) | Hastighet (m/s)\n0 | 1\n1 | 3\n2 | 5";
+  activeQuestions = [{ ...activeQuestions[0], id: "physics-graph", graph_spec: {
+    kind: "scatter", slope: null, intercept: null,
+    points: [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }],
+    x_label: "Model x", y_label: "Model y",
+  } }];
+  const physicsGenerated = await invoke(generateExam, {
+    lang: "sv", level: "C", course: physicsCourse, pastedText: physicsMaterial, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(physicsGenerated.status, 200, JSON.stringify(physicsGenerated.body));
+  const physicsQuestion = physicsGenerated.body.exam.questions[0];
+  assert.deepEqual(physicsQuestion.graph_ui, {
+    mode: "scatter", point_count: 3, x_label: "Tid (s)", y_label: "Hastighet (m/s)",
+    source_table: { headers: ["Tid (s)", "Hastighet (m/s)"], rows: [[0, 1], [1, 3], [2, 5]] },
+  }, "physics graph UI and grading derive exact measurements and units from the source, not model labels");
+  assert.equal(Object.hasOwn(physicsQuestion, "graph_spec"), false);
+  assert.equal(Object.hasOwn(physicsQuestion, "model_answer"), false);
+  const physicsGraded = await invoke(gradeExam, {
+    lang: "sv", course: physicsCourse, pastedText: physicsMaterial,
+    exam_manifest: physicsGenerated.body.exam.exam_manifest,
+    questions: [physicsQuestion],
+    answers: [{ id: physicsQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 1 }, { x: 1, y: 3 }, { x: 2, y: 5 },
+    ] }) }],
+  });
+  assert.equal(physicsGraded.status, 200, JSON.stringify(physicsGraded.body));
+  assert.equal(physicsGraded.body.result.total_points, 3);
+  assert.equal(physicsGraded.body.result.max_points, 3);
+
+  calls.length = 0;
+  const unsupportedPhysicsTable = await invoke(generateExam, {
+    lang: "sv", level: "C", course: physicsCourse,
+    pastedText: "Tid (s) | Hastighet (m/s)\n0 | 1\n1 | 2.5\n2 | 4", qType: "graph", numQuestions: 1,
+  });
+  assert.equal(unsupportedPhysicsTable.status, 400);
+  assert.equal(unsupportedPhysicsTable.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "unsupported physics decimals are rejected before provider use");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
+    "unsupported physics decimals do not consume an exam quota");
+
   const mathScatterCourse = "Matematik 2b";
   const mathScatterMaterial = "Talpar:\nx-värde | y-värde\n0 | 2\n1 | 3\n2 | 4";
   activeQuestions = [{ ...activeQuestions[0], id: "math-scatter" }];

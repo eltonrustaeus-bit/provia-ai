@@ -4,6 +4,14 @@ import { mockApis, ROOT, seed, serve } from "./_harness.mjs";
 
 const scenarios = [
   {
+    id: "physics",
+    course: "Fysik 1a",
+    title: "Fysikprov",
+    material: "En vagns hastighet under en mätning:\nTid (s) | Hastighet (m/s)\n0 | 1\n1 | 3\n2 | 5",
+    headers: ["Tid (s)", "Hastighet (m/s)"],
+    rows: [[0, 1], [1, 3], [2, 5]],
+  },
+  {
     id: "biology",
     course: "Biologi 1",
     title: "Biologiprov",
@@ -209,7 +217,7 @@ async function verifyScatterScenario(scenario) {
 
 try {
   for (const scenario of scenarios) await verifyScatterScenario(scenario);
-  console.log("scatter graph flows: biology, geography and math table data render accessibly and submit from mobile/desktop");
+  console.log("scatter graph flows: physics, biology, geography and math table data render and submit from mobile/desktop");
 } finally {
   await browser.close();
   await server.close();
