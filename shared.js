@@ -1416,7 +1416,12 @@ function finalizeMsg(div, text) {
     function toggle() {
       if (!document.getElementById('perBubble') || !document.getElementById('perPanel')) return;
       _open = !_open;
-      if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') window.XgShell.closeMenu();
+      var focusAfterOpen = document.activeElement;
+      var menuWasOpen = !!document.querySelector('.xg-menu.on');
+      if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') {
+        window.XgShell.closeMenu();
+        if (menuWasOpen) focusAfterOpen = document.querySelector('.xg-menu-btn');
+      }
       var panel = document.getElementById('perPanel');
       var bubble = document.getElementById('perBubble');
       if (panel) panel.classList.toggle('per-open', _open);
@@ -1442,7 +1447,9 @@ function finalizeMsg(div, text) {
           }
         }
         var inp = document.getElementById('perInput');
-        if (inp) setTimeout(function () { inp.focus(); }, 50);
+        if (inp) setTimeout(function () {
+          if (_open && document.activeElement === focusAfterOpen) inp.focus();
+        }, 50);
       }
     }
 
@@ -1706,7 +1713,7 @@ function finalizeMsg(div, text) {
           widget.classList.remove('per-menu-obstructed');
           if (!widget.classList.contains('per-obstructed')) widget.removeAttribute('aria-hidden');
           scheduleObstructionCheck();
-          if (bubble.classList.contains('per-open')) {
+          if (bubble.classList.contains('per-open') && document.activeElement === document.querySelector('.xg-menu-btn')) {
             var input = document.getElementById('perInput');
             if (input) input.focus();
           }

@@ -115,6 +115,17 @@ try {
   await page.waitForFunction(() => document.querySelector("#xgMenu").hidden);
   await page.waitForFunction(() => !document.querySelector("#perWidget").classList.contains("per-menu-obstructed"));
   console.log("PASS menu and P.E.R do not cover one another");
+
+  await page.locator(".xg-menu-btn").click();
+  await page.waitForFunction(() => document.querySelector("#xgMenu").classList.contains("on"));
+  await page.keyboard.press("Alt+p");
+  await page.keyboard.press("Shift+Tab");
+  await page.evaluate(() => { window.__perFocusAfterKeyboardMove = document.activeElement; });
+  assert.notEqual(await page.evaluate(() => document.activeElement.id), "perInput", "user can move focus while the menu closes");
+  await page.waitForFunction(() => document.querySelector("#xgMenu").hidden);
+  assert.equal(await page.evaluate(() => document.activeElement === window.__perFocusAfterKeyboardMove), true, "menu close does not steal focus after the user moved it");
+  assert.notEqual(await page.evaluate(() => document.activeElement.id), "perInput", "P.E.R does not reclaim focus after the user moved it");
+  console.log("PASS P.E.R focus handoff respects keyboard navigation during menu close");
 } finally {
   await ctx.close();
   await browser.close();
