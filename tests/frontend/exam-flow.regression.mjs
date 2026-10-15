@@ -1079,6 +1079,32 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await ctx.close();
 }
 
+// Result recommendations must follow the selected app language.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "english-result-recommendation", "en");
+    await toExam(page);
+    await page.click(".xf-mc-opt >> nth=0");
+    await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(200);
+    await page.fill(".xf-answer", "own answer");
+    await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(200);
+    await page.click(".xf-mc-opt >> nth=2");
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+
+    const card = page.locator("#xf .xf-next");
+    const copy = await card.innerText();
+    ok("resultatrekommendationen visas på engelska",
+      /Next practice/i.test(copy) && /Practise these topics/.test(copy)
+        && /Ask P\.E\.R\. what to do next/.test(copy)
+        && !/Nästa träning|Träna misstagen|Fråga P\.E\.R/.test(copy), copy);
+    ok("engelskt resultatflöde saknar konsolfel", errs.length === 0, errs.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+}
+
 // ── T12: no 0/0 independent score when P.E.R was opened on every question ──
 {
   const { ctx, page } = await mk();

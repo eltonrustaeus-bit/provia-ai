@@ -240,34 +240,38 @@
       .filter(function (item) { return item.unanswered === true; }).length;
     if (!weak.length) {
       var clean = el("div", "xf-next");
-      clean.appendChild(el("div", "xf-next-k", "Nästa träning"));
-      clean.appendChild(el("h3", null, skipped ? "Pröva det du lämnade obesvarat" : "Bra: inga tydliga luckor i det här provet"));
+      clean.appendChild(el("div", "xf-next-k", tx("Nästa träning", "Next practice")));
+      clean.appendChild(el("h3", null, skipped
+        ? tx("Pröva det du lämnade obesvarat", "Try the questions you left unanswered")
+        : tx("Bra: inga tydliga luckor i det här provet", "Good: no clear gaps in this exam")));
       clean.appendChild(el("p", null, skipped
-        ? "Du fick 0 poäng på de obesvarade frågorna, men de visar inte vad du kan ännu. Skapa ett nytt prov på samma material och försök själv innan du tittar på facit."
-        : "Gör ett nytt prov på samma material med högre nivå eller fler frågor för att se om det sitter även när frågorna vrids om."));
+        ? tx("Du fick 0 poäng på de obesvarade frågorna, men de visar inte vad du kan ännu. Skapa ett nytt prov på samma material och försök själv innan du tittar på facit.", "Unanswered questions received 0 points, but they do not show what you know yet. Create a new exam from the same material and try it yourself before looking at the answers.")
+        : tx("Gör ett nytt prov på samma material med högre nivå eller fler frågor för att se om det sitter även när frågorna vrids om.", "Create another exam from the same material at a higher level or with more questions to check your understanding from a different angle.")));
       root.appendChild(clean);
       return;
     }
 
     var primary = weak[0];
     var card = el("div", "xf-next");
-    card.appendChild(el("div", "xf-next-k", "Nästa träning"));
-    card.appendChild(el("h3", null, primary.concept ? "Börja med " + primary.concept : "Börja med den svagaste frågan"));
+    card.appendChild(el("div", "xf-next-k", tx("Nästa träning", "Next practice")));
+    card.appendChild(el("h3", null, primary.concept
+      ? tx("Börja med " + primary.concept, "Start with " + primary.concept)
+      : tx("Börja med den svagaste frågan", "Start with the question that needs the most work")));
 
     var intro = primary.feedback
       ? primary.feedback.replace(/^\s*Poäng:\s*\d+\s*\/\s*\d+\.?\s*/i, "")
-      : "Det här är den tydligaste luckan från rättningen.";
+      : tx("Det här är den tydligaste luckan från rättningen.", "This is the clearest gap identified in your results.");
     card.appendChild(el("p", null, intro.slice(0, 210)));
 
     var chips = el("div", "xf-next-list");
     weak.slice(0, 4).forEach(function (item, i) {
-      var label = item.concept || ("Fråga " + (i + 1));
+      var label = item.concept || tx("Fråga " + (i + 1), "Question " + (i + 1));
       chips.appendChild(el("span", null, label + " " + item.got + "/" + item.max));
     });
     card.appendChild(chips);
 
     var actions = el("div", "xf-next-actions");
-    var train = el("a", "xf-btn primary", "Träna misstagen");
+    var train = el("a", "xf-btn primary", tx("Träna misstagen", "Practise these topics"));
     train.href = "app.html#train";
     train.addEventListener("click", function () {
       lsSet(LS_TRAIN_PICK, {
@@ -277,7 +281,7 @@
     });
     actions.appendChild(train);
 
-    var ask = el("button", "xf-btn ghost", "Fråga P.E.R vad du ska göra");
+    var ask = el("button", "xf-btn ghost", tx("Fråga P.E.R vad du ska göra", "Ask P.E.R. what to do next"));
     ask.type = "button";
     ask.addEventListener("click", function () {
       var total = Number(result && result.total_points) || 0;
