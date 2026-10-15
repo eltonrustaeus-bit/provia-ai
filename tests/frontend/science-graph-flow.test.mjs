@@ -1,17 +1,37 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { Readable } from "node:stream";
 import { ROOT, serve, mockApis, seed } from "./_harness.mjs";
 import { chromium } from "playwright";
 
 const require = createRequire(import.meta.url);
 const graphAnswers = require("../../api/_graph.js");
+const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
+const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+const previousFetch = globalThis.fetch;
+const origin = "https://science-graph-contract.invalid";
+const userId = "22222222-2222-4222-8222-222222222222";
+const signingSecret = "synthetic-science-graph-signing-secret";
+const serviceCalls = [];
+for (const [key, value] of Object.entries({
+  SUPABASE_URL: origin,
+  SUPABASE_SECRET_KEY: "sb_secret_synthetic_only",
+  SUPABASE_SERVICE_ROLE_KEY: signingSecret,
+  OPENAI_API_KEY: "synthetic-provider-key",
+  EXAM_SIGNING_SECRET: signingSecret,
+})) process.env[key] = value;
+
+const generateExam = require("../../api/generate-exam.js");
+const gradeExam = require("../../api/grade.js");
 const server = await serve(ROOT, { indexFile: "app.html" });
 const browser = await chromium.launch({ headless: true });
 let generateBody = null;
+let generatedExam = null;
 let gradeBody = null;
 let retryBody = null;
 let retryCount = 0;
 let savedExam = null;
+let gradingState = "active";
 const sourceTable = {
   headers: ["Ljusnivå (steg)", "Grodda frön (antal)"],
   rows: [[0, 1], [1, 3], [2, 4]],
@@ -24,6 +44,108 @@ const graphSpec = {
   x_label: sourceTable.headers[0],
   y_label: sourceTable.headers[1],
 };
+const providerQuestions = [{
+  id: "biology-scatter-1",
+  type: "graph",
+  points: 3,
+  question: "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.",
+  options: [],
+  correct_index: -1,
+  rubric: "En poäng per rätt datapunkt.",
+  model_answer: "(0, 1), (1, 3), (2, 4)",
+  topic: "Mätdata",
+  subtopic: "Biologiskt försök",
+  concept_tag: "Mätdata",
+  learning_objective: "Återge en mätserie i ett punktdiagram.",
+  source_references: ["Mätserie"],
+  cognitive_level: "tillämpa",
+  accepted_answers: [],
+  estimated_answer_length: "none",
+  scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
+  graph_spec: graphSpec,
+}];
+
+function outputResponse(value) {
+  return Response.json({
+    model: "synthetic-review-model",
+    usage: { input_tokens: 41, output_tokens: 12 },
+    output: [{ content: [{ type: "output_text", text: JSON.stringify(value) }] }],
+  });
+}
+
+globalThis.fetch = async (input, init = {}) => {
+  const url = String(input);
+  const method = init.method || "GET";
+  const body = init.body ? JSON.parse(init.body) : null;
+  serviceCalls.push({ url, method, body });
+
+  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
+  if (url.startsWith(`${origin}/rest/v1/user_profiles?select=mastery`)) return Response.json([]);
+  if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) return Response.json({ ok: true, count: 1, limit: 3, period: "synthetic", unlimited: false });
+  if (url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) return Response.json({ committed: true });
+  if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
+  if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(gradingState);
+  if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
+    gradingState = "grading";
+    return Response.json("claimed");
+  }
+  if (url.endsWith("/rest/v1/rpc/release_exam_grading")) {
+    gradingState = "active";
+    return Response.json("released");
+  }
+  if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(0);
+  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) {
+    gradingState = "completed";
+    return Response.json("saved");
+  }
+  if (url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")) return Response.json("processed");
+  if (url.includes("/rest/v1/exam_issuances")) return method === "POST"
+    ? Response.json([{ submission_id: body.submission_id }], { status: 201 })
+    : new Response(null, { status: 204 });
+  if (url.includes("/rest/v1/mock_results")) return Response.json({ num_questions: 1 });
+  if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
+  if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
+  if (url.endsWith("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
+
+  if (url === "https://api.openai.com/v1/responses") {
+    const request = JSON.parse(init.body || "{}");
+    if (request.stream) {
+      const delta = { type: "response.output_text.delta", delta: JSON.stringify({ title: "Biologiprov", level: "C", questions: providerQuestions }) };
+      const completed = { type: "response.completed", response: { model: "synthetic-generator-model", usage: { input_tokens: 120, output_tokens: 40 } } };
+      return new Response(`data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
+    }
+    const schemaName = request.text?.format?.name;
+    if (schemaName === "exam_verifier_schema") return outputResponse({ results: providerQuestions.map((q) => ({
+      id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
+      source_alignment: 1, scoring_quality: 1, language_quality: 1, issues: [], required_changes: [],
+    })) });
+    if (schemaName === "exam_solver_schema") return outputResponse({ results: providerQuestions.map((q) => ({
+      id: q.id, option_verdicts: [], index: -1, confidence: 1, reason: "Syntetisk grafkontroll.",
+    })) });
+    throw new Error(`Unexpected synthetic provider schema: ${String(schemaName)}`);
+  }
+  throw new Error(`Unexpected synthetic request: ${method} ${url}`);
+};
+
+function invoke(handler, body) {
+  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  req.method = "POST";
+  req.headers = { authorization: "Bearer synthetic-user-token", "content-type": "application/json" };
+  return new Promise((resolve, reject) => {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      setHeader(name, value) { this.headers[name] = value; },
+      end(raw) {
+        try { resolve({ status: this.statusCode, body: JSON.parse(raw) }); }
+        catch (error) { reject(error); }
+      },
+    };
+    Promise.resolve(handler(req, res)).catch(reject);
+  });
+}
 
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -32,31 +154,9 @@ try {
     extra: [
       ["**/api/generate-exam", async (route) => {
         generateBody = route.request().postDataJSON();
-        await route.fulfill({ json: {
-          ok: true,
-          exam: {
-            title: "Biologiprov",
-            level: "C",
-            exam_manifest: "synthetic-biology-graph-manifest",
-            questions: [{
-              id: "biology-scatter-1",
-              type: "graph",
-              points: 3,
-              question: "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.",
-              grade_task: "opaque-biology-graph-task",
-              options: [],
-              topic: "Mätdata",
-              graph_ui: {
-                mode: "scatter",
-                point_count: 3,
-                x_label: sourceTable.headers[0],
-                y_label: sourceTable.headers[1],
-                source_table: sourceTable,
-              },
-            }],
-          },
-          meta: { quota: { enforced: false } },
-        } });
+        const generated = await invoke(generateExam, generateBody);
+        generatedExam = generated.body?.exam || null;
+        await route.fulfill({ status: generated.status, json: generated.body });
       }],
       ["**/api/grade", async (route) => {
         const body = route.request().postDataJSON();
@@ -76,22 +176,8 @@ try {
           return;
         }
         gradeBody = body;
-        const graphGrade = graphAnswers.gradeAnswer(body.answers[0].answer, graphSpec);
-        await route.fulfill({ json: {
-          ok: true,
-          exam_proof: `v2.${"c".repeat(32)}.syntheticBiologyGraphProof`,
-          result: {
-            total_points: graphGrade.points,
-            max_points: graphGrade.max_points,
-            per_question: [{
-              id: "biology-scatter-1",
-              points: graphGrade.points,
-              max_points: graphGrade.max_points,
-              feedback: graphGrade.feedback,
-              model_answer: graphAnswers.modelAnswer(graphSpec),
-            }],
-          },
-        } });
+        const graded = await invoke(gradeExam, body);
+        await route.fulfill({ status: graded.status, json: graded.body });
       }],
       ["**/rest/v1/user_exams*", async (route) => {
         if (route.request().method() === "POST") {
@@ -126,6 +212,12 @@ try {
   assert.equal(generateBody?.qType, "graph");
   assert.equal(generateBody?.numQuestions, 1);
   assert.equal(generateBody?.pastedText, material);
+  assert.equal(generatedExam?.questions?.[0]?.type, "graph");
+  assert.ok(generatedExam?.questions?.[0]?.grade_task, "the real generator issues opaque grading authority");
+  assert.equal(Object.hasOwn(generatedExam.questions[0], "graph_spec"), false);
+  assert.equal(Object.hasOwn(generatedExam.questions[0], "model_answer"), false);
+  assert.equal(await page.locator(".xf-exam.on .xf-q-text").count(), 1);
+  assert.match(await page.locator(".xf-exam.on .xf-q-text").innerText(), /Använd tabellens värden/i);
   assert.deepEqual(await page.locator(".xf-exam.on .xf-source-table thead th").allTextContents(), sourceTable.headers);
   assert.deepEqual(await page.locator(".xf-exam.on .xf-source-table tbody tr").allTextContents(), ["01", "13", "24"]);
   const scatterPointTabs = page.locator(".xf-exam.on .graph-answer--scatter .graph-point-tabs button");
@@ -164,7 +256,8 @@ try {
     type: "scatter",
     points: [{ x: 0, y: 1 }, { x: 1, y: 2 }, { x: 2, y: 4 }],
   });
-  assert.equal(gradeBody.questions?.[0]?.grade_task, "opaque-biology-graph-task");
+  assert.equal(gradeBody.questions?.[0]?.grade_task, generatedExam.questions[0].grade_task,
+    "the exact signed graph question issued by the backend reaches the grading handler");
   assert.equal("graph_spec" in (gradeBody.questions?.[0] ?? {}), false,
     "source coordinates are not sent as client-supplied grading authority");
   assert.equal(await page.locator(".xf-score.lead b").innerText(), "2/3");
@@ -246,10 +339,19 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true,
     "the science graph exam and result fit a 390px viewport");
+  assert.ok(serviceCalls.some((call) => call.url === "https://api.openai.com/v1/responses"),
+    "the API handlers ran through synthetic provider calls, not browser route fixtures");
+  assert.equal(serviceCalls.some((call) => call.url.includes("science-graph-contract.invalid")), true,
+    "generation and grading reached the synthetic Supabase boundary");
   assert.deepEqual(errors, [], "the Biology graph flow has no browser errors");
 } finally {
   await browser.close();
   await server.close();
+  globalThis.fetch = previousFetch;
+  for (const key of envKeys) {
+    if (previousEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = previousEnv[key];
+  }
 }
 
 console.log("science-graph-flow: Biology 1 source table -> scatter input -> deterministic result passed");
