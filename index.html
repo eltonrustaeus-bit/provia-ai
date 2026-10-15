@@ -2,6 +2,7 @@
 <html lang="sv">
 <head>
   <script src="/js/exgen-runtime.js"></script>
+  <script src="/js/pilot-public-surface.js"></script>
   <script src="/js/site-gate.js"></script>
   <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
@@ -88,6 +89,17 @@
   <!-- Mobilmenyns bindning. Låg tidigare inline i fem kopior. -->
     <noscript><style>.rev,.reveal{opacity:1!important;transform:none!important}</style></noscript>
   <style>
+  .pilotEntryOnly,.pilotBlockOnly,.pilotInlineOnly{display:none!important}
+  html[data-exgen-environment="pilot"] .publicOnly{display:none!important}
+  html[data-exgen-environment="pilot"] .pilotEntryOnly{display:inline-flex!important}
+  html[data-exgen-environment="pilot"] .pilotBlockOnly{display:block!important}
+  html[data-exgen-environment="pilot"] .pilotInlineOnly{display:inline!important}
+  html[data-exgen-environment="pilot"] #pricingStrip,
+  html[data-exgen-environment="pilot"] #parentPricingItem,
+  html[data-exgen-environment="pilot"] #faq-1,
+  html[data-exgen-environment="pilot"] #faq-4,
+  html[data-exgen-environment="pilot"] #faq-6,
+  html[data-exgen-environment="pilot"] .xg-footer a[href="pricing.html"]{display:none!important}
   /* ═══════════════════════════════════
      INDEX 2.0 — skolfokus (grundskola + gymnasium)
   ═══════════════════════════════════ */
@@ -452,7 +464,7 @@
   .parentT { font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;margin-bottom:6px; }
   .parentD { font-size:var(--fs-sm);color:var(--t2);line-height:1.65; }
   .parentNote { font-size:var(--exgen-text-xs);color:var(--t3);margin:var(--exgen-space-6) 0 0; }
-  .parentNote a { color:var(--a); }
+  .parentNote a { color:var(--a);text-decoration:underline;text-underline-offset:2px; }
 
   /* ── ETIKETT ──
      Fem regler med exakt samma deklarationer stod på var sitt håll i den här
@@ -707,10 +719,12 @@
 
         <div class="heroCtas" id="heroCtas">
           <div class="heroBtns">
-            <a class="ctaBtn" href="app.html" data-pv-auth="register">Skapa ditt första prov</a>
+            <a class="ctaBtn publicOnly" href="app.html" data-pv-auth="register">Skapa ditt första prov</a>
+            <a class="ctaBtn pilotEntryOnly" href="app.html" data-pv-auth="login">Logga in med skolpilotkonto</a>
           </div>
           <div class="heroMeta">
-            <p class="heroFine">Gratis att börja · inget kort krävs</p>
+            <p class="heroFine publicOnly">Gratis att börja · inget kort krävs</p>
+            <p class="heroFine pilotBlockOnly">Endast för inbjudna skolpilotkonton</p>
           </div>
         </div>
 
@@ -781,7 +795,8 @@
               <span class="demoBankEye">Felbank</span>
               <p id="demoBankText"></p>
             </div>
-            <a class="demoGo demoGo--final" href="app.html" data-pv-auth="register">Fortsätt med ditt eget material</a>
+            <a class="demoGo demoGo--final publicOnly" href="app.html" data-pv-auth="register">Fortsätt med ditt eget material</a>
+            <a class="demoGo demoGo--final pilotEntryOnly" href="app.html" data-pv-auth="login">Logga in med skolpilotkonto</a>
           </div>
 
         </div>
@@ -873,7 +888,7 @@
       <h2 class="secTitle">Vanliga frågor</h2>
 
       <div class="faqList">
-      <div class="faqItem">
+      <div class="faqItem" id="faq-1">
         <button class="faqQ" id="faq-1-q" type="button" aria-expanded="false" aria-controls="faq-1-answer">
           <span>Är det gratis att använda?</span>
           <div class="faqIco" aria-hidden="true">+</div>
@@ -897,7 +912,7 @@
         <div class="faqA" id="faq-3-answer" role="region" aria-labelledby="faq-3-q" hidden>Nej. ExGen skriver inte dina inlämningar — det gör prov på material du redan ska kunna, rättar dem och visar vad du missat. Det är studieteknik, ungefär som att göra gamla prov, fast på just din kurs. Ingen betygssättning sker här.</div>
       </div>
 
-      <div class="faqItem">
+      <div class="faqItem" id="faq-4">
         <button class="faqQ" id="faq-4-q" type="button" aria-expanded="false" aria-controls="faq-4-answer">
           <span>Kan jag avbryta prenumerationen när som helst?</span>
           <div class="faqIco" aria-hidden="true">+</div>
@@ -913,7 +928,7 @@
         <div class="faqA" id="faq-5-answer" role="region" aria-labelledby="faq-5-q" hidden>Ja, optimerat för mobil. Träna var som helst — alla sidor fungerar på telefon och surfplatta.</div>
       </div>
 
-      <div class="faqItem">
+      <div class="faqItem" id="faq-6">
         <button class="faqQ" id="faq-6-q" type="button" aria-expanded="false" aria-controls="faq-6-answer">
           <span>Vad händer när gratiskvoten tar slut?</span>
           <div class="faqIco" aria-hidden="true">+</div>
@@ -942,9 +957,13 @@
           <div class="parentT">Inga svar skrivs åt eleven</div>
           <div class="parentD">ExGen gör inte inlämningsuppgifter. Det ställer frågor på sådant eleven redan ska kunna, rättar svaren och visar vad som saknades. Ingen betygssättning sker här.</div>
         </div>
-        <div class="parentItem">
+        <div class="parentItem" id="parentPricingItem">
           <div class="parentT">0 kr att pröva</div>
           <div class="parentD">Tre prov i veckan är gratis och kräver inget kort. Vill ni ha mer kostar det 29 eller 79 kr i månaden, utan bindningstid.</div>
+        </div>
+        <div class="parentItem pilotBlockOnly">
+          <div class="parentT">Tillgång via skolpilot</div>
+          <div class="parentD">Testversionen är endast tillgänglig för inbjudna skolpilotkonton. Registrering och köp är inte öppna i pilotläget.</div>
         </div>
       </div>
       <p class="parentNote">
@@ -953,7 +972,7 @@
     </section>
 
     <!-- ═══ PRICING ═══ -->
-    <section class="pricingStrip rev" aria-label="Priser">
+    <section class="pricingStrip rev publicOnly" id="pricingStrip" aria-label="Priser">
       <div class="pCard">
         <div class="pLeft">
           <div class="pEye">Priser &amp; medlemskap</div>
@@ -1001,7 +1020,7 @@
   <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
     <span>© <span id="yr"></span> ExGen</span>
     <span>·</span>
-    <a href="pricing.html">Priser</a>
+    <a class="publicOnly" href="pricing.html">Priser</a>
     <span>·</span>
     <a href="app.html">Mockprov</a>
     <span>·</span>
@@ -1238,8 +1257,9 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 <!-- VISITOR BOTTOM NAV — hidden by shared.js when user is logged in -->
 <!-- JOIN CTA — appears after scrolling past hero -->
 <div id="joinCta" class="joinCta" aria-hidden="true" inert role="complementary">
-  <span class="joinCtaTxt">Gratis att starta<br>Inget kort krävs</span>
-  <button class="joinCtaBtn" id="joinCtaBtn" type="button">Skapa konto</button>
+  <span class="joinCtaTxt publicOnly">Gratis att starta<br>Inget kort krävs</span>
+  <span class="joinCtaTxt pilotBlockOnly">Endast för inbjudna skolpilotkonton</span>
+  <button class="joinCtaBtn" id="joinCtaBtn" type="button"><span class="publicOnly">Skapa konto</span><span class="pilotInlineOnly">Logga in</span></button>
 </div>
 
 <!-- Landing CTA bar — the auth modal is the shared shared.js pvModal -->
@@ -1271,7 +1291,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
   var joinBtn = document.getElementById('joinCtaBtn');
   if (joinBtn) joinBtn.addEventListener('click', function(){
-    document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: 'register' } }));
+    document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: window.ExGenRuntime.environment === 'pilot' ? 'login' : 'register' } }));
   });
 
   document.addEventListener('proviaNavReady', function(){ if (jc) { jc.style.display = 'none'; jc.inert = true; jc.setAttribute('aria-hidden', 'true'); document.body.classList.remove('joincta-on'); } });

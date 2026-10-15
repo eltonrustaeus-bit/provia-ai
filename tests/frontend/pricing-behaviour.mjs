@@ -48,7 +48,7 @@ async function mk(s = {}) {
   const extra = s.backendDisabled ? [
     ["**/js/exgen-runtime.js", route => route.fulfill({
       contentType: "application/javascript",
-      body: `window.ExGenRuntime = Object.freeze({ environment: "pilot", projectRef: "", supabaseUrl: "", publishableKey: "", appOrigin: "http://localhost", authStorageKey: "exgen-test-auth-token" });`,
+      body: `window.ExGenRuntime = Object.freeze({ environment: "unconfigured", projectRef: "", supabaseUrl: "", publishableKey: "", appOrigin: "http://localhost", authStorageKey: "exgen-test-auth-token" });`,
     })],
     ["**/supabase.min.js", route => route.fulfill({
       contentType: "application/javascript",
