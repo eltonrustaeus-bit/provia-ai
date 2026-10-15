@@ -86,6 +86,9 @@ const PLANS = [
   await page.waitForTimeout(100);
   const content = await page.locator("main").innerText();
   ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
+  const premiumDescription = await page.locator("#plan-premium .planDesc").innerText();
+  ok("0n Premium beskriver funktioner utan att utlova läranderesultat",
+    premiumDescription === "Personlig AI-coach och träning utifrån dina misstag." && !/maxa resultaten/i.test(premiumDescription));
   const impact = await page.locator("#zonImpact").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
   ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
