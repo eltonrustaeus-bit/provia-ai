@@ -2560,19 +2560,19 @@ try{
     // texten i stället för att skriva den i ett fält — flödet äger sin egen ruta.
     async ocr(file) {
       if (window.ExGenRuntime?.environment === "pilot") {
-        return { ok: false, error: "Bildinläsning är inte tillgänglig i skolpiloten." };
+        return { ok: false, error: LANG === "sv" ? "Bildinläsning är inte tillgänglig i skolpiloten." : "Image reading is not available in the school pilot." };
       }
       if (currentRole === "gratis") {
-        return { ok: false, error: "OCR ingår i Basic och uppåt.", upgrade: true };
+        return { ok: false, error: LANG === "sv" ? "OCR ingår i Basic och uppåt." : "OCR is included with Basic and above.", upgrade: true };
       }
       try {
         const dataUrl = await fileToDataUrl(file);
         const res = await postJson("/api/ocr", { imageDataUrl: dataUrl, lang: LANG });
-        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         return { ok: true, text: String(res.data.text || "").trim() };
       } catch (e) {
         reportErr(e);
-        return { ok: false, error: "Kunde inte läsa bilden." };
+        return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
       }
     },
 
@@ -2586,22 +2586,22 @@ try{
      * provflödet kan visa eleven vad avläsningen tvekade på. */
     async readSolution(file, questionText) {
       if (window.ExGenRuntime?.environment === "pilot") {
-        return { ok: false, error: "Fotoinlämning är inte tillgänglig i skolpiloten." };
+        return { ok: false, error: LANG === "sv" ? "Fotoinlämning är inte tillgänglig i skolpiloten." : "Photo answers are not available in the school pilot." };
       }
       if (currentRole === "gratis") {
-        return { ok: false, error: "Fotoinlämning ingår i Basic och uppåt.", upgrade: true };
+        return { ok: false, error: LANG === "sv" ? "Fotoinlämning ingår i Basic och uppåt." : "Photo answers are included with Basic and above.", upgrade: true };
       }
       try {
         const dataUrl = await downscaleImage(file, 1600, 0.85);
-        if (!dataUrl) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (!dataUrl) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         const res = await postJson("/api/ocr", {
           mode: "solution",
           imageDataUrl: dataUrl,
           questionText: String(questionText || "").slice(0, 2000),
           lang: LANG
         });
-        if (res.status === 403) return { ok: false, error: "Fotoinlämning ingår i Basic och uppåt.", upgrade: true };
-        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (res.status === 403) return { ok: false, error: LANG === "sv" ? "Fotoinlämning ingår i Basic och uppåt." : "Photo answers are included with Basic and above.", upgrade: true };
+        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         return {
           ok: true,
           readable: res.data.readable === true,
@@ -2611,7 +2611,7 @@ try{
         };
       } catch (e) {
         reportErr(e);
-        return { ok: false, error: "Kunde inte läsa bilden." };
+        return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
       }
     }
   };

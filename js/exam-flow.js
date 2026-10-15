@@ -74,7 +74,7 @@
     file.style.display = "none";
     file.className = "xf-photo-input";
 
-    var LABEL = "📷 Fota din lösning";
+    var LABEL = tx("📷 Fota din lösning", "📷 Add a photo of your solution");
     var btn = el("button", "xf-btn ghost xf-photo-btn", LABEL);
     btn.type = "button";
     btn.addEventListener("click", function () { file.click(); });
@@ -94,10 +94,13 @@
     file.addEventListener("change", function () {
       if (!file.files || !file.files[0]) return;
       var engine = window.ExGenEngine;
-      if (!engine || !engine.readSolution) { say("Fotoinlämning är inte tillgänglig här.", "bad"); return; }
+      if (!engine || !engine.readSolution) {
+        say(tx("Fotoinlämning är inte tillgänglig här.", "Photo answers are not available here."), "bad");
+        return;
+      }
 
       btn.disabled = true;
-      btn.textContent = "Läser din lösning…";
+      btn.textContent = tx("Läser din lösning…", "Reading your solution…");
       say("", null);
 
       engine.readSolution(file.files[0], q && q.question).then(function (r) {
@@ -107,12 +110,15 @@
         file.value = "";
 
         if (!r || !r.ok) {
-          say((r && r.error) || "Kunde inte läsa bilden.", "bad");
+          say((r && r.error) || tx("Kunde inte läsa bilden.", "Could not read the image."), "bad");
           return;
         }
         if (!r.readable) {
           // Textarean lämnas orörd — eleven kan ha skrivit något själv.
-          say("Jag kunde inte tyda bilden. Försök igen med bättre ljus, eller skriv svaret i rutan.", "bad");
+          say(tx(
+            "Jag kunde inte tyda bilden. Försök igen med bättre ljus, eller skriv svaret i rutan.",
+            "I couldn't read the image clearly. Try better lighting, or type your answer in the box."
+          ), "bad");
           return;
         }
 
@@ -124,9 +130,9 @@
         publish();
         armStuck();
 
-        var delar = ["Kontrollera att det stämmer innan du skickar in."];
+        var delar = [tx("Kontrollera att det stämmer innan du skickar in.", "Check that the transcription is correct before submitting.")];
         if (r.uncertain && r.uncertain.length) {
-          delar.push("Jag var osäker på: " + r.uncertain.join("; ") + ".");
+          delar.push(tx("Jag var osäker på: ", "I was unsure about: ") + r.uncertain.join("; ") + ".");
         }
         say(delar.join(" "), r.confidence < 0.7 ? "warn" : null);
         ta.focus();
@@ -1622,7 +1628,7 @@
 
   function openExam(resumedAt) {
     if (window.PER && window.PER.setExamHistoryMasked) window.PER.setExamHistoryMasked(true);
-    UI.languageRerender = null;
+    UI.languageRerender = function () { renderQuestion(); };
     if (window.dismissWelcome) window.dismissWelcome();
     document.body.classList.remove("xf-contract");
     // Vid återupptagning behålls den tid provet redan pågått. Att nollställa
@@ -1995,7 +2001,7 @@
     }
 
     var head = el("div", "xf-q-head");
-    head.appendChild(el("span", null, String(q.cognitive_level || "").trim() || "Uppgift"));
+    head.appendChild(el("span", null, String(q.cognitive_level || "").trim() || tx("Uppgift", "Task")));
     head.appendChild(el("span", "xf-q-pts", (Number(q.points) || 0) + " p"));
     sheet.appendChild(head);
 
@@ -2050,9 +2056,9 @@
       }
     } else {
       var ta = el("textarea", "xf-answer");
-      ta.placeholder = "Ditt svar…";
+      ta.placeholder = tx("Ditt svar…", "Your answer…");
       ta.value = S.answers[id] || "";
-      ta.setAttribute("aria-label", "Svar på fråga " + (i + 1));
+      ta.setAttribute("aria-label", tx("Svar på fråga ", "Answer to question ") + (i + 1));
       ta.addEventListener("input", function () {
         S.answers[id] = ta.value;
         saveDraftSoon();

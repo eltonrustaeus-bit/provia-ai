@@ -33,7 +33,7 @@ const EXAM = {
 const LÄST = { ok: true, readable: true, text: "$3x + 7 = 22$\n$3x = 15$\n$x = 8$", confidence: 0.92, uncertain: [] };
 
 /* ocr: vad /api/ocr ska svara. role: elevens roll (styr rollspärren). */
-async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium" } = {}) {
+async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium", language = "sv" } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   const anrop = [];
@@ -54,7 +54,7 @@ async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium" } = {}) {
       }],
     ],
   });
-  await seed(page, { user: { id: "u1", email: "u1@t.se" }, role });
+  await seed(page, { user: { id: "u1", email: "u1@t.se" }, role, lang: language });
   await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
@@ -94,6 +94,60 @@ try {
     R.ok("K2 flervalsfråga får ingen kameraknapp", await t.page.locator(".xf-photo-btn").count() === 0);
     await till(t.page, 3);
     R.ok("K2 gäller även sista flervalsfrågan", await t.page.locator(".xf-photo-btn").count() === 0);
+    await t.close();
+  }
+
+  /* ── Engelsk lokalisering ───────────────────────────────────────────────── */
+  {
+    const t = await öppna({ language: "en" });
+    await till(t.page, 2);
+    const answer = t.page.locator(".xf-answer");
+    R.ok("K9 fritextfältet har engelsk platshållare", await answer.getAttribute("placeholder") === "Your answer…");
+    R.ok("K9 fritextfältet har engelsk skärmläsaretikett", await answer.getAttribute("aria-label") === "Answer to question 2");
+    R.ok("K9 fotoknappen är lokaliserad", /Add a photo/.test(await t.page.locator(".xf-photo-btn").innerText()));
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K9 bekräftelse om avläsning är på engelska", /Check that the transcription is correct/.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", ocr: { ok: false } });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 OCR-fel är på engelska", note === "Could not read the image.", note);
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", ocr: { ok: true, readable: false, text: "", confidence: 0.1, uncertain: [] } });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 oläslig bild får engelsk vägledning", /I couldn't read the image clearly/.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna({
+      language: "en",
+      ocr: { ok: true, readable: true, text: "$x = 15$", confidence: 0.42, uncertain: ["line 1: could be 15 or 45"] },
+    });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 osäkra delar kommuniceras på engelska", /I was unsure about: line 1/.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", role: "gratis" });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K11 behörighetsbeskedet är på engelska", /Photo answers are included with Basic and above/.test(note), note);
     await t.close();
   }
 
