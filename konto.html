@@ -313,11 +313,13 @@
           Du kan lämna klassen när du vill — då slutar läraren se dig direkt.
         </p>
         <div id="myClasses" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+        <label class="kHelpText" for="joinCode" style="display:block;margin-bottom:6px">Klasskod från din lärare</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="joinCode" type="text" maxlength="12" placeholder="Klasskod (t.ex. K7P2QX)"
+          <input id="joinCode" type="text" maxlength="12" placeholder="t.ex. K7P2QX"
             style="flex:1;min-width:160px;padding:10px 13px;border-radius:var(--exgen-radius-md);border:1px solid var(--l);background:var(--s);color:var(--t);font-family:var(--font);font-size:14px;letter-spacing:.06em;text-transform:uppercase;outline:none" />
           <button class="kBtn kBtnOutline" id="joinBtn">Gå med</button>
         </div>
+        <p id="joinStatus" class="kHelpText" role="status" aria-live="polite" hidden style="margin:10px 0 0"></p>
       </div>
     </div>
 
@@ -601,14 +603,22 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     const code=inp.value.trim();
     if(!code){ showMsg("Ange en klasskod.","err"); return; }
     const btn=document.getElementById("joinBtn");
-    btn.disabled=true; btn.textContent="…";
+    if(btn.disabled)return;
+    const status=document.getElementById("joinStatus");
+    btn.disabled=true; btn.textContent="Ansluter…";
+    btn.setAttribute("aria-busy","true");
+    status.textContent="Ansluter till klassen…";
+    status.hidden=false;
     try{
       const {class:cls}=await callRole("student_join",{code});
       inp.value="";
       showMsg(`Du gick med i "${cls.name}".`,"ok");
       await loadMyClasses();
     }catch(e){ showMsg("Fel: "+e.message,"err"); }
-    finally{ btn.disabled=false; btn.textContent="Gå med"; }
+    finally{
+      btn.disabled=false; btn.textContent="Gå med"; btn.removeAttribute("aria-busy");
+      status.hidden=true; status.textContent="";
+    }
   }
 
   async function leaveClass(id,name){
