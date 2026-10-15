@@ -53,6 +53,9 @@ const signingSecret = "synthetic-invalid-output-secret";
 let providerOutput = "";
 const calls = [];
 const usageBatches = [];
+let issuanceState = "active";
+let persistedPayload = null;
+let persistenceOutcome = "saved";
 Object.assign(process.env, {
   SUPABASE_URL: origin,
   SUPABASE_SERVICE_ROLE_KEY: "synthetic-server-key",
@@ -63,11 +66,25 @@ delete process.env.SUPABASE_SECRET_KEY;
 
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
+  const body = init.body ? JSON.parse(init.body) : {};
   calls.push(url);
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
-  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json("active");
-  if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) return Response.json("claimed");
-  if (url.endsWith("/rest/v1/rpc/release_exam_grading")) return Response.json("released");
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(issuanceState);
+  if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
+    issuanceState = "grading";
+    return Response.json("claimed");
+  }
+  if (url.endsWith("/rest/v1/rpc/release_exam_grading")) {
+    issuanceState = "active";
+    return Response.json("released");
+  }
+  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) {
+    persistedPayload = body.p_result_payload;
+    issuanceState = "completed";
+    return Response.json(persistenceOutcome);
+  }
+  if (url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")) return Response.json("processed");
+  if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(0);
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.includes("/rest/v1/feature_flags") || url.includes("/rest/v1/user_profiles")) return Response.json([]);
   if (url.endsWith("/rest/v1/ai_usage_events")) {
@@ -156,6 +173,21 @@ try {
     assert.equal(usageBatches.at(-1)?.[0]?.pipeline_step, "grade", "even invalid paid grading is measured");
     assert.equal(usageBatches.at(-1)?.[0]?.input_tokens, 55);
   }
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerOutput = JSON.stringify({ per_question: expected.map((item) => ({
+    ...row(item.id),
+    model_answer: "Motsägande facit från rättningsmodellen.",
+  })) });
+  const graded = await invoke(body);
+  assert.equal(graded.status, 200, JSON.stringify({ body: graded.body, persistedPayload, issuanceState }));
+  assert.deepEqual(graded.body.result.per_question.map((item) => item.model_answer), [
+    "En kort beskrivning.", "En kort beskrivning.",
+  ], "the signed answer key is returned instead of a contradictory grader answer");
+  assert.deepEqual(persistedPayload.per_question.map((item) => item.model_answer), [
+    "En kort beskrivning.", "En kort beskrivning.",
+  ], "the saved exam result also preserves the signed answer key");
 } finally {
   globalThis.fetch = oldFetch;
   for (const [key, value] of Object.entries(oldEnv)) {

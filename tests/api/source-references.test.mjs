@@ -24,6 +24,15 @@ test("normalizes Unicode compatibility forms and whitespace before matching", ()
   ]), ["Elevens lärande är viktigt.", "Kapitel １", "ＡＴＰ lagrar energi."]);
 });
 
+test("requires whole word and phrase boundaries without breaking Swedish or punctuation", () => {
+  assert.deepEqual(filterSourceReferences("Biodiversity. Matters are discussed in Östergötland.", [
+    "diversity",
+    "matters",
+    "Östergötland",
+    "biodiversity.",
+  ]), ["matters", "Östergötland", "biodiversity."]);
+});
+
 test("rejects malformed, empty, overlong and non-array references", () => {
   assert.deepEqual(filterSourceReferences("Källmaterial", [
     null, 4, "", "   ", "x".repeat(501), "påhittad",

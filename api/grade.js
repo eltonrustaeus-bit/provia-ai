@@ -896,7 +896,9 @@ module.exports = async function handler(req, res) {
           points: pts,
           max_points: mp,
           feedback: String(got.feedback || ""),
-          model_answer: String(got.model_answer || item.model_answer || item.rubric || ""),
+          // The signed grading task is the source of truth when it carries an
+          // answer key; a grader-model response must not replace that key.
+          model_answer: String(item.model_answer || got.model_answer || item.rubric || ""),
           concept_tag: conceptTag,
           error_tags: errorTags
         });
