@@ -396,8 +396,8 @@ body.xf-grading .xf-progress { display: none; }
 .graph-sr-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .graph-grid line { stroke: var(--xf-line); stroke-width: .7; }
 .graph-axes line { stroke: var(--xf-ink-2); stroke-width: 1.6; }
-.graph-tick-labels text { fill: var(--xf-ink-2); font: 6.5px var(--exgen-font-mono); pointer-events: none; }
-.graph-answer--scaled .graph-tick-labels text { font-size: 8px; }
+.graph-tick-labels text { fill: var(--xf-ink-2); font: 9px var(--exgen-font-mono); pointer-events: none; }
+.graph-answer--scaled .graph-tick-labels text { font-size: 9.5px; }
 .graph-tick-labels .graph-axis-name { fill: var(--xf-ink); font-size: 8px; font-weight: 600; }
 .graph-student-line { stroke: var(--xf-accent); stroke-width: 2.5; }
 .graph-mark circle { fill: var(--xf-accent); stroke: var(--s); stroke-width: 1.5; }
@@ -409,6 +409,13 @@ body.xf-grading .xf-progress { display: none; }
 .graph-coordinate-fields input[aria-invalid="true"] { border-color: var(--danger); }
 .graph-validation-message { margin: 0 0 10px; color: var(--danger); font-size: var(--exgen-text-sm); line-height: var(--exgen-leading-relaxed); }
 .graph-clear { font-size: var(--exgen-text-sm); }
+
+@media (max-width: 600px) {
+  .xf-input,
+  .xf-area,
+  .xf-answer,
+  .graph-coordinate-fields input { font-size: 16px; }
+}
 
 .xf-ask {
   position: relative;

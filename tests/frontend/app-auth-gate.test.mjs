@@ -39,6 +39,11 @@ try {
   await page.locator("#authGateAction").click();
   await page.locator("#pvModal").waitFor({ state: "visible" });
   assert.equal(await page.getByRole("dialog", { name: "Skapa konto" }).count(), 1, "create-account action opens registration");
+  const mobileAuthFonts = await page.locator("#pvRE, #pastedText").evaluateAll(elements =>
+    elements.map(element => Number.parseFloat(getComputedStyle(element).fontSize)));
+  assert.equal(mobileAuthFonts.length, 2, "mobile auth and material controls are both present for typography QA");
+  assert.ok(mobileAuthFonts.every(size => size >= 16),
+    `mobile form controls avoid iOS focus zoom: ${JSON.stringify(mobileAuthFonts)}`);
   await page.locator("#pvCl").click();
   await page.locator("#pvModal").waitFor({ state: "hidden" });
   await page.locator("#authGateLogin").click();

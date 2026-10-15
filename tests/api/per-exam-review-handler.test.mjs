@@ -290,23 +290,26 @@ test("post-exam review follows the requested English language without weakening 
   }
 });
 
-test("a verified post-grade review ignores stale finished-exam metadata", async () => {
-  calls.length = 0;
+test("verified post-grade review ignores stale finished, expired, and abandoned client metadata", async () => {
   activeCount = 0;
   issuanceState = "completed";
   const submissionId = proof.receipt.split(".")[1];
   try {
-    const response = await invoke({
-      examReview: true,
-      examProof: proof,
-      pageContext: { examState: { phase: "finished", submissionId } },
-    });
-    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
-    assert.equal(response.body.reviewMode, "personalized");
-    assert.match(response.body.answer, /lutningen/i);
-    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/active_exam_count")));
-    assert.ok(calls.every(({ url, body }) => !url.includes("/rest/v1/rpc/exam_issuance_state") ||
-      !String(body).includes(submissionId)));
+    for (const phase of ["finished", "expired", "abandoned"]) {
+      calls.length = 0;
+      const response = await invoke({
+        examReview: true,
+        examProof: proof,
+        pageContext: { examState: { phase, submissionId } },
+      });
+      assert.equal(response.statusCode, 200, `${phase}: ${JSON.stringify(response.body)}`);
+      assert.equal(response.body.reviewMode, "personalized", phase);
+      assert.match(response.body.answer, /lutningen/i, phase);
+      assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/active_exam_count")), phase);
+      assert.ok(calls.every(({ url, body }) => !url.includes("/rest/v1/rpc/exam_issuance_state") ||
+        !String(body).includes(submissionId)), `${phase}: stale client metadata is not used as authority`);
+      assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results")), `${phase}: saved result is reverified`);
+    }
   } finally {
     issuanceState = "active";
   }

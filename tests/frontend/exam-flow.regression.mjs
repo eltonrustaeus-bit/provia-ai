@@ -94,9 +94,9 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
-const signIn = async (page, uid, lang = "sv", storage = {}) => {
+const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") => {
   await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
-  await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role: "premium" }] }));
+  await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role }] }));
   await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang, storage });
 };
 
@@ -206,6 +206,46 @@ async function toMaterial(page) {
   await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
   await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+}
+
+// Free-plan students see the OCR requirement before opening the camera; paid
+// plans retain the direct image-input control.
+{
+  const free = await mk();
+  try {
+    await signIn(free.page, "free-ocr", "sv", {}, "gratis");
+    await toMaterial(free.page);
+    const link = free.page.locator('.xf-screen[data-screen="material"] a[href="pricing.html#plan-basic"]');
+    ok("gratisplanen visar Basic+ innan kameran öppnas", await link.isVisible()
+      && /Bildinläsning · Basic\+/.test(await link.innerText()));
+    ok("gratisplanen erbjuder ingen dold kameraväljare", await free.page.locator(
+      '.xf-screen[data-screen="material"] input[type="file"]'
+    ).count() === 0);
+  } finally { await free.ctx.close(); }
+
+  const paid = await mk();
+  try {
+    await signIn(paid.page, "basic-ocr", "sv", {}, "basic");
+    await toMaterial(paid.page);
+    ok("Basic behåller direkt kameraval för OCR", await paid.page.locator(
+      '.xf-screen[data-screen="material"] button:has-text("Fota en sida i stället")'
+    ).isVisible());
+  } finally { await paid.ctx.close(); }
+
+  for (const [role, lang, label] of [["teacher", "sv", "lärarroll"], ["unknown", "en", "okänd roll"]]) {
+    const restricted = await mk();
+    try {
+      await signIn(restricted.page, `restricted-ocr-${role}`, lang, {}, role);
+      await toMaterial(restricted.page);
+      const linkText = lang === "sv" ? "Bildinläsning · Basic+" : "Image reading · Basic+";
+      const link = restricted.page.locator('.xf-screen[data-screen="material"] a[href="pricing.html#plan-basic"]');
+      ok(`${label} får Basic+-länken på ${lang === "sv" ? "svenska" : "engelska"}`, await link.isVisible()
+        && (await link.innerText()).includes(linkText));
+      ok(`${label} får ingen OCR-filväljare`, await restricted.page.locator(
+        '.xf-screen[data-screen="material"] input[type="file"]'
+      ).count() === 0);
+    } finally { await restricted.ctx.close(); }
+  }
 }
 
 // Long source text must be preserved up to the shared 12,000-character cap;

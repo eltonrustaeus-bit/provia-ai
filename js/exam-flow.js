@@ -1290,35 +1290,43 @@
     if (!(window.ExGenRuntime && window.ExGenRuntime.environment === "pilot")) {
     var ocrWrap = el("div", "xf-act");
     ocrWrap.style.marginTop = "14px";
-    var file = el("input");
-    file.type = "file";
-    file.accept = "image/*";
-    file.setAttribute("capture", "environment");
-    file.style.display = "none";
-    var ocrBtn = el("button", "xf-btn ghost", tx("Fota en sida i stället", "Take a photo of a page instead"));
-    ocrBtn.type = "button";
-    ocrBtn.addEventListener("click", function () { file.click(); });
-    file.addEventListener("change", function () {
-      if (!file.files || !file.files[0]) return;
-      var selectedFile = file.files[0];
-      file.value = "";
-      ocrBtn.disabled = true;
-      ocrBtn.textContent = tx("Läser bilden…", "Reading image…");
-      busy(true);
-      window.ExGenEngine.ocr(selectedFile).then(function (r) {
-        busy(false);
-        ocrBtn.disabled = false;
-        ocrBtn.textContent = tx("Fota en sida i stället", "Take a photo of a page instead");
-        if (r && r.ok && r.text) {
-          ta.value = (ta.value ? ta.value + "\n\n" : "") + r.text;
-          onType();
-        } else {
-          err.textContent = (r && r.error) || tx("Kunde inte läsa bilden. Prova en tydligare bild.", "Could not read the image. Try a clearer photo.");
-        }
+    var ocrRole = String(window.ExGenEngine && window.ExGenEngine.role ? window.ExGenEngine.role() : "gratis");
+    var canUseOcr = ["basic", "premium", "admin", "user"].indexOf(ocrRole) !== -1;
+    if (!canUseOcr) {
+      var ocrPlanLink = el("a", "xf-btn ghost", tx("Bildinläsning · Basic+", "Image reading · Basic+"));
+      ocrPlanLink.href = "pricing.html#plan-basic";
+      ocrWrap.appendChild(ocrPlanLink);
+    } else {
+      var file = el("input");
+      file.type = "file";
+      file.accept = "image/*";
+      file.setAttribute("capture", "environment");
+      file.style.display = "none";
+      var ocrBtn = el("button", "xf-btn ghost", tx("Fota en sida i stället", "Take a photo of a page instead"));
+      ocrBtn.type = "button";
+      ocrBtn.addEventListener("click", function () { file.click(); });
+      file.addEventListener("change", function () {
+        if (!file.files || !file.files[0]) return;
+        var selectedFile = file.files[0];
+        file.value = "";
+        ocrBtn.disabled = true;
+        ocrBtn.textContent = tx("Läser bilden…", "Reading image…");
+        busy(true);
+        window.ExGenEngine.ocr(selectedFile).then(function (r) {
+          busy(false);
+          ocrBtn.disabled = false;
+          ocrBtn.textContent = tx("Fota en sida i stället", "Take a photo of a page instead");
+          if (r && r.ok && r.text) {
+            ta.value = (ta.value ? ta.value + "\n\n" : "") + r.text;
+            onType();
+          } else {
+            err.textContent = (r && r.error) || tx("Kunde inte läsa bilden. Prova en tydligare bild.", "Could not read the image. Try a clearer photo.");
+          }
+        });
       });
-    });
-    ocrWrap.appendChild(ocrBtn);
-    ocrWrap.appendChild(file);
+      ocrWrap.appendChild(ocrBtn);
+      ocrWrap.appendChild(file);
+    }
     b.appendChild(ocrWrap);
     }
 

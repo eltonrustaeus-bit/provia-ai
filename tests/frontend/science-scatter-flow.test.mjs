@@ -161,6 +161,13 @@ async function verifyScatterScenario(scenario) {
     `${scenario.id} table and graph do not create horizontal overflow on mobile`);
   await page.waitForFunction(() => Number(getComputedStyle(document.querySelector("#xf .xf-exam.on .xf-sheet")).opacity) === 1);
   const graphSvg = exam.locator(".graph-answer svg");
+  await page.setViewportSize({ width: 320, height: 844 });
+  const tickFontSize = await graphSvg.locator(".graph-tick-labels text:not(.graph-axis-name)").first()
+    .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  assert.ok(tickFontSize >= 9, `${scenario.id} graph tick labels remain readable at 320px (${tickFontSize}px)`);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true,
+    `${scenario.id} graph labels fit a 320px viewport without horizontal overflow`);
+  await page.setViewportSize({ width: 390, height: 844 });
   if (scenario.graph) {
     const tickLabels = graphSvg.locator(".graph-tick-labels text");
     assert.equal(await tickLabels.first().getAttribute("y"), "247",

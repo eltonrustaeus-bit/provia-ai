@@ -102,6 +102,12 @@ async function toContract(page) {
   await page.waitForTimeout(250);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
     "Cellandning sker i mitokondrien. Glykolysen sker i cytoplasman och ger 2 ATP. Citronsyracykeln sker i mitokondriens matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos. Mjölksyra ansamlas i muskeln vid syrebrist under hårt arbete.");
+  const materialFont = await page.locator("#xf .xf-screen[data-screen='material'] .xf-area")
+    .evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+  const viewportWidth = page.viewportSize().width;
+  if (viewportWidth <= 640 && materialFont < 16) {
+    add("MEDEL", `${viewportWidth}px`, `Materialfältets text är ${materialFont}px och kan utlösa iOS-zoom`, ".xf-area", "Använd minst 16px i mobila inmatningsfält");
+  }
   await page.waitForTimeout(200);
   await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
   await page.waitForTimeout(250);
