@@ -2443,6 +2443,9 @@ try{
     // OCR går via samma endpoint och samma rollspärr som ocrBtn. Returnerar
     // texten i stället för att skriva den i ett fält — flödet äger sin egen ruta.
     async ocr(file) {
+      if (window.ExGenRuntime?.environment === "pilot") {
+        return { ok: false, error: "Bildinläsning är inte tillgänglig i skolpiloten." };
+      }
       if (currentRole === "gratis") {
         return { ok: false, error: "OCR ingår i Basic och uppåt.", upgrade: true };
       }
@@ -2466,6 +2469,9 @@ try{
      * Returnerar hela kontraktet vidare (readable/confidence/uncertain) så att
      * provflödet kan visa eleven vad avläsningen tvekade på. */
     async readSolution(file, questionText) {
+      if (window.ExGenRuntime?.environment === "pilot") {
+        return { ok: false, error: "Fotoinlämning är inte tillgänglig i skolpiloten." };
+      }
       if (currentRole === "gratis") {
         return { ok: false, error: "Fotoinlämning ingår i Basic och uppåt.", upgrade: true };
       }

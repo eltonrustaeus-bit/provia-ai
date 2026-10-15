@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { buildCandidate, collectFunctionPlan, collectStaticFiles, packageClosure, PILOT_ROUTES, sanitizePilotHtml, verifyCandidateOutput, verifyPilotHtml } from "../../tools/build-pilot-candidate.mjs";
+import { buildCandidate, collectFunctionPlan, collectStaticFiles, packageClosure, PILOT_ROUTES, PILOT_UI_HELD_OUT_ROUTES, sanitizePilotHtml, verifyCandidateOutput, verifyPilotHtml } from "../../tools/build-pilot-candidate.mjs";
 import { ROOT } from "../frontend/_harness.mjs";
 
 test("pilot candidate plan has a narrow page and route allowlist", () => {
@@ -22,7 +23,16 @@ test("pilot candidate plan has a narrow page and route allowlist", () => {
   assert.ok(!files.includes("pricing.html"));
   assert.ok(!files.includes("larare.html"));
   assert.ok(!files.includes("admin.html"));
-  assert.deepEqual(PILOT_ROUTES, ["check-role", "explain", "generate-exam", "grade"]);
+  assert.deepEqual(PILOT_ROUTES, ["abandon-exam", "check-role", "explain", "generate-exam", "grade"]);
+  assert.deepEqual(PILOT_UI_HELD_OUT_ROUTES, ["create-checkout-session", "ocr", "signup"]);
+
+  const referencedRoutes = new Set();
+  for (const file of files.filter((item) => /\.(?:html|js|mjs)$/i.test(item) && existsSync(path.join(ROOT, item)))) {
+    const source = readFileSync(path.join(ROOT, file), "utf8");
+    for (const match of source.matchAll(/\/api\/([a-z0-9-]+)/gi)) referencedRoutes.add(match[1]);
+  }
+  assert.deepEqual([...referencedRoutes].sort(), [...PILOT_ROUTES, ...PILOT_UI_HELD_OUT_ROUTES].sort(),
+    "every API route referenced by packaged UI is either included or explicitly held out");
 });
 
 test("function plans include only each route's local module closure and runtime data", () => {

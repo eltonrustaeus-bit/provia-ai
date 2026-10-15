@@ -2742,6 +2742,17 @@ function finalizeMsg(div, text) {
       var token = q.get('access_token');
       if (!token) return;
 
+      var email = jwtEmail(token);
+      clean();
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        onReady(function() {
+          openModal('login');
+          var message = document.getElementById('pvLE2');
+          if (message) message.textContent = 'Google-inloggning är inte tillgänglig i skolpiloten. Logga in med ditt inbjudna skolpilotkonto.';
+        });
+        return;
+      }
+
       var ttl = Number(q.get('expires_in') || 3600);
       saveSession({
         access_token: token,
@@ -2750,9 +2761,6 @@ function finalizeMsg(div, text) {
         expires_at: Math.floor(Date.now() / 1000) + ttl,
         token_type: q.get('token_type') || 'bearer'
       });
-      clean();
-
-      var email = jwtEmail(token);
 
       /* Supabase creates the user itself on this path, so the signup branch
          never runs and nothing would send the welcome mail. This is the same

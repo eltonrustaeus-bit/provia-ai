@@ -824,6 +824,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   /* CHECKOUT */
   window.startCheckout=async function(plan){
+    if(pilotMode){showMsg("Betalning är inte tillgänglig i skolpiloten.","err");return}
     const btn=document.querySelector(`[onclick="startCheckout('${plan}')"]`);
     const orig=btn.textContent;btn.disabled=true;btn.textContent="Laddar…";
     try{

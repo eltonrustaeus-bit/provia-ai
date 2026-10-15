@@ -14,7 +14,8 @@ const BUILD_RECIPE_FILES = [
   "package.json",
   "package-lock.json",
 ];
-export const PILOT_ROUTES = ["check-role", "explain", "generate-exam", "grade"];
+export const PILOT_ROUTES = ["abandon-exam", "check-role", "explain", "generate-exam", "grade"];
+export const PILOT_UI_HELD_OUT_ROUTES = ["create-checkout-session", "ocr", "signup"];
 const PILOT_ENV = { EXGEN_PILOT_MODE: "true" };
 const RUNTIME_PLACEHOLDER = `window.ExGenRuntime = Object.freeze({
   environment: "pilot",
