@@ -88,7 +88,7 @@ const PLANS = [
   ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
   const impact = await page.locator("#zonImpact").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
-  ok("0h Impact skiljer plan från nuläge", /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
+  ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
   ok("0i Impact lovar inte elevmånader eller effektresultat", /köp är ännu inte kopplade till Impact/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
   ok("0l Impact skiljer tillgång från läranderesultat", /tillgång för en elev under en månad, inte ett löfte om förbättrat resultat/i.test(impact) && /Finansierad, aktiverad och använd tillgång ska redovisas var för sig/i.test(impact));
   ok("0m Impact kräver kostnadsunderlag och skolgodkännande", /AI, drift och betalningar kostar/i.test(impact) && /skolans godkännande behövs/i.test(impact));
