@@ -257,7 +257,31 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   await page.waitForSelector("#xf .xf-screen.on");
   await page.waitForTimeout(600);
 
-  // hur många tabbar innan man når "Skapa prov"?
+  // Use the skip link first, as a keyboard user can, then verify focus enters
+  // the visible exam landmark before counting the remaining tab stops.
+  await page.keyboard.press("Tab");
+  const skipStart = await page.evaluate(() => {
+    const link = document.querySelector("#appSkipLink");
+    const target = link && document.querySelector(link.getAttribute("href"));
+    return {
+      first: document.activeElement === link,
+      href: link?.getAttribute("href") || "",
+      hidden: !target || target.hasAttribute("hidden") || target.getClientRects().length === 0,
+    };
+  });
+  if (!skipStart.first) add("MEDEL", "tangentbord", "Skip-länken är inte den första tabbplatsen", "#appSkipLink", "Kontrollera DOM-ordningen");
+  else if (skipStart.hidden) add("HÖG", "tangentbord", `Skip-länken pekar på en dold eller saknad målsektion (${skipStart.href})`, "app.html .skip-link", "Peka på den synliga huvudytan");
+  else {
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(40);
+    const landedOnMain = await page.evaluate(() => {
+      const target = document.querySelector(document.querySelector("#appSkipLink")?.getAttribute("href") || "");
+      return Boolean(target && document.activeElement === target);
+    });
+    if (!landedOnMain) add("MEDEL", "tangentbord", "Skip-länken navigerar men flyttar inte fokus till målsektionen", "#appSkipLink", "Säkerställ fokuserbart mål");
+  }
+
+  // Count remaining tabs after the skip-link action.
   let tabs = 0, reached = false;
   for (; tabs < 60; tabs++) {
     const f = await page.evaluate(() => {
@@ -267,8 +291,8 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
     if (/xf-btn primary/.test(f.cls) && /Skapa prov/.test(f.txt)) { reached = true; break; }
     await page.keyboard.press("Tab");
   }
-  if (!reached) add("MEDEL", "tangentbord", "Nådde inte 'Skapa prov' inom 60 tabbar", "#xf", "Kontrollera tabordning");
-  else if (tabs > 12) add("MEDEL", "tangentbord", `${tabs} tabbtryck krävs innan startknappen nås — hela sidhuvudet ligger före`, "#xf", "Skip-länk till #xf (pekar i dag på dolt <main>)");
+  if (!reached) add("MEDEL", "tangentbord", "Nådde inte 'Skapa prov' inom 60 tabbar efter skip-länken", "#xf", "Kontrollera tabordning");
+  else if (tabs > 2) add("MEDEL", "tangentbord", `${tabs} tabbtryck krävs efter skip-länken innan startknappen nås`, "#xf", "Kontrollera första interaktiva kontrollen");
 
   // fokus efter skärmbyte
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
@@ -281,7 +305,7 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   if (focusAfter.isBody || !focusAfter.inActive)
     add("MEDEL", "tangentbord", "Fokus flyttas inte till den nya skärmen vid steg­byte — det hamnar på body eller på en knapp som försvunnit", "js/exam-flow.js screen()", "Ge aktiv skärms rubrik tabindex=-1 och fokusera den");
 
-  // skip-länk
+  // The link must continue to target a visible region after the screen changes.
   const skip = await page.evaluate(() => {
     const a = document.querySelector(".skip-link");
     if (!a) return null;
@@ -290,7 +314,7 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
     return { href, targetHidden: t ? t.hasAttribute("hidden") : "saknas" };
   });
   if (skip && skip.targetHidden === true)
-    add("HÖG", "tangentbord", `Skip-länken pekar på ${skip.href} som är hidden — tangentbordshoppet landar i ingenting`, "app.html .skip-link", "Peka på #xf");
+    add("HÖG", "tangentbord", `Skip-länken pekar på ${skip.href} som är hidden — tangentbordshoppet landar i ingenting`, "app.html .skip-link", "Peka på synlig målsektion");
 
   // landmark + h1
   const sem = await page.evaluate(() => ({
