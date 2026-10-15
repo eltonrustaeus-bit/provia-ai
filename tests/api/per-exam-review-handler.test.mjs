@@ -216,6 +216,28 @@ test("post-exam review follows the requested English language without weakening 
   }
 });
 
+test("a verified post-grade review ignores stale finished-exam metadata", async () => {
+  calls.length = 0;
+  activeCount = 0;
+  issuanceState = "completed";
+  const submissionId = proof.receipt.split(".")[1];
+  try {
+    const response = await invoke({
+      examReview: true,
+      examProof: proof,
+      pageContext: { examState: { phase: "finished", submissionId } },
+    });
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    assert.equal(response.body.reviewMode, "personalized");
+    assert.match(response.body.answer, /lutningen/i);
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/active_exam_count")));
+    assert.ok(calls.every(({ url, body }) => !url.includes("/rest/v1/rpc/exam_issuance_state") ||
+      !String(body).includes(submissionId)));
+  } finally {
+    issuanceState = "active";
+  }
+});
+
 test("an empty English post-exam response uses a localized retry message", async () => {
   calls.length = 0;
   const previousAnswer = providerAnswer;
@@ -344,7 +366,11 @@ test("a second active exam blocks post-grade review of an earlier exam", async (
   calls.length = 0;
   activeCount = 1;
   try {
-    const response = await invoke({ examReview: true, examProof: proof });
+    const response = await invoke({
+      examReview: true,
+      examProof: proof,
+      pageContext: { examState: { phase: "finished", submissionId: proof.receipt.split(".")[1] } },
+    });
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.examActive, true);
     assert.equal(response.body.reviewDeferred, true);
@@ -1071,6 +1097,23 @@ test("a verified post-grade explanation holds and releases its answer lease", as
   const providerIndex = calls.findIndex(({ url }) => url === "https://api.openai.com/v1/responses");
   const releaseIndex = calls.findIndex(({ url }) => url.includes("release_per_answer_lease"));
   assert.ok(acquireIndex >= 0 && providerIndex > acquireIndex && releaseIndex > providerIndex);
+});
+
+test("an exam issued during post-grade review is caught by the atomic answer lease", async () => {
+  calls.length = 0;
+  activeCount = 0;
+  answerLeaseState = "exam_active";
+  try {
+    const response = await invoke({ examReview: true, examProof: proof });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.examActive, true);
+    assert.equal(response.body.reviewDeferred, true);
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("consume_per_chat_quota")));
+  } finally {
+    answerLeaseState = "acquired";
+  }
 });
 
 test("provider failure still releases the per-answer lease", async () => {

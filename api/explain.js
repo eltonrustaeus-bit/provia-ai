@@ -621,6 +621,20 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
 }
 
 async function gateActiveExam(req, res, body, user) {
+  // A verified post-grade request carries its own signed completion proof.
+  // Treat client issuance metadata as stale display context here; still block
+  // while any exam is active, and let the answer lease close the issuance race.
+  if (body.examReview === true) {
+    const activeCount = await examIssuance.activeExamCount(user.id);
+    if (activeCount === null) {
+      res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+      return true;
+    }
+    if (activeCount === 0) return false;
+    sendActiveExamGuidance(req, res, body);
+    return true;
+  }
+
   const examState = body.pageContext?.examState;
   const submissionId = String(examState?.submissionId || "");
   const hasSubmissionId = /^[a-f0-9]{32}$/.test(submissionId);
