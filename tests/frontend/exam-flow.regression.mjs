@@ -207,6 +207,63 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// Long source text must be preserved up to the shared 12,000-character cap;
+// the student must never proceed with a silently shortened source.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "material-limit-user");
+    await toMaterial(page);
+    await page.setViewportSize({ width: 320, height: 740 });
+    const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
+    const next = page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await area.fill("x".repeat(12001));
+    const overLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("aktivt materialflöde varnar och stoppar över 12 000 tecken",
+      /12.?000/.test(overLimit || "") && /korta ner/.test(overLimit || "") && await next.isDisabled(), overLimit || "");
+    ok("övergränsmaterialet bevaras redigerbart",
+      (await area.inputValue()).length === 12001);
+    await area.fill("x".repeat(12000));
+    const atLimit = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']").textContent();
+    ok("exakt 12 000 tecken tillåts och hela texten används",
+      /12.?000 \/ 12.?000/.test(atLimit || "") && /hela texten används/.test(atLimit || "") && await next.isEnabled(), atLimit || "");
+    const mobileOverflow = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      status: document.querySelector("#xf .xf-screen[data-screen='material'] .xf-read[role='status']")?.getBoundingClientRect().toJSON(),
+    }));
+    ok("teckenräknaren ryms på minsta mobilbredd", mobileOverflow.documentWidth <= 320
+      && mobileOverflow.status.x >= 0 && mobileOverflow.status.right <= 320, JSON.stringify(mobileOverflow));
+    await next.click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    ok("materialgränsen ger inga webbläsarfel", errs.length === 0, errs.join(" | "));
+  } catch (e) {
+    ok("materialgränsen fungerar i den aktiva elevvyn", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Felbanksträning is a separate path and must not silently slice its source.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "long-training-material-user");
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
+    await page.evaluate(() => window.__xfPrefill("y".repeat(12001), "Biologi 1"));
+    const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
+    const status = page.locator("#xf .xf-screen[data-screen='material'] .xf-read[role='status']");
+    ok("felbanksträning visar hela överlånga källan och stoppar fortsättning",
+      (await area.inputValue()).length === 12001 && await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").isDisabled()
+        && /12.?000/.test(await status.textContent() || "")
+        && /Träningsmaterialet är längre/.test(await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").textContent() || ""));
+  } catch (e) {
+    ok("felbanksträning bevarar material över gränsen", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // The learner can decide which source-supported terms the generator should prioritize.
 {
   const { ctx, page, errs } = await mk();
@@ -283,14 +340,14 @@ async function toMaterial(page) {
     await desktopLanguage.click();
     const material = await page.locator("#xf .xf-screen[data-screen='material']").textContent();
     const swedishMaterialHeading = await page.locator("#xf .xf-screen[data-screen='material'] .xf-say").getAttribute("aria-label");
-    const swedishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read").textContent();
+    const swedishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read:not([role='status'])").textContent();
     ok("materialsteget översätts och behåller inklistrad text",
       /Ge mig materialet/.test(swedishMaterialHeading || "") && /Kort underlag/.test(swedishMaterialHint || "")
       && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), material || "");
     await desktopLanguage.click();
     const englishMaterial = await page.locator("#xf .xf-screen[data-screen='material']").textContent();
     const englishMaterialHeading = await page.locator("#xf .xf-screen[data-screen='material'] .xf-say").getAttribute("aria-label");
-    const englishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read").textContent();
+    const englishMaterialHint = await page.locator("#xf .xf-screen[data-screen='material'] .xf-read:not([role='status'])").textContent();
     ok("materialsteget kan växla tillbaka till engelska utan dataförlust",
       /Add your study material/.test(englishMaterialHeading || "") && /short source/i.test(englishMaterialHint || "")
       && (await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()).includes("Photosynthesis"), englishMaterial || "");
@@ -929,6 +986,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       { ts: Date.now(), course: "Biologi 1", level: "C", qType: "short", id: "m1", question: "Vad sker i matrix?", user_answer: "vet ej", feedback: "saknar citronsyracykeln", model_answer: "Citronsyracykeln", points: 0, max_points: 3 },
       { ts: Date.now(), course: "Biologi 1", level: "C", qType: "mc", id: "m2", question: "Hur många ATP ger jäsning?", user_answer: "30", feedback: "fel", model_answer: "2", points: 0, max_points: 2 }
     ]));
+    localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
   // loadExamsFromAccountToLocal() skriver över felbanken från servern vid varje
   // laddning, så den måste sättas efter att den körts — annars testar vi tomt.
@@ -939,6 +997,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       { ts: Date.now(), course: "Biologi 1", level: "C", qType: "short", id: "m1", question: "Vad sker i matrix?", user_answer: "vet ej", feedback: "saknar citronsyracykeln", model_answer: "Citronsyracykeln", points: 0, max_points: 3 },
       { ts: Date.now(), course: "Biologi 1", level: "C", qType: "mc", id: "m2", question: "Hur många ATP ger jäsning?", user_answer: "30", feedback: "fel", model_answer: "2", points: 0, max_points: 2 }
     ]));
+    localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
   await page.goto(`${srv.url}/app.html#train`, { waitUntil: "networkidle" });
   await page.waitForTimeout(3000);

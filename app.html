@@ -625,6 +625,7 @@ white-space:nowrap;
 <div class="sBody">
 <label class="fieldLabel" for="pastedText" id="tPasteLabel">Studiematerial</label>
 <textarea id="pastedText" placeholder="Rubriker → punktlista → definitioner/formler → exempel"></textarea>
+<div class="stxt" id="materialCounter" role="status" aria-live="polite"></div>
 <div class="uploadBox" style="margin-top:16px">
 <div class="uploadTop">
 <span class="uploadTitle" id="tOcrTitle">Bild → OCR (valfritt)</span>
@@ -819,6 +820,7 @@ function escapeHtml(s){
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
 let selectedExamFocusTerms = [];
+const MATERIAL_CHAR_LIMIT = 12000;
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
@@ -836,6 +838,7 @@ sv:{
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
+  materialTooLong:"Materialet är för långt. Korta ner det till högst 12 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
@@ -882,6 +885,7 @@ en:{
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
+  materialTooLong:"The material is too long. Shorten it to 12,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
@@ -1307,7 +1311,7 @@ function setWizardStep(step,opts={}){
 }
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
-  onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}setWizardStep(1);});
+  onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}if(Array.from(mat).length>MATERIAL_CHAR_LIMIT){setStatus(materialTooLongMessage(),"bad");return;}setWizardStep(1);});
   onClick("wBack1",()=>setWizardStep(0));
   onClick("wBack2",()=>setWizardStep(1));
   onClick("wNext2",async()=>{const g=$("gradeBtn");if(g&&!g.disabled)g.click();});
@@ -1400,6 +1404,7 @@ function applyLang(){
   set("mImprove",t.mImprove);set("mLang",t.mLang);set("mLogout",t.mLogout);set("langPill",LANG.toUpperCase());
   set("tStep1",t.step1);set("tStep1Sub",t.step1Sub);set("tPasteLabel",t.pasteLabel);
   const pt=$("pastedText");if(pt)pt.placeholder=t.pastePH;
+  updateMaterialCounter();
   set("tOcrTitle",t.ocrTitle);set("ocrBtn",t.ocrBtn);set("tOcrHint",t.ocrHint);set("formatHint",t.tip);
   set("tStep2",t.step2);set("tStep2Sub",t.step2Sub);set("tLevel",t.level);set("tCourse",t.course);
   const c=$("course");if(c)c.placeholder=t.coursePH;
@@ -1466,6 +1471,19 @@ function applyLang(){
   if(cc)cc.placeholder=(LANG==="sv")?"Skriv kurs/ämne exakt...":"Type subject/course...";
   if(sc)sc.textContent=(LANG==="sv")?"Spara i min lista":"Save to my list";
 }
+
+function updateMaterialCounter(){
+  const input=$("pastedText"), counter=$("materialCounter");
+  if(!input||!counter)return;
+  const count=Array.from(input.value).length;
+  const over=count>MATERIAL_CHAR_LIMIT;
+  counter.className="stxt"+(over?" bad":"");
+  counter.textContent=LANG==="sv"
+    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":"Hela texten används."}`
+    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":"All entered text is used."}`;
+}
+
+function materialTooLongMessage(){return T[LANG].materialTooLong;}
 
 const spinWrap=()=>$("spinWrap"),miniStateEl=()=>$("miniState"),statusEl=()=>$("status");
 const pastedTextEl=()=>$("pastedText"),levelEl=()=>$("level"),courseEl=()=>$("course");
@@ -1951,6 +1969,7 @@ try{
   initWizard();
   initCourseLibrary();
   applyLang();
+  pastedTextEl()?.addEventListener("input",updateMaterialCounter);
   $("authGateAction")?.addEventListener("click",handleAuthGateAction);
   $("authGateLogin")?.addEventListener("click",handleAuthGateLogin);
   const headerActions=document.querySelector(".xg-header-right");
@@ -2063,7 +2082,7 @@ try{
       const res=await postJson("/api/ocr",{imageDataUrl:dataUrl,lang:LANG});
       if(!res.ok||!res.data||!res.data.ok){setBusy(false);setOcrStatus(`OCR error (HTTP ${res.status}).`,"bad");showDebug(res.raw);return;}
       const extracted=String(res.data.text||"").trim();
-      if(extracted){const prefix=(LANG==="sv")?"\n\n--- OCR (bild) ---\n":"\n\n--- OCR (image) ---\n";const base=(pastedTextEl()?.value||"").trim();if(pastedTextEl())pastedTextEl().value=(base?base+prefix:"")+extracted+"\n";}
+      if(extracted){const prefix=(LANG==="sv")?"\n\n--- OCR (bild) ---\n":"\n\n--- OCR (image) ---\n";const base=(pastedTextEl()?.value||"").trim();if(pastedTextEl()){pastedTextEl().value=(base?base+prefix:"")+extracted+"\n";updateMaterialCounter();}}
       setBusy(false);setOcrStatus(t.ocrDone,"ok");
     }catch(e){setBusy(false);setOcrStatus("OCR error.","bad");reportErr(e);}
   });
@@ -2077,6 +2096,7 @@ try{
     hideDebug();setStatus("");const t=T[LANG];
     const pastedText=(pastedTextEl()?.value||"").trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
+    if(Array.from(pastedText).length>MATERIAL_CHAR_LIMIT){const message=materialTooLongMessage();setStatus(message,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:message};}
 
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
@@ -2093,6 +2113,10 @@ try{
     }
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);
+      if(res.data?.error==="MATERIAL_TOO_LONG"){
+        const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message};
+      }
       if(res.data?.error==="GRAPH_GENERATION_REJECTED"||res.data?.error==="GRAPH_MATERIAL_UNSUPPORTED"){
         const message=res.data.message||(LANG==="sv"
           ?"Grafuppgiften kunde inte skapas utifrån materialet. Kontrollera grafkraven och försök igen."
@@ -2163,6 +2187,7 @@ try{
       });
     }
     const pastedText=(pastedTextEl()?.value||"").trim();
+    if(Array.from(pastedText).length>MATERIAL_CHAR_LIMIT){const message=materialTooLongMessage();setStatus(message,"bad");return {ok:false,error:message};}
     const payload={lang:LANG,course:(courseEl()?.value||"").trim(),pastedText,questions:currentExam.questions,answers,exam_manifest:currentExam.exam_manifest};
     let gradingSession=null;
     try{const snapshot=await db?.auth.getSession();if(!snapshot?.error)gradingSession=snapshot?.data?.session||null;}catch{}
@@ -2187,6 +2212,10 @@ try{
 
     try{
       if(!res||!res.ok||!res.data||!res.data.ok){
+        if(res?.data?.error==="MATERIAL_TOO_LONG"){
+          const message=materialTooLongMessage();setStatus(message,"bad");showToast(message,"bad");
+          return {ok:false,error:message};
+        }
         const providerUnavailable = res?.data?.error === "grading_provider_unavailable";
         const alreadyGraded = res?.data?.error === "EXAM_ALREADY_GRADED";
         const inactiveExam = res?.data?.error === "EXAM_NOT_ACTIVE";

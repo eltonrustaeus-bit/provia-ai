@@ -1,6 +1,7 @@
 import { requireAuth } from "./_auth.js";
 import examCompletion from "./_exam-completion.cjs";
 import examIssuance from "./_exam-issuance.cjs";
+import materialInput from "./_material.cjs";
 
 export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
   }
   const { course, pastedText, questions, exam_manifest: manifest } = body;
   if (typeof course !== "string" || course.length > 200 ||
-      typeof pastedText !== "string" || pastedText.length > 3000 ||
+      !materialInput.validateMaterial(pastedText).ok ||
       !Array.isArray(questions) || questions.length < 1 || questions.length > 20 ||
       !examCompletion.verifyExamManifest(manifest, user.id, course, pastedText, questions)) {
     return res.status(400).json({ ok: false, error: "EXAM_MANIFEST_INVALID" });

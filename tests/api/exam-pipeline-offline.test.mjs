@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
+const gradeTasks = require("../../api/_grade-task.js");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -289,7 +290,7 @@ try {
       rubric: `En poäng för ${answer}.`, model_answer: answer,
       topic: "Ekvationer", subtopic: "Enkla beräkningar", concept_tag: "algebra",
       learning_objective: "Lösa och beräkna enkla uttryck.", source_references: ["addition"],
-      cognitive_level: "tillämpa", accepted_answers: [], estimated_answer_length: "short",
+      cognitive_level: "tillämpa", accepted_answers: [answer, `Svar ${answer}`], estimated_answer_length: "short",
       scoring_rubric: { parts: [{ description: `Rätt svar ${answer}`, points: 1 }], full_score_requirements: answer, partial_credit_notes: "" },
     };
   });
@@ -304,6 +305,15 @@ try {
   assert.equal(shortExam.body.exam.questions.length, 4, "an open-response exemplar rejected by review is withheld");
   assert.equal(shortExam.body.exam.questions.some((q) => q.id === "short-wrong-example"), false,
     "a contradictory model answer cannot reach the learner when the reviewer rejects it");
+  assert.equal(shortExam.body.exam.questions.every((q) => !Object.hasOwn(q, "accepted_answers")), true,
+    "accepted short-answer variants never reach the learner before submission");
+  const publicShortQuestion = shortExam.body.exam.questions[0];
+  const openedShortQuestion = gradeTasks.openQuestion(
+    publicShortQuestion, publicShortQuestion.grade_task, undefined,
+    gradeTasks.hashContext(pastedText, course, userId)
+  );
+  assert.ok(openedShortQuestion.accepted_answers.length > 0,
+    "accepted variants remain available inside the server-sealed grading task");
   const shortVerifierInput = verifierInputs.at(-1);
   assert.equal(shortVerifierInput.source_material, pastedText);
   assert.equal(shortVerifierInput.questions.find((q) => q.id === "short-wrong-example")?.model_answer, "x = 3");

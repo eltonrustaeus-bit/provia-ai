@@ -1,6 +1,11 @@
 const crypto = require("node:crypto");
 const gradeTasks = require("./_grade-task.js");
 const { getExamSigningSecret } = require("./_exam-signing-secret.cjs");
+const MAX_MATERIAL_CHARS = 12000;
+
+function supportedMaterial(material) {
+  return typeof material === "string" && !!material.trim() && Array.from(material).length <= MAX_MATERIAL_CHARS;
+}
 
 // Same signed question set and course produce one submission ID, regardless of
 // answers or retries. A newly generated set receives different task tokens.
@@ -40,7 +45,7 @@ function issueExamManifest(userId, course, material, questions) {
 }
 
 function verifyExamManifest(manifest, userId, course, material, questions) {
-  if (typeof manifest !== "string" || manifest.length > 80) return false;
+  if (typeof manifest !== "string" || manifest.length > 80 || !supportedMaterial(material)) return false;
   const expected = issueExamManifest(userId, course, material, questions);
   if (!expected) return false;
   const givenBytes = Buffer.from(manifest);
@@ -66,7 +71,7 @@ function verifyCompletion(proof, userId) {
   if (!proof || typeof proof !== "object" || Array.isArray(proof) || !userId) return null;
   const { receipt, course, material, questions, answers, selectedQuestionId } = proof;
   if (typeof course !== "string" || course.length > 200 ||
-      typeof material !== "string" || material.length > 3000 ||
+      !supportedMaterial(material) ||
       !Array.isArray(questions) || questions.length < 1 || questions.length > 20 ||
       !Array.isArray(answers) || answers.length !== questions.length ||
       typeof selectedQuestionId !== "string" || !selectedQuestionId || selectedQuestionId.length > 100 ||

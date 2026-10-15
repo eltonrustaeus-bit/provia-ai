@@ -40,6 +40,7 @@ const DEFAULT_MISMATCH_CONFIDENCE = 0.7;
 // latency budget. Questions are built from the material as a whole, so the cap
 // is generous; anything beyond it is handled by the CANNOT_JUDGE escape rather
 // than by guessing.
+const materialInput = require("./_material.cjs");
 const MATERIAL_CHAR_CAP = 12000;
 
 function solverModel(generatorModel) {
@@ -220,7 +221,7 @@ async function solveQuestions(questions, opts) {
   // source_references are deliberately withheld: if the solver could see the
   // key it would not be an independent solve, it would be a rubber stamp.
   const items = mcs.map(q => ({ id: String(q.id), question: q.question, options: q.options }));
-  const trimmedMaterial = String(material || "").slice(0, MATERIAL_CHAR_CAP);
+  const trimmedMaterial = materialInput.truncateMaterial(material, MATERIAL_CHAR_CAP);
 
   const startedAt = Date.now();
   try {

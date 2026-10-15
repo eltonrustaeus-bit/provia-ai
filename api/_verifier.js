@@ -57,11 +57,12 @@ const DEFAULT_THRESHOLDS = {
   minLanguageQuality: 0.6,
 };
 
+const materialInput = require("./_material.cjs");
 const SOURCE_MATERIAL_CHAR_CAP = 12000;
 const REVIEW_PAYLOAD_CHAR_CAP = 60000;
 
 function reviewInputWithinLimits(input) {
-  if (input.questions.length > 20 || input.source_material.length > SOURCE_MATERIAL_CHAR_CAP) return false;
+  if (input.questions.length > 20 || Array.from(input.source_material).length > SOURCE_MATERIAL_CHAR_CAP) return false;
   let size = input.source_material.length;
   for (const question of input.questions) {
     if (typeof question.question === "string" && question.question.length > 3000) return false;
@@ -199,7 +200,7 @@ async function verifyQuestions(questions, opts) {
     source_references: q.source_references,
   }));
   const reviewInput = {
-    source_material: String(material || "").slice(0, SOURCE_MATERIAL_CHAR_CAP),
+    source_material: materialInput.truncateMaterial(material, SOURCE_MATERIAL_CHAR_CAP),
     questions: items,
   };
   const reviewPayload = JSON.stringify(reviewInput);

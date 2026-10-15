@@ -45,7 +45,7 @@
   /* Serverns tak på pastedText i api/generate-exam.js. Speglas här så att
      eleven ser gränsen medan hen klistrar in i stället för att upptäcka den
      genom att halva materialet tyst försvann. */
-  var MATERIAL_MAX = 3000;
+  var MATERIAL_MAX = 12000;
 
   // ── Små hjälpare ─────────────────────────────────────────────────────────
 
@@ -1250,7 +1250,7 @@
     return repeated.slice(0, 6);
   }
 
-  function stepMaterial() {
+  function stepMaterial(initialMessage) {
     UI.languageRerender = stepMaterial;
     var b = mount("material");
 
@@ -1265,6 +1265,10 @@
 
     var read = el("div", "xf-read");
     b.appendChild(read);
+    var limitStatus = el("div", "xf-read");
+    limitStatus.setAttribute("role", "status");
+    limitStatus.setAttribute("aria-live", "polite");
+    b.appendChild(limitStatus);
 
     // Bild → text ligger utanför den avgränsade elevpiloten.
     if (!(window.ExGenRuntime && window.ExGenRuntime.environment === "pilot")) {
@@ -1312,7 +1316,12 @@
     go.type = "button";
     go.disabled = true;
     go.addEventListener("click", function () {
-      S.material = ta.value.trim().slice(0, MATERIAL_MAX);
+      var material = ta.value.trim();
+      if (Array.from(material).length > MATERIAL_MAX) {
+        err.textContent = tx("Korta ner materialet till högst " + MATERIAL_MAX.toLocaleString("sv-SE") + " tecken innan du fortsätter.", "Shorten the material to " + MATERIAL_MAX.toLocaleString("en-US") + " characters or fewer before continuing.");
+        return;
+      }
+      S.material = material;
       stepContract();
     });
     act.appendChild(go);
@@ -1324,7 +1333,16 @@
       if (S.material !== ta.value) S.focusTerms = null;
       S.material = ta.value;
       err.textContent = "";
-      go.disabled = !v;
+      var length = Array.from(v).length;
+      var overLimit = length > MATERIAL_MAX;
+      go.disabled = !v || overLimit;
+
+      var locale = isEnglish() ? "en-US" : "sv-SE";
+      limitStatus.textContent = length.toLocaleString(locale) + " / " + MATERIAL_MAX.toLocaleString(locale) + " " + tx("tecken", "characters") +
+        (overLimit
+          ? tx(" · korta ner materialet innan du fortsätter.", " · shorten the material before continuing.")
+          : tx(" · hela texten används.", " · all entered text is used."));
+      limitStatus.style.color = overLimit ? "var(--exgen-warning-text)" : "";
 
       read.innerHTML = "";
       if (!v) return;
@@ -1343,15 +1361,11 @@
       } else {
         read.appendChild(el("span", null, v.length + " tecken"));
       }
-      if (v.length > MATERIAL_MAX) {
-        var warn = el("span", null, tx("· använder de första " + MATERIAL_MAX + " tecknen", "· using the first " + MATERIAL_MAX + " characters"));
-        warn.style.color = "var(--exgen-warning-text)";
-        read.appendChild(warn);
-      }
     }
 
     ta.addEventListener("input", onType);
     onType();
+    if (initialMessage) err.textContent = initialMessage;
 
     screen("material");
     setTimeout(function () { ta.focus(); }, 320);
@@ -2606,7 +2620,7 @@
             examProof: {
               receipt: examProof,
               course: S.course,
-              material: S.material.slice(0, 3000),
+              material: S.material,
               questions: qs,
               answers: submittedAnswers,
               selectedQuestionId: String(item.id)
@@ -2969,12 +2983,13 @@
        app.html#train, och runTrainModeIfRequested() i app.html bygger ihop ett
        material av de fel eleven valt. Innan flödet fanns skrevs det rakt in i
        wizardens textruta; nu är den rutan dold, så materialet måste in här i
-       stället. Hoppet går direkt till kontraktet — kurs och material är redan
-       kända, och att fråga om dem igen vore att låtsas. */
+       stället. Flödet går normalt direkt till kontraktet — kurs och material
+       är redan kända. Om det sammanslagna materialet överskrider gränsen går
+       eleven tillbaka till materialsteget för att korta ner det. */
     window.__xfPrefill = function (material, course) {
       var mat = String(material || "").trim();
       if (!mat) return false;
-      S.material = mat.slice(0, MATERIAL_MAX);
+      S.material = mat;
       S.focusTerms = null;
       if (course) S.course = String(course).trim();
       if (!S.course) S.course = dna().courses[0] || "Repetition";
@@ -2983,6 +2998,10 @@
       S.qType = "mix";
       S.num = clamp(d.num, 3, 20);
       S.nonGraphNum = S.num;
+      if (Array.from(mat).length > MATERIAL_MAX) {
+        stepMaterial(tx("Träningsmaterialet är längre än gränsen. Korta ner texten innan du fortsätter.", "The practice material exceeds the limit. Shorten it before continuing."));
+        return true;
+      }
       stepContract();
       return true;
     };

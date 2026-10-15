@@ -18,6 +18,7 @@ const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
 const { sanitizeHistory } = require("./_student-history.cjs");
+const materialInput = require("./_material.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -346,7 +347,20 @@ module.exports = async function handler(req, res) {
     }
 
     const lang = asEnum(p.lang, ["sv", "en"], "sv");
-    const pastedText = safeString(p.pastedText, 3000);
+    const material = materialInput.validateMaterial(p.pastedText);
+    if (!material.ok) {
+      const tooLong = material.reason === "too_long";
+      return json(res, 400, {
+        ok: false,
+        error: tooLong ? "MATERIAL_TOO_LONG" : "Missing pastedText",
+        message: tooLong
+          ? (lang === "sv"
+            ? `Materialet får vara högst ${materialInput.MAX_MATERIAL_CHARS.toLocaleString("sv-SE")} tecken.`
+            : `Study material must be ${materialInput.MAX_MATERIAL_CHARS.toLocaleString("en-US")} characters or fewer.`)
+          : undefined
+      });
+    }
+    const pastedText = material.text;
     const contextCourse = safeString(p.course, 200);
     const submittedQuestions = Array.isArray(p.questions) ? p.questions : [];
     if (!submittedQuestions.length) return json(res, 400, { ok: false, error: "Missing questions" });
@@ -790,7 +804,7 @@ module.exports = async function handler(req, res) {
       "8) Style: Professional. No fluff.\n";
 
     const userPayload = {
-      material: pastedText.slice(0, 12000),
+      material: pastedText,
       student_context: { history, mistakes: mistakesCtx },
       items: nonMcPack
     };

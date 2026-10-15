@@ -61,6 +61,24 @@ test("a graded full set authorizes only its signed question for its owner", () =
   assert.match(checked?.submissionId || "", /^[a-f0-9]{32}$/);
 });
 
+test("completion proof accepts the full supported material limit", () => {
+  const longMaterial = "x".repeat(12000);
+  const contextHash = gradeTasks.hashContext(longMaterial, course, userId);
+  const question = {
+    id: "long-source", type: "mc", points: 1,
+    question: "Vilket tecken används?", options: ["x", "y"], correct_index: 0,
+    model_answer: "x",
+  };
+  const questions = [{ ...question, grade_task: gradeTasks.sealQuestion(question, undefined, contextHash) }];
+  const longProof = {
+    receipt: completion.issueCompletion(userId, course, questions),
+    course, material: longMaterial, questions,
+    answers: [{ id: "long-source", answer: "x" }], selectedQuestionId: "long-source",
+  };
+  assert.equal(completion.verifyCompletion(longProof, userId)?.material, longMaterial);
+  assert.equal(completion.verifyCompletion({ ...longProof, material: longMaterial + "x" }, userId), null);
+});
+
 test("an ungraded set has no completion receipt", () => {
   assert.equal(completion.verifyCompletion({ ...proof(), receipt: "" }, userId), null);
 });

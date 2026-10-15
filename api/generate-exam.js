@@ -15,6 +15,7 @@ const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
+const materialInput = require("./_material.cjs");
 
 function cognitiveVerbHint(lang) {
   const v = assessment.COGNITIVE_VERBS;
@@ -840,7 +841,20 @@ module.exports = async function handler(req, res) {
   const level = asEnum(parsed.level, ["E", "C", "A"], "C");
   const qType = asEnum(parsed.qType, ["mix", "mc", "short", "graph"], "mix");
   const course = safeString(parsed.course, 200);
-  const pastedText = safeString(parsed.pastedText, 3000);
+  const material = materialInput.validateMaterial(parsed.pastedText);
+  if (!material.ok) {
+    const tooLong = material.reason === "too_long";
+    return json(res, 400, {
+      ok: false,
+      error: tooLong ? "MATERIAL_TOO_LONG" : "Missing pastedText",
+      message: tooLong
+        ? (lang === "sv"
+          ? `Materialet får vara högst ${materialInput.MAX_MATERIAL_CHARS.toLocaleString("sv-SE")} tecken.`
+          : `Study material must be ${materialInput.MAX_MATERIAL_CHARS.toLocaleString("en-US")} characters or fewer.`)
+        : undefined
+    });
+  }
+  const pastedText = material.text;
   const selectedFocusTerms = normalizeSelectedFocusTerms(parsed.focusTerms, pastedText);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 12);
