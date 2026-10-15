@@ -1271,7 +1271,7 @@
         { go:'coach', label:'Fråga P.E.R vad du ska göra',
           small:isCoachCacheFresh(cache)?'analys från senaste dygnet':'ny analys av din historik',
           av:!h.length },
-        { go:'rapport', label:'Rapport till läraren',
+        { go:'rapport', label:'Skapa övningsrapport',
           small:'minst 3 verifierat rättade prov',
           av:false }
       ].forEach(v=>{
@@ -1455,10 +1455,10 @@
       box.parentNode.appendChild(b);
     }
 
-    /* ── LÄRARRAPPORT ── */
+    /* ── ÖVNINGSRAPPORT ── */
     function renderRapport(){
-      flow.say('rapport','Rapport till läraren',
-        'En sammanfattning av verifierat rättade övningsprov som du kan kopiera och visa. Minst tre krävs.');
+      flow.say('rapport','AI-övningsrapport',
+        'En AI-sammanfattning av dina rättade övningsprov. Använd som samtalsunderlag, inte som betyg eller säker kunskapsbedömning. Minst tre verifierat rättade prov krävs.');
 
       const body=flow.body('rapport');
       backBtn(body);
@@ -1469,7 +1469,7 @@
 
       const act=document.createElement('div');
       act.className='xf-act xfReportAct';
-      act.innerHTML='<button class="xf-btn" id="genReportBtn" type="button">Skapa rapport</button>'+
+      act.innerHTML='<button class="xf-btn" id="genReportBtn" type="button">Skapa övningsrapport</button>'+
         '<button class="xf-btn ghost" id="copyReportBtn" type="button" disabled>Kopiera</button>'+
         '<span class="xf-chip" id="reportPill" style="display:none">—</span>';
       body.appendChild(act);
@@ -1496,8 +1496,8 @@
     const PER_TARGETS=[
       { id:'felbank', label:'Felbank',      hint:'frågor du tappat poäng på, med modellsvar', go:function(){flow.show('felbank');} },
       { id:'prov',    label:'Prov',         hint:'alla rättade prov och resultatgrafen',      go:function(){flow.show('prov');} },
-      { id:'coach',   label:'Coach',        hint:'personlig studieplan från misstagen',       go:function(){flow.show('coach');} },
-      { id:'rapport', label:'Lärarrapport', hint:'sammanfattning att visa läraren',           go:function(){flow.show('rapport');} }
+      { id:'coach',   label:'Coach',        hint:'övningsförslag från provhistorik och felbank', go:function(){flow.show('coach');} },
+      { id:'rapport', label:'Övningsrapport', hint:'AI-sammanfattning från minst 3 verifierat rättade prov', go:function(){flow.show('rapport');} }
     ];
 
     function pushPerContext(){

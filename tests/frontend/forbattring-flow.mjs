@@ -108,12 +108,18 @@ const synliga = page => page.evaluate(() =>
   const { ctx, page } = await open();
   const v = await page.evaluate(() =>
     [...document.querySelectorAll('[data-screen="hem"] .xf-opt')].map(b => ({
-      mål: b.dataset.go, small: (b.querySelector("small")?.textContent || "").trim(),
+      mål: b.dataset.go,
+      label: [...b.childNodes].find(node => node.nodeType === Node.TEXT_NODE)?.textContent.trim() || "",
+      small: (b.querySelector("small")?.textContent || "").trim(),
     })));
   ok("F3 fyra vägar med levande tillstånd",
     v.length === 4 && v.every(x => x.small.length > 0) &&
     JSON.stringify(v.map(x => x.mål)) === '["felbank","prov","coach","rapport"]',
     JSON.stringify(v));
+  ok("F3 coach och rapport utlovar bara det funktionerna visar",
+    v.some(x => x.mål === "coach" && /Fråga P\.E\.R vad du ska göra/i.test(x.label) && /analys/i.test(x.small)) &&
+    v.some(x => x.mål === "rapport" && /Skapa övningsrapport/i.test(x.label) && /minst 3 verifierat rättade prov/i.test(x.small)) &&
+    !JSON.stringify(v).match(/personlig studieplan|Rapport till läraren/i), JSON.stringify(v));
   await ctx.close();
 }
 
@@ -126,6 +132,11 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
   const h = await page.evaluate(() => location.hash);
   ok(`F4 vägen till ${mål} öppnar sin skärm och skriver fragmentet`,
     v.length === 1 && v[0] === mål && h === "#" + mål, JSON.stringify({ v, h }));
+  if (mål === "rapport") {
+    const copy = await page.locator('[data-screen="rapport"]').innerText();
+    ok("F4 rapporten skiljer AI-övningsunderlag från betyg och säker bedömning",
+      /AI-övningsrapport/.test(copy) && /inte som betyg eller säker kunskapsbedömning/i.test(copy) && /minst tre verifierat rättade prov krävs/i.test(copy));
+  }
   await ctx.close();
 }
 

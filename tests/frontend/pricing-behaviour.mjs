@@ -91,7 +91,9 @@ const PLANS = [
     premiumDescription === "Personlig AI-coach och träning utifrån dina misstag." && !/maxa resultaten/i.test(premiumDescription));
   const premiumFeatures = await page.locator("#plan-premium .featureList").innerText();
   ok("0o Premium undviker obestyrkt löfte om full ämnesprogression",
-    /P\.E\.R Coach: personlig studieplan från dina misstag/i.test(premiumFeatures) && !/full progression över alla ämnen/i.test(premiumFeatures));
+    /P\.E\.R Coach: personliga övningsförslag från sparade prov och felbank/i.test(premiumFeatures) &&
+    /AI-genererad övningsrapport från dina prov \(minst 3 verifierat rättade\)/i.test(premiumFeatures) &&
+    !/personlig studieplan|personlig plan|Lärarrapport|inför utvecklingssamtal|full progression över alla ämnen/i.test(premiumFeatures));
   const impact = await page.locator("#zonImpact").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
   ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
@@ -367,7 +369,7 @@ const FAQ = [
   ok("7a jämförelsen har rader", t.visible > 0, JSON.stringify({ total: t.total, visible: t.visible }));
   ok("7b fyra kolumner: funktion + tre planer", t.cols === 4, String(t.cols));
   ok("7c gamla produktgrenar finns inte i tabellen", !/Repetitionsläge|Vägmärken|Teoriprov/i.test(t.allText), t.allText.slice(0, 160));
-  ok("7d studieraderna finns kvar", /Lärarrapport/.test(t.text) && /Felbank/.test(t.text), t.text.slice(0, 200));
+  ok("7d premiumverktygen beskrivs konkret", /P\.E\.R Coach – övningsförslag/.test(t.text) && /AI-genererad övningsrapport/.test(t.text) && /Felbank/.test(t.text), t.text.slice(0, 200));
   await ctx.close();
 }
 
