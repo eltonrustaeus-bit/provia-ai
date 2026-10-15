@@ -23,8 +23,10 @@ assert.match(examsRoute, /\.rpc\("clear_user_exam_history", \{ p_user_id: user\.
 assert.match(examsRoute, /error \|\| data !== true/,
   "a failed or unconfirmed clear cannot be reported as success");
 assert.doesNotMatch(examsRoute, /auth\.admin\.deleteUser/, "exam-history deletion is not account deletion");
-assert.match(memory, /export async function clearLongMemory[\s\S]*?\.from\("per_long_memory"\)\.delete\(\)\.eq\("user_id", userId\)[\s\S]*?\.from\("per_sessions"\)\.delete\(\)\.eq\("user_id", userId\)/,
-  "P.E.R memory/session deletion is a separate user-scoped action");
+assert.match(memory, /export async function clearLongMemory[\s\S]*?\.rpc\("clear_per_memory", \{ p_user_id: userId \}\)/,
+  "P.E.R memory/session deletion is a separate user-scoped transactional action");
+assert.doesNotMatch(memory, /export async function clearLongMemory[\s\S]*?\.from\("per_long_memory"\)\.delete\(/,
+  "P.E.R clearing cannot bypass the epoch barrier with direct deletes");
 assert.match(profile, /export async function forgetAllFacts[\s\S]*?\.from\("learner_profile_facts"\)\.delete\(\)\.eq\("user_id", userId\)/,
   "profile facts have their own user-scoped deletion");
 assert.match(apiSources, /if \(action === "delete_account"\)[\s\S]*?confirmationEmail[\s\S]*?stripe_customer_id[\s\S]*?teacher_id[\s\S]*?auth\.admin\.signOut\(token, "global"\)[\s\S]*?auth\.admin\.deleteUser\(user\.id, false\)/,

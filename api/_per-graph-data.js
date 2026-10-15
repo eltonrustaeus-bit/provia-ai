@@ -270,11 +270,6 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
-      "id": "tabell:per_sessions",
-      "etikett": "per_sessions",
-      "typ": "tabell"
-    },
-    {
       "id": "tabell:profiles",
       "etikett": "profiles",
       "typ": "tabell"
@@ -307,6 +302,11 @@ export const PER_GRAPH = {
     {
       "id": "tabell:user_profiles",
       "etikett": "user_profiles",
+      "typ": "tabell"
+    },
+    {
+      "id": "tabell:per_sessions",
+      "etikett": "per_sessions",
       "typ": "tabell"
     }
   ],
@@ -522,10 +522,6 @@ export const PER_GRAPH = {
     {
       "från": "per-memory",
       "till": "tabell:mock_results"
-    },
-    {
-      "från": "per-memory",
-      "till": "tabell:per_sessions"
     },
     {
       "från": "admin",

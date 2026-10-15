@@ -121,6 +121,7 @@
   /* ── P.E.R FLOATING WIDGET ── */
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
+  var PER_MEMORY_CLEAR_EPOCH_KEY = 'proviaai_per_memory_clear_epoch';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
@@ -564,9 +565,16 @@
   }
 
   window.addEventListener('storage', function (event) {
-    if (event.key !== PER_EXAM_HISTORY_MASK_KEY) return;
-    if (event.newValue === '1') setExamHistoryMasked(true);
-    else if (event.newValue === null) setExamHistoryMasked(false);
+    if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
+      if (event.newValue === '1') setExamHistoryMasked(true);
+      else if (event.newValue === null) setExamHistoryMasked(false);
+      return;
+    }
+    if (event.key === PER_MEMORY_CLEAR_EPOCH_KEY && event.newValue && event.newValue !== event.oldValue) {
+      if (window.PER && typeof window.PER.clearAfterServerMemoryClear === 'function') {
+        window.PER.clearAfterServerMemoryClear();
+      }
+    }
   });
 
   window.PER = (function () {
@@ -900,6 +908,35 @@
     }
 
     function register(fn) { _getToken = fn; }
+
+    function clearAfterServerMemoryClear() {
+      if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
+      try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+      }
+      var input = document.getElementById('perInput');
+      if (input) input.value = '';
+      var sendBtn = document.getElementById('perSendBtn');
+      if (sendBtn) sendBtn.disabled = false;
+      var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+      if (!language) {
+        try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+      }
+      var message = language === 'en'
+        ? 'Saved P.E.R. history and long-term memory were cleared. New conversations may be saved again. Profile facts are managed separately.'
+        : 'Sparad P.E.R-historik och långtidsminne har rensats. Nya samtal kan sparas igen. Profiluppgifter hanteras separat.';
+      var msgs = document.getElementById('perMessages');
+      if (msgs) {
+        var notice = document.createElement('div');
+        notice.className = 'per-msg teacher';
+        notice.setAttribute('role', 'status');
+        notice.textContent = message;
+        msgs.replaceChildren(notice);
+      }
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = message;
+    }
 
     /* En token som gått ut är inte en token.
      *
@@ -2211,7 +2248,7 @@ function finalizeMsg(div, text) {
       initWidget();
     }
 
-    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
+    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, clearAfterServerMemoryClear: clearAfterServerMemoryClear, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
   /* ── GLOBAL BOTTOM NAV (inloggad) ── */

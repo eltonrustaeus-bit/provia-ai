@@ -389,7 +389,7 @@
         <div class="kBtnRow">
           <button class="kBtn kBtnDanger" id="clearPerMemoryBtn">Rensa P.E.R-minne</button>
         </div>
-        <div class="kPrivacyNote">Rensar P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. Sparade profiluppgifter kan finnas kvar och fortsätta anpassa svaren; granska eller ta bort dem separat under Vad P.E.R. vet om mig. Dina prov, resultat och felbank påverkas inte. En P.E.R-begäran som redan pågår kan spara nytt minne när den slutförs. Vänta tills svaren är klara och rensa igen.</div>
+        <div class="kPrivacyNote">Rensar P.E.R:s sparade chatthistorik och långtidsminne för ditt konto. En rensning spärrar pågående P.E.R-begäranden från att återskapa just dessa minnen. Nya samtal kan sparas igen efter rensningen. Separata profiluppgifter kan finnas kvar och fortsätta anpassa svaren; granska eller ta bort dem under Vad P.E.R. vet om mig. Dina prov, resultat och felbank påverkas inte.</div>
       </div>
     </div>
 
@@ -754,7 +754,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   /* P.E.R MEMORY */
   document.getElementById("clearPerMemoryBtn")?.addEventListener("click",async()=>{
-    const ok=confirm("Rensa P.E.R-minnet?\n\nDetta tar bort sparad chatthistorik och långtidsminne. En P.E.R-begäran som redan pågår kan spara nytt minne när den slutförs. Vänta tills svaren är klara och rensa igen. Profiluppgifter rensas separat under Vad P.E.R. vet om mig. Dina provresultat och felbank påverkas inte.");
+    const ok=confirm("Rensa P.E.R-minnet?\n\nDetta tar bort sparad chatthistorik och långtidsminne. Pågående P.E.R-begäranden spärras från att återskapa dessa minnen efter rensningen. Nya samtal kan sparas efteråt. Separata profiluppgifter hanteras under Vad P.E.R. vet om mig. Dina provresultat och felbank påverkas inte.");
     if(!ok)return;
     const btn=document.getElementById("clearPerMemoryBtn");
     const orig=btn.textContent;
@@ -768,7 +768,9 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       const data=await r.json().catch(()=>({}));
       if(r.ok&&data.ok){
         try{localStorage.removeItem("proviaai_per_history")}catch{}
-        showMsg("Sparad P.E.R-historik och långtidsminne har rensats. Pågående P.E.R-svar kan spara nytt minne efteråt; avsluta dem och rensa igen.","ok");
+        try{localStorage.setItem("proviaai_per_memory_clear_epoch",Date.now()+":"+Math.random().toString(36).slice(2))}catch{}
+        try{window.PER?.clearAfterServerMemoryClear?.()}catch{}
+        showMsg("Sparad P.E.R-historik och långtidsminne har rensats. Pågående svar kan inte återskapa dessa minnen.","ok");
       }else{
         showMsg("Fel: "+(data.error||"Kunde inte rensa P.E.R-minnet."),"err");
       }

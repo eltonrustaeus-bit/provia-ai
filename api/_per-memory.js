@@ -26,6 +26,22 @@ function isStale(updatedAt) {
   return Number.isFinite(ageDays) && ageDays > MEMORY_TTL_DAYS;
 }
 
+const MEMORY_EPOCH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validMemoryEpoch(epoch) {
+  return typeof epoch === "string" && MEMORY_EPOCH_PATTERN.test(epoch);
+}
+
+export async function getLongMemoryEpoch(supabase, userId) {
+  if (typeof userId !== "string" || !userId) return null;
+  try {
+    const { data, error } = await supabase.rpc("get_per_memory_epoch", { p_user_id: userId });
+    return !error && validMemoryEpoch(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // JSON schema for structured memory extraction via OpenAI Structured Outputs
 const STRUCTURED_SCHEMA = {
   type: "json_schema",
@@ -49,7 +65,7 @@ const STRUCTURED_SCHEMA = {
 };
 
 // Returns { summary: string|null, structured: object|null }
-export async function loadLongMemory(supabase, userId) {
+export async function loadLongMemory(supabase, userId, epoch = null) {
   try {
     const { data } = await supabase
       .from("per_long_memory")
@@ -58,7 +74,13 @@ export async function loadLongMemory(supabase, userId) {
       .maybeSingle();
 
     if (data?.updated_at && isStale(data.updated_at)) {
-      await supabase.from("per_long_memory").delete().eq("user_id", userId);
+      if (validMemoryEpoch(epoch)) {
+        await supabase.rpc("delete_stale_per_long_memory", {
+          p_user_id: userId,
+          p_epoch: epoch,
+          p_expected_updated_at: data.updated_at,
+        });
+      }
       return { summary: null, structured: null };
     }
 
@@ -162,57 +184,60 @@ export async function enrichMemoryFromExamData(supabase, userId) {
 }
 
 // Track helpLevel signal — lightweight ring buffer upsert, never blocks request
-export async function updateHelpLevelSignal(supabase, userId, helpLevel) {
-  if (typeof helpLevel !== "number" || !Number.isFinite(helpLevel)) return;
+export async function updateHelpLevelSignal(supabase, userId, helpLevel, epoch) {
+  if (typeof helpLevel !== "number" || !Number.isFinite(helpLevel) || !validMemoryEpoch(epoch)) return false;
   const level = Math.min(3, Math.max(0, Math.floor(helpLevel)));
   try {
-    const { data } = await supabase
-      .from("per_long_memory")
-      .select("structured")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const existing = data?.structured || {};
-    const log      = Array.isArray(existing.help_level_log) ? existing.help_level_log : [];
-    const newLog   = [...log, { level, ts: new Date().toISOString() }].slice(-MAX_HELP_LOG);
-
-    // Mode of last 10 entries = preferred level
-    const recent = newLog.slice(-10).map(e => e.level);
-    const freq   = {};
-    for (const l of recent) freq[l] = (freq[l] || 0) + 1;
-    const preferred = Number(Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0);
-
-    await supabase
-      .from("per_long_memory")
-      .upsert(
-        {
-          user_id:    userId,
-          structured: {
-            ...existing,
-            help_level_log:       newLog,
-            preferred_help_level: Number.isFinite(preferred) ? preferred : null,
-          },
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
-  } catch { /* best-effort */ }
+    const { data, error } = await supabase.rpc("record_per_help_level", {
+      p_user_id: userId,
+      p_epoch: epoch,
+      p_level: level,
+    });
+    return !error && data === true;
+  } catch { return false; }
 }
 
 export async function clearLongMemory(supabase, userId) {
   try {
-    const [memoryResult, sessionsResult] = await Promise.all([
-      supabase.from("per_long_memory").delete().eq("user_id", userId),
-      supabase.from("per_sessions").delete().eq("user_id", userId),
-    ]);
-    return !memoryResult?.error && !sessionsResult?.error;
+    const { data, error } = await supabase.rpc("clear_per_memory", { p_user_id: userId });
+    return !error && data === true;
   } catch {
     return false;
   }
 }
 
-export async function maybeRefreshLongMemory(supabase, userId, recentMessages, callAIFn, learningSignals = "") {
+export async function savePerSessionHistory(supabase, userId, messages, epoch) {
+  if (!validMemoryEpoch(epoch) || !Array.isArray(messages)) return false;
   try {
+    const { data, error } = await supabase.rpc("save_per_session_if_epoch", {
+      p_user_id: userId,
+      p_epoch: epoch,
+      p_messages: messages.slice(-40),
+    });
+    return !error && data === true;
+  } catch { return false; }
+}
+
+async function saveLongMemoryIfEpoch(supabase, userId, summary, structured, epoch) {
+  if (!validMemoryEpoch(epoch)) return false;
+  const patch = structured && typeof structured === "object"
+    ? Object.fromEntries(Object.entries(structured).filter(([key]) => !["help_level_log", "preferred_help_level"].includes(key)))
+    : null;
+  try {
+    const { data, error } = await supabase.rpc("save_per_long_memory_if_epoch", {
+      p_user_id: userId,
+      p_epoch: epoch,
+      p_summary: cleanMemoryText(summary, 900),
+      p_structured_patch: patch,
+    });
+    return !error && data === true;
+  } catch { return false; }
+}
+
+export async function maybeRefreshLongMemory(supabase, userId, recentMessages, callAIFn, learningSignals = "", epoch = null) {
+  try {
+    if (!validMemoryEpoch(epoch) || await getLongMemoryEpoch(supabase, userId) !== epoch) return;
+
     // Fetch real school-study data first — needed for both the guard and the prompts
     const examData    = await enrichMemoryFromExamData(supabase, userId);
     const hasExamData = examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0
@@ -236,6 +261,8 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
       .join("\n")
       .slice(0, MAX_HIST_CHARS);
     const signalText = cleanMemoryText(learningSignals, 700);
+
+    if (await getLongMemoryEpoch(supabase, userId) !== epoch) return;
 
     const mockSection = (examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0)
       ? `\nVerifierade provresultat:\n- Svaga begrepp: ${examData.mockWeakConcepts.join(", ") || "inga"}\n- Senaste provpoäng: ${examData.mockRecentScores.map(s => s + "%").join(", ") || "inga"}\n`
@@ -270,6 +297,7 @@ Svara på svenska, max 130 ord. Hitta inte på data.`;
 
     const summary = await callAIFn([{ role: "user", content: summaryPrompt }], { timeout: 20_000 });
     if (!summary) return;
+    if (await getLongMemoryEpoch(supabase, userId) !== epoch) return;
 
     const structuredPrompt = `Analysera konversationshistoriken och extrahera ett strukturerat lärmönster.
 Basera dig BARA på vad som faktiskt syns i historiken. Hitta inte på data.
@@ -308,7 +336,6 @@ ${histText || "Ingen chathistorik tillgänglig."}`;
 
     // Preserve signal-tracked fields (help_level_log, preferred_help_level)
     // — these are written by updateHelpLevelSignal, not by AI extraction
-    const existingStructured = data?.structured || {};
     const mergedStructured   = aiStructured
       ? {
           ...aiStructured,
@@ -317,20 +344,10 @@ ${histText || "Ingen chathistorik tillgänglig."}`;
           felbank_weak_concepts:   examData.felBankWeakConcepts,
           felbank_error_types:     examData.felBankErrorTypes,
           felbank_courses:         examData.felBankCourses,
-          help_level_log:       existingStructured.help_level_log || [],
-          preferred_help_level: existingStructured.preferred_help_level ?? null,
         }
       : undefined;
 
-    await supabase.from("per_long_memory").upsert(
-      {
-        user_id:    userId,
-        summary:    cleanMemoryText(summary, 900),
-        structured: mergedStructured,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
+    await saveLongMemoryIfEpoch(supabase, userId, summary, mergedStructured, epoch);
   } catch {
     // Best-effort; never block the main P.E.R request.
   }

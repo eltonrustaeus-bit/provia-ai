@@ -21,9 +21,9 @@ try {
 
   const persistentNote = page.locator("#clearPerMemoryBtn").locator("xpath=ancestor::div[contains(@class,'kCardBody')]").locator(".kPrivacyNote");
   const persistentCopy = await persistentNote.innerText();
-  assert.match(persistentCopy, /begäran som redan pågår kan spara nytt minne/i);
-  assert.match(persistentCopy, /profiluppgifter kan finnas kvar/i);
-  assert.match(persistentCopy, /ta bort dem separat under vad P\.E\.R\. vet om mig/i);
+  assert.match(persistentCopy, /spärrar pågående p\.e\.r-begäranden från att återskapa just dessa minnen/i);
+  assert.match(persistentCopy, /separata profiluppgifter kan finnas kvar/i);
+  assert.match(persistentCopy, /ta bort dem under vad P\.E\.R\. vet om mig/i);
   assert.match(persistentCopy, /prov, resultat och felbank påverkas inte/i);
 
   let confirmation = "";
@@ -32,15 +32,16 @@ try {
     await dialog.accept();
   });
   await page.locator("#clearPerMemoryBtn").click();
-  assert.match(confirmation, /vänta tills svaren är klara och rensa igen/i);
-  assert.match(confirmation, /profiluppgifter rensas separat under vad P\.E\.R\. vet om mig/i);
+  assert.match(confirmation, /pågående p\.e\.r-begäranden spärras från att återskapa dessa minnen efter rensningen/i);
+  assert.match(confirmation, /separata profiluppgifter hanteras under vad P\.E\.R\. vet om mig/i);
   assert.match(confirmation, /provresultat och felbank påverkas inte/i);
-  await page.waitForFunction(() => document.querySelector("#kontoMsg")?.textContent.includes("Pågående P.E.R-svar kan spara nytt minne"));
+  await page.waitForFunction(() => document.querySelector("#kontoMsg")?.textContent.includes("Pågående svar kan inte återskapa dessa minnen"));
+  assert.ok(await page.evaluate(() => localStorage.getItem("proviaai_per_memory_clear_epoch")), "confirmed clear broadcasts a local conversation reset");
   assert.equal(clearRequests, 1, "clear is sent only after the caution is shown and accepted");
   assert.deepEqual(await page.locator("#kontoMsg").getAttribute("class"), "ok");
 
   await close();
-  console.log("per-memory-clear-warning: concurrent-write limitation is visible before and after clear");
+  console.log("per-memory-clear-warning: epoch barrier, profile boundary and confirmed-clear reset are visible");
 } finally {
   await browser.close();
   await server.close();

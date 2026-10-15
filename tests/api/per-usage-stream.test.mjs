@@ -6,6 +6,7 @@ const keys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PI
 const oldEnv = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "44444444-4444-4444-8444-444444444444";
+const memoryEpoch = "55555555-5555-4555-8555-555555555555";
 Object.assign(process.env, {
   SUPABASE_URL: origin,
   SUPABASE_SECRET_KEY: "sb_secret_synthetic_stream",
@@ -22,6 +23,9 @@ globalThis.fetch = async (input, init = {}) => {
   const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
   requests.push({ url, body });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "synthetic@example.invalid" });
+  if (url.includes("/rest/v1/rpc/get_per_memory_epoch")) return Response.json(memoryEpoch);
+  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch") ||
+      url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");

@@ -42,9 +42,9 @@ test("the requested pilot feedback has a user-initiated route and warns against 
 test("P.E.R memory clearing discloses that profile facts are a separate store", async () => {
   const account = await readFile(`${ROOT}/konto.html`, "utf8");
   assert.match(account, /Rensar P\.E\.R:s sparade chatthistorik och långtidsminne/);
-  assert.match(account, /Sparade profiluppgifter kan finnas kvar och fortsätta anpassa svaren/);
-  assert.match(account, /granska eller ta bort dem separat under Vad P\.E\.R\. vet om mig/);
-  assert.match(account, /Profiluppgifter rensas separat under Vad P\.E\.R\. vet om mig/);
+  assert.match(account, /Separata profiluppgifter kan finnas kvar och fortsätta anpassa svaren/);
+  assert.match(account, /granska eller ta bort dem under Vad P\.E\.R\. vet om mig/);
+  assert.match(account, /Separata profiluppgifter hanteras under Vad P\.E\.R\. vet om mig/);
 });
 
 test("student pilot authentication is login-only for pre-provisioned test accounts", async () => {

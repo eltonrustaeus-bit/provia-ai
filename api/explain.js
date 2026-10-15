@@ -11,7 +11,7 @@ import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
 import { decideSalesMode, buildSalesGuardrail, SALES_MODE } from "./_per-sales.js";
 import { decidePerRole, buildRoleInstruction } from "./_per-role.js";
 import { buildCurriculumContext } from "./_math-curriculum.js";
-import { buildLearningSignals, loadLongMemory, maybeRefreshLongMemory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
+import { buildLearningSignals, getLongMemoryEpoch, loadLongMemory, maybeRefreshLongMemory, savePerSessionHistory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
 import { currentPeriodKey, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
 import { buildPERContextPack } from "./_per-context.js";
 import { flagsEnabled } from "./_flags.js";
@@ -45,12 +45,12 @@ const supabase = createSupabaseServerClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-function refreshPerMemory(userId, history, learningSignals) {
+function refreshPerMemory(userId, history, learningSignals, epoch) {
   const callMemoryAI = (messages, options) => callMeasuredPerAI(messages, options, {
     userId,
     feature: "per_memory",
   });
-  return maybeRefreshLongMemory(supabase, userId, history, callMemoryAI, learningSignals);
+  return maybeRefreshLongMemory(supabase, userId, history, callMemoryAI, learningSignals, epoch);
 }
 
 async function callMeasuredPerAI(messages, options, { userId, feature = "per_chat", step = "generate" }) {
@@ -409,15 +409,6 @@ async function loadPerHistory(userId) {
   } catch { return []; }
 }
 
-async function savePerHistory(userId, messages) {
-  try {
-    await supabase.from("per_sessions").upsert(
-      { user_id: userId, messages: messages.slice(-40), updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
-  } catch { /* best-effort */ }
-}
-
 /* Elevens hjälpnivå, bokförd på ETT ställe.
  *
  * Signalen skrevs tidigare bara till per_long_memory.structured
@@ -438,8 +429,8 @@ async function savePerHistory(userId, messages) {
  * Under ASSERT_CONFIDENCE hamnar den bland de osäkra iakttagelserna, som P.E.R.
  * får låta forma svaret men aldrig påstå.
  */
-function recordHelpPreference(supabase, userId, level) {
-  updateHelpLevelSignal(supabase, userId, level).catch(() => {});
+function recordHelpPreference(supabase, userId, level, epoch) {
+  updateHelpLevelSignal(supabase, userId, level, epoch).catch(() => {});
   const style = helpLevelToStyle(level);
   if (style) saveInferred(supabase, userId, { help_style: style }, { confidence: 0.45 }).catch(() => {});
 }
@@ -876,6 +867,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
+  const persistentTeachTurn = body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
+    && !Array.isArray(body.scores)
+    && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
+  const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
   if (await gateActiveExam(req, res, body, user)) return;
   const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
   if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
@@ -1007,7 +1002,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        profileEnabled avgörs server-side. En klient ska inte kunna be om
        personalisering som inte är utrullad. */
     const [{ summary: longMemory, structured: structuredMemory }, liveExamData, profileEnabled] = await Promise.all([
-      loadLongMemory(supabase, user.id),
+      loadLongMemory(supabase, user.id, perMemoryEpoch),
       enrichMemoryFromExamData(supabase, user.id),
       flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
@@ -1207,8 +1202,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: 'user', content: userMsg },
         { role: 'assistant', content: fullText },
       ].slice(-20);
-      await savePerHistory(user.id, newHistory);
-      refreshPerMemory(user.id, newHistory, learningSignals).catch(() => {});
+      const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
+      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1219,11 +1214,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå);
+      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
 
       // Confirm the saved primary answer before optional self-review. The client
       // can then distinguish a completed answer from a delayed correction pass.
-      res.write(`data: ${JSON.stringify({ done: true, history: newHistory, helpCap, helpLevelUsed: helpLevel })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel })}\n\n`);
 
       /* Granskningen körs EFTER att svaret strömmat färdigt. Eleven har redan
          läst texten; en rättelse under den är ärligare än att hålla tillbaka
@@ -1253,8 +1248,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: "user", content: userMsg },
         { role: "assistant", content: answer },
       ].slice(-20);
-      await savePerHistory(user.id, newHistory);
-      refreshPerMemory(user.id, newHistory, learningSignals).catch(() => {});
+      const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
+      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1265,8 +1260,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå);
-      return res.json({ answer, history: newHistory, helpCap, helpLevelUsed: helpLevel });
+      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel });
     } catch {
       return res.status(500).json({ error: "P.E.R är tillfälligt otillgänglig. Försök igen senare." });
     }

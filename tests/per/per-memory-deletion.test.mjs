@@ -1,43 +1,29 @@
 import assert from "node:assert/strict";
 import { clearLongMemory } from "../../api/_per-memory.js";
 
-function fakeSupabase(errors = {}) {
+function fakeSupabase(result = { data: true, error: null }) {
   const calls = [];
   return {
     calls,
-    from(table) {
-      return {
-        delete() {
-          return {
-            async eq(column, userId) {
-              calls.push({ table, column, userId });
-              return { error: errors[table] || null };
-            },
-          };
-        },
-      };
+    async rpc(name, args) {
+      calls.push({ name, args });
+      if (result instanceof Error) throw result;
+      return result;
     },
   };
 }
 
 const successDb = fakeSupabase();
-assert.equal(await clearLongMemory(successDb, "student-1"), true);
-assert.deepEqual(successDb.calls.sort((a, b) => a.table.localeCompare(b.table)), [
-  { table: "per_long_memory", column: "user_id", userId: "student-1" },
-  { table: "per_sessions", column: "user_id", userId: "student-1" },
-]);
+assert.equal(await clearLongMemory(successDb, "student-a"), true);
+assert.deepEqual(successDb.calls, [{ name: "clear_per_memory", args: { p_user_id: "student-a" } }]);
 
-for (const failedTable of ["per_long_memory", "per_sessions"]) {
-  const db = fakeSupabase({ [failedTable]: { message: "simulated database refusal" } });
-  assert.equal(await clearLongMemory(db, "student-1"), false, `${failedTable} delete error is reported`);
-  assert.equal(db.calls.length, 2, "both owned tables are attempted even if one returns an error");
-}
+const falseDb = fakeSupabase({ data: false, error: null });
+assert.equal(await clearLongMemory(falseDb, "student-a"), false, "an unconfirmed transaction cannot be reported as success");
 
-const rejectingDb = {
-  from() {
-    return { delete: () => ({ eq: async () => { throw new Error("offline"); } }) };
-  },
-};
-assert.equal(await clearLongMemory(rejectingDb, "student-1"), false, "rejected delete request is reported");
+const errorDb = fakeSupabase({ data: null, error: { message: "simulated database refusal" } });
+assert.equal(await clearLongMemory(errorDb, "student-a"), false, "RPC errors are reported as failed clears");
 
-console.log("P.E.R memory deletion: success, returned errors and thrown failures handled truthfully");
+const rejectingDb = fakeSupabase(new Error("offline"));
+assert.equal(await clearLongMemory(rejectingDb, "student-a"), false, "transport failures are reported as failed clears");
+
+console.log("P.E.R memory deletion: one user-scoped transactional RPC and truthful failure states");
