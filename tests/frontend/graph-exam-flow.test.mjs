@@ -134,9 +134,20 @@ try {
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "1 grafuppgift");
   const graphHint = page.locator("#xf .xf-screen[data-screen='aim'] .xf-card .xf-graph-limit-note");
   assert.equal(await graphHint.isVisible(), true, "graph limits are visible as soon as graph mode is selected");
-  assert.match(await graphHint.innerText(), /en uttrycklig rät linje y = mx \+ b/i);
-  assert.match(await graphHint.innerText(), /natur- och samhällsvetenskap.*avdelade med \|/i);
+  assert.match(await graphHint.innerText(), /en uttrycklig rät linje y = mx \+ b där m och b är heltal mellan −5 och 5/i);
+  assert.match(await graphHint.innerText(), /matematik.*rät linje.*eller.*tabell.*avdelade med \|/i);
+  assert.match(await graphHint.innerText(), /natur- och samhällsvetenskap.*samma tabellformat/i);
   assert.match(await graphHint.innerText(), /exakt tre heltalsrader.*−5 och 5.*olika x-värden/i);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.locator("#langBtnDesktop").click();
+  assert.match(await graphHint.innerText(), /Math: an explicit straight line y = mx \+ b where m and b are integers from −5 to 5/i);
+  assert.match(await graphHint.innerText(), /at least two points appear on the graph/i);
+  await page.locator("#langBtnDesktop").click();
+  assert.match(await graphHint.innerText(), /Matematik: en uttrycklig rät linje/i);
+  assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(1).textContent(), "Interaktiv graf",
+    "language switching preserves the selected graph task type");
+  await page.getByRole("button", { name: "Ändra" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Blandat" }).click();
   assert.equal(await graphHint.isVisible(), false, "graph-only constraints are hidden for other question types");
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
