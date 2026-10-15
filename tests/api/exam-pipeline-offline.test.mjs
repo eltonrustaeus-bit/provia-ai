@@ -172,10 +172,18 @@ try {
   assert.match(unsupportedGraphEn.body.message, /math, natural-science, or social-science table/i);
   assert.match(unsupportedGraphEn.body.message, /exactly three distinct integer coordinate pairs/i);
   assert.match(unsupportedGraphEn.body.message, /same x-value may appear more than once/i);
+  calls.length = 0;
+  const outOfBoundsGraph = await invoke(generateExam, {
+    lang: "en", level: "C", course: "Mathematics 2b",
+    pastedText: "The straight line is y = 6x + 1.", qType: "graph", numQuestions: 1,
+  });
+  assert.equal(outOfBoundsGraph.status, 400, "a line outside the supported graph grid is rejected before generation");
+  assert.equal(outOfBoundsGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
+  assert.match(outOfBoundsGraph.body.message, /from −5 to 5 and at least two visible grid positions/i);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
-    "unsupported graph types are rejected before model traffic");
+    "unsupported graph formats and line bounds are rejected before model traffic");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
-    "unsupported graph types do not consume a mock-exam quota");
+    "unsupported graph formats and line bounds do not consume a mock-exam quota");
 
   activeQuestions = questions.map((question, index) => ({
     ...question,
@@ -411,6 +419,21 @@ try {
     "a graph equation in the editable course label is not treated as study-material evidence");
   assert.equal(courseOnlyGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
 
+  activeQuestions = [questions[0]];
+  calls.length = 0;
+  const wrongGraphType = await invoke(generateExam, {
+    lang: "sv", level: "C", course: graphCourse, pastedText: graphMaterial, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(wrongGraphType.status, 500, "graph mode cannot deliver a non-graph question");
+  assert.equal(wrongGraphType.body.error, "GRAPH_GENERATION_REJECTED");
+  assert.equal(wrongGraphType.body.ok, false);
+  assert.equal(Object.hasOwn(wrongGraphType.body, "exam"), false, "a non-graph model response is not exposed as a graph exam");
+  const wrongGraphCalls = calls.slice();
+  assert.equal(wrongGraphCalls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 1);
+  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
+  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+    "the rejected non-graph response returns the reserved quota");
+
   activeQuestions = [{
     id: "graph-1", type: "graph", points: 2,
     question: "Rita grafen till y = 2x + 1.", options: [], correct_index: -1,
@@ -533,6 +556,15 @@ try {
   assert.equal(mathLinePriority.status, 200, JSON.stringify(mathLinePriority.body));
   assert.equal(mathLinePriority.body.exam.questions[0].graph_ui.mode, "line",
     "a supported explicit math line keeps priority over a table in the same material");
+
+  const unsupportedLineAndTable = `Den räta linjen ges av y = 6x + 1.\n${mathScatterMaterial}`;
+  const mathTableFallback = await invoke(generateExam, {
+    lang: "sv", level: "C", course: mathScatterCourse, pastedText: unsupportedLineAndTable, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(mathTableFallback.status, 200, JSON.stringify(mathTableFallback.body));
+  assert.equal(mathTableFallback.body.exam.questions[0].graph_ui.mode, "scatter",
+    "an out-of-range line does not hide an independently valid math point table");
+  assert.deepEqual(mathTableFallback.body.exam.questions[0].graph_ui.source_table.rows, [[0, 2], [1, 3], [2, 4]]);
 
   calls.length = 0;
   const unsupportedMathTable = await invoke(generateExam, {

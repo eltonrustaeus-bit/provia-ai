@@ -852,18 +852,25 @@ module.exports = async function handler(req, res) {
   const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
   const graphLines = graphAnswers.parseLinearEquations(pastedText);
   const uniqueGraphLines = new Map(graphLines.map((line) => [`${line.slope}|${line.intercept}`, line]));
+  const graphLine = uniqueGraphLines.size === 1 ? [...uniqueGraphLines.values()][0] : null;
+  const supportedGraphLine = graphLine && graphAnswers.isValidSpec({
+    kind: "line", slope: graphLine.slope, intercept: graphLine.intercept, points: [], x_label: "", y_label: "",
+  });
   const pointTable = graphAnswers.parsePointTable(pastedText);
-  const graphMode = isMath && uniqueGraphLines.size === 1
+  const useMathPointTable = subjectProfile === "mathematics" && isMath && pointTable
+    && (uniqueGraphLines.size === 0 || (uniqueGraphLines.size === 1 && !supportedGraphLine));
+  const graphMode = isMath && uniqueGraphLines.size === 1 && supportedGraphLine
     ? "line"
-    : (subjectProfile === "mathematics" && isMath && uniqueGraphLines.size === 0
-      || ["natural_sciences", "social_sciences"].includes(subjectProfile)) && pointTable ? "scatter" : null;
+    : (useMathPointTable || (["natural_sciences", "social_sciences"].includes(subjectProfile) && pointTable))
+      ? "scatter"
+      : null;
   if (qType === "graph" && !graphMode) {
     return json(res, 400, {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger."
-        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a math, natural-science, or social-science table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once."
+        ? "Grafstöd kräver en linje y = mx + b i matematik med heltal från −5 till 5 och minst två synliga rutnätspositioner, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger."
+        : "Graph support requires a math line y = mx + b with integer values from −5 to 5 and at least two visible grid positions, or a math, natural-science, or social-science table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once."
     });
   }
 
@@ -1023,6 +1030,15 @@ module.exports = async function handler(req, res) {
       : fail(500, { ok: false, error: reason, ...detail });
     const keptQuestions = [];
     for (const q of exam.questions) {
+      if (qType === "graph" && q?.type !== "graph") {
+        const bail = guardFail("GRAPH_GENERATION_REJECTED", {
+          message: lang === "en"
+            ? "The requested graph task could not be created. Please try again with supported graph material."
+            : "Den efterfrågade grafuppgiften kunde inte skapas. Försök igen med material som stöds för grafer."
+        });
+        if (bail) return bail;
+        continue;
+      }
       if (q?.type !== "mc" && q?.type !== "short" && q?.type !== "graph") {
         const bail = guardFail("Invalid question type returned", { got: q?.type });
         if (bail) return bail;
