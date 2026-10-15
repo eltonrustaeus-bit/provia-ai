@@ -184,6 +184,8 @@ ok("T4k svenskt fel återställer frågan och låser upp Skicka", await page.loc
 ok("T4l skärmläsarregionen annonserar samma besked", await page.locator("#perAnnouncement").innerText() === swedishRetry);
 
 await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
+ok("språkbyte under prov bevarar öppna P.E.R-panelen", await page.locator("#perPanel").isVisible()
+  && await page.locator("#perBubble").getAttribute("aria-expanded") === "true");
 const englishRetry = "I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.";
 await page.fill("#perInput", "How should I think about this?");
 await page.click("#perSendBtn");

@@ -1628,7 +1628,7 @@
 
   function openExam(resumedAt) {
     if (window.PER && window.PER.setExamHistoryMasked) window.PER.setExamHistoryMasked(true);
-    UI.languageRerender = function () { renderQuestion(); };
+    UI.languageRerender = function () { renderQuestion(false, true); };
     if (window.dismissWelcome) window.dismissWelcome();
     document.body.classList.remove("xf-contract");
     // Vid återupptagning behålls den tid provet redan pågått. Att nollställa
@@ -1957,16 +1957,16 @@
     publishTimer = setTimeout(publish, 500);
   }
 
-  function renderQuestion(focusQuestion) {
+  function renderQuestion(focusQuestion, preservePerPanel) {
     var qs = S.exam.questions;
     var i = clamp(S.idx, 0, qs.length - 1);
     S.idx = i;
     var q = qs[i];
     var id = qid(q, i);
 
-    // P.E.R:s svar gällde föregående fråga. Bubblan går tillbaka i sitt gömda
-    // läge vid frågebyte så att den inte ligger kvar över svarstexten.
-    closePerPanel();
+    // P.E.R:s svar gällde föregående fråga. Stäng bara vid frågebyte; en
+    // språkväxling renderar om samma fråga och ska behålla den öppna hjälpen.
+    if (!preservePerPanel) closePerPanel();
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
