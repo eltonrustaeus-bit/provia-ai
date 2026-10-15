@@ -110,7 +110,7 @@
       return name === names[0] ? "" : "#" + name;
     }
 
-    function apply(name) {
+    function apply(name, focusHeading = true) {
       names.forEach(function (n) {
         var on = n === name;
         parts[n].screen.classList.toggle("on", on);
@@ -124,8 +124,10 @@
          window — en feature-detektering här väljer alltid "auto" och ger en mjuk
          scroll där en omedelbar var meningen. */
       window.scrollTo({ top: 0, behavior: "instant" });
-      try { parts[name].say.focus({ preventScroll: true }); }
-      catch (_) { parts[name].say.focus(); }
+      if (focusHeading) {
+        try { parts[name].say.focus({ preventScroll: true }); }
+        catch (_) { parts[name].say.focus(); }
+      }
       for (var i = 0; i < listeners.length; i++) listeners[i](name);
     }
 
@@ -152,7 +154,7 @@
     /* Startläge. En djuplänk (förbättring.html#felbank) ska landa på sin skärm —
        annars är länken app.html och P.E.R skickar eleven till en lögn. */
     var start = useHash ? decodeURIComponent(location.hash.replace(/^#/, "")) : "";
-    apply(parts[start] ? start : names[0]);
+    apply(parts[start] ? start : names[0], Boolean(start));
 
     return {
       show: function (name) { return show(name, false); },

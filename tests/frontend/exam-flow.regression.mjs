@@ -105,6 +105,31 @@ const signIn = async (page, uid, lang = "sv", storage = {}) => {
     });
     await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    const initialHeadingFocus = await page.evaluate(() => {
+      const heading = document.querySelector("#xf .xf-screen.on .xf-say");
+      return { focused: document.activeElement === heading, visible: !!heading?.matches(":focus-visible") };
+    });
+    ok("första provskärmen visar ingen dekorativ fokusram vid sidstart",
+      !initialHeadingFocus.focused && !initialHeadingFocus.visible, JSON.stringify(initialHeadingFocus));
+    await page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary").focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='subject']")?.classList.contains("on"));
+    const subjectHeadingFocus = await page.evaluate(() => {
+      const heading = document.querySelector("#xf .xf-screen[data-screen='subject'] .xf-say");
+      return { focused: document.activeElement === heading, visible: !!heading?.matches(":focus-visible") };
+    });
+    ok("tangentbordsövergång flyttar fokus och visar fokusram på nästa rubrik",
+      subjectHeadingFocus.focused && subjectHeadingFocus.visible, JSON.stringify(subjectHeadingFocus));
+    const back = page.getByRole("button", { name: /Back|Tillbaka/ });
+    await back.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='start']")?.classList.contains("on"));
+    const returnedHeadingFocus = await page.evaluate(() => {
+      const heading = document.querySelector("#xf .xf-screen[data-screen='start'] .xf-say");
+      return { focused: document.activeElement === heading, visible: !!heading?.matches(":focus-visible") };
+    });
+    ok("tangentbordsnavigering tillbaka flyttar fokus till starthuvudets rubrik",
+      returnedHeadingFocus.focused && returnedHeadingFocus.visible, JSON.stringify(returnedHeadingFocus));
     ok("P.E.R-kontrollerna är engelska redan vid första sidladdningen",
       await page.locator("#perInput").getAttribute("aria-label") === "Ask P.E.R a question"
       && await page.locator("#perSendBtn").textContent() === "Send"

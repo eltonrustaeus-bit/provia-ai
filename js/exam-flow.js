@@ -616,7 +616,7 @@
       (english ? "Step " : "Steg ") + step + (english ? " of " : " av ") + STEPS.length + ": " + STEP_LABELS[name][english ? "en" : "sv"]);
   }
 
-  function screen(name) {
+  function screen(name, focusHeading = true) {
     if (name === "contract") {
       var panel = document.getElementById("perPanel");
       var bubble = document.getElementById("perBubble");
@@ -649,7 +649,7 @@
        så att den går att fokusera utan att hamna i tabbordningen. */
     var sc = UI.screens[name];
     var head = sc && sc.querySelector(".xf-say");
-    if (head) {
+    if (head && focusHeading) {
       try { head.focus({ preventScroll: true }); } catch (_) { head.focus(); }
     }
   }
@@ -670,7 +670,7 @@
 
   // ── Steg 0: start ────────────────────────────────────────────────────────
 
-  function stepStart() {
+  function stepStart(focusHeading = true) {
     UI.languageRerender = stepStart;
     var renderVersion = ++startVersion;
     var d = dna();
@@ -836,7 +836,7 @@
         });
       }).catch(function () {});
     }
-    screen("start");
+    screen("start", focusHeading);
   }
 
   /* ── Kurskatalogen ──────────────────────────────────────────────────────
@@ -2825,7 +2825,7 @@
     // steg tystas, felen släpps igenom. Se showToast i app.html.
     window.__xfActive = true;
     buildDom(root);
-    stepStart();
+    stepStart(false);
     window.addEventListener("exgen:history-updated", function () {
       if (UI.screens.start && UI.screens.start.classList.contains("on")) stepStart();
     });
