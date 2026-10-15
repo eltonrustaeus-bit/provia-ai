@@ -264,6 +264,7 @@
       var move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
       if (move) {
         event.preventDefault();
+        event.stopPropagation();
         cursor.x = Math.max(MIN, Math.min(MAX, cursor.x + move[0]));
         cursor.y = Math.max(MIN, Math.min(MAX, cursor.y + move[1]));
         paintCursor();

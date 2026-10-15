@@ -221,6 +221,26 @@ try {
   await page.evaluate(() => window.showWelcome("Test", false));
   assert.equal(await page.locator("#proviaWelcome").count(), 0, "a delayed welcome callback cannot cover an active exam");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, "graph exam fits the mobile viewport");
+  let arrowTriggeredSubmit = false;
+  page.on("dialog", async (dialog) => {
+    arrowTriggeredSubmit = true;
+    await dialog.dismiss();
+  });
+  const graphSvg = page.locator(".xf-exam.on .graph-answer svg");
+  await graphSvg.focus();
+  await graphSvg.press("ArrowRight");
+  await graphSvg.press("ArrowLeft");
+  assert.equal(arrowTriggeredSubmit, false, "graph arrow keys never invoke exam submission");
+  assert.match(await page.locator(".graph-sr-status").innerText(), /markör \(0, 0\)/i,
+    "the keyboard cursor moves within the graph and returns to its origin");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await graphSvg.focus();
+  await graphSvg.press("ArrowRight");
+  await graphSvg.press("ArrowLeft");
+  assert.equal(arrowTriggeredSubmit, false, "desktop graph arrows remain isolated from exam navigation");
+  assert.equal(await page.locator(".xf-exam.on .graph-answer").count(), 1,
+    "graph arrow keys leave the active exam question in place");
+  await page.setViewportSize({ width: 390, height: 844 });
   for (const [label, value] of [["Punkt A, x-koordinat", "0"], ["Punkt A, y-koordinat", "1"], ["Punkt B, x-koordinat", "2"], ["Punkt B, y-koordinat", "3"]]) {
     const input = page.getByRole("spinbutton", { name: label });
     await input.focus();
