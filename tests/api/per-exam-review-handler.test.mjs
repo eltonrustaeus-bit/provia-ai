@@ -696,6 +696,32 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
+    issuanceState = "abandoned";
+    const abandoned = await invoke({ userQuestion: "Give me the exact answer", helpLevel: 3 }, "POST", "application/json");
+    assert.equal(abandoned.statusCode, 200);
+    assert.equal(abandoned.body.examState, "abandoned");
+    assert.match(abandoned.body.answer, /fullständigt svar kräver verifierad rättning/i);
+    assert.equal(abandoned.body.helpCap, 2);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+
+    calls.length = 0;
+    const abandonedReview = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } }, "POST", "application/json");
+    assert.equal(abandonedReview.statusCode, 403);
+    assert.match(abandonedReview.body.error, /kunde inte verifieras som rättat/i);
+    assert.ok(calls.every(({ url }) => !url.includes("recover_graded_exam_result") && !url.includes("openai.com") &&
+      !url.includes("consume_per_chat_quota")), JSON.stringify(calls));
+
+    calls.length = 0;
+    const conflictingReview = await invoke({ examReview: true, examProof: proof, tipsMode: true, question: "Q", feedback: "F", model_answer: "A" }, "POST", "application/json");
+    assert.equal(conflictingReview.statusCode, 400);
+    assert.equal(conflictingReview.body.error, "INVALID_MODE_COMBINATION");
+    assert.equal(calls.length, 0, "conflicting answer modes are rejected before auth, quota, or model work");
+    const conflictingQuiz = await invoke({ examReview: true, examProof: proof, mode: "quiz" }, "POST", "application/json");
+    assert.equal(conflictingQuiz.statusCode, 400);
+    assert.equal(conflictingQuiz.body.error, "INVALID_MODE_COMBINATION");
+    assert.equal(calls.length, 0, "exam review cannot be rerouted into another P.E.R mode");
+
+    calls.length = 0;
     issuanceState = "completed";
     const verified = await invoke({ scores: [0.5] }, "POST", "application/json");
     assert.equal(verified.statusCode, 400);

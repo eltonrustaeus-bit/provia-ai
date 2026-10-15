@@ -769,7 +769,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
   // Landing-mode answers are not backed by a completion receipt. Never let
   // the generic landing pipeline handle a request that claims post-exam review.
-  if (body.landingMode === true && body.examReview === true) {
+  if (body.examReview === true && (
+    body.landingMode === true || body.tipsMode === true || body.legalMode === true ||
+    Array.isArray(body.scores) || body.question != null || body.correct != null || body.mode != null
+  )) {
     res.setHeader("Cache-Control", "no-store");
     return res.status(400).json({ error: "INVALID_MODE_COMBINATION" });
   }
