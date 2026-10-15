@@ -133,6 +133,23 @@
     padding:48px 0 56px;
   }
 
+  .account-deletion-notice {
+    width:min(720px,calc(100% - 32px));
+    box-sizing:border-box;
+    margin:20px auto 0;
+    padding:18px 20px;
+    border:1px solid color-mix(in srgb,var(--exgen-error) 28%,var(--exgen-border));
+    border-left:4px solid var(--exgen-error);
+    border-radius:8px;
+    background:color-mix(in srgb,var(--exgen-error) 6%,var(--exgen-bg));
+    color:var(--exgen-text);
+  }
+  .account-deletion-notice[hidden] { display:none; }
+  .account-deletion-notice h2 { margin:0 0 8px; font-size:18px; line-height:1.35; }
+  .account-deletion-notice p { margin:0; line-height:1.55; }
+  .account-deletion-notice a { display:inline-block; margin-top:10px; color:var(--exgen-error-text); font-weight:600; text-underline-offset:3px; }
+  .account-deletion-notice .account-deletion-notice__privacy { margin-top:8px; color:var(--exgen-text-secondary); font-size:13px; }
+
   /* Background — one soft top-centred wash plus a faint, heavily masked
      grid for texture. The previous treatment (full-bleed gradient + two
      animated blurred blobs + a stronger grid) read as visual noise behind
@@ -695,6 +712,19 @@
 <!-- HEADER -->
 <div data-xg-header></div>
 
+<section id="accountDeletionNotice" class="account-deletion-notice" role="alert" aria-labelledby="accountDeletionNoticeTitle" hidden>
+  <div>
+    <h2 id="accountDeletionNoticeTitle">Kontoraderingen kunde inte bekräftas</h2>
+    <p>Du har loggats ut, men raderingen har inte kunnat bekräftas. Kontot eller tillhörande uppgifter kan därför finnas kvar. Kontakta ExGen så hjälper vi dig att kontrollera statusen.</p>
+    <a href="mailto:elton.rustaeus@gmail.com?subject=ExGen%20kontoradering">Kontakta ExGen support</a>
+    <p class="account-deletion-notice__privacy">Skicka inte lösenord eller provsvar i ditt meddelande.</p>
+  </div>
+</section>
+<script>
+  if (new URLSearchParams(window.location.search).get("accountDeletion") === "unconfirmed") {
+    document.getElementById("accountDeletionNotice").hidden = false;
+  }
+</script>
 
 <main id="main-content">
 
