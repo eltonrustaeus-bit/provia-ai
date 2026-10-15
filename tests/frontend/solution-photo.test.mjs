@@ -263,6 +263,36 @@ try {
     R.ok("K8 inget tekniskt fel visas", !/error|500|failed/i.test(note), note);
     await t.close();
   }
+  {
+    const t = await öppna();
+    await till(t.page, 2);
+    await t.page.evaluate(() => {
+      window.photoReadCalls = 0;
+      window.photoUnhandledRejection = false;
+      window.addEventListener("unhandledrejection", () => { window.photoUnhandledRejection = true; });
+      window.ExGenEngine.readSolution = () => {
+        window.photoReadCalls++;
+        if (window.photoReadCalls === 1) return Promise.reject(new Error("synthetic read failure"));
+        return Promise.resolve({ ok: true, readable: true, text: "x = 5", confidence: 0.95, uncertain: [] });
+      };
+    });
+    await lämna(t.page);
+    await t.page.waitForFunction(() => {
+      const button = document.querySelector(".xf-photo-btn");
+      const note = document.querySelector(".xf-photo-note");
+      return button && !button.disabled && note && note.textContent.includes("Försök igen");
+    });
+    R.ok("K12 ett avvisat OCR-löfte återställer knappen", !(await t.page.locator(".xf-photo-btn").isDisabled()));
+    R.ok("K12 ett avvisat OCR-löfte visar återhämtningsråd", /Försök igen eller skriv svaret/.test(await t.page.locator(".xf-photo-note").innerText()));
+    R.ok("K12 filfältet nollställs så samma bild kan väljas igen", await t.page.locator(".xf-photo-input").inputValue() === "");
+    R.ok("K12 avvisat OCR-löfte blir hanterat", !(await t.page.evaluate(() => window.photoUnhandledRejection)));
+
+    await lämna(t.page);
+    await t.page.waitForFunction(() => document.querySelector(".xf-photo-note")?.textContent.includes("Kontrollera att det stämmer"));
+    R.ok("K12 eleven kan skicka samma bild igen efter felet", await t.page.evaluate(() => window.photoReadCalls) === 2);
+    R.ok("K12 lyckad återförsökning når svarsrutan", /x = 5/.test(await t.page.locator(".xf-answer").inputValue()));
+    await t.close();
+  }
 } catch (e) {
   process.exitCode = R.finish(e);
   await browser.close(); srv.close(); process.exit(process.exitCode);

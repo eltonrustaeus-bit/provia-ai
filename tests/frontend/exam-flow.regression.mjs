@@ -48,7 +48,7 @@ const ok = (n, c, d = "") => (c ? pass : fail).push(n + (d ? " — " + d : ""));
 
 const browser = await chromium.launch();
 
-async function mk(opts = {}, gradeOk = true, gradeResult = null) {
+async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 0) {
   const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 860 } }, opts));
   const page = await ctx.newPage();
   const errs = [];
@@ -78,6 +78,7 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null) {
     ["**/api/grade", async r => {
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
+    if (gradeDelayMs > 0) await new Promise(resolve => setTimeout(resolve, gradeDelayMs));
     const qs = lastGradePayload?.questions || [];
     const result = gradeResult ? gradeResult(qs, lastGradePayload?.answers || []) : {
       total_points: 5, max_points: 8,
@@ -728,7 +729,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 
 // Grading announces its changing status and owns focus until the result screen.
 {
-  const { ctx, page } = await mk();
+  const { ctx, page } = await mk({}, true, null, 7200);
   try {
     await signIn(page, "grading-status");
     await toExam(page);
@@ -753,6 +754,10 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("rättningen meddelas som status och får fokus", state.live === "polite" && state.focused
       && /läser dina svar/.test(state.firstStep) && state.gradingRegion === "Rättningen pågår" && state.backgroundInert,
       JSON.stringify(state));
+    await page.getByText("kontrollerar poänggränserna", { exact: true }).waitFor({ timeout: 9000 });
+    const gradingSteps = await page.locator(".xf-log").innerText();
+    ok("rättningsstatusen beskriver poängkontrollen och lovar ingen historikjämförelse",
+      /kontrollerar poänggränserna/i.test(gradingSteps) && !/tidigare prov|previous exams/i.test(gradingSteps), gradingSteps);
     await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 12000 });
     const resultFocus = await page.evaluate(() => !!document.activeElement?.closest(".xf-screen[data-screen='result']"));
     ok("fokus lämnar rättningen till resultatsidan", resultFocus);

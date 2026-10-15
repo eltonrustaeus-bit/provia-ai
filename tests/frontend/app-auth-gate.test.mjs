@@ -20,6 +20,22 @@ try {
   assert.equal(await page.locator("#perWidget").isVisible(), false, "study help does not cover the locked page");
   assert.equal(await page.getByRole("main").count(), 1, "only the locked view is a visible main landmark");
   assert.equal(await page.locator("#appSkipLink").getAttribute("href"), "#authGate");
+  assert.match(await page.locator("#authGateText").innerText(), /Logga in eller skapa konto/i,
+    "visitor guidance matches the sign-in and registration actions");
+  const visitorGateLayout = await page.evaluate(() => {
+    const text = document.getElementById("authGateText");
+    const actions = document.getElementById("authGateActions");
+    return {
+      viewport: innerWidth,
+      textRight: text.getBoundingClientRect().right,
+      textBottom: text.getBoundingClientRect().bottom,
+      actionsTop: actions.getBoundingClientRect().top,
+      clipped: text.scrollWidth > text.clientWidth || text.scrollHeight > text.clientHeight,
+    };
+  });
+  assert.ok(visitorGateLayout.textRight <= visitorGateLayout.viewport + 1
+    && visitorGateLayout.textBottom <= visitorGateLayout.actionsTop && !visitorGateLayout.clipped,
+  `registration/sign-in guidance fits above the controls: ${JSON.stringify(visitorGateLayout)}`);
   await page.locator("#authGateAction").click();
   await page.locator("#pvModal").waitFor({ state: "visible" });
   assert.equal(await page.getByRole("dialog", { name: "Skapa konto" }).count(), 1, "create-account action opens registration");
@@ -33,12 +49,29 @@ try {
   await visitor.close();
 
   const englishVisitor = await openPage(browser, `${server.url}/app.html`, {
+    width: 390,
     state: { signedIn: false, role: null, lang: "en" },
     mocks: { allow: true, extra: [
       ["**/api/signup", route => route.fulfill({ json: { ok: true } })],
       ["**/auth/v1/token**", route => route.fulfill({ status: 400, json: { msg: "Invalid login credentials" } })],
     ] },
   });
+  assert.match(await englishVisitor.page.locator("#authGateText").innerText(), /Sign in or create an account/i,
+    "English visitor guidance matches both available actions");
+  const englishGateLayout = await englishVisitor.page.evaluate(() => {
+    const text = document.getElementById("authGateText");
+    const actions = document.getElementById("authGateActions");
+    return {
+      viewport: innerWidth,
+      textRight: text.getBoundingClientRect().right,
+      textBottom: text.getBoundingClientRect().bottom,
+      actionsTop: actions.getBoundingClientRect().top,
+      clipped: text.scrollWidth > text.clientWidth || text.scrollHeight > text.clientHeight,
+    };
+  });
+  assert.ok(englishGateLayout.textRight <= englishGateLayout.viewport + 1
+    && englishGateLayout.textBottom <= englishGateLayout.actionsTop && !englishGateLayout.clipped,
+  `English registration/sign-in guidance fits above the controls: ${JSON.stringify(englishGateLayout)}`);
   assert.equal(await englishVisitor.page.locator("#authGateAction").innerText(), "Create an account");
   assert.equal(await englishVisitor.page.locator("#authGateLogin").innerText(), "Sign in");
   await englishVisitor.page.locator("#authGateAction").click();

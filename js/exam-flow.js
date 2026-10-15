@@ -103,11 +103,17 @@
       btn.textContent = tx("Läser din lösning…", "Reading your solution…");
       say("", null);
 
-      engine.readSolution(file.files[0], q && q.question).then(function (r) {
+      function restorePhotoInput() {
         btn.disabled = false;
         btn.textContent = LABEL;
         // Samma fil två gånger i rad ger annars ingen change-händelse.
         file.value = "";
+      }
+
+      Promise.resolve().then(function () {
+        return engine.readSolution(file.files[0], q && q.question);
+      }).then(function (r) {
+        restorePhotoInput();
 
         if (!r || !r.ok) {
           say((r && r.error) || tx("Kunde inte läsa bilden.", "Could not read the image."), "bad");
@@ -136,6 +142,12 @@
         }
         say(delar.join(" "), r.confidence < 0.7 ? "warn" : null);
         ta.focus();
+      }).catch(function () {
+        restorePhotoInput();
+        say(tx(
+          "Kunde inte läsa bilden. Försök igen eller skriv svaret i rutan.",
+          "Could not read the image. Try again or type your answer in the box."
+        ), "bad");
       });
     });
 
@@ -2336,11 +2348,11 @@
      mindre: den som väntar ska få veta vad väntan går åt till. */
 
   var LOG = [
-    ["01", "läser dina svar"],
-    ["02", "matchar mot bedömningsmallen"],
-    ["03", "väger delpoäng per fråga"],
-    ["04", "jämför med dina tidigare prov"],
-    ["05", "skriver din återkoppling"]
+    ["01", "läser dina svar", "Reading your answers"],
+    ["02", "matchar mot bedömningsmallen", "Matching answers to the scoring guide"],
+    ["03", "väger delpoäng per fråga", "Weighing partial credit per question"],
+    ["04", "kontrollerar poänggränserna", "Checking score limits"],
+    ["05", "sammanställer din återkoppling", "Preparing your feedback"]
   ];
 
   var PEP = [
@@ -2379,7 +2391,7 @@
       Array.prototype.forEach.call(UI.log.children, function (c) { c.classList.remove("now"); });
       var row = el("div", "now");
       row.appendChild(el("i", null, LOG[n][0]));
-      row.appendChild(el("span", null, LOG[n][1]));
+      row.appendChild(el("span", null, tx(LOG[n][1], LOG[n][2])));
       UI.log.appendChild(row);
       n++;
     }
