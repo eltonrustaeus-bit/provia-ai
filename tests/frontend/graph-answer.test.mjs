@@ -134,6 +134,28 @@ try {
   assert.equal(await page.evaluate((raw) => window.ExGenGraphAnswer.isComplete(raw), keyboardLineAnswer), true);
   await lineKeyboard.evaluate((root) => root.remove());
 
+  const decimalGraphConfig = {
+    mode: "scatter", point_count: 3, x_label: "Pris (kr)", y_label: "Efterfrågan (st)",
+    coordinate_scale: 10, x_axis: { min: 100, max: 220, step: 20 },
+    y_axis: { min: 150, max: 400, step: 50 },
+  };
+  await page.evaluate((ui) => {
+    const root = document.createElement("div"); root.id = "decimalKeyboard"; document.body.appendChild(root);
+    window.ExGenGraphAnswer(root, "", () => {}, "sv", ui);
+  }, decimalGraphConfig);
+  const decimalKeyboard = page.locator("#decimalKeyboard");
+  const decimalGrid = decimalKeyboard.locator("svg");
+  await decimalGrid.focus();
+  for (let i = 0; i < 25; i++) await decimalGrid.press("ArrowRight");
+  await decimalGrid.press("Enter");
+  await decimalGrid.press("Shift+ArrowRight");
+  await decimalGrid.press("ArrowUp");
+  await decimalGrid.press("Enter");
+  const decimalKeyboardAnswer = JSON.parse(await decimalKeyboard.locator("input.graphAnswer").inputValue());
+  assert.deepEqual(decimalKeyboardAnswer.points, [{ x: 125, y: 150 }, { x: 145, y: 151 }, null],
+    "keyboard can reach decimal coordinates and Shift+arrow advances by a grid interval");
+  await decimalKeyboard.evaluate((root) => root.remove());
+
   await page.evaluate(() => {
     const root = document.createElement("div"); root.id = "wideGrid"; document.body.appendChild(root);
     window.ExGenGraphAnswer(root, "", () => {});
@@ -212,9 +234,9 @@ try {
   const invalidX = page.locator("#graph").getByRole("spinbutton", { name: "Punkt A, x-koordinat" });
   for (const value of ["6", "1.5"]) {
     await invalidX.fill(value);
-    assert.equal(await invalidX.inputValue(), "", `invalid coordinate ${value} is not left visible as though it were saved`);
+    assert.equal(await invalidX.inputValue(), value, `invalid coordinate ${value} remains editable for correction`);
     assert.equal(await invalidX.getAttribute("aria-invalid"), "true");
-    assert.match(await page.locator("#graph .graph-validation-message").textContent(), /Ange heltal mellan/);
+    assert.match(await page.locator("#graph .graph-validation-message").textContent(), /Ange värden inom axlarnas intervall/);
     assert.equal(await page.locator("#graph input.graphAnswer").inputValue(), "", "invalid input is excluded from the serialized answer");
     const restoredInvalid = await page.evaluate((raw) => {
       const root = document.createElement("div"); document.body.appendChild(root);

@@ -1839,7 +1839,7 @@ function renderExam(exam){
         const source=graphUi&&graphUi.mode==="scatter"?graphUi.source_table:null;
         if(source&&Array.isArray(source.headers)&&source.headers.length===2&&Array.isArray(source.rows)&&source.rows.length===3
           &&source.headers.every(value=>typeof value==="string"&&value.length<=32)
-          &&source.rows.every(row=>Array.isArray(row)&&row.length===2&&row.every(Number.isInteger))){
+          &&source.rows.every(row=>Array.isArray(row)&&row.length===2&&row.every(value=>Number.isSafeInteger(value)||(typeof value==="string"&&/^[+-]?\d+(?:[.,]\d{1,3})?$/.test(value))))){
           const wrap=document.createElement("div");wrap.className="xf-source-table-wrap";
           const table=document.createElement("table");table.className="xf-source-table";
           const caption=document.createElement("caption");caption.textContent=LANG==="en"?"Values from your material":"Värden från materialet";table.appendChild(caption);

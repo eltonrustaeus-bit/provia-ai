@@ -36,6 +36,20 @@ const scenarios = [
     rows: [[1, -2], [2, 1], [3, 3]],
   },
   {
+    id: "economics-decimals",
+    course: "Företagsekonomi 1",
+    title: "Ekonomiprov",
+    material: "Prisexempel:\nPris (kr) | Efterfrågan (st)\n12,5 | 34\n15,0 | 29\n18,5 | 21",
+    headers: ["Pris (kr)", "Efterfrågan (st)"],
+    rows: [["12,5", "34"], ["15,0", "29"], ["18,5", "21"]],
+    expectedPoints: [{ x: 125, y: 340 }, { x: 150, y: 290 }, { x: 185, y: 210 }],
+    graph: {
+      coordinate_scale: 10,
+      x_axis: { min: 100, max: 220, step: 20 },
+      y_axis: { min: 150, max: 400, step: 50 },
+    },
+  },
+  {
     id: "biology-partial",
     course: "Biologi 1",
     title: "Biologiprov",
@@ -55,6 +69,7 @@ async function verifyScatterScenario(scenario) {
     mode: "scatter", point_count: 3,
     x_label: scenario.headers[0], y_label: scenario.headers[1],
     source_table: sourceTable,
+    ...(scenario.graph || {}),
   };
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];
@@ -116,11 +131,13 @@ async function verifyScatterScenario(scenario) {
   const pointCount = scenario.partial ? 2 : scenario.rows.length;
   for (let i = 0; i < pointCount; i++) {
     const [x, y] = scenario.rows[i];
-    await page.getByRole("spinbutton", { name: `Punkt ${pointLetters[i]}, x-koordinat` }).fill(String(x));
-    await page.getByRole("spinbutton", { name: `Punkt ${pointLetters[i]}, y-koordinat` }).fill(String(y));
+    await exam.locator(`.graph-coordinate-fields [aria-label="Punkt ${pointLetters[i]}, x-koordinat"]`).fill(String(x));
+    await exam.locator(`.graph-coordinate-fields [aria-label="Punkt ${pointLetters[i]}, y-koordinat"]`).fill(String(y));
   }
   const serializedAnswer = await exam.locator(".graph-answer input[type=hidden]").inputValue();
-  const expectedPoints = scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
+  const expectedPoints = scenario.expectedPoints
+    ? scenario.expectedPoints.slice(0, pointCount)
+    : scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
   if (scenario.partial) expectedPoints.push(null);
   assert.deepEqual(JSON.parse(serializedAnswer), {
     type: "scatter", points: expectedPoints,
@@ -144,6 +161,14 @@ async function verifyScatterScenario(scenario) {
     `${scenario.id} table and graph do not create horizontal overflow on mobile`);
   await page.waitForFunction(() => Number(getComputedStyle(document.querySelector("#xf .xf-exam.on .xf-sheet")).opacity) === 1);
   const graphSvg = exam.locator(".graph-answer svg");
+  if (scenario.graph) {
+    const tickLabels = graphSvg.locator(".graph-tick-labels text");
+    assert.equal(await tickLabels.first().getAttribute("y"), "247",
+      "positive-only x-axis tick labels sit beside the lower x-axis, not through the data");
+    const topYTick = tickLabels.filter({ hasText: "40" }).first();
+    assert.equal(await topYTick.getAttribute("x"), "32",
+      "positive-only y-axis tick labels sit beside the left y-axis");
+  }
   const assertGraphVisibleAboveNavigation = async (viewport) => {
     await graphSvg.evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
     const [graphBounds, topBounds, navBounds] = await Promise.all([
@@ -157,7 +182,7 @@ async function verifyScatterScenario(scenario) {
       && graphBounds.y + graphBounds.height <= navBounds.y,
     `${scenario.id} graph scrolls fully into the usable ${viewport.width}px viewport above fixed controls`);
   };
-  const lastCoordinate = page.getByRole("spinbutton", { name: "Punkt C, y-koordinat" });
+  const lastCoordinate = exam.locator('.graph-coordinate-fields [aria-label="Punkt C, y-koordinat"]');
   const assertLastCoordinateVisibleAboveNavigation = async (viewport) => {
     await sheetWrap.evaluate((element) => { element.scrollTop = element.scrollHeight; });
     const [inputBounds, navBounds] = await Promise.all([
@@ -200,7 +225,9 @@ async function verifyScatterScenario(scenario) {
     throw new Error(`${scenario.id} did not reach results; grade request=${JSON.stringify(gradeBody)}; text=${visibleText}`);
   }
   assert.equal(unansweredPrompt, false, `${scenario.id} valid scatter attempt should not need an unanswered-question confirmation`);
-  const submittedPoints = scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
+  const submittedPoints = scenario.expectedPoints
+    ? scenario.expectedPoints.slice(0, pointCount)
+    : scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
   if (scenario.partial) submittedPoints.push(null);
   assert.deepEqual(gradeBody?.answers, [{ id: `${scenario.id}-scatter`, answer: JSON.stringify({
     type: "scatter", points: submittedPoints,
@@ -217,7 +244,7 @@ async function verifyScatterScenario(scenario) {
 
 try {
   for (const scenario of scenarios) await verifyScatterScenario(scenario);
-  console.log("scatter graph flows: physics, biology, geography and math table data render and submit from mobile/desktop");
+  console.log("scatter graph flows: physics, biology, geography, math and decimal economics render and submit from mobile/desktop");
 } finally {
   await browser.close();
   await server.close();

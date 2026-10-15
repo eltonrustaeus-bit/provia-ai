@@ -397,6 +397,7 @@ body.xf-grading .xf-progress { display: none; }
 .graph-grid line { stroke: var(--xf-line); stroke-width: .7; }
 .graph-axes line { stroke: var(--xf-ink-2); stroke-width: 1.6; }
 .graph-tick-labels text { fill: var(--xf-ink-2); font: 6.5px var(--exgen-font-mono); pointer-events: none; }
+.graph-answer--scaled .graph-tick-labels text { font-size: 8px; }
 .graph-tick-labels .graph-axis-name { fill: var(--xf-ink); font-size: 8px; font-weight: 600; }
 .graph-student-line { stroke: var(--xf-accent); stroke-width: 2.5; }
 .graph-mark circle { fill: var(--xf-accent); stroke: var(--s); stroke-width: 1.5; }

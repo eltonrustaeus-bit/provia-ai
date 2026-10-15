@@ -1116,7 +1116,7 @@
     dl.appendChild(rNum);
     card.appendChild(dl);
     var graphHint = el("p", "xf-graph-limit-note",
-      tx("Matematik: en uttrycklig rät linje y = mx + b där m och b är heltal mellan −5 och 5 och minst två punkter syns i diagrammet, eller en entydig tabell med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger. Natur- och samhällsvetenskap stöder samma tabellformat. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b where m and b are integers from −5 to 5 and at least two points appear on the graph, or one unambiguous table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once. Natural and social sciences support the same table format. Other graph and chart formats are not supported yet."));
+      tx("Matematik: en uttrycklig rät linje y = mx + b där m och b är heltal mellan −5 och 5 och minst två punkter syns, eller en entydig tabell med två rubriker avdelade med | och exakt tre olika talpar. Tabellvärden får ha upp till tre decimaler (komma eller punkt), ligga inom ±100 000 och axlarna skalas automatiskt. Samma x-värde får förekomma flera gånger. Natur- och samhällsvetenskap stöder samma tabellformat. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b where m and b are integers from −5 to 5 and at least two points appear, or one unambiguous table with two headers separated by | and exactly three distinct numeric pairs. Table values may have up to three decimal places (comma or point), must be within ±100,000, and axes are scaled automatically. The same x-value may appear more than once. Natural and social sciences support the same table format. Other graph and chart formats are not supported yet."));
     graphHint.hidden = S.qType !== "graph";
     card.appendChild(graphHint);
     b.appendChild(card);
@@ -1921,7 +1921,9 @@
       || !Array.isArray(source.rows) || source.rows.length !== 3
       || !source.headers.every(function (value) { return typeof value === "string" && value.length <= 32; })
       || !source.rows.every(function (row) {
-        return Array.isArray(row) && row.length === 2 && row.every(Number.isInteger);
+        return Array.isArray(row) && row.length === 2 && row.every(function (value) {
+          return Number.isSafeInteger(value) || (typeof value === "string" && /^[+-]?\d+(?:[.,]\d{1,3})?$/.test(value));
+        });
       })) return;
 
     var wrap = el("div", "xf-source-table-wrap");

@@ -320,8 +320,8 @@ function buildMockExamSchema(numQuestions) {
                     items: {
                       type: "object", additionalProperties: false, required: ["x", "y"],
                       properties: {
-                        x: { type: "integer", minimum: -5, maximum: 5 },
-                        y: { type: "integer", minimum: -5, maximum: 5 }
+                        x: { type: "number", minimum: -100000, maximum: 100000 },
+                        y: { type: "number", minimum: -100000, maximum: 100000 }
                       }
                     }
                   },
@@ -1020,8 +1020,8 @@ module.exports = async function handler(req, res) {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd kräver en linje y = mx + b i matematik med heltal från −5 till 5 och minst två synliga rutnätspositioner, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger."
-        : "Graph support requires a math line y = mx + b with integer values from −5 to 5 and at least two visible grid positions, or a math, natural-science, or social-science table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once."
+        ? "Grafstöd kräver en linje y = mx + b i matematik med heltal från −5 till 5 och minst två synliga rutnätspositioner, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre olika talpar (högst tre decimaler, inom ±100 000). Samma x-värde får förekomma flera gånger."
+        : "Graph support requires a math line y = mx + b with integer values from −5 to 5 and at least two visible grid positions, or a math, natural-science, or social-science table with two headers separated by | and exactly three distinct numeric pairs (up to three decimals, within ±100,000). The same x-value may appear more than once."
     });
   }
 

@@ -197,7 +197,8 @@ try {
   assert.equal(unsupportedGraph.status, 400);
   assert.equal(unsupportedGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
   assert.match(unsupportedGraph.body.message, /matematik, naturvetenskap eller samhällsvetenskap/i);
-  assert.match(unsupportedGraph.body.message, /exakt tre olika heltalspar/i);
+  assert.match(unsupportedGraph.body.message, /exakt tre olika talpar.*högst tre decimaler/i);
+  assert.match(unsupportedGraph.body.message, /inom ±100 000/i);
   assert.match(unsupportedGraph.body.message, /samma x-värde får förekomma flera gånger/i);
   const unsupportedGraphEn = await invoke(generateExam, {
     lang: "en", level: "C", course: "Mathematics 2b", pastedText: "The parabola is y = x^2.",
@@ -206,7 +207,8 @@ try {
   assert.equal(unsupportedGraphEn.status, 400);
   assert.equal(unsupportedGraphEn.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
   assert.match(unsupportedGraphEn.body.message, /math, natural-science, or social-science table/i);
-  assert.match(unsupportedGraphEn.body.message, /exactly three distinct integer coordinate pairs/i);
+  assert.match(unsupportedGraphEn.body.message, /exactly three distinct numeric pairs.*up to three decimals/i);
+  assert.match(unsupportedGraphEn.body.message, /within ±100,000/i);
   assert.match(unsupportedGraphEn.body.message, /same x-value may appear more than once/i);
   calls.length = 0;
   const outOfBoundsGraph = await invoke(generateExam, {
@@ -726,16 +728,29 @@ try {
   assert.equal(physicsGraded.body.result.max_points, 3);
 
   calls.length = 0;
-  const unsupportedPhysicsTable = await invoke(generateExam, {
+  const decimalPhysicsTable = await invoke(generateExam, {
     lang: "sv", level: "C", course: physicsCourse,
     pastedText: "Tid (s) | Hastighet (m/s)\n0 | 1\n1 | 2.5\n2 | 4", qType: "graph", numQuestions: 1,
   });
-  assert.equal(unsupportedPhysicsTable.status, 400);
-  assert.equal(unsupportedPhysicsTable.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
-    "unsupported physics decimals are rejected before provider use");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
-    "unsupported physics decimals do not consume an exam quota");
+  assert.equal(decimalPhysicsTable.status, 200, JSON.stringify(decimalPhysicsTable.body));
+  const decimalPhysicsQuestion = decimalPhysicsTable.body.exam.questions[0];
+  assert.deepEqual(decimalPhysicsQuestion.graph_ui, {
+    mode: "scatter", point_count: 3, x_label: "Tid (s)", y_label: "Hastighet (m/s)",
+    coordinate_scale: 10, x_axis: { min: -5, max: 25, step: 5 },
+    y_axis: { min: 5, max: 45, step: 5 },
+    source_table: { headers: ["Tid (s)", "Hastighet (m/s)"], rows: [["0", "1"], ["1", "2.5"], ["2", "4"]] },
+  }, "decimal physics measurements keep their source formatting and receive a server-derived scale");
+  const decimalPhysicsGraded = await invoke(gradeExam, {
+    lang: "sv", course: physicsCourse, pastedText: "Tid (s) | Hastighet (m/s)\n0 | 1\n1 | 2.5\n2 | 4",
+    exam_manifest: decimalPhysicsTable.body.exam.exam_manifest,
+    questions: [decimalPhysicsQuestion],
+    answers: [{ id: decimalPhysicsQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 10 }, { x: 10, y: 25 }, { x: 20, y: 40 },
+    ] }) }],
+  });
+  assert.equal(decimalPhysicsGraded.status, 200, JSON.stringify(decimalPhysicsGraded.body));
+  assert.equal(decimalPhysicsGraded.body.result.total_points, 3,
+    "the signed grading task compares decimal-derived scaled integers exactly");
 
   const mathScatterCourse = "Matematik 2b";
   const mathScatterMaterial = "Talpar:\nx-värde | y-värde\n0 | 2\n1 | 3\n2 | 4";
@@ -782,16 +797,17 @@ try {
   assert.deepEqual(mathTableFallback.body.exam.questions[0].graph_ui.source_table.rows, [[0, 2], [1, 3], [2, 4]]);
 
   calls.length = 0;
-  const unsupportedMathTable = await invoke(generateExam, {
+  const decimalMathTable = await invoke(generateExam, {
     lang: "sv", level: "C", course: mathScatterCourse,
     pastedText: "Tid (s) | Temperatur (°C)\n0 | 2.5\n1 | 4\n2 | 6", qType: "graph", numQuestions: 1,
   });
-  assert.equal(unsupportedMathTable.status, 400);
-  assert.equal(unsupportedMathTable.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
-    "a math table outside the exact integer contract is rejected before provider use");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
-    "an unsupported math table does not consume an exam quota");
+  assert.equal(decimalMathTable.status, 200, JSON.stringify(decimalMathTable.body));
+  assert.deepEqual(decimalMathTable.body.exam.questions[0].graph_ui, {
+    mode: "scatter", point_count: 3, x_label: "Tid (s)", y_label: "Temperatur (°C)",
+    coordinate_scale: 10,
+    x_axis: { min: -5, max: 25, step: 5 }, y_axis: { min: 10, max: 70, step: 10 },
+    source_table: { headers: ["Tid (s)", "Temperatur (°C)"], rows: [["0", "2.5"], ["1", "4"], ["2", "6"]] },
+  }, "math tables use the same exact decimal and scaled-axis contract as science tables");
 
   const socialCourse = "Företagsekonomi 1";
   const socialMaterial = "Efterfrågan och pris:\nAntal | Pris (kr)\n1 | 5\n2 | 4\n3 | 3";

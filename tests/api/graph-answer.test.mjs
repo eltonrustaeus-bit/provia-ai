@@ -51,7 +51,48 @@ assert.equal(graph.gradeAnswer(repeatedXAnswer, repeatedXSpec).points, 3, "disti
 assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n0 | 4\n1 | 1"), null, "duplicate coordinate pairs remain invalid");
 assert.equal(graph.answerIsComplete(JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, { x: 0, y: 4 }, { x: 1, y: 1 }] }), repeatedXSpec), false,
   "the same observation cannot be submitted twice");
-assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1"), null, "decimal values are not rounded");
+assert.deepEqual(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1").points,
+  [{ x: 0, y: 45 }, { x: 10, y: 30 }, { x: 20, y: 10 }], "decimal values are converted to exact scaled integers");
+const decimalTable = "Pris (kr) | Efterfrågan (st)\n12,5 | 34\n15,0 | 29\n18,5 | 21";
+const decimalData = {
+  points: [{ x: 125, y: 340 }, { x: 150, y: 290 }, { x: 185, y: 210 }],
+  x_label: "Pris (kr)", y_label: "Efterfrågan (st)", coordinate_scale: 10,
+  x_axis: { min: 100, max: 220, step: 20 }, y_axis: { min: 150, max: 400, step: 50 },
+  source_rows: [["12,5", "34"], ["15,0", "29"], ["18,5", "21"]],
+};
+const decimalSpec = { kind: "scatter", slope: null, intercept: null, ...decimalData };
+assert.deepEqual(graph.parsePointTable(decimalTable), decimalData, "comma decimals keep exact scaled values and source formatting");
+assert.equal(graph.isValidSpec(decimalSpec), true);
+assert.equal(graph.sourceContainsSpec(decimalTable, decimalSpec), true);
+assert.equal(graph.isValidSpec({ ...decimalSpec, x_axis: { ...decimalSpec.x_axis, step: 10 } }), false,
+  "axis bounds and intervals are derived and cannot be independently changed");
+assert.deepEqual(graph.displaySpec(decimalSpec), {
+  mode: "scatter", point_count: 3, x_label: "Pris (kr)", y_label: "Efterfrågan (st)",
+  coordinate_scale: 10,
+  x_axis: { min: 100, max: 220, step: 20 }, y_axis: { min: 150, max: 400, step: 50 },
+  source_table: { headers: ["Pris (kr)", "Efterfrågan (st)"], rows: [["12,5", "34"], ["15,0", "29"], ["18,5", "21"]] },
+});
+const decimalAnswer = JSON.stringify({ type: "scatter", points: decimalData.points });
+assert.equal(graph.answerIsComplete(decimalAnswer, decimalSpec), true);
+assert.equal(graph.gradeAnswer(decimalAnswer, decimalSpec).points, 3,
+  "decimal coordinates are graded by exact scaled integers, not floating-point tolerance");
+assert.equal(graph.gradeAnswer(JSON.stringify({ type: "scatter", points: [
+  { x: 125, y: 341 }, { x: 150, y: 290 }, { x: 185, y: 210 },
+] }), decimalSpec).points, 2, "a one-hundredth coordinate error is not rounded into a correct point");
+const finePrecision = graph.parsePointTable("Time (s) | Change (m)\n-1.25 | -0,125\n0 | 0.5\n2 | 1.375");
+assert.deepEqual(finePrecision.points, [{ x: -1250, y: -125 }, { x: 0, y: 500 }, { x: 2000, y: 1375 }],
+  "mixed decimal commas, decimal points, signs and precision share one exact scale");
+assert.equal(finePrecision.coordinate_scale, 1000);
+assert.equal(graph.isValidSpec({ kind: "scatter", slope: null, intercept: null, ...finePrecision }), true);
+assert.equal(graph.gradeAnswer(JSON.stringify({ type: "scatter", points: finePrecision.points }), {
+  kind: "scatter", slope: null, intercept: null, ...finePrecision,
+}).points, 3);
+assert.equal(graph.parsePointTable("x | y\n1e2 | 2\n3 | 4\n5 | 6"), null, "exponent notation is rejected");
+assert.equal(graph.parsePointTable("x | y\n1,2345 | 2\n3 | 4\n5 | 6"), null, "more than three decimal places is rejected");
+assert.equal(graph.parsePointTable("x | y\n100001 | 2\n3 | 4\n5 | 6"), null, "values outside the supported magnitude are rejected");
+const dynamicInteger = graph.parsePointTable("År | Intäkt\n2019 | 1200\n2020 | 1500\n2021 | 1800");
+assert.ok(dynamicInteger && dynamicInteger.coordinate_scale === 1, "integer source values outside the legacy grid get a derived scale");
+assert.equal(graph.isValidSpec({ kind: "scatter", slope: null, intercept: null, ...dynamicInteger }), true);
 assert.equal(graph.isValidSpec(scatterSpec), true);
 assert.deepEqual(graph.displaySpec(scatterSpec), {
   mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",

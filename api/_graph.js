@@ -6,16 +6,67 @@ const { getExamSigningSecret } = require("./_exam-signing-secret.cjs");
 const GRID_MIN = -5;
 const GRID_MAX = 5;
 const SCATTER_POINT_COUNT = 3;
+const MAX_RAW_COORDINATE = 100_000;
 
 function isGridPoint(point) {
-  return point && Number.isInteger(point.x) && Number.isInteger(point.y)
+  return point && Number.isSafeInteger(point.x) && Number.isSafeInteger(point.y)
     && point.x >= GRID_MIN && point.x <= GRID_MAX
     && point.y >= GRID_MIN && point.y <= GRID_MAX;
+}
+
+function isScaledPoint(point, scale = 1) {
+  return point && Number.isSafeInteger(point.x) && Number.isSafeInteger(point.y)
+    && Math.abs(point.x) <= MAX_RAW_COORDINATE * scale
+    && Math.abs(point.y) <= MAX_RAW_COORDINATE * scale;
 }
 
 function safeAxisLabel(value) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= 32
     && /\p{L}/u.test(value) && !/[<>\p{C}]/u.test(value);
+}
+
+function parseCoordinateCell(value) {
+  const match = /^([+-]?)(\d+)(?:([.,])(\d{1,3}))?$/.exec(value);
+  if (!match) return null;
+  const precision = match[4]?.length || 0;
+  return { sign: match[1] === "-" ? -1 : 1, whole: match[2], fraction: match[4] || "", precision, text: value };
+}
+
+function niceStep(target) {
+  const power = 10 ** Math.floor(Math.log10(Math.max(1, target)));
+  for (const factor of [1, 2, 5, 10]) {
+    const step = factor * power;
+    if (step >= target) return step;
+  }
+  return power * 10;
+}
+
+function axisFor(values, scale) {
+  const minimum = Math.min(...values), maximum = Math.max(...values);
+  const span = maximum - minimum;
+  const targetStep = span > 0
+    ? span / 6
+    : Math.max(scale, Math.abs(minimum) * 0.2) / 3;
+  let step = niceStep(targetStep);
+  let min = (Math.floor(minimum / step) - 1) * step;
+  let max = (Math.ceil(maximum / step) + 1) * step;
+  while ((max - min) / step > 8) {
+    step = niceStep(step + 1);
+    min = (Math.floor(minimum / step) - 1) * step;
+    max = (Math.ceil(maximum / step) + 1) * step;
+  }
+  return { min, max, step };
+}
+
+function isValidAxis(axis, values, scale) {
+  return axis && Number.isSafeInteger(axis.min) && Number.isSafeInteger(axis.max)
+    && Number.isSafeInteger(axis.step) && axis.step > 0
+    && Math.abs(axis.min) <= MAX_RAW_COORDINATE * scale * 1.5
+    && Math.abs(axis.max) <= MAX_RAW_COORDINATE * scale * 1.5
+    && axis.min < Math.min(...values) && axis.max > Math.max(...values)
+    && (axis.max - axis.min) % axis.step === 0
+    && (axis.max - axis.min) / axis.step >= 2 && (axis.max - axis.min) / axis.step <= 8
+    && JSON.stringify(axis) === JSON.stringify(axisFor(values, scale));
 }
 
 function parsePointTable(text) {
@@ -35,18 +86,37 @@ function parsePointTable(text) {
       if (!rows[j].validWidth) { points.length = 0; break; }
       const row = rows[j].cells;
       if (row.every((cell) => /^:?-{3,}:?$/.test(cell))) { j++; continue; }
-      if (!row.every((cell) => /^-?\d+$/.test(cell))) {
+      if (!row.every((cell) => parseCoordinateCell(cell))) {
         points.length = 0;
         break;
       }
-      const point = { x: Number(row[0]), y: Number(row[1]) };
-      if (!isGridPoint(point)) { points.length = 0; break; }
-      points.push(point);
+      points.push(row.map(parseCoordinateCell));
       j++;
     }
-    if (points.length !== SCATTER_POINT_COUNT
-      || new Set(points.map((p) => `${p.x}|${p.y}`)).size !== points.length) continue;
-    candidates.push({ points, x_label: header[0], y_label: header[1] });
+    if (points.length !== SCATTER_POINT_COUNT) continue;
+    const precision = Math.max(...points.flat().map((cell) => cell.precision));
+    const scale = 10 ** precision;
+    const values = points.map(([x, y]) => [x, y].map((cell) => {
+      const fraction = cell.fraction.padEnd(precision, "0");
+      return cell.sign * Number(`${cell.whole}${fraction}`);
+    }));
+    const scaledPoints = values.map(([x, y]) => ({ x, y }));
+    if (scaledPoints.some((point) => !isScaledPoint(point, scale))
+      || new Set(scaledPoints.map((p) => `${p.x}|${p.y}`)).size !== scaledPoints.length) continue;
+    if (precision === 0 && scaledPoints.every((point) => point.x >= GRID_MIN && point.x <= GRID_MAX
+      && point.y >= GRID_MIN && point.y <= GRID_MAX)) {
+      candidates.push({ points: scaledPoints, x_label: header[0], y_label: header[1] });
+      continue;
+    }
+    candidates.push({
+      points: scaledPoints,
+      x_label: header[0],
+      y_label: header[1],
+      coordinate_scale: scale,
+      x_axis: axisFor(scaledPoints.map((point) => point.x), scale),
+      y_axis: axisFor(scaledPoints.map((point) => point.y), scale),
+      source_rows: points.map((row) => row.map((cell) => cell.text)),
+    });
   }
   return candidates.length === 1 ? candidates[0] : null;
 }
@@ -94,11 +164,30 @@ function openSpec(q, token, secret) {
 function isValidSpec(spec) {
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) return false;
   if (spec.kind === "scatter") {
-    return spec.slope === null && spec.intercept === null
-      && Array.isArray(spec.points) && spec.points.length === SCATTER_POINT_COUNT
-      && spec.points.every(isGridPoint)
-      && new Set(spec.points.map((point) => `${point.x}|${point.y}`)).size === spec.points.length
-      && safeAxisLabel(spec.x_label) && safeAxisLabel(spec.y_label);
+    const scale = spec.coordinate_scale || 1;
+    const pointsValid = Array.isArray(spec.points) && spec.points.length === SCATTER_POINT_COUNT
+      && spec.points.every((point) => isScaledPoint(point, scale))
+      && new Set(spec.points.map((point) => `${point.x}|${point.y}`)).size === spec.points.length;
+    if (!pointsValid || spec.slope !== null || spec.intercept !== null
+      || !safeAxisLabel(spec.x_label) || !safeAxisLabel(spec.y_label)) return false;
+    if (spec.coordinate_scale === undefined) {
+      return spec.x_axis === undefined && spec.y_axis === undefined && spec.source_rows === undefined
+        && spec.points.every((point) => point.x >= GRID_MIN && point.x <= GRID_MAX
+          && point.y >= GRID_MIN && point.y <= GRID_MAX);
+    }
+    if (![1, 10, 100, 1000].includes(spec.coordinate_scale)
+      || !Array.isArray(spec.source_rows) || spec.source_rows.length !== SCATTER_POINT_COUNT
+      || !spec.source_rows.every((row) => Array.isArray(row) && row.length === 2
+        && row.every((cell) => typeof cell === "string" && parseCoordinateCell(cell)))) return false;
+    return isValidAxis(spec.x_axis, spec.points.map((point) => point.x), spec.coordinate_scale)
+      && isValidAxis(spec.y_axis, spec.points.map((point) => point.y), spec.coordinate_scale)
+      && spec.source_rows.every((row, index) => row.every((cell, axis) => {
+        const parsed = parseCoordinateCell(cell);
+        if (!parsed || parsed.precision > Math.log10(spec.coordinate_scale)) return false;
+        const fraction = parsed.fraction.padEnd(Math.log10(spec.coordinate_scale), "0");
+        const value = parsed.sign * Number(`${parsed.whole}${fraction}`);
+        return value === spec.points[index][axis === 0 ? "x" : "y"];
+      }));
   }
   if (spec.kind != null && spec.kind !== "line") return false;
   if (spec.kind === "line" && (!Array.isArray(spec.points) || spec.points.length !== 0
@@ -121,9 +210,16 @@ function displaySpec(spec) {
       point_count: SCATTER_POINT_COUNT,
       x_label: spec.x_label,
       y_label: spec.y_label,
+      ...(spec.coordinate_scale === undefined ? {} : {
+        coordinate_scale: spec.coordinate_scale,
+        x_axis: spec.x_axis,
+        y_axis: spec.y_axis,
+      }),
       source_table: {
         headers: [spec.x_label, spec.y_label],
-        rows: spec.points.map((point) => [point.x, point.y]),
+        rows: spec.coordinate_scale === undefined
+          ? spec.points.map((point) => [point.x, point.y])
+          : spec.source_rows,
       },
     }
     : { mode: "line", point_count: 2, x_label: "x", y_label: "y" };
@@ -157,9 +253,15 @@ function parseLinearEquations(text) {
 function sourceContainsSpec(text, spec) {
   if (spec?.kind === "scatter") {
     const parsed = parsePointTable(text);
-    return Boolean(parsed && JSON.stringify(parsed) === JSON.stringify({
-      points: spec.points, x_label: spec.x_label, y_label: spec.y_label
-    }));
+    if (!parsed) return false;
+    const expected = {
+      points: spec.points, x_label: spec.x_label, y_label: spec.y_label,
+      ...(spec.coordinate_scale === undefined ? {} : {
+        coordinate_scale: spec.coordinate_scale, x_axis: spec.x_axis,
+        y_axis: spec.y_axis, source_rows: spec.source_rows,
+      }),
+    };
+    return JSON.stringify(parsed) === JSON.stringify(expected);
   }
   return isValidSpec(spec) && parseLinearEquations(text).some((line) =>
     line.slope === spec.slope && line.intercept === spec.intercept);
@@ -177,7 +279,10 @@ function parseAnswer(raw, spec) {
     const points = [];
     for (const point of value.points) {
       if (point === null) continue;
-      if (!isGridPoint(point)) return null;
+      const xAxis = spec?.kind === "scatter" ? spec.x_axis || { min: GRID_MIN, max: GRID_MAX } : { min: GRID_MIN, max: GRID_MAX };
+      const yAxis = spec?.kind === "scatter" ? spec.y_axis || { min: GRID_MIN, max: GRID_MAX } : { min: GRID_MIN, max: GRID_MAX };
+      if (!isScaledPoint(point, spec?.coordinate_scale || 1) || point.x < xAxis.min || point.x > xAxis.max
+        || point.y < yAxis.min || point.y > yAxis.max) return null;
       points.push({ x: point.x, y: point.y });
     }
     if (!points.length) return null;
@@ -271,7 +376,13 @@ function questionText(spec, lang = "sv") {
 function modelAnswer(spec, lang = "sv") {
   if (!isValidSpec(spec)) return "";
   if (spec.kind === "scatter") {
-    const values = spec.points.map((point) => `(${point.x}, ${point.y})`).join(", ");
+    const scale = spec.coordinate_scale || 1;
+    const format = (value) => {
+      if (!spec.coordinate_scale) return String(value);
+      const formatted = (value / scale).toFixed(Math.log10(scale)).replace(/\.?0+$/, "");
+      return lang === "en" ? formatted : formatted.replace(".", ",");
+    };
+    const values = spec.points.map((point) => `(${format(point.x)}, ${format(point.y)})`).join(", ");
     return lang === "en"
       ? `The data points are ${values}.`
       : `Datapunkternas koordinater är ${values}.`;
