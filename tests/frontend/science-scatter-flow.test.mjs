@@ -19,6 +19,15 @@ const scenarios = [
     headers: ["x-värde", "y-värde"],
     rows: [[0, 2], [1, 3], [2, 4]],
   },
+  {
+    id: "biology-partial",
+    course: "Biologi 1",
+    title: "Biologiprov",
+    material: "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n0 | 4\n0 | 3\n1 | 1",
+    headers: ["Tid (min)", "Syrehalt (mg/L)"],
+    rows: [[0, 4], [0, 3], [1, 1]],
+    partial: true,
+  },
 ];
 
 const server = await serve(ROOT, { indexFile: "app.html" });
@@ -56,9 +65,10 @@ async function verifyScatterScenario(scenario) {
     ["**/api/grade", async (route) => {
       gradeBody = route.request().postDataJSON();
       await route.fulfill({ json: { ok: true, exam_proof: `v2.${"e".repeat(32)}.synthetic-${scenario.id}`, result: {
-        total_points: 3, max_points: 3,
-        per_question: [{ id: `${scenario.id}-scatter`, points: 3, max_points: 3,
-          feedback: "Alla tre datapunkterna stämmer.", model_answer: "Punkterna överfördes korrekt från tabellen." }],
+        total_points: scenario.partial ? 2 : 3, max_points: 3,
+        per_question: [{ id: `${scenario.id}-scatter`, points: scenario.partial ? 2 : 3, max_points: 3,
+          feedback: scenario.partial ? "2 av 3 datapunkter stämmer med tabellen." : "Alla tre datapunkterna stämmer.",
+          model_answer: "Punkterna överfördes korrekt från tabellen." }],
       } } });
     }],
   ] });
@@ -87,18 +97,26 @@ async function verifyScatterScenario(scenario) {
   assert.equal(await exam.locator(".graph-answer").count(), 1);
 
   const pointLetters = ["A", "B", "C"];
-  for (let i = 0; i < scenario.rows.length; i++) {
+  const pointCount = scenario.partial ? 2 : scenario.rows.length;
+  for (let i = 0; i < pointCount; i++) {
     const [x, y] = scenario.rows[i];
     await page.getByRole("spinbutton", { name: `Punkt ${pointLetters[i]}, x-koordinat` }).fill(String(x));
     await page.getByRole("spinbutton", { name: `Punkt ${pointLetters[i]}, y-koordinat` }).fill(String(y));
   }
   const serializedAnswer = await exam.locator(".graph-answer input[type=hidden]").inputValue();
+  const expectedPoints = scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
+  if (scenario.partial) expectedPoints.push(null);
   assert.deepEqual(JSON.parse(serializedAnswer), {
-    type: "scatter", points: scenario.rows.map(([x, y]) => ({ x, y })),
-  }, `${scenario.id} graph widget serializes all three plotted points`);
+    type: "scatter", points: expectedPoints,
+  }, `${scenario.id} graph widget serializes exactly the plotted points`);
   assert.equal(await page.evaluate(({ answer, config }) => window.ExGenGraphAnswer.isComplete(answer, config), {
     answer: serializedAnswer, config: graphUi,
   }), true, `${scenario.id} plotted scatter answer satisfies the graph completion contract`);
+  if (scenario.partial) {
+    assert.equal(await page.evaluate((config) => window.ExGenGraphAnswer.isComplete(JSON.stringify({
+      type: "scatter", points: [{ x: 0, y: 4 }, { x: null, y: 1 }, null],
+    }), config), graphUi), false, "invalid partial coordinates do not pass the client completion check");
+  }
   const chartBounds = await exam.locator(".graph-answer").boundingBox();
   const sheetBounds = await exam.locator(".xf-sheet").boundingBox();
   const sheetWrap = exam.locator(".xf-sheet-wrap");
@@ -165,10 +183,18 @@ async function verifyScatterScenario(scenario) {
     const visibleText = (await page.locator("#xf").innerText()).slice(-1400);
     throw new Error(`${scenario.id} did not reach results; grade request=${JSON.stringify(gradeBody)}; text=${visibleText}`);
   }
-  assert.equal(unansweredPrompt, false, `${scenario.id} complete graph answer should not need an unanswered-question confirmation`);
+  assert.equal(unansweredPrompt, false, `${scenario.id} valid scatter attempt should not need an unanswered-question confirmation`);
+  const submittedPoints = scenario.rows.slice(0, pointCount).map(([x, y]) => ({ x, y }));
+  if (scenario.partial) submittedPoints.push(null);
   assert.deepEqual(gradeBody?.answers, [{ id: `${scenario.id}-scatter`, answer: JSON.stringify({
-    type: "scatter", points: scenario.rows.map(([x, y]) => ({ x, y })),
+    type: "scatter", points: submittedPoints,
   }) }], `${scenario.id} submits the learner's plotted coordinates as scatter data`);
+  if (scenario.partial) {
+    assert.equal(JSON.parse(gradeBody.answers[0].answer).points.filter(Boolean).length, 2,
+      "only the two learner-entered points are sent for grading");
+    assert.equal(await page.locator("#xf .xf-screen[data-screen='result'].on").count(), 1,
+      "the learner receives the graded partial attempt");
+  }
   assert.deepEqual(errors, [], `${scenario.id} page has no runtime errors`);
   await page.close();
 }

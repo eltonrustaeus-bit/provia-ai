@@ -72,11 +72,21 @@ const scatterAnswer = JSON.stringify({ type: "scatter", points: [
 assert.equal(graph.answerIsComplete(scatterAnswer, scatterSpec), true);
 assert.equal(graph.gradeAnswer(scatterAnswer, scatterSpec).points, 3, "point order does not affect deterministic scoring");
 const scatterPartial = JSON.stringify({ type: "scatter", points: [
-  { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 }
+  { x: 0, y: 4 }, null, { x: 2, y: 1 }
 ] });
+assert.equal(graph.answerIsComplete(scatterPartial, scatterSpec), true,
+  "a scatter attempt with one omitted point remains gradable");
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).points, 2);
 assert.equal(graph.gradeAnswer(scatterPartial, scatterSpec).max_points, 3);
 assert.match(graph.gradeAnswer(scatterPartial, scatterSpec).feedback, /datapunkter/);
+assert.equal(graph.gradeAnswer(JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, null, null] }), scatterSpec).points, 1,
+  "one correct plotted observation receives its point even when two are omitted");
+assert.equal(graph.answerIsComplete(JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, { x: null, y: 1 }, null] }), scatterSpec), false,
+  "a malformed partial coordinate is rejected rather than silently treated as empty");
+assert.equal(graph.answerIsComplete(JSON.stringify({ type: "scatter", points: [null, null, null] }), scatterSpec), false,
+  "an entirely empty scatter attempt remains unanswered");
+assert.equal(graph.answerIsComplete(JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, null, { x: 0, y: 4 }] }), scatterSpec), false,
+  "a duplicate placed point is rejected rather than double-counted");
 assert.equal(graph.questionText(scatterSpec), "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.");
 assert.doesNotMatch(graph.questionText(scatterSpec), /\(0, 4\)|\(1, 3\)|\(2, 1\)/,
   "the task instruction no longer repeats the answer coordinates");

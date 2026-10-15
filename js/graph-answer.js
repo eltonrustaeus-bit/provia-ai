@@ -278,11 +278,17 @@
     return hidden;
   };
   window.ExGenGraphAnswer.isComplete = function (raw, displayConfig) {
-    var config = configFor(displayConfig), points = read(raw, config);
-    if (points.length !== config.count || !points.every(validPoint)) return false;
+    var config = configFor(displayConfig), value;
+    try { value = JSON.parse(raw || "null"); } catch (_) { return false; }
+    if (!value || !Array.isArray(value.points) || value.points.length !== config.count
+      || value.type !== (config.mode === "scatter" ? "scatter" : "line")) return false;
     if (config.mode === "scatter") {
-      return new Set(points.map(function (p) { return p.x + "|" + p.y; })).size === points.length;
+      if (value.points.some(function (point) { return point !== null && !validPoint(point); })) return false;
+      var placed = value.points.filter(validPoint);
+      return placed.length > 0
+        && new Set(placed.map(function (p) { return p.x + "|" + p.y; })).size === placed.length;
     }
-    return points[0].x !== points[1].x;
+    var points = read(raw, config);
+    return points.length === config.count && points.every(validPoint) && points[0].x !== points[1].x;
   };
 })();

@@ -173,11 +173,19 @@ function parseAnswer(raw, spec) {
   const scatter = spec?.kind === "scatter";
   if (!value || typeof value !== "object" || value.type !== (scatter ? "scatter" : "line") || !Array.isArray(value.points)) return null;
   if (value.points.length !== (scatter ? SCATTER_POINT_COUNT : 2)) return null;
-  const points = value.points.map((point) => ({ x: point?.x, y: point?.y }));
-  if (points.some((point) => !isGridPoint(point))) return null;
   if (scatter) {
+    const points = [];
+    for (const point of value.points) {
+      if (point === null) continue;
+      if (!isGridPoint(point)) return null;
+      points.push({ x: point.x, y: point.y });
+    }
+    if (!points.length) return null;
     if (new Set(points.map((point) => `${point.x}|${point.y}`)).size !== points.length) return null;
-  } else if (points[0].x === points[1].x) return null;
+    return points;
+  }
+  const points = value.points.map((point) => ({ x: point?.x, y: point?.y }));
+  if (points.some((point) => !isGridPoint(point)) || points[0].x === points[1].x) return null;
   return points;
 }
 

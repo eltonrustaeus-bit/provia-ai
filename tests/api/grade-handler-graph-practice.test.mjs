@@ -530,6 +530,35 @@ try {
   assert.ok(!calls.some((call) => call.url.includes("openai.com")),
     "deterministic science graph grading does not call the AI provider");
 
+  const partialScienceAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 0, y: 4 }, null, { x: 2, y: 1 },
+  ] });
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+  calls.length = 0;
+  const officialPartialScience = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    exam_manifest: scienceManifest, questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: partialScienceAnswer }],
+  });
+  assert.equal(officialPartialScience.status, 200,
+    "the official grade handler accepts a scatter answer with one omitted point");
+  assert.equal(officialPartialScience.body.result.total_points, 2,
+    "the official score preserves credit for the two correct plotted observations");
+  assert.deepEqual(officialPartialScience.body.result.per_question[0], {
+    id: scienceQuestion.id, points: 2, max_points: 3,
+    feedback: "2 av 3 datapunkter stämmer med tabellen.",
+    model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
+    concept_tag: "tolka mätdata", error_tags: ["graph_data_points_incorrect"],
+  });
+  assert.ok(!officialPartialScience.body.result.per_question[0].unanswered,
+    "a partial scatter attempt is not mislabeled as unanswered");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")),
+    "the partial official result uses canonical persistence");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "partial scatter scoring stays deterministic and does not call the AI provider");
+
   const scienceExamProof = {
     receipt: officialScience.body.exam_proof,
     course: scienceCourse,
