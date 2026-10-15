@@ -5,6 +5,7 @@
   var OWNER_KEY = "exgen_local_data_owner";
   var EXAM_DRAFT_PREFIX = "exgen_flow_draft_";
   var EXAM_PROGRESS_PREFIX = "exgen_flow_progress_";
+  var PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
   var PILOT_PENDING_QUESTION_KEY = "exgen_pilot_pending_per_question";
   var PILOT_REAUTH_REQUIRED_KEY = "exgen_pilot_reauth_required";
   var PRIVATE_KEYS = [
@@ -25,19 +26,7 @@
     "proviaai_app_access"
   ];
 
-  function clearOtherAccountDrafts(activeUserId) {
-    var keepKey = activeUserId ? EXAM_DRAFT_PREFIX + String(activeUserId) : "";
-    var keepProgressKey = activeUserId ? EXAM_PROGRESS_PREFIX + String(activeUserId) : "";
-    var staleDrafts = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
-      var isExamState = key && (key.indexOf(EXAM_DRAFT_PREFIX) === 0 || key.indexOf(EXAM_PROGRESS_PREFIX) === 0);
-      if (isExamState && key !== keepKey && key !== keepProgressKey) staleDrafts.push(key);
-    }
-    staleDrafts.forEach(function (key) { localStorage.removeItem(key); });
-  }
-
-  function clearPrivateData(activeUserId) {
+  function clearPrivateData() {
     PRIVATE_KEYS.forEach(function (key) { localStorage.removeItem(key); });
     var teacherInsightKeys = [];
     for (var i = 0; i < localStorage.length; i++) {
@@ -45,7 +34,28 @@
       if (key && key.indexOf("proviaai_teacher_insight_") === 0) teacherInsightKeys.push(key);
     }
     teacherInsightKeys.forEach(function (key) { localStorage.removeItem(key); });
-    clearOtherAccountDrafts(activeUserId);
+  }
+
+  function examDataKeys(userId) {
+    var id = String(userId || "");
+    if (!id || id.length > 200) return [];
+    return [EXAM_DRAFT_PREFIX + id, EXAM_PROGRESS_PREFIX + id, PENDING_EXAMS_PREFIX + id];
+  }
+
+  function hasLocalExamData(userId) {
+    try {
+      return examDataKeys(userId).some(function (key) { return localStorage.getItem(key) !== null; });
+    } catch (_) { return true; }
+  }
+
+  function clearLocalExamData(userId) {
+    var keys = examDataKeys(userId);
+    if (!keys.length) return false;
+    var cleared = true;
+    keys.forEach(function (key) {
+      try { localStorage.removeItem(key); } catch (_) { cleared = false; }
+    });
+    return cleared;
   }
 
   function tokenSubject(token) {
@@ -79,8 +89,7 @@
       localStorage.removeItem(OWNER_KEY);
       return;
     }
-    if (owner !== session.id) clearPrivateData(session.id);
-    else clearOtherAccountDrafts(session.id);
+    if (owner !== session.id) clearPrivateData();
     localStorage.setItem(OWNER_KEY, session.id);
   }
 
@@ -121,7 +130,9 @@
 
   global.ExGenLocalDataBoundary = {
     syncSession: syncSession,
-    clearForSignOut: clearForSignOut
+    clearForSignOut: clearForSignOut,
+    hasLocalExamData: hasLocalExamData,
+    clearLocalExamData: clearLocalExamData
   };
 
   syncSession();

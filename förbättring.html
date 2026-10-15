@@ -1552,6 +1552,7 @@
       const btn=$('resetBtn');
       if(!btn)return;
       btn.addEventListener('click',async()=>{
+        if(!window.confirm('Rensa sparade provdata? ExGen försöker radera provposter och resultatsammanfattningar från kontot och tar bort detta kontots lokala provutkast, svar, osynkade resultat och provhistorik från enheten. Lokal data kan försvinna även om serverraderingen inte kan bekräftas. P.E.R-minne och kunskapsöversikt påverkas inte. Kan inte ångras.'))return;
         btn.setAttribute('disabled','disabled');
         let clearSession=null;
         try{
@@ -1567,7 +1568,9 @@
             if(!r.ok)console.warn('Supabase delete failed:',r.error);
           }catch(e){console.warn('Supabase delete error:',e);}
         }
-        if(clearUserId)try{localStorage.removeItem('proviaai_pending_exams:'+clearUserId);}catch{}
+        const localExamDataCleared=clearUserId
+          ?window.ExGenLocalDataBoundary?.clearLocalExamData(clearUserId)!==false
+          :false;
         const localDataOwner=localStorage.getItem('exgen_local_data_owner');
         if((clearUserId||localDataOwner)&&localDataOwner!==clearUserId){
           btn.removeAttribute('disabled');
@@ -1582,7 +1585,8 @@
          LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
         renderAll();
         btn.removeAttribute('disabled');
-        if(remoteHistoryDeleted) window.alert('Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte.');
+        if(!localExamDataCleared)window.alert('Delad lokal historik rensades, men kontots provutkast eller osynkade resultat kunde inte bekräftas raderade.');
+        else if(remoteHistoryDeleted) window.alert('Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte.');
         else window.alert('Lokal historik rensad. Kontodata kunde inte bekräftas raderad. Försök igen när anslutningen fungerar.');
       });
     });

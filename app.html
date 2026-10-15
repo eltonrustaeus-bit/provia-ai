@@ -1565,7 +1565,35 @@ if(db)db.auth.onAuthStateChange((event,session)=>{
 // Transient verification errors are surfaced as a toast; pending approval has
 // a persistent message in the gate instead.
 function setLockError(msg){ if(msg&&window.showToast)window.showToast(msg,"bad",5000); }
-async function logout(){
+async function logout(options={}){
+  const signOutUserId=verifiedUserId;
+  if(!options.skipLocalDataConfirm&&signOutUserId&&window.ExGenLocalDataBoundary?.hasLocalExamData(signOutUserId)){
+    const keepData=confirm(LANG==="sv"
+      ? "Ett provutkast eller osynkat provresultat finns kvar i webbläsaren. Vill du behålla det lokalt för samma konto och logga ut? Lokal lagring är inte krypterad."
+      : "An unfinished exam or unsynced result remains in this browser. Keep it locally for the same account and sign out? Local storage is not encrypted.");
+    if(!keepData){
+      const discardData=confirm(LANG==="sv"
+        ? "Ta bort det här kontots lokala provutkast, svar och osynkade resultat och logga ut? Andra kontons lokala data påverkas inte."
+        : "Delete this account's local exam draft, answers and unsynced results, then sign out? Other accounts' local data will not be affected.");
+      if(!discardData)return;
+      window.ExGenExamDrafts?.discardForUser(signOutUserId);
+      if(window.ExGenLocalDataBoundary?.clearLocalExamData(signOutUserId)===false){
+        setLockError(LANG==="sv"?"Lokala provdata kunde inte rensas. Du är fortfarande inloggad.":"Local exam data could not be cleared. You are still signed in.");
+        return;
+      }
+    }else{
+      window.ExGenExamDrafts?.flush();
+    }
+  }
+  if(options.skipLocalDataConfirm&&signOutUserId)window.ExGenExamDrafts?.flush();
+  if(signOutUserId){
+    const{data:beforeSignOut,error:sessionError}=await db.auth.getSession().catch(()=>({data:null,error:true}));
+    if(sessionError||beforeSignOut?.session?.user?.id!==signOutUserId){
+      setLockError(LANG==="sv"?"Kontot ändrades innan utloggningen. Ingen annan kontos lokala data rensades.":"The account changed before sign-out. No other account's local data was cleared.");
+      location.reload();
+      return;
+    }
+  }
   verifiedUserId=null;
   accountPendingApproval=false;
   document.body.classList.add("app-locked");
@@ -1574,6 +1602,8 @@ async function logout(){
   currentRole = "gratis";
   window.XgShell&&window.XgShell.closeMenu();
   if(db){try{await db.auth.signOut();}catch{}}
+  const{data:afterSignOut}=db?await db.auth.getSession().catch(()=>({data:null})):({data:null});
+  if(afterSignOut?.session?.user?.id){location.reload();return;}
   window.ExGenLocalDataBoundary?.clearForSignOut();
   showLock();
   await refreshQuotaUi();
@@ -1586,7 +1616,7 @@ async function checkApprovalAndUnlock(session){
   const{data:prof,error}=await db.from("profiles").select("approved,role").eq("id",user.id).maybeSingle();
   if(error){setLockError(String(error.message||error));return false;}
   if(!prof){
-    await logout();
+    await logout({skipLocalDataConfirm:true});
     setLockError(LANG==="sv"?"Kontot kunde inte verifieras. Kontakta den som bjöd in dig.":"Your account could not be verified. Contact the person who invited you.");
     return false;
   } else {
@@ -2316,6 +2346,11 @@ try{
         currentUnsavedAccountExam=accountRecord;
         let accountSave;
         try{accountSave=await saveExamToAccount(accountRecord,{checkExisting:!!res.data.recovered});}catch{accountSave={ok:false,attempted:true};}
+        if((await getUserId().catch(()=>""))!==gradingOwnerId||currentExam?.exam_manifest!==payload.exam_manifest){
+          currentUnsavedAccountExam=null;
+          const msg=LANG==="sv"?"Kontot ändrades medan resultatet sparades. Resultatet sparades inte i den nya sessionens historik.":"The account changed while the result was saving. It was not added to the new session's history.";
+          setStatus(msg,"bad");return {ok:false,error:msg};
+        }
         accountSaveFailed=!accountSave?.ok;
         if(accountSave?.ok){removePendingExam(userId,localId);currentUnsavedAccountExam=null;}
       }
@@ -2352,8 +2387,8 @@ try{
 
   onClick("clearBtn", async () => {
     if (!confirm(LANG === "sv"
-      ? "Rensa provhistorik och misstag?\n\nExGen raderar provposter och resultatsammanfattningar från kontot samt lokala kopior. P.E.R:s minne och kunskapsöversikten påverkas inte. Kan inte ångras."
-      : "Clear exam history and mistakes?\n\nExGen deletes exam records and result summaries from your account plus local copies. P.E.R memory and the learning overview are unchanged. This cannot be undone.")) return;
+      ? "Rensa sparade provdata?\n\nExGen försöker radera provposter och resultatsammanfattningar från kontot och tar bort detta kontos lokala provutkast, svar, osynkade resultat och provhistorik från enheten. Lokal data kan försvinna även om serverraderingen inte kan bekräftas. P.E.R:s minne och kunskapsöversikten påverkas inte. Kan inte ångras."
+      : "Clear saved exam data?\n\nExGen will try to delete exam records and result summaries from your account and remove this account's local exam draft, answers, unsynced results and exam history from this device. Local data may be lost even if server deletion cannot be confirmed. P.E.R memory and the learning overview are unchanged. This cannot be undone.")) return;
 
     let clearSession = null;
     try {
@@ -2383,7 +2418,12 @@ try{
       } catch (_) {}
     }
 
-    if (clearUserId) try { localStorage.removeItem(pendingExamKey(clearUserId)); } catch (_) {}
+    const localExamDataCleared = clearUserId
+      ? window.ExGenLocalDataBoundary?.clearLocalExamData(clearUserId) !== false
+      : false;
+    if (clearUserId) {
+      window.ExGenExamDrafts?.discardForUser(clearUserId);
+    }
     const localDataOwner = localStorage.getItem("exgen_local_data_owner");
     if ((clearUserId || localDataOwner) && localDataOwner !== clearUserId) {
       if (btn) { btn.disabled = false; btn.textContent = T[LANG]?.clear || "Rensa"; }
@@ -2410,10 +2450,12 @@ try{
     clearAll();
 
     if (btn) { btn.disabled = false; btn.textContent = T[LANG]?.clear || "Rensa"; }
-    const message = remoteHistoryDeleted
-      ? (LANG === "sv" ? "Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte." : "Exam records and result summaries are cleared. P.E.R memory and learning overview are unchanged.")
-      : (LANG === "sv" ? "Lokal historik rensad. Kontodata kunde inte bekräftas raderad." : "Local history cleared. Account data deletion could not be confirmed.");
-    showToast(message, remoteHistoryDeleted ? "ok" : "bad");
+    const message = !localExamDataCleared
+      ? (LANG === "sv" ? "Delad lokal historik rensades, men kontots provutkast eller osynkade resultat kunde inte bekräftas raderade." : "Shared local history was cleared, but this account's exam draft or unsynced results could not be confirmed deleted.")
+      : remoteHistoryDeleted
+        ? (LANG === "sv" ? "Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte." : "Exam records and result summaries are cleared. P.E.R memory and learning overview are unchanged.")
+        : (LANG === "sv" ? "Lokal historik rensad. Kontodata kunde inte bekräftas raderad." : "Local history cleared. Account data deletion could not be confirmed.");
+    showToast(message, remoteHistoryDeleted && localExamDataCleared ? "ok" : "bad");
   });
 
   // Floating grade-knapp kör samma som gradeBtn

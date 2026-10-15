@@ -202,7 +202,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     }));
     assert.equal(switchedAccount.owner, "account-b");
     assert.equal(switchedAccount.history, null, "switching accounts clears account A's history");
-    assert.equal(switchedAccount.draft, null, "switching accounts clears account A's exam draft");
+    assert.ok(switchedAccount.draft, "switching accounts preserves A's draft for same-account recovery");
     assert.equal(switchedAccount.pending, null, "account A's pending question is not shown to account B");
     assert.equal(switchedAccount.restoredNotice, false);
 

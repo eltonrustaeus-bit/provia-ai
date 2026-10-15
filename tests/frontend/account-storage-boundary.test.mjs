@@ -39,9 +39,9 @@ try {
   assert.equal(initial.teacherInsight, null, "unowned teacher class insights are cleared before page scripts use them");
   assert.ok(initial.pendingA, "account-scoped failed-save queue is preserved");
   assert.ok(initial.draftA, "the active account can resume its own draft");
-  assert.equal(initial.draftB, null, "other-account drafts are cleared before the active page uses storage");
+  assert.ok(initial.draftB, "another account's draft is retained under its own key");
   assert.ok(initial.progressA, "the active account can recover its own saved progress");
-  assert.equal(initial.progressB, null, "other-account progress is cleared before the active page uses storage");
+  assert.ok(initial.progressB, "another account's progress is retained under its own key");
   assert.equal(initial.language, "sv", "non-personal preferences are preserved");
 
   await page.evaluate((authKey) => {
@@ -72,9 +72,9 @@ try {
   assert.equal(switched.perHistory, null, "account switch clears the previous account's P.E.R transcript");
   assert.equal(switched.teacherInsight, null, "account switch clears cached teacher class reports");
   assert.ok(switched.pendingA, "the failed-save queue remains UID-scoped rather than being merged");
-  assert.equal(switched.draftA, null, "account switching removes the previous account's exam draft");
+  assert.ok(switched.draftA, "account switching preserves the previous account's draft for recovery");
   assert.ok(switched.draftB, "the newly active account can resume only its own draft");
-  assert.equal(switched.progressA, null, "account switching removes the previous account's progress");
+  assert.ok(switched.progressA, "account switching preserves the previous account's saved progress");
   assert.ok(switched.progressB, "the newly active account keeps only its own progress");
 
   const pendingB = await page.evaluate(() => localStorage.getItem("proviaai_pending_exams:account-b"));
@@ -116,14 +116,33 @@ try {
   assert.equal(signedOut.history, null, "sign-out removes shared study caches");
   assert.equal(signedOut.teacherInsight, null, "sign-out removes cached teacher class reports");
   assert.ok(signedOut.pendingA, "per-account recovery data stays in its isolated key");
-  assert.equal(signedOut.draftA, null, "sign-out removes the account's unfinished exam draft");
-  assert.equal(signedOut.draftB, null, "sign-out removes every remaining local exam draft");
-  assert.equal(signedOut.progressA, null, "sign-out removes the account's saved exam progress");
-  assert.equal(signedOut.progressB, null, "sign-out removes all saved exam progress");
+  assert.ok(signedOut.draftA, "sign-out preserves the account's unfinished exam for same-account recovery");
+  assert.ok(signedOut.draftB, "sign-out preserves other account drafts under separate keys");
+  assert.ok(signedOut.progressA, "sign-out preserves the account's saved exam progress");
+  assert.ok(signedOut.progressB, "sign-out preserves other account progress under separate keys");
   assert.equal(signedOut.pendingQuestion, null, "sign-out clears a transient PER question draft");
   assert.equal(signedOut.reauth, null, "sign-out clears the pilot reauthentication marker");
+  const explicitClear = await page.evaluate(() => {
+    const result = window.ExGenLocalDataBoundary.clearLocalExamData("account-a");
+    return {
+      result,
+      draftA: localStorage.getItem("exgen_flow_draft_account-a"),
+      progressA: localStorage.getItem("exgen_flow_progress_account-a"),
+      pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
+      draftB: localStorage.getItem("exgen_flow_draft_account-b"),
+      progressB: localStorage.getItem("exgen_flow_progress_account-b"),
+      pendingB: localStorage.getItem("proviaai_pending_exams:account-b")
+    };
+  });
+  assert.equal(explicitClear.result, true);
+  assert.equal(explicitClear.draftA, null, "explicit clear removes this account's exam draft");
+  assert.equal(explicitClear.progressA, null, "explicit clear removes this account's progress");
+  assert.equal(explicitClear.pendingA, null, "explicit clear removes this account's unsynced result queue");
+  assert.ok(explicitClear.draftB, "explicit clear preserves another account's draft");
+  assert.ok(explicitClear.progressB, "explicit clear preserves another account's progress");
+  assert.ok(explicitClear.pendingB, "explicit clear preserves another account's result queue");
   await close();
-  console.log("account-storage-boundary: legacy, A-to-B-to-A and sign-out caches are isolated");
+  console.log("account-storage-boundary: shared caches clear, exam drafts stay UID-scoped through A-to-B-to-A/sign-out, explicit clear removes only its owner");
 } finally {
   await browser.close();
   await server.close();

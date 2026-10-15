@@ -956,6 +956,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await b.page.waitForTimeout(500);
   const txt = await b.page.textContent("#xf .xf-screen[data-screen='start'] .xf-body");
   ok("T3b elev B erbjuds inte elev A:s prov", !/Fortsätt provet/.test(txt || ""), txt);
+  ok("T3c elev A:s lokala provdata ligger kvar för återhämtning", !!(await b.page.evaluate(() => localStorage.getItem("exgen_flow_draft_elev-A"))));
   await b.ctx.close();
 }
 

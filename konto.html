@@ -781,6 +781,39 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     }
   });
 
+  function clearDeletedAccountLocalData(userId){
+    let cleared=true;
+    try{window.ExGenLocalDataBoundary?.clearForSignOut();}catch{cleared=false;}
+    if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false)cleared=false;
+    try{localStorage.removeItem(window.ExGenRuntime.authStorageKey);}catch{cleared=false;}
+    try{sessionStorage.clear();}catch{cleared=false;}
+    return cleared;
+  }
+
+  async function finishAccountDeletion(userId,unconfirmed){
+    const{data:current}=await sb.auth.getSession().catch(()=>({data:null}));
+    if(current?.session?.user?.id!==userId){
+      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
+      showMsg(examDataCleared
+        ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto är nu aktivt och dess session och lokala data lämnades orörda."
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+      return false;
+    }
+    await sb.auth.signOut({scope:"local"}).catch(()=>{});
+    const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
+    if(afterSignOut?.session?.user?.id&&afterSignOut.session.user.id!==userId){
+      const examDataCleared=window.ExGenLocalDataBoundary?.clearLocalExamData(userId)!==false;
+      showMsg(examDataCleared
+        ?"Raderingen slutfördes för det ursprungliga kontot. Ett annat konto loggades in under utloggningen; dess session och lokala data lämnades orörda."
+        :"Raderingen slutfördes för det ursprungliga kontot, men vissa lokala provdata kunde inte bekräftas rensade. Det andra kontots session och delade data lämnades orörda.","err");
+      return false;
+    }
+    const examDataCleared=clearDeletedAccountLocalData(userId);
+    if(!examDataCleared)window.alert("Kontot har raderats, men vissa lokala provdata kunde inte bekräftas rensade på den här enheten.");
+    window.location.replace(unconfirmed?"index.html?accountDeletion=unconfirmed":"index.html");
+    return true;
+  }
+
   document.getElementById("deleteAccountBtn")?.addEventListener("click",async()=>{
     const typed=window.prompt("Skriv kontots e-postadress för att bekräfta raderingen:");
     if(!typed||typed.trim().toLowerCase()!==(user.email||"").trim().toLowerCase()){
@@ -799,18 +832,14 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       const data=await r.json().catch(()=>({}));
       if(!r.ok||data.ok!==true){
         if(data.refreshSessionsRevoked===true){
-          await sb.auth.signOut({scope:"local"}).catch(()=>{});
-          try{localStorage.clear();sessionStorage.clear();}catch{}
-          window.location.replace("index.html?accountDeletion=unconfirmed");
+          await finishAccountDeletion(user.id,true);
           return;
         }
         showMsg(data.error||"Kontoraderingen kunde inte bekräftas.","err");
         btn.disabled=false;btn.textContent="Radera konto";
         return;
       }
-      await sb.auth.signOut({scope:"local"}).catch(()=>{});
-      try{localStorage.clear();sessionStorage.clear();}catch{}
-      window.location.replace("index.html");
+      await finishAccountDeletion(user.id,false);
     }catch{
       showMsg("Nätverksfel. Kontakta support om raderingsstatusen är oklar.","err");
       btn.disabled=false;btn.textContent="Radera konto";
@@ -827,7 +856,30 @@ document.getElementById("yr").textContent=new Date().getFullYear();
      än, och ett ?. hade gjort den tyst död i stället för att kasta. */
   document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("xgLogout").addEventListener("click",async()=>{
+    const{data}=await sb.auth.getSession().catch(()=>({data:null}));
+    const userId=data?.session?.user?.id;
+    if(userId&&window.ExGenLocalDataBoundary?.hasLocalExamData(userId)){
+      const keepData=window.confirm("Ett provutkast eller osynkat provresultat finns kvar i webbläsaren. Vill du behålla det lokalt för samma konto och logga ut? Lokal lagring är inte krypterad.");
+      if(keepData)window.ExGenExamDrafts?.flush();
+      else if(window.confirm("Ta bort det här kontots lokala provutkast, svar och osynkade resultat och logga ut? Andra kontons lokala data påverkas inte.")){
+        window.ExGenExamDrafts?.discardForUser(userId);
+        if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false){
+          showMsg("Lokala provdata kunde inte rensas. Du är fortfarande inloggad.","err");
+          return;
+        }
+      }else return;
+    }
+    const{data:beforeSignOut,error:sessionError}=await sb.auth.getSession().catch(()=>({data:null,error:true}));
+    if(sessionError||beforeSignOut?.session?.user?.id!==userId){
+      showMsg("Kontot ändrades innan utloggningen. Ingen annan kontos lokala data rensades.","err");
+      return;
+    }
     await sb.auth.signOut();
+    const{data:afterSignOut}=await sb.auth.getSession().catch(()=>({data:null}));
+    if(afterSignOut?.session?.user?.id){
+      showMsg("Utloggningen kunde inte bekräftas. Lokal data lämnades orörd.","err");
+      return;
+    }
     window.ExGenLocalDataBoundary?.clearForSignOut();
     window.location.href="index.html";
   });

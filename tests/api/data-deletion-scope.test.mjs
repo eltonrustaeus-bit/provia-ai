@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 
-const [roleApi, memory, profile, app, improvement, checklist, deletionDoc, apiFiles] = await Promise.all([
+const [roleApi, memory, profile, app, improvement, konto, checklist, deletionDoc, apiFiles] = await Promise.all([
   readFile(new URL("../../api/check-role.js", import.meta.url), "utf8"),
   readFile(new URL("../../api/_per-memory.js", import.meta.url), "utf8"),
   readFile(new URL("../../api/_learner-profile.js", import.meta.url), "utf8"),
   readFile(new URL("../../app.html", import.meta.url), "utf8"),
   readFile(new URL("../../förbättring.html", import.meta.url), "utf8"),
+  readFile(new URL("../../konto.html", import.meta.url), "utf8"),
   readFile(new URL("../../docs/codex/11_PILOT_READINESS_CHECKLIST.md", import.meta.url), "utf8"),
   readFile(new URL("../../docs/codex/12_DATA_DELETION_GAP.md", import.meta.url), "utf8"),
   readdir(new URL("../../api/", import.meta.url)),
@@ -44,8 +45,16 @@ const improvementClear = improvement.slice(improvementClearStart, improvementCle
 assert.match(improvementClear, /let remoteHistoryDeleted=false/, "the coach page reports remote deletion only after server confirmation");
 assert.match(improvementClear, /deleteAllUserExamsFromAccount\(clearSession\)/, "coach deletion uses the captured session rather than re-reading another account");
 assert.match(improvementClear, /\(clearUserId\|\|localDataOwner\)&&localDataOwner!==clearUserId/, "coach clear fails closed when the session is missing or account owner changed");
-assert.match(app.slice(appClearStart, appClearEnd), /pendingExamKey\(clearUserId\)/, "app clear removes only the active account's pending queue");
-assert.match(improvementClear, /proviaai_pending_exams:'\+clearUserId/, "coach clear removes only the active account's pending queue");
+assert.match(app.slice(appClearStart, appClearEnd), /clearLocalExamData\(clearUserId\)/, "app clear removes only the active account's draft, progress and pending queue");
+assert.match(improvementClear, /clearLocalExamData\(clearUserId\)/, "coach clear removes only the active account's draft, progress and pending queue");
+const appLogoutStart = app.indexOf("async function logout(options={})");
+const appLogoutEnd = app.indexOf("// ── CENTRAL: läser roll", appLogoutStart);
+assert.match(app.slice(appLogoutStart, appLogoutEnd), /await db\.auth\.signOut\(\)[\s\S]*?await db\.auth\.getSession\(\)[\s\S]*?afterSignOut\?\.session\?\.user\?\.id[\s\S]*?location\.reload\(\);return;[\s\S]*?clearForSignOut\(\)/,
+  "app logout rechecks the active account after sign-out before clearing shared local data");
+const deletionFinishStart = konto.indexOf("async function finishAccountDeletion");
+const deletionFinishEnd = konto.indexOf("document.getElementById(\"deleteAccountBtn\")", deletionFinishStart);
+assert.match(konto.slice(deletionFinishStart, deletionFinishEnd), /await sb\.auth\.signOut\(\{scope:\"local\"\}\)[\s\S]*?await sb\.auth\.getSession\(\)[\s\S]*?afterSignOut\.session\.user\.id!==userId[\s\S]*?clearLocalExamData\(userId\)[\s\S]*?return false;[\s\S]*?clearDeletedAccountLocalData\(userId\)/,
+  "account deletion rechecks ownership after sign-out and preserves a newly active account");
 assert.match(checklist, /docs\/codex\/12_DATA_DELETION_GAP\.md/, "pilot start criteria point to the complete deletion gate");
 assert.match(deletionDoc, /local, unpublished self-service deletion candidate/i,
   "the deletion document distinguishes the local candidate from a verified release");

@@ -464,11 +464,14 @@
     } catch (_) { return "anon"; }
   }
 
-  function draftKey() { return LS_DRAFT_BASE + "_" + uid(); }
-  function progressKey() { return LS_PROGRESS_BASE + "_" + uid(); }
-  function clearDraft() {
-    lsDel(draftKey());
-    lsDel(progressKey());
+  function draftKey(userId) { return LS_DRAFT_BASE + "_" + String(userId || uid()); }
+  function progressKey(userId) { return LS_PROGRESS_BASE + "_" + String(userId || uid()); }
+  function clearDraft(userId) {
+    var ownerId = String(userId || S.draftOwnerId || uid());
+    if (ownerId !== uid()) return false;
+    lsDel(draftKey(ownerId));
+    lsDel(progressKey(ownerId));
+    return true;
   }
 
   function questionState(source) {
@@ -493,6 +496,7 @@
     exam: null,
     answers: questionState(),   // qid -> svar
     helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
+    draftOwnerId: "",
     idx: 0,
     startedAt: 0,
     nudges: 0,
@@ -768,6 +772,7 @@
             return;
           }
         }
+        S.draftOwnerId = String(draft.uid || uid());
         S.course = draft.course || "";
         S.level = draft.level || "C";
         S.qType = draft.qType || "mix";
@@ -1516,6 +1521,7 @@
     // tryckt två gånger, får inte kosta två prov.
     if (S.generating) return;
     S.generating = true;
+    var requestOwnerId = uid();
 
     btn.disabled = true;
     btn.textContent = tx("Bygger…", "Building…");
@@ -1537,11 +1543,16 @@
 
     window.ExGenEngine.generate().then(function (r) {
       done();
+      if (uid() !== requestOwnerId) {
+        err.textContent = tx("Kontot ändrades medan provet skapades. Logga in igen för att fortsätta.", "The account changed while the exam was being created. Sign in again to continue.");
+        return;
+      }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
         say(tx("Det gick inte den här gången.", "That did not work this time."), tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions."));
         return;
       }
+      S.draftOwnerId = requestOwnerId;
       S.exam = normalizeIds(r.exam);
       var got = S.exam.questions.length;
       S.questionCountNote = got < S.num
@@ -2723,30 +2734,32 @@
     clearTimeout(draftTimer);
     draftTimer = null;
     if (!S.exam) return;
+    var ownerId = String(S.draftOwnerId || "");
+    if (!ownerId || ownerId !== uid()) return;
     var draft = {
       ts: Date.now(),
-      uid: uid(),
+      uid: ownerId,
       startedAt: S.startedAt,
       course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
       material: S.material, exam: S.exam,
       answers: S.answers, helped: S.helped, idx: S.idx
     };
 
-    if (lsSet(draftKey(), draft)) {
-      lsDel(progressKey());
+    if (lsSet(draftKey(ownerId), draft)) {
+      lsDel(progressKey(ownerId));
       return;
     }
 
     /* Keep the signed exam/material snapshot intact. The small progress record
        is usable only alongside that exact snapshot and can never replace it. */
-    var saved = lsGet(draftKey(), null);
-    var resumableBase = saved && String(saved.uid || "") === uid()
+    var saved = lsGet(draftKey(ownerId), null);
+    var resumableBase = saved && String(saved.uid || "") === ownerId
       && saved.exam && Array.isArray(saved.exam.questions) && saved.exam.questions.length
       && typeof saved.material === "string"
       && saved.exam.exam_manifest
       && saved.exam.exam_manifest === S.exam.exam_manifest;
-    var progressSaved = resumableBase && lsSet(progressKey(), {
-      ts: Date.now(), uid: uid(), startedAt: S.startedAt,
+    var progressSaved = resumableBase && lsSet(progressKey(ownerId), {
+      ts: Date.now(), uid: ownerId, startedAt: S.startedAt,
       examManifest: S.exam.exam_manifest,
       answers: S.answers, helped: S.helped, idx: S.idx
     });
@@ -2773,6 +2786,24 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") flushDraftSoon();
   });
+
+  window.ExGenExamDrafts = {
+    flush: flushDraftSoon,
+    discardForUser: function (userId) {
+      var ownerId = String(userId || "");
+      if (!ownerId || ownerId !== uid() || (S.draftOwnerId && S.draftOwnerId !== ownerId)) return false;
+      clearTimeout(draftTimer);
+      draftTimer = null;
+      if (!clearDraft(ownerId)) return false;
+      S.exam = null;
+      S.answers = questionState();
+      S.helped = questionState();
+      S.material = "";
+      S.draftOwnerId = "";
+      stepStart();
+      return true;
+    }
+  };
 
   /* Progress is merged only into the exact signed exam snapshot it belongs to. */
   function readDraft() {

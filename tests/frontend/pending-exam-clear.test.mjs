@@ -32,6 +32,9 @@ try {
     }),
     "proviaai_pending_exams:u1": [{ local_id: "pending-1", user_id: "u1", created_at: new Date().toISOString() }],
     "proviaai_pending_exams:u2": [{ local_id: "pending-2", user_id: "u2", created_at: new Date().toISOString() }],
+    "exgen_flow_draft_u1": { uid: "u1", material: "synthetic draft" },
+    "exgen_flow_progress_u1": { uid: "u1", answers: { q1: "synthetic answer" } },
+    "exgen_flow_draft_u2": { uid: "u2", material: "other account draft" },
     exgen_local_data_owner: "u1",
     proviaai_history: [{ ts: Date.now(), course: "Matematik" }],
   } });
@@ -120,6 +123,9 @@ try {
     }),
     "proviaai_pending_exams:u1": [{ local_id: "pending-1", user_id: "u1" }],
     "proviaai_pending_exams:u2": [{ local_id: "pending-2", user_id: "u2" }],
+    "exgen_flow_draft_u1": { uid: "u1", material: "synthetic draft" },
+    "exgen_flow_progress_u1": { uid: "u1", answers: { q1: "synthetic answer" } },
+    "exgen_flow_draft_u2": { uid: "u2", material: "other account draft" },
     exgen_local_data_owner: "u1",
     proviaai_history: [{ course: "Matematik" }],
   } });
@@ -145,12 +151,19 @@ try {
   const appState = await appPage.evaluate(() => ({
     pendingA: localStorage.getItem("proviaai_pending_exams:u1"),
     pendingB: localStorage.getItem("proviaai_pending_exams:u2"),
+    draftA: localStorage.getItem("exgen_flow_draft_u1"),
+    progressA: localStorage.getItem("exgen_flow_progress_u1"),
+    draftB: localStorage.getItem("exgen_flow_draft_u2"),
     history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
   }));
-  assert.match(appDialog, /Rensa provhistorik och misstag/);
+  assert.match(appDialog, /Rensa sparade provdata/);
+  assert.match(appDialog, /osynkade resultat/i);
   assert.equal(appAuthorization, "Bearer token-account-a");
   assert.equal(appState.pendingA, null);
   assert.ok(appState.pendingB, "the app preserves another account's pending queue");
+  assert.equal(appState.draftA, null, "app clear removes this account's unfinished exam draft");
+  assert.equal(appState.progressA, null, "app clear removes this account's saved answers");
+  assert.ok(appState.draftB, "app clear preserves another account's unfinished draft");
   assert.equal(appState.history?.[0]?.user_id, "u2", "app clear preserves the next account's shared history");
 
   const appNoSessionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -177,7 +190,7 @@ try {
     owner: localStorage.getItem("exgen_local_data_owner"),
     history: JSON.parse(localStorage.getItem("proviaai_history") || "null"),
   }));
-  assert.match(appNoSessionDialog, /Rensa provhistorik och misstag/);
+  assert.match(appNoSessionDialog, /Rensa sparade provdata/);
   assert.equal(appNoSessionRemoteDelete, false, "app missing-session clear never calls remote deletion");
   assert.equal(appNoSessionState.owner, "u2");
   assert.equal(appNoSessionState.history?.[0]?.course, "Fysik", "app missing-session clear preserves owned local history");
@@ -199,6 +212,9 @@ try {
     }),
     "proviaai_pending_exams:u1": [{ local_id: "coach-pending-1", user_id: "u1" }],
     "proviaai_pending_exams:u2": [{ local_id: "coach-pending-2", user_id: "u2" }],
+    "exgen_flow_draft_u1": { uid: "u1", material: "synthetic draft" },
+    "exgen_flow_progress_u1": { uid: "u1", answers: { q1: "synthetic answer" } },
+    "exgen_flow_draft_u2": { uid: "u2", material: "other account draft" },
     exgen_local_data_owner: "u1",
   } });
   await coachPage.goto(`${server.url}/förbättring.html`, { waitUntil: "networkidle" });
@@ -206,18 +222,30 @@ try {
   await coachPage.evaluate(() => localStorage.setItem("proviaai_last_material", "synthetic saved study material"));
   await coachPage.getByRole("button", { name: "Meny" }).click();
   let coachAlert = "";
-  coachPage.on("dialog", async (dialog) => { coachAlert = dialog.message(); await dialog.accept(); });
+  let coachConfirmation = "";
+  coachPage.on("dialog", async (dialog) => {
+    if (dialog.type() === "confirm") coachConfirmation = dialog.message();
+    else coachAlert = dialog.message();
+    await dialog.accept();
+  });
   await coachPage.locator("#resetBtn").click({ force: true });
   await coachPage.waitForFunction(() => localStorage.getItem("proviaai_last_material") === null);
   const coachState = await coachPage.evaluate(() => ({
     material: localStorage.getItem("proviaai_last_material"),
     pendingA: localStorage.getItem("proviaai_pending_exams:u1"),
     pendingB: localStorage.getItem("proviaai_pending_exams:u2"),
+    draftA: localStorage.getItem("exgen_flow_draft_u1"),
+    progressA: localStorage.getItem("exgen_flow_progress_u1"),
+    draftB: localStorage.getItem("exgen_flow_draft_u2"),
   }));
   assert.match(coachAlert, /Provposter och resultatsammanfattningar är rensade/);
+  assert.match(coachConfirmation, /osynkade resultat/i);
   assert.equal(coachState.material, null, "coach clear removes locally saved study material");
   assert.equal(coachState.pendingA, null, "coach clear removes this account's pending exam queue");
   assert.ok(coachState.pendingB, "coach clear preserves another account's pending exam queue");
+  assert.equal(coachState.draftA, null, "coach clear removes this account's unfinished exam draft");
+  assert.equal(coachState.progressA, null, "coach clear removes this account's saved answers");
+  assert.ok(coachState.draftB, "coach clear preserves another account's unfinished draft");
 } finally {
   await browser.close();
   await server.close();

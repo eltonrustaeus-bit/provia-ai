@@ -13,6 +13,6 @@ assert.match(rollback, /raise exception .*privilege-escalation path/i);
 
 const profileCheck = app.slice(app.indexOf("async function checkApprovalAndUnlock"), app.indexOf("// signInEmail()"));
 assert.doesNotMatch(profileCheck, /\.from\(["']profiles["']\)\.insert/i, "missing profile must fail closed instead of client-inserting trusted role fields");
-assert.match(profileCheck, /if\(!prof\)[\s\S]*?await logout\(\);[\s\S]*?return false;/, "missing profile clears the session and keeps the account locked");
+assert.match(profileCheck, /if\(!prof\)[\s\S]*?await logout\(\{skipLocalDataConfirm:true\}\);[\s\S]*?return false;/, "missing profile clears the session without prompting and keeps the account locked");
 
 console.log("profiles insert privilege: client bootstrap removed; staging-gated migration and blocked rollback verified");

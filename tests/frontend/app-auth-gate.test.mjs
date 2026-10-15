@@ -201,7 +201,13 @@ try {
       await first.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").click();
       await first.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
       await first.locator("#xf .xf-exam.on").waitFor({ state: "visible" });
+      await first.waitForFunction(() => !!localStorage.getItem("exgen_flow_draft_u1"));
     }
+    let logoutPrompt = "";
+    if (activeExam) second.on("dialog", async dialog => {
+      logoutPrompt = dialog.message();
+      await dialog.accept();
+    });
     await Promise.all([
       first.waitForNavigation({ waitUntil: "domcontentloaded" }),
       activeExam
@@ -211,6 +217,10 @@ try {
     await first.waitForFunction(() => document.body.classList.contains("app-locked"));
     assert.equal(await first.locator("#xf").isVisible(), false, "another tab's sign-out hides the wizard");
     assert.equal(await first.locator("#xf .xf-exam.on").count(), 0, "old active exam is not visible after sign-out");
+    if (activeExam) {
+      assert.match(logoutPrompt, /behålla det lokalt/i, "manual sign-out explains the local exam data choice");
+      assert.ok(await first.evaluate(() => localStorage.getItem("exgen_flow_draft_u1")), "keeping local data preserves the exam draft after sign-out");
+    }
     await context.close();
   }
 
