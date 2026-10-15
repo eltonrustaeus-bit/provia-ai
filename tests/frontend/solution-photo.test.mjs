@@ -109,6 +109,13 @@ try {
     await t.page.waitForTimeout(900);
     const note = await t.page.locator(".xf-photo-note").innerText();
     R.ok("K9 bekräftelse om avläsning är på engelska", /Check that the transcription is correct/.test(note), note);
+    await t.page.evaluate(() => document.getElementById("langBtnDesktop").click());
+    R.ok("K9 språkbyte uppdaterar fritextfältet mitt i provet",
+      await answer.getAttribute("placeholder") === "Ditt svar…",
+      await answer.getAttribute("placeholder"));
+    R.ok("K9 språkbyte uppdaterar fotoknappen mitt i provet",
+      /Fota din lösning/.test(await t.page.locator(".xf-photo-btn").innerText()),
+      await t.page.locator(".xf-photo-btn").innerText());
     await t.close();
   }
   {
