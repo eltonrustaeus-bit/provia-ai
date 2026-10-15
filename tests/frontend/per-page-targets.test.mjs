@@ -54,12 +54,15 @@ async function mk(path) {
   // klickas (toggle() i shared.js). app.html:s eget test öppnar panelen
   // indirekt via ".xf-ask"; här finns ingen sådan genväg, så vi klickar
   // bubblan direkt.
-  ok("T1d1 P.E.R-knappen pekar ut panelen", await page.locator("#perBubble").getAttribute("aria-controls") === "perPanel");
+  const controls = await page.locator("#perBubble").getAttribute("aria-controls");
+  ok("T1d1 P.E.R-knappen pekar ut panelen", controls === "perPanel" && controls === await page.locator("#perPanel").getAttribute("id"));
   ok("T1d2 panelen börjar stängd enligt ARIA", await page.locator("#perBubble").getAttribute("aria-expanded") === "false");
   await page.click("#perBubble");
-  ok("T1d3 öppnad panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "true");
+  const opened = await page.locator("#perPanel").evaluate(el => el.classList.contains("per-open"));
+  ok("T1d3 öppnad panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "true" && opened);
   await page.click("#perBubble");
-  ok("T1d4 stängd panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "false");
+  const closed = await page.locator("#perPanel").evaluate(el => el.classList.contains("per-open"));
+  ok("T1d4 stängd panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "false" && !closed);
   await page.click("#perBubble");
   await page.evaluate(() => {
     const msgs = document.getElementById("perMessages");
