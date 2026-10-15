@@ -5,7 +5,6 @@
   <script src="/js/site-gate.js"></script>
   <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
-  <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
   <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
@@ -48,7 +47,7 @@
   .statusBar{display:none;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--exgen-radius-lg);font-family:var(--mono);font-size:12px;margin-bottom:16px;border:1px solid var(--l)}
   .statusBar.ok{background:rgba(0,183,217,.08);border-color:rgba(0,183,217,.2);color:var(--a)}
   .statusBar.err{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.2);color:#ff6b6b}
-  .statusBar.warn{background:rgba(255,200,80,.08);border-color:rgba(255,200,80,.25);color:#f4c842}
+  .statusBar.warn{background:rgba(255,200,80,.08);border-color:rgba(255,200,80,.25);color:#6b4f00}
 
   /* card system (konto kCard) */
   .kCard{background:var(--s);border:1px solid var(--l);border-radius:var(--exgen-radius-lg);margin-bottom:14px;overflow:hidden}
@@ -123,11 +122,11 @@
   .resBadge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;font-weight:500;
     letter-spacing:.04em;padding:3px 9px;border-radius:var(--exgen-radius-pill)}
   .resBadge.pass{background:rgba(0,183,217,.08);color:var(--a);border:1px solid rgba(0,183,217,.25)}
-  .resBadge.mid{background:rgba(255,200,80,.08);color:#f4c842;border:1px solid rgba(255,200,80,.25)}
+  .resBadge.mid{background:rgba(255,200,80,.08);color:#6b4f00;border:1px solid rgba(255,200,80,.25)}
   .resBadge.fail{background:rgba(255,107,107,.08);color:#ff6b6b;border:1px solid rgba(255,107,107,.25)}
   .resBadge.none{background:transparent;color:var(--t3);border:1px solid var(--l)}
   .weakTags{display:flex;flex-wrap:wrap;gap:4px;max-width:240px}
-  .weakTag{font-family:var(--mono);font-size:9.5px;color:#f4c842;background:rgba(255,200,80,.07);
+  .weakTag{font-family:var(--mono);font-size:9.5px;color:#6b4f00;background:rgba(255,200,80,.07);
     border:1px solid rgba(255,200,80,.2);border-radius:var(--exgen-radius-pill);padding:2px 8px}
 
   /* sparkline */
