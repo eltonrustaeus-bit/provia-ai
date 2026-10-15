@@ -112,6 +112,8 @@ assert.equal(assessment.gateExam({ questions: [{ ...question, points: 3, graph_s
 assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "natural_sciences", secret }).questions.length, 1);
 assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "social_sciences", secret }).questions.length, 1,
   "social-science tasks accept only the deterministic table-based scatter contract");
+assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "mathematics", secret }).questions.length, 1,
+  "mathematics accepts the same deterministic scatter contract when the source table is explicit");
 assert.equal(assessment.gateExam({ questions: [question] }, { profile: "social_sciences", secret }).questions.length, 0,
   "social-science tasks do not accept math line tasks");
 assert.equal(graph.sourceContainsSpec("Tid | Halt\n0 | 4\n1 | 3\n2 | 1", scatterSpec), false,

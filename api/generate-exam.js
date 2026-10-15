@@ -831,14 +831,15 @@ module.exports = async function handler(req, res) {
   const pointTable = graphAnswers.parsePointTable(pastedText);
   const graphMode = isMath && uniqueGraphLines.size === 1
     ? "line"
-    : ["natural_sciences", "social_sciences"].includes(subjectProfile) && pointTable ? "scatter" : null;
+    : (subjectProfile === "mathematics" && isMath && uniqueGraphLines.size === 0
+      || ["natural_sciences", "social_sciences"].includes(subjectProfile)) && pointTable ? "scatter" : null;
   if (qType === "graph" && !graphMode) {
     return json(res, 400, {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en natur- eller samhällsvetenskaplig tabell med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden."
-        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a natural- or social-sciences table with two headers separated by | and exactly three integer rows from −5 to 5 with distinct x-values."
+        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden."
+        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a math, natural-science, or social-science table with two headers separated by | and exactly three integer rows from −5 to 5 with distinct x-values."
     });
   }
 

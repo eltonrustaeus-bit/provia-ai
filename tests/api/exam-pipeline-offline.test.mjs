@@ -153,7 +153,7 @@ try {
   });
   assert.equal(unsupportedGraph.status, 400);
   assert.equal(unsupportedGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraph.body.message, /natur- eller samhällsvetenskaplig tabell/i);
+  assert.match(unsupportedGraph.body.message, /matematik, naturvetenskap eller samhällsvetenskap/i);
   assert.match(unsupportedGraph.body.message, /exakt tre heltalsrader/i);
   const unsupportedGraphEn = await invoke(generateExam, {
     lang: "en", level: "C", course: "Mathematics 2b", pastedText: "The parabola is y = x^2.",
@@ -161,7 +161,7 @@ try {
   });
   assert.equal(unsupportedGraphEn.status, 400);
   assert.equal(unsupportedGraphEn.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
-  assert.match(unsupportedGraphEn.body.message, /natural- or social-sciences table/i);
+  assert.match(unsupportedGraphEn.body.message, /math, natural-science, or social-science table/i);
   assert.match(unsupportedGraphEn.body.message, /exactly three integer rows/i);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
     "unsupported graph types are rejected before model traffic");
@@ -428,6 +428,53 @@ try {
   assert.equal(scienceGraded.body.result.total_points, 2);
   assert.equal(scienceGraded.body.result.max_points, 3);
   assert.equal(scienceGraded.body.result.per_question[0].feedback, "2 av 3 datapunkter stämmer med tabellen.");
+
+  const mathScatterCourse = "Matematik 2b";
+  const mathScatterMaterial = "Talpar:\nx-värde | y-värde\n0 | 2\n1 | 3\n2 | 4";
+  activeQuestions = [{ ...activeQuestions[0], id: "math-scatter" }];
+  const mathScatterGenerated = await invoke(generateExam, {
+    lang: "sv", level: "C", course: mathScatterCourse, pastedText: mathScatterMaterial, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(mathScatterGenerated.status, 200, JSON.stringify(mathScatterGenerated.body));
+  const mathScatterQuestion = mathScatterGenerated.body.exam.questions[0];
+  assert.deepEqual(mathScatterQuestion.graph_ui, {
+    mode: "scatter", point_count: 3, x_label: "x-värde", y_label: "y-värde",
+    source_table: { headers: ["x-värde", "y-värde"], rows: [[0, 2], [1, 3], [2, 4]] },
+  }, "math scatter uses only the exact supported values and labels from the submitted table");
+  assert.equal(Object.hasOwn(mathScatterQuestion, "graph_spec"), false);
+  assert.equal(Object.hasOwn(mathScatterQuestion, "model_answer"), false);
+  const mathScatterGraded = await invoke(gradeExam, {
+    lang: "sv", course: mathScatterCourse, pastedText: mathScatterMaterial,
+    exam_manifest: mathScatterGenerated.body.exam.exam_manifest,
+    questions: [mathScatterQuestion],
+    answers: [{ id: mathScatterQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 5 },
+    ] }) }],
+  });
+  assert.equal(mathScatterGraded.status, 200, JSON.stringify(mathScatterGraded.body));
+  assert.equal(mathScatterGraded.body.result.total_points, 2);
+  assert.equal(mathScatterGraded.body.result.max_points, 3);
+
+  const mathLineAndTable = `${graphMaterial}\nMätdata:\nTid (s) | Höjd (m)\n0 | 1\n1 | 3\n2 | 5`;
+  activeQuestions = [{ ...activeQuestions[0], id: "math-line-priority", graph_spec: { kind: "line", slope: 2, intercept: 1, points: [], x_label: "", y_label: "" } }];
+  const mathLinePriority = await invoke(generateExam, {
+    lang: "sv", level: "C", course: mathScatterCourse, pastedText: mathLineAndTable, qType: "graph", numQuestions: 1,
+  });
+  assert.equal(mathLinePriority.status, 200, JSON.stringify(mathLinePriority.body));
+  assert.equal(mathLinePriority.body.exam.questions[0].graph_ui.mode, "line",
+    "a supported explicit math line keeps priority over a table in the same material");
+
+  calls.length = 0;
+  const unsupportedMathTable = await invoke(generateExam, {
+    lang: "sv", level: "C", course: mathScatterCourse,
+    pastedText: "Tid (s) | Temperatur (°C)\n0 | 2.5\n1 | 4\n2 | 6", qType: "graph", numQuestions: 1,
+  });
+  assert.equal(unsupportedMathTable.status, 400);
+  assert.equal(unsupportedMathTable.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "a math table outside the exact integer contract is rejected before provider use");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
+    "an unsupported math table does not consume an exam quota");
 
   const socialCourse = "Företagsekonomi 1";
   const socialMaterial = "Efterfrågan och pris:\nAntal | Pris (kr)\n1 | 5\n2 | 4\n3 | 3";
