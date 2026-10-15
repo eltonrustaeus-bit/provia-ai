@@ -144,13 +144,14 @@ const signIn = async (page, uid, lang = "sv", storage = {}) => {
       await page.locator("#perInput").getAttribute("aria-label") === "Ask P.E.R a question"
       && await page.locator("#perSendBtn").textContent() === "Send"
       && await page.locator("#perMicBtn").getAttribute("aria-label") === "Speak to P.E.R");
-    const perToolLabels = await Promise.all(["perQuizBtn", "perCornerBtn", "perSizeBtn", "perClearBtn"]
+    const perToolLabels = await Promise.all(["perQuizBtn", "perCornerBtn", "perSizeBtn", "perClearBtn", "perCloseBtn"]
       .map(id => page.locator("#" + id).getAttribute("aria-label")));
     ok("P.E.R-verktygen har engelska tillgängliga namn",
       perToolLabels[0] === "Let P.E.R quiz me"
       && perToolLabels[1] === "Move P.E.R to bottom right"
       && perToolLabels[2] === "Use normal panel size"
-      && perToolLabels[3] === "Clear conversation on this device", JSON.stringify(perToolLabels));
+      && perToolLabels[3] === "Clear conversation"
+      && perToolLabels[4] === "Close P.E.R", JSON.stringify(perToolLabels));
     await page.locator("#langBtnDesktop").click();
     await page.waitForFunction(() => document.querySelector("#perInput")?.getAttribute("aria-label") === "Ställ en fråga till P.E.R");
     ok("sparad P.E.R-position och storlek behåller svenska handlingsnamn efter språkbyte",

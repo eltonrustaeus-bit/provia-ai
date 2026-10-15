@@ -357,6 +357,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await clearPage.locator("#perSendBtn").click();
     await clearPage.locator("#perMessages").getByText("Del av svar").waitFor();
     await clearPage.locator("#perAnnouncement").evaluate(el => { el.textContent = "Gammalt färdigt svar"; });
+    clearPage.once("dialog", dialog => dialog.accept());
     await clearPage.locator("#perClearBtn").click();
     await clearPage.locator("#perMessages").getByText("Samtalet är rensat på den här enheten.").waitFor();
     assert.equal(await clearPage.locator("#perAnnouncement").innerText(), "Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.",

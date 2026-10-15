@@ -111,7 +111,8 @@ try {
     (await en.page.locator("#perMessages").innerText()).includes("The conversation was cleared from this device"));
   R.ok("engelska P.E.R-verktyg behåller rätt åtkomstnamn efter öppning",
     await en.page.locator("#perQuizBtn").getAttribute("aria-label") === "Let P.E.R quiz me"
-      && await en.page.locator("#perClearBtn").getAttribute("aria-label") === "Clear conversation on this device");
+      && await en.page.locator("#perClearBtn").getAttribute("aria-label") === "Clear conversation"
+      && await en.page.locator("#perCloseBtn").getAttribute("aria-label") === "Close P.E.R");
   await en.close();
 } catch (e) {
   process.exitCode = R.finish(e);

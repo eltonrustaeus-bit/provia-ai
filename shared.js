@@ -482,6 +482,20 @@
     var _getToken = null;
     var _open = false;
     var _pendingInputFocusHandoff = null;
+    var _perFocusOrigin = null;
+
+    function focusPerLauncherOrOrigin() {
+      var bubble = document.getElementById('perBubble');
+      var isVisible = function (element) {
+        return !!(element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      };
+      if (isVisible(bubble)) bubble.focus();
+      else if (isVisible(_perFocusOrigin)) _perFocusOrigin.focus();
+      else {
+        var fallback = document.querySelector('.xg-menu-btn');
+        if (isVisible(fallback)) fallback.focus();
+      }
+    }
     var _nudgeTimer = null;
     var _nudgeShownKey = null;
 
@@ -1442,16 +1456,18 @@ function finalizeMsg(div, text) {
 
     function toggle() {
       if (!document.getElementById('perBubble') || !document.getElementById('perPanel')) return;
+      var panel = document.getElementById('perPanel');
       _open = !_open;
       var focusAfterOpen = document.activeElement;
       var menuWasOpen = !!document.querySelector('.xg-menu.on');
+      var restoreLauncherFocus = !_open && panel.contains(document.activeElement);
+      var bubble = document.getElementById('perBubble');
+      if (_open) _perFocusOrigin = focusAfterOpen && focusAfterOpen !== bubble && !panel.contains(focusAfterOpen) ? focusAfterOpen : null;
       if (!_open && _pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
       if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') {
         window.XgShell.closeMenu();
         if (menuWasOpen) focusAfterOpen = document.querySelector('.xg-menu-btn');
       }
-      var panel = document.getElementById('perPanel');
-      var bubble = document.getElementById('perBubble');
       if (panel) panel.classList.toggle('per-open', _open);
       if (bubble) {
         bubble.classList.toggle('per-open', _open);
@@ -1479,6 +1495,8 @@ function finalizeMsg(div, text) {
           var handoff = startInputFocusHandoff(inp, focusAfterOpen);
           if (!menuWasOpen) setTimeout(function () { completeInputFocusHandoff(handoff); }, 50);
         }
+      } else if (restoreLauncherFocus && bubble) {
+        focusPerLauncherOrOrigin();
       }
     }
 
@@ -1667,7 +1685,8 @@ function finalizeMsg(div, text) {
               '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
               '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
               '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
-              '<button class="per-clr" id="perClearBtn" title="Rensa på den här enheten"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+              '<button class="per-clr" id="perClearBtn" title="Rensa konversationen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg></button>' +
+              '<button class="per-clr" id="perCloseBtn" title="Stäng P.E.R" aria-label="Stäng P.E.R"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>' +
             '</div>' +
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="app.html">Skapa gratis konto →</a></div>' +
@@ -1767,6 +1786,7 @@ function finalizeMsg(div, text) {
         var corner = document.getElementById('perCornerBtn');
         var size = document.getElementById('perSizeBtn');
         var clear = document.getElementById('perClearBtn');
+        var close = document.getElementById('perCloseBtn');
         var greeting = document.getElementById('perGreeting');
         var landingLink = document.querySelector('#perLandingBar a');
         var savedCorner = 'br';
@@ -1797,8 +1817,10 @@ function finalizeMsg(div, text) {
             : (savedSize === 'large' ? 'Återställ normal storlek' : 'Gör P.E.R större');
           size.setAttribute('aria-label', size.title);
         }
-        clear.title = english ? 'Clear conversation on this device' : 'Rensa på den här enheten';
+        clear.title = english ? 'Clear conversation' : 'Rensa konversationen';
         clear.setAttribute('aria-label', clear.title);
+        close.title = english ? 'Close P.E.R' : 'Stäng P.E.R';
+        close.setAttribute('aria-label', close.title);
         if (greeting && greeting.id === 'perGreeting') greeting.textContent = english ? 'How can I help you?' : 'Vad kan jag hjälpa dig med?';
         if (landingLink) landingLink.textContent = english ? 'Create a free account →' : 'Skapa gratis konto →';
       }
@@ -1807,6 +1829,7 @@ function finalizeMsg(div, text) {
       window.addEventListener('exgen:languagechange', updatePerInputLanguage);
 
       document.getElementById('perBubble').onclick = toggle;
+      document.getElementById('perCloseBtn').onclick = toggle;
 
       // Never let the widget sit over a focused answer field on mobile — shrink
       // it out of the way instead of guessing a safe position for every keyboard
@@ -1837,12 +1860,18 @@ function finalizeMsg(div, text) {
         }
       };
       document.getElementById('perClearBtn').onclick = function () {
+        var input = document.getElementById('perInput');
+        var hasConversation = perGetHist().some(function (message) { return message.role === 'user'; }) ||
+          !!(input && input.value.trim()) || !!_perActiveRequest;
+        var english = perWidgetUsesEnglish();
+        if (hasConversation && !window.confirm(english
+          ? 'Clear this conversation from this device? Server-stored history and P.E.R memory will remain.'
+          : 'Rensa konversationen från den här enheten? Serverlagrad historik och P.E.R-minne finns kvar.')) return;
         if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
         }
-        var input = document.getElementById('perInput');
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');
         if (sendBtn) sendBtn.disabled = false;
@@ -2081,7 +2110,14 @@ function finalizeMsg(div, text) {
 
       /* Alt+P keyboard shortcut */
       document.addEventListener('keydown', function(e) {
-        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P')) {
+        var target = e.target;
+        var isEditable = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        if (e.key === 'Escape' && _open && !document.querySelector('.xg-menu.on')) {
+          e.preventDefault();
+          toggle();
+          return;
+        }
+        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P') && !isEditable) {
           e.preventDefault();
           toggle();
         }
