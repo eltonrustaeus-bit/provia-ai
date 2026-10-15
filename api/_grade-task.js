@@ -65,6 +65,7 @@ function validQuestion(question) {
       && question.correct_index >= 0 && question.correct_index < question.options.length;
   }
   if (question.type === "graph") return graph.isValidSpec(question.graph_spec)
+    && question.points === (question.graph_spec.kind === "scatter" ? 3 : 2)
     && (question.graph_ui === undefined || graph.isValidDisplaySpec(question.graph_ui, question.graph_spec))
     && (question.graph_spec.kind !== "scatter" || question.graph_ui !== undefined);
   return typeof question.model_answer === "string" && question.model_answer.length <= 12000;

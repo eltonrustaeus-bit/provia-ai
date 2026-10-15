@@ -619,9 +619,10 @@ module.exports = async function handler(req, res) {
       } else if (type === "graph") {
         const spec = q.graph_spec;
         const graded = graphAnswers.gradeAnswer(userAns, spec, lang);
-        total += graded.points;
+        const awardedPoints = Math.min(maxP, graded.points);
+        total += awardedPoints;
         perById.set(id, {
-          id, points: Math.min(maxP, graded.points), max_points: maxP,
+          id, points: awardedPoints, max_points: maxP,
           feedback: unanswered
             ? lang === "sv" ? "Obesvarad. Du placerade inga punkter." : "Not answered. You did not plot any points."
             : graded.feedback,

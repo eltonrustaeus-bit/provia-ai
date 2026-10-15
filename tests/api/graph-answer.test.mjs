@@ -156,6 +156,10 @@ const mcTask = {
   correct_index: 1, model_answer: "4", akey_sig: "signed-answer-key"
 };
 const ctxHash = gradeTasks.hashContext("material", "Matematik", "user-1");
+assert.equal(gradeTasks.validQuestion({ ...q, points: 1 }), false,
+  "a signed line-graph task cannot claim a one-point maximum for a two-point rubric");
+assert.equal(gradeTasks.sealQuestion({ ...q, points: 1 }, secret, ctxHash), "",
+  "invalid line-graph score ceilings are not sealable");
 const sealed = gradeTasks.sealQuestion(mcTask, secret, ctxHash);
 assert.ok(sealed);
 const publicMc = { id: mcTask.id, type: mcTask.type, points: mcTask.points, question: mcTask.question, options: mcTask.options, grade_task: sealed };
@@ -172,6 +176,10 @@ const scatterQuestion = {
   graph_ui: graph.displaySpec(scatterSpec), model_answer: graph.modelAnswer(scatterSpec)
 };
 const scatterContext = gradeTasks.hashContext(table, "Biologi 1", "user-1");
+assert.equal(gradeTasks.validQuestion({ ...scatterQuestion, points: 2 }), false,
+  "a signed scatter task cannot claim a maximum below its three-point rubric");
+assert.equal(gradeTasks.sealQuestion({ ...scatterQuestion, points: 2 }, secret, scatterContext), "",
+  "invalid scatter score ceilings are not sealable");
 const scatterSealed = gradeTasks.sealQuestion(scatterQuestion, secret, scatterContext);
 assert.ok(scatterSealed, "scatter graph and UI configuration are signed together");
 const publicScatter = { id: scatterQuestion.id, type: "graph", points: 3, question: scatterQuestion.question,
@@ -186,6 +194,8 @@ assert.equal(gradeTasks.openQuestion({
 }, scatterSealed, secret, scatterContext), null,
 "the learner-facing table cannot be changed independently of the sealed grading task");
 const gradeSource = require("node:fs").readFileSync(new URL("../../api/grade.js", import.meta.url), "utf8");
+assert.match(gradeSource, /const awardedPoints = Math\.min\(maxP, graded\.points\);\s*total \+= awardedPoints;[\s\S]*?points: awardedPoints/,
+  "the same capped graph score feeds both the question row and exam total");
 const source = require("node:fs").readFileSync(new URL("../../api/generate-exam.js", import.meta.url), "utf8");
 assert.match(source, /clientQuestion\.grade_task = gradeTasks\.sealQuestion\(q, undefined, gradeTasks\.hashContext\(pastedText, course, user\.id\)\)/);
 assert.match(source, /const canRegenerate = qType !== "graph" && !hasMultipleChoice\s*&& budget\.remaining\(\) > MIN_GENERATION_MS \+ VERIFIER_RESERVE_MS/,
