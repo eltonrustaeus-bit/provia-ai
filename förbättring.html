@@ -897,7 +897,7 @@
             <span class="xfMissQ">${esc(m.question||'')}</span>
             <span class="xfMissMeta">${esc((m.course||'').trim()||'ingen kurs')} · ${date}</span>
           </button>
-          <div class="xfMissMore">
+          <div class="xfMissMore" data-per-avoid>
             <button type="button" class="xfDisclose" aria-expanded="false">Visa svar</button>
             <button class="xfDisclose doneBtn" type="button">Klar</button>
             <button class="xfDisclose tipsBtnEl" type="button">P.E.R-tips${hasCached?' <span class="xfCached">cache</span>':''}</button>

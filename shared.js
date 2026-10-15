@@ -1426,6 +1426,8 @@ function finalizeMsg(div, text) {
       if (document.body && document.body.classList.contains('xf-result')) {
         document.body.classList.toggle('xf-result-per-open', _open);
       }
+      var widget = document.getElementById('perWidget');
+      if (widget && widget._syncPerObstruction) widget._syncPerObstruction();
       if (_open) {
         hideNudge();
         /* Update greeting if no real user messages yet */
@@ -1536,6 +1538,7 @@ function finalizeMsg(div, text) {
         '#perNudge:hover{border-color:rgba(0,183,217,.4);background:var(--exgen-bg-secondary,#F8FAFC)}',
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
         '#perWidget.per-minimized{transform:scale(.001);opacity:0;pointer-events:none;transition:transform .15s ease,opacity .15s ease}',
+        '#perWidget.per-obstructed{visibility:hidden;pointer-events:none}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
         '@media(max-width:480px){#perBubble{height:40px;padding:0 8px;gap:4px;font-size:11px}#perBubble svg{width:14px;height:14px}}',
@@ -1645,6 +1648,54 @@ function finalizeMsg(div, text) {
           '<span>P.E.R</span></button>'+
           '<div id="perSees" aria-hidden="true">ser: den här sidan</div>';
       document.body.appendChild(widget);
+
+      // Keep the launcher from covering controls that explicitly opt into
+      // collision protection. The improvement page still exposes its inline
+      // P.E.R action while the floating launcher is temporarily out of view.
+      (function () {
+        var bubble = document.getElementById('perBubble');
+        var frame = 0;
+        function syncObstruction() {
+          frame = 0;
+          if (!bubble) return;
+          if (bubble.classList.contains('per-open')) {
+            widget.classList.remove('per-obstructed');
+            widget.removeAttribute('aria-hidden');
+            return;
+          }
+          if (getComputedStyle(widget).display === 'none') {
+            widget.classList.remove('per-obstructed');
+            widget.removeAttribute('aria-hidden');
+            return;
+          }
+          var bubbleRect = bubble.getBoundingClientRect();
+          var obstructing = null;
+          document.querySelectorAll('[data-per-avoid]').forEach(function (el) {
+            if (obstructing || !el.getClientRects().length) return;
+            var rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 &&
+                rect.left < bubbleRect.right && rect.right > bubbleRect.left &&
+                rect.top < bubbleRect.bottom && rect.bottom > bubbleRect.top) obstructing = el;
+          });
+          if (obstructing && widget.contains(document.activeElement)) {
+            var nextControl = obstructing.querySelector('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled)');
+            if (nextControl) nextControl.focus({ preventScroll: true });
+          }
+          widget.classList.toggle('per-obstructed', !!obstructing);
+          if (obstructing) widget.setAttribute('aria-hidden', 'true');
+          else widget.removeAttribute('aria-hidden');
+        }
+        widget._syncPerObstruction = syncObstruction;
+        function scheduleObstructionCheck() {
+          if (frame) return;
+          frame = requestAnimationFrame(syncObstruction);
+        }
+        window.addEventListener('scroll', scheduleObstructionCheck, { passive: true, capture: true });
+        window.addEventListener('resize', scheduleObstructionCheck, { passive: true });
+        var observer = new MutationObserver(scheduleObstructionCheck);
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+        syncObstruction();
+      })();
 
       function perWidgetUsesEnglish() {
         var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
