@@ -175,10 +175,10 @@ for (const url of PAGES) {
       const a = document.querySelector(".xg-login-btn");
       if (!a) return null;
       const r = a.getBoundingClientRect();
-      return { href: a.getAttribute("href"), visible: r.width > 0 && r.height > 0 };
+      return { href: a.getAttribute("href"), visible: r.width > 0 && r.height > 0, height: r.height };
     });
     ok(`${url} @390: kontoknappen syns även med menyn utfälld`,
-      !!acct && acct.visible && acct.href === "konto.html", JSON.stringify(acct));
+      !!acct && acct.visible && acct.href === "konto.html" && acct.height >= 44, JSON.stringify(acct));
     await ctx.close();
   }
 
