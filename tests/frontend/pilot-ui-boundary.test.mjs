@@ -27,7 +27,16 @@ test("student pilot account UI hides held-out actions and states deletion limita
   assert.match(account, /data-exgen-environment="pilot"\] #manageCard/);
   assert.match(account, /data-exgen-environment="pilot"\] #deleteAccountBtn/);
   assert.match(account, /id="pilotDeletionNotice"/);
+  assert.match(account, /pilotDeletionNotice[\s\S]*mailto:elton\.rustaeus@gmail\.com\?subject=ExGen%20datafr%C3%A5ga/);
+  assert.match(account, /Ingen tidsfrist eller fullständig dataradering utlovas här/);
   assert.match(account, /if\(!pilotMode\)loadMyClasses\(\)/);
+});
+
+test("the requested pilot feedback has a user-initiated route and warns against sending student data", async () => {
+  const app = await readFile(`${ROOT}/app.html`, "utf8");
+  assert.match(app, /id="betaFeedbackLink" href="mailto:elton\.rustaeus@gmail\.com\?subject=ExGen%20feedback"/);
+  assert.match(app, /id="betaPrivacyHint"[^>]*>Skicka inte personuppgifter eller provsvar\./);
+  assert.match(app, /Do not include personal data or exam answers\./);
 });
 
 test("P.E.R memory clearing discloses that profile facts are a separate store", async () => {
