@@ -644,8 +644,32 @@ async function gateActiveExam(req, res, body, user) {
       res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
       return true;
     }
-    sendActiveExamGuidance(req, res, body, state);
-    return true;
+    if (state === "active" || state === "grading") {
+      sendActiveExamGuidance(req, res, body, state);
+      return true;
+    }
+    const activeCount = await examIssuance.activeExamCount(user.id);
+    if (activeCount === null) {
+      res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+      return true;
+    }
+    if (activeCount > 0) {
+      sendActiveExamGuidance(req, res, body);
+      return true;
+    }
+    const hasCurrentQuestion = body.pageContext?.currentQuestion &&
+      typeof body.pageContext.currentQuestion === "object";
+    if (hasCurrentQuestion) {
+      // Question context can identify the exact exam item. Keep it on the
+      // answer-free path even for completed results; review uses its signed
+      // result route. The normal results view clears this context client-side.
+      sendActiveExamGuidance(req, res, body, state);
+      return true;
+    }
+    // After the verified-result migration is applied, completed means a
+    // server-verified grade exists. Old metadata must not block unrelated
+    // study help; the answer lease closes a race with a newly issued exam.
+    return false;
   }
   // Client phase is a hint, not an issuance identity. A stale exam view must
   // not strand study help when the server confirms there is no active exam.
@@ -656,7 +680,16 @@ async function gateActiveExam(req, res, body, user) {
     res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
     return true;
   }
-  if (activeCount === 0) return false;
+  if (activeCount === 0) {
+    if (body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)) {
+      // With no server-active exam, client-supplied question and phase are stale
+      // display context, not trusted inputs to the general study-help prompt.
+      body.pageContext = { ...body.pageContext };
+      delete body.pageContext.currentQuestion;
+      delete body.pageContext.examState;
+    }
+    return false;
+  }
   sendActiveExamGuidance(req, res, body);
   return true;
 }

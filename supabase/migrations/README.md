@@ -191,3 +191,13 @@ select version, name from supabase_migrations.schema_migrations order by version
 
 Jämför namnen mot filerna här. Slår något ut, avgör vilket register som har fel genom att titta
 på **schemat**, inte på det andra registret.
+
+## Verifiable exam completion — local draft only
+
+`20261015111112_require_verified_exam_result_for_exam_state.sql` changes the issuance-state and
+active-exam-count RPCs so only `mock_results.verified_at IS NOT NULL` marks an exam completed.
+Legacy result rows remain unverified and therefore cannot release the P.E.R answer gate. The
+migration has not been applied or PostgreSQL-tested. Staging has no app schema; reconcile and
+restore its approved baseline, then run synthetic active/unverified/verified result tests only
+after separate migration approval. Its rollback intentionally aborts because restoring the
+unverified-row behavior could release answers during an active exam.

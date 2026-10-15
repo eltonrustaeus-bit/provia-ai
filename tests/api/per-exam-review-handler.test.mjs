@@ -865,6 +865,77 @@ test("an active issuance is checked by its exact server identity even if the cli
   assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
 });
 
+test("inactive exam metadata does not block study help or bypass another active exam", async () => {
+  const submissionId = proof.receipt.split(".")[1];
+  issuanceState = "completed";
+  activeCount = 0;
+  calls.length = 0;
+  try {
+    const unrelated = await invoke({
+      userQuestion: "Vad betyder derivata?",
+      pageContext: { examState: { phase: "exam", submissionId } },
+    }, "POST", "application/json");
+    assert.equal(unrelated.statusCode, 200);
+    assert.equal(unrelated.body.examActive, undefined);
+    assert.equal(unrelated.body.answer, defaultProviderAnswer);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
+
+    calls.length = 0;
+    const completedWithStaleQuestion = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      pageContext: {
+        currentQuestion: { type: "short", text: "Förklara skillnaden mellan derivata och integral" },
+        examState: { phase: "result", submissionId },
+      },
+    }, "POST", "application/json");
+    assert.equal(completedWithStaleQuestion.statusCode, 200);
+    assert.equal(completedWithStaleQuestion.body.examActive, false);
+    assert.match(completedWithStaleQuestion.body.answer, /kan inte längre fortsätta/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+
+    calls.length = 0;
+    const unboundContext = await invoke({
+      userQuestion: "Hjälp mig förstå derivata",
+      pageContext: { currentQuestion: "stale question context", examState: { phase: "exam" } },
+    }, "POST", "application/json");
+    assert.equal(unboundContext.statusCode, 200);
+    assert.equal(unboundContext.body.examActive, undefined);
+    assert.equal(unboundContext.body.answer, defaultProviderAnswer);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ body }) => !String(body).includes("Stale question context")));
+    assert.ok(calls.every(({ body }) => !String(body).includes('"phase":"exam"')));
+
+    calls.length = 0;
+    const unboundExamState = await invoke({
+      userQuestion: "Explain a biology concept",
+      pageContext: { examState: { phase: "exam" } },
+    }, "POST", "application/json");
+    assert.equal(unboundExamState.statusCode, 200);
+    assert.equal(unboundExamState.body.answer, defaultProviderAnswer);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.every(({ body }) => !String(body).includes('"phase":"exam"')));
+
+    activeCount = 1;
+    calls.length = 0;
+    const anotherExamActive = await invoke({
+      userQuestion: "Vad betyder derivata?",
+      pageContext: {
+        currentQuestion: { type: "short", text: "Förklara skillnaden mellan derivata och integral" },
+        examState: { phase: "result", submissionId },
+      },
+    }, "POST", "application/json");
+    assert.equal(anotherExamActive.statusCode, 200);
+    assert.equal(anotherExamActive.body.examActive, true);
+    assert.match(anotherExamActive.body.answer, /Identifiera vilket begrepp eller samband frågan prövar/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+  } finally {
+    activeCount = 0;
+    issuanceState = "active";
+  }
+});
+
 test("non-active issuance states deny model answers with state-appropriate guidance", async () => {
   activeCount = 0;
   const submissionId = completion.submissionId(userId, course, [publicQuestion]);
