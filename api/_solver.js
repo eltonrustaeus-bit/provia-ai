@@ -205,9 +205,9 @@ function parseSolverResults(results, questions) {
 // Solves the multiple-choice questions in `questions`. Short-answer items are
 // not solvable this way and are simply not sent; the caller keeps them.
 //
-// Fail-open: any transport, parse or shape problem returns callOk:false and the
-// caller ships what the gate and verifier already approved. A missing safety
-// check must never become a missing exam.
+// Fail-closed for multiple choice: transport, parse or shape problems return
+// callOk:false, so the caller withholds MC items rather than issuing unchecked
+// answer keys. Verifier-approved short-answer items do not require this solver.
 async function solveQuestions(questions, opts) {
   const { apiKey, model, subjectProfile, lang, material, timeoutMs } = opts || {};
   const mcs = (questions || []).filter(

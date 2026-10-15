@@ -61,6 +61,27 @@ check("rejects when source_alignment is below threshold", () => {
   assert.equal(V.decideApproval({ ...good, source_alignment: 0.3 }), false);
 });
 
+const scoreKeys = [
+  "factual_accuracy", "ambiguity_score", "difficulty_match",
+  "source_alignment", "scoring_quality", "language_quality",
+];
+
+check("rejects non-numeric, non-finite, and out-of-range verifier scores", () => {
+  for (const key of scoreKeys) {
+    for (const value of ["0.9", null, NaN, Infinity, -Infinity, -0.01, 1.01]) {
+      assert.equal(V.decideApproval({ ...good, [key]: value }), false, `${key}=${String(value)}`);
+    }
+  }
+});
+
+check("verifier schema constrains all six scores to the 0-1 interval", () => {
+  const properties = V.buildVerifierSchema().schema.properties.results.items.properties;
+  for (const key of scoreKeys) {
+    assert.equal(properties[key].minimum, 0, `${key} minimum`);
+    assert.equal(properties[key].maximum, 1, `${key} maximum`);
+  }
+});
+
 check("rejects when there are any required_changes, even with good scores", () => {
   assert.equal(V.decideApproval({ ...good, required_changes: ["förtydliga alternativ B"] }), false);
 });

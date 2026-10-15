@@ -1142,10 +1142,9 @@ module.exports = async function handler(req, res) {
           const vres = v1.perQuestion.get(String(q.id));
           verifierOutcome.checked++;
           const verifierOk = !!(vres && verifier.decideApproval(vres));
-          // A question ships only if BOTH roles clear it. The solver fails open
-          // as a whole (callOk:false means it is not consulted at all), but when
-          // it did run, a question it could not answer the same way as the key
-          // is not one to put in front of a student.
+          // A multiple-choice question ships only if both independent roles
+          // clear it. If the solver is unavailable, withhold that item; verified
+          // short-answer items do not depend on the solver.
           let solverOk = q.type !== "mc";
           if (q.type === "mc") {
             const decision = s1.callOk
@@ -1295,6 +1294,16 @@ module.exports = async function handler(req, res) {
         message: lang === "en"
           ? "The question quality check could not be completed. No exam was delivered; please try again."
           : "Kvalitetskontrollen hann inte slutföras. Inget prov lämnades ut; försök igen."
+      });
+    }
+
+    if (exam.questions.length === 0 && !solverOutcome.callOk && solverOutcome.checked > 0) {
+      return fail(503, {
+        ok: false,
+        error: "independent_check_unavailable",
+        message: lang === "en"
+          ? "The independent answer check could not be completed. No exam was delivered; please try again."
+          : "Den oberoende facitkontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen."
       });
     }
 

@@ -28,12 +28,12 @@ function buildVerifierSchema() {
             properties: {
               id: { type: "string" },
               approved: { type: "boolean" },
-              factual_accuracy: { type: "number" },
-              ambiguity_score: { type: "number" },
-              difficulty_match: { type: "number" },
-              source_alignment: { type: "number" },
-              scoring_quality: { type: "number" },
-              language_quality: { type: "number" },
+              factual_accuracy: { type: "number", minimum: 0, maximum: 1 },
+              ambiguity_score: { type: "number", minimum: 0, maximum: 1 },
+              difficulty_match: { type: "number", minimum: 0, maximum: 1 },
+              source_alignment: { type: "number", minimum: 0, maximum: 1 },
+              scoring_quality: { type: "number", minimum: 0, maximum: 1 },
+              language_quality: { type: "number", minimum: 0, maximum: 1 },
               issues: { type: "array", items: { type: "string" }, maxItems: 10 },
               required_changes: { type: "array", items: { type: "string" }, maxItems: 10 }
             }
@@ -65,12 +65,21 @@ function decideApproval(r, thresholds) {
   if (!r || typeof r !== "object") return false;
   if (r.approved !== true) return false;
   if (Array.isArray(r.required_changes) && r.required_changes.length > 0) return false;
-  if (!(Number(r.factual_accuracy) >= t.minFactualAccuracy)) return false;
-  if (!(Number(r.ambiguity_score) <= t.maxAmbiguity)) return false;
-  if (!(Number(r.difficulty_match) >= t.minDifficultyMatch)) return false;
-  if (!(Number(r.source_alignment) >= t.minSourceAlignment)) return false;
-  if (!(Number(r.scoring_quality) >= t.minScoringQuality)) return false;
-  if (!(Number(r.language_quality) >= t.minLanguageQuality)) return false;
+  const scores = [
+    r.factual_accuracy,
+    r.ambiguity_score,
+    r.difficulty_match,
+    r.source_alignment,
+    r.scoring_quality,
+    r.language_quality,
+  ];
+  if (scores.some((score) => typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > 1)) return false;
+  if (!(r.factual_accuracy >= t.minFactualAccuracy)) return false;
+  if (!(r.ambiguity_score <= t.maxAmbiguity)) return false;
+  if (!(r.difficulty_match >= t.minDifficultyMatch)) return false;
+  if (!(r.source_alignment >= t.minSourceAlignment)) return false;
+  if (!(r.scoring_quality >= t.minScoringQuality)) return false;
+  if (!(r.language_quality >= t.minLanguageQuality)) return false;
   return true;
 }
 

@@ -49,6 +49,7 @@ let activeQuestions = questions;
 let emptyGenerationResponse = false;
 let generationTextOverride = null;
 let gradingState = "active";
+let solverUnavailable = false;
 
 function outputResponse(value) {
   return Response.json({
@@ -115,6 +116,7 @@ globalThis.fetch = async (input, init = {}) => {
       })) });
     }
     if (schemaName === "exam_solver_schema") {
+      if (solverUnavailable) return new Response("synthetic solver outage", { status: 503 });
       return outputResponse({ results: activeQuestions.map((q) => ({
         id: q.id, option_verdicts: q.options.map((_, i) => i === q.correct_index),
         index: q.correct_index, confidence: 1, reason: "Syntetiskt kontrollsvar.",
@@ -250,6 +252,24 @@ try {
   });
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
     "a successfully generated exam commits its reserved quota");
+
+  calls.length = 0;
+  solverUnavailable = true;
+  const uncheckedMultipleChoice = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  solverUnavailable = false;
+  assert.equal(uncheckedMultipleChoice.status, 503, JSON.stringify(uncheckedMultipleChoice.body));
+  assert.equal(uncheckedMultipleChoice.body.error, "independent_check_unavailable");
+  assert.match(uncheckedMultipleChoice.body.message, /Inget prov lämnades ut; försök igen/i);
+  const outageUrls = calls.map((call) => call.url);
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+    "the reserved quota is returned after the independent check fails");
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
+    "unchecked multiple-choice questions do not commit quota");
+  assert.equal(outageUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
+    "an exam without an independent answer check is neither persisted nor counted toward mastery");
 
   gradingState = "active";
   const malformedMc = await invoke(gradeExam, {
