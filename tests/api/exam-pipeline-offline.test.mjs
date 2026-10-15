@@ -15,6 +15,7 @@ const userId = "22222222-2222-4222-8222-222222222222";
 const signingSecret = "synthetic-exam-pipeline-signing-secret";
 const calls = [];
 const verifierInputs = [];
+const solverInputs = [];
 
 for (const [key, value] of Object.entries({
   SUPABASE_URL: origin,
@@ -52,7 +53,14 @@ let emptyGenerationResponse = false;
 let generationTextOverride = null;
 let gradingState = "active";
 let solverUnavailable = false;
+let solverUnavailableForRetry = false;
+let verifierUnavailableForRetry = false;
+let solverThrowsForRetry = false;
+let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
+let solverRejectQuestionId = null;
+let regenerationQuestions = null;
+let throwOnRepair = false;
 
 function outputResponse(value) {
   return Response.json({
@@ -111,9 +119,21 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
     const schemaName = body.text?.format?.name;
+    if (schemaName === "mock_exam_schema") {
+      if (throwOnRepair) throw new Error("synthetic repair transport timeout");
+      if (!regenerationQuestions) throw new Error("unexpected synthetic repair request");
+      activeQuestions = regenerationQuestions;
+      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: regenerationQuestions });
+    }
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
       verifierInputs.push(reviewInput);
+      if (verifierThrowsForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
+        throw new Error("synthetic retry verifier timeout");
+      }
+      if (verifierUnavailableForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
+        return new Response("synthetic retry verifier outage", { status: 503 });
+      }
       return outputResponse({ results: reviewInput.questions.map((q) => ({
         id: q.id, approved: q.id !== verifierRejectQuestionId, factual_accuracy: q.id === verifierRejectQuestionId ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
@@ -122,11 +142,26 @@ globalThis.fetch = async (input, init = {}) => {
       })) });
     }
     if (schemaName === "exam_solver_schema") {
-      if (solverUnavailable) return new Response("synthetic solver outage", { status: 503 });
-      return outputResponse({ results: activeQuestions.map((q) => ({
-        id: q.id, option_verdicts: q.options.map((_, i) => i === q.correct_index),
-        index: q.correct_index, confidence: 1, reason: "Syntetiskt kontrollsvar.",
-      })) });
+      const userContent = body.input.find((item) => item.role === "user")?.content || "";
+      const marker = "\n\nFrågor:\n";
+      const questionPayload = userContent.slice(userContent.indexOf(marker) + marker.length);
+      const requestedQuestions = JSON.parse(questionPayload);
+      solverInputs.push(requestedQuestions);
+      if (solverThrowsForRetry && requestedQuestions.some((question) => question.id.startsWith("retry-"))) {
+        throw new Error("synthetic retry solver timeout");
+      }
+      if (solverUnavailable || (solverUnavailableForRetry && requestedQuestions.some((question) => question.id.startsWith("retry-")))) {
+        return new Response("synthetic solver outage", { status: 503 });
+      }
+      return outputResponse({ results: requestedQuestions.map((requested) => {
+        const q = activeQuestions.find((question) => question.id === requested.id);
+        if (!q) return { id: requested.id, option_verdicts: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
+        return {
+        id: q.id, option_verdicts: q.options.map((_, i) => i === (q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index)),
+        index: q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index,
+        confidence: 1, reason: "Syntetiskt kontrollsvar.",
+        };
+      }) });
     }
     throw new Error(`Unexpected synthetic provider schema: ${String(schemaName)}`);
   }
@@ -280,6 +315,134 @@ try {
   });
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
     "a successfully generated exam commits its reserved quota");
+
+  const retryOptions = [["4", "5", "7"], ["1", "3", "5"], ["8", "9", "10"]];
+  const repairedQuestions = questions.map((question, index) => ({
+    ...question,
+    id: `retry-${index + 1}`,
+    question: `Ny formulering: ${question.question}`,
+    options: retryOptions[index],
+    correct_index: 1,
+    model_answer: retryOptions[index][1],
+  }));
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = "q-1";
+  calls.length = 0;
+  solverInputs.length = 0;
+  const repairedMcExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(repairedMcExam.status, 200, JSON.stringify(repairedMcExam.body));
+  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["retry-1", "retry-2", "retry-3"],
+    "a regenerated MC batch replaces the first only after all items pass the verifier and blind solver");
+  assert.equal(repairedMcExam.body.meta.verifier.approved, 3);
+  assert.equal(repairedMcExam.body.meta.solver.checked, 3);
+  assert.deepEqual(solverInputs.at(-1).map(({ id, question, options }) => ({ id, question, options })),
+    repairedQuestions.map(({ id, question, options }) => ({ id, question, options })),
+    "the blind solver receives the actual regenerated IDs, wording and options");
+  for (const item of solverInputs.at(-1)) {
+    assert.deepEqual(Object.keys(item).sort(), ["id", "options", "question"],
+      "every retry solver item contains only the blind-solver input fields");
+  }
+  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.map(({ id }) => id),
+    "the retry verifier receives that same regenerated batch");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+    "at most one bounded whole-exam retry is requested");
+
+  const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
+  activeQuestions = questions;
+  regenerationQuestions = unsafeRetryQuestions;
+  solverRejectQuestionId = "retry-fallback-1";
+  calls.length = 0;
+  const solverRejectedRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(solverRejectedRetry.status, 200, JSON.stringify(solverRejectedRetry.body));
+  assert.deepEqual(solverRejectedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "a retry that does not improve the count falls back only to first-round approved questions");
+  assert.equal(solverRejectedRetry.body.meta.solver.checked, 3,
+    "fallback metadata remains tied to the authoritative first-round solver result");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  solverRejectQuestionId = null;
+  verifierUnavailableForRetry = true;
+  const verifierFailedRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierUnavailableForRetry = false;
+  assert.equal(verifierFailedRetry.status, 200, JSON.stringify(verifierFailedRetry.body));
+  assert.deepEqual(verifierFailedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "retry verifier failure falls back only to the already-approved first-round subset");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  verifierThrowsForRetry = true;
+  const verifierTimeoutRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierThrowsForRetry = false;
+  assert.equal(verifierTimeoutRetry.status, 200, JSON.stringify(verifierTimeoutRetry.body));
+  assert.deepEqual(verifierTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "retry verifier timeout cannot override or erase the safe first-round fallback");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  solverUnavailableForRetry = true;
+  const solverUnavailableRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  solverUnavailableForRetry = false;
+  assert.equal(solverUnavailableRetry.status, 200, JSON.stringify(solverUnavailableRetry.body));
+  assert.deepEqual(solverUnavailableRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "retry solver outage withholds all regenerated MC items and preserves the approved first-round subset");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  solverThrowsForRetry = true;
+  const solverTimeoutRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  solverThrowsForRetry = false;
+  assert.equal(solverTimeoutRetry.status, 200, JSON.stringify(solverTimeoutRetry.body));
+  assert.deepEqual(solverTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "retry solver timeout withholds every unchecked MC item and retains the first-round fallback");
+
+  activeQuestions = questions;
+  regenerationQuestions = [
+    { ...repairedQuestions[0], id: "retry-duplicate" },
+    { ...repairedQuestions[1], id: "retry-duplicate" },
+    { ...repairedQuestions[2], id: "retry-last" },
+  ];
+  solverRejectQuestionId = null;
+  calls.length = 0;
+  const malformedRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(malformedRetry.status, 200, JSON.stringify(malformedRetry.body));
+  assert.deepEqual(malformedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "duplicate retry IDs are rejected before review and cannot displace the safe first-round subset");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  solverRejectQuestionId = null;
+  throwOnRepair = true;
+  calls.length = 0;
+  const timedOutRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(timedOutRetry.status, 200, JSON.stringify(timedOutRetry.body));
+  assert.deepEqual(timedOutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
+    "repair transport failure preserves the already-approved first-round subset");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_solver_schema"), true,
+    "first-round MCs are independently solved before retry starts");
+
+  throwOnRepair = false;
+  verifierRejectQuestionId = null;
+  solverRejectQuestionId = null;
+  regenerationQuestions = null;
+  activeQuestions = questions;
 
   const shortQuestions = Array.from({ length: 5 }, (_, index) => {
     const id = index === 0 ? "short-wrong-example" : `short-${index + 1}`;

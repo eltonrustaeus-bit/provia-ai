@@ -184,7 +184,8 @@ function extractOutputText(data) {
 }
 
 async function verifyQuestions(questions, opts) {
-  const { apiKey, model, subjectProfile, lang, material } = opts || {};
+  const { apiKey, model, subjectProfile, lang, material, timeoutMs } = opts || {};
+  const requestTimeoutMs = Math.max(1_000, Math.min(30_000, Number(timeoutMs) || 30_000));
   const sourceQuestions = Array.isArray(questions) ? questions : [];
   const items = sourceQuestions.map(q => ({
     id: q && typeof q.id === "string" ? q.id : "",
@@ -224,7 +225,7 @@ async function verifyQuestions(questions, opts) {
         ],
         text: { format: buildVerifierSchema() }
       }),
-      signal: AbortSignal.timeout(30_000)
+      signal: AbortSignal.timeout(requestTimeoutMs)
     });
     if (!r.ok) return failed;
     const raw = await r.text();

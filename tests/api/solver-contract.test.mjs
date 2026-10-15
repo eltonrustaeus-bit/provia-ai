@@ -86,6 +86,22 @@ try {
     assert.equal(outcome.model, "measured-solver-model", name);
     assert.deepEqual(outcome.usage, { input_tokens: 44, output_tokens: 9 }, name);
   }
+  let solverTimeoutSignal = null;
+  const solverTimeoutKeeper = setTimeout(() => {}, 1_100);
+  globalThis.fetch = async (_input, init = {}) => {
+    solverTimeoutSignal = init.signal;
+    return new Promise((_, reject) => {
+      const abort = () => reject(init.signal.reason || new Error("synthetic solver timeout"));
+      if (init.signal.aborted) abort();
+      else init.signal.addEventListener("abort", abort, { once: true });
+    });
+  };
+  const timedOut = await solver.solveQuestions([questions[0]], {
+    apiKey: "test-only", model: "test-model", lang: "en", material: "test", timeoutMs: 1_000,
+  });
+  assert.equal(timedOut.callOk, false, "an actually expired retry solver signal fails closed");
+  assert.equal(solverTimeoutSignal.aborted, true, "the bounded solver request is aborted at its timeout");
+  clearTimeout(solverTimeoutKeeper);
 } finally {
   globalThis.fetch = originalFetch;
 }

@@ -7,10 +7,14 @@ const { verifyQuestions, buildVerifierPrompt, decideApproval } = require("../../
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "") {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs) {
   const originalFetch = globalThis.fetch;
+  const originalAbortTimeout = AbortSignal.timeout;
+  const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
   let fetchCalls = 0;
   let requestBody = null;
+  let requestTimeoutMs = null;
+  AbortSignal.timeout = (ms) => { requestTimeoutMs = ms; return boundAbortTimeout(ms); };
   globalThis.fetch = async (_input, init = {}) => {
     fetchCalls++;
     requestBody = JSON.parse(init.body || "{}");
@@ -21,9 +25,10 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material }), fetchCalls, requestBody };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
+    AbortSignal.timeout = originalAbortTimeout;
   }
 }
 
@@ -33,6 +38,33 @@ assert.equal(valid.outcome.perQuestion.size, 2);
 assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
 assert.equal(valid.outcome.model, "measured-review-model");
 assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
+assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upper timeout");
+const boundedReview = await runWithResults([result("q1", true)], [question("q1")], "", 6_500);
+assert.equal(boundedReview.requestTimeoutMs, 6_500, "retry can bound the reviewer to the remaining function budget");
+const cappedReview = await runWithResults([result("q1", true)], [question("q1")], "", 60_000);
+assert.equal(cappedReview.requestTimeoutMs, 30_000, "caller timeouts cannot extend the review beyond its existing ceiling");
+
+const originalTimeoutFetch = globalThis.fetch;
+let verifierTimeoutSignal = null;
+globalThis.fetch = async (_input, init = {}) => {
+  verifierTimeoutSignal = init.signal;
+  return new Promise((_, reject) => {
+    const abort = () => reject(init.signal.reason || new Error("synthetic verifier timeout"));
+    if (init.signal.aborted) abort();
+    else init.signal.addEventListener("abort", abort, { once: true });
+  });
+};
+const verifierTimeoutKeeper = setTimeout(() => {}, 1_100);
+try {
+  const timedOutReview = await verifyQuestions([question("timeout")], {
+    apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
+  });
+  assert.equal(timedOutReview.callOk, false, "an actually expired retry reviewer signal fails closed");
+  assert.equal(verifierTimeoutSignal.aborted, true, "the bounded verifier request is aborted at its timeout");
+} finally {
+  clearTimeout(verifierTimeoutKeeper);
+  globalThis.fetch = originalTimeoutFetch;
+}
 
 for (const results of [
   [result("q1", false), result("q1", true)],

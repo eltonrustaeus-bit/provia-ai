@@ -43,8 +43,12 @@ assert.match(gradeApi, /answerChars > 24000/, "AI grading has a total student-an
 assert.match(generatorApi, /correct_index, model_answer, rubric, scoring_rubric, accepted_answers/, "answer keys and grading rubrics are stripped from browser payloads");
 assert.match(generatorApi, /bytes > 64 \* 1024/, "exam generation request is capped while streaming");
 assert.match(generatorApi, /error: "quality_review_unavailable"/, "ordinary exams are not delivered when review is unavailable");
-assert.match(generatorApi, /qType !== "graph" && !hasMultipleChoice/, "regeneration stays limited to non-graph exams without MC solver obligations");
-assert.match(generatorApi, /budget\.remaining\(\) - VERIFIER_RESERVE_MS/, "regeneration preserves the full verifier time budget");
+assert.match(generatorApi, /qType !== "graph"\s*&&\s*regenerationTimeoutMs !== null/, "regeneration stays limited to supported non-graph exams with enough time");
+assert.match(generatorApi, /REGENERATION_REVIEW_TIMEOUT_MS = 15_000/, "the optional retry review has a bounded timeout");
+assert.match(generatorApi, /REGENERATION_POST_REVIEW_RESERVE_MS = 14_000/, "regeneration reserves time for issue, quota and usage finalization");
+assert.match(generatorApi, /solver\.solveQuestions\(candidateQuestions/, "regenerated MC items receive a fresh independent blind-solver check");
+assert.match(generatorApi, /kept\.length > round1ApprovedQuestions\.length/, "a retry replaces the first batch only when it yields more fully approved questions");
+assert.match(generatorApi, /verifier\.verifyQuestions\(candidateQuestions,[\s\S]*?timeoutMs:/, "retry verification receives the remaining bounded timeout");
 assert.match(generatorApi, /keep: false, reason: "solver_unavailable"/, "multiple-choice items fail closed when the independent solver is unavailable");
 assert.match(ocrApi, /p_bucket: "ocr:" \+ user\.id/, "OCR calls are rate limited per account");
 assert.match(ocrApi, /received > MAX_BODY_BYTES/, "OCR body size is enforced while streaming");

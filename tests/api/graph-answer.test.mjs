@@ -198,8 +198,10 @@ assert.match(gradeSource, /const awardedPoints = Math\.min\(maxP, graded\.points
   "the same capped graph score feeds both the question row and exam total");
 const source = require("node:fs").readFileSync(new URL("../../api/generate-exam.js", import.meta.url), "utf8");
 assert.match(source, /clientQuestion\.grade_task = gradeTasks\.sealQuestion\(q, undefined, gradeTasks\.hashContext\(pastedText, course, user\.id\)\)/);
-assert.match(source, /const canRegenerate = qType !== "graph" && !hasMultipleChoice\s*&& budget\.remaining\(\) > MIN_GENERATION_MS \+ VERIFIER_RESERVE_MS/,
-  "graph tasks and unchecked multiple-choice batches cannot enter the second-generation path");
+assert.match(source, /const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null/,
+  "graph tasks stay outside bounded retry until graph-specific retry coverage exists");
+assert.match(source, /solver\.solveQuestions\(candidateQuestions/,
+  "any regenerated multiple-choice batch receives a fresh independent solver check");
 assert.match(source, /correct_index, model_answer, rubric, scoring_rubric, accepted_answers/);
 assert.match(gradeSource, /gradeTasks\.openQuestion\(submitted, submitted\?\.grade_task, undefined, contextHash\)/);
 assert.match(gradeSource, /consume_anon_rate/);

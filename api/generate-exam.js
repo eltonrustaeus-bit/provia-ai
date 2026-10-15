@@ -76,6 +76,135 @@ function keepQuestionsWithValidIds(questions) {
   });
 }
 
+function normalizeGeneratedExam(exam, {
+  qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions, truncated = false,
+}) {
+  if (!Array.isArray(exam?.questions) || exam.questions.length === 0) {
+    return { failure: { status: 500, payload: { ok: false, error: "Schema mismatch", exam } } };
+  }
+  if (truncated) {
+    exam.questions = keepQuestionsWithValidIds(exam.questions);
+  } else if (!normalizeUniqueQuestionIds(exam.questions)) {
+    return { failure: { status: 500, payload: {
+      ok: false,
+      error: "GENERATION_QUESTION_IDS_INVALID",
+      message: "Provet kunde inte färdigställas. Försök igen.",
+    } } };
+  }
+  if (exam.questions.length === 0) {
+    return { failure: { status: 500, payload: {
+      ok: false,
+      error: "GENERATION_QUESTION_IDS_INVALID",
+      message: "Provet kunde inte färdigställas. Försök igen.",
+    } } };
+  }
+  if (!truncated && exam.questions.length !== numQuestions) {
+    return { failure: { status: 500, payload: { ok: false, error: "Schema mismatch", exam } } };
+  }
+
+  const reject = (reason, detail = {}) => truncated ? null : { reason, detail };
+  const keptQuestions = [];
+  for (const q of exam.questions) {
+    if (qType === "graph" && q?.type !== "graph") {
+      const failure = reject("GRAPH_GENERATION_REJECTED", {
+        message: lang === "en"
+          ? "The requested graph task could not be created. Please try again with supported graph material."
+          : "Den efterfrågade grafuppgiften kunde inte skapas. Försök igen med material som stöds för grafer."
+      });
+      if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+      continue;
+    }
+    if (q?.type !== "mc" && q?.type !== "short" && q?.type !== "graph") {
+      const failure = reject("Invalid question type returned", { got: q?.type });
+      if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+      continue;
+    }
+
+    if (q.type === "short") {
+      if (!Array.isArray(q.options)) q.options = [];
+      q.options = [];
+      q.correct_index = -1;
+      if (!q.scoring_rubric || !Array.isArray(q.scoring_rubric.parts)) {
+        const failure = reject("Missing scoring_rubric on short question", { question: q });
+        if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+        continue;
+      }
+    } else if (q.type === "graph") {
+      const graphSpecValid = graphMode === "scatter"
+        ? Boolean(pointTable)
+        : isMath && graphAnswers.isValidSpec(q.graph_spec) && graphAnswers.sourceContainsSpec(pastedText, q.graph_spec);
+      if (qType !== "graph" || !graphSpecValid) {
+        const failure = reject("GRAPH_GENERATION_REJECTED", {
+          message: lang === "en"
+            ? "The graph task could not be created from the supported data in your material. Check the graph requirements and try again."
+            : "Grafuppgiften kunde inte skapas utifrån de data som stöds i materialet. Kontrollera grafkraven och försök igen."
+        });
+        if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+        continue;
+      }
+      q.options = [];
+      q.correct_index = -1;
+      if (graphMode === "scatter") {
+        q.graph_spec = { kind: "scatter", slope: null, intercept: null, ...pointTable };
+        q.points = graphAnswers.SCATTER_POINT_COUNT;
+        q.rubric = lang === "en" ? "One point for each correctly plotted data point." : "En poäng för varje korrekt placerad datapunkt.";
+        q.scoring_rubric = {
+          parts: pointTable.points.map((_, index) => ({ description: `${lang === "en" ? "Data point" : "Datapunkt"} ${index + 1}`, points: 1 })),
+          full_score_requirements: lang === "en"
+            ? "All three data points match the exact coordinates in the table."
+            : "Alla tre datapunkter är placerade på tabellens exakta koordinater.",
+          partial_credit_notes: lang === "en"
+            ? "Award one point per correctly plotted data point; misplaced or duplicate points earn no point."
+            : "Ge en poäng per korrekt datapunkt; felplacerade och dubblerade punkter ger ingen poäng."
+        };
+      } else {
+        q.graph_spec = { kind: "line", slope: q.graph_spec.slope, intercept: q.graph_spec.intercept, points: [], x_label: "", y_label: "" };
+        q.points = 2;
+        q.rubric = lang === "en" ? "1 point for the correct slope and 1 point for the correct y-intercept." : "1 p för rätt lutning och 1 p för rätt skärning med y-axeln.";
+        q.scoring_rubric = {
+          parts: [
+            { description: lang === "en" ? "Slope" : "Lutning", points: 1 },
+            { description: lang === "en" ? "Y-intercept" : "Skärning med y-axeln", points: 1 }
+          ],
+          full_score_requirements: lang === "en"
+            ? "The graph has the correct slope and crosses the y-axis at the correct value."
+            : "Grafen har rätt lutning och skär y-axeln vid rätt värde.",
+          partial_credit_notes: lang === "en"
+            ? "Award one point each for the correct slope and y-intercept."
+            : "Ge en poäng för vardera korrekt lutning och korrekt skärning med y-axeln."
+        };
+      }
+      q.graph_ui = graphAnswers.displaySpec(q.graph_spec);
+      q.question = graphAnswers.questionText(q.graph_spec, lang);
+      q.model_answer = graphAnswers.modelAnswer(q.graph_spec, lang);
+    } else {
+      if (!Array.isArray(q.options) || q.options.length < 3) {
+        const failure = reject("MC options invalid", { question: q });
+        if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+        continue;
+      }
+      if (!Number.isInteger(q.correct_index) || q.correct_index < 0 || q.correct_index >= q.options.length) {
+        const failure = reject("MC correct_index invalid", { question: q });
+        if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
+        continue;
+      }
+    }
+    if (q.type !== "graph") q.graph_spec = null;
+    q.source_references = filterSourceReferences(pastedText, q.source_references);
+    keptQuestions.push(q);
+  }
+  if (keptQuestions.length === 0) {
+    return { failure: { status: 504, payload: {
+      ok: false,
+      error: "Provet hann inte genereras",
+      message: "Generatorn hann inte färdigt inom tidsgränsen. Försök igen, gärna med färre frågor.",
+      requested: numQuestions,
+    } } };
+  }
+  exam.questions = keptQuestions;
+  return { exam };
+}
+
 function asEnum(x, allowed, fallback) {
   return allowed.includes(x) ? x : fallback;
 }
@@ -467,6 +596,14 @@ const RESPONSE_RESERVE_MS = 3_000;      // serialising and returning the respons
 const VERIFIER_RESERVE_MS = 30_000;
 const MIN_VERIFIER_MS = 8_000;          // below this, skip verification entirely
 const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
+const REGENERATION_REVIEW_TIMEOUT_MS = 15_000; // optional retry; timeout safely falls back to round 1
+const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
+
+function regenerationGenerationTimeout(remainingMs) {
+  const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + REGENERATION_POST_REVIEW_RESERVE_MS;
+  if (remainingMs <= MIN_GENERATION_MS + verificationAndFinalization) return null;
+  return remainingMs - verificationAndFinalization;
+}
 
 function makeBudget(startedAt) {
   const deadline = startedAt + FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS;
@@ -1010,138 +1147,14 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (!Array.isArray(exam.questions) || exam.questions.length === 0) {
-      return fail(500, { ok: false, error: "Schema mismatch", exam });
+    const normalizedInitial = normalizeGeneratedExam(exam, {
+      qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions, truncated,
+    });
+    if (normalizedInitial.failure) {
+      if (normalizedInitial.failure.status === 504) normalizedInitial.failure.payload.elapsedMs = budget.elapsed();
+      return fail(normalizedInitial.failure.status, normalizedInitial.failure.payload);
     }
-    if (truncated) {
-      exam.questions = keepQuestionsWithValidIds(exam.questions);
-    } else if (!normalizeUniqueQuestionIds(exam.questions)) {
-      return fail(500, {
-        ok: false,
-        error: "GENERATION_QUESTION_IDS_INVALID",
-        message: "Provet kunde inte färdigställas. Försök igen.",
-      });
-    }
-    if (exam.questions.length === 0) {
-      return fail(500, {
-        ok: false,
-        error: "GENERATION_QUESTION_IDS_INVALID",
-        message: "Provet kunde inte färdigställas. Försök igen.",
-      });
-    }
-    // A complete response must still match the requested count exactly; a
-    // salvaged one is short by construction and that is the point.
-    if (!truncated && exam.questions.length !== numQuestions) {
-      return fail(500, { ok: false, error: "Schema mismatch", exam });
-    }
-
-    // Server-side guard: inga essay + fixa short-regler.
-    // On a complete response a malformed question is a contract violation and
-    // still fails loudly. On a salvaged one the tail is expected to be ragged,
-    // so bad questions are dropped rather than discarding the whole exam.
-    const guardFail = (reason, detail) => truncated
-      ? null
-      : fail(500, { ok: false, error: reason, ...detail });
-    const keptQuestions = [];
-    for (const q of exam.questions) {
-      if (qType === "graph" && q?.type !== "graph") {
-        const bail = guardFail("GRAPH_GENERATION_REJECTED", {
-          message: lang === "en"
-            ? "The requested graph task could not be created. Please try again with supported graph material."
-            : "Den efterfrågade grafuppgiften kunde inte skapas. Försök igen med material som stöds för grafer."
-        });
-        if (bail) return bail;
-        continue;
-      }
-      if (q?.type !== "mc" && q?.type !== "short" && q?.type !== "graph") {
-        const bail = guardFail("Invalid question type returned", { got: q?.type });
-        if (bail) return bail;
-        continue;
-      }
-
-      if (q.type === "short") {
-        if (!Array.isArray(q.options)) q.options = [];
-        q.options = [];
-        q.correct_index = -1;
-        if (!q.scoring_rubric || !Array.isArray(q.scoring_rubric.parts)) {
-          const bail = guardFail("Missing scoring_rubric on short question", { question: q });
-          if (bail) return bail;
-          continue;
-        }
-      } else if (q.type === "graph") {
-        const graphSpecValid = graphMode === "scatter"
-          ? Boolean(pointTable)
-          : isMath && graphAnswers.isValidSpec(q.graph_spec) && graphAnswers.sourceContainsSpec(pastedText, q.graph_spec);
-        if (qType !== "graph" || !graphSpecValid) {
-          const bail = guardFail("GRAPH_GENERATION_REJECTED", {
-            message: lang === "en"
-              ? "The graph task could not be created from the supported data in your material. Check the graph requirements and try again."
-              : "Grafuppgiften kunde inte skapas utifrån de data som stöds i materialet. Kontrollera grafkraven och försök igen."
-          });
-          if (bail) return bail;
-          continue;
-        }
-        q.options = [];
-        q.correct_index = -1;
-        if (graphMode === "scatter") {
-          q.graph_spec = { kind: "scatter", slope: null, intercept: null, ...pointTable };
-          q.points = graphAnswers.SCATTER_POINT_COUNT;
-          q.rubric = lang === "en" ? "One point for each correctly plotted data point." : "En poäng för varje korrekt placerad datapunkt.";
-          q.scoring_rubric = {
-            parts: pointTable.points.map((_, index) => ({ description: `${lang === "en" ? "Data point" : "Datapunkt"} ${index + 1}`, points: 1 })),
-            full_score_requirements: lang === "en"
-              ? "All three data points match the exact coordinates in the table."
-              : "Alla tre datapunkter är placerade på tabellens exakta koordinater.",
-            partial_credit_notes: lang === "en"
-              ? "Award one point per correctly plotted data point; misplaced or duplicate points earn no point."
-              : "Ge en poäng per korrekt datapunkt; felplacerade och dubblerade punkter ger ingen poäng."
-          };
-        } else {
-          q.graph_spec = { kind: "line", slope: q.graph_spec.slope, intercept: q.graph_spec.intercept, points: [], x_label: "", y_label: "" };
-          q.points = 2;
-          q.rubric = lang === "en" ? "1 point for the correct slope and 1 point for the correct y-intercept." : "1 p för rätt lutning och 1 p för rätt skärning med y-axeln.";
-          q.scoring_rubric = {
-            parts: [
-              { description: lang === "en" ? "Slope" : "Lutning", points: 1 },
-              { description: lang === "en" ? "Y-intercept" : "Skärning med y-axeln", points: 1 }
-            ],
-            full_score_requirements: lang === "en"
-              ? "The graph has the correct slope and crosses the y-axis at the correct value."
-              : "Grafen har rätt lutning och skär y-axeln vid rätt värde.",
-            partial_credit_notes: lang === "en"
-              ? "Award one point each for the correct slope and y-intercept."
-              : "Ge en poäng för vardera korrekt lutning och korrekt skärning med y-axeln."
-          };
-        }
-        q.graph_ui = graphAnswers.displaySpec(q.graph_spec);
-        q.question = graphAnswers.questionText(q.graph_spec, lang);
-        q.model_answer = graphAnswers.modelAnswer(q.graph_spec, lang);
-      } else {
-        if (!Array.isArray(q.options) || q.options.length < 3) {
-          const bail = guardFail("MC options invalid", { question: q });
-          if (bail) return bail;
-          continue;
-        }
-        if (!Number.isInteger(q.correct_index) || q.correct_index < 0 || q.correct_index >= q.options.length) {
-          const bail = guardFail("MC correct_index invalid", { question: q });
-          if (bail) return bail;
-          continue;
-        }
-      }
-      if (q.type !== "graph") q.graph_spec = null;
-      q.source_references = filterSourceReferences(pastedText, q.source_references);
-      keptQuestions.push(q);
-    }
-    exam.questions = keptQuestions;
-    if (exam.questions.length === 0) {
-      return fail(504, {
-        ok: false,
-        error: "Provet hann inte genereras",
-        message: "Generatorn hann inte färdigt inom tidsgränsen. Försök igen, gärna med färre frågor.",
-        elapsedMs: budget.elapsed(),
-        requested: numQuestions,
-      });
-    }
+    exam = normalizedInitial.exam;
 
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
     let gate = assessment.gateExam(exam, { profile: subjectProfile });
@@ -1224,84 +1237,97 @@ module.exports = async function handler(req, res) {
         // never loop, never regenerate per-question (cost + spec §13 says no
         // unbounded regeneration loops).
         //
-        // The regeneration round needs a full generation AND a second
-        // verification. Starting it without that much budget left was the one
-        // path that guaranteed a platform timeout: a 45 s call begun at t=50 s
-        // inside a 60 s function could not finish, and the student got a 504
-        // instead of the round-1 questions that were already verified and ready
-        // to ship.
-        // A regenerated graph batch currently bypasses the first-pass canonical
-        // source/spec normalization. Keep graph tasks on the validated round-1
-        // path until both rounds share that normalization contract.
-        const hasMultipleChoice = exam.questions.some((q) => q.type === "mc");
-        const canRegenerate = qType !== "graph" && !hasMultipleChoice
-          && budget.remaining() > MIN_GENERATION_MS + VERIFIER_RESERVE_MS;
+        // A regenerated graph batch remains excluded until the graph-specific
+        // cross-round fixture is covered. Ordinary and MC batches share the
+        // same server normalization, gate, verifier and (for MC) blind solver.
+        const regenerationTimeoutMs = regenerationGenerationTimeout(budget.remaining());
+        const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null;
         if (rejectedIds.length > 0 && rejectedIds.length / exam.questions.length > 0.3 && canRegenerate) {
-          // Round-1 structurally-gated questions, kept aside so that if
-          // regeneration fails for any reason we can still fall back to just
-          // the subset that DID pass verification — never ship a question the
-          // verifier explicitly rejected merely because regeneration failed.
           const originalGatedQuestions = exam.questions;
-          // Snapshot round-1's structural gate result so the fallback path
-          // (regeneration attempted but round-2 verifier call fails, or
-          // regeneration fails outright) can restore it alongside
-          // exam.questions/activeVerifierMap — otherwise gate would keep
-          // describing round-2's regenerated exam even though round-1
-          // questions are what actually ships.
+          const round1ApprovedQuestions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
           const round1Gate = gate;
           let regenerationSucceeded = false;
           const regenStartedAt = Date.now();
-          const r2 = await fetch("https://api.openai.com/v1/responses", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            // Preserve the full verifier reserve. The verifier itself may use
-            // up to 30 seconds; leaving only MIN_VERIFIER_MS here can turn a
-            // successful repair into a platform timeout before we can return
-            // the already-approved round-1 subset.
-            signal: AbortSignal.timeout(Math.max(0, budget.remaining() - VERIFIER_RESERVE_MS))
-          });
-          const raw2 = await r2.text();
-          let data2; try { data2 = JSON.parse(raw2); } catch { data2 = null; }
-          recordUsage("repair", data2?.model || model, data2?.usage, Date.now() - regenStartedAt);
-          if (r2.ok && data2) {
-            const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
-            let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
-            if (exam2 && Array.isArray(exam2.questions) && exam2.questions.length === numQuestions
-              && normalizeUniqueQuestionIds(exam2.questions)) {
-              gate = assessment.gateExam(exam2, { profile: subjectProfile });
-              const regatedQuestions = gate.questions;
-              if (regatedQuestions.length > 0) {
-                const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang, material: pastedText });
-                recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
-                if (v2.callOk) {
+          let data2 = null;
+          try {
+            const r2 = await fetch("https://api.openai.com/v1/responses", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              // Preserve time for independent review plus delivery finalization.
+              signal: AbortSignal.timeout(regenerationTimeoutMs)
+            });
+            const raw2 = await r2.text();
+            try { data2 = JSON.parse(raw2); } catch { data2 = null; }
+            if (r2.ok && data2) {
+              const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
+              let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
+              const normalized2 = exam2 && normalizeGeneratedExam(exam2, {
+                qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions, truncated: false,
+              });
+              if (normalized2?.exam) {
+                const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile });
+                const candidateQuestions = candidateGate.questions;
+                if (candidateQuestions.length > 0) {
+                  const [v2, s2] = await Promise.all([
+                    verifier.verifyQuestions(candidateQuestions, {
+                      apiKey, model, subjectProfile, lang, material: pastedText,
+                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
+                    }),
+                    solver.solveQuestions(candidateQuestions, {
+                      apiKey, model, subjectProfile, lang, material: pastedText,
+                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
+                    }),
+                  ]);
+                  recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
+                  recordUsage("verify_blind", s2.model, s2.usage, s2.latencyMs);
                   const kept = [];
-                  const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: true };
-                  for (const q of regatedQuestions) {
-                    const vres = v2.perQuestion.get(String(q.id));
-                    outcome2.checked++;
-                    if (vres && verifier.decideApproval(vres)) { kept.push(q); outcome2.approved++; }
-                    else outcome2.rejected++;
-                  }
-                  if (kept.length > 0) {
-                    exam.questions = kept;
-                    activeVerifierMap = v2.perQuestion;
-                    verifierOutcome = outcome2;
-                    regenerationSucceeded = true;
+                  const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: v2.callOk };
+                  const solverOutcome2 = { checked: 0, rejected: 0, callOk: s2.callOk, model: s2.model, reasons: {} };
+                  if (v2.callOk) {
+                    for (const q of candidateQuestions) {
+                      const vres = v2.perQuestion.get(String(q.id));
+                      const verifierOk = !!(vres && verifier.decideApproval(vres));
+                      let solverOk = q.type !== "mc";
+                      if (q.type === "mc") {
+                        const decision = s2.callOk
+                          ? solver.decideKeep(s2.perQuestion.get(String(q.id)), q)
+                          : { keep: false, reason: "solver_unavailable" };
+                        solverOk = decision.keep;
+                        solverOutcome2.checked++;
+                        if (!decision.keep) {
+                          solverOutcome2.rejected++;
+                          solverOutcome2.reasons[decision.reason] = (solverOutcome2.reasons[decision.reason] || 0) + 1;
+                          q.detected_issues = [...(q.detected_issues || []), decision.reason];
+                        }
+                      }
+                      outcome2.checked++;
+                      if (verifierOk && solverOk) { kept.push(q); outcome2.approved++; }
+                      else outcome2.rejected++;
+                    }
+                    if (kept.length > round1ApprovedQuestions.length) {
+                      exam = { ...normalized2.exam, questions: kept };
+                      gate = candidateGate;
+                      activeVerifierMap = v2.perQuestion;
+                      verifierOutcome = outcome2;
+                      solverOutcome = solverOutcome2;
+                      regenerationSucceeded = true;
+                    }
                   }
                 }
               }
             }
+          } catch {
+            // A bounded repair is optional. Preserve the already-reviewed
+            // round-1 subset if generation or either independent check fails.
+          } finally {
+            recordUsage("repair", data2?.model || model, data2?.usage, Date.now() - regenStartedAt);
           }
           if (!regenerationSucceeded) {
-            // Regeneration failed outright (network/parse/shape) or produced
-            // zero verified-approved questions after re-gating/re-verifying —
-            // fall back to the round-1 approved subset instead of shipping the
-            // original, unfiltered (still verifier-rejected) batch.
-            exam.questions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
+            // Never restore a question explicitly rejected in round 1.
+            exam.questions = round1ApprovedQuestions;
             activeVerifierMap = v1.perQuestion;
             gate = round1Gate;
-            // verifierOutcome already holds round-1 checked/approved/rejected counts.
           }
         } else {
           exam.questions = exam.questions.filter(q => approvedIds.has(String(q.id)));
@@ -1473,6 +1499,7 @@ module.exports.buildMockExamSchema = buildMockExamSchema;
 module.exports.looksLikeMath = looksLikeMath;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested
+module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
 module.exports.streamGeneration = streamGeneration; // transport — exercised by the eval
 module.exports.refundMockExamQuota = refundMockExamQuota;
 module.exports.commitMockExamQuota = commitMockExamQuota;
