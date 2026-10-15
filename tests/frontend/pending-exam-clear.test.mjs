@@ -181,6 +181,43 @@ try {
   assert.equal(appNoSessionRemoteDelete, false, "app missing-session clear never calls remote deletion");
   assert.equal(appNoSessionState.owner, "u2");
   assert.equal(appNoSessionState.history?.[0]?.course, "Fysik", "app missing-session clear preserves owned local history");
+
+  const coachPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await mockApis(coachPage, { extra: [["**/api/check-role", async (route) => {
+    const body = route.request().postDataJSON() || {};
+    if (body.action === "delete_exams") {
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    await route.fulfill({ json: { ok: true, allow: true, role: "premium", approved: true } });
+  }]] });
+  await seed(coachPage, { storage: {
+    [AUTH_KEY]: JSON.stringify({
+      access_token: "token-account-a", refresh_token: "refresh-a", expires_in: 7200,
+      expires_at: Math.floor(Date.now() / 1000) + 7200, token_type: "bearer",
+      user: { id: "u1", email: "a@example.test" },
+    }),
+    "proviaai_pending_exams:u1": [{ local_id: "coach-pending-1", user_id: "u1" }],
+    "proviaai_pending_exams:u2": [{ local_id: "coach-pending-2", user_id: "u2" }],
+    exgen_local_data_owner: "u1",
+  } });
+  await coachPage.goto(`${server.url}/förbättring.html`, { waitUntil: "networkidle" });
+  await coachPage.waitForSelector("#resetBtn", { state: "attached" });
+  await coachPage.evaluate(() => localStorage.setItem("proviaai_last_material", "synthetic saved study material"));
+  await coachPage.getByRole("button", { name: "Meny" }).click();
+  let coachAlert = "";
+  coachPage.on("dialog", async (dialog) => { coachAlert = dialog.message(); await dialog.accept(); });
+  await coachPage.locator("#resetBtn").click({ force: true });
+  await coachPage.waitForFunction(() => localStorage.getItem("proviaai_last_material") === null);
+  const coachState = await coachPage.evaluate(() => ({
+    material: localStorage.getItem("proviaai_last_material"),
+    pendingA: localStorage.getItem("proviaai_pending_exams:u1"),
+    pendingB: localStorage.getItem("proviaai_pending_exams:u2"),
+  }));
+  assert.match(coachAlert, /Provposter och resultatsammanfattningar är rensade/);
+  assert.equal(coachState.material, null, "coach clear removes locally saved study material");
+  assert.equal(coachState.pendingA, null, "coach clear removes this account's pending exam queue");
+  assert.ok(coachState.pendingB, "coach clear preserves another account's pending exam queue");
 } finally {
   await browser.close();
   await server.close();

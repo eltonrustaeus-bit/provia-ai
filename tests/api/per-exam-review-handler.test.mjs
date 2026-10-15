@@ -774,7 +774,7 @@ test("verified completed exams route each answer type's signed answer to post-gr
 
   for (const entry of cases) {
     const gradedQuestion = {
-      id: entry.id, type: entry.type, points: 2,
+      id: entry.id, type: entry.type, points: entry.graph_spec?.kind === "scatter" ? 3 : 2,
       question: `Förklara ${entry.id} och visa resonemanget.`,
       options: entry.options || [],
       ...(entry.correct_index === undefined ? {} : { correct_index: entry.correct_index }),
@@ -791,7 +791,7 @@ test("verified completed exams route each answer type's signed answer to post-gr
     const reviewFeedback = `${entry.id}_SAVED_FEEDBACK_MARKER: compare this attempt to the signed rubric.`;
     const examProof = createReviewProof(
       [signedQuestion], entry.id, [{ id: entry.id, answer: reviewAnswer }],
-      [{ id: entry.id, points: 1, max_points: 2, feedback: reviewFeedback }]
+      [{ id: entry.id, points: 1, max_points: gradedQuestion.points, feedback: reviewFeedback }]
     );
     const submissionId = completion.submissionId(userId, course, [signedQuestion]);
     providerAnswer = entry.expected;

@@ -1576,7 +1576,7 @@
               : 'Kontot byttes. Kontodata kunde inte bekräftas raderad; delad lokal data lämnades orörd.');
           return;
         }
-        [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
+        [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
          LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
         renderAll();
         btn.removeAttribute('disabled');
