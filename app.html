@@ -827,6 +827,7 @@ sv:{
   brandTag:"Studieplattform för skolan",
   authGateEyebrow:"Mockprov",authGateTitle:"Ditt studiematerial börjar här.",
   authGateText:"Logga in för att skapa ett prov av ditt material och fortsätta där du slutade.",
+  authPilotGateText:"Endast elever med ett inbjudet skolpilotkonto kan logga in här. Använd kontot du fått. Saknar du inloggningsuppgifter? Be personen som bjöd in dig om hjälp.",
   authGateAction:"Skapa konto",authGateLogin:"Logga in",
   authPendingEyebrow:"Kontot väntar",authPendingTitle:"Ditt konto väntar på godkännande.",
   authPendingText:"Du kan inte skapa prov ännu. Kontakta den som bjöd in dig om du behöver hjälp.",
@@ -872,6 +873,7 @@ en:{
   brandTag:"A study platform for school",
   authGateEyebrow:"Practice exam",authGateTitle:"Start with your study material.",
   authGateText:"Sign in to create an exam from your material and pick up where you left off.",
+  authPilotGateText:"Only students invited to the school pilot can sign in here. Use the account you were given. Need help with your sign-in details? Contact the person who invited you.",
   authGateAction:"Create an account",authGateLogin:"Sign in",
   authPendingEyebrow:"Account pending",authPendingTitle:"Your account is awaiting approval.",
   authPendingText:"You cannot create exams yet. Contact the person who invited you if you need help.",
@@ -1502,7 +1504,7 @@ function renderAuthGate(){
   const pilot=window.ExGenRuntime?.environment==="pilot";
   $("authGateEyebrow").textContent=t[prefix+"Eyebrow"];
   $("authGateTitle").textContent=t[prefix+"Title"];
-  $("authGateText").textContent=t[prefix+"Text"];
+  $("authGateText").textContent=pilot&&!accountPendingApproval?t.authPilotGateText:t[prefix+"Text"];
   $("authGateAction").textContent=accountPendingApproval?t.authPendingAction:pilot?t.authGateLogin:t.authGateAction;
   const login=$("authGateLogin");if(login){login.textContent=t.authGateLogin;login.hidden=accountPendingApproval||pilot;}
 }

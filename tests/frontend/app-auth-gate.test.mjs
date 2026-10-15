@@ -61,14 +61,39 @@ try {
   await englishVisitor.close();
 
   const pilotVisitor = await openPage(browser, `${server.url}/app.html`, {
+    width: 390,
+    height: 800,
     state: { signedIn: false, role: null },
     mocks: { allow: true, runtime: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});` },
   });
   assert.equal(await pilotVisitor.page.locator("#authGateAction").innerText(), "Logga in");
   assert.equal(await pilotVisitor.page.locator("#authGateLogin").isVisible(), false, "pilot visitor sees one sign-in action");
+  assert.match(await pilotVisitor.page.locator("#authGateText").innerText(), /Endast elever med ett inbjudet skolpilotkonto.*Be personen som bjöd in dig om hjälp/i);
+  const pilotGateLayout = await pilotVisitor.page.evaluate(() => {
+    const text = document.getElementById("authGateText");
+    const actions = document.getElementById("authGateActions");
+    const textRect = text.getBoundingClientRect();
+    const actionRect = actions.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      textRight: textRect.right,
+      textBottom: textRect.bottom,
+      actionsTop: actionRect.top,
+      clipped: text.scrollWidth > text.clientWidth || text.scrollHeight > text.clientHeight,
+    };
+  });
+  assert.ok(pilotGateLayout.textRight <= pilotGateLayout.viewport + 1 && pilotGateLayout.textBottom <= pilotGateLayout.actionsTop && !pilotGateLayout.clipped,
+    `pilot guidance fits mobile without clipping/overlap: ${JSON.stringify(pilotGateLayout)}`);
   await pilotVisitor.page.locator("#authGateAction").click();
   await pilotVisitor.page.getByRole("dialog", { name: "Logga in" }).waitFor();
   await pilotVisitor.close();
+
+  const englishPilotVisitor = await openPage(browser, `${server.url}/app.html`, {
+    state: { signedIn: false, role: null, lang: "en" },
+    mocks: { allow: true, runtime: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});` },
+  });
+  assert.match(await englishPilotVisitor.page.locator("#authGateText").innerText(), /Only students invited to the school pilot can sign in here.*Contact the person who invited you/i);
+  await englishPilotVisitor.close();
 
   const approved = await openPage(browser, `${server.url}/app.html`, {
     state: { signedIn: true, role: "gratis" },
