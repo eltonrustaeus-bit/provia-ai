@@ -270,7 +270,7 @@ try {
   await page.getByRole("button", { name: "Lämna in" }).click();
   await page.waitForSelector("#xf .xf-screen[data-screen='result'].on");
   const warning = page.locator(".xf-save-warning[role='status']");
-  assert.match(await warning.innerText(), /syns inte i ditt konto eller för läraren/);
+  assert.match(await warning.innerText(), /Resultatet har inte sparats till kontot ännu/);
   const warningBox = await warning.boundingBox();
   assert.ok(warningBox && warningBox.x >= 0 && warningBox.x + warningBox.width <= 390, "save warning fits the mobile viewport");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, "save warning adds no horizontal overflow");
