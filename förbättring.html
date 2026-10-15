@@ -870,7 +870,7 @@
         // kunde bära.
         const d=document.createElement('article');
         const date=new Date(m.ts||Date.now()).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'});
-        const key=mKey(m),isPicked=pickSet.has(key),cKey=tipsCKey(m),hasCached=!!(tc[cKey]);
+        const key=mKey(m),isPicked=pickSet.has(key),cKey=tipsCKey(m),tipsId='per-tips-'+encodeURIComponent(key),hasCached=!!(tc[cKey]);
         const cTag=conceptOf(m),eTags=errorTagsOf(m).slice(0,3);
         const antal=cTag?(begreppsAntal[cTag]||0):0;
         d.className='xfMiss'+(isPicked?' sel':'');
@@ -899,7 +899,7 @@
           <div class="xfMissMore" data-per-avoid>
             <button type="button" class="xfDisclose" aria-expanded="false">Visa svar</button>
             <button class="xfDisclose doneBtn" type="button">Klar</button>
-            <button class="xfDisclose tipsBtnEl" type="button">P.E.R-tips${hasCached?' <span class="xfCached">cache</span>':''}</button>
+            <button class="xfDisclose tipsBtnEl" type="button" aria-expanded="false" aria-controls="${esc(tipsId)}">P.E.R-tips${hasCached?' <span class="xfCached">cache</span>':''}</button>
           </div>
           <div class="xf-note xfMissDetail" hidden>
             <div class="mFL">Ditt svar</div>
@@ -910,7 +910,7 @@
             <div class="mFL">Modellsvar</div>
             <div class="mFV">${esc(m.model_answer||'—')}</div>
           </div>
-          <div class="tipsBox tipsBoxEl" style="display:none"></div>`;
+          <div class="tipsBox tipsBoxEl" id="${esc(tipsId)}" role="status" aria-live="polite" aria-atomic="true" hidden></div>`;
 
         // Markering: hela raden.
         /* Markeringen sitter på KORTET, inte bara på frågeraden. Kortet är
@@ -940,12 +940,14 @@
         });
         d.querySelector('.doneBtn')?.addEventListener('click',()=>{removeMistake(m);renderAll();});
         const tBtn=d.querySelector('.tipsBtnEl'),tBox=d.querySelector('.tipsBoxEl');
-        const isTipsVis=()=>tBox.style.display!=='none';
+        const isTipsVis=()=>!tBox.hasAttribute('hidden');
         tBtn?.addEventListener('click',async()=>{
-          if(isTipsVis()){tBox.style.display='none';tBox.textContent='';return;}
+          if(isTipsVis()){tBox.setAttribute('hidden','');tBox.textContent='';tBtn.setAttribute('aria-expanded','false');return;}
+          tBtn.setAttribute('aria-expanded','true');
           const cache=getTipsCache(),cached=cache[cKey];
-          if(cached){tBox.style.display='block';tBox.textContent=String(cached);return;}
-          tBtn.setAttribute('disabled','disabled');tBox.style.display='block';tBox.textContent='P.E.R analyserar…';
+          tBox.removeAttribute('hidden');
+          if(cached){tBox.textContent=String(cached);return;}
+          tBtn.setAttribute('disabled','disabled');tBox.textContent='P.E.R analyserar…';
           try{const text=await fetchTips(m),norm=String(text||'').trim();if(!norm){tBox.textContent='Kunde inte hämta tips — försök igen.';}else{const c2=getTipsCache();c2[cKey]=norm;setTipsCache(c2);tBox.textContent=norm;}}
           catch{tBox.textContent='Kunde inte hämta tips — försök igen.';}
           finally{tBtn.removeAttribute('disabled');}

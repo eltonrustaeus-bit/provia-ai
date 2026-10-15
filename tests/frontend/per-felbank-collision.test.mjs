@@ -32,7 +32,10 @@ const { ctx, page } = await openPage(browser, `${server.url}/förbättring.html#
   width: 390,
   height: 700,
   settle: 1200,
-  mocks: { extra: [["**/rest/v1/user_exams**", route => route.fulfill({ json: rows })]] },
+  mocks: { extra: [
+    ["**/rest/v1/user_exams**", route => route.fulfill({ json: rows })],
+    ["**/api/explain", route => route.fulfill({ json: { tips: "Börja med att skilja på cellandning och fotosyntes." } })],
+  ] },
 });
 
 try {
@@ -50,6 +53,19 @@ try {
   assert.equal(compact.hidden, true, "floating P.E.R launcher yields when it covers the action row");
   assert.equal(compact.announcedHidden, true, "temporarily hidden widget is also hidden from assistive technology");
   assert.equal(await page.locator(".xfMissMore .tipsBtnEl").first().isVisible(), true, "the inline P.E.R help action remains available");
+
+  const tipsButton = page.locator(".xfMissMore .tipsBtnEl").first();
+  await tipsButton.click();
+  const tipsId = await tipsButton.getAttribute("aria-controls");
+  assert.ok(tipsId, "the P.E.R help button identifies its response region");
+  assert.equal(await tipsButton.getAttribute("aria-expanded"), "true", "opening P.E.R help is exposed to assistive technology");
+  const tipsRegion = page.locator(`[id="${tipsId}"]`);
+  assert.equal(await tipsRegion.getAttribute("role"), "status");
+  assert.equal(await tipsRegion.getAttribute("aria-live"), "polite");
+  await page.waitForFunction(id => document.getElementById(id)?.textContent.includes("skilja på cellandning"), tipsId);
+  await tipsButton.click();
+  assert.equal(await tipsButton.getAttribute("aria-expanded"), "false", "closing P.E.R help updates the expanded state");
+  assert.equal(await tipsRegion.isHidden(), true, "closed help is removed from the visible and announced content");
 
   await page.keyboard.press("Alt+p");
   await page.waitForFunction(() => document.querySelector("#perBubble").classList.contains("per-open"));
