@@ -465,21 +465,14 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId 
 }
 
 function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
-  if (issuanceState !== "active") {
+  const safeHelpStates = ["unverified", "abandoned", "expired", "missing", "completed"];
+  if (issuanceState !== "active" && !safeHelpStates.includes(issuanceState)) {
     const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
     res.setHeader("Cache-Control", "no-store");
-    const grading = issuanceState === "grading";
-    const unverified = issuanceState === "unverified";
     return res.json({
-      answer: grading
-        ? (en ? "Your exam is being graded. The review will be available when grading is complete." : "Provet håller på att rättas. Genomgången blir tillgänglig när rättningen är klar.")
-        : unverified
-          ? (en
-            ? "I can't verify that this exam is open. I can help with the method, but not reveal an answer until the exam status is verified. Reopen the exam or start a new one to continue."
-            : "Jag kan inte verifiera att det här provet är öppet. Jag kan hjälpa dig med metoden, men inte visa facit innan provstatusen är verifierad. Öppna provet igen eller starta ett nytt för att fortsätta.")
-          : (en
-          ? "This exam can no longer be continued. Keep your study material and create a new exam before asking for its answers."
-          : "Det här provet kan inte längre fortsätta. Materialet finns kvar; skapa ett nytt prov innan du ber om facit."),
+      answer: en
+        ? "Your exam is being graded. The review will be available when grading is complete."
+        : "Provet håller på att rättas. Genomgången blir tillgänglig när rättningen är klar.",
       helpCap: 0, helpLevelUsed: 0, examActive: false, examState: issuanceState,
     });
   }
@@ -622,15 +615,33 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
     : ladder[type];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
+  const statusNote = issuanceState === "active" ? "" : issuanceState === "unverified"
+    ? (en
+      ? "I can't verify this exam's status. I can help with the method, but a full answer requires verified grading. "
+      : "Jag kan inte verifiera provets status. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ")
+    : (en
+      ? "This exam is not open for answering. I can help with the method, but a full answer requires verified grading. "
+      : "Provet är inte öppet för svar. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ");
   res.json({
-    answer: sequence?.[requestedLevel] || ladder.short[requestedLevel],
+    answer: statusNote + (sequence?.[requestedLevel] || ladder.short[requestedLevel]),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
-    examActive: true,
+    examActive: issuanceState === "active",
+    ...(issuanceState !== "active" ? { examState: issuanceState } : {}),
   });
 }
 
 async function gateActiveExam(req, res, body, user) {
+  const context = body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)
+    ? body.pageContext
+    : null;
+  const page = String(context?.page || "").trim().toLowerCase();
+  const examPage = ["prov", "resultat", "exam", "exam-result"].includes(page);
+  const hasOtherPage = Boolean(page && !examPage);
+  const hasCurrentQuestion = context?.currentQuestion && typeof context.currentQuestion === "object";
+  const hasExamPhase = typeof context?.examState?.phase === "string" && context.examState.phase.trim().length > 0;
+  const examContextDeclared = examPage || (!hasOtherPage && (hasCurrentQuestion || hasExamPhase));
+
   // A verified post-grade request carries its own signed completion proof.
   // Treat client issuance metadata as stale display context here; still block
   // while any exam is active, and let the answer lease close the issuance race.
@@ -645,7 +656,7 @@ async function gateActiveExam(req, res, body, user) {
     return true;
   }
 
-  const examState = body.pageContext?.examState;
+  const examState = context?.examState;
   const submissionId = String(examState?.submissionId || "");
   const hasSubmissionId = /^[a-f0-9]{32}$/.test(submissionId);
   if (hasSubmissionId) {
@@ -667,28 +678,22 @@ async function gateActiveExam(req, res, body, user) {
       sendActiveExamGuidance(req, res, body);
       return true;
     }
-    const hasCurrentQuestion = body.pageContext?.currentQuestion &&
-      typeof body.pageContext.currentQuestion === "object";
-    if (hasCurrentQuestion) {
-      // Question context can identify the exact exam item. Keep it on the
-      // answer-free path even for completed results; review uses its signed
-      // result route. The normal results view clears this context client-side.
-      sendActiveExamGuidance(req, res, body, state);
-      return true;
-    }
     if (state !== "completed") {
-      // Expired, abandoned and missing issuances never fall through to a
-      // model answer, even when the client omits its question context.
+      // A known issuance without a server-verified grade remains answer-gated,
+      // even if the client moved away from the exam page or dropped its context.
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
-    // After the verified-result migration is applied, completed means a
-    // server-verified grade exists. Old metadata must not block unrelated
-    // study help; the answer lease closes a race with a newly issued exam.
-    if (body.pageContext && typeof body.pageContext === "object") {
-      body.pageContext = { ...body.pageContext };
+    if (examContextDeclared) {
+      // A verified result can be reviewed through the signed completion flow;
+      // a plain chat request on the exam view still does not get the answer.
+      sendActiveExamGuidance(req, res, body, state);
+      return true;
+    }
+    if (context) {
+      body.pageContext = { ...context };
       delete body.pageContext.examState;
-      if (["prov", "resultat"].includes(body.pageContext.page)) delete body.pageContext.page;
+      delete body.pageContext.currentQuestion;
     }
     return false;
   }
@@ -702,15 +707,14 @@ async function gateActiveExam(req, res, body, user) {
     return true;
   }
   if (activeCount === 0) {
-    const phase = String(examState?.phase || "");
-    if (["exam", "result", "finished", "expired"].includes(phase)) {
+    if (examContextDeclared) {
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
-    if (body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)) {
+    if (context) {
       // With no server-active exam, client-supplied question and phase are stale
       // display context, not trusted inputs to the general study-help prompt.
-      body.pageContext = { ...body.pageContext };
+      body.pageContext = { ...context };
       delete body.pageContext.currentQuestion;
       delete body.pageContext.examState;
       if (["prov", "resultat"].includes(body.pageContext.page)) delete body.pageContext.page;
