@@ -132,13 +132,6 @@
     return '' +
       '<div class="xg-utility-bar">' +
         '<div class="xg-utility-wrap">' +
-          '<a class="xg-utility-badge" href="https://ungdrive.se" target="_blank" rel="noopener" aria-label="Backed by UngDrive">' +
-            /* Lokal fil. Sju av åtta sidor hämtade en 1024px-bild från
-               ungdrive.se för att rita den i 12x12 — en tredjepartsförfrågan
-               per sidladdning, på en sajt med en integritetspolicy. */
-            '<img src="/image/ungdrive-icon.png" width="12" height="12" alt="">' +
-            "<span>Backed by UngDrive</span>" +
-          "</a>" +
           '<div class="xg-utility-right">' +
             '<a href="integritetspolicy.html"' + (policyAktiv ? ' aria-current="page"' : "") +
             ">Integritetspolicy</a></div>" +
