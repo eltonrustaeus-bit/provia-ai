@@ -7,9 +7,9 @@ const scenarios = [
     id: "biology",
     course: "Biologi 1",
     title: "Biologiprov",
-    material: "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n0 | 4\n1 | 3\n2 | 1",
+    material: "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n0 | 4\n0 | 3\n1 | 1",
     headers: ["Tid (min)", "Syrehalt (mg/L)"],
-    rows: [[0, 4], [1, 3], [2, 1]],
+    rows: [[0, 4], [0, 3], [1, 1]],
   },
   {
     id: "mathematics",

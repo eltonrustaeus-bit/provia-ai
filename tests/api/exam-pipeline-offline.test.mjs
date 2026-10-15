@@ -154,7 +154,8 @@ try {
   assert.equal(unsupportedGraph.status, 400);
   assert.equal(unsupportedGraph.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
   assert.match(unsupportedGraph.body.message, /matematik, naturvetenskap eller samhällsvetenskap/i);
-  assert.match(unsupportedGraph.body.message, /exakt tre heltalsrader/i);
+  assert.match(unsupportedGraph.body.message, /exakt tre olika heltalspar/i);
+  assert.match(unsupportedGraph.body.message, /samma x-värde får förekomma flera gånger/i);
   const unsupportedGraphEn = await invoke(generateExam, {
     lang: "en", level: "C", course: "Mathematics 2b", pastedText: "The parabola is y = x^2.",
     qType: "graph", numQuestions: 1,
@@ -162,7 +163,8 @@ try {
   assert.equal(unsupportedGraphEn.status, 400);
   assert.equal(unsupportedGraphEn.body.error, "GRAPH_MATERIAL_UNSUPPORTED");
   assert.match(unsupportedGraphEn.body.message, /math, natural-science, or social-science table/i);
-  assert.match(unsupportedGraphEn.body.message, /exactly three integer rows/i);
+  assert.match(unsupportedGraphEn.body.message, /exactly three distinct integer coordinate pairs/i);
+  assert.match(unsupportedGraphEn.body.message, /same x-value may appear more than once/i);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
     "unsupported graph types are rejected before model traffic");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
@@ -384,7 +386,7 @@ try {
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")));
 
   const scienceCourse = "Biologi 1";
-  const scienceMaterial = "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n1 | 3\n2 | 1";
+  const scienceMaterial = "Mätserie för vattenprovet:\nTid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n0 | 3\n1 | 1";
   const scienceSpecFromModel = {
     kind: "scatter", slope: null, intercept: null,
     points: [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }],
@@ -408,11 +410,11 @@ try {
     mode: "scatter", point_count: 3, x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
     source_table: {
       headers: ["Tid (min)", "Syrehalt (mg/L)"],
-      rows: [[0, 4], [1, 3], [2, 1]],
+      rows: [[0, 4], [0, 3], [1, 1]],
     },
   }, "server derives the visible graph setup from the exact source table, not model-provided labels");
   assert.match(scienceQuestion.question, /tabellens värden/i);
-  assert.doesNotMatch(scienceQuestion.question, /\(0, 4\)|\(1, 3\)|\(2, 1\)/);
+  assert.doesNotMatch(scienceQuestion.question, /\(0, 4\)|\(0, 3\)|\(1, 1\)/);
   assert.equal(Object.hasOwn(scienceQuestion, "graph_spec"), false);
   assert.equal(Object.hasOwn(scienceQuestion, "model_answer"), false);
   gradingState = "active";
@@ -421,7 +423,7 @@ try {
     exam_manifest: scienceGenerated.body.exam.exam_manifest,
     questions: [scienceQuestion],
     answers: [{ id: scienceQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
-      { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 },
+      { x: 0, y: 4 }, { x: 0, y: 2 }, { x: 1, y: 1 },
     ] }) }],
   });
   assert.equal(scienceGraded.status, 200, JSON.stringify(scienceGraded.body));

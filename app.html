@@ -1746,7 +1746,21 @@ function renderExam(exam){
     if(q.type==="graph"){
       if(typeof window.ExGenGraphAnswer==="function"){
         const widget=document.createElement("div");widget.className="legacyGraphAnswer";widget.dataset.qid=qid;
-        const graphInput=window.ExGenGraphAnswer(widget,"",function(){},LANG);graphInput.dataset.qid=qid;box.appendChild(widget);
+        const graphUi=q.graph_ui;
+        const source=graphUi&&graphUi.mode==="scatter"?graphUi.source_table:null;
+        if(source&&Array.isArray(source.headers)&&source.headers.length===2&&Array.isArray(source.rows)&&source.rows.length===3
+          &&source.headers.every(value=>typeof value==="string"&&value.length<=32)
+          &&source.rows.every(row=>Array.isArray(row)&&row.length===2&&row.every(Number.isInteger))){
+          const wrap=document.createElement("div");wrap.className="xf-source-table-wrap";
+          const table=document.createElement("table");table.className="xf-source-table";
+          const caption=document.createElement("caption");caption.textContent=LANG==="en"?"Values from your material":"Värden från materialet";table.appendChild(caption);
+          const thead=document.createElement("thead"),headerRow=document.createElement("tr");
+          source.headers.forEach(label=>{const cell=document.createElement("th");cell.scope="col";cell.textContent=label;headerRow.appendChild(cell);});
+          thead.appendChild(headerRow);table.appendChild(thead);
+          const tbody=document.createElement("tbody");source.rows.forEach(row=>{const tr=document.createElement("tr");row.forEach(value=>{const cell=document.createElement("td");cell.textContent=String(value);tr.appendChild(cell);});tbody.appendChild(tr);});
+          table.appendChild(tbody);wrap.appendChild(table);box.appendChild(wrap);
+        }
+        const graphInput=window.ExGenGraphAnswer(widget,"",function(){},LANG,graphUi);graphInput.dataset.qid=qid;box.appendChild(widget);
       }else{
         const unavailable=document.createElement("p");unavailable.className="graph-tool-error";
         unavailable.setAttribute("role","alert");

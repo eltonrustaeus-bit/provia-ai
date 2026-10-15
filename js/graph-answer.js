@@ -280,8 +280,7 @@
     var config = configFor(displayConfig), points = read(raw, config);
     if (points.length !== config.count || !points.every(validPoint)) return false;
     if (config.mode === "scatter") {
-      return new Set(points.map(function (p) { return p.x; })).size === points.length
-        && new Set(points.map(function (p) { return p.x + "|" + p.y; })).size === points.length;
+      return new Set(points.map(function (p) { return p.x + "|" + p.y; })).size === points.length;
     }
     return points[0].x !== points[1].x;
   };

@@ -1088,7 +1088,7 @@
     dl.appendChild(rNum);
     card.appendChild(dl);
     var graphHint = el("p", "xf-graph-limit-note",
-      tx("Matematik: en uttrycklig rät linje y = mx + b där m och b är heltal mellan −5 och 5 och minst två punkter syns i diagrammet, eller en entydig tabell med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden. Natur- och samhällsvetenskap stöder samma tabellformat. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b where m and b are integers from −5 to 5 and at least two points appear on the graph, or one unambiguous table with two headers separated by | and exactly three integer rows from −5 to 5 with distinct x-values. Natural and social sciences support the same table format. Other graph and chart formats are not supported yet."));
+      tx("Matematik: en uttrycklig rät linje y = mx + b där m och b är heltal mellan −5 och 5 och minst två punkter syns i diagrammet, eller en entydig tabell med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger. Natur- och samhällsvetenskap stöder samma tabellformat. Andra graf- och diagramformat stöds inte ännu.", "Math: an explicit straight line y = mx + b where m and b are integers from −5 to 5 and at least two points appear on the graph, or one unambiguous table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once. Natural and social sciences support the same table format. Other graph and chart formats are not supported yet."));
     graphHint.hidden = S.qType !== "graph";
     card.appendChild(graphHint);
     b.appendChild(card);

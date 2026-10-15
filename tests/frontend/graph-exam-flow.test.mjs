@@ -137,11 +137,12 @@ try {
   assert.match(await graphHint.innerText(), /en uttrycklig rät linje y = mx \+ b där m och b är heltal mellan −5 och 5/i);
   assert.match(await graphHint.innerText(), /matematik.*rät linje.*eller.*tabell.*avdelade med \|/i);
   assert.match(await graphHint.innerText(), /natur- och samhällsvetenskap.*samma tabellformat/i);
-  assert.match(await graphHint.innerText(), /exakt tre heltalsrader.*−5 och 5.*olika x-värden/i);
+  assert.match(await graphHint.innerText(), /exakt tre olika heltalspar.*−5 och 5.*samma x-värde får förekomma flera gånger/i);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.locator("#langBtnDesktop").click();
   assert.match(await graphHint.innerText(), /Math: an explicit straight line y = mx \+ b where m and b are integers from −5 to 5/i);
   assert.match(await graphHint.innerText(), /at least two points appear on the graph/i);
+  assert.match(await graphHint.innerText(), /three distinct integer coordinate pairs.*same x-value may appear more than once/i);
   await page.locator("#langBtnDesktop").click();
   assert.match(await graphHint.innerText(), /Matematik: en uttrycklig rät linje/i);
   assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(1).textContent(), "Interaktiv graf",

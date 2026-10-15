@@ -838,8 +838,8 @@ module.exports = async function handler(req, res) {
       ok: false,
       error: "GRAPH_MATERIAL_UNSUPPORTED",
       message: lang === "sv"
-        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre heltalsrader mellan −5 och 5 med olika x-värden."
-        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a math, natural-science, or social-science table with two headers separated by | and exactly three integer rows from −5 to 5 with distinct x-values."
+        ? "Grafstöd kräver en uttrycklig heltalslinje y = mx + b i matematik, eller en tabelluppgift i matematik, naturvetenskap eller samhällsvetenskap med två rubriker avdelade med | och exakt tre olika heltalspar mellan −5 och 5. Samma x-värde får förekomma flera gånger."
+        : "Graph support requires an explicit integer line y = mx + b in mathematics, or a math, natural-science, or social-science table with two headers separated by | and exactly three distinct integer coordinate pairs from −5 to 5. The same x-value may appear more than once."
     });
   }
 

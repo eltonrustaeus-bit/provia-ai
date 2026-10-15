@@ -39,7 +39,18 @@ assert.equal(graph.sourceContainsSpec(table, scatterSpec), true);
 assert.equal(graph.parsePointTable(`${table}\n3 | 0`), null, "extra rows are not silently dropped");
 assert.equal(graph.parsePointTable(`${table}\n3 | 0.5`), null, "a trailing decimal row is not silently dropped");
 assert.equal(graph.parsePointTable(`${table}\n3 | 0.5 | extra`), null, "a malformed-width row is not silently treated as the end of the table");
-assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n1 | 3\n1 | 1"), null, "repeated x-values are rejected");
+const repeatedXTable = "Tid (min) | Halt\n0 | 4\n0 | 3\n1 | 1";
+const repeatedXData = { points: [{ x: 0, y: 4 }, { x: 0, y: 3 }, { x: 1, y: 1 }], x_label: "Tid (min)", y_label: "Halt" };
+const repeatedXSpec = { kind: "scatter", slope: null, intercept: null, ...repeatedXData };
+const repeatedXAnswer = JSON.stringify({ type: "scatter", points: [{ x: 1, y: 1 }, { x: 0, y: 3 }, { x: 0, y: 4 }] });
+assert.deepEqual(graph.parsePointTable(repeatedXTable), repeatedXData, "repeated measurements at one x-value are valid");
+assert.equal(graph.isValidSpec(repeatedXSpec), true);
+assert.equal(graph.sourceContainsSpec(repeatedXTable, repeatedXSpec), true);
+assert.equal(graph.answerIsComplete(repeatedXAnswer, repeatedXSpec), true);
+assert.equal(graph.gradeAnswer(repeatedXAnswer, repeatedXSpec).points, 3, "distinct observations sharing x are graded independently");
+assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4\n0 | 4\n1 | 1"), null, "duplicate coordinate pairs remain invalid");
+assert.equal(graph.answerIsComplete(JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, { x: 0, y: 4 }, { x: 1, y: 1 }] }), repeatedXSpec), false,
+  "the same observation cannot be submitted twice");
 assert.equal(graph.parsePointTable("Tid | Halt\n0 | 4.5\n1 | 3\n2 | 1"), null, "decimal values are not rounded");
 assert.equal(graph.isValidSpec(scatterSpec), true);
 assert.deepEqual(graph.displaySpec(scatterSpec), {

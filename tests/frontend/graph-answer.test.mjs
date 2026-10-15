@@ -102,6 +102,12 @@ try {
   assert.deepEqual(JSON.parse(keyboardScatterAnswer).points, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }],
     "scatter task can be completed entirely by keyboard");
   assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [keyboardScatterAnswer, scatterUi]), true);
+  const repeatedXAnswer = JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, { x: 0, y: 3 }, { x: 1, y: 1 }] });
+  assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [repeatedXAnswer, scatterUi]), true,
+    "scatter completion accepts distinct measurements with the same x-coordinate");
+  assert.equal(await page.evaluate(([raw, ui]) => window.ExGenGraphAnswer.isComplete(raw, ui), [
+    JSON.stringify({ type: "scatter", points: [{ x: 0, y: 4 }, { x: 0, y: 4 }, { x: 1, y: 1 }] }), scatterUi,
+  ]), false, "scatter completion still rejects duplicate coordinate pairs");
   assert.match(await scatterKeyboard.locator("[role=status]").innerText(), /Punkt C placerad \(2, 2\).*Punkt A vald/,
     "live status identifies the placed coordinate and next active point");
   await scatterGrid.blur();

@@ -44,7 +44,7 @@ function parsePointTable(text) {
       points.push(point);
       j++;
     }
-    if (points.length !== SCATTER_POINT_COUNT || new Set(points.map((p) => p.x)).size !== points.length
+    if (points.length !== SCATTER_POINT_COUNT
       || new Set(points.map((p) => `${p.x}|${p.y}`)).size !== points.length) continue;
     candidates.push({ points, x_label: header[0], y_label: header[1] });
   }
@@ -97,7 +97,6 @@ function isValidSpec(spec) {
     return spec.slope === null && spec.intercept === null
       && Array.isArray(spec.points) && spec.points.length === SCATTER_POINT_COUNT
       && spec.points.every(isGridPoint)
-      && new Set(spec.points.map((point) => point.x)).size === spec.points.length
       && new Set(spec.points.map((point) => `${point.x}|${point.y}`)).size === spec.points.length
       && safeAxisLabel(spec.x_label) && safeAxisLabel(spec.y_label);
   }
@@ -177,8 +176,7 @@ function parseAnswer(raw, spec) {
   const points = value.points.map((point) => ({ x: point?.x, y: point?.y }));
   if (points.some((point) => !isGridPoint(point))) return null;
   if (scatter) {
-    if (new Set(points.map((point) => point.x)).size !== points.length
-      || new Set(points.map((point) => `${point.x}|${point.y}`)).size !== points.length) return null;
+    if (new Set(points.map((point) => `${point.x}|${point.y}`)).size !== points.length) return null;
   } else if (points[0].x === points[1].x) return null;
   return points;
 }
