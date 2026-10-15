@@ -1398,7 +1398,10 @@ function finalizeMsg(div, text) {
       var panel = document.getElementById('perPanel');
       var bubble = document.getElementById('perBubble');
       if (panel) panel.classList.toggle('per-open', _open);
-      if (bubble) bubble.classList.toggle('per-open', _open);
+      if (bubble) {
+        bubble.classList.toggle('per-open', _open);
+        bubble.setAttribute('aria-expanded', _open ? 'true' : 'false');
+      }
       if (document.body && document.body.classList.contains('xf-result')) {
         document.body.classList.toggle('xf-result-per-open', _open);
       }
@@ -1614,7 +1617,7 @@ function finalizeMsg(div, text) {
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
-        '<button id="perBubble" title="Fråga P.E.R" aria-label="Fråga P.E.R">'+
+        '<button id="perBubble" title="Fråga P.E.R" aria-label="Fråga P.E.R" aria-controls="perPanel" aria-expanded="false">'+
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v10H9l-4 4V5Z"/></svg>'+
           '<span>P.E.R</span></button>'+
           '<div id="perSees" aria-hidden="true">ser: den här sidan</div>';
