@@ -63,8 +63,11 @@ html {
    den bara i verktygsraden, så den flyttades dit i stället för att tas bort. */
 @media (max-width: 480px) { .xg-utility-bar { display: none; } }
 
-.xg-header {
+[data-xg-header] {
   position: sticky; top: 0; z-index: 500;
+}
+.xg-header {
+  position: relative; z-index: 500;
   background: var(--exgen-bg, #FFFFFF);
   border-bottom: var(--exgen-border-width, 1px) solid var(--exgen-border, #E4E7EC);
 }

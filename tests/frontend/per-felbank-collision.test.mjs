@@ -20,16 +20,23 @@ const row = {
     per_question: [{ id: "q1", points: 0, max_points: 2, feedback: "Fel svar.", model_answer: "Cellandning." }],
   },
 };
+const rows = [1, 2, 3].map(index => index === 1 ? row : ({
+  ...row,
+  id: `synthetic-${index}`,
+  created_at: new Date(Date.now() - index * 86400000).toISOString(),
+  exam: { questions: [{ id: `q${index}`, question: `Exempeluppgift ${index}`, type: "short" }] },
+  answers: [{ id: `q${index}`, answer: "Fel svar" }],
+}));
 
 const { ctx, page } = await openPage(browser, `${server.url}/förbättring.html#felbank`, {
   width: 390,
   height: 700,
   settle: 1200,
-  mocks: { extra: [["**/rest/v1/user_exams**", route => route.fulfill({ json: [row] })]] },
+  mocks: { extra: [["**/rest/v1/user_exams**", route => route.fulfill({ json: rows })]] },
 });
 
 try {
-  await page.locator(".xfMissMore[data-per-avoid]").waitFor();
+  await page.locator(".xfMissMore[data-per-avoid]").first().waitFor();
   const compact = await page.evaluate(() => {
     const button = document.querySelector("#perBubble").getBoundingClientRect();
     const actions = document.querySelector(".xfMissMore[data-per-avoid]").getBoundingClientRect();
@@ -42,7 +49,7 @@ try {
   assert.equal(compact.overlaps, true, "fixture reproduces the narrow viewport collision");
   assert.equal(compact.hidden, true, "floating P.E.R launcher yields when it covers the action row");
   assert.equal(compact.announcedHidden, true, "temporarily hidden widget is also hidden from assistive technology");
-  assert.equal(await page.locator(".xfMissMore .tipsBtnEl").isVisible(), true, "the inline P.E.R help action remains available");
+  assert.equal(await page.locator(".xfMissMore .tipsBtnEl").first().isVisible(), true, "the inline P.E.R help action remains available");
 
   await page.keyboard.press("Alt+p");
   await page.waitForFunction(() => document.querySelector("#perBubble").classList.contains("per-open"));
@@ -75,6 +82,39 @@ try {
   await page.setViewportSize({ width: 390, height: 700 });
   await page.waitForFunction(() => document.querySelector("#perWidget").classList.contains("per-obstructed"));
   console.log("PASS P.E.R yields and returns as the felbank action row enters or leaves its footprint");
+
+  for (const width of [390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 600 });
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.waitForFunction(() => window.scrollY > 0);
+    const header = await page.evaluate(() => ({
+      slot: document.querySelector("[data-xg-header]").getBoundingClientRect(),
+      content: document.querySelector(".xg-header").getBoundingClientRect(),
+    }));
+    assert.ok(Math.abs(header.slot.top) <= 1 && header.content.top >= header.slot.top - 1 && header.content.bottom <= header.slot.bottom + 1, `header stays in its sticky slot after scroll at ${width}px: ${JSON.stringify(header)}`);
+  }
+  console.log("PASS shared header remains sticky at 390, 768 and 1280px");
+
+  await page.setViewportSize({ width: 768, height: 692 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator(".xg-menu-btn").click();
+  await page.waitForFunction(() => document.querySelector("#xgMenu").classList.contains("on"));
+  assert.equal(await page.locator("#perWidget").evaluate(el => getComputedStyle(el).visibility), "hidden", "open menu takes priority over the floating P.E.R launcher");
+
+  await page.keyboard.press("Alt+p");
+  await page.waitForFunction(() => document.querySelector("#perBubble").classList.contains("per-open"));
+  await page.waitForFunction(() => document.querySelector("#xgMenu").hidden && !document.querySelector("#perWidget").classList.contains("per-menu-obstructed") && document.activeElement.id === "perInput");
+  assert.equal(await page.locator("#perPanel").isVisible(), true, "P.E.R can open after dismissing the menu");
+  assert.equal(await page.locator("#perInput").evaluate(el => document.activeElement === el), true, "keyboard focus moves into P.E.R after the menu closes");
+
+  await page.locator(".xg-menu-btn").click();
+  await page.waitForFunction(() => document.querySelector("#xgMenu").classList.contains("on"));
+  await page.waitForFunction(() => !document.querySelector("#perBubble").classList.contains("per-open"));
+  assert.equal(await page.locator("#perWidget").evaluate(el => getComputedStyle(el).visibility), "hidden", "opening the menu closes P.E.R and removes its launcher from the menu area");
+  await page.locator(".xg-menu-btn").click();
+  await page.waitForFunction(() => document.querySelector("#xgMenu").hidden);
+  await page.waitForFunction(() => !document.querySelector("#perWidget").classList.contains("per-menu-obstructed"));
+  console.log("PASS menu and P.E.R do not cover one another");
 } finally {
   await ctx.close();
   await browser.close();

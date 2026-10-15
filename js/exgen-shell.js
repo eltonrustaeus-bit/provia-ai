@@ -213,6 +213,7 @@
       document.body.style.overflow = "hidden";
       var first = menu.querySelector("a, button");
       if (first) first.focus();
+      document.dispatchEvent(new CustomEvent("exgen:menuopen"));
     }
 
     function close(restoreFocus) {
@@ -225,7 +226,11 @@
          bort i stället för att glida — och ett stängt ark som ligger kvar utan
          hidden fångar klick över hela sidan. */
       window.setTimeout(function () {
-        if (!menu.classList.contains("on")) { menu.hidden = true; dim.hidden = true; }
+        if (!menu.classList.contains("on")) {
+          menu.hidden = true;
+          dim.hidden = true;
+          document.dispatchEvent(new CustomEvent("exgen:menuclose"));
+        }
       }, 200);
       /* Fokus tillbaka till knappen. Utan det står fokus kvar i ett ark som inte
          längre syns, och nästa Tab börjar i tomma luften. */

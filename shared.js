@@ -1416,6 +1416,7 @@ function finalizeMsg(div, text) {
     function toggle() {
       if (!document.getElementById('perBubble') || !document.getElementById('perPanel')) return;
       _open = !_open;
+      if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') window.XgShell.closeMenu();
       var panel = document.getElementById('perPanel');
       var bubble = document.getElementById('perBubble');
       if (panel) panel.classList.toggle('per-open', _open);
@@ -1539,6 +1540,7 @@ function finalizeMsg(div, text) {
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
         '#perWidget.per-minimized{transform:scale(.001);opacity:0;pointer-events:none;transition:transform .15s ease,opacity .15s ease}',
         '#perWidget.per-obstructed{visibility:hidden;pointer-events:none}',
+        '#perWidget.per-menu-obstructed{visibility:hidden;pointer-events:none}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
         '@media(max-width:480px){#perBubble{height:40px;padding:0 8px;gap:4px;font-size:11px}#perBubble svg{width:14px;height:14px}}',
@@ -1695,6 +1697,20 @@ function finalizeMsg(div, text) {
         var observer = new MutationObserver(scheduleObstructionCheck);
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
         syncObstruction();
+        document.addEventListener('exgen:menuopen', function () {
+          if (bubble.classList.contains('per-open')) toggle();
+          widget.classList.add('per-menu-obstructed');
+          widget.setAttribute('aria-hidden', 'true');
+        });
+        document.addEventListener('exgen:menuclose', function () {
+          widget.classList.remove('per-menu-obstructed');
+          if (!widget.classList.contains('per-obstructed')) widget.removeAttribute('aria-hidden');
+          scheduleObstructionCheck();
+          if (bubble.classList.contains('per-open')) {
+            var input = document.getElementById('perInput');
+            if (input) input.focus();
+          }
+        });
       })();
 
       function perWidgetUsesEnglish() {
