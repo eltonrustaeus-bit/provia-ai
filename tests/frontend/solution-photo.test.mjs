@@ -24,7 +24,7 @@ const browser = await chromium.launch();
 const EXAM = {
   title: "Matteprov", level: "C",
   questions: [
-    { id: "m1", type: "mc", points: 2, question: "Vad är $2+2$?", options: ["3", "4", "5", "6"], correct_index: 1, topic: "Aritmetik", cognitive_level: "minnas", source_references: ["s.1"], model_answer: "4", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
+    { id: "m1", type: "mc", points: 2, question: "Vad är $2+2$?", options: ["3", "4", "5", "6"], correct_index: 1, topic: "Aritmetik", source_references: ["s.1"], model_answer: "4", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "m2", type: "short", points: 4, question: "Lös ekvationen $3x + 7 = 22$. Visa din lösning.", options: [], correct_index: -1, topic: "Ekvationer", cognitive_level: "tillämpa", source_references: ["s.4"], model_answer: "x = 5", scoring_rubric: { parts: [{ description: "Uträkning", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "m3", type: "mc", points: 2, question: "Vad är $10/2$?", options: ["2", "5", "10", "20"], correct_index: 1, topic: "Division", cognitive_level: "minnas", source_references: ["s.6"], model_answer: "5", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
   ],
@@ -104,6 +104,13 @@ try {
     const answer = t.page.locator(".xf-answer");
     R.ok("K9 fritextfältet har engelsk platshållare", await answer.getAttribute("placeholder") === "Your answer…");
     R.ok("K9 fritextfältet har engelsk skärmläsaretikett", await answer.getAttribute("aria-label") === "Answer to question 2");
+    const meta = t.page.locator(".xf-q-head span");
+    R.ok("K9 kognitiv nivå översätts till engelska", await meta.nth(0).innerText() === "APPLY", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten använder engelska plural", await meta.nth(1).innerText() === "4 POINTS", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 1);
+    R.ok("K9 saknad kognitiv nivå får engelsk reservetikett", await meta.nth(0).innerText() === "TASK", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten fungerar även med flertal", await meta.nth(1).innerText() === "2 POINTS", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 2);
     R.ok("K9 fotoknappen är lokaliserad", /Add a photo/.test(await t.page.locator(".xf-photo-btn").innerText()));
     await lämna(t.page);
     await t.page.waitForTimeout(900);
@@ -116,6 +123,11 @@ try {
     R.ok("K9 språkbyte uppdaterar fotoknappen mitt i provet",
       /Fota din lösning/.test(await t.page.locator(".xf-photo-btn").innerText()),
       await t.page.locator(".xf-photo-btn").innerText());
+    R.ok("K9 kognitiv nivå följer språkbytet mitt i provet", await meta.nth(0).innerText() === "TILLÄMPA", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten följer språkbytet mitt i provet", await meta.nth(1).innerText() === "4 P", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 1);
+    R.ok("K9 svensk reservetikett behålls när nivån saknas", await meta.nth(0).innerText() === "UPPGIFT", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 svensk poängförkortning behålls", await meta.nth(1).innerText() === "2 P", JSON.stringify(await meta.allInnerTexts()));
     await t.close();
   }
   {

@@ -2001,8 +2001,17 @@
     }
 
     var head = el("div", "xf-q-head");
-    head.appendChild(el("span", null, String(q.cognitive_level || "").trim() || tx("Uppgift", "Task")));
-    head.appendChild(el("span", "xf-q-pts", (Number(q.points) || 0) + " p"));
+    var cognitiveLevel = String(q.cognitive_level || "").trim().toLowerCase();
+    var cognitiveLabels = {
+      minnas: tx("Minnas", "Recall"),
+      "förstå": tx("Förstå", "Understand"),
+      tillämpa: tx("Tillämpa", "Apply"),
+      analysera: tx("Analysera", "Analyze"),
+      värdera: tx("Värdera", "Evaluate"),
+    };
+    head.appendChild(el("span", null, cognitiveLabels[cognitiveLevel] || tx("Uppgift", "Task")));
+    var points = Number(q.points) || 0;
+    head.appendChild(el("span", "xf-q-pts", points + " " + tx("p", points === 1 ? "point" : "points")));
     sheet.appendChild(head);
 
     var qText = el("h2", "xf-q-text", q.question || "");
