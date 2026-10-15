@@ -32,6 +32,7 @@ const publicQuestion = {
 const calls = [];
 const savedSubmissionIds = new Set();
 const savedQuestionCounts = new Map();
+const savedVerifiedAt = new Map();
 const savedReviewResults = new Map();
 function createReviewProof(questions, selectedQuestionId, answers, perQuestion) {
   const submissionId = completion.submissionId(userId, course, questions);
@@ -39,6 +40,7 @@ function createReviewProof(questions, selectedQuestionId, answers, perQuestion) 
   const fingerprint = completion.answerFingerprint(userId, course, questions, answerMap);
   savedSubmissionIds.add(submissionId);
   savedQuestionCounts.set(submissionId, questions.length);
+  savedVerifiedAt.set(submissionId, "2026-10-15T12:00:00.000Z");
   savedReviewResults.set(`${userId}:${submissionId}:${fingerprint}`, {
     total_points: perQuestion.reduce((sum, row) => sum + row.points, 0),
     max_points: perQuestion.reduce((sum, row) => sum + row.max_points, 0),
@@ -83,7 +85,11 @@ globalThis.fetch = async (input, init = {}) => {
     const requestedUser = (query.get("user_id") || "").replace(/^eq\./, "");
     const requestedSubmission = (query.get("submission_id") || "").replace(/^eq\./, "");
     return Response.json(resultPresent && requestedUser === userId && savedSubmissionIds.has(requestedSubmission)
-      ? { submission_id: requestedSubmission, num_questions: savedQuestionCounts.get(requestedSubmission) }
+      ? {
+        submission_id: requestedSubmission,
+        num_questions: savedQuestionCounts.get(requestedSubmission),
+        verified_at: savedVerifiedAt.get(requestedSubmission),
+      }
       : null);
   }
   if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) {
@@ -157,6 +163,22 @@ test("deleting the saved result revokes an otherwise valid completion proof", as
     assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
   } finally {
     resultPresent = true;
+  }
+});
+
+test("an unverified legacy result cannot unlock post-exam answers", async () => {
+  calls.length = 0;
+  const submissionId = completion.submissionId(userId, course, proof.questions);
+  const verifiedAt = savedVerifiedAt.get(submissionId);
+  savedVerifiedAt.set(submissionId, null);
+  try {
+    const denied = await invoke({ examReview: true, examProof: proof });
+    assert.equal(denied.statusCode, 403);
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results")));
+    assert.ok(calls.every(({ url }) => !url.includes("recover_graded_exam_result") &&
+      !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+  } finally {
+    savedVerifiedAt.set(submissionId, verifiedAt);
   }
 });
 

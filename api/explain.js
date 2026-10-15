@@ -205,11 +205,11 @@ async function handleExamReview(res, body, user) {
   if (!completed) return fail(403, "Provet kunde inte verifieras som rättat.", "The exam could not be verified as graded.");
   try {
     const { data, error } = await supabase.from("mock_results")
-      .select("submission_id,num_questions")
+      .select("submission_id,num_questions,verified_at")
       .eq("user_id", user.id)
       .eq("submission_id", completed.submissionId)
       .maybeSingle();
-    if (error || data?.num_questions !== body.examProof.questions.length) {
+    if (error || data?.num_questions !== body.examProof.questions.length || data?.verified_at == null) {
       return fail(403, "Det sparade provresultatet kunde inte verifieras.", "The saved exam result could not be verified.");
     }
   } catch {
