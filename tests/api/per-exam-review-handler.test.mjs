@@ -72,6 +72,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/exam_issuance_state")) return Response.json(issuanceState);
   if (url.includes("/rest/v1/exam_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
+  if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
+    { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
+  ]});
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/rpc/recover_graded_exam_result")) {
@@ -1417,6 +1420,34 @@ test("active exam hides P.E.R history and uncertain state fails closed", async (
     assert.equal(uncertain.body.error, "EXAM_STATE_UNAVAILABLE");
   } finally {
     activeCount = 0;
+  }
+});
+
+test("P.E.R history stays hidden after abandoned or expired exams until verified grading", async () => {
+  const previous = { activeCount, latestSubmissionId, issuanceState };
+  try {
+    activeCount = 0;
+    latestSubmissionId = "a".repeat(32);
+    for (const state of ["abandoned", "expired", "missing", "grading"]) {
+      issuanceState = state;
+      calls.length = 0;
+      const response = await invoke(undefined, "GET");
+      assert.equal(response.statusCode, 409, `${state} exam must keep stored P.E.R history locked`);
+      assert.equal(response.body.error, "PER_HISTORY_LOCKED");
+      assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/per_sessions")
+        && !url.includes("acquire_per_answer_lease")), `${state} history is rejected before reading it or acquiring a lease`);
+    }
+
+    issuanceState = "completed";
+    calls.length = 0;
+    const verified = await invoke(undefined, "GET");
+    assert.equal(verified.statusCode, 200);
+    assert.equal(verified.body.history[0].content, "VERIFIED_HISTORY_SENTINEL");
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/per_sessions")));
+  } finally {
+    activeCount = previous.activeCount;
+    latestSubmissionId = previous.latestSubmissionId;
+    issuanceState = previous.issuanceState;
   }
 });
 

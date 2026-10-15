@@ -129,12 +129,8 @@
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
 
-  function isExamWorkspacePage() {
-    var page = String(window.location.pathname || '').toLowerCase().split('/').pop();
-    return page === 'app.html' || page === 'app';
-  }
-
-  var _examHistoryMasked = isExamWorkspacePage();
+  var _examHistoryMasked = true;
+  var _serverVerifiedPerHistoryRelease = false;
   try {
     if (localStorage.getItem(PER_EXAM_HISTORY_MASK_KEY) === '1') _examHistoryMasked = true;
   } catch (_) {}
@@ -521,6 +517,8 @@
 
   function setExamHistoryMasked(masked, persist) {
     var next = Boolean(masked);
+    if (!next && !_serverVerifiedPerHistoryRelease) return;
+    if (next) _serverVerifiedPerHistoryRelease = false;
     var shouldPersist = arguments.length < 2 || Boolean(persist);
     if (next === _examHistoryMasked && !next) return;
     var msgs = document.getElementById('perMessages');
@@ -564,10 +562,47 @@
     renderPerHistory(history);
   }
 
+  async function refreshPerHistoryIfVerified() {
+    try {
+      var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
+      var token = session && session.access_token;
+      if (session && session.expires_at
+        && Number(session.expires_at) - 60 <= Date.now() / 1000) return null;
+      if (!token) return null;
+      var response = await fetch('/api/explain', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (!response.ok) return false;
+      var data = await response.json();
+      if (!data || !Array.isArray(data.history)) return false;
+      var history = data.history.filter(function (msg) {
+        return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
+      }).slice(-PER_MAX_HIST);
+      _serverVerifiedPerHistoryRelease = true;
+      _examHistoryMasked = false;
+      try {
+        localStorage.setItem(PER_HIST_KEY, JSON.stringify(history));
+        localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
+      } catch (_) {}
+      if (history.length) {
+        renderPerHistory(history);
+      } else {
+        var msgs = document.getElementById('perMessages');
+        if (msgs) {
+          Array.prototype.forEach.call(msgs.querySelectorAll('.per-history-mask-notice'), function (notice) {
+            notice.remove();
+          });
+          if (!msgs.querySelector('.per-msg')) renderPerHistory([]);
+        }
+      }
+      return history;
+    } catch (_) { return null; }
+  }
+
   window.addEventListener('storage', function (event) {
     if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
       if (event.newValue === '1') setExamHistoryMasked(true);
-      else if (event.newValue === null) setExamHistoryMasked(false);
+      else if (event.newValue === null) refreshPerHistoryIfVerified();
       return;
     }
     if (event.key === PER_MEMORY_CLEAR_EPOCH_KEY && event.newValue && event.newValue !== event.oldValue) {
@@ -962,7 +997,12 @@
     }
 
     async function getToken() {
-      if (_getToken) try { return await _getToken(); } catch (_) {}
+      if (_getToken) {
+        try {
+          var registeredToken = await _getToken();
+          if (registeredToken) return registeredToken;
+        } catch (_) {}
+      }
       /* Fallback: read Supabase session directly from localStorage */
       try {
         var raw = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
@@ -2134,8 +2174,9 @@ function finalizeMsg(div, text) {
 
       /* Restore previous history — never expose it while an exam may be active. */
       var hist = perGetHist();
-      if (_examHistoryMasked) setExamHistoryMasked(true, false);
-      else if (hist.length > 0) renderPerHistory(hist);
+      // Cached assistant replies stay hidden until the server confirms that no
+      // ungraded issuance is outstanding for this account.
+      setExamHistoryMasked(true, false);
 
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try {
@@ -2162,17 +2203,10 @@ function finalizeMsg(div, text) {
       }
 
       /* Background Supabase sync — load cross-device history */
-      getToken().then(function(tok) {
-        if (!tok) return;
-        fetch('/api/explain', {
-          headers: { 'Authorization': 'Bearer ' + tok }
-        }).then(function(r) {
-          if (!r.ok) return null;
-          return r.json();
-        }).then(function(data) {
+      refreshPerHistoryIfVerified().then(function(history) {
           if (_examHistoryMasked) return;
-          if (!data || !Array.isArray(data.history) || data.history.length <= hist.length) return;
-          perSaveHist(data.history);
+          if (!Array.isArray(history) || history.length <= hist.length) return;
+          perSaveHist(history);
           /* Only update UI if chat is closed and user hasn't started a new conversation */
           var currentHist = perGetHist();
           var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
@@ -2180,7 +2214,7 @@ function finalizeMsg(div, text) {
             var msgsEl = document.getElementById('perMessages');
             if (msgsEl) {
               msgsEl.innerHTML = '';
-              data.history.forEach(function(msg) {
+              history.forEach(function(msg) {
                 var div = document.createElement('div');
                 div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
                 div.textContent = msg.content;
@@ -2190,7 +2224,6 @@ function finalizeMsg(div, text) {
             }
           }
         }).catch(function() {});
-      });
 
       /* Show quota bar for unauthenticated users on all pages */
       var _hasSession = false;
@@ -2248,7 +2281,7 @@ function finalizeMsg(div, text) {
       initWidget();
     }
 
-    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, clearAfterServerMemoryClear: clearAfterServerMemoryClear, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
+    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, refreshHistoryIfVerified: refreshPerHistoryIfVerified, clearAfterServerMemoryClear: clearAfterServerMemoryClear, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
   /* ── GLOBAL BOTTOM NAV (inloggad) ── */

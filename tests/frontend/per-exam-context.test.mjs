@@ -29,6 +29,7 @@ const EXAM = {
 let lastExplain = null;
 let examStateUnavailable = false;
 let activeExamCount = 0;
+let historyAllowed = true;
 const activeExamCountCalls = [];
 const SAVED_PER_HISTORY = [
   { role: "user", content: "Explain my old practice result." },
@@ -45,7 +46,10 @@ const page = await ctx.newPage();
 // registreras sist och därmed vinner.
 await mockApis(page, {
   extra: [
-    ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+    ["**/api/generate-exam", r => {
+      historyAllowed = false;
+      r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+    }],
     ["**/api/abandon-exam**", r => {
       activeExamCountCalls.push({ method: r.request().method(), url: r.request().url() });
       const url = new URL(r.request().url());
@@ -54,6 +58,11 @@ await mockApis(page, {
         : { ok: true, active_count: activeExamCount } });
     }],
     ["**/api/explain", r => {
+      if (r.request().method() === "GET") {
+        if (historyAllowed) r.fulfill({ json: { ok: true, history: SAVED_PER_HISTORY } });
+        else r.fulfill({ status: 409, json: { error: "PER_HISTORY_LOCKED" } });
+        return;
+      }
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
       if (examStateUnavailable) r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
       else r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
@@ -92,6 +101,7 @@ ok("active exam history mask persists for same-browser navigation", historyDurin
 
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+await page.evaluate(() => window.PER.setExamHistoryMasked(false));
 const historyBeforeResume = await page.evaluate(() => ({
   visible: document.getElementById("perMessages")?.innerText || "",
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
@@ -307,7 +317,9 @@ ok("T8b sidan svarar fortfarande", await page.evaluate(() => typeof window.PER?.
 // manifestet. Eleven som lämnade in ett prov och stod på resultatskärmen och
 // frågade "varför fick jag så lågt?" fick svar om provets sista fråga i
 // stället för om resultatet, eftersom __perManifest fortfarande pekade dit.
-await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"d".repeat(32)}.syntheticCompletionProof`, result: {
+await page.route("**/api/grade", r => {
+  historyAllowed = true;
+  r.fulfill({ json: { ok: true, exam_proof: `v2.${"d".repeat(32)}.syntheticCompletionProof`, result: {
   total_points: 4, max_points: 9,
   per_question: [
     { id: "q1", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" },
@@ -315,7 +327,8 @@ await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: 
     { id: "q3", points: 2, max_points: 3, feedback: "delvis", model_answer: "Beta" },
     { id: "q4", points: 0, max_points: 3, feedback: "fel", model_answer: "Beta" }
   ]
-} } }));
+} } });
+});
 
 // T8 skrev över manifestet med ett eget testmanifest utan fokus. Navigera till
 // en riktig fråga så att publish() sätter ett äkta manifest igen — annars
@@ -337,7 +350,7 @@ const historyAfterGrade = await page.evaluate(() => ({
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
   stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
 }));
-ok("P.E.R restores the preserved transcript only after server confirms no active exams",
+ok("P.E.R restores the server-approved transcript after the verified result",
   historyAfterGrade.mask === null && historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
   JSON.stringify({ mask: historyAfterGrade.mask, visible: historyAfterGrade.visible, calls: activeExamCountCalls }));
 const afterSubmit = await page.evaluate(() => window.__perTestCtx());

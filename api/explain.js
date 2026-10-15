@@ -752,6 +752,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const activeCount = await examIssuance.activeExamCount(user.id);
     if (activeCount === null) return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
     if (activeCount > 0) return res.status(409).json({ error: "EXAM_ACTIVE" });
+    const latestState = await examIssuance.latestExamState(user.id);
+    if (latestState === null) return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    if (latestState !== "none" && latestState !== "completed") {
+      return res.status(409).json({ error: "PER_HISTORY_LOCKED" });
+    }
     const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
     if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true });
     const messages = await loadPerHistory(user.id);
