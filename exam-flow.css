@@ -716,6 +716,10 @@ body.xf-in-exam.xf-per-open #perWidget {
   color: var(--xf-ink-2);
 }
 
+.xf-score span,
+.xf-next p,
+.xf-next-actions .xf-btn.ghost { color: var(--t2); }
+
 .xf-next-list,
 .xf-next-actions {
   display: flex;

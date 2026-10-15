@@ -16,11 +16,12 @@ import path from "node:path";
 //   node tests/frontend/exam-flow.viewports.mjs
 //
 // Fristående Node-skript som använder repots egen playwright-dep. Ingen runner.
-// Exitkod 0 = allt grönt.
+// Exitkod 0 = inga medel/allvarliga fynd; LÅG redovisas för manuell bedömning.
 
 
 const OUT = process.env.OUT_DIR || resolve(ROOT, ".test-out");
 const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
+const axeSource = fs.readFileSync(resolve(ROOT, "node_modules/axe-core/axe.min.js"), "utf8");
 
 const SHOT = OUT;
 fs.mkdirSync(SHOT, { recursive: true });
@@ -106,6 +107,16 @@ async function toContract(page) {
   await page.waitForTimeout(250);
 }
 
+async function axeViolations(page) {
+  await page.evaluate(axeSource);
+  return page.evaluate(async () => {
+    const result = await window.axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } });
+    return result.violations.map(({ id, impact, help, nodes }) => ({
+      id, impact, help, targets: nodes.map(node => node.target.join(" ")),
+    }));
+  });
+}
+
 const overflow = page => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1
   ? { over: true, sw: document.documentElement.scrollWidth, w: window.innerWidth } : { over: false });
 
@@ -130,6 +141,12 @@ for (const [label, w, h] of VIEWS) {
   await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${SHOT}/exam-${label.replace(/\s/g, "_")}.png` });
+  if (["390x844", "1440x900"].includes(label)) {
+    const violations = await axeViolations(page);
+    if (violations.length) {
+      add("HÖG", label, `WCAG 2 A/AA-fynd i aktivt prov: ${JSON.stringify(violations)}`, ".xf-exam", "Åtgärda tillgänglighetsfyndet och behåll regressionstestet");
+    }
+  }
 
   const o2 = await overflow(page);
   if (o2.over) add("HÖG", label, `Horisontell scroll i provläget (${o2.sw}px i ${o2.w}px)`, ".xf-exam", "Se .xf-sheet/.xf-exam-top");
@@ -242,6 +259,10 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 20000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${SHOT}/q20-result-${w}.png` });
+  const resultAxe = await axeViolations(page);
+  if (resultAxe.length) {
+    add("HÖG", label, `WCAG 2 A/AA-fynd på resultatsidan: ${JSON.stringify(resultAxe)}`, "#xf .xf-screen[data-screen='result']", "Åtgärda tillgänglighetsfyndet och behåll regressionstestet");
+  }
   const o3 = await overflow(page);
   if (o3.over) add("HÖG", label, `Horisontell scroll på resultatskärmen (${o3.sw}px i ${o3.w}px)`, ".xf-item", "Kolla långa modellsvar/källrader");
   const resH = await page.evaluate(() => Math.round(document.body.scrollHeight));
@@ -461,3 +482,4 @@ console.log("\n════ VISUELL GRANSKNING ════\n");
 if (!findings.length) console.log("inga fynd");
 findings.forEach(f => console.log(`${f.sev} | ${f.ctx} | ${f.what}\n   → ${f.where} — ${f.fix}\n`));
 console.log("skärmbilder:", fs.readdirSync(SHOT).join(", "));
+if (findings.some(finding => finding.sev !== "LÅG")) process.exitCode = 1;

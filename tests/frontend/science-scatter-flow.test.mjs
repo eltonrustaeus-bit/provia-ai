@@ -20,6 +20,14 @@ const scenarios = [
     rows: [[0, 2], [1, 3], [2, 4]],
   },
   {
+    id: "geography",
+    course: "Geografi 1",
+    title: "Geografiprov",
+    material: "Temperaturavvikelse från månadsmedel (°C):\nMånad | Avvikelse (°C)\n1 | -2\n2 | 1\n3 | 3",
+    headers: ["Månad", "Avvikelse (°C)"],
+    rows: [[1, -2], [2, 1], [3, 3]],
+  },
+  {
     id: "biology-partial",
     course: "Biologi 1",
     title: "Biologiprov",
@@ -201,7 +209,7 @@ async function verifyScatterScenario(scenario) {
 
 try {
   for (const scenario of scenarios) await verifyScatterScenario(scenario);
-  console.log("scatter graph flows: biology and math table data render accessibly and submit from mobile/desktop");
+  console.log("scatter graph flows: biology, geography and math table data render accessibly and submit from mobile/desktop");
 } finally {
   await browser.close();
   await server.close();
