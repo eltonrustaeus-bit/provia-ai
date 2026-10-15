@@ -793,6 +793,84 @@ test("verified completed exams route each answer type's signed answer to post-gr
   }
 });
 
+test("post-grade review treats a blank response as unanswered while explaining the verified answer", async () => {
+  activeCount = 0;
+  const blankQuestion = {
+    id: "review-blank", type: "short", points: 2,
+    question: "Förklara vad lutningen beskriver.", options: [],
+    model_answer: "Lutningen beskriver ändringen i y när x ökar med ett.",
+  };
+  const signedQuestion = {
+    ...blankQuestion,
+    grade_task: tasks.sealQuestion(blankQuestion, undefined, tasks.hashContext(material, course, userId)),
+  };
+  const examProof = createReviewProof(
+    [signedQuestion], blankQuestion.id, [{ id: blankQuestion.id, answer: "" }],
+    [{ id: blankQuestion.id, points: 0, max_points: 2, feedback: "Obesvarad. Inget svar lämnades." }]
+  );
+  providerAnswer = "P.E.R visar facit först efter verifierad inlämning och rättning.";
+  calls.length = 0;
+  try {
+    const response = await invoke({ examReview: true, examProof });
+    assert.equal(response.statusCode, 200, `${JSON.stringify(response.body)}`);
+    assert.equal(response.body.reviewMode, "personalized");
+    assert.equal(response.body.answer, providerAnswer);
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "verified blank submission can receive the post-grade explanation");
+    const providerRequest = JSON.parse(provider.body);
+    const systemPrompt = providerRequest.input.find(({ role }) => role === "system").content;
+    const reviewPayload = JSON.parse(providerRequest.input.find(({ role }) => role === "user").content);
+    assert.match(systemPrompt, /Eleven lämnade frågan obesvarad/i);
+    assert.match(systemPrompt, /beskriv inte en missuppfattning/i);
+    assert.equal(reviewPayload.student_answer, "");
+    assert.equal(reviewPayload.awarded_points, 0);
+    assert.match(reviewPayload.model_answer, /Lutningen beskriver ändringen i y/);
+    assert.ok(calls.some(({ url }) => url.includes("consume_per_chat_quota")));
+  } finally {
+    providerAnswer = defaultProviderAnswer;
+    const submissionId = completion.submissionId(userId, course, [signedQuestion]);
+    savedSubmissionIds.delete(submissionId);
+  }
+});
+
+test("English post-grade review treats a blank response as unanswered", async () => {
+  activeCount = 0;
+  const blankQuestion = {
+    id: "review-blank-en", type: "short", points: 2,
+    question: "Explain what the gradient describes.", options: [],
+    model_answer: "The gradient describes the change in y when x increases by one.",
+  };
+  const signedQuestion = {
+    ...blankQuestion,
+    grade_task: tasks.sealQuestion(blankQuestion, undefined, tasks.hashContext(material, course, userId)),
+  };
+  const examProof = createReviewProof(
+    [signedQuestion], blankQuestion.id, [{ id: blankQuestion.id, answer: "" }],
+    [{ id: blankQuestion.id, points: 0, max_points: 2, feedback: "Unanswered. No response was provided." }]
+  );
+  providerAnswer = "P.E.R explains the verified answer after submission and grading.";
+  calls.length = 0;
+  try {
+    const response = await invoke({ examReview: true, examProof, lang: "en" });
+    assert.equal(response.statusCode, 200, `${JSON.stringify(response.body)}`);
+    assert.equal(response.body.reviewMode, "personalized");
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "verified blank submission can receive the post-grade explanation");
+    const providerRequest = JSON.parse(provider.body);
+    const systemPrompt = providerRequest.input.find(({ role }) => role === "system").content;
+    const reviewPayload = JSON.parse(providerRequest.input.find(({ role }) => role === "user").content);
+    assert.match(systemPrompt, /The learner left this question unanswered/i);
+    assert.match(systemPrompt, /Do not describe a misconception/i);
+    assert.equal(reviewPayload.student_answer, "");
+    assert.equal(reviewPayload.awarded_points, 0);
+    assert.match(reviewPayload.model_answer, /change in y when x increases by one/);
+  } finally {
+    providerAnswer = defaultProviderAnswer;
+    const submissionId = completion.submissionId(userId, course, [signedQuestion]);
+    savedSubmissionIds.delete(submissionId);
+  }
+});
+
 test("post-grade explanation rejects a signed exam without its matching saved result", async () => {
   activeCount = 0;
   const unsubmitted = {
