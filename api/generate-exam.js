@@ -1147,7 +1147,7 @@ module.exports = async function handler(req, res) {
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
       const [v1, s1] = await Promise.all([
-        verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang }),
+        verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang, material: pastedText }),
         solver.solveQuestions(exam.questions, {
           apiKey, model, subjectProfile, lang, pastedText,
           material: pastedText,
@@ -1238,7 +1238,7 @@ module.exports = async function handler(req, res) {
               gate = assessment.gateExam(exam2, { profile: subjectProfile });
               const regatedQuestions = gate.questions;
               if (regatedQuestions.length > 0) {
-                const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang });
+                const v2 = await verifier.verifyQuestions(regatedQuestions, { apiKey, model, subjectProfile, lang, material: pastedText });
                 recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
                 if (v2.callOk) {
                   const kept = [];

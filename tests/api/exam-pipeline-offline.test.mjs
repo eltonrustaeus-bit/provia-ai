@@ -13,6 +13,7 @@ const origin = "https://offline-pipeline.invalid";
 const userId = "22222222-2222-4222-8222-222222222222";
 const signingSecret = "synthetic-exam-pipeline-signing-secret";
 const calls = [];
+const verifierInputs = [];
 
 for (const [key, value] of Object.entries({
   SUPABASE_URL: origin,
@@ -50,6 +51,7 @@ let emptyGenerationResponse = false;
 let generationTextOverride = null;
 let gradingState = "active";
 let solverUnavailable = false;
+let verifierRejectQuestionId = null;
 
 function outputResponse(value) {
   return Response.json({
@@ -109,10 +111,13 @@ globalThis.fetch = async (input, init = {}) => {
     }
     const schemaName = body.text?.format?.name;
     if (schemaName === "exam_verifier_schema") {
-      return outputResponse({ results: activeQuestions.map((q) => ({
-        id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0,
+      const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
+      verifierInputs.push(reviewInput);
+      return outputResponse({ results: reviewInput.questions.map((q) => ({
+        id: q.id, approved: q.id !== verifierRejectQuestionId, factual_accuracy: q.id === verifierRejectQuestionId ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
-        language_quality: 1, issues: [], required_changes: [],
+        language_quality: 1, issues: q.id === verifierRejectQuestionId ? ["Exempelsvaret motsäger frågan."] : [],
+        required_changes: q.id === verifierRejectQuestionId ? ["Rätta exempelsvaret."] : [],
       })) });
     }
     if (schemaName === "exam_solver_schema") {
@@ -205,6 +210,13 @@ try {
   }
   assert.equal(generated.body.meta.verifier.approved, 3);
   assert.equal(generated.body.meta.solver.checked, 3);
+  const initialVerifierInput = verifierInputs.at(-1);
+  assert.equal(initialVerifierInput.source_material, pastedText,
+    "the real generation handler forwards source evidence to the independent reviewer");
+  assert.equal(initialVerifierInput.questions[0].model_answer, questions[0].model_answer,
+    "the independent reviewer receives the generated answer exemplar");
+  assert.equal(initialVerifierInput.questions[0].rubric, questions[0].rubric);
+  assert.deepEqual(initialVerifierInput.questions[0].scoring_rubric, questions[0].scoring_rubric);
   const usageWrite = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
   assert.ok(usageWrite, "the complete provider chain writes one metrics batch");
   assert.deepEqual(usageWrite.body.map((event) => event.pipeline_step), ["generate", "verify_compare", "verify_blind"]);
@@ -259,6 +271,35 @@ try {
   });
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
     "a successfully generated exam commits its reserved quota");
+
+  const shortQuestions = Array.from({ length: 5 }, (_, index) => {
+    const id = index === 0 ? "short-wrong-example" : `short-${index + 1}`;
+    const question = ["Lös 2x = 4.", "Lös x + 3 = 5.", "Lös 3x = 12.", "Lös x - 2 = 1.", "Beräkna 2 + 3."][index];
+    const answer = ["x = 3", "x = 2", "x = 4", "x = 3", "5"][index];
+    return {
+      id, type: "short", points: 1, question, options: [], correct_index: -1,
+      rubric: `En poäng för ${answer}.`, model_answer: answer,
+      topic: "Ekvationer", subtopic: "Enkla beräkningar", concept_tag: "algebra",
+      learning_objective: "Lösa och beräkna enkla uttryck.", source_references: ["addition"],
+      cognitive_level: "tillämpa", accepted_answers: [], estimated_answer_length: "short",
+      scoring_rubric: { parts: [{ description: `Rätt svar ${answer}`, points: 1 }], full_score_requirements: answer, partial_credit_notes: "" },
+    };
+  });
+  activeQuestions = shortQuestions;
+  verifierRejectQuestionId = "short-wrong-example";
+  const shortExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "short", numQuestions: 5,
+  });
+  activeQuestions = questions;
+  verifierRejectQuestionId = null;
+  assert.equal(shortExam.status, 200, JSON.stringify(shortExam.body));
+  assert.equal(shortExam.body.exam.questions.length, 4, "an open-response exemplar rejected by review is withheld");
+  assert.equal(shortExam.body.exam.questions.some((q) => q.id === "short-wrong-example"), false,
+    "a contradictory model answer cannot reach the learner when the reviewer rejects it");
+  const shortVerifierInput = verifierInputs.at(-1);
+  assert.equal(shortVerifierInput.source_material, pastedText);
+  assert.equal(shortVerifierInput.questions.find((q) => q.id === "short-wrong-example")?.model_answer, "x = 3");
+  assert.equal(shortExam.body.meta.verifier.rejected, 1);
 
   calls.length = 0;
   solverUnavailable = true;

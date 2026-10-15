@@ -2,16 +2,18 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { verifyQuestions } = require("../../api/_verifier.js");
+const { verifyQuestions, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")]) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "") {
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
-  globalThis.fetch = async () => {
+  let requestBody = null;
+  globalThis.fetch = async (_input, init = {}) => {
     fetchCalls++;
+    requestBody = JSON.parse(init.body || "{}");
     return Response.json({
       model: "measured-review-model",
       usage: { input_tokens: 31, output_tokens: 7 },
@@ -19,7 +21,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic" }), fetchCalls };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material }), fetchCalls, requestBody };
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -63,3 +65,33 @@ for (const malformedId of [undefined, "", "   ", 7]) {
 }
 
 console.log("verifier output contract: exact IDs accepted; duplicate, missing, foreign, and duplicate-input IDs fail closed");
+
+const openQuestion = {
+  id: "open-1", type: "short", question: "Lös 2x = 4.", options: [], correct_index: -1,
+  points: 1, cognitive_level: "tillämpa", model_answer: "x = 3", rubric: "En poäng för x = 2.",
+  scoring_rubric: { parts: [{ description: "x = 2", points: 1 }], full_score_requirements: "x = 2", partial_credit_notes: "" },
+  source_references: ["2x = 4"],
+};
+const needsRevision = {
+  id: "open-1", approved: false, factual_accuracy: 0.2, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 0.2, language_quality: 1,
+  issues: ["Exempelsvaret löser inte ekvationen."], required_changes: ["Byt exempelsvaret till x = 2."],
+};
+const openResponse = await runWithResults([needsRevision], [openQuestion], "Ekvationer: 2x = 4.");
+const transmitted = JSON.parse(openResponse.requestBody.input.find((item) => item.role === "user").content);
+assert.equal(transmitted.source_material, "Ekvationer: 2x = 4.");
+assert.equal(transmitted.questions[0].model_answer, "x = 3", "the reviewer receives the generated exemplar it must independently check");
+assert.equal(transmitted.questions[0].rubric, "En poäng för x = 2.");
+assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_rubric);
+assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
+assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
+assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
+  "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
+assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");
+const boundedMaterial = await runWithResults([needsRevision], [openQuestion], "m".repeat(12050));
+const boundedInput = JSON.parse(boundedMaterial.requestBody.input.find((item) => item.role === "user").content);
+assert.equal(boundedInput.source_material.length, 12000, "source context is capped before the paid review request");
+const oversizedAnswer = await runWithResults([result("open-1", true)], [{ ...openQuestion, model_answer: "x".repeat(6001) }]);
+assert.equal(oversizedAnswer.outcome.callOk, false, "oversized generated review fields fail closed");
+assert.equal(oversizedAnswer.fetchCalls, 0, "oversized review input is rejected before provider traffic");
+console.log("verifier open-answer contract: source material, exemplar, and rubrics reach independent review; contradictory example is rejected");
