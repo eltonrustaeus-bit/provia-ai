@@ -20,7 +20,11 @@ try {
   });
 
   const persistentNote = page.locator("#clearPerMemoryBtn").locator("xpath=ancestor::div[contains(@class,'kCardBody')]").locator(".kPrivacyNote");
-  assert.match(await persistentNote.innerText(), /begäran som redan pågår kan spara nytt minne/i);
+  const persistentCopy = await persistentNote.innerText();
+  assert.match(persistentCopy, /begäran som redan pågår kan spara nytt minne/i);
+  assert.match(persistentCopy, /profiluppgifter kan finnas kvar/i);
+  assert.match(persistentCopy, /ta bort dem separat under vad P\.E\.R\. vet om mig/i);
+  assert.match(persistentCopy, /prov, resultat och felbank påverkas inte/i);
 
   let confirmation = "";
   page.on("dialog", async (dialog) => {
@@ -29,6 +33,8 @@ try {
   });
   await page.locator("#clearPerMemoryBtn").click();
   assert.match(confirmation, /vänta tills svaren är klara och rensa igen/i);
+  assert.match(confirmation, /profiluppgifter rensas separat under vad P\.E\.R\. vet om mig/i);
+  assert.match(confirmation, /provresultat och felbank påverkas inte/i);
   await page.waitForFunction(() => document.querySelector("#kontoMsg")?.textContent.includes("Pågående P.E.R-svar kan spara nytt minne"));
   assert.equal(clearRequests, 1, "clear is sent only after the caution is shown and accepted");
   assert.deepEqual(await page.locator("#kontoMsg").getAttribute("class"), "ok");
