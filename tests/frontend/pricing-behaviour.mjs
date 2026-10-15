@@ -95,9 +95,12 @@ const PLANS = [
     /AI-genererad övningsrapport från dina prov \(minst 3 verifierat rättade\)/i.test(premiumFeatures) &&
     !/personlig studieplan|personlig plan|Lärarrapport|inför utvecklingssamtal|full progression över alla ämnen/i.test(premiumFeatures));
   const impact = await page.locator("#zonImpact").innerText();
+  const impactStatus = await page.locator("#zonImpact .impactStatus").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
   ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
   ok("0i Impact lovar inte elevmånader eller effektresultat", /köp är ännu inte kopplade till Impact/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
+  ok("0p Impact klargör att finansiering, skolåtkomst och användning inte registreras ännu",
+    /registrerar ännu inte reserverad Impact-finansiering, tilldelad skolåtkomst eller använda elevmånader/i.test(impactStatus));
   ok("0l Impact skiljer tillgång från läranderesultat", /tillgång för en elev under en månad, inte ett löfte om förbättrat resultat/i.test(impact) && /Finansierad, aktiverad och använd tillgång ska redovisas var för sig/i.test(impact));
   ok("0m Impact kräver kostnadsunderlag och skolgodkännande", /AI, drift och betalningar kostar/i.test(impact) && /skolans godkännande behövs/i.test(impact));
   ok("0j Impact-sektionen har en tillgänglig rubrik", impactHeading === "impact-title" && await page.locator(`#${impactHeading}`).isVisible());
