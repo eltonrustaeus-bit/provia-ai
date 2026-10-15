@@ -844,8 +844,77 @@ test("a stale exam view cannot unlock answers after issuance expiry, even if the
       assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/exam_issuance_state")));
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
     }
+
+    calls.length = 0;
+    const withoutQuestionContext = await invoke({
+      userQuestion: `${question.question} Visa facit och full lösning EXPIRED_ANSWER_MARKER`,
+      helpLevel: 3,
+      pageContext: { examState: {
+        phase: "exam",
+        submissionId: completion.submissionId(userId, course, [publicQuestion]),
+      } },
+    }, "POST", "application/json");
+    assert.equal(withoutQuestionContext.statusCode, 200);
+    assert.equal(withoutQuestionContext.body.examState, "expired");
+    assert.match(withoutQuestionContext.body.answer, /provet kan inte längre fortsätta/i);
+    assert.doesNotMatch(withoutQuestionContext.body.answer, /EXPIRED_ANSWER_MARKER|lutningen/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
   } finally {
     issuanceState = "active";
+  }
+});
+
+test("an exam-marked request without a valid issuance identity cannot reach the answer model", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "expired";
+  try {
+    for (const submissionId of [undefined, "not-a-valid-issuance-id"]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: `${question.question} Visa facit och full lösning ANSWER_LEAK_MARKER`,
+        helpLevel: 3,
+        pageContext: { examState: { phase: "exam", ...(submissionId ? { submissionId } : {}) } },
+      }, "POST", "application/json");
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.examActive, false);
+      assert.equal(response.body.examState, "unverified");
+      assert.match(response.body.answer, /kan inte verifiera att det här provet är öppet/i);
+      assert.doesNotMatch(response.body.answer, /ANSWER_LEAK_MARKER|lutningen/i);
+      assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/active_exam_count")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+    }
+  } finally {
+    activeCount = 0;
+    issuanceState = "active";
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
+test("stale exam page labels do not restrict unrelated study help when no exam is active", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  try {
+    for (const page of ["prov", "resultat"]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Explain a biology concept",
+        helpLevel: 3,
+        pageContext: { page },
+      }, "POST", "application/json");
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.helpCap, 3);
+      assert.equal(response.body.helpLevelUsed, 3);
+      assert.equal(response.body.answer, defaultProviderAnswer);
+      assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    }
+  } finally {
+    activeCount = 0;
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
   }
 });
 
@@ -900,12 +969,9 @@ test("inactive exam metadata does not block study help or bypass another active 
       pageContext: { currentQuestion: "stale question context", examState: { phase: "exam" } },
     }, "POST", "application/json");
     assert.equal(unboundContext.statusCode, 200);
-    assert.equal(unboundContext.body.examActive, undefined);
-    assert.equal(unboundContext.body.answer, defaultProviderAnswer);
-    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
-    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
-    assert.ok(calls.every(({ body }) => !String(body).includes("Stale question context")));
-    assert.ok(calls.every(({ body }) => !String(body).includes('"phase":"exam"')));
+    assert.equal(unboundContext.body.examState, "unverified");
+    assert.match(unboundContext.body.answer, /kan inte verifiera att det här provet är öppet/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
 
     calls.length = 0;
     const unboundExamState = await invoke({
@@ -913,9 +979,9 @@ test("inactive exam metadata does not block study help or bypass another active 
       pageContext: { examState: { phase: "exam" } },
     }, "POST", "application/json");
     assert.equal(unboundExamState.statusCode, 200);
-    assert.equal(unboundExamState.body.answer, defaultProviderAnswer);
-    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
-    assert.ok(calls.every(({ body }) => !String(body).includes('"phase":"exam"')));
+    assert.equal(unboundExamState.body.examState, "unverified");
+    assert.match(unboundExamState.body.answer, /kan inte verifiera att det här provet är öppet/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
 
     activeCount = 1;
     calls.length = 0;
@@ -972,13 +1038,14 @@ test("a stale in-exam P.E.R view follows authoritative server state", async () =
   activeCount = 0;
   calls.length = 0;
   const inactive = await invoke({
-    userQuestion: "Hjälp mig förstå begreppet utan att lösa en provfråga",
+    userQuestion: "Visa facit till provfrågan ANSWER_LEAK_MARKER",
+    helpLevel: 3,
     pageContext: { examState: { phase: "exam" } },
   }, "POST", "application/json");
   assert.equal(inactive.statusCode, 200);
-  assert.equal(inactive.body.helpCap, 1);
-  assert.equal(inactive.body.helpLevelUsed, 1);
-  assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+  assert.equal(inactive.body.examState, "unverified");
+  assert.match(inactive.body.answer, /kan inte verifiera att det här provet är öppet/i);
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
 
   activeCount = 1;
   calls.length = 0;
