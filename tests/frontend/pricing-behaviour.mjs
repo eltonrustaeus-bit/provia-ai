@@ -89,6 +89,9 @@ const PLANS = [
   const premiumDescription = await page.locator("#plan-premium .planDesc").innerText();
   ok("0n Premium beskriver funktioner utan att utlova läranderesultat",
     premiumDescription === "Personlig AI-coach och träning utifrån dina misstag." && !/maxa resultaten/i.test(premiumDescription));
+  const premiumFeatures = await page.locator("#plan-premium .featureList").innerText();
+  ok("0o Premium undviker obestyrkt löfte om full ämnesprogression",
+    /P\.E\.R Coach: personlig studieplan från dina misstag/i.test(premiumFeatures) && !/full progression över alla ämnen/i.test(premiumFeatures));
   const impact = await page.locator("#zonImpact").innerText();
   const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
   ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
