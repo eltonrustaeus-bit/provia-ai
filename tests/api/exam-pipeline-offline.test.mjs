@@ -180,6 +180,7 @@ try {
   }));
   const generated = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    focusTerms: ["heltal", "påhittat"],
   });
   activeQuestions = questions;
 
@@ -189,6 +190,12 @@ try {
   assert.deepEqual(generated.body.exam.questions.map((question) => question.source_references), [
     ["addition, subtraktion"], ["heltal"], ["heltal"],
   ], "only source excerpts that literally occur in the learner material reach the UI");
+  const generationCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.stream);
+  const generationUserPrompt = generationCall?.body?.input?.find((item) => item.role === "user")?.content || "";
+  assert.match(generationUserPrompt, /Elevens valda fokusbegrepp \(ord från materialet\): heltal/,
+    "a source-supported learner selection reaches the real generation handler's prompt");
+  assert.doesNotMatch(generationUserPrompt, /påhittat/,
+    "a client term absent from the source is removed before model input");
   assert.match(generated.body.exam.exam_manifest, /^v1\.3\./);
   for (const question of generated.body.exam.questions) {
     assert.ok(question.grade_task, "each delivered question has opaque signed grading material");

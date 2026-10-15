@@ -812,6 +812,7 @@ function escapeHtml(s){
 }
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
+let selectedExamFocusTerms = [];
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
@@ -2016,7 +2017,7 @@ try{
 
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
-    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12)};
+    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12),focusTerms:selectedExamFocusTerms};
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
@@ -2333,12 +2334,13 @@ try{
   window.ExGenEngine = {
     ready: true,
     language() { return LANG === "en" ? "en" : "sv"; },
-    setInputs({ course, level, qType, num, material }) {
+    setInputs({ course, level, qType, num, material, focusTerms }) {
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
       if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 12)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
+      selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den
       // gamla vyn, och så att clearAll() inte skriver tillbaka ett gammalt val.
       const search = document.getElementById("courseSearch");

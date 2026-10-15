@@ -467,6 +467,7 @@
     nonGraphNum: 12,
     questionCountNote: "",
     material: "",
+    focusTerms: null,
     exam: null,
     answers: questionState(),   // qid -> svar
     helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
@@ -1189,14 +1190,14 @@
     "detta denna dessa vilket vilken samt under efter före mellan genom mycket " +
     "andra vara blir blev hade skulle kunna finns bland utan över").split(" ");
 
-  /* Begreppsläsning i klienten. Ingen AI, inget anrop — ord som återkommer i
-     elevens egen text, filtrerade mot stoppord. Det är därför raden får heta
-     "hittade begrepp" och inte "analyserat": den påstår bara det den vet. */
+  /* Lokal ordheuristik för elevens val före provet. Ingen AI eller nätverksbegäran:
+     återkommande och särpräglade ord väljs ur texten och eleven kan prioritera
+     dem. Det är förslag, inte semantisk begreppsigenkänning. */
   function terms(text) {
-    var words = String(text).toLowerCase().match(/[a-zåäö][a-zåäö\-]{4,}/g) || [];
+    var words = String(text).toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || [];
     var freq = {};
     words.forEach(function (w) {
-      if (STOP.indexOf(w) !== -1) return;
+      if (w.length > 48 || STOP.indexOf(w) !== -1) return;
       freq[w] = (freq[w] || 0) + 1;
     });
     var all = Object.keys(freq);
@@ -1294,6 +1295,7 @@
 
     function onType() {
       var v = ta.value.trim();
+      if (S.material !== ta.value) S.focusTerms = null;
       S.material = ta.value;
       err.textContent = "";
       go.disabled = !v;
@@ -1369,12 +1371,42 @@
 
     var t = terms(S.material);
     if (t.length) {
-      var cov = el("div");
-      cov.appendChild(el("div", "xf-eyebrow", tx("Begrepp jag hittade i ditt material", "Key terms found in your material")));
-      var chips = el("div", "xf-cov");
-      t.forEach(function (w) { chips.appendChild(el("span", null, w)); });
-      cov.appendChild(chips);
-      b.appendChild(cov);
+      if (!Array.isArray(S.focusTerms)) S.focusTerms = t.slice();
+      S.focusTerms = S.focusTerms.filter(function (term) { return t.indexOf(term) !== -1; });
+
+      var focus = el("fieldset", "xf-focus");
+      focus.appendChild(el("legend", "xf-eyebrow", tx("Prioritera ord", "Prioritize words")));
+      var focusHelp = el("p", "xf-focus-help", tx(
+        "AI:n prioriterar dina val när materialet ger stöd. Listan är ingen fullständig kurskarta.",
+        "The AI prioritizes your choices when supported by the material. This is not a complete course map."
+      ));
+      focusHelp.id = "xf-focus-help";
+      focus.setAttribute("aria-describedby", "xf-focus-help");
+      focus.appendChild(focusHelp);
+
+      var choices = el("div", "xf-focus-options");
+      t.forEach(function (word) {
+        var option = el("label", "xf-focus-option");
+        var checkbox = el("input");
+        checkbox.type = "checkbox";
+        checkbox.value = word;
+        checkbox.checked = S.focusTerms.indexOf(word) !== -1;
+        checkbox.setAttribute("aria-label", word);
+        option.classList.toggle("selected", checkbox.checked);
+        checkbox.addEventListener("change", function () {
+          if (checkbox.checked) {
+            if (S.focusTerms.indexOf(word) === -1) S.focusTerms.push(word);
+          } else {
+            S.focusTerms = S.focusTerms.filter(function (term) { return term !== word; });
+          }
+          option.classList.toggle("selected", checkbox.checked);
+        });
+        option.appendChild(checkbox);
+        option.appendChild(el("span", null, word));
+        choices.appendChild(option);
+      });
+      focus.appendChild(choices);
+      b.appendChild(focus);
     }
 
     var err = el("div", "xf-err");
@@ -1436,7 +1468,7 @@
 
     window.ExGenEngine.setInputs({
       course: S.course, level: S.level, qType: S.qType,
-      num: S.num, material: S.material
+      num: S.num, material: S.material, focusTerms: S.focusTerms || []
     });
 
     window.ExGenEngine.generate().then(function (r) {
@@ -2853,7 +2885,24 @@
     buildDom(root);
     stepStart(false);
     window.addEventListener("exgen:history-updated", function () {
-      if (UI.screens.start && UI.screens.start.classList.contains("on")) stepStart();
+      var start = UI.screens.start;
+      if (!start || !start.classList.contains("on")) return;
+      var active = document.activeElement;
+      var restoreHeading = start.contains(active) && active.matches(".xf-say");
+      var restoreControl = start.contains(active) && active.matches("button, a, input, select, textarea")
+        ? { tag: active.tagName, text: active.textContent.trim() }
+        : null;
+      stepStart(false);
+      if (restoreHeading) {
+        var heading = UI.screens.start.querySelector(".xf-say");
+        if (heading) heading.focus();
+      } else if (restoreControl) {
+        var controls = UI.screens.start.querySelectorAll("button, a, input, select, textarea");
+        var next = Array.prototype.find.call(controls, function (node) {
+          return node.tagName === restoreControl.tag && node.textContent.trim() === restoreControl.text;
+        });
+        if (next) next.focus();
+      }
     });
 
     document.addEventListener("keydown", function (e) {
@@ -2898,6 +2947,7 @@
       var mat = String(material || "").trim();
       if (!mat) return false;
       S.material = mat.slice(0, MATERIAL_MAX);
+      S.focusTerms = null;
       if (course) S.course = String(course).trim();
       if (!S.course) S.course = dna().courses[0] || "Repetition";
       var d = dna();

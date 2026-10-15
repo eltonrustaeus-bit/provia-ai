@@ -39,6 +39,7 @@ const EXAM = {
 };
 
 let lastGradePayload = null;
+let lastGeneratePayload = null;
 let lastAbandonPayload = null;
 let activeExamCountResponse = 0;
 let examIssuanceStateResponse = "active";
@@ -70,7 +71,10 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null) {
         ? { ok: true, abandoned_count: 1 }
         : { ok: true, abandoned: true } });
     }],
-    ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+    ["**/api/generate-exam", r => {
+      try { lastGeneratePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
+      return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+    }],
     ["**/api/grade", async r => {
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
@@ -111,6 +115,12 @@ const signIn = async (page, uid, lang = "sv", storage = {}) => {
     });
     ok("första provskärmen visar ingen dekorativ fokusram vid sidstart",
       !initialHeadingFocus.focused && !initialHeadingFocus.visible, JSON.stringify(initialHeadingFocus));
+    const startAction = page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    await startAction.focus();
+    await page.evaluate(() => window.dispatchEvent(new Event("exgen:history-updated")));
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "Create an exam");
+    ok("historikuppdatering behåller elevens tangentbordsfokus i startvyn",
+      await page.evaluate(() => document.activeElement?.textContent?.trim() === "Create an exam"));
     await page.locator("#xf .xf-screen[data-screen='start'] .xf-btn.primary").focus();
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='subject']")?.classList.contains("on"));
@@ -194,6 +204,43 @@ async function toMaterial(page) {
   await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
   await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+}
+
+// The learner can decide which source-supported terms the generator should prioritize.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "focus-scope-user");
+    await toMaterial(page);
+    const material = "Fotosyntesen sker i växtens kloroplaster. Klorofyll fångar ljusenergi och koldioxid tas upp genom klyvöppningarna. Vatten transporteras från rötterna och används när växten bygger druvsocker. Syre bildas som en restprodukt under processen.";
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", material);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const boxes = page.locator(".xf-focus-option input[type='checkbox']");
+    const count = await boxes.count();
+    const initialSelection = await boxes.evaluateAll(nodes => nodes.every(node => node.checked));
+    const focusValues = await boxes.evaluateAll(nodes => nodes.map(node => node.value));
+    const sourceTerm = count ? await boxes.first().inputValue() : "";
+    if (count) await boxes.first().uncheck();
+    const remainingTerms = count > 1 ? await boxes.evaluateAll(nodes => nodes.filter(node => node.checked).map(node => node.value)) : [];
+    await page.getByRole("button", { name: "Skapa provet" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    ok("T14a fokusval visas som tillgängliga val med tydlig täckningsbegränsning",
+      count > 0 && initialSelection
+      && focusValues.every(term => term.length <= 48 && /^[a-zåäö][a-zåäö-]{3,}[a-zåäö]$/.test(term))
+      && await page.locator(".xf-focus legend").textContent() === "Prioritera ord"
+      && await page.locator(".xf-focus").getAttribute("aria-describedby") === "xf-focus-help"
+      && /ingen fullständig kurskarta/.test(await page.locator(".xf-focus-help").textContent() || ""));
+    ok("T14b elevens avval och kvarvarande fokusbegrepp följer med till generatorn",
+      lastGeneratePayload?.pastedText === material
+      && Array.isArray(lastGeneratePayload?.focusTerms)
+      && lastGeneratePayload.focusTerms.length === remainingTerms.length
+      && lastGeneratePayload.focusTerms.includes(remainingTerms[0])
+      && !lastGeneratePayload.focusTerms.includes(sourceTerm), JSON.stringify(lastGeneratePayload?.focusTerms));
+    ok("T14c fokusvalet lämnar inga klientfel", errs.length === 0, errs.join(" | "));
+  } finally {
+    await ctx.close();
+  }
 }
 
 // Desktop language access and wizard copy must stay usable without losing input.

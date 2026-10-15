@@ -40,6 +40,20 @@ function safeString(x, maxLen = 200000) {
   return s.length > maxLen ? s.slice(0, maxLen) : s;
 }
 
+function normalizeSelectedFocusTerms(value, pastedText) {
+  if (!Array.isArray(value) || value.length > 6) return [];
+  const sourceWords = new Set(String(pastedText || "").toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || []);
+  const accepted = new Set();
+  for (const raw of value) {
+    if (typeof raw !== "string") continue;
+    const term = raw.trim().toLowerCase();
+    if (term.length > 48 || !/^[a-zåäö][a-zåäö-]{3,}[a-zåäö]$/.test(term)) continue;
+    if (!sourceWords.has(term) || accepted.has(term)) continue;
+    accepted.add(term);
+  }
+  return [...accepted];
+}
+
 function normalizeUniqueQuestionIds(questions) {
   if (!Array.isArray(questions)) return false;
   const seen = new Set();
@@ -596,7 +610,7 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   return { ok: true, text, cutShort, usage, model: providerModel, latencyMs: Date.now() - t0 };
 }
 
-function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "" }) {
+function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "", selectedFocusTerms = [] }) {
   const systemSvBase =
     "Du skapar ett realistiskt mockprov som en svensk gymnasielärare. " +
     "Du MÅSTE följa JSON-schemat exakt och bara returnera JSON. " +
@@ -726,6 +740,13 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
       ? systemSvBase + (isMath ? (" " + systemSvMath) : "")
       : systemEnBase + (isMath ? (" " + systemEnMath) : "");
 
+  const verifiedFocusTerms = normalizeSelectedFocusTerms(selectedFocusTerms, pastedText);
+  const learnerFocusInstruction = verifiedFocusTerms.length
+    ? lang === "sv"
+      ? `Elevens valda fokusbegrepp (ord från materialet): ${verifiedFocusTerms.join(", ")}. Prioritera frågor som prövar dessa begrepp när materialet ger tydligt stöd. Materialet är enda faktakällan: hitta inte på innehåll, och lova inte fullständig täckning. Behåll variation och ta även upp annat centralt innehåll som stöds.`
+      : `Student-selected focus terms (words from the source): ${verifiedFocusTerms.join(", ")}. Prioritize questions that test these terms when the material clearly supports them. The material is the only factual source: do not invent content or promise complete coverage. Preserve variety and include other central material that is supported.`
+    : "";
+
   const mixRuleSv =
     qType === "mc"
       ? "Gör ALLA frågor som flervalsfrågor (mc)."
@@ -762,6 +783,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     mixRuleSv,
     `Antal frågor: ${numQuestions}.`,
     focusInstruction,
+    learnerFocusInstruction,
     "",
     "Material (använd bara detta som underlag):",
     pastedText
@@ -774,6 +796,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     mixRuleEn,
     `Number of questions: ${numQuestions}.`,
     focusInstruction,
+    learnerFocusInstruction,
     "",
     "Material (use only this as the source):",
     pastedText
@@ -818,6 +841,7 @@ module.exports = async function handler(req, res) {
   const qType = asEnum(parsed.qType, ["mix", "mc", "short", "graph"], "mix");
   const course = safeString(parsed.course, 200);
   const pastedText = safeString(parsed.pastedText, 3000);
+  const selectedFocusTerms = normalizeSelectedFocusTerms(parsed.focusTerms, pastedText);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 12);
   const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(3, numQuestionsRaw));
@@ -917,7 +941,7 @@ module.exports = async function handler(req, res) {
     const focusInstruction = await buildAdaptiveFocus(user.id, { numQuestions, lang });
 
     const { systemPrompt, userPrompt } = buildExamPrompts({
-      lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction
+      lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms
     });
 
     const payload = {
@@ -1409,6 +1433,7 @@ module.exports = async function handler(req, res) {
 // itself as the handler). Exposed so tests/evals can drive the real prompt and
 // schema without an HTTP request.
 module.exports.buildExamPrompts = buildExamPrompts;
+module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;
 module.exports.readJsonBody = readJsonBody;
 module.exports.buildMockExamSchema = buildMockExamSchema;
 module.exports.looksLikeMath = looksLikeMath;

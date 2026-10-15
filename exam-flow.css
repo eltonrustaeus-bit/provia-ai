@@ -865,6 +865,82 @@ body.xf-in-exam.xf-per-open #perWidget {
   color: var(--exgen-warning-text);
 }
 
+.xf-focus {
+  min-width: 0;
+  margin: 0 0 var(--exgen-space-6);
+  padding: 0;
+  border: 0;
+}
+
+.xf-focus legend { padding: 0; }
+
+.xf-focus-help,
+.xf-focus-note {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--xf-ink-2);
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
+}
+
+.xf-focus-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 9px 0 0;
+}
+
+.xf-focus-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 5px 9px;
+  border: 1px solid var(--xf-line);
+  border-radius: var(--exgen-radius-sm);
+  background: var(--s);
+  color: var(--xf-ink);
+  font-size: var(--exgen-text-xs);
+  line-height: var(--exgen-leading-normal);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.xf-focus-option.selected {
+  border-color: var(--xf-accent);
+  background: var(--xf-accent-soft);
+}
+
+.xf-focus-option input {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--xf-accent);
+}
+
+.xf-focus-option:focus-within {
+  outline: var(--exgen-focus-ring);
+  outline-offset: var(--exgen-focus-offset);
+}
+
+@media (max-width: 520px) {
+  body.xf-contract .xf-screen[data-screen="contract"] {
+    padding-top: 16px;
+  }
+
+  body.xf-contract .xf-screen[data-screen="contract"] .xf-card {
+    padding: 18px;
+  }
+
+  body.xf-contract .xf-screen[data-screen="contract"] .xf-row {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .xf-orb::after,
   .xf-say.typing::after { animation: none !important; }
