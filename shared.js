@@ -1370,7 +1370,19 @@ function finalizeMsg(div, text) {
             } else if (!r.ok) {
               restoreFailedQuestion();
               typing.className = 'per-msg teacher';
-              typing.textContent = data.error || 'Fel — försök igen.';
+              if (data.error === 'EXAM_STATE_UNAVAILABLE') {
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.'
+                  : 'Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.';
+                var failureAnnouncement = document.getElementById('perAnnouncement');
+                if (failureAnnouncement) failureAnnouncement.textContent = typing.textContent;
+              } else {
+                typing.textContent = data.error || 'Fel — försök igen.';
+              }
             } else {
               if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
               finalizeMsg(typing, data.answer || 'Inget svar.');

@@ -27,6 +27,7 @@ const EXAM = {
 };
 
 let lastExplain = null;
+let examStateUnavailable = false;
 const R = report("per-exam-context");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
@@ -41,7 +42,8 @@ await mockApis(page, {
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
     ["**/api/explain", r => {
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
-      r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
+      if (examStateUnavailable) r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
+      else r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
     }],
   ],
 });
@@ -126,6 +128,31 @@ ok("T4h okänt grafmetadata når P.E.R utan linjeantagande",
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4i frågetypen finns kvar för serverns neutrala grafvägledning",
    lastExplain?.pageContext?.currentQuestion?.type === "graph");
+
+// A missing server status must stay fail-closed without exposing an internal
+// error code or leaving the learner with a consumed question.
+examStateUnavailable = true;
+const swedishRetry = "Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.";
+await page.fill("#perInput", "Hur ska jag tänka?");
+await page.click("#perSendBtn");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "kan därför inte hjälpa med en enskild provfråga" }).last().waitFor();
+ok("T4j svensk status visar en trygg återförsöksväg", (await page.locator("#perMessages").innerText()).includes(swedishRetry));
+ok("T4k svenskt fel återställer frågan och låser upp Skicka", await page.locator("#perInput").inputValue() === "Hur ska jag tänka?"
+   && await page.locator("#perSendBtn").isEnabled());
+ok("T4l skärmläsarregionen annonserar samma besked", await page.locator("#perAnnouncement").innerText() === swedishRetry);
+
+await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
+const englishRetry = "I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.";
+await page.fill("#perInput", "How should I think about this?");
+await page.click("#perSendBtn");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+ok("T4m English status explains the safe retry", (await page.locator("#perMessages").innerText()).includes(englishRetry));
+ok("T4n English retry also preserves the question and send action", await page.locator("#perInput").inputValue() === "How should I think about this?"
+   && await page.locator("#perSendBtn").isEnabled());
+ok("T4o English failure is announced without exposing its API code", await page.locator("#perAnnouncement").innerText() === englishRetry
+   && !(await page.locator("#perMessages").innerText()).includes("EXAM_STATE_UNAVAILABLE"));
+await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
+examStateUnavailable = false;
 
 // ── T5: påhittat id ritar ingen knapp ─────────────────────────────────────
 await page.evaluate(() => {
