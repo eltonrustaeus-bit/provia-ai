@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { buildCandidate, collectFunctionPlan, collectStaticFiles, packageClosure, PILOT_ROUTES, verifyCandidateOutput } from "../../tools/build-pilot-candidate.mjs";
+import { buildCandidate, collectFunctionPlan, collectStaticFiles, packageClosure, PILOT_ROUTES, sanitizePilotHtml, verifyCandidateOutput, verifyPilotHtml } from "../../tools/build-pilot-candidate.mjs";
 import { ROOT } from "../frontend/_harness.mjs";
 
 test("pilot candidate plan has a narrow page and route allowlist", () => {
@@ -101,6 +101,60 @@ test("candidate builder refuses to overwrite an existing directory", async (t) =
   assert.throws(() => buildCandidate(target), /already exists/);
 });
 
+test("pilot metadata sanitation and verification handle HTML attribute variants and duplicates", () => {
+  const unsafeTags = [
+    '<link rel=canonical href=/public>',
+    '<link rel="alternate canonical" href="/public">',
+    '<link rel="can&#111;nical" href="/public">',
+    '<meta name=description content="Public > description">',
+    "<meta property='og:title' content='Public > title'>",
+    '<meta property="og&colon;title" content="Public">',
+    '<meta property=twitter:title content=Public>',
+    '<meta name=twitter:title content=Public>',
+    '<script type=application/ld+json>{"@context":"https://schema.org"}</script>',
+    '<script type="application/ld&#43;json">{"@context":"https://schema.org"}</script>',
+    '<script type="application&sol;ld+json">{"@context":"https://schema.org"}</script>',
+    '<meta name=robots content=index,follow>',
+    '<meta name=googlebot content=index,follow>',
+    '<meta name=ia_archiver content=index,follow>',
+  ];
+  const safe = '<html><head><title>ExGen skolpilot</title><meta name="robots" content="noindex,nofollow"></head><body></body></html>';
+  for (const tag of unsafeTags) {
+    const source = `<html><head><title>Public title</title>${tag}</head><body></body></html>`;
+    const sanitized = sanitizePilotHtml(source);
+    assert.doesNotThrow(() => verifyPilotHtml(sanitized), `sanitizer removes ${tag}`);
+    assert.throws(() => verifyPilotHtml(safe.replace("</head>", `${tag}</head>`)),
+      /Public crawler metadata remains|title\/robots metadata/,
+      `verifier rejects reintroduced ${tag}`);
+  }
+
+  const duplicateTitles = '<html><head><title>First public title</title><title>Second public title</title></head><body></body></html>';
+  const duplicateRobots = '<html><head><title>Public title</title><meta name="robots" content="index,follow"><meta name="robots" content="noindex,nofollow"></head><body></body></html>';
+  assert.doesNotThrow(() => verifyPilotHtml(sanitizePilotHtml(duplicateTitles)));
+  assert.doesNotThrow(() => verifyPilotHtml(sanitizePilotHtml(duplicateRobots)));
+  assert.throws(() => verifyPilotHtml(safe.replace("</head>", '<title>Public title</title></head>')), /title\/robots metadata/);
+  assert.throws(() => verifyPilotHtml(safe.replace("</body>", '<meta name="robots" content="index,follow"></body>')), /title\/robots metadata/);
+  assert.throws(() => verifyPilotHtml(safe.replace("<meta name=\"robots\"", "<div></div><meta name=\"robots\"")), /title\/robots metadata/);
+  assert.throws(() => verifyPilotHtml(safe.replace("<meta name=\"robots\"", "stray text<meta name=\"robots\"")), /title\/robots metadata/);
+  for (const malformedComment of ["<!-- --!><meta name=robots content=index,follow> -->", "<!--><meta name=robots content=index,follow> -->"]) {
+    const source = `<html><head><title>Public</title>${malformedComment}</head><body></body></html>`;
+    assert.throws(() => verifyPilotHtml(sanitizePilotHtml(source)), /title\/robots metadata/,
+      `verifier rejects metadata hidden behind HTML comment termination: ${malformedComment}`);
+  }
+  const scriptEndTagVariant = '<html><head><title>Public</title></head><body><script>void 0;</script data-x="1"><meta name=robots content=index,follow></body></html>';
+  const sanitizedScriptEndTagVariant = sanitizePilotHtml(scriptEndTagVariant);
+  assert.doesNotMatch(sanitizedScriptEndTagVariant, /index,follow/);
+  assert.doesNotThrow(() => verifyPilotHtml(sanitizedScriptEndTagVariant));
+  const scriptTextWithNonbreakingSpace = '<script>const sample = "</script\u00a0><meta name=robots content=index,follow>";</script>';
+  const scriptTextFixture = `<html><head><title>Public</title></head><body>${scriptTextWithNonbreakingSpace}</body></html>`;
+  const sanitizedScriptTextFixture = sanitizePilotHtml(scriptTextFixture);
+  assert.ok(sanitizedScriptTextFixture.includes(scriptTextWithNonbreakingSpace), "HTML-like text in a script remains unchanged");
+  assert.doesNotThrow(() => verifyPilotHtml(sanitizedScriptTextFixture));
+  const templateHead = '<html><template><head><title>Public</title><meta name=robots content=index,follow></head></template><body>app</body></html>';
+  assert.throws(() => sanitizePilotHtml(templateHead), /well-formed html, head, and body structure/);
+  assert.throws(() => verifyPilotHtml(templateHead), /title\/robots metadata/);
+});
+
 test("candidate integrity verification scans server source inside function packages", async (t) => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "exgen-candidate-integrity-"));
   const target = path.join(parent, "candidate");
@@ -123,6 +177,20 @@ test("candidate integrity verification scans server source inside function packa
   assert.ok(Object.values(manifest.functionInputs).every((plan) => plan.sourceFiles.length < 40));
   assert.equal(manifest.verification.functionRoutes.length, PILOT_ROUTES.length);
   assert.doesNotThrow(() => verifyCandidateOutput(target));
+  const staticRoot = path.join(target, ".vercel/output/static");
+  for (const page of ["index.html", "app.html", "konto.html", "integritetspolicy.html", "aterstall.html"]) {
+    const html = await readFile(path.join(staticRoot, page), "utf8");
+    assert.match(html, /<title>ExGen skolpilot<\/title>/i, `${page} has neutral pilot title in static HTML`);
+    assert.match(html, /<meta\s+name="robots"\s+content="noindex,nofollow">/i, `${page} is noindex before JavaScript`);
+    assert.doesNotMatch(html, /<link\b[^>]*\brel=["']canonical["']|<meta\b(?=[^>]*\b(?:property=["']og:|name=["'](?:description|twitter:)))[^>]*>|<script\b(?=[^>]*\btype=["']application\/ld\+json["'])/i,
+      `${page} does not expose public crawler/social metadata in its static response`);
+  }
+  const pilotAppHtml = path.join(staticRoot, "app.html");
+  const sanitizedPilotApp = await readFile(pilotAppHtml, "utf8");
+  await writeFile(pilotAppHtml, sanitizedPilotApp.replace("</head>", "<meta property=\"og:title\" content=\"Public title\"></head>"));
+  assert.throws(() => verifyCandidateOutput(target), /Public crawler metadata remains in candidate HTML\.: app\.html/,
+    "candidate verification rejects public social metadata reintroduced after sanitization");
+  await writeFile(pilotAppHtml, sanitizedPilotApp);
 
   process.env.SUPABASE_URL = "https://synthetic-staging.invalid";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test_only_012345678901234567890123456789";

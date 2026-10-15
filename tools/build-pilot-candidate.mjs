@@ -137,12 +137,250 @@ export function collectStaticFiles(root = ROOT) {
   return [...files].sort();
 }
 
-function sanitizeHtml(source) {
-  return source
-    .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>/gi, "")
-    .replace(/<meta\b[^>]*\bproperty=["']og:url["'][^>]*>/gi, "")
-    .replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2(?:\/dist\/umd\/supabase\.min\.js)?/g, "/vendor/supabase.js")
-    .replace(/<head([^>]*)>/i, `<head$1><meta name="robots" content="noindex,nofollow">`);
+function tagEnd(source, start) {
+  let quote = "";
+  for (let i = start + 1; i < source.length; i++) {
+    const char = source[i];
+    if (quote) {
+      if (char === quote) quote = "";
+    } else if (char === "\"" || char === "'") quote = char;
+    else if (char === ">") return i + 1;
+  }
+  return source.length;
+}
+
+function rawTextClosingTag(source, name, start) {
+  const pattern = new RegExp(`<\\/${name}(?=[\\t\\n\\f\\r />])`, "ig");
+  pattern.lastIndex = start;
+  const match = pattern.exec(source);
+  return match ? { start: match.index, end: tagEnd(source, match.index) } : null;
+}
+
+function decodeAttributeReferences(value) {
+  return value
+    .replace(/&#(?:x([0-9a-f]+)|([0-9]+));?/gi, (_match, hex, decimal) => {
+      const point = Number.parseInt(hex || decimal, hex ? 16 : 10);
+      return Number.isInteger(point) && point > 0 && point <= 0x10ffff
+        ? String.fromCodePoint(point) : "\ufffd";
+    })
+    .replace(/&colon;?/gi, ":")
+    .replace(/&sol;?/gi, "/")
+    .replace(/&Tab;?/gi, "\t")
+    .replace(/&NewLine;?/gi, "\n")
+    .replace(/&plus;?/gi, "+");
+}
+
+function commentEnd(source, start) {
+  let cursor = start + 4;
+  if (source[cursor] === ">") return cursor + 1;
+  if (source.startsWith("->", cursor)) return cursor + 2;
+  while (cursor < source.length) {
+    if (source.startsWith("--!>", cursor)) return cursor + 4;
+    if (source.startsWith("-->", cursor)) return cursor + 3;
+    cursor++;
+  }
+  return source.length;
+}
+
+function attributesFromTag(raw, nameEnd) {
+  const attributes = new Map();
+  const limit = raw.length - 1;
+  let i = nameEnd;
+  while (i < limit) {
+    while (i < limit && /[\s/]/.test(raw[i])) i++;
+    const start = i;
+    while (i < limit && !/[\s=/>]/.test(raw[i])) i++;
+    if (i === start) { i++; continue; }
+    const name = raw.slice(start, i).toLowerCase();
+    while (i < limit && /\s/.test(raw[i])) i++;
+    let value = "";
+    if (raw[i] === "=") {
+      i++;
+      while (i < limit && /\s/.test(raw[i])) i++;
+      const quote = raw[i] === "\"" || raw[i] === "'" ? raw[i++] : "";
+      const valueStart = i;
+      if (quote) {
+        while (i < limit && raw[i] !== quote) i++;
+        value = raw.slice(valueStart, i);
+        if (raw[i] === quote) i++;
+      } else {
+        while (i < limit && !/[\s>]/.test(raw[i])) i++;
+        value = raw.slice(valueStart, i).replace(/\/$/, "");
+      }
+    }
+    if (!attributes.has(name)) attributes.set(name, decodeAttributeReferences(value));
+  }
+  return attributes;
+}
+
+function htmlTags(source) {
+  const tags = [];
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf("<", cursor);
+    if (start < 0) break;
+    if (source.startsWith("<!--", start)) {
+      cursor = commentEnd(source, start);
+      continue;
+    }
+    if (source[start + 1] === "!" || source[start + 1] === "?") {
+      cursor = tagEnd(source, start);
+      continue;
+    }
+
+    let nameStart = start + 1;
+    const closing = source[nameStart] === "/";
+    if (closing) nameStart++;
+    while (/\s/.test(source[nameStart] || "")) nameStart++;
+    const nameMatch = /^[A-Za-z][A-Za-z0-9:-]*/.exec(source.slice(nameStart));
+    if (!nameMatch) { cursor = start + 1; continue; }
+    const nameEnd = nameStart + nameMatch[0].length;
+    const end = tagEnd(source, start);
+    const name = nameMatch[0].toLowerCase();
+    const raw = source.slice(start, end);
+    tags.push({ start, end, name, closing, attributes: closing ? new Map() : attributesFromTag(raw, nameEnd - start) });
+    cursor = end;
+
+    if (!closing && ["script", "style", "textarea", "title"].includes(name)) {
+      const close = rawTextClosingTag(source, name, cursor);
+      cursor = close ? close.start : source.length;
+    }
+  }
+  return tags;
+}
+
+function isPublicMetadataTag(tag) {
+  if (tag.name === "link") {
+    const rel = String(tag.attributes.get("rel") || "").toLowerCase().split(/\s+/);
+    return rel.includes("canonical");
+  }
+  if (tag.name !== "meta") return false;
+  const name = String(tag.attributes.get("name") || "").toLowerCase();
+  const property = String(tag.attributes.get("property") || "").toLowerCase();
+  return name === "description" || name.startsWith("twitter:")
+    || property.startsWith("og:") || property.startsWith("twitter:");
+}
+
+function isRobotsTag(tag) {
+  if (tag.name !== "meta") return false;
+  const name = String(tag.attributes.get("name") || "").toLowerCase();
+  return name === "robots" || /(?:bot|spider|crawl|slurp|archiver|yandex|teoma)/.test(name);
+}
+
+function isJsonLdTag(tag) {
+  if (tag.name !== "script") return false;
+  const type = String(tag.attributes.get("type") || "").toLowerCase().split(";")[0].trim();
+  return type === "application/ld+json";
+}
+
+function elementRange(tags, index, name) {
+  const opening = tags[index];
+  const closingIndex = tags.findIndex((tag, candidate) => candidate > index && tag.name === name && tag.closing);
+  return { start: opening.start, end: closingIndex < 0 ? opening.end : tags[closingIndex].end };
+}
+
+function onlyWhitespaceAndComments(value) {
+  let cursor = 0;
+  while (cursor < value.length) {
+    if (/[\t\n\f\r ]/.test(value[cursor])) { cursor++; continue; }
+    if (!value.startsWith("<!--", cursor)) return false;
+    const end = commentEnd(value, cursor);
+    if (end === value.length && !value.endsWith("-->")) return false;
+    if (!value.slice(cursor, end).endsWith("-->")) return false;
+    cursor = end;
+  }
+  return true;
+}
+
+function hasValidHeadStructure(tags, html, head, headClose) {
+  const inside = tags.filter((tag) => tag.start >= head.end && tag.end <= headClose.start);
+  const allowed = new Set(["base", "link", "meta", "script", "style", "title"]);
+  let cursor = head.end;
+  for (let i = 0; i < inside.length; i++) {
+    const tag = inside[i];
+    if (tag.closing || !allowed.has(tag.name)) return false;
+    if (!onlyWhitespaceAndComments(html.slice(cursor, tag.start))) return false;
+    if (["script", "style", "title"].includes(tag.name)) {
+      const closing = inside[i + 1];
+      if (!closing?.closing || closing.name !== tag.name) return false;
+      cursor = closing.end;
+      i++;
+      continue;
+    }
+    cursor = tag.end;
+  }
+  return onlyWhitespaceAndComments(html.slice(cursor, headClose.start));
+}
+
+function documentHead(tags, html) {
+  const htmlOpenings = tags.filter((tag) => tag.name === "html" && !tag.closing);
+  const htmlClosings = tags.filter((tag) => tag.name === "html" && tag.closing);
+  const heads = tags.filter((tag) => tag.name === "head");
+  const bodies = tags.filter((tag) => tag.name === "body");
+  const root = htmlOpenings[0];
+  const rootClose = htmlClosings[0];
+  const head = heads.find((tag) => !tag.closing);
+  const headClose = heads.find((tag) => tag.closing);
+  const body = bodies.find((tag) => !tag.closing);
+  const bodyClose = bodies.find((tag) => tag.closing);
+  if (htmlOpenings.length !== 1 || htmlClosings.length !== 1 || heads.length !== 2 || bodies.length !== 2
+    || !root || !rootClose || !head || !headClose || !body || !bodyClose
+    || root.end > head.start || head.end > headClose.start || headClose.end > body.start
+    || body.end > bodyClose.start || bodyClose.end > rootClose.start
+    || !onlyWhitespaceAndComments(html.slice(root.end, head.start))
+    || !onlyWhitespaceAndComments(html.slice(headClose.end, body.start))) return null;
+  return { root, rootClose, head, headClose, body, bodyClose };
+}
+
+export function sanitizePilotHtml(source) {
+  const tags = htmlTags(String(source));
+  if (!documentHead(tags, String(source))) throw new Error("Pilot HTML must have one well-formed html, head, and body structure.");
+  const ranges = [];
+  for (let i = 0; i < tags.length; i++) {
+    const tag = tags[i];
+    if (tag.closing) continue;
+    if (tag.name === "title" || isRobotsTag(tag) || isPublicMetadataTag(tag)) {
+      ranges.push(tag.name === "title" ? elementRange(tags, i, tag.name) : { start: tag.start, end: tag.end });
+    } else if (isJsonLdTag(tag)) {
+      ranges.push(elementRange(tags, i, tag.name));
+    }
+  }
+  let html = String(source);
+  for (const range of ranges.sort((a, b) => b.start - a.start)) {
+    html = html.slice(0, range.start) + html.slice(range.end);
+  }
+  html = html.replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2(?:\/dist\/umd\/supabase\.min\.js)?/g, "/vendor/supabase.js");
+  const head = htmlTags(html).find((tag) => tag.name === "head" && !tag.closing);
+  if (!head) throw new Error("Pilot HTML lost its head element during sanitization.");
+  return html.slice(0, head.end) + "<title>ExGen skolpilot</title><meta name=\"robots\" content=\"noindex,nofollow\">" + html.slice(head.end);
+}
+
+export function verifyPilotHtml(html) {
+  const source = String(html);
+  const tags = htmlTags(source);
+  const structure = documentHead(tags, source);
+  const head = structure?.head;
+  const headClose = structure?.headClose;
+  const inHead = (tag) => head && headClose && tag.start >= head.end && tag.end <= headClose.start;
+  const headOpenings = tags.filter((tag) => tag.name === "head" && !tag.closing);
+  const headClosings = tags.filter((tag) => tag.name === "head" && tag.closing);
+  const titles = tags.filter((tag) => tag.name === "title" && !tag.closing);
+  const titleClosings = tags.filter((tag) => tag.name === "title" && tag.closing);
+  const titleClose = titles.length === 1 && titleClosings.length === 1 && titleClosings[0].start > titles[0].end
+    ? titleClosings[0] : null;
+  const titleText = titleClose ? source.slice(titles[0].end, titleClose.start).trim() : "";
+  const robots = tags.filter(isRobotsTag);
+  const robotsValue = robots.length === 1 ? String(robots[0].attributes.get("content") || "").replace(/\s+/g, "").toLowerCase() : "";
+  const publicTag = tags.find((tag) => isPublicMetadataTag(tag)
+    || (tag.name === "script" && !tag.closing && isJsonLdTag(tag)));
+  if (!structure || headOpenings.length !== 1 || headClosings.length !== 1 || !head || !headClose || head.end > headClose.start
+    || !hasValidHeadStructure(tags, String(html), head, headClose)
+    || titles.length !== 1 || titleClosings.length !== 1 || !inHead(titles[0]) || titleText !== "ExGen skolpilot"
+    || robots.length !== 1 || !inHead(robots[0]) || robotsValue !== "noindex,nofollow") {
+    throw new Error("Candidate pilot title/robots metadata is missing, duplicated, conflicting, or outside head.");
+  }
+  if (publicTag) throw new Error("Public crawler metadata remains in candidate HTML.");
+  return true;
 }
 
 function copyStaticFile(sourceRoot, staticRoot, relative) {
@@ -151,7 +389,7 @@ function copyStaticFile(sourceRoot, staticRoot, relative) {
   const destination = path.join(staticRoot, normalized);
   mkdirSync(path.dirname(destination), { recursive: true });
   if (normalized === "index.html") {
-    writeFileSync(destination, "<!doctype html><html lang=\"sv\"><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta http-equiv=\"refresh\" content=\"0;url=/app.html\"><title>ExGen pilot</title></head><body><p><a href=\"/app.html\">Öppna ExGen</a></p><script>location.replace('/app.html'+location.search+location.hash)</script></body></html>\n", { flag: "wx", mode: 0o644 });
+    writeFileSync(destination, "<!doctype html><html lang=\"sv\"><head><meta charset=\"utf-8\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta http-equiv=\"refresh\" content=\"0;url=/app.html\"><title>ExGen skolpilot</title></head><body><p><a href=\"/app.html\">Öppna ExGen</a></p><script>location.replace('/app.html'+location.search+location.hash)</script></body></html>\n", { flag: "wx", mode: 0o644 });
     return;
   }
   if (normalized === "js/exgen-runtime.js") {
@@ -162,7 +400,7 @@ function copyStaticFile(sourceRoot, staticRoot, relative) {
     cpSync(path.join(sourceRoot, "node_modules/@supabase/supabase-js/dist/umd/supabase.js"), destination, { errorOnExist: true, force: false });
     return;
   }
-  if (/\.html?$/i.test(normalized)) writeFileSync(destination, sanitizeHtml(readFileSync(source, "utf8")), { flag: "wx", mode: 0o644 });
+  if (/\.html?$/i.test(normalized)) writeFileSync(destination, sanitizePilotHtml(readFileSync(source, "utf8")), { flag: "wx", mode: 0o644 });
   else cpSync(source, destination, { errorOnExist: true, force: false, dereference: true, recursive: true });
 }
 
@@ -427,6 +665,11 @@ export function verifyCandidateOutput(outputPath, expectations = null) {
   const expectedPages = [...PAGES, "index.html"].sort();
   if (JSON.stringify(pages) !== JSON.stringify(expectedPages)) {
     throw new Error(`Candidate static page allowlist mismatch: ${pages.join(",")}`);
+  }
+  for (const page of pages) {
+    const html = readFileSync(path.join(staticRoot, page), "utf8");
+    try { verifyPilotHtml(html); }
+    catch (error) { throw new Error(`${error.message}: ${page}`); }
   }
   for (const route of PILOT_ROUTES) {
     const base = path.join(functionsRoot, `api/${route}.func`);
