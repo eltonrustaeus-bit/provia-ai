@@ -1255,7 +1255,11 @@ module.exports = async function handler(req, res) {
             method: "POST",
             headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(Math.max(0, budget.remaining() - MIN_VERIFIER_MS))
+            // Preserve the full verifier reserve. The verifier itself may use
+            // up to 30 seconds; leaving only MIN_VERIFIER_MS here can turn a
+            // successful repair into a platform timeout before we can return
+            // the already-approved round-1 subset.
+            signal: AbortSignal.timeout(Math.max(0, budget.remaining() - VERIFIER_RESERVE_MS))
           });
           const raw2 = await r2.text();
           let data2; try { data2 = JSON.parse(raw2); } catch { data2 = null; }
