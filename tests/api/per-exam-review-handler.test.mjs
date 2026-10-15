@@ -1026,6 +1026,31 @@ test("authenticated landing mode cannot bypass an active exam outside pilot mode
   }
 });
 
+test("landing mode cannot bypass proof validation for an expired post-exam review", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "expired";
+  calls.length = 0;
+  try {
+    const response = await invoke({
+      landingMode: true,
+      examReview: true,
+      examProof: { receipt: "forged", questions: [publicQuestion], selectedQuestionId: question.id },
+      pageContext: { examState: { submissionId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", phase: "expired" } },
+      userQuestion: question.question,
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.error, "INVALID_MODE_COMBINATION");
+    assert.equal(response.headers["Cache-Control"], "no-store");
+    assert.equal(calls.length, 0, "reject the mixed mode before auth, database, quota, cache or AI work");
+  } finally {
+    activeCount = 0;
+    issuanceState = "active";
+    process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
 test("pilot landing mode requires auth so exam state can be checked", async () => {
   calls.length = 0;
   const response = {

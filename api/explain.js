@@ -695,6 +695,13 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
   const body = req.body || {};
 
+  // Landing-mode answers are not backed by a completion receipt. Never let
+  // the generic landing pipeline handle a request that claims post-exam review.
+  if (body.landingMode === true && body.examReview === true) {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(400).json({ error: "INVALID_MODE_COMBINATION" });
+  }
+
   if (isPilotMode() && !isPilotExplainRequestAllowed(body)) {
     return denyOutOfScopePilotRoute(req, res);
   }
