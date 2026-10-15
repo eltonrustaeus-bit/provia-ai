@@ -31,6 +31,9 @@ test("requires whole word and phrase boundaries without breaking Swedish or punc
     "Östergötland",
     "biodiversity.",
   ]), ["matters", "Östergötland", "biodiversity."]);
+  assert.deepEqual(filterSourceReferences("Biodiversity.x", ["Biodiversity."]), []);
+  assert.deepEqual(filterSourceReferences("a".repeat(12_000), ["a"]), [],
+    "many rejected substring hits are scanned without copying the entire prefix each time");
 });
 
 test("rejects malformed, empty, overlong and non-array references", () => {
