@@ -481,8 +481,35 @@
   window.PER = (function () {
     var _getToken = null;
     var _open = false;
+    var _pendingInputFocusHandoff = null;
     var _nudgeTimer = null;
     var _nudgeShownKey = null;
+
+    function clearInputFocusHandoff(handoff) {
+      if (!handoff || _pendingInputFocusHandoff !== handoff) return;
+      document.removeEventListener('focusin', handoff.onFocusIn, true);
+      _pendingInputFocusHandoff = null;
+    }
+
+    function startInputFocusHandoff(input, expectedFocus) {
+      if (_pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
+      var handoff = { input: input, expectedFocus: expectedFocus, cancelled: false };
+      handoff.onFocusIn = function (event) {
+        if (event.target !== handoff.expectedFocus) {
+          handoff.cancelled = true;
+        }
+      };
+      _pendingInputFocusHandoff = handoff;
+      document.addEventListener('focusin', handoff.onFocusIn, true);
+      return handoff;
+    }
+
+    function completeInputFocusHandoff(handoff) {
+      if (!handoff || _pendingInputFocusHandoff !== handoff) return;
+      var shouldFocus = _open && !handoff.cancelled && document.activeElement === handoff.expectedFocus;
+      clearInputFocusHandoff(handoff);
+      if (shouldFocus) handoff.input.focus();
+    }
 
     function getNudgeKey() {
       try {
@@ -1418,6 +1445,7 @@ function finalizeMsg(div, text) {
       _open = !_open;
       var focusAfterOpen = document.activeElement;
       var menuWasOpen = !!document.querySelector('.xg-menu.on');
+      if (!_open && _pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
       if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') {
         window.XgShell.closeMenu();
         if (menuWasOpen) focusAfterOpen = document.querySelector('.xg-menu-btn');
@@ -1447,9 +1475,10 @@ function finalizeMsg(div, text) {
           }
         }
         var inp = document.getElementById('perInput');
-        if (inp) setTimeout(function () {
-          if (_open && document.activeElement === focusAfterOpen) inp.focus();
-        }, 50);
+        if (inp) {
+          var handoff = startInputFocusHandoff(inp, focusAfterOpen);
+          if (!menuWasOpen) setTimeout(function () { completeInputFocusHandoff(handoff); }, 50);
+        }
       }
     }
 
@@ -1713,9 +1742,9 @@ function finalizeMsg(div, text) {
           widget.classList.remove('per-menu-obstructed');
           if (!widget.classList.contains('per-obstructed')) widget.removeAttribute('aria-hidden');
           scheduleObstructionCheck();
-          if (bubble.classList.contains('per-open') && document.activeElement === document.querySelector('.xg-menu-btn')) {
-            var input = document.getElementById('perInput');
-            if (input) input.focus();
+          var menuButton = document.querySelector('.xg-menu-btn');
+          if (bubble.classList.contains('per-open') && _pendingInputFocusHandoff && _pendingInputFocusHandoff.expectedFocus === menuButton) {
+            completeInputFocusHandoff(_pendingInputFocusHandoff);
           }
         });
       })();

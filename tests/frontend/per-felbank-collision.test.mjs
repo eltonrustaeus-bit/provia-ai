@@ -120,11 +120,24 @@ try {
   await page.waitForFunction(() => document.querySelector("#xgMenu").classList.contains("on"));
   await page.keyboard.press("Alt+p");
   await page.keyboard.press("Shift+Tab");
+  assert.equal(await page.evaluate(() => document.activeElement.matches(".xg-login-btn")), true, "Shift+Tab moves focus away from the menu button during close");
+  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement.matches(".xg-menu-btn")), true, "Tab can return focus to the menu button during close");
   await page.evaluate(() => { window.__perFocusAfterKeyboardMove = document.activeElement; });
   assert.notEqual(await page.evaluate(() => document.activeElement.id), "perInput", "user can move focus while the menu closes");
   await page.waitForFunction(() => document.querySelector("#xgMenu").hidden);
   assert.equal(await page.evaluate(() => document.activeElement === window.__perFocusAfterKeyboardMove), true, "menu close does not steal focus after the user moved it");
   assert.notEqual(await page.evaluate(() => document.activeElement.id), "perInput", "P.E.R does not reclaim focus after the user moved it");
+
+  await page.locator(".xg-menu-btn").click();
+  await page.waitForFunction(() => document.querySelector("#xgMenu").classList.contains("on"));
+  await page.keyboard.press("Alt+p");
+  await page.evaluate(() => {
+    document.querySelector("#perInput").dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    document.querySelector(".xg-menu-btn").dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+  });
+  await page.waitForFunction(() => document.querySelector("#xgMenu").hidden);
+  assert.equal(await page.evaluate(() => document.activeElement.matches(".xg-menu-btn")), true, "an excursion through the P.E.R input also cancels the pending handoff");
   console.log("PASS P.E.R focus handoff respects keyboard navigation during menu close");
 } finally {
   await ctx.close();
