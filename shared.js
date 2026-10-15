@@ -2279,22 +2279,55 @@ function finalizeMsg(div, text) {
       } catch (_) { return ''; }
     }
 
-    /* Swedish wording for the errors Supabase answers with in English. The
-       dialog is the first thing a new user meets, and "Invalid login
-       credentials" in the middle of a Swedish page reads as a system error
-       rather than a typo they can fix. Unknown messages fall through to a
-       generic line instead of leaking raw API text. */
-    function svError(raw, fallback) {
+    function authText(key) {
+      var language = '';
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang || ''; } catch (_) {}
+      var english = /^en\b/i.test(String(language));
+      var copy = {
+        sv: {
+          emailPasswordRequired:'Fyll i e-post och lösenord.', passwordTooShort:'Lösenordet måste vara minst 8 tecken.',
+          registerLoading:'Skapar konto…', registerSuccess:'Om adressen kan registreras skickar vi en verifieringslänk.',
+          registerError:'Kunde inte skapa kontot. Försök igen.', forgotEmailRequired:'Fyll i din e-post.',
+          forgotLoading:'Skickar…', forgotSuccess:'Kolla mejlen. Finns adressen hos oss ligger en återställningslänk där om en minut.',
+          forgotSent:'Länk skickad', forgotError:'Kunde inte skicka länken. Försök igen.', loginLoading:'Loggar in…',
+          loginError:'Fel e-post eller lösenord.', signIn:'Logga in', create:'Skapa konto', reset:'Skicka återställningslänk',
+          invalidLogin:'Fel e-post eller lösenord.', emailUnconfirmed:'Bekräfta din e-post först — kolla mejlen.',
+          accountExists:'Du har redan ett konto med den adressen.', passwordInvalid:'Lösenordet är för kort — minst 8 tecken.',
+          emailInvalid:'E-postadressen ser inte giltig ut.', rateLimited:'För många försök. Vänta en stund och prova igen.',
+          networkError:'Ingen kontakt med servern. Kolla nätet och försök igen.',
+          googleOpening:'Öppnar Google…', googleCancelled:'Google-inloggningen avbröts.', googleError:'Google-inloggningen gick inte igenom. Försök igen.',
+          pilotGoogleUnavailable:'Google-inloggning är inte tillgänglig i skolpiloten. Logga in med ditt inbjudna skolpilotkonto.'
+        },
+        en: {
+          emailPasswordRequired:'Enter your email and password.', passwordTooShort:'Your password must be at least 8 characters.',
+          registerLoading:'Creating account…', registerSuccess:'If this address can be registered, we will send a confirmation link.',
+          registerError:'Could not create your account. Please try again.', forgotEmailRequired:'Enter your email address.',
+          forgotLoading:'Sending…', forgotSuccess:'Check your email. If the address has an account, a reset link should arrive shortly.',
+          forgotSent:'Link sent', forgotError:'Could not send the link. Please try again.', loginLoading:'Signing in…',
+          loginError:'Incorrect email or password.', signIn:'Sign in', create:'Create account', reset:'Send reset link',
+          invalidLogin:'Incorrect email or password.', emailUnconfirmed:'Confirm your email first. Check your inbox.',
+          accountExists:'An account already exists for this address.', passwordInvalid:'Your password is too short. Use at least 8 characters.',
+          emailInvalid:'Enter a valid email address.', rateLimited:'Too many attempts. Wait a moment and try again.',
+          networkError:'Could not reach the server. Check your connection and try again.',
+          googleOpening:'Opening Google…', googleCancelled:'Google sign-in was cancelled.', googleError:'Google sign-in did not work. Please try again.',
+          pilotGoogleUnavailable:'Google sign-in is unavailable in the school pilot. Sign in with your invited pilot account.'
+        }
+      };
+      return copy[english ? 'en' : 'sv'][key] || key;
+    }
+
+    /* Translate known auth failures and keep unknown provider details private. */
+    function svError(raw, fallbackKey) {
       var m = String(raw || '').toLowerCase();
-      if (!m) return fallback;
-      if (m.indexOf('invalid login credentials') > -1) return 'Fel e-post eller lösenord.';
-      if (m.indexOf('email not confirmed') > -1) return 'Bekräfta din e-post först — kolla mejlen.';
-      if (m.indexOf('already registered') > -1 || m.indexOf('already been registered') > -1) return 'Du har redan ett konto med den adressen.';
-      if (m.indexOf('password should be') > -1 || m.indexOf('password must be') > -1) return 'Lösenordet är för kort — minst 8 tecken.';
-      if (m.indexOf('unable to validate email') > -1 || m.indexOf('invalid email') > -1) return 'E-postadressen ser inte giltig ut.';
-      if (m.indexOf('for security purposes') > -1 || m.indexOf('rate limit') > -1 || m.indexOf('too many') > -1) return 'För många försök. Vänta en stund och prova igen.';
-      if (m.indexOf('failed to fetch') > -1 || m.indexOf('networkerror') > -1 || m.indexOf('load failed') > -1) return 'Ingen kontakt med servern. Kolla nätet och försök igen.';
-      return fallback;
+      if (!m) return authText(fallbackKey);
+      if (m.indexOf('invalid login credentials') > -1) return authText('invalidLogin');
+      if (m.indexOf('email not confirmed') > -1) return authText('emailUnconfirmed');
+      if (m.indexOf('already registered') > -1 || m.indexOf('already been registered') > -1) return authText('accountExists');
+      if (m.indexOf('password should be') > -1 || m.indexOf('password must be') > -1) return authText('passwordInvalid');
+      if (m.indexOf('unable to validate email') > -1 || m.indexOf('invalid email') > -1) return authText('emailInvalid');
+      if (m.indexOf('for security purposes') > -1 || m.indexOf('rate limit') > -1 || m.indexOf('too many') > -1) return authText('rateLimited');
+      if (m.indexOf('failed to fetch') > -1 || m.indexOf('networkerror') > -1 || m.indexOf('load failed') > -1) return authText('networkError');
+      return authText(fallbackKey);
     }
 
     /* The header button is rendered before we know anything, so its label has
@@ -2402,7 +2435,7 @@ function finalizeMsg(div, text) {
     }
 
     function startGoogle(btn) {
-      if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Öppnar Google…'; }
+      if (btn) { btn.disabled = true; btn.querySelector('span').textContent = authText('googleOpening'); }
       location.href = SUPA_URL + '/auth/v1/authorize?provider=google&redirect_to='
         + encodeURIComponent(authReturnUrl());
     }
@@ -2503,17 +2536,69 @@ function finalizeMsg(div, text) {
     function switchView(view) {
       if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       _view = view;
+      var language = '';
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang || ''; } catch (_) {}
+      var english = /^en\b/i.test(String(language));
+      var pilot = EXGEN_RUNTIME.environment === 'pilot';
       var map = { welcome:'pvVW', register:'pvVR', login:'pvVL', forgot:'pvVF' };
       Object.keys(map).forEach(function(k) {
         var el = document.getElementById(map[k]);
         if (el) el.classList.toggle('pv-vx', k === view);
       });
-      var titles = { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in', forgot:'Återställ lösenord' };
-      var subs = EXGEN_RUNTIME.environment === 'pilot'
-        ? { welcome:'SKOLPILOT · INBJUDNA TESTKONTON', register:'SKOLPILOT · INBJUDNA TESTKONTON', login:'SKOLPILOT · LOGGA IN', forgot:'VI MEJLAR EN LÄNK' }
-        : { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
+      var titles = english
+        ? { welcome:'Create your account', register:'Create your account', login:'Sign in', forgot:'Reset password' }
+        : { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in', forgot:'Återställ lösenord' };
+      var subs = english
+        ? pilot
+          ? { welcome:'SCHOOL PILOT · INVITED TEST ACCOUNTS', register:'SCHOOL PILOT · INVITED TEST ACCOUNTS', login:'SCHOOL PILOT · SIGN IN', forgot:'WE WILL EMAIL A LINK' }
+          : { welcome:'FREE TO START · NO CARD REQUIRED', register:'FREE TO START · NO CARD REQUIRED', login:'WELCOME BACK', forgot:'WE WILL EMAIL A LINK' }
+        : pilot
+          ? { welcome:'SKOLPILOT · INBJUDNA TESTKONTON', register:'SKOLPILOT · INBJUDNA TESTKONTON', login:'SKOLPILOT · LOGGA IN', forgot:'VI MEJLAR EN LÄNK' }
+          : { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
       var ti = document.getElementById('pvTi'); if (ti) ti.textContent = titles[view] || '';
       var sb = document.getElementById('pvSb'); if (sb) sb.textContent = subs[view] || '';
+      var labels = english ? {
+        close:'Close', registerChoice:'Create a free account', loginChoice:'Sign in',
+        google:'Continue with Google', emailDivider:'or continue with email',
+        email:'Email', password:'Password', emailPlaceholder:'you@example.com',
+        newPasswordPlaceholder:'At least 8 characters', passwordPlaceholder:'Your password',
+        create:'Create account', signIn:'Sign in', already:'Already have an account? ',
+        newHere:'New here? ', forgot:'Forgot password?', reset:'Send reset link',
+        freeNote:'Free account — no card required.', back:'Back to sign in', or:'or'
+      } : {
+        close:'Stäng', registerChoice:'Skapa gratis konto', loginChoice:'Logga in',
+        google:'Fortsätt med Google', emailDivider:'eller med e-post',
+        email:'E-post', password:'Lösenord', emailPlaceholder:'du@exempel.se',
+        newPasswordPlaceholder:'Minst 8 tecken', passwordPlaceholder:'Ditt lösenord',
+        create:'Skapa konto', signIn:'Logga in', already:'Har du redan ett konto? ',
+        newHere:'Ny här? ', forgot:'Glömt lösenordet?', reset:'Skicka återställningslänk',
+        freeNote:'Gratis konto — inget kort krävs.', back:'Tillbaka till inloggning', or:'eller'
+      };
+      function setText(id, value) { var node = document.getElementById(id); if (node) node.textContent = value; }
+      function setPlaceholder(id, value) { var node = document.getElementById(id); if (node) node.placeholder = value; }
+      setText('pvCl', '×');
+      var close = document.getElementById('pvCl'); if (close) close.setAttribute('aria-label', labels.close);
+      setText('pvToReg', labels.registerChoice); setText('pvToLog', labels.loginChoice);
+      setText('pvRBtn', labels.create); setText('pvLBtn', labels.signIn); setText('pvFBtn', labels.reset);
+      setText('pvToForgot', labels.forgot); setText('pvFBk', labels.back);
+      setText('pvRBk', labels.signIn); setText('pvLBk', labels.create);
+      setPlaceholder('pvRE', labels.emailPlaceholder); setPlaceholder('pvLE', labels.emailPlaceholder); setPlaceholder('pvFE', labels.emailPlaceholder);
+      setPlaceholder('pvRP', labels.newPasswordPlaceholder); setPlaceholder('pvLP', labels.passwordPlaceholder);
+      ['pvRE','pvLE','pvFE'].forEach(function(id) {
+        var label = document.querySelector('label[for="' + id + '"]'); if (label) label.textContent = labels.email;
+      });
+      ['pvRP','pvLP'].forEach(function(id) {
+        var label = document.querySelector('label[for="' + id + '"]'); if (label) label.textContent = labels.password;
+      });
+      document.querySelectorAll('.pv-go span').forEach(function(node) { node.textContent = labels.google; });
+      document.querySelectorAll('.pv-dv:not([data-module="google"])').forEach(function(node) { node.textContent = labels.or; });
+      document.querySelectorAll('.pv-dv[data-module="google"]').forEach(function(node) { node.textContent = labels.emailDivider; });
+      var registerToggle = document.getElementById('pvRBk');
+      if (registerToggle && registerToggle.parentNode) registerToggle.parentNode.firstChild.textContent = labels.already;
+      var loginToggle = document.getElementById('pvLBk');
+      if (loginToggle && loginToggle.parentNode) loginToggle.parentNode.firstChild.textContent = labels.newHere;
+      setText('pvToReg', labels.registerChoice);
+      var note = document.querySelector('#pvVR .pv-hn'); if (note) note.textContent = labels.freeNote;
       var focusMap = { register:'pvRE', login:'pvLE', forgot:'pvFE' };
       if (focusMap[view]) setTimeout(function() { var inp = document.getElementById(focusMap[view]); if (inp) inp.focus(); }, 60);
       /* Reset every error slot, including its colour: doForgot and doRegister
@@ -2632,9 +2717,9 @@ function finalizeMsg(div, text) {
       var errEl = document.getElementById('pvRE2');
       var btn   = document.getElementById('pvRBtn');
       errEl.textContent = '';
-      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
-      if (pass.length < 8) { errEl.textContent = 'Lösenordet måste vara minst 8 tecken.'; return; }
-      btn.disabled = true; btn.textContent = 'Skapar konto…';
+      if (!email || !pass) { errEl.textContent = authText('emailPasswordRequired'); return; }
+      if (pass.length < 8) { errEl.textContent = authText('passwordTooShort'); return; }
+      btn.disabled = true; btn.textContent = authText('registerLoading');
       /* The endpoint creates an unconfirmed signup and sends one generic
          confirmation response, so the form must never infer whether an email
          address already has an account. */
@@ -2649,12 +2734,12 @@ function finalizeMsg(div, text) {
         });
       }).then(function(d) {
         errEl.style.color = 'var(--a,#00768F)';
-        errEl.textContent = d.message || 'Om adressen kan registreras skickar vi en verifieringslänk.';
-        btn.disabled = false; btn.textContent = 'Skapa konto';
+        errEl.textContent = authText('registerSuccess');
+        btn.disabled = false; btn.textContent = authText('create');
       }).catch(function(e) {
-        btn.disabled = false; btn.textContent = 'Skapa konto';
+        btn.disabled = false; btn.textContent = authText('create');
         errEl.style.color = '';
-        errEl.textContent = svError(e.message, 'Kunde inte skapa kontot. Försök igen.');
+        errEl.textContent = svError(e.message, 'registerError');
       });
     }
 
@@ -2663,19 +2748,19 @@ function finalizeMsg(div, text) {
       var errEl = document.getElementById('pvFE2');
       var btn   = document.getElementById('pvFBtn');
       errEl.style.color = ''; errEl.textContent = '';
-      if (!email) { errEl.textContent = 'Fyll i din e-post.'; return; }
-      btn.disabled = true; btn.textContent = 'Skickar…';
+      if (!email) { errEl.textContent = authText('forgotEmailRequired'); return; }
+      btn.disabled = true; btn.textContent = authText('forgotLoading');
       var redirect = location.origin + '/aterstall.html';
       supaPost('recover?redirect_to=' + encodeURIComponent(redirect), { email: email }).then(function() {
         /* Supabase answers 200 whether or not the address exists, and the
            wording keeps it that way — confirming which addresses have
            accounts would hand out a user list to anyone who asks. */
         errEl.style.color = 'var(--a,#00768F)';
-        errEl.textContent = 'Kolla mejlen. Finns adressen hos oss ligger en återställningslänk där om en minut.';
-        btn.textContent = 'Länk skickad';
+        errEl.textContent = authText('forgotSuccess');
+        btn.textContent = authText('forgotSent');
       }).catch(function(e) {
-        errEl.textContent = svError(e.message, 'Kunde inte skicka länken. Försök igen.');
-        btn.disabled = false; btn.textContent = 'Skicka återställningslänk';
+        errEl.textContent = svError(e.message, 'forgotError');
+        btn.disabled = false; btn.textContent = authText('reset');
       });
     }
 
@@ -2685,15 +2770,15 @@ function finalizeMsg(div, text) {
       var errEl = document.getElementById('pvLE2');
       var btn   = document.getElementById('pvLBtn');
       errEl.textContent = '';
-      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
-      btn.disabled = true; btn.textContent = 'Loggar in…';
+      if (!email || !pass) { errEl.textContent = authText('emailPasswordRequired'); return; }
+      btn.disabled = true; btn.textContent = authText('loginLoading');
       supaPost('token?grant_type=password', { email: email, password: pass }).then(function(d) {
         saveSession(d); closeModal();
         if (window.triggerWelcome) window.triggerWelcome(email, false);
         pvAfterAuth();
       }).catch(function(e) {
-        errEl.textContent = svError(e.message, 'Fel e-post eller lösenord.');
-        btn.disabled = false; btn.textContent = 'Logga in';
+        errEl.textContent = svError(e.message, 'loginError');
+        btn.disabled = false; btn.textContent = authText('signIn');
       });
     }
 
@@ -2763,8 +2848,8 @@ function finalizeMsg(div, text) {
           var el = document.getElementById('pvLE2');
           if (!el) return;
           el.textContent = cancelled
-            ? 'Google-inloggningen avbröts.'
-            : svError(msg, 'Google-inloggningen gick inte igenom. Försök igen.');
+            ? authText('googleCancelled')
+            : svError(msg, 'googleError');
         });
         return;
       }
@@ -2778,7 +2863,7 @@ function finalizeMsg(div, text) {
         onReady(function() {
           openModal('login');
           var message = document.getElementById('pvLE2');
-          if (message) message.textContent = 'Google-inloggning är inte tillgänglig i skolpiloten. Logga in med ditt inbjudna skolpilotkonto.';
+          if (message) message.textContent = authText('pilotGoogleUnavailable');
         });
         return;
       }

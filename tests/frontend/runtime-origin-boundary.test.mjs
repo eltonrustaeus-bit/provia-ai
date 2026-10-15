@@ -42,7 +42,8 @@ test("local browser origin never receives production Supabase credentials or con
     });
     await seed(page, { signedIn: false, role: null });
     await page.goto(`${server.url}/app.html`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => document.querySelector("#pvModal")?.classList.contains("pv-on"));
+    await page.locator("#authGate").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#pvModal").count(), 0, "unconfigured local app does not force open login");
 
     const runtime = await page.evaluate(() => ({
       environment: window.ExGenRuntime.environment,
@@ -82,7 +83,8 @@ test("unconfigured localhost preview bypasses the public gate without making API
     await page.route("https://**", (route) => route.abort());
     await seed(page, { signedIn: false, role: null });
     await page.goto(`${server.url}/app.html`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => document.querySelector("#pvModal")?.classList.contains("pv-on"));
+    await page.locator("#authGate").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#pvModal").count(), 0, "unconfigured local app does not require the auth dialog to render");
     assert.equal(await page.title(), "ExGen – App");
     assert.equal(apiRequests.length, 0);
     assert.equal(await page.evaluate(() => window.ExGenRuntime.environment), "unconfigured");

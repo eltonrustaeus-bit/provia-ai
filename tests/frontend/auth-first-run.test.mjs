@@ -34,7 +34,7 @@ try {
   await page.locator("#pvRE").fill("student@example.invalid");
   await page.locator("#pvRP").fill("  pass word  ");
   await page.locator("#pvRBtn").click();
-  await page.waitForFunction(() => document.querySelector("#pvRE2")?.textContent?.includes("Kontrollera mejlen"));
+  await page.waitForFunction(() => document.querySelector("#pvRE2")?.textContent?.includes("Om adressen kan registreras skickar vi en verifieringslänk."));
   assert.equal(signupPayload.password, "  pass word  ", "signup sends the password unchanged");
 
   await page.locator("#pvCl").click();

@@ -61,10 +61,14 @@ body.app-locked #xf,body.app-locked #main-content,body.app-locked #perWidget,bod
 .authGateEyebrow{font:500 12px 'DM Mono',monospace;color:var(--a);text-transform:uppercase;margin-bottom:18px}
 .authGateTitle{font:700 36px/1.15 'DM Sans',sans-serif;color:var(--t);margin:0 0 14px}
 .authGateText{font:400 16px/1.6 'DM Sans',sans-serif;color:var(--t2);max-width:520px;margin:0 0 28px}
-.authGateAction{min-height:48px;padding:0 22px;border:0;border-radius:6px;background:var(--a);color:#fff;font:700 15px 'DM Sans',sans-serif;cursor:pointer}
+.authGateActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.authGateAction,.authGateLogin{min-height:48px;padding:0 22px;border:1px solid transparent;border-radius:6px;font:700 15px 'DM Sans',sans-serif;cursor:pointer}
+.authGateAction{background:var(--a);color:#fff}
+.authGateLogin{border-color:var(--exgen-border,#E4E7EC);background:transparent;color:var(--t)}
 .authGateAction:hover{background:var(--a2)}
-.authGateAction:focus-visible{outline:2px solid var(--t);outline-offset:3px}
-@media(max-width:600px){#authGate{min-height:calc(100vh - 180px);padding:40px 20px}.authGateTitle{font-size:28px}}
+.authGateLogin:hover{background:var(--exgen-bg-secondary,#F8FAFC)}
+.authGateAction:focus-visible,.authGateLogin:focus-visible{outline:2px solid var(--t);outline-offset:3px}
+@media(max-width:600px){#authGate{min-height:calc(100vh - 180px);padding:40px 20px}.authGateTitle{font-size:28px}.authGateActions{width:100%;flex-direction:column;align-items:stretch}.authGateAction,.authGateLogin{width:100%}}
 
 /* HERO */
 .hero{padding:40px 0 24px}
@@ -542,7 +546,10 @@ white-space:nowrap;
   <span class="authGateEyebrow" id="authGateEyebrow">Mockprov</span>
   <h1 class="authGateTitle" id="authGateTitle">Ditt studiematerial börjar här.</h1>
   <p class="authGateText" id="authGateText">Logga in för att skapa ett prov av ditt material och fortsätta där du slutade.</p>
-  <button class="authGateAction" id="authGateAction" type="button">Logga in eller skapa konto</button>
+  <div class="authGateActions" id="authGateActions">
+    <button class="authGateAction" id="authGateAction" type="button">Skapa konto</button>
+    <button class="authGateLogin" id="authGateLogin" type="button">Logga in</button>
+  </div>
 </main>
 
 <!-- Den P.E.R-ledda provskaparen. Ytan bor i js/exam-flow.js; motorn nedanför
@@ -821,7 +828,7 @@ sv:{
   brandTag:"Studieplattform för skolan",
   authGateEyebrow:"Mockprov",authGateTitle:"Ditt studiematerial börjar här.",
   authGateText:"Logga in för att skapa ett prov av ditt material och fortsätta där du slutade.",
-  authGateAction:"Logga in eller skapa konto",
+  authGateAction:"Skapa konto",authGateLogin:"Logga in",
   authPendingEyebrow:"Kontot väntar",authPendingTitle:"Ditt konto väntar på godkännande.",
   authPendingText:"Du kan inte skapa prov ännu. Kontakta den som bjöd in dig om du behöver hjälp.",
   authPendingAction:"Kontrollera igen",
@@ -866,7 +873,7 @@ en:{
   brandTag:"A study platform for school",
   authGateEyebrow:"Practice exam",authGateTitle:"Start with your study material.",
   authGateText:"Sign in to create an exam from your material and pick up where you left off.",
-  authGateAction:"Sign in or create an account",
+  authGateAction:"Create an account",authGateLogin:"Sign in",
   authPendingEyebrow:"Account pending",authPendingTitle:"Your account is awaiting approval.",
   authPendingText:"You cannot create exams yet. Contact the person who invited you if you need help.",
   authPendingAction:"Check again",
@@ -1448,26 +1455,18 @@ let accountPendingApproval=false;
 let relockingForAuthChange=false;
 function renderAuthGate(){
   const t=T[LANG],prefix=accountPendingApproval?"authPending":"authGate";
+  const pilot=window.ExGenRuntime?.environment==="pilot";
   $("authGateEyebrow").textContent=t[prefix+"Eyebrow"];
   $("authGateTitle").textContent=t[prefix+"Title"];
   $("authGateText").textContent=t[prefix+"Text"];
-  $("authGateAction").textContent=t[prefix+"Action"];
+  $("authGateAction").textContent=accountPendingApproval?t.authPendingAction:pilot?t.authGateLogin:t.authGateAction;
+  const login=$("authGateLogin");if(login){login.textContent=t.authGateLogin;login.hidden=accountPendingApproval||pilot;}
 }
 function showLock(){
   document.body.classList.add("app-locked");
   const gate=$("authGate");if(gate)gate.hidden=false;
   const skip=$("appSkipLink");if(skip)skip.href="#authGate";
   renderAuthGate();
-  if(accountPendingApproval)return;
-  // shared.js is deferred, so it may not have defined the opener yet. If it
-  // never does, the whole shared layer (nav, cookie banner, P.E.R) is missing
-  // too, so send the visitor to the landing page rather than leaving them on
-  // a gated page with nothing to click.
-  if(window.openProviaLogin){ window.openProviaLogin('register',true); return; }
-  let n=0; const iv=setInterval(()=>{
-    if(window.openProviaLogin){ clearInterval(iv); window.openProviaLogin('register',true); }
-    else if(++n>50){ clearInterval(iv); location.href="index.html"; }
-  },60);
 }
 function hideLock(){
   document.body.classList.remove("app-locked");
@@ -1542,7 +1541,7 @@ async function checkApprovalAndUnlock(session){
 }
 
 async function handleAuthGateAction(){
-  if(!accountPendingApproval){window.openProviaLogin?.("register",true);return;}
+  if(!accountPendingApproval){window.openProviaLogin?.(window.ExGenRuntime?.environment==="pilot"?"login":"register",true);return;}
   const button=$("authGateAction");button.disabled=true;
   try{
     const {data,error}=await db.auth.getSession();
@@ -1552,6 +1551,10 @@ async function handleAuthGateAction(){
     if(ok){await loadExamsFromAccountToLocal();await refreshQuotaUi();runTrainModeIfRequested();}
   }catch(error){setLockError(String(error?.message||error));}
   finally{button.disabled=false;}
+}
+function handleAuthGateLogin(){
+  if(window.openProviaLogin)window.openProviaLogin("login",true);
+  else location.href="index.html";
 }
 
 // signInEmail()/signUpEmail() lived here and drove the removed inline
@@ -1890,6 +1893,7 @@ try{
   initCourseLibrary();
   applyLang();
   $("authGateAction")?.addEventListener("click",handleAuthGateAction);
+  $("authGateLogin")?.addEventListener("click",handleAuthGateLogin);
   const headerActions=document.querySelector(".xg-header-right");
   let desktopLangBtn=null;
   if(headerActions){

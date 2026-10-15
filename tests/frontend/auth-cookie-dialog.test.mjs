@@ -13,6 +13,7 @@ try {
   });
   await page.addInitScript(() => localStorage.removeItem("proviaai_cookie_consent"));
   await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#authGateLogin").click();
   await page.waitForFunction(() => document.querySelector("#pvModal")?.classList.contains("pv-on"));
   await page.locator("#proviaCookieBanner").waitFor({ state: "visible" });
 

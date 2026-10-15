@@ -18,22 +18,29 @@ try {
   });
   await seed(page, { role: null, user: { id: "u1", email: "u1@t.se" } });
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
-  await page.waitForFunction(() => document.querySelector("#pvModal")?.classList.contains("pv-on"));
+  await page.locator("#authGate").waitFor({ state: "visible" });
 
-  const state = await page.evaluate(() => ({
-    role: localStorage.getItem("proviaai_role"),
-    unlocked: localStorage.getItem("proviaai_app_access"),
-    modalVisible: getComputedStyle(document.querySelector("#pvModal")).display !== "none",
-    toast: document.querySelector("#toastRoot")?.innerText || "",
-  }));
+  const state = await page.evaluate(() => {
+    const modal = document.querySelector("#pvModal");
+    return {
+      role: localStorage.getItem("proviaai_role"),
+      unlocked: localStorage.getItem("proviaai_app_access"),
+      modalVisible: !!modal && getComputedStyle(modal).display !== "none",
+      gateVisible: getComputedStyle(document.querySelector("#authGate")).display !== "none",
+      toast: document.querySelector("#toastRoot")?.innerText || "",
+    };
+  });
   state.token = await page.evaluate((key) => localStorage.getItem(key), AUTH_KEY);
   assert.ok(profileMethods.includes("GET"), "the app checks its server-created profile");
   assert.equal(profileMethods.includes("POST"), false, "the browser never creates a trusted role/approval profile");
   assert.equal(state.role, null, "missing profile does not create a locally trusted role");
   assert.equal(state.unlocked, null, "missing profile leaves the app locked");
   assert.equal(state.token, null, "the unverified session is signed out");
-  assert.equal(state.modalVisible, true, "the user is routed to login instead of unlocked");
+  assert.equal(state.modalVisible, false, "the login dialog is not forced open after a failed profile check");
+  assert.equal(state.gateVisible, true, "the user remains on the locked entry gate");
   assert.match(state.toast, /Kontot kunde inte verifieras/, "the user receives a non-technical explanation");
+  await page.locator("#authGateLogin").click();
+  await page.getByRole("dialog", { name: "Logga in" }).waitFor();
   console.log("profile bootstrap: missing server profile signs out and fails closed without client INSERT");
 } finally {
   await browser.close();

@@ -13,10 +13,8 @@ try {
     mocks: { allow: true },
   });
   const { page } = visitor;
-  await page.locator("#pvModal").waitFor({ state: "visible" });
-  await page.locator("#pvCl").click();
-  await page.locator("#pvModal").waitFor({ state: "hidden" });
-  assert.equal(await page.locator("#authGate").isVisible(), true, "closing login leaves a clear entry point");
+  assert.equal(await page.locator("#pvModal").count(), 0, "the login modal is not forced open on arrival");
+  assert.equal(await page.locator("#authGate").isVisible(), true, "locked visitor sees a clear entry point");
   assert.equal(await page.locator("#xf").isVisible(), false, "the exam wizard stays hidden until profile verification");
   assert.equal(await page.locator("#pastedText").isVisible(), false, "study input is not exposed to a visitor");
   assert.equal(await page.locator("#perWidget").isVisible(), false, "study help does not cover the locked page");
@@ -24,7 +22,53 @@ try {
   assert.equal(await page.locator("#appSkipLink").getAttribute("href"), "#authGate");
   await page.locator("#authGateAction").click();
   await page.locator("#pvModal").waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("dialog", { name: "Skapa konto" }).count(), 1, "create-account action opens registration");
+  await page.locator("#pvCl").click();
+  await page.locator("#pvModal").waitFor({ state: "hidden" });
+  await page.locator("#authGateLogin").click();
+  await page.locator("#pvModal").waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("dialog", { name: "Logga in" }).count(), 1, "login action opens sign-in directly");
+  await page.locator("#pvCl").click();
+  await page.locator("#pvModal").waitFor({ state: "hidden" });
   await visitor.close();
+
+  const englishVisitor = await openPage(browser, `${server.url}/app.html`, {
+    state: { signedIn: false, role: null, lang: "en" },
+    mocks: { allow: true, extra: [
+      ["**/api/signup", route => route.fulfill({ json: { ok: true } })],
+      ["**/auth/v1/token**", route => route.fulfill({ status: 400, json: { msg: "Invalid login credentials" } })],
+    ] },
+  });
+  assert.equal(await englishVisitor.page.locator("#authGateAction").innerText(), "Create an account");
+  assert.equal(await englishVisitor.page.locator("#authGateLogin").innerText(), "Sign in");
+  await englishVisitor.page.locator("#authGateAction").click();
+  await englishVisitor.page.getByRole("dialog", { name: "Create your account" }).waitFor();
+  await englishVisitor.page.locator("#pvFormR").evaluate(form => form.requestSubmit());
+  assert.equal(await englishVisitor.page.locator("#pvRE2").innerText(), "Enter your email and password.");
+  await englishVisitor.page.locator("#pvRE").fill("student@example.test");
+  await englishVisitor.page.locator("#pvRP").fill("synthetic-password");
+  await englishVisitor.page.locator("#pvRBtn").click();
+  await englishVisitor.page.getByText("If this address can be registered, we will send a confirmation link.").waitFor();
+  await englishVisitor.page.locator("#pvCl").click();
+  await englishVisitor.page.locator("#pvModal").waitFor({ state: "hidden" });
+  await englishVisitor.page.locator("#authGateLogin").click();
+  await englishVisitor.page.getByRole("dialog", { name: "Sign in" }).waitFor();
+  assert.equal(await englishVisitor.page.locator('label[for="pvLE"]').innerText(), "EMAIL", "English sign-in dialog labels its email field");
+  await englishVisitor.page.locator("#pvLE").fill("student@example.test");
+  await englishVisitor.page.locator("#pvLP").fill("wrong-password");
+  await englishVisitor.page.locator("#pvLBtn").click();
+  await englishVisitor.page.getByText("Incorrect email or password.").waitFor();
+  await englishVisitor.close();
+
+  const pilotVisitor = await openPage(browser, `${server.url}/app.html`, {
+    state: { signedIn: false, role: null },
+    mocks: { allow: true, runtime: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});` },
+  });
+  assert.equal(await pilotVisitor.page.locator("#authGateAction").innerText(), "Logga in");
+  assert.equal(await pilotVisitor.page.locator("#authGateLogin").isVisible(), false, "pilot visitor sees one sign-in action");
+  await pilotVisitor.page.locator("#authGateAction").click();
+  await pilotVisitor.page.getByRole("dialog", { name: "Logga in" }).waitFor();
+  await pilotVisitor.close();
 
   const approved = await openPage(browser, `${server.url}/app.html`, {
     state: { signedIn: true, role: "gratis" },
@@ -47,6 +91,7 @@ try {
   assert.equal(await pending.page.locator("#xf").isVisible(), false, "pending account cannot reach the exam wizard");
   assert.match(await pending.page.locator("#authGateTitle").innerText(), /väntar på godkännande/);
   assert.equal(await pending.page.locator("#authGateAction").innerText(), "Kontrollera igen");
+  assert.equal(await pending.page.locator("#authGateLogin").isVisible(), false, "pending account sees no redundant login action");
   assert.equal(await pending.page.locator("#pvModal").isVisible(), false, "pending account is not asked to register again");
   await pending.page.waitForTimeout(5200);
   assert.match(await pending.page.locator("#authGateText").innerText(), /Kontakta den som bjöd in dig/, "the reason remains after a toast would expire");
