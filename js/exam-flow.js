@@ -465,6 +465,7 @@
     qType: "mix",
     num: 12,
     nonGraphNum: 12,
+    questionCountNote: "",
     material: "",
     exam: null,
     answers: questionState(),   // qid -> svar
@@ -1446,6 +1447,11 @@
         return;
       }
       S.exam = normalizeIds(r.exam);
+      var got = S.exam.questions.length;
+      S.questionCountNote = got < S.num
+        ? tx("Jag skrev " + S.num + " frågor men kastade " + (S.num - got) + " som inte höll måttet. Du får " + got + " — hellre färre och rätt.",
+            "I drafted " + S.num + " questions but removed " + (S.num - got) + " that did not meet the quality bar. You will get " + got + " instead — fewer, but better.")
+        : "";
       S.answers = questionState();
       S.helped = questionState();
       S.idx = 0;
@@ -1454,19 +1460,6 @@
       S.submitting = false;
       saveDraft();
       openExam();
-
-      /* Kvalitetskontrollen i generate-exam.js sorterar bort frågor den inte
-         litar på, och gör det tyst: ett prov på tolv frågor kan landa på sju.
-         Mätt skarpt mot gpt-4o-mini underkände verifieraren tre av sex. Utan
-         det här beskedet ser eleven bara att kontraktet lovade ett antal och
-         provet visar ett annat, vilket läser som en bugg i stället för som
-         kvalitetsarbete. */
-      var got = S.exam.questions.length;
-      if (got < S.num) {
-        nudge(tx("Jag skrev " + S.num + " frågor men kastade " + (S.num - got) +
-              " som inte höll måttet. Du får " + got + " — hellre färre och rätt.", "I drafted " + S.num + " questions but removed " + (S.num - got) +
-              " that did not meet the quality bar. You will get " + got + " instead — fewer, but better."), true);
-      }
     }).catch(function (e) {
       /* generate() går via runGenerate i app.html. postJson kastar aldrig,
          men andra auth-/UI-anrop kan göra det. Återställ alltid knappen så att
@@ -1914,6 +1907,20 @@
 
     var sheet = el("div", "xf-sheet");
 
+    if (S.questionCountNote) {
+      var qualityNote = el("div", "xf-question-quality-note");
+      qualityNote.setAttribute("role", "status");
+      qualityNote.setAttribute("aria-live", "polite");
+      var qualityText = el("p", null, S.questionCountNote);
+      var dismissQualityNote = el("button", null, "✕");
+      dismissQualityNote.type = "button";
+      dismissQualityNote.setAttribute("aria-label", tx("Stäng meddelandet", "Dismiss message"));
+      dismissQualityNote.addEventListener("click", function () { S.questionCountNote = ""; renderQuestion(); });
+      qualityNote.appendChild(qualityText);
+      qualityNote.appendChild(dismissQualityNote);
+      sheet.appendChild(qualityNote);
+    }
+
     var head = el("div", "xf-q-head");
     head.appendChild(el("span", null, String(q.cognitive_level || "").trim() || "Uppgift"));
     head.appendChild(el("span", "xf-q-pts", (Number(q.points) || 0) + " p"));
@@ -1932,12 +1939,17 @@
         var letter = String.fromCharCode(65 + n);
         var btn = el("button", "xf-mc-opt");
         btn.type = "button";
+        btn.setAttribute("aria-pressed", S.answers[id] === letter ? "true" : "false");
         btn.appendChild(el("span", "xf-mc-let", letter));
         btn.appendChild(el("span", null, opt));
         if (S.answers[id] === letter) btn.classList.add("sel");
         btn.addEventListener("click", function () {
-          Array.prototype.forEach.call(group.children, function (c) { c.classList.remove("sel"); });
+          Array.prototype.forEach.call(group.children, function (c) {
+            c.classList.remove("sel");
+            c.setAttribute("aria-pressed", "false");
+          });
           btn.classList.add("sel");
+          btn.setAttribute("aria-pressed", "true");
           S.answers[id] = letter;
           saveDraft();
           publish();
@@ -2327,7 +2339,7 @@
 
     function answerText(q, raw) {
       var answer = String(raw || "").trim();
-      if (!answer) return "Inget svar";
+      if (!answer) return tx("Inget svar", "No answer");
       if (q.type === "mc") {
         var option = Array.isArray(q.options) ? q.options[answer.charCodeAt(0) - 65] : null;
         return option ? answer + ". " + option : answer;
@@ -2339,11 +2351,11 @@
             return p && Number.isInteger(p.x) && Number.isInteger(p.y);
           })) {
             return points.map(function (p, index) {
-              return "Punkt " + String.fromCharCode(65 + index) + " (" + p.x + ", " + p.y + ")";
+              return tx("Punkt ", "Point ") + String.fromCharCode(65 + index) + " (" + p.x + ", " + p.y + ")";
             }).join(" · ");
           }
         } catch (_) {}
-        return "Ingen fullständig graf angiven";
+        return tx("Ingen fullständig graf angiven", "No complete graph was provided");
       }
       return answer;
     }
@@ -2373,29 +2385,34 @@
     var independentPct = independentMax > 0 ? Math.round((independentPoints / independentMax) * 100) : 0;
 
     if (hasIndependentCheck) {
-      say("Du fick " + total + " av " + max + ".",
-          "P.E.R öppnades på " + helpedCount + " " + (helpedCount === 1 ? "fråga" : "frågor") +
-          ". På de " + independentCount + " frågor där P.E.R inte öppnades fick du " + independentPoints + " av " + independentMax + " poäng.");
+      say(tx("Du fick " + total + " av " + max + ".", "You scored " + total + " out of " + max + "."),
+          tx("P.E.R öppnades på " + helpedCount + " " + (helpedCount === 1 ? "fråga" : "frågor") +
+            ". På de " + independentCount + " frågor där P.E.R inte öppnades fick du " + independentPoints + " av " + independentMax + " poäng.",
+            "P.E.R was opened for " + helpedCount + " " + (helpedCount === 1 ? "question" : "questions") +
+            ". On the " + independentCount + " questions where P.E.R was not opened, you scored " + independentPoints + " out of " + independentMax + " points."));
     } else if (helpedCount > 0 && independentCount === 0) {
-      say("Du fick " + total + " av " + max + ".",
-          "P.E.R öppnades på alla frågor, så det finns inget separat resultat för frågor utan P.E.R.");
+      say(tx("Du fick " + total + " av " + max + ".", "You scored " + total + " out of " + max + "."),
+          tx("P.E.R öppnades på alla frågor, så det finns inget separat resultat för frågor utan P.E.R.",
+            "P.E.R was opened for every question, so there is no separate score for questions without P.E.R."));
     } else if (helpedCount > 0) {
-      say("Du fick " + total + " av " + max + ".",
-          "P.E.R öppnades under provet. Ditt resultat ovan ändras inte av det.");
+      say(tx("Du fick " + total + " av " + max + ".", "You scored " + total + " out of " + max + "."),
+          tx("P.E.R öppnades under provet. Ditt resultat ovan ändras inte av det.",
+            "P.E.R was opened during the exam. It does not change your score above."));
     } else {
-      say("Du fick " + total + " av " + max + ".", "P.E.R öppnades inte under provet.");
+      say(tx("Du fick " + total + " av " + max + ".", "You scored " + total + " out of " + max + "."),
+          tx("P.E.R öppnades inte under provet.", "P.E.R was not opened during the exam."));
     }
 
     var scores = el("div", "xf-scores" + (hasIndependentCheck ? "" : " solo"));
     var s1 = el("div", "xf-score lead");
     s1.appendChild(el("b", null, total + "/" + max));
-    s1.appendChild(el("span", null, "Ditt resultat · " + pct + " %"));
+    s1.appendChild(el("span", null, tx("Ditt resultat · ", "Your score · ") + pct + " %"));
     scores.appendChild(s1);
 
     if (hasIndependentCheck) {
       var s2 = el("div", "xf-score");
       s2.appendChild(el("b", null, independentPoints + "/" + independentMax));
-      s2.appendChild(el("span", null, "Frågor utan P.E.R · " + independentPct + " %"));
+      s2.appendChild(el("span", null, tx("Frågor utan P.E.R · ", "Questions without P.E.R · ") + independentPct + " %"));
       scores.appendChild(s2);
     }
     b.appendChild(scores);
@@ -2404,29 +2421,29 @@
       var saveWarning = el("div", "xf-err xf-save-warning");
       saveWarning.setAttribute("role", "status");
       saveWarning.setAttribute("aria-live", "polite");
-      var saveMessage = el("p", null, persistence.message || "Resultatet har inte sparats till kontot ännu.");
+      var saveMessage = el("p", null, tx("Resultatet har inte sparats till kontot ännu.", "This result has not been saved to your account yet."));
       saveWarning.appendChild(saveMessage);
       if (persistence.localId && window.ExGenEngine && window.ExGenEngine.retryAccountSave) {
-        var retrySave = el("button", "xf-btn quiet", "Försök spara till kontot igen");
+        var retrySave = el("button", "xf-btn quiet", tx("Försök spara till kontot igen", "Try saving to your account again"));
         retrySave.type = "button";
         retrySave.addEventListener("click", function () {
           if (retrySave.disabled) return;
           retrySave.disabled = true;
-          retrySave.textContent = "Sparar…";
+          retrySave.textContent = tx("Sparar…", "Saving…");
           window.ExGenEngine.retryAccountSave(persistence.localId).then(function (saved) {
             if (saved && saved.ok) {
-              saveMessage.textContent = "Resultatet är nu sparat till kontot och tillgängligt i lärarvyn.";
+              saveMessage.textContent = tx("Resultatet är nu sparat till kontot och tillgängligt i lärarvyn.", "The result is now saved to your account and available in the teacher view.");
               retrySave.remove();
               saveWarning.classList.add("saved");
             } else {
               retrySave.disabled = false;
-              retrySave.textContent = "Försök spara till kontot igen";
-              saveMessage.textContent = "Kontosparningen kunde inte bekräftas. Resultatet finns kvar på den här enheten.";
+              retrySave.textContent = tx("Försök spara till kontot igen", "Try saving to your account again");
+              saveMessage.textContent = tx("Kontosparningen kunde inte bekräftas. Resultatet finns kvar på den här enheten.", "The account save could not be confirmed. The result is still on this device.");
             }
           }).catch(function () {
             retrySave.disabled = false;
-            retrySave.textContent = "Försök spara till kontot igen";
-            saveMessage.textContent = "Kontosparningen kunde inte bekräftas. Resultatet finns kvar på den här enheten.";
+            retrySave.textContent = tx("Försök spara till kontot igen", "Try saving to your account again");
+            saveMessage.textContent = tx("Kontosparningen kunde inte bekräftas. Resultatet finns kvar på den här enheten.", "The account save could not be confirmed. The result is still on this device.");
           });
         });
         saveWarning.appendChild(retrySave);
@@ -2452,12 +2469,14 @@
     });
     var tKeys = Object.keys(topics);
     if (tKeys.length) {
-      b.appendChild(el("div", "xf-eyebrow", "Vad provet täckte"));
+      b.appendChild(el("div", "xf-eyebrow", tx("Vad provet täckte", "What the exam covered")));
       var cov = el("div", "xf-cov");
       tKeys.forEach(function (t) {
         var o = topics[t];
         var ratio = o.attemptedMax > 0 ? o.attemptedGot / o.attemptedMax : 1;
-        var note = o.skipped ? " · " + o.skipped + " obesvarad" + (o.skipped === 1 ? "" : "e") : "";
+        var note = o.skipped ? " · " + o.skipped + " " + (isEnglish()
+          ? "unanswered"
+          : (o.skipped === 1 ? "obesvarad" : "obesvarade")) : "";
         var chip = el("span", ratio < 0.6 ? "weak" : null, t + " " + o.got + "/" + o.max + note);
         cov.appendChild(chip);
       });
@@ -2475,7 +2494,8 @@
 
       var it = el("div", "xf-item");
       var head = el("div", "xf-item-head");
-      head.appendChild(el("span", null, "Fråga " + (n + 1) + (S.helped[String(item.id)] ? " · P.E.R öppnades" : "")));
+      head.appendChild(el("span", null, tx("Fråga ", "Question ") + (n + 1) + (S.helped[String(item.id)]
+        ? tx(" · P.E.R öppnades", " · P.E.R was opened") : "")));
       var score = el("b", got >= m && m > 0 ? "full" : got === 0 ? "miss" : null, got + "/" + m);
       head.appendChild(score);
       it.appendChild(head);
@@ -2483,7 +2503,7 @@
       if (q.question) it.appendChild(el("div", "xf-item-q", q.question));
 
       var own = el("div", "xf-item-own");
-      own.appendChild(el("span", "xf-item-label", "Ditt svar"));
+      own.appendChild(el("span", "xf-item-label", tx("Ditt svar", "Your answer")));
       own.appendChild(el("span", null, answerText(q, S.answers[String(item.id)])));
       it.appendChild(own);
 
@@ -2498,7 +2518,7 @@
         it.appendChild(buildGraphRetry(item, q.graph_ui));
       } else if (item.model_answer) {
         var mo = el("div", "xf-item-model");
-        mo.appendChild(el("em", null, "Fullpoängssvar"));
+        mo.appendChild(el("em", null, tx("Fullpoängssvar", "Full-credit answer")));
         mo.appendChild(el("span", null, item.model_answer));
         it.appendChild(mo);
       }
@@ -2559,17 +2579,17 @@
     // varandra efter tre misslyckade försök.
     var againErr = el("div", "xf-err");
 
-    var again = el("button", "xf-btn primary", "Gör om — nya frågor, samma nivå");
+    var again = el("button", "xf-btn primary", tx("Gör om — nya frågor, samma nivå", "Try again — new questions, same level"));
     again.type = "button";
     again.addEventListener("click", function () { build(again, againErr); });
     act.appendChild(again);
 
-    var toImprove = el("a", "xf-btn ghost", "Träna sparade misstag");
+    var toImprove = el("a", "xf-btn ghost", tx("Träna sparade misstag", "Practice saved mistakes"));
     toImprove.href = "app.html#train";
     toImprove.addEventListener("click", function () { lsDel(LS_TRAIN_PICK); });
     act.appendChild(toImprove);
 
-    var fresh = el("button", "xf-btn quiet", "Nytt ämne");
+    var fresh = el("button", "xf-btn quiet", tx("Nytt ämne", "New topic"));
     fresh.type = "button";
     fresh.addEventListener("click", function () {
       S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";

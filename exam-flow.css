@@ -539,6 +539,39 @@ body.xf-in-exam.xf-per-open #perWidget {
   align-self: flex-start;
 }
 
+.xf-question-quality-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  color: var(--xf-ink-2);
+  background: var(--s2);
+  border: 1px solid var(--xf-line);
+  border-left: 2px solid var(--xf-accent);
+  border-radius: var(--exgen-radius-sm);
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-normal);
+}
+
+.xf-question-quality-note p { flex: 1; min-width: 0; margin: 0; }
+
+.xf-question-quality-note button {
+  flex: 0 0 auto;
+  padding: 1px 3px;
+  color: var(--xf-ink-2);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.xf-question-quality-note button:focus-visible {
+  outline: 2px solid var(--xf-accent);
+  outline-offset: 2px;
+}
+
 /* ══ RÄTTNINGEN ══════════════════════════════════════════════════════════════
    Mörk maskinyta. Bytet från ljus app till mörk yta är signalen att något
    annat än UI händer nu. Raderna som tickar in är verkliga steg, inte en
