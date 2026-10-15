@@ -594,11 +594,25 @@
     }
 
     /* ── PICK / SELECTION ── */
-    function mKey(m){return`${Number(m.ts||0)}:${m.course||''}:${m.id||''}:${m.question||''}`;}
-    function getPick(){return lsObj(LS_TRAIN_PICK)||{ids:[],course:''};}
+    function ensureMistakeKeys(rows){
+      const seen=new Set();let changed=false;
+      const normalized=(Array.isArray(rows)?rows:[]).map((m,index)=>{
+        if(!m||typeof m!=='object'||Array.isArray(m))return m;
+        let key=String(m.mistake_key||'');
+        if(!key)key=`legacy:${Number(m.ts||0)}:${m.course||''}:${m.id||''}:${m.question||''}:${index}`;
+        if(seen.has(key))key=`${key}:${index}`;
+        seen.add(key);
+        if(key!==m.mistake_key){changed=true;return{...m,mistake_key:key};}
+        return m;
+      });
+      if(changed)lsSet(LS_MISTAKES,normalized);
+      return normalized;
+    }
+    function mKey(m){return String(m?.mistake_key||'');}
+    function getPick(){const p=lsObj(LS_TRAIN_PICK)||{};return{keys:Array.isArray(p.keys)?p.keys.map(String):[],mode:p.mode==='all'?'all':'selected',course:String(p.course||'')};}
     function setPick(p){lsSet(LS_TRAIN_PICK,p);updateSelPill();}
-    function togglePickId(id){const p=getPick(),ids=Array.isArray(p.ids)?p.ids.map(x=>String(x)):[],sid=String(id),set=new Set(ids);if(set.has(sid))set.delete(sid);else set.add(sid);p.ids=Array.from(set);p.course=String($('courseFilter')?.value||'');setPick(p);}
-    function clearPick(){setPick({ids:[],course:String($('courseFilter')?.value||'')});}
+    function togglePickKey(key){const p=getPick(),keys=new Set(p.keys),skey=String(key);if(keys.has(skey))keys.delete(skey);else keys.add(skey);p.keys=Array.from(keys);p.mode='selected';p.course=String($('courseFilter')?.value||'');setPick(p);}
+    function clearPick(){setPick({keys:[],mode:'selected',course:String($('courseFilter')?.value||'')});}
     /* Räknaren äger radens tillstånd: texten, mätaren, om primärhandlingen går
        att trycka på och om "Rensa" alls syns. Ett enda ställe, så raden inte kan
        säga en sak och bete sig som en annan.
@@ -609,7 +623,7 @@
     function updateSelPill(){
       const el=$('selCountPill'); if(!el)return;
       const p=getPick();
-      const n=Array.isArray(p.ids)?p.ids.length:0;
+      const n=Array.isArray(p.keys)?p.keys.length:0;
       const totalt=document.querySelectorAll('#mistakeList .xf-opt').length;
 
       el.textContent = n
@@ -627,7 +641,7 @@
       const clear=$('clearSelectionBtn');
       if(clear) clear.hidden = n === 0;
     }
-    function removeMistake(m){const all=lsArr(LS_MISTAKES),k=mKey(m);lsSet(LS_MISTAKES,all.filter(x=>mKey(x)!==k));const p=getPick(),ids=(Array.isArray(p.ids)?p.ids:[]).map(String),sid=String(m.id);if(ids.includes(sid)){p.ids=ids.filter(x=>x!==sid);setPick(p);}}
+    function removeMistake(m){const all=lsArr(LS_MISTAKES),k=mKey(m);lsSet(LS_MISTAKES,all.filter(x=>mKey(x)!==k));const p=getPick();if(p.keys.includes(k)){p.keys=p.keys.filter(x=>x!==k);setPick(p);}}
 
     /* ── PER COACH ── */
     const PER_COACH_TTL = 24 * 60 * 60 * 1000;
@@ -793,6 +807,7 @@
 
     /* ── RENDER MISTAKES ── */
     function renderMistakes(mistakes,courseFilter){
+      mistakes=ensureMistakeKeys(mistakes);
       const list=$('mistakeList'),st=$('mistakeStatus');
       list.innerHTML='';
       const course=(courseFilter||'').trim();
@@ -839,7 +854,7 @@
       const shownConcept=CONCEPT_FILTER==='__none__'?'Otaggade':CONCEPT_FILTER;
       const scope=[course,shownConcept].filter(Boolean).join(' › ');
       st.textContent=`${filtered.length} misstag${scope?' · '+scope:''}`;st.className='statusText';
-      const pick=getPick(),pickSet=new Set((Array.isArray(pick.ids)?pick.ids:[]).map(x=>String(x)));
+      const pick=getPick(),pickSet=new Set(pick.keys);
       /* Hur många gånger varje begrepp återkommer i det eleven ser just nu.
          Det är den enda signalen som säger vad som ska prioriteras — fyra
          identiska kort säger ingenting om vilket misstag som är ett mönster
@@ -856,7 +871,7 @@
         // kunde bära.
         const d=document.createElement('article');
         const date=new Date(m.ts||Date.now()).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'});
-        const isPicked=pickSet.has(String(m.id)),cKey=tipsCKey(m),hasCached=!!(tc[cKey]);
+        const key=mKey(m),isPicked=pickSet.has(key),cKey=tipsCKey(m),hasCached=!!(tc[cKey]);
         const cTag=conceptOf(m),eTags=errorTagsOf(m).slice(0,3);
         const antal=cTag?(begreppsAntal[cTag]||0):0;
         d.className='xfMiss'+(isPicked?' sel':'');
@@ -876,7 +891,7 @@
           : '';
 
         d.innerHTML=`
-          <button type="button" class="xf-opt xfMissRow" data-id="${esc(m.id)}"
+          <button type="button" class="xf-opt xfMissRow" data-id="${esc(m.id)}" data-mistake-key="${esc(key)}"
                   aria-pressed="${isPicked?'true':'false'}">
             ${huvudHtml}
             <span class="xfMissQ">${esc(m.question||'')}</span>
@@ -908,8 +923,8 @@
            Eleven markerade i blindo. */
         const rad=d.querySelector('.xfMissRow');
         rad?.addEventListener('click',()=>{
-          togglePickId(m.id);
-          const valt=(getPick().ids||[]).map(String).includes(String(m.id));
+          togglePickKey(key);
+          const valt=getPick().keys.includes(key);
           d.classList.toggle('sel',valt);
           rad.setAttribute('aria-pressed',valt?'true':'false');
         });
@@ -1039,18 +1054,52 @@
     }
 
     /* ── SYNC ── */
+    function stableJSON(value){if(Array.isArray(value))return'['+value.map(stableJSON).join(',')+']';if(value&&typeof value==='object')return'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableJSON(value[k])).join(',')+'}';return JSON.stringify(value);}
+    function canonicalTimestamp(value){
+      const input=String(value||''),match=input.match(/^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2})(?::(\d{2}))?(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/i);
+      if(!match)return input;
+      const base=Date.parse(`${match[1]}T${match[2]}:${match[3]||'00'}${match[5]||''}`);
+      if(!Number.isFinite(base))return input;
+      const seconds=new Date(Math.floor(base/1000)*1000).toISOString().replace('.000Z','');
+      const fraction=String(match[4]||'').replace(/0+$/g,'');
+      return`${seconds}${fraction?'.'+fraction:''}Z`;
+    }
+    function legacyTrainingBatchId(record){
+      const exam=record?.exam&&typeof record.exam==='object'?{...record.exam}:null;
+      if(exam)delete exam.training_batch_id;
+      const input=stableJSON([canonicalTimestamp(record?.created_at),String(record?.course||''),String(record?.level||''),String(record?.qtype||record?.qType||''),String(record?.material||''),exam,record?.answers||null,record?.result||null]);
+      const lanes=[2166136261,0x9e3779b9,0x85ebca6b,0xc2b2ae35],primes=[16777619,2246822519,3266489917,668265263];
+      for(let i=0;i<input.length;i++){const c=input.charCodeAt(i);for(let lane=0;lane<lanes.length;lane++)lanes[lane]=Math.imul(lanes[lane]^c,primes[lane]);}
+      return'legacy-'+lanes.map(value=>(value>>>0).toString(16).padStart(8,'0')).join('');
+    }
+    function stableMistakeSignature(item){return stableJSON([Number(item?.ts||0),String(item?.course||''),String(item?.id||''),String(item?.question||''),String(item?.user_answer||''),String(item?.feedback||''),String(item?.model_answer||''),Number(item?.points||0),Number(item?.max_points||0)]);}
+    function migrateTrainingPick(oldMistakes,newMistakes){
+      const pick=lsObj(LS_TRAIN_PICK);if(!Array.isArray(pick?.keys)||!pick.keys.length)return;
+      const nextKeys=new Set((newMistakes||[]).map(item=>String(item?.mistake_key||''))),available=new Map();
+      (newMistakes||[]).forEach(item=>{const sig=stableMistakeSignature(item);if(!available.has(sig))available.set(sig,[]);available.get(sig).push(String(item?.mistake_key||''));});
+      const oldByKey=new Map((oldMistakes||[]).map(item=>[String(item?.mistake_key||''),item])),consumed=new Set(),mapped=[];
+      for(const selected of pick.keys.map(String)){
+        if(nextKeys.has(selected)){mapped.push(selected);continue;}
+        const legacy=oldByKey.get(selected),bucket=legacy?available.get(stableMistakeSignature(legacy)):null;
+        const replacement=bucket?.find(key=>key&&!consumed.has(key));
+        if(replacement){mapped.push(replacement);consumed.add(replacement);}else mapped.push(selected);
+      }
+      const keys=Array.from(new Set(mapped));
+      if(keys.length!==pick.keys.length||keys.some((key,index)=>key!==String(pick.keys[index]||'')))lsSet(LS_TRAIN_PICK,{...pick,keys});
+    }
     function mergeMistakes(rows){
       const out=[];
       (rows||[]).forEach(r=>{
         const cTs=Date.parse(r.created_at)||0;
         const exam=r.exam||null,result=r.result||null,answers=r.answers||null;
+        const batchId=String(exam?.training_batch_id||r.submission_id||legacyTrainingBatchId(r));
         const qById=new Map(((exam&&exam.questions)?exam.questions:[]).map(q=>[String(q.id),q]));
         const aById=new Map((Array.isArray(answers)?answers:[]).map(a=>[String(a.id),String(a.answer||'')]));
         const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
-        per.forEach(item=>{
+        per.forEach((item,questionIndex)=>{
           const got=Number(item.points||0),mx=Number(item.max_points||0);
           if(mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
-            out.push({ts:cTs||Date.now(),course:r.course||'',level:r.level||'C',qType:q.type||(r.qtype||'mix'),id:qid,question:String(q.question||''),user_answer:String(aById.get(qid)||''),feedback:String(item.feedback||''),model_answer:String(item.model_answer||''),points:got,max_points:mx,concept_tag:String(item.concept_tag||''),error_tags:Array.isArray(item.error_tags)?item.error_tags:[]});}
+            out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:cTs||Date.now(),course:r.course||'',level:r.level||'C',qType:q.type||(r.qtype||'mix'),id:qid,question:String(q.question||''),user_answer:String(aById.get(qid)||''),feedback:String(item.feedback||''),model_answer:String(item.model_answer||''),points:got,max_points:mx,concept_tag:String(item.concept_tag||''),error_tags:Array.isArray(item.error_tags)?item.error_tags:[]});}
         });
       });
       while(out.length>200)out.shift();return out;
@@ -1073,7 +1122,8 @@
       const last2=rows.length?rows[rows.length-1]:null;
       if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')localStorage.setItem(LS_MATERIAL,last2.material);}
       else localStorage.removeItem(LS_LAST);
-      lsSet(LS_MISTAKES,mergeMistakes(rows));
+      const oldMistakes=lsArr(LS_MISTAKES),newMistakes=mergeMistakes(rows);
+      migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
       if(st){st.textContent='Synkat';st.className='statusText ok';}
       if(syncBtn)syncBtn.removeAttribute('disabled');
       renderAll();
@@ -1298,7 +1348,8 @@
         const p=getPick();
         /* Knappen är avstängd utan urval, men villkoret står kvar som andra
            spärr: disabled är ett gränssnittstillstånd, inte en garanti. */
-        if(!p.ids||!p.ids.length)return;
+        if(!p.keys.length)return;
+        p.mode='selected';setPick(p);
         window.location.href='app.html#train';
       });
     }

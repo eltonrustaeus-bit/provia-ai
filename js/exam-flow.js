@@ -211,13 +211,14 @@
 
   function weakResultItems(result, questionsById) {
     return (result && Array.isArray(result.per_question) ? result.per_question : [])
-      .map(function (item) {
+      .map(function (item, index) {
         var id = String(item.id || "");
         var q = questionsById[id] || {};
         var got = Number(item.points) || 0;
         var max = Number(item.max_points) || 0;
         return {
           id: id,
+          index: index,
           q: q,
           got: got,
           max: max,
@@ -274,8 +275,11 @@
     var train = el("a", "xf-btn primary", tx("Träna misstagen", "Practise these topics"));
     train.href = "app.html#train";
     train.addEventListener("click", function () {
+      var last = lsGet("proviaai_last_result", null);
+      var batchId = last && last.training_batch_id ? String(last.training_batch_id) : "";
       lsSet(LS_TRAIN_PICK, {
-        ids: weak.slice(0, 8).map(function (item) { return item.id; }),
+        keys: batchId ? weak.slice(0, 8).map(function (item) { return "exam:" + batchId + ":" + item.index; }) : [],
+        mode: batchId ? "selected" : "none",
         course: S.course || ""
       });
     });
@@ -2620,7 +2624,7 @@
 
     var toImprove = el("a", "xf-btn ghost", tx("Träna sparade misstag", "Practice saved mistakes"));
     toImprove.href = "app.html#train";
-    toImprove.addEventListener("click", function () { lsDel(LS_TRAIN_PICK); });
+    toImprove.addEventListener("click", function () { lsSet(LS_TRAIN_PICK, { keys: [], mode: "all", course: "" }); });
     act.appendChild(toImprove);
 
     var fresh = el("button", "xf-btn quiet", tx("Nytt ämne", "New topic"));

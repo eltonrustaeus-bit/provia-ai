@@ -121,6 +121,20 @@ try {
   });
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on");
+  const subMillisecondCheck = await page.evaluate(() => {
+    const base = { created_at: "2026-10-15T10:00:00.123000Z", course: "Matematik 1b", level: "C", qtype: "graph", material: "M", exam: { questions: [{ id: "q1", question: "q" }] }, answers: [{ id: "q1", answer: "A" }], result: { total_points: 0 } };
+    const sameInstant = { ...base, created_at: "2026-10-15T12:00:00.123000+02:00" };
+    const laterMicrosecond = { ...base, created_at: "2026-10-15T10:00:00.123001Z" };
+    return {
+      sameInstant: sameSavedExam(base, sameInstant),
+      sameIdentity: legacyTrainingBatchId(base) === legacyTrainingBatchId(sameInstant),
+      sameMillis: Date.parse(base.created_at) === Date.parse(laterMicrosecond.created_at),
+      distinctInstant: sameSavedExam(base, laterMicrosecond),
+      distinctIdentity: legacyTrainingBatchId(base) !== legacyTrainingBatchId(laterMicrosecond),
+    };
+  });
+  assert.deepEqual(subMillisecondCheck, { sameInstant: true, sameIdentity: true, sameMillis: true, distinctInstant: false, distinctIdentity: true },
+    "timestamp normalization deduplicates equivalent zones but preserves sub-millisecond distinctions");
   await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([{
     course: "Matematik 1b", level: "C", qType: "graph", numQuestions: 1, percent: 70
   }])));
@@ -339,15 +353,39 @@ try {
     document.querySelector(".xf-next-actions a")?.addEventListener("click", (event) => event.preventDefault(), { capture: true, once: true });
   });
   await page.getByRole("link", { name: "Träna misstagen" }).click();
-  const trainingPick = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"));
-  assert.deepEqual(trainingPick, { ids: ["graph-1"], course: "Matematik 1b" },
-    "the real result-card action passes the weak question and course to training");
+  const trainingPick = await page.evaluate(() => ({
+    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
+    batch: JSON.parse(localStorage.getItem("proviaai_last_result") || "null")?.training_batch_id,
+  }));
+  assert.deepEqual(trainingPick.pick, { keys: [`exam:${trainingPick.batch}:0`], mode: "selected", course: "Matematik 1b" },
+    "the real result-card action passes the exact weak question and course to training");
+  await page.evaluate(() => {
+    const link = Array.from(document.querySelectorAll(".xf-next-actions a"))
+      .find(anchor => anchor.textContent.includes("Träna sparade misstag"));
+    link?.addEventListener("click", event => event.preventDefault(), { capture: true, once: true });
+  });
+  await page.getByRole("link", { name: "Träna sparade misstag" }).evaluate(anchor => anchor.click());
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_train_pick") || "null")),
+    { keys: [], mode: "all", course: "" }, "the separate saved-mistakes action explicitly selects all mistakes");
+  await page.evaluate(selected => localStorage.setItem("proviaai_train_pick", JSON.stringify(selected)), trainingPick.pick);
   const queuedBeforeRetry = await page.evaluate(() => {
     const key = Object.keys(localStorage).find((name) => name.startsWith("proviaai_pending_exams:"));
     return { key, length: key ? JSON.parse(localStorage.getItem(key) || "[]").length : 0 };
   });
   assert.equal(queuedBeforeRetry.length, 1, "failed result is retained in a user-scoped local queue");
   assert.equal(queuedBeforeRetry.key, "proviaai_pending_exams:u1", "the pending result is partitioned by authenticated user ID");
+  const legacyPending = await page.evaluate(() => {
+    const key = "proviaai_pending_exams:u1";
+    const rows = JSON.parse(localStorage.getItem(key) || "[]");
+    const row = { ...rows[0], exam: { ...rows[0].exam } };
+    delete row.exam.training_batch_id;
+    delete row.submission_id;
+    rows[0] = row;
+    localStorage.setItem(key, JSON.stringify(rows));
+    return { localId: row.local_id, batchId: row.exam.training_batch_id, created_at: row.created_at };
+  });
+  assert.ok(legacyPending.localId, "the retry fixture represents a pre-batch-id pending exam");
+  assert.equal(legacyPending.batchId, undefined);
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen[data-screen='start'].on");
   await page.getByText(/Ett prov väntar på att sparas till ditt konto/).waitFor();
@@ -355,11 +393,33 @@ try {
   assert.equal(await page.getByRole("button", { name: /Spara Matematik 1b/ }).count(), 1, "pending result remains actionable from the start screen after reload");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= 390), true, "pending-save recovery fits the mobile viewport");
   await page.screenshot({ path: "/tmp/exgen-pending-save-reload-mobile.png", fullPage: true });
+  const legacyRemote = await page.evaluate(() => {
+    const row = JSON.parse(localStorage.getItem("proviaai_pending_exams:u1") || "[]")[0];
+    const created_at = row.created_at.replace(/(\.\d{3})Z$/, (_match, fraction) => `${fraction}000+00:00`);
+    return { ...row, id: "legacy-existing", local_id: undefined, submission_id: null, created_at };
+  });
+  delete legacyRemote.local_id;
+  assert.notEqual(legacyRemote.created_at, legacyPending.created_at, "the pre-existing row uses a different textual timestamp representation");
+  assert.equal(Date.parse(legacyRemote.created_at), Date.parse(legacyPending.created_at), "both timestamp representations identify the same instant");
+  savedExamRows.push(legacyRemote);
+  const selectedAfterReload = await page.evaluate(() => ({
+    batch: JSON.parse(localStorage.getItem("proviaai_last_result") || "null")?.training_batch_id,
+    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
+  }));
+  assert.ok(selectedAfterReload.batch, "a legacy pending exam receives a stable batch identity after reload");
+  assert.ok(selectedAfterReload.pick?.keys?.includes(`exam:${selectedAfterReload.batch}:0`),
+    "the previously selected weak question migrates to the stable legacy identity");
   failAccountSave = false;
   await page.getByRole("button", { name: /Spara Matematik 1b/ }).click();
   await page.getByText("Alla väntande prov är nu sparade till kontot.").waitFor();
-  assert.equal(accountSaveAttempts, 2, "retry saves the result without grading it again");
+  assert.equal(accountSaveAttempts, 1, "an existing legacy account row is detected without a duplicate insert");
   assert.equal(savedExamRows.length, 1, "retry creates only one account row");
+  const selectionAfterSync = await page.evaluate(() => ({
+    pick: JSON.parse(localStorage.getItem("proviaai_train_pick") || "null"),
+    keys: JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").map(row => row.mistake_key),
+  }));
+  assert.ok(selectionAfterSync.keys.includes(`exam:${selectedAfterReload.batch}:0`), "retry preserves the pending question identity after account sync");
+  assert.ok(selectionAfterSync.pick.keys.includes(`exam:${selectedAfterReload.batch}:0`), "saved training selection still points at the synced mistake");
   const queuedAfterRetry = await page.evaluate(() => {
     const key = Object.keys(localStorage).find((name) => name.startsWith("proviaai_pending_exams:"));
     return key ? JSON.parse(localStorage.getItem(key) || "[]").length : 0;

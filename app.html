@@ -1083,12 +1083,55 @@ function submissionIdFromProof(proof){const match=typeof proof==="string"?proof.
 function queuePendingExam(row){const rows=readPendingExams(row.user_id);if(rows.some(x=>x.local_id===row.local_id))return true;if(rows.length>=100)return false;rows.push(row);return writePendingExams(row.user_id,rows);}
 function removePendingExam(userId,localId){const rows=readPendingExams(userId).filter(x=>x.local_id!==localId);return writePendingExams(userId,rows);}
 function stableJSON(value){if(Array.isArray(value))return"["+value.map(stableJSON).join(",")+"]";if(value&&typeof value==="object")return"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stableJSON(value[k])).join(",")+"}";return JSON.stringify(value);}
-function sameSavedExam(a,b){if(a.submission_id&&b.submission_id)return a.submission_id===b.submission_id;return String(a.created_at||"")===String(b.created_at||"")&&String(a.course||"")===String(b.course||"")&&String(a.level||"")===String(b.level||"")&&String(a.qtype||"")===String(b.qtype||"")&&String(a.material||"")===String(b.material||"")&&stableJSON(a.exam||null)===stableJSON(b.exam||null)&&stableJSON(a.answers||null)===stableJSON(b.answers||null)&&stableJSON(a.result||null)===stableJSON(b.result||null);}
+function canonicalTimestamp(value){
+  const input=String(value||""),match=input.match(/^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2})(?::(\d{2}))?(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/i);
+  if(!match)return input;
+  const base=Date.parse(`${match[1]}T${match[2]}:${match[3]||"00"}${match[5]||""}`);
+  if(!Number.isFinite(base))return input;
+  const seconds=new Date(Math.floor(base/1000)*1000).toISOString().replace(".000Z","");
+  const fraction=String(match[4]||"").replace(/0+$/g,"");
+  return`${seconds}${fraction?`.${fraction}`:""}Z`;
+}
+function legacyTrainingBatchId(record){
+  const exam=record?.exam&&typeof record.exam==="object"?{...record.exam}:null;
+  if(exam)delete exam.training_batch_id;
+  const input=stableJSON([canonicalTimestamp(record?.created_at),String(record?.course||""),String(record?.level||""),String(record?.qtype||record?.qType||""),String(record?.material||""),exam,record?.answers||null,record?.result||null]);
+  const lanes=[2166136261,0x9e3779b9,0x85ebca6b,0xc2b2ae35],primes=[16777619,2246822519,3266489917,668265263];
+  for(let i=0;i<input.length;i++){const c=input.charCodeAt(i);for(let lane=0;lane<lanes.length;lane++)lanes[lane]=Math.imul(lanes[lane]^c,primes[lane]);}
+  return`legacy-${lanes.map(value=>(value>>>0).toString(16).padStart(8,"0")).join("")}`;
+}
+function sameExamPayload(a,b){
+  if(stableJSON(a||null)===stableJSON(b||null))return true;
+  const aBatch=String(a?.training_batch_id||""),bBatch=String(b?.training_batch_id||"");
+  if(aBatch&&bBatch)return false;
+  const withoutBatch=exam=>{if(!exam||typeof exam!=="object"||Array.isArray(exam))return exam;const copy={...exam};delete copy.training_batch_id;return copy;};
+  return stableJSON(withoutBatch(a)||null)===stableJSON(withoutBatch(b)||null);
+}
+function sameSavedExam(a,b){if(a.submission_id&&b.submission_id)return a.submission_id===b.submission_id;return canonicalTimestamp(a.created_at)===canonicalTimestamp(b.created_at)&&String(a.course||"")===String(b.course||"")&&String(a.level||"")===String(b.level||"")&&String(a.qtype||"")===String(b.qtype||"")&&String(a.material||"")===String(b.material||"")&&sameExamPayload(a.exam,b.exam)&&stableJSON(a.answers||null)===stableJSON(b.answers||null)&&stableJSON(a.result||null)===stableJSON(b.result||null);}
+function migrateTrainingPick(oldMistakes,newMistakes){
+  const pick=lsGetObj(LS_TRAIN_PICK);if(!Array.isArray(pick?.keys)||!pick.keys.length)return;
+  const nextKeys=new Set((newMistakes||[]).map(item=>String(item?.mistake_key||""))),available=new Map();
+  const signature=item=>stableJSON([Number(item?.ts||0),String(item?.course||""),String(item?.id||""),String(item?.question||""),String(item?.user_answer||""),String(item?.feedback||""),String(item?.model_answer||""),Number(item?.points||0),Number(item?.max_points||0)]);
+  (newMistakes||[]).forEach(item=>{const key=signature(item);if(!available.has(key))available.set(key,[]);available.get(key).push(String(item?.mistake_key||""));});
+  const oldByKey=new Map((oldMistakes||[]).map(item=>[String(item?.mistake_key||""),item])),consumed=new Set(),mapped=[];
+  for(const selected of pick.keys.map(String)){
+    if(nextKeys.has(selected)){mapped.push(selected);continue;}
+    const legacy=oldByKey.get(selected),bucket=legacy?available.get(signature(legacy)):null;
+    const replacement=bucket?.find(key=>key&&!consumed.has(key));
+    if(replacement){mapped.push(replacement);consumed.add(replacement);}
+    else mapped.push(selected);
+  }
+  const keys=Array.from(new Set(mapped));
+  if(keys.length!==pick.keys.length||keys.some((key,index)=>key!==String(pick.keys[index]||"")))lsSet(LS_TRAIN_PICK,{...pick,keys});
+}
 async function saveExamToAccount(record,{checkExisting=false}={}){
   if(!db)return{ok:false,attempted:false,error:"Supabase not configured"};
   const userId=await getUserId(); if(!userId)return{ok:false,attempted:false,error:"Not logged in"};
   if(record.user_id&&record.user_id!==userId)return{ok:false,attempted:false,error:"Account changed"};
-  const row={user_id:userId,submission_id:record.submission_id||null,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam:record.exam||null,answers:record.answers||null,result:record.result||null,created_at:record.created_at||new Date().toISOString()};
+  const createdAt=record.created_at||new Date().toISOString(),identityRecord={...record,created_at:createdAt};
+  const batchId=String(record.exam?.training_batch_id||record.submission_id||legacyTrainingBatchId(identityRecord));
+  const exam=record.exam&&batchId?{...record.exam,training_batch_id:batchId}:record.exam||null;
+  const row={user_id:userId,submission_id:record.submission_id||null,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam,answers:record.answers||null,result:record.result||null,created_at:createdAt};
   const columns="id,submission_id,created_at,course,level,qtype,material,exam,answers,result";
   const receipt=typeof row.exam?.submission_receipt==="string"?row.exam.submission_receipt:"";
   const existingQuery=()=>{
@@ -1156,16 +1199,17 @@ function mergeMistakesFromExamRows(rows){
   (rows||[]).forEach(r=>{
     const createdTs=Date.parse(r.created_at)||0;
     const exam=r.exam||null,result=r.result||null,answers=r.answers||null;
+    const batchId=String(exam?.training_batch_id||r.submission_id||legacyTrainingBatchId(r));
     const qById=new Map();
     (exam&&Array.isArray(exam.questions)?exam.questions:[]).forEach(q=>{const id=q&&typeof q==="object"?idOf(q.id):"";if(id)qById.set(id,q);});
     const aById=new Map();
     (Array.isArray(answers)?answers:[]).forEach(a=>{const id=a&&typeof a==="object"?idOf(a.id):"";if(id)aById.set(id,String(a.answer||""));});
     const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
-    per.forEach(item=>{
+    per.forEach((item,questionIndex)=>{
       if(!item||typeof item!=="object")return;
       const got=scoreOf(item.points),mx=scoreOf(item.max_points),qid=idOf(item.id),q=qid?qById.get(qid):null;
       if(item.unanswered!==true&&q&&typeof q.question==="string"&&q.question.trim()&&got!==null&&mx!==null&&mx>0&&got>=0&&got<=mx&&got<mx){
-        out.push({ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
+        out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
     });
   });
   while(out.length>200)out.shift(); return out;
@@ -1190,9 +1234,10 @@ async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   });
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
-  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
+  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
   else{try{localStorage.removeItem(LS_LAST);}catch{}}
-  lsSet(LS_MISTAKES,mergeMistakesFromExamRows(filtered));
+  const oldMistakes=lsGetArray(LS_MISTAKES),newMistakes=mergeMistakesFromExamRows(filtered);
+  migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
   if(notifyHistoryUpdate)window.dispatchEvent(new Event("exgen:history-updated"));
 }
 
@@ -1561,15 +1606,17 @@ function handleAuthGateLogin(){
 // overlay. shared.js's dialog owns both flows now, including the reset
 // path these two never had.
 
-function buildTrainingMaterialFromMistakes(mistakes,pickedIds,courseOverride){
-  const course=String(courseOverride||courseEl()?.value||"").trim();
+function buildTrainingMaterialFromMistakes(mistakes,selectedKeys,courseOverride){
+  const course=String(courseOverride==null?courseEl()?.value||"":courseOverride).trim();
   const courseKey=value=>String(value||"").trim().replace(/\s+/g," ").toLowerCase();
   const selectedCourse=courseKey(course);
-  const src=Array.isArray(mistakes)?mistakes:[],idSet=(Array.isArray(pickedIds)&&pickedIds.length)?new Set(pickedIds.map(x=>String(x))):null;
-  const filtered=src.filter(m=>{
-    if(idSet&&!idSet.has(String(m.id)))return false;
+  const src=Array.isArray(mistakes)?mistakes:[],keySet=selectedKeys===null?null:new Set((Array.isArray(selectedKeys)?selectedKeys:[]).map(String));
+  const filtered=src.filter((m,index)=>{
+    const fallbackKey=`legacy:${Number(m?.ts||0)}:${m?.course||''}:${m?.id||''}:${m?.question||''}:${index}`;
+    if(keySet&&!keySet.has(String(m?.mistake_key||fallbackKey)))return false;
     return !selectedCourse||courseKey(m.course)===selectedCourse;
   }),recent=filtered.slice(-30).reverse();
+  if(!recent.length)return "";
   const hSv=`TRÄNING PÅ DINA MISSTAG\n${course?`Kurs: ${course}\n`:""}Instruktion: Skapa prov som bara testar dessa svaga delar.\n\n`;
   const hEn=`TRAINING FROM YOUR MISTAKES\n${course?`Course: ${course}\n`:""}Instruction: Generate exams that focus only on these weak areas.\n\n`;
   const blocks=recent.map((m,i)=>{
@@ -1597,11 +1644,22 @@ function runTrainModeIfRequested(){
     if(window.showToast)window.showToast(msg,"bad",5000);
     return;
   }
-  const pick=lsGetObj(LS_TRAIN_PICK),pickedIds=Array.isArray(pick?.ids)?pick.ids:[];
+  const pick=lsGetObj(LS_TRAIN_PICK),pickedKeys=Array.isArray(pick?.keys)?pick.keys.map(String):[];
+  const mode=pick?.mode==="all"?"all":"selected";
+  if(mode!=="all"&&!pickedKeys.length){
+    const msg=LANG==="sv"?"Markera minst ett misstag i felbanken innan du startar träningen.":"Select at least one mistake in the mistake bank before starting practice.";
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
   // Use the same course for the material header and the generation request;
   // the hidden wizard field may still contain a previous course.
-  const course=String(pick?.course||courseEl()?.value||"").trim();
-  const mat=buildTrainingMaterialFromMistakes(mistakes,pickedIds,course);
+  const course=String(mode==="all"?"":pick&&Object.prototype.hasOwnProperty.call(pick,"course")?pick.course||"":courseEl()?.value||"").trim();
+  const mat=buildTrainingMaterialFromMistakes(mistakes,mode==="all"?null:pickedKeys,course);
+  if(!mat){
+    const msg=LANG==="sv"?"De valda misstagen finns inte kvar. Gå tillbaka och markera dem igen.":"Those selected mistakes are no longer available. Go back and select them again.";
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
   if(pastedTextEl())pastedTextEl().value=mat;
   try{localStorage.setItem(LS_MATERIAL,mat);}catch{}
   if(qTypeEl())qTypeEl().value="mix";
@@ -2218,7 +2276,7 @@ try{
       const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
       const userId=gradingOwnerId;
       const localId=newLocalExamId();
-      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
+      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
       let accountSaveFailed=!db||!userId,localCopySaved=false;
       if(userId){
         localCopySaved=queuePendingExam(accountRecord);
@@ -2230,16 +2288,16 @@ try{
       }
       attempt.accountSaved=!!userId&&!accountSaveFailed;
       const history=lsGetArray(LS_HISTORY);history.push(attempt);while(history.length>60)history.shift();lsSet(LS_HISTORY,history);
-      lsSet(LS_LAST,{ts,attempt,exam:accountRecord.exam,result,examProof,accountSaved:!!userId&&!accountSaveFailed});
+      lsSet(LS_LAST,{ts,attempt,exam:accountRecord.exam,result,examProof,training_batch_id:localId,accountSaved:!!userId&&!accountSaveFailed});
       const mistakes=lsGetArray(LS_MISTAKES);
       // Samma id-fallback som rendering och rättning använder. Med bara String(q.id??"")
       // kollapsade alla frågor utan id på tom sträng, och felbanken sparade då
       // fel frågetext och fel elevsvar för var och en av dem.
       const qById=new Map((currentExam.questions||[]).map((q,idx)=>[String(q.id??(idx+1)),q]));
       const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
-      (result.per_question||[]).forEach(item=>{
+      (result.per_question||[]).forEach((item,questionIndex)=>{
         const got=Number(item.points||0),m=Number(item.max_points||0);
-        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
+        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({mistake_key:`exam:${localId}:${questionIndex}`,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
       try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
