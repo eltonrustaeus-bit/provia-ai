@@ -707,6 +707,18 @@ async function gateActiveExam(req, res, body, user) {
     return true;
   }
   if (activeCount === 0) {
+    const latestState = await examIssuance.latestExamState(user.id);
+    if (latestState === null) {
+      res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+      return true;
+    }
+    if (latestState !== "none" && latestState !== "completed") {
+      // Until the latest issued exam has a verified saved grade, keep even
+      // context-free PER requests on fixed method guidance. A new graded exam
+      // becomes the verified checkpoint that restores ordinary study help.
+      sendActiveExamGuidance(req, res, body, latestState);
+      return true;
+    }
     if (examContextDeclared) {
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;

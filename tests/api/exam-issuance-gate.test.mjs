@@ -31,6 +31,7 @@ const body = {
 
 const calls = [];
 let state = "active";
+let latestSubmissionId = null;
 let count = 1;
 let fail = false;
 let answerLeaseState = "acquired";
@@ -43,6 +44,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (fail) return Response.json({ error: "unavailable" }, { status: 503 });
   if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(state);
   if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(count);
+  if (method === "GET" && url.startsWith(`${origin}/rest/v1/exam_issuances?`)) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
   if (url.endsWith("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
   if (url.endsWith("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.endsWith("/rest/v1/rpc/abandon_exam_issuance")) return Response.json(state === "active" ? "abandoned" : state);
@@ -85,6 +87,28 @@ test("issuance registration and status use server-only credentials and exact sub
   const insert = calls.find((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST");
   assert.deepEqual(JSON.parse(insert.body), { user_id: userId, submission_id: submissionId });
   assert.equal(calls.some((call) => call.url.includes("student@example.invalid")), false);
+});
+
+test("latest issuance status is server-read, user-scoped and fail-closed", async () => {
+  calls.length = 0;
+  assert.equal(await issuance.latestExamState(userId), "none");
+  latestSubmissionId = submissionId;
+  state = "abandoned";
+  try {
+    assert.equal(await issuance.latestExamState(userId), "abandoned");
+    const lookup = calls.find((call) => call.url.startsWith(`${origin}/rest/v1/exam_issuances?`));
+    const query = new URL(lookup.url).searchParams;
+    assert.equal(query.get("user_id"), `eq.${userId}`);
+    assert.equal(query.get("order"), "issued_at.desc");
+    assert.equal(query.get("limit"), "1");
+    assert.ok(calls.some((call) => call.url.endsWith("/rpc/exam_issuance_state") && call.body.includes(submissionId)));
+    fail = true;
+    assert.equal(await issuance.latestExamState(userId), null);
+  } finally {
+    fail = false;
+    latestSubmissionId = null;
+    state = "active";
+  }
 });
 
 test("abandon requires the signed full exam and rejects a completed exam", async () => {

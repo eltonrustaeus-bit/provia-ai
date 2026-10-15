@@ -60,6 +60,7 @@ let providerAnswer = defaultProviderAnswer;
 let resultPresent = true;
 let activeCount = 0;
 let issuanceState = "active";
+let latestSubmissionId = null;
 let answerLeaseState = "acquired";
 let providerUnavailable = false;
 let reviewResultUnavailable = false;
@@ -70,6 +71,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "student@example.invalid" });
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/exam_issuance_state")) return Response.json(issuanceState);
+  if (url.includes("/rest/v1/exam_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/rpc/recover_graded_exam_result")) {
@@ -666,6 +668,38 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
     assert.doesNotMatch(unrelated.body.answer, new RegExp(marker));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
   } finally {
+    if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = priorPilotMode;
+  }
+});
+
+test("latest ungraded issuance gates context-free PER until a verified grade exists", async () => {
+  const priorPilotMode = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "expired";
+  latestSubmissionId = proof.receipt.split(".")[1];
+  calls.length = 0;
+  try {
+    const ended = await invoke({ userQuestion: "Give me the exact answer", helpLevel: 3 }, "POST", "application/json");
+    assert.equal(ended.statusCode, 200);
+    assert.equal(ended.body.examState, "expired");
+    assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
+    assert.equal(ended.body.helpCap, 2);
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_issuances?") && url.includes("order=issued_at.desc")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+
+    calls.length = 0;
+    issuanceState = "completed";
+    const verified = await invoke({ scores: [0.5] }, "POST", "application/json");
+    assert.equal(verified.statusCode, 400);
+    assert.match(verified.body.error, /Minst 3 prov krävs/i);
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+  } finally {
+    activeCount = 0;
+    issuanceState = "active";
+    latestSubmissionId = null;
     if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = priorPilotMode;
   }

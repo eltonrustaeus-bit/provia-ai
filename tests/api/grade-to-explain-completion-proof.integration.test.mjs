@@ -40,6 +40,7 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json("released");
   }
   if (url.endsWith("/rpc/active_exam_count")) return Response.json(activeExamCount);
+  if (url.startsWith(`${origin}/rest/v1/exam_issuances?`) && (init.method || "GET") === "GET") return Response.json([]);
   if (url.endsWith("/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1 });
   if (url.endsWith("/rpc/persist_graded_exam_result")) {
     if (persistenceMode === "error") return Response.json({ message: "synthetic persistence failure" }, { status: 500 });

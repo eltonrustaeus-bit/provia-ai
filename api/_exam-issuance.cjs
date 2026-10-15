@@ -53,6 +53,28 @@ async function examState(userId, submissionId) {
   }
 }
 
+async function latestExamState(userId) {
+  if (!userId) return null;
+  const query = new URLSearchParams({
+    select: "submission_id",
+    user_id: `eq.${userId}`,
+    order: "issued_at.desc",
+    limit: "1",
+  });
+  const response = await request(`exam_issuances?${query}`, { method: "GET" });
+  if (!response?.ok) return null;
+  try {
+    const rows = await response.json();
+    if (!Array.isArray(rows)) return null;
+    if (rows.length === 0) return "none";
+    const submissionId = rows[0]?.submission_id;
+    if (rows.length !== 1 || !/^[a-f0-9]{32}$/.test(submissionId || "")) return null;
+    return await examState(userId, submissionId);
+  } catch {
+    return null;
+  }
+}
+
 async function activeExamCount(userId) {
   if (!userId) return null;
   const response = await request("rpc/active_exam_count", {
@@ -238,7 +260,7 @@ async function removeUndeliveredExam(userId, submissionId) {
 }
 
 module.exports = {
-  issueExam, examState, activeExamCount, acquirePerAnswerLease, releasePerAnswerLease,
+  issueExam, examState, latestExamState, activeExamCount, acquirePerAnswerLease, releasePerAnswerLease,
   claimExamGrading, releaseExamGrading,
   recoverExamResult, persistExamResult, replayLearningJob,
   abandonExam, abandonAllActiveExams, removeUndeliveredExam,
