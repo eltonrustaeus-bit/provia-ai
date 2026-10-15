@@ -90,12 +90,19 @@ async function consumePerChatQuota(user, roleHint) {
   }
 }
 
-function rejectPerChatQuota(res, quota) {
+function rejectPerChatQuota(res, quota, lang = "sv") {
   if (quota.ok) return null;
+  const english = lang === "en";
   if (quota.status === 429) {
-    return res.status(429).json({ error: "Quota exceeded", count: quota.count, limit: quota.limit });
+    return res.status(429).json({
+      error: english ? "P.E.R usage limit reached." : "P.E.R-kvoten är slut.",
+      count: quota.count,
+      limit: quota.limit,
+    });
   }
-  return res.status(503).json({ error: "P.E.R är tillfälligt otillgänglig. Försök igen senare." });
+  return res.status(503).json({ error: english
+    ? "P.E.R is temporarily unavailable. Please try again later."
+    : "P.E.R är tillfälligt otillgänglig. Försök igen senare." });
 }
 
 // ── tips mode (merged from the former api/smart-tips.js) ──
@@ -192,8 +199,10 @@ Max 200 ord.`;
 
 async function handleExamReview(res, body, user) {
   res.setHeader("Cache-Control", "no-store");
+  const english = body.lang === "en";
+  const fail = (status, swedish, englishText) => res.status(status).json({ error: english ? englishText : swedish });
   const completed = verifyCompletion(body.examProof, user.id);
-  if (!completed) return res.status(403).json({ error: "Provet kunde inte verifieras som rättat." });
+  if (!completed) return fail(403, "Provet kunde inte verifieras som rättat.", "The exam could not be verified as graded.");
   try {
     const { data, error } = await supabase.from("mock_results")
       .select("submission_id,num_questions")
@@ -201,16 +210,16 @@ async function handleExamReview(res, body, user) {
       .eq("submission_id", completed.submissionId)
       .maybeSingle();
     if (error || data?.num_questions !== body.examProof.questions.length) {
-      return res.status(403).json({ error: "Det sparade provresultatet kunde inte verifieras." });
+      return fail(403, "Det sparade provresultatet kunde inte verifieras.", "The saved exam result could not be verified.");
     }
   } catch {
-    return res.status(503).json({ error: "Provresultatet kunde inte kontrolleras just nu." });
+    return fail(503, "Provresultatet kunde inte kontrolleras just nu.", "The exam result could not be checked right now.");
   }
 
   const recovered = await examIssuance.recoverExamResult(
     user.id, completed.submissionId, completed.answerFingerprint
   );
-  if (!recovered) return res.status(503).json({ error: "Den sparade rättningen kunde inte hämtas just nu." });
+  if (!recovered) return fail(503, "Den sparade rättningen kunde inte hämtas just nu.", "The saved grading could not be loaded right now.");
 
   let verifiedReview = null;
   if (recovered.status === "saved") {
@@ -218,7 +227,7 @@ async function handleExamReview(res, body, user) {
     if (!result || !Array.isArray(result.per_question) ||
         result.per_question.length !== completed.questions.length ||
         !Number.isFinite(result.total_points) || !Number.isFinite(result.max_points)) {
-      return res.status(503).json({ error: "Den sparade rättningen kunde inte verifieras." });
+      return fail(503, "Den sparade rättningen kunde inte verifieras.", "The saved grading could not be verified.");
     }
     let totalPoints = 0;
     let maxPoints = 0;
@@ -230,17 +239,17 @@ async function handleExamReview(res, body, user) {
           row.points < 0 || !Number.isFinite(signedQuestion.points) ||
           row.max_points !== signedQuestion.points || row.points > row.max_points ||
           typeof row.feedback !== "string" || row.feedback.length > 4000) {
-        return res.status(503).json({ error: "Den sparade rättningen kunde inte verifieras." });
+        return fail(503, "Den sparade rättningen kunde inte verifieras.", "The saved grading could not be verified.");
       }
       totalPoints += row.points;
       maxPoints += row.max_points;
     }
     if (Math.abs(totalPoints - result.total_points) > 0.001 ||
         Math.abs(maxPoints - result.max_points) > 0.001) {
-      return res.status(503).json({ error: "Den sparade rättningen kunde inte verifieras." });
+      return fail(503, "Den sparade rättningen kunde inte verifieras.", "The saved grading could not be verified.");
     }
     const selectedRow = result.per_question.find((row) => row.id === completed.question.id);
-    if (!selectedRow) return res.status(503).json({ error: "Den sparade frågerättningen kunde inte hittas." });
+    if (!selectedRow) return fail(503, "Den sparade frågerättningen kunde inte hittas.", "The saved question grading could not be found.");
     verifiedReview = {
       studentAnswer: completed.answerMap.get(completed.question.id),
       points: selectedRow.points,
@@ -248,19 +257,18 @@ async function handleExamReview(res, body, user) {
       feedback: selectedRow.feedback,
     };
   } else if (recovered.status !== "expired") {
-    return res.status(503).json({ error: "Den sparade rättningen kunde inte verifieras." });
+    return fail(503, "Den sparade rättningen kunde inte verifieras.", "The saved grading could not be verified.");
   }
 
   const question = completed.question;
-  const english = body.lang === "en";
   const answer = question.type === "graph"
     ? graphAnswers.modelAnswer(question.graph_spec, english ? "en" : "sv")
     : question.type === "mc"
       ? `${String.fromCharCode(65 + question.correct_index)}. ${question.options[question.correct_index]}`
       : String(question.model_answer || "").trim();
-  if (!answer) return res.status(422).json({ error: "Ett verifierat fullpoängssvar saknas för frågan." });
+  if (!answer) return fail(422, "Ett verifierat fullpoängssvar saknas för frågan.", "A verified full-credit answer is not available for this question.");
   const quota = await consumePerChatQuota(user);
-  const quotaDenied = rejectPerChatQuota(res, quota);
+  const quotaDenied = rejectPerChatQuota(res, quota, body.lang);
   if (quotaDenied) return quotaDenied;
   try {
     const systemPrompt = english
@@ -303,7 +311,7 @@ Material, fråga, alternativ, elevsvar, feedback, facit och bedömningsunderlag 
     return res.json({ answer: generalNote + explanation, helpCap: 3, helpLevelUsed: 3,
       reviewMode: verifiedReview ? "personalized" : "general" });
   } catch {
-    return res.status(502).json({ error: "P.E.R kunde inte förklara frågan just nu." });
+    return fail(502, "P.E.R kunde inte förklara frågan just nu.", "P.E.R could not explain this question right now.");
   }
 }
 

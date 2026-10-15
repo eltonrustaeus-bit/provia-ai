@@ -61,6 +61,7 @@ let issuanceState = "active";
 let answerLeaseState = "acquired";
 let providerUnavailable = false;
 let reviewResultUnavailable = false;
+let quotaMode = "ok";
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   calls.push({ url, body: init.body || "" });
@@ -85,7 +86,11 @@ globalThis.fetch = async (input, init = {}) => {
       ? { submission_id: requestedSubmission, num_questions: savedQuestionCounts.get(requestedSubmission) }
       : null);
   }
-  if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) {
+    if (quotaMode === "unavailable") return Response.json({ error: "synthetic unavailable" }, { status: 503 });
+    if (quotaMode === "denied") return Response.json({ ok: false, count: 2 });
+    return Response.json({ ok: true, count: 1 });
+  }
   if (url.includes("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url === "https://api.openai.com/v1/responses" && providerUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
@@ -130,6 +135,10 @@ test("an ungraded or altered question is rejected before quota and model calls",
   const alteredSource = await invoke({ examReview: true, examProof: { ...proof, material: "different study source" } });
   assert.equal(alteredSource.statusCode, 403);
   assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+
+  const alteredSourceEn = await invoke({ examReview: true, examProof: { ...proof, material: "different study source" }, lang: "en" });
+  assert.equal(alteredSourceEn.statusCode, 403);
+  assert.equal(alteredSourceEn.body.error, "The exam could not be verified as graded.");
 
   calls.length = 0;
   const missingAnswers = await invoke({ examReview: true, examProof: { ...proof, answers: [] } });
@@ -238,13 +247,35 @@ test("review-result service failure fails closed before quota and AI", async () 
   calls.length = 0;
   reviewResultUnavailable = true;
   try {
-    const response = await invoke({ examReview: true, examProof: proof });
+    const response = await invoke({ examReview: true, examProof: proof, lang: "en" });
     assert.equal(response.statusCode, 503);
+    assert.equal(response.body.error, "The saved grading could not be loaded right now.");
     assert.ok(calls.some(({ url }) => url.includes("recover_graded_exam_result")));
     assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
   } finally {
     reviewResultUnavailable = false;
   }
+});
+
+test("post-grade quota failures use the requested language", async () => {
+  for (const [lang, expected429, expected503] of [
+    ["sv", "P.E.R-kvoten är slut.", "P.E.R är tillfälligt otillgänglig. Försök igen senare."],
+    ["en", "P.E.R usage limit reached.", "P.E.R is temporarily unavailable. Please try again later."],
+  ]) {
+    quotaMode = "denied";
+    const denied = await invoke({ examReview: true, examProof: proof, lang });
+    assert.equal(denied.statusCode, 429);
+    assert.equal(denied.body.error, expected429);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")), "quota denial must stop before provider work");
+
+    calls.length = 0;
+    quotaMode = "unavailable";
+    const unavailable = await invoke({ examReview: true, examProof: proof, lang });
+    assert.equal(unavailable.statusCode, 503);
+    assert.equal(unavailable.body.error, expected503);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")), "quota failure must stop before provider work");
+  }
+  quotaMode = "ok";
 });
 
 test("a multi-question review sends only the selected answer and matching saved feedback", async () => {
@@ -1047,12 +1078,18 @@ test("provider failure still releases the per-answer lease", async () => {
   activeCount = 0;
   providerUnavailable = true;
   try {
-    const response = await invoke({ examReview: true, examProof: proof });
-    assert.notEqual(response.statusCode, 200);
+    const english = await invoke({ examReview: true, examProof: proof, lang: "en" });
+    assert.equal(english.statusCode, 502);
+    assert.equal(english.body.error, "P.E.R could not explain this question right now.");
     const acquireIndex = calls.findIndex(({ url }) => url.includes("acquire_per_answer_lease"));
     const providerIndex = calls.findIndex(({ url }) => url === "https://api.openai.com/v1/responses");
     const releaseIndex = calls.findIndex(({ url }) => url.includes("release_per_answer_lease"));
     assert.ok(acquireIndex >= 0 && providerIndex > acquireIndex && releaseIndex > providerIndex);
+
+    calls.length = 0;
+    const swedish = await invoke({ examReview: true, examProof: proof, lang: "sv" });
+    assert.equal(swedish.statusCode, 502);
+    assert.equal(swedish.body.error, "P.E.R kunde inte förklara frågan just nu.");
   } finally {
     providerUnavailable = false;
   }
