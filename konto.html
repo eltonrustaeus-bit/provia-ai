@@ -74,8 +74,9 @@
     padding:5px 12px;background:rgba(0,183,217,.07);
   }
   .planBadge.free{color:var(--t3);border-color:var(--l);background:transparent}
+  .planBadge.unavailable{color:var(--t2);border-color:var(--l);background:transparent}
   .planBadgeDot{width:6px;height:6px;border-radius:50%;background:var(--a);flex-shrink:0;animation:eyeBlink 1.8s ease-in-out infinite}
-  .planBadge.free .planBadgeDot{background:var(--t3);animation:none}
+  .planBadge.free .planBadgeDot,.planBadge.unavailable .planBadgeDot{background:var(--t3);animation:none}
   @keyframes eyeBlink{0%,100%{opacity:1}50%{opacity:.25}}
 
   .usageBar{margin-top:14px}
@@ -209,14 +210,14 @@
         <div class="kCardIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:1em;height:1em;display:inline-block;vertical-align:-0.12em" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
         <div>
           <div class="kCardLabel">Nuvarande plan</div>
-          <div class="kCardTitle" id="planTitle">Laddar…</div>
+          <div class="kCardTitle" id="planTitle">Kontrollerar…</div>
         </div>
       </div>
       <div class="kCardBody">
         <div class="planRow">
-          <span class="planBadge free" id="planBadge">
+          <span class="planBadge unavailable" id="planBadge">
             <span class="planBadgeDot" aria-hidden="true"></span>
-            <span id="planBadgeText">Gratis</span>
+            <span id="planBadgeText">Kontrollerar…</span>
           </span>
           <span class="planNote" id="planUsage"></span>
         </div>
@@ -226,6 +227,10 @@
             <span id="usageRight"></span>
           </div>
           <div class="usageTrack"><div class="usageFill" id="usageFill" style="width:0%"></div></div>
+        </div>
+        <div id="planLoadError" aria-live="polite" aria-atomic="true" hidden style="margin-top:12px">
+          <p class="kHelpText" style="margin:0 0 10px">Vi kunde inte kontrollera din plan just nu. Dina planfunktioner visas när anslutningen fungerar igen.</p>
+          <button class="kBtn kBtnOutline" id="planRetryBtn" type="button">Försök igen</button>
         </div>
       </div>
     </div>
@@ -512,27 +517,64 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   }
 
   /* LOAD PROFILE */
-  const entitlements=await loadEntitlements();
-  const role=entitlements?.role||"gratis";
-
-  /* Plan display */
+  let role=null;
   const planTitle=document.getElementById("planTitle");
   const planBadge=document.getElementById("planBadge");
   const planBadgeText=document.getElementById("planBadgeText");
+  const planUsage=document.getElementById("planUsage");
+  const planLoadError=document.getElementById("planLoadError");
+  const planRetryBtn=document.getElementById("planRetryBtn");
 
-  planTitle.textContent=ROLE_LABELS[role]||role;
-  planBadgeText.textContent=ROLE_LABELS[role]||role;
-
-  if(role!=="gratis"){
-    planBadge.classList.remove("free");
+  function isValidLimit(limit){
+    return Boolean(limit&&typeof limit==="object"&&
+      typeof limit.unlimited==="boolean"&&
+      (limit.unlimited?limit.cap===null:Number.isFinite(limit.cap)&&limit.cap>=0)&&
+      ["day","week","month"].includes(limit.period));
   }
 
-  document.getElementById("planUsage").textContent=entitlements
-    ? `${formatLimit(entitlements.features.mockExam,"mockprov")} · ${formatLimit(entitlements.features.perChat,"P.E.R")}`
-    : (ROLE_DESCS[role]||"");
+  function renderEntitlements(entitlements){
+    const candidateRole=entitlements?.role;
+    const features=entitlements?.features;
+    const validSnapshot=typeof candidateRole==="string"&&
+      Object.prototype.hasOwnProperty.call(ROLE_LABELS,candidateRole)&&
+      entitlements.label===ROLE_LABELS[candidateRole]&&
+      typeof entitlements.price==="string"&&
+      isValidLimit(features?.mockExam)&&isValidLimit(features?.perChat);
+    role=validSnapshot?candidateRole:null;
+    if(!validSnapshot){
+      role=null;
+      planTitle.textContent="Status kunde inte hämtas";
+      planBadge.classList.remove("free");
+      planBadge.classList.add("unavailable");
+      planBadgeText.textContent="Ej tillgänglig";
+      planUsage.textContent="";
+      planLoadError.hidden=false;
+      return;
+    }
 
-  /* Show admin card */
-  if(role==="admin") document.getElementById("adminCard").style.display="";
+    const label=ROLE_LABELS[role]||role;
+    planTitle.textContent=label;
+    planBadgeText.textContent=label;
+    planBadge.classList.toggle("free",role==="gratis");
+    planBadge.classList.remove("unavailable");
+    const limits=[formatLimit(features.mockExam,"mockprov"),formatLimit(features.perChat,"P.E.R")].filter(Boolean);
+    planUsage.textContent=limits.length?limits.join(" · "):(ROLE_DESCS[role]||"");
+    planLoadError.hidden=true;
+    document.getElementById("adminCard").style.display=role==="admin"?"":"none";
+    document.getElementById("teacherCard").style.display=role==="teacher"||role==="admin"?"":"none";
+    document.getElementById("upgradeCard").style.display=role==="gratis"?"":"none";
+    document.getElementById("manageCard").style.display=role==="gratis"?"none":"";
+  }
+
+  renderEntitlements(await loadEntitlements());
+  planRetryBtn.addEventListener("click",async()=>{
+    if(planRetryBtn.disabled)return;
+    planRetryBtn.disabled=true;
+    planRetryBtn.textContent="Kontrollerar…";
+    renderEntitlements(await loadEntitlements());
+    planRetryBtn.disabled=false;
+    planRetryBtn.textContent="Försök igen";
+  });
 
   /* ── KLASSER ──
      Lärarkortet kräver lärarbehörighet (rollen sätts bara av en admin). Elevkortet visas
@@ -631,12 +673,6 @@ document.getElementById("yr").textContent=new Date().getFullYear();
   if(!pilotMode)loadMyClasses();
 
   /* Show upgrade or manage card */
-  if(role==="gratis"){
-    document.getElementById("upgradeCard").style.display="";
-  } else {
-    document.getElementById("manageCard").style.display="";
-  }
-
   /* PORTAL BUTTON */
   document.getElementById("portalBtn")?.addEventListener("click",async()=>{
     const btn=document.getElementById("portalBtn");
