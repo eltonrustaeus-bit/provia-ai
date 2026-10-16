@@ -1045,9 +1045,16 @@ module.exports = async function handler(req, res) {
     quota = await consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId);
   } catch {
     await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
+    console.error(JSON.stringify({
+      event: "exam_generation_failed",
+      requestId: quotaRequestId,
+      stage: "quota_reservation",
+      elapsedMs: budget.elapsed(),
+    }));
     return json(res, 503, {
       ok: false,
       error: "mock_quota_unavailable",
+      requestId: quotaRequestId,
       message: "Mockprovskvoten kunde inte kontrolleras just nu. Försök igen senare."
     });
   }
@@ -1500,6 +1507,7 @@ module.exports = async function handler(req, res) {
     return fail(500, {
       ok: false,
       error: "exam_generation_failed",
+      requestId: quotaRequestId,
       message: "Provet kunde inte färdigställas. Försök igen."
     });
   }

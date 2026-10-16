@@ -19,6 +19,7 @@ const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClien
 const { logMockExamUsage } = require("./_ai-usage.cjs");
 const { sanitizeHistory } = require("./_student-history.cjs");
 const materialInput = require("./_material.cjs");
+const { randomUUID } = require("crypto");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -37,6 +38,34 @@ function safeString(x, maxLen = 200000) {
 
 function asEnum(x, allowed, fallback) {
   return allowed.includes(x) ? x : fallback;
+}
+
+async function acquirePostExamReviewLease(userId) {
+  const leaseId = randomUUID();
+  const outcome = await examIssuance.acquirePerAnswerLease(userId, leaseId);
+  if (outcome !== "acquired") return { outcome, leaseId: null };
+
+  // Recheck under the lease: a new issuance cannot pass its matching DB trigger
+  // while a post-exam answer is being prepared and returned.
+  const activeCount = await examIssuance.activeExamCount(userId);
+  const latestState = activeCount === 0 ? await examIssuance.latestExamState(userId) : null;
+  if (activeCount === 0 && (latestState === "none" || latestState === "completed")) {
+    return { outcome: "acquired", leaseId };
+  }
+
+  const released = await examIssuance.releasePerAnswerLease(userId, leaseId);
+  if (released !== "released") return { outcome: null, leaseId: null };
+  if (activeCount === null || latestState === null) return { outcome: null, leaseId: null };
+  return { outcome: activeCount > 0 ? "exam_active" : "ungraded_exam", leaseId: null };
+}
+
+function answerLeaseFailure(outcome, graphPractice = false) {
+  if (outcome === "exam_active") return { status: 409, error: "EXAM_ACTIVE" };
+  if (outcome === "busy") return { status: 409, error: "PER_REQUEST_IN_PROGRESS" };
+  if (outcome === "ungraded_exam") return graphPractice
+    ? { status: 403, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" }
+    : { status: 409, error: "EXAM_NOT_ACTIVE" };
+  return { status: 503, error: "EXAM_STATE_UNAVAILABLE" };
 }
 
 function clamp(n, min, max) {
@@ -457,39 +486,61 @@ module.exports = async function handler(req, res) {
       if (claim === "stale") return json(res, 409, { ok: false, error: "EXAM_GRADING_INTERRUPTED" });
       if (claim === "conflict") return json(res, 409, { ok: false, error: "EXAM_ANSWERS_CONFLICT" });
       if (claim === "completed") {
-        const activeCount = await examIssuance.activeExamCount(user.id);
-        if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-        if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
-        const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
-        if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-        if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
-        const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
-        if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
-          return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+        const lease = await acquirePostExamReviewLease(user.id);
+        if (lease.outcome !== "acquired") {
+          const failure = answerLeaseFailure(lease.outcome);
+          return json(res, failure.status, { ok: false, error: failure.error });
         }
-        await examIssuance.replayLearningJob(user.id, submissionId);
-        return json(res, 200, {
-          ok: true, recovered: true, result: recovered.result,
-          exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
-          persistence: { mock_result_saved: true },
-        });
+        try {
+          const recoveryClient = await supabaseClient();
+          if (!recoveryClient) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          const { data: savedResult, error: savedResultError } = await recoveryClient.from("mock_results")
+            .select("verified_at")
+            .eq("user_id", user.id)
+            .eq("submission_id", submissionId)
+            .maybeSingle();
+          if (savedResultError) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (!savedResult?.verified_at) return json(res, 403, { ok: false, error: "EXAM_RESULT_NOT_VERIFIED" });
+          const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
+          if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
+          const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
+          if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
+            return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+          }
+          await examIssuance.replayLearningJob(user.id, submissionId);
+          return json(res, 200, {
+            ok: true, recovered: true, result: recovered.result,
+            exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
+            persistence: { mock_result_saved: true },
+          });
+        } finally {
+          await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
+        }
       }
       if (claim !== "claimed") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
       claimed = { id: submissionId, fingerprint };
     }
 
+    let postExamLeaseId = null;
     try {
     const quotaClient = await supabaseClient();
     if (!quotaClient) return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
     if (practiceCompletion) {
+      const lease = await acquirePostExamReviewLease(user.id);
+      if (lease.outcome !== "acquired") {
+        const failure = answerLeaseFailure(lease.outcome, true);
+        return fail(failure.status, { ok: false, error: failure.error });
+      }
+      postExamLeaseId = lease.leaseId;
       try {
         const { data, error } = await quotaClient.from("mock_results")
-          .select("submission_id,num_questions")
+          .select("submission_id,num_questions,verified_at")
           .eq("user_id", user.id)
           .eq("submission_id", practiceCompletion.submissionId)
           .maybeSingle();
         if (error) return fail(503, { ok: false, error: "Graded exam could not be checked" });
-        if (data?.num_questions !== p.examProof.questions.length) {
+        if (data?.num_questions !== p.examProof.questions.length || !data?.verified_at) {
           return fail(403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
         }
       } catch {
@@ -938,6 +989,8 @@ module.exports = async function handler(req, res) {
       });
     } catch {
       return fail(500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+    } finally {
+      if (postExamLeaseId) await examIssuance.releasePerAnswerLease(user.id, postExamLeaseId);
     }
   });
 };

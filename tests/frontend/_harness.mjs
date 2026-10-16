@@ -211,11 +211,20 @@ export async function mockApis(page, {
   role = "premium", approved = true, allow = true,
   restRows = [], profiles = undefined, extra = [], runtime = TEST_RUNTIME,
 } = {}) {
+  const corsHeaders = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+  };
+  await page.route("**/auth/v1/**", r => r.fulfill({
+    status: r.request().method() === "OPTIONS" ? 204 : 200,
+    headers: corsHeaders,
+    json: r.request().method() === "OPTIONS" ? undefined : { id: "u1", email: "t@t.se" },
+  }));
   await page.route("**/api/**", r => r.fulfill({ json: { ok: true } }));
   // EFTER den generella. Fälla 1.
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow, ok: true, role, approved } }));
-  await page.route("**/auth/v1/**", r => r.fulfill({ json: { id: "u1", email: "t@t.se" } }));
-  await page.route("**/rest/v1/**", r => r.fulfill({ json: restRows }));
+  await page.route("**/rest/v1/**", r => r.fulfill({ json: restRows, headers: corsHeaders }));
   await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2**", r => r.fulfill({
     status: 200,
     contentType: "application/javascript; charset=utf-8",

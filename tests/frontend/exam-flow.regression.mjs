@@ -95,7 +95,10 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
 const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") => {
-  await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
+  await page.route("**/auth/v1/user**", route => route.fulfill({
+    json: { id: uid, email: uid + "@t.se" },
+    headers: { "access-control-allow-origin": "*" },
+  }));
   await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role }] }));
   await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang, storage });
 };
@@ -605,16 +608,25 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const requestId = "12345678-1234-4234-8234-123456789abc";
     await page.route("**/api/generate-exam", route => route.fulfill({
-      status: 503, json: { ok: false, error: "Syntetiskt genereringsfel" },
+      status: 500, json: { ok: false, error: "exam_generation_failed", requestId },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Syntetiskt genereringsfel/.test(
+    await page.waitForFunction(() => /Referens: 12345678-1234-4234-8234-123456789abc/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
     const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
       .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
-    ok("genereringsfel annonseras som ett sammanhållet larm", errorA11y.role === "alert" && errorA11y.atomic === "true",
+    ok("genereringsfel visar en säker korrelationsreferens i ett sammanhållet larm",
+      errorA11y.role === "alert" && errorA11y.atomic === "true",
       JSON.stringify(errorA11y));
+    await page.route("**/api/generate-exam", route => route.abort("failed"));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Anslutningen bröts/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    ok("nätverksfel skiljs från serverfel och eleven kan försöka igen",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
   } catch (e) {
     ok("genereringsfel annonseras för hjälpmedel", false, e.message);
   } finally {

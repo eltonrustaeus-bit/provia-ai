@@ -2138,6 +2138,21 @@ try{
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
+    const clearGenerationPlaceholder=()=>{
+      const body=examBodyEl();
+      if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
+    };
+    const requestReference=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(res.data?.requestId||"")
+      ? (LANG==="sv"?`Referens: ${res.data.requestId}`:`Reference: ${res.data.requestId}`)
+      : "";
+    if(res.timedOut||res.networkError){
+      setBusy(false);clearGenerationPlaceholder();hideDebug();
+      const message=res.timedOut
+        ? (LANG==="sv"?"Provskapandet tog för lång tid. Ditt material finns kvar; försök igen.":"Exam creation timed out. Your material is still here; please try again.")
+        : (LANG==="sv"?"Anslutningen bröts innan provet kunde skapas. Ditt material finns kvar; kontrollera nätverket och försök igen.":"The connection failed before the exam was created. Your material is still here; check your connection and try again.");
+      setStatus(message,"bad");
+      return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
+    }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
       const msg = quotaLimitMessage(res.data.period || ROLE_LIMITS[currentRole]?.period);
@@ -2146,6 +2161,7 @@ try{
     }
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);
+      clearGenerationPlaceholder();
       if(res.data?.error==="MATERIAL_TOO_LONG"){
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
@@ -2163,6 +2179,14 @@ try{
         setStatus(res.data.message||"Kvalitetskontrollen kunde inte slutföras. Försök igen.","bad");
         hideDebug();
         return {ok:false,error:res.data.message||res.data.error};
+      }
+      if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
+        const message=res.data.error==="mock_quota_unavailable"
+          ? (LANG==="sv"?"Provkvoten kunde inte kontrolleras. Försök igen senare.":"The exam quota could not be checked. Please try again later.")
+          : (LANG==="sv"?"Provet kunde inte färdigställas. Försök igen.":"The exam could not be completed. Please try again.");
+        const withReference=requestReference?`${message} ${requestReference}`:message;
+        setStatus(withReference,"bad");hideDebug();
+        return {ok:false,error:withReference,requestId:res.data.requestId||null};
       }
       setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);
       // 504 från generate-exam.js bär ett läsbart meddelande om att provet inte

@@ -901,6 +901,8 @@ try {
   issuanceUnavailable = false;
   assert.equal(issuanceFailure.status, 500, "a failed exam issuance is never returned as a usable exam");
   assert.equal(issuanceFailure.body.error, "exam_generation_failed");
+  assert.match(issuanceFailure.body.requestId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "the safe response includes an opaque correlation id");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,
     "an unissued exam never commits quota");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")), true,
@@ -911,6 +913,8 @@ try {
     try { return JSON.parse(line); } catch { return null; }
   }).find((event) => event?.event === "exam_generation_failed" && event.stage === "exam_issuance");
   assert.ok(issuanceEvent, "the privacy-safe diagnostic identifies the exam issuance stage");
+  assert.equal(issuanceEvent.requestId, issuanceFailure.body.requestId,
+    "the response reference correlates with the stage-only server diagnostic");
   assert.doesNotMatch(JSON.stringify(issuanceEvent), /synthetic schema unavailable|Träna addition|synthetic-user-token/);
 
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")));
