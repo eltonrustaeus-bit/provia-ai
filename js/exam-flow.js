@@ -1994,6 +1994,9 @@
     S.idx = i;
     var q = qs[i];
     var id = qid(q, i);
+    var focusedDotIndex = UI.dots && UI.dots.contains(document.activeElement)
+      ? Array.prototype.indexOf.call(UI.dots.children, document.activeElement)
+      : -1;
 
     // P.E.R:s svar gällde föregående fråga. Stäng bara vid frågebyte; en
     // språkväxling renderar om samma fråga och ska behålla den öppna hjälpen.
@@ -2012,6 +2015,9 @@
       UI.dots.appendChild(d);
     });
     updateQuestionDotLabels();
+    if (focusedDotIndex >= 0 && UI.dots.children[focusedDotIndex]) {
+      UI.dots.children[focusedDotIndex].focus({ preventScroll: true });
+    }
 
     UI.count.textContent = tx("Fråga ", "Question ") + (i + 1) + " / " + qs.length;
 

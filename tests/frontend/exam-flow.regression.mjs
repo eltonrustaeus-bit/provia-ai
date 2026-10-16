@@ -828,6 +828,19 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T1a2 aktuell fråga och obesvarat tillstånd exponeras", ids.currentLabel === "Fråga 1, aktuell, obesvarad"
     && ids.unansweredLabel === "Fråga 2, obesvarad", JSON.stringify(ids));
 
+  await page.locator(".xf-dot").nth(1).focus();
+  await page.keyboard.press("Enter");
+  const dotNavigationFocus = await page.evaluate(() => ({
+    label: document.activeElement?.getAttribute("aria-label"),
+    isCurrent: document.activeElement?.getAttribute("aria-current") === "step",
+    isQuestionTwo: document.activeElement === document.querySelector(".xf-dot:nth-child(2)"),
+  }));
+  ok("tangentbordsbyte av fråga behåller fokus på den nya navigeringsknappen",
+    dotNavigationFocus.isCurrent && dotNavigationFocus.isQuestionTwo
+      && /Fråga 2, aktuell, obesvarad/.test(dotNavigationFocus.label || ""), JSON.stringify(dotNavigationFocus));
+  await page.locator(".xf-dot").first().focus();
+  await page.keyboard.press("Enter");
+
   // svara olika på de två dubblett-frågorna
   await page.click(".xf-mc-opt >> nth=0"); await page.waitForTimeout(500);   // fråga 1 = A
   const progress = await page.locator(".xf-dot").evaluateAll(dots => dots.map(d => ({
