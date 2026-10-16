@@ -214,4 +214,8 @@ verified exam appear latest again. These are source-level contracts only: Postgr
 concurrent behavior, effective grants and account erasure remain unverified in a real isolated
 database. If separately approved, deploy the fail-closed API code before applying the migration;
 that order may temporarily block P.E.R but does not reopen answers. Do not apply or deploy this
-draft without separate migration approval and database tests.
+draft without separate migration approval and database tests. The migration takes an
+`ACCESS EXCLUSIVE` lock on `exam_issuances` and a `SHARE ROW EXCLUSIVE` lock on `mock_results`
+through commit; issuance and grading requests may wait, so verify table size and schedule an
+approved maintenance window before staging. The marker grants `service_role` select/insert/update
+but no delete; its history-clear RPC retains the gate instead of deleting the marker.
