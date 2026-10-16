@@ -477,7 +477,10 @@ async function runAnswerBearingLearnerOp(req, res, user, op) {
     }
     return await LEARNER_OPS[op](req, res, user);
   } finally {
-    await examIssuance.releasePerAnswerLease(user.id, leaseId);
+    const released = await examIssuance.releasePerAnswerLease(user.id, leaseId);
+    if (released !== "released") {
+      console.warn(JSON.stringify({ event: "per_answer_lease_release_failed" }));
+    }
   }
 }
 

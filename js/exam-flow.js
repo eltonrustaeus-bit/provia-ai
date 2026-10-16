@@ -41,6 +41,8 @@
   // allt per tecken märks som hack på en mobil. Frågebyten och flervalsval
   // sparas fortfarande direkt — det är bara skrivandet som väntar.
   var DRAFT_DEBOUNCE_MS = 800;
+  var perWidgetHome = null;
+  var perMessageObserver = null;
 
   /* Serverns tak på pastedText i api/generate-exam.js. Speglas här så att
      eleven ser gränsen medan hen klistrar in i stället för att upptäcka den
@@ -2001,6 +2003,7 @@
     // P.E.R:s svar gällde föregående fråga. Stäng bara vid frågebyte; en
     // språkväxling renderar om samma fråga och ska behålla den öppna hjälpen.
     if (!preservePerPanel) closePerPanel();
+    else restorePerWidget();
 
     // Prickraden: hela provets form på en gång, och en genväg till varje fråga.
     UI.dots.innerHTML = "";
@@ -2137,9 +2140,12 @@
       saveDraft();
     });
     sheet.appendChild(ask);
+    sheet.appendChild(el("div", "xf-per-dock"));
 
     UI.sheetWrap.innerHTML = "";
     UI.sheetWrap.appendChild(sheet);
+    var perBubble = document.getElementById("perBubble");
+    if (preservePerPanel && perBubble && perBubble.classList.contains("per-open")) movePerWidgetIntoSheet();
     UI.sheetWrap.scrollTop = 0;
     if (focusQuestion) qText.focus({ preventScroll: true });
 
@@ -2174,30 +2180,66 @@
     // igen vid frågebyte och när provet lämnas.
     document.body.classList.add("xf-per-open");
     bubble.click();
-    scrollSheetClear();
+    movePerWidgetIntoSheet();
     return true;
   }
+
+  function movePerWidgetIntoSheet() {
+    if (window.innerWidth > 600) return;
+    var widget = document.getElementById("perWidget");
+    var dock = document.querySelector(".xf-exam.on .xf-per-dock");
+    if (!widget || !dock || dock.contains(widget)) return;
+    perWidgetHome = perWidgetHome || { parent: widget.parentNode, next: widget.nextSibling };
+    widget.classList.add("xf-per-inline");
+    dock.appendChild(widget);
+    fitPerWidgetAboveExamNav(widget);
+    if (window.MutationObserver && !perMessageObserver) {
+      perMessageObserver = new MutationObserver(function () {
+        if (widget.isConnected && widget.classList.contains("xf-per-inline")) {
+          requestAnimationFrame(function () { fitPerWidgetAboveExamNav(widget); });
+        }
+      });
+      perMessageObserver.observe(widget, { childList: true, subtree: true, characterData: true });
+    }
+  }
+
+  function fitPerWidgetAboveExamNav(widget) {
+    var wrap = widget && widget.closest(".xf-sheet-wrap");
+    var nav = document.querySelector(".xf-exam-nav");
+    if (!wrap || !nav) return;
+    var overflow = widget.getBoundingClientRect().bottom - nav.getBoundingClientRect().top + 12;
+    if (overflow > 0) wrap.scrollTop += overflow;
+  }
+
+  function restorePerWidget() {
+    var widget = document.getElementById("perWidget");
+    if (!widget || !perWidgetHome) return;
+    var home = perWidgetHome;
+    perWidgetHome = null;
+    if (perMessageObserver) {
+      perMessageObserver.disconnect();
+      perMessageObserver = null;
+    }
+    widget.classList.remove("xf-per-inline");
+    if (home.parent && home.parent.isConnected) {
+      home.parent.insertBefore(widget, home.next && home.next.parentNode === home.parent ? home.next : null);
+    } else {
+      document.body.appendChild(widget);
+    }
+  }
+
+  window.addEventListener("resize", function () {
+    var bubble = document.getElementById("perBubble");
+    if (!bubble || !bubble.classList.contains("per-open") || !document.body.classList.contains("xf-in-exam")) return;
+    if (window.innerWidth <= 600) movePerWidgetIntoSheet();
+    else restorePerWidget();
+  });
 
   function closePerPanel() {
     var bubble = document.getElementById("perBubble");
     if (bubble && bubble.classList.contains("per-open")) bubble.click();
     document.body.classList.remove("xf-per-open");
-  }
-
-  /* Panelen lägger sig över arkets nedre del på en telefon. exam-flow.css ger
-     arket luft under sig så att ingenting blir instängt; den här raden gör att
-     eleven slipper scrolla dit själv — frågans början hamnar överst i det band
-     som är kvar ovanför panelen. Ingen effekt på en bred skärm, där panelen
-     ligger vid sidan av arket. */
-  function scrollSheetClear() {
-    var wrap = document.querySelector(".xf-sheet-wrap");
-    var sheet = wrap && wrap.querySelector(".xf-sheet");
-    if (!wrap || !sheet) return;
-    if (window.innerWidth > 600) return;
-    var top = sheet.offsetTop - 8;
-    if (top < 0) top = 0;
-    try { wrap.scrollTo({ top: top, behavior: "smooth" }); }
-    catch (_) { wrap.scrollTop = top; }
+    restorePerWidget();
   }
 
   function next(focusQuestion) {

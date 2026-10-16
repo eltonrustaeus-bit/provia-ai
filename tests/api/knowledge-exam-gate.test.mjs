@@ -19,6 +19,7 @@ let leaseResult = "exam_active";
 let latestSubmission = null;
 let issuanceState = "active";
 let failState = false;
+let failRelease = false;
 const calls = [];
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
@@ -31,7 +32,10 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url.endsWith("/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.endsWith("/rpc/acquire_per_answer_lease")) return Response.json(leaseResult);
-  if (url.endsWith("/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.endsWith("/rpc/release_per_answer_lease")) {
+    return failRelease ? Response.json({ error: "unavailable" }, { status: 503 }) : Response.json("released");
+  }
+  if (url.endsWith("/rpc/per_consume_daily_quota")) return Response.json({ allowed: false });
   if (url.includes("/rest/v1/exam_issuances?")) {
     return Response.json(latestSubmission ? [{ submission_id: latestSubmission }] : []);
   }
@@ -43,7 +47,7 @@ globalThis.fetch = async (input, init = {}) => {
 
 const handler = (await import(`../../api/knowledge.js?knowledge-exam-gate-test`)).default;
 
-async function invoke() {
+async function invoke(op = "per_coach") {
   const response = {
     statusCode: 200,
     status(code) { this.statusCode = code; return this; },
@@ -53,7 +57,7 @@ async function invoke() {
   await handler({
     method: "POST",
     headers: { authorization: "Bearer synthetic" },
-    body: { op: "per_coach", concept_id: "concept-1", question_id: "question-1" },
+    body: { op, concept_id: "concept-1", question_id: "question-1", answer: "synthetic", idempotency_key: "synthetic" },
   }, response);
   return response;
 }
@@ -66,30 +70,34 @@ after(() => {
   }
 });
 
-test("learner coach stops during an active exam before quota or model work", async () => {
-  calls.length = 0;
-  activeCount = 1;
-  leaseResult = "exam_active";
-  const response = await invoke();
-  assert.equal(response.statusCode, 409);
-  assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED");
-  assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
-  assert.equal(calls.some(({ url }) => url.includes("consume_per_chat_quota")), false);
-  assert.equal(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")), false);
+test("all answer-bearing learner operations stop during an active exam before quota or model work", async () => {
+  for (const op of ["per_diagnose", "per_answer", "per_coach"]) {
+    calls.length = 0;
+    activeCount = 1;
+    leaseResult = "exam_active";
+    const response = await invoke(op);
+    assert.equal(response.statusCode, 409, op);
+    assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED", op);
+    assert.equal(calls.some(({ url }) => url.includes("openai.com")), false, op);
+    assert.equal(calls.some(({ url }) => url.includes("per_consume_daily_quota")), false, op);
+    assert.equal(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")), false, op);
+  }
 });
 
-test("abandoned or unknown grading state stays gated and releases its answer lease", async () => {
-  calls.length = 0;
+test("unverified and unknown grading states stay gated and release their answer lease", async () => {
   activeCount = 0;
   leaseResult = "acquired";
   latestSubmission = submissionId;
-  issuanceState = "abandoned";
   failState = false;
-  const response = await invoke();
-  assert.equal(response.statusCode, 409);
-  assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED");
-  assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")));
-  assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
+  for (const state of ["abandoned", "expired", "grading", "missing"]) {
+    calls.length = 0;
+    issuanceState = state;
+    const response = await invoke();
+    assert.equal(response.statusCode, 409, state);
+    assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED", state);
+    assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")), state);
+    assert.equal(calls.some(({ url }) => url.includes("openai.com")), false, state);
+  }
 
   calls.length = 0;
   failState = true;
@@ -100,4 +108,33 @@ test("abandoned or unknown grading state stays gated and releases its answer lea
   assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")));
   assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
   latestSubmission = null;
+});
+
+test("only none or verified-completed states reach the quota path; release failures are logged", async () => {
+  activeCount = 0;
+  leaseResult = "acquired";
+  failState = false;
+  for (const state of ["none", "completed"]) {
+    calls.length = 0;
+    issuanceState = state;
+    latestSubmission = state === "completed" ? submissionId : null;
+    const response = await invoke();
+    assert.equal(response.statusCode, 429, state, "verified states proceed to operation quota");
+    assert.ok(calls.some(({ url }) => url.endsWith("/rpc/per_consume_daily_quota")), state);
+    assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")), state);
+  }
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (value) => warnings.push(String(value));
+  try {
+    failRelease = true;
+    latestSubmission = null;
+    const response = await invoke();
+    assert.equal(response.statusCode, 429);
+  } finally {
+    failRelease = false;
+    console.warn = originalWarn;
+  }
+  assert.ok(warnings.some((value) => value.includes("per_answer_lease_release_failed")));
 });

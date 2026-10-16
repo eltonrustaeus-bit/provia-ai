@@ -13,12 +13,11 @@
 // svarsalternativ vid 390px: under provet är den flytande bubblan HELT dold
 // (`body.xf-in-exam #perWidget { display:none }`) och ingången är i stället
 // `.xf-ask` inne i provarket. Öppnas panelen därifrån sätter flödet
-// `body.xf-per-open`, som släpper fram widgeten lyft ovanför `.xf-exam-nav`.
+// `body.xf-per-open`, som flyttar panelen in under den aktuella frågan.
 //
 // Testet bevisar därför tre saker per bredd:
 //   1. Bubblan är osynlig medan provet pågår
-//   2. Öppnas den via .xf-ask syns den, och överlappar varken arkets innehåll
-//      eller botten-navigeringen
+//   2. Öppnas den via .xf-ask syns den i flödet och överlappar inte frågan
 //   3. Vid frågebyte går den tillbaka i sitt gömda läge
 //
 // Fristående — använder repots egen playwright-dep. Hoppas över (exit 0) om
@@ -120,7 +119,7 @@ async function run() {
       if (!hidden) throw new Error("#perWidget är synlig under provet");
       ok(`bubblan är dold under provet vid ${width}px`);
 
-      // 2. Öppnad via .xf-ask: syns, men överlappar inget
+      // 2. Öppnad via .xf-ask: panelen ligger i frågearket på mobil.
       await page.click(".xf-ask");
       await page.waitForFunction(() =>
         document.body.classList.contains("xf-per-open") &&
@@ -129,6 +128,25 @@ async function run() {
         { timeout: 5000 }
       );
       await page.locator("#perInput").waitFor({ state: "visible", timeout: 5000 });
+
+      const inlinePlacement = await page.evaluate(() => {
+        const widget = document.querySelector("#perWidget");
+        const dock = document.querySelector(".xf-per-dock");
+        const panel = document.querySelector("#perPanel");
+        const ask = document.querySelector(".xf-ask");
+        return {
+          inDock: Boolean(dock && widget && dock.contains(widget)),
+          widgetPosition: widget ? getComputedStyle(widget).position : "missing",
+          panelPosition: panel ? getComputedStyle(panel).position : "missing",
+          askBeforeWidget: Boolean(ask && widget &&
+            (ask.compareDocumentPosition(widget) & Node.DOCUMENT_POSITION_FOLLOWING)),
+        };
+      });
+      if (!inlinePlacement.inDock || inlinePlacement.widgetPosition !== "static" ||
+          inlinePlacement.panelPosition !== "static" || !inlinePlacement.askBeforeWidget) {
+        throw new Error(`P.E.R ligger inte i flödet efter frågan: ${JSON.stringify(inlinePlacement)}`);
+      }
+      ok(`P.E.R öppnas i flödet under frågan vid ${width}px`);
 
       // Panelen mäts efter ett riktigt svar, då den har sitt fulla innehåll.
       await page.fill("#perInput", "hjälp mig med frågan");
@@ -157,21 +175,15 @@ async function run() {
       if (!widgetBox || widgetBox.width < 1) throw new Error("#perWidget syns inte efter .xf-ask");
 
       const nav = await page.locator(".xf-exam-nav").boundingBox();
-      if (rectsOverlap(widgetBox, nav)) throw new Error(`bubblan täcker .xf-exam-nav vid ${width}px`);
+      if (rectsOverlap(widgetBox, nav)) {
+        const scroll = await page.locator(".xf-sheet-wrap").evaluate((node) => ({ top: node.scrollTop, max: node.scrollHeight - node.clientHeight }));
+        throw new Error(`P.E.R överlappar .xf-exam-nav vid ${width}px: ${JSON.stringify({ widgetBox, nav, scroll })}`);
+      }
 
       // Arkets faktiska innehåll — alternativen och svarsfältet är det eleven
       // måste kunna läsa och träffa.
       //
-      // Kravet är INTE att panelen aldrig överlappar. Uppmätt vid 390x700 finns
-      // ~200px mellan toppraden och panelens överkant, och en fråga med fyra
-      // alternativ behöver ~350px: att visa båda samtidigt går inte på en
-      // telefon, och ett test som kräver det kräver en skärm som inte finns.
-      //
-      // Kravet är att ingenting är INSTÄNGT. Arket är en egen scroller. Rullas
-      // den till sitt yttersta har allt flyttats upp så långt det går — ligger
-      // något då fortfarande under panelen går det inte att nå, och det är
-      // felet. (Den kontroll som fanns här förut mätte överlapp med en trasig
-      // rectsOverlap och kunde aldrig bli röd; se kommentaren vid funktionen.)
+      // The question remains in the same scroll flow above the in-flow panel.
       const targets = await page.locator(".xf-mc-opt, .xf-answer, .xf-q-text").all();
       if (!targets.length) throw new Error("hittade inget provinnehåll att mäta mot");
       const panelBox = await page.locator("#perPanel").boundingBox();
@@ -186,8 +198,8 @@ async function run() {
       for (const t of targets) {
         const box = await t.boundingBox();
         if (!box || box.height <= 0) continue;
-        if (rectsOverlap(widgetBox, box)) throw new Error(`bubblan täcker provinnehåll vid ${width}px`);
-        if (box.y + box.height > panelBox.y) {
+        if (rectsOverlap(widgetBox, box)) throw new Error(`P.E.R täcker provinnehåll vid ${width}px`);
+        if (box.y + box.height > panelBox.y && box.y < panelBox.y + panelBox.height) {
           const txt = (await t.innerText()).replace(/\s+/g, " ").slice(0, 30);
           throw new Error(`"${txt}" går inte att scrolla fram ovanför panelen vid ${width}px`);
         }

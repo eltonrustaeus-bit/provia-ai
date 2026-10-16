@@ -39,6 +39,7 @@ assert.match(api, /ANSWER_BEARING_LEARNER_OPS[\s\S]*?per_diagnose[\s\S]*?per_ans
 assert.match(api, /acquirePerAnswerLease\(user\.id, leaseId\)/);
 assert.match(api, /latestExamState\(user\.id\)/);
 assert.match(api, /latestState !== "none" && latestState !== "completed"/);
-assert.match(api, /finally\s*\{\s*await examIssuance\.releasePerAnswerLease\(user\.id, leaseId\)/);
+assert.match(api, /finally\s*\{[\s\S]*?examIssuance\.releasePerAnswerLease\(user\.id, leaseId\)/);
+assert.match(api, /per_answer_lease_release_failed/);
 
 console.log("knowledge job quota: atomic reservation and failure handling contract passed");
