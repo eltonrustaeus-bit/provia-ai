@@ -55,8 +55,10 @@ async function acquirePostExamReviewLease(userId) {
 
   const released = await examIssuance.releasePerAnswerLease(userId, leaseId);
   if (released !== "released") return { outcome: null, leaseId: null };
-  if (activeCount === null || latestState === null) return { outcome: null, leaseId: null };
-  return { outcome: activeCount > 0 ? "exam_active" : "ungraded_exam", leaseId: null };
+  if (activeCount === null) return { outcome: null, leaseId: null };
+  if (activeCount > 0) return { outcome: "exam_active", leaseId: null };
+  if (latestState === null) return { outcome: null, leaseId: null };
+  return { outcome: "ungraded_exam", leaseId: null };
 }
 
 function answerLeaseFailure(outcome, graphPractice = false) {

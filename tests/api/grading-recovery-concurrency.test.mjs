@@ -31,6 +31,7 @@ const publicQuestion = {
   options: [], grade_task: tasks.sealQuestion(question, process.env.EXAM_SIGNING_SECRET,
     tasks.hashContext(material, course, userId)),
 };
+const submissionId = completion.submissionId(userId, course, [publicQuestion]);
 const body = {
   lang: "sv", course, pastedText: material, questions: [publicQuestion],
   exam_manifest: completion.issueExamManifest(userId, course, material, [publicQuestion]),
@@ -55,6 +56,14 @@ globalThis.fetch = async (input, init = {}) => {
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
   if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(staleClaim ? "active" : state);
   if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
+  if (url.endsWith("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
+  if (url.endsWith("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.includes("/rest/v1/exam_latest_issuances?")) {
+    return Response.json([{ submission_id: submissionId, needs_fresh_verified_exam: false }]);
+  }
+  if (url.includes("/rest/v1/mock_results?")) {
+    return Response.json([{ submission_id: submissionId, verified_at: "2026-10-16T10:00:00Z" }]);
+  }
   if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
     if (staleClaim) return Response.json("stale");
     const given = JSON.parse(init.body).p_answer_fingerprint;
