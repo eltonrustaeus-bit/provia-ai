@@ -1643,17 +1643,19 @@
     examInertState = null;
   }
 
+  var examTabStopSelector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+  function visibleTabStops(root, excluded) {
+    return root ? Array.prototype.filter.call(root.querySelectorAll(examTabStopSelector), function (node) {
+      return node.getClientRects().length > 0 && !node.closest('[inert]') && !(excluded && excluded.contains(node));
+    }) : [];
+  }
+
   function examTabStops() {
-    var selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-    var stops = Array.prototype.filter.call(UI.exam.querySelectorAll(selector), function (node) {
-      return node.getClientRects().length > 0 && !node.closest('[inert]');
-    });
     var per = document.getElementById("perWidget");
-    if (per && per.getClientRects().length > 0) {
-      stops = stops.concat(Array.prototype.filter.call(per.querySelectorAll(selector), function (node) {
-        return node.getClientRects().length > 0 && !node.disabled;
-      }));
-    }
+    var perInline = per && UI.exam.contains(per);
+    var stops = visibleTabStops(UI.exam, perInline ? null : per);
+    if (per && !perInline) stops = stops.concat(visibleTabStops(per));
     return stops;
   }
 
@@ -2252,7 +2254,7 @@
   function prev() {
     if (S.idx <= 0) return;
     S.idx--;
-    renderQuestion();
+    renderQuestion(true);
     saveDraft();
   }
 
@@ -3065,6 +3067,10 @@
       if (!UI.exam.classList.contains("on")) return;
       if (e.key === "Tab") {
         var stops = examTabStops();
+        var per = document.getElementById("perWidget");
+        var perInline = per && UI.exam.contains(per);
+        var examStops = visibleTabStops(UI.exam, perInline ? null : per);
+        var perStops = per && !perInline ? visibleTabStops(per) : [];
         if (!stops.length) {
           e.preventDefault();
           UI.exam.focus();
@@ -3072,10 +3078,18 @@
         }
         var first = stops[0];
         var last = stops[stops.length - 1];
+        var firstPer = perStops[0];
+        var lastExam = examStops[examStops.length - 1];
         var active = document.activeElement;
         if (!UI.exam.contains(active) && !document.getElementById("perWidget")?.contains(active)) {
           e.preventDefault();
           first.focus();
+        } else if (!perInline && e.shiftKey && firstPer && active === firstPer && lastExam) {
+          e.preventDefault();
+          lastExam.focus();
+        } else if (!perInline && !e.shiftKey && lastExam && active === lastExam && firstPer) {
+          e.preventDefault();
+          firstPer.focus();
         } else if (e.shiftKey && (active === first || !stops.includes(active))) {
           e.preventDefault();
           last.focus();

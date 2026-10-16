@@ -683,7 +683,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 
 // Keyboard selection auto-advances to the next question without dropping focus.
 {
-  const { ctx, page } = await mk({ viewport: { width: 390, height: 844 } });
+  const { ctx, page } = await mk({ viewport: { width: 1024, height: 768 } });
   try {
     await signIn(page, "keyboard-focus");
     await toExam(page);
@@ -746,6 +746,38 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       JSON.stringify({ controlsVisible: perBoundary, tabReachedPer }));
     ok("fokus går mellan P.E.R och provets sista kontroll", perBoundary && returnedToExam && returnedToPer,
       JSON.stringify({ hasControls: perBoundary, returnedToExam, returnedToPer }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => document.getElementById("perWidget")?.classList.contains("xf-per-inline"));
+    const inlineStops = await page.evaluate(() => {
+      const selector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+      const visible = node => node.getClientRects().length > 0 && !node.closest('[inert]');
+      const stops = [...document.querySelectorAll(".xf-exam " + selector)].filter(visible);
+      const per = document.getElementById("perWidget");
+      const firstPer = stops.find(node => per.contains(node));
+      const previous = firstPer && stops[stops.indexOf(firstPer) - 1];
+      const last = stops.at(-1);
+      window.__inlineFirstPer = firstPer || null;
+      window.__inlinePrevious = previous || null;
+      window.__inlineLast = last || null;
+      return { perIsInline: document.querySelector(".xf-exam").contains(per), unique: new Set(stops).size === stops.length,
+        previousLabel: previous?.getAttribute("aria-label") || previous?.textContent?.trim(), lastLabel: last?.textContent?.trim() };
+    });
+    await page.evaluate(() => window.__inlineFirstPer?.focus());
+    await page.keyboard.press("Shift+Tab");
+    const inlinePrevious = await page.evaluate(() => document.activeElement === window.__inlinePrevious);
+    await page.evaluate(() => window.__inlineLast?.focus());
+    await page.keyboard.press("Tab");
+    const inlineWrap = await page.evaluate(() => {
+      const first = [...document.querySelectorAll(".xf-exam a[href],.xf-exam button:not([disabled]),.xf-exam input:not([disabled]),.xf-exam select:not([disabled]),.xf-exam textarea:not([disabled]),.xf-exam [tabindex]:not([tabindex=\"-1\"])")]
+        .find(node => node.getClientRects().length > 0 && !node.closest('[inert]'));
+      const ok = document.activeElement === first;
+      delete window.__inlineFirstPer; delete window.__inlinePrevious; delete window.__inlineLast;
+      return ok;
+    });
+    ok("mobilens inline-P.E.R följer provets naturliga DOM-ordning utan dubbletter",
+      inlineStops.perIsInline && inlineStops.unique, JSON.stringify(inlineStops));
+    ok("Shift+Tab från inline-P.E.R går till föregående synliga provkontroll", inlinePrevious);
+    ok("Tab från sista inline-kontrollen går runt till första provkontrollen", inlineWrap);
     const firstOption = page.locator(".xf-mc-opt").first();
     await firstOption.focus();
     await page.keyboard.press("Enter");

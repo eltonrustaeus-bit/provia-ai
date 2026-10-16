@@ -104,6 +104,7 @@
 
   /* table */
   .tableWrap{overflow-x:auto}
+  .tableWrap:focus-visible{outline:2px solid var(--a);outline-offset:3px}
   .stTable{width:100%;border-collapse:collapse;min-width:720px}
   .stTable thead th{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.07em;
     text-transform:uppercase;padding:0 14px 11px;border-bottom:1px solid var(--l);text-align:left;white-space:nowrap}
@@ -198,7 +199,7 @@
       <div class="whoLabel" id="whoLabel">Laddar…</div>
     </header>
 
-    <div class="statusBar" id="statusBar"></div>
+    <div class="statusBar" id="statusBar" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Logged-out state. The page used to show only a status line saying
          "log in with your teacher account" with nothing to click. -->
@@ -252,7 +253,7 @@
         </div>
         <div class="kCardBody">
           <div class="insightBox" id="insightBox" style="display:none"></div>
-          <div class="tableWrap">
+          <div class="tableWrap" role="region" aria-label="Elevresultat, rulla i sidled för fler kolumner" tabindex="0">
             <table class="stTable">
               <thead><tr>
                 <th>Elev</th><th>Rättade prov</th><th>Kurser</th><th>Snitt</th><th>Senaste</th><th>Trend</th><th>Träningsområden</th><th></th>
@@ -312,9 +313,17 @@ let drilldownReturnFocus = null;
 
 function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');}
 
-function showStatus(msg,type){
+function showStatus(msg,type,contact){
   const bar=document.getElementById('statusBar');
-  bar.className='statusBar '+type; bar.textContent=msg; bar.style.display='flex';
+  bar.className='statusBar '+type; bar.replaceChildren(document.createTextNode(msg));
+  if(contact){
+    const link=document.createElement('a');
+    link.href='mailto:elton.rustaeus@gmail.com?subject=ExGen%20l%C3%A4rarbeh%C3%B6righet';
+    link.textContent='Kontakta ExGen';
+    link.style.cssText='color:inherit;text-decoration:underline;text-underline-offset:3px';
+    bar.append(' ',link);
+  }
+  bar.style.display='flex';
   if(type==='ok') setTimeout(()=>{bar.style.display='none';},3000);
 }
 
@@ -679,7 +688,7 @@ async function init(){
   if(role!=='teacher' && role!=='admin'){
     who.textContent='Ingen lärarbehörighet';
     document.getElementById('main').style.display='none';
-    showStatus('Det här kontot har inte lärarbehörighet. Hör av dig till ExGen så lägger vi upp dig som lärare.','warn');
+    showStatus('Det här kontot har inte lärarbehörighet.','warn',true);
     return;
   }
 

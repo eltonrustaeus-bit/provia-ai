@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const page = await readFile(new URL("../../larare.html", import.meta.url), "utf8");
+const examFlow = await readFile(new URL("../../js/exam-flow.js", import.meta.url), "utf8");
 const api = await readFile(new URL("../../api/check-role.js", import.meta.url), "utf8");
 const admin = await readFile(new URL("../../admin.html", import.meta.url), "utf8");
 const improvement = await readFile(new URL("../../förbättring.html", import.meta.url), "utf8");
@@ -9,6 +10,15 @@ const konto = await readFile(new URL("../../konto.html", import.meta.url), "utf8
 const signup = await readFile(new URL("../../api/signup.js", import.meta.url), "utf8");
 assert.match(page, /<button class="classOpen"[^>]*data-id=/, "opening a class uses a native button");
 assert.match(page, /<button class="codePill"[^>]*data-code=/, "copying a class code uses a native button");
+assert.match(page, /class="tableWrap" role="region"[^>]*aria-label="Elevresultat, rulla i sidled för fler kolumner"[^>]*tabindex="0"/, "teacher results table can be reached and scrolled with a keyboard");
+assert.match(page, /id="statusBar" role="status" aria-live="polite" aria-atomic="true"/, "asynchronous teacher access status is announced to assistive technology");
+assert.match(page, /showStatus\('Det här kontot har inte lärarbehörighet\.',\s*'warn',\s*true\)/, "teacher access denial offers a direct support route");
+assert.match(examFlow, /d\.addEventListener\("click", function \(\) \{ S\.idx = n; renderQuestion\(\); \}\)/, "question-dot navigation retains its current keyboard focus behavior");
+assert.match(examFlow, /function prev\(\)\s*\{[\s\S]*?renderQuestion\(true\);/, "previous-question navigation moves focus to the new question");
+assert.match(examFlow, /UI\.next\.addEventListener\("click", next\)/, "next-question navigation retains its current focus behavior");
+assert.match(examFlow, /perInline = per && UI\.exam\.contains\(per\)/, "inline P.E.R controls are counted exactly once in the exam tab order");
+assert.match(examFlow, /!perInline && !e\.shiftKey && lastExam && active === lastExam && firstPer/, "external P.E.R tab order crosses the exam boundary");
+assert.match(examFlow, /perInline \? null : per/, "inline P.E.R keeps its natural position in the exam tab order");
 assert.doesNotMatch(page, /classCard[^>]*role="button"/, "class card does not nest interactive controls inside a button role");
 assert.match(page, /drilldownReturnFocus = document\.activeElement/, "student detail dialog remembers the invoking control");
 assert.match(page, /document\.getElementById\('ddClose'\)\.focus\(\)/, "student detail dialog receives initial focus");
