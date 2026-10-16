@@ -56,20 +56,36 @@ async function examState(userId, submissionId) {
 async function latestExamState(userId) {
   if (!userId) return null;
   const query = new URLSearchParams({
-    select: "submission_id",
+    select: "submission_id,needs_fresh_verified_exam",
     user_id: `eq.${userId}`,
-    order: "issued_at.desc",
     limit: "1",
   });
-  const response = await request(`exam_issuances?${query}`, { method: "GET" });
+  const response = await request(`exam_latest_issuances?${query}`, { method: "GET" });
   if (!response?.ok) return null;
   try {
     const rows = await response.json();
     if (!Array.isArray(rows)) return null;
     if (rows.length === 0) return "none";
+    if (rows.length !== 1) return null;
+    if (rows[0]?.needs_fresh_verified_exam === true) return "missing";
     const submissionId = rows[0]?.submission_id;
-    if (rows.length !== 1 || !/^[a-f0-9]{32}$/.test(submissionId || "")) return null;
-    return await examState(userId, submissionId);
+    if (!/^[a-f0-9]{32}$/.test(submissionId || "")) return "missing";
+    const state = await examState(userId, submissionId);
+    if (state !== "missing") return state;
+
+    // Issuance details can be purged, but a verified result remains authoritative.
+    const resultQuery = new URLSearchParams({
+      select: "submission_id",
+      user_id: `eq.${userId}`,
+      submission_id: `eq.${submissionId}`,
+      verified_at: "not.is.null",
+      limit: "1",
+    });
+    const resultResponse = await request(`mock_results?${resultQuery}`, { method: "GET" });
+    if (!resultResponse?.ok) return null;
+    const results = await resultResponse.json();
+    if (!Array.isArray(results)) return null;
+    return results.some((row) => row?.submission_id === submissionId) ? "completed" : "missing";
   } catch {
     return null;
   }

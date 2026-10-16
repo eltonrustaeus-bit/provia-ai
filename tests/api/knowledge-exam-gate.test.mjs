@@ -36,9 +36,10 @@ globalThis.fetch = async (input, init = {}) => {
     return failRelease ? Response.json({ error: "unavailable" }, { status: 503 }) : Response.json("released");
   }
   if (url.endsWith("/rpc/per_consume_daily_quota")) return Response.json({ allowed: false });
-  if (url.includes("/rest/v1/exam_issuances?")) {
+  if (url.includes("/rest/v1/exam_latest_issuances?")) {
     return Response.json(latestSubmission ? [{ submission_id: latestSubmission }] : []);
   }
+  if (url.includes("/rest/v1/mock_results?")) return Response.json([]);
   if (url.endsWith("/rpc/exam_issuance_state")) {
     return failState ? Response.json({ error: "unavailable" }, { status: 503 }) : Response.json(issuanceState);
   }

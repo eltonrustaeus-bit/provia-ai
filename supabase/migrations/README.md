@@ -201,3 +201,17 @@ migration has not been applied or PostgreSQL-tested. Staging has no app schema; 
 restore its approved baseline, then run synthetic active/unverified/verified result tests only
 after separate migration approval. Its rollback intentionally aborts because restoring the
 unverified-row behavior could release answers during an active exam.
+
+## Latest exam issuance marker — local draft only
+
+`20261016120000_preserve_latest_exam_issuance.sql` preserves the latest issuance identity after
+exam details are purged, backfills accounts with surviving exam evidence behind a one-time
+fresh-verified-grade gate, serializes backfill against issuance/result writes, and retains only
+an anonymous gate after the user clears exam history. A verified result for the marked latest
+issuance created after the marker is installed clears that gate; an older result cannot. The API fails closed when the marker is missing or its result cannot
+be checked. Its rollback intentionally aborts because dropping the marker could make an older
+verified exam appear latest again. These are source-level contracts only: PostgreSQL syntax,
+concurrent behavior, effective grants and account erasure remain unverified in a real isolated
+database. If separately approved, deploy the fail-closed API code before applying the migration;
+that order may temporarily block P.E.R but does not reopen answers. Do not apply or deploy this
+draft without separate migration approval and database tests.

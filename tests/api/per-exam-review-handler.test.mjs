@@ -76,7 +76,7 @@ globalThis.fetch = async (input, init = {}) => {
     const payload = JSON.parse(init.body || "{}");
     return Response.json(issuanceStateBySubmission.get(payload.p_submission_id) || issuanceState);
   }
-  if (url.includes("/rest/v1/exam_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
+  if (url.includes("/rest/v1/exam_latest_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
   if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
     { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
   ]});
@@ -101,6 +101,11 @@ globalThis.fetch = async (input, init = {}) => {
     const query = new URL(url).searchParams;
     const requestedUser = (query.get("user_id") || "").replace(/^eq\./, "");
     const requestedSubmission = (query.get("submission_id") || "").replace(/^eq\./, "");
+    if (query.get("verified_at") === "not.is.null") {
+      return Response.json(resultPresent && requestedUser === userId && savedSubmissionIds.has(requestedSubmission)
+        ? [{ submission_id: requestedSubmission }]
+        : []);
+    }
     return Response.json(resultPresent && requestedUser === userId && savedSubmissionIds.has(requestedSubmission)
       ? {
         submission_id: requestedSubmission,
@@ -704,7 +709,7 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     assert.equal(ended.body.examState, "expired");
     assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
     assert.equal(ended.body.helpCap, 2);
-    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_issuances?") && url.includes("order=issued_at.desc")));
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
@@ -751,36 +756,58 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
   }
 });
 
-test("an older verified exam cannot bypass a newer ungraded exam", async () => {
+test("an older verified exam cannot bypass a newer unverified or purged issuance", async () => {
   const previous = { activeCount, issuanceState, latestSubmissionId };
   const olderSubmissionId = proof.receipt.split(".")[1];
   try {
     activeCount = 0;
-    issuanceState = "abandoned";
     latestSubmissionId = "b".repeat(32);
     issuanceStateBySubmission.set(olderSubmissionId, "completed");
 
+    for (const state of ["abandoned", "expired", "grading", "missing"]) {
+      issuanceState = state;
+      calls.length = 0;
+      const ordinary = await invoke({
+        userQuestion: "Give me the exact answer",
+        pageContext: { page: "studies", examState: { submissionId: olderSubmissionId } },
+      });
+      assert.equal(ordinary.statusCode, 200, state);
+      assert.equal(ordinary.body.examState, state, state);
+      assert.equal(ordinary.body.helpCap, state === "grading" ? 0 : 2, state);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+        !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")), state);
+
+      calls.length = 0;
+      const review = await invoke({ examReview: true, examProof: proof });
+      assert.equal(review.statusCode, 200, state);
+      assert.equal(review.body.examActive, false, state);
+      assert.equal(review.body.examState, state, state);
+      assert.equal(review.body.helpCap, 0, state);
+      assert.match(review.body.answer, state === "grading"
+        ? /håller på att rättas|being graded/i
+        : /without giving the answer|utan att visa facit|utan att ge svaret/i, state);
+      assert.ok(calls.every(({ url }) => (state === "missing" || !url.includes("/rest/v1/mock_results")) &&
+        !url.includes("recover_graded_exam_result") && !url.includes("consume_per_chat_quota") &&
+        !url.includes("openai.com") && !url.includes("acquire_per_answer_lease")), state);
+    }
+
+    issuanceState = "missing";
     calls.length = 0;
-    const ordinary = await invoke({
-      userQuestion: "Give me the exact answer",
-      pageContext: { page: "studies", examState: { submissionId: olderSubmissionId } },
-    });
-    assert.equal(ordinary.statusCode, 200);
-    assert.equal(ordinary.body.examState, "abandoned");
-    assert.equal(ordinary.body.helpCap, 2);
+    const deletedLatest = await invoke({ userQuestion: "Give me the exact answer" });
+    assert.equal(deletedLatest.statusCode, 200);
+    assert.equal(deletedLatest.body.examState, "missing");
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results?") && url.includes("verified_at=not.is.null")));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
       !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
-    const review = await invoke({ examReview: true, examProof: proof });
-    assert.equal(review.statusCode, 200);
-    assert.equal(review.body.examActive, false);
-    assert.equal(review.body.examState, "abandoned");
-    assert.equal(review.body.helpCap, 0);
-    assert.match(review.body.answer, /without giving the answer|utan att visa facit|utan att ge svaret/i);
-    assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/mock_results") &&
-      !url.includes("recover_graded_exam_result") && !url.includes("consume_per_chat_quota") &&
-      !url.includes("openai.com") && !url.includes("acquire_per_answer_lease")));
+    const deletedLatestReview = await invoke({ examReview: true, examProof: proof });
+    assert.equal(deletedLatestReview.statusCode, 200);
+    assert.equal(deletedLatestReview.body.examState, "missing");
+    assert.equal(deletedLatestReview.body.helpCap, 0);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("consume_per_chat_quota") && !url.includes("recover_graded_exam_result")));
   } finally {
     activeCount = previous.activeCount;
     issuanceState = previous.issuanceState;
