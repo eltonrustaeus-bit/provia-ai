@@ -409,9 +409,10 @@
       </div>
       <div class="kCardBody">
         <p class="kHelpText" id="accountDeletionCopy">Självservice är endast tillgänglig för kostnadsfria elevkonton utan betalningskoppling eller lärarklasser. När servern bekräftar begäran tas Auth-kontot bort; radering av relaterade data, leverantörsloggar och lokal data på andra enheter är inte verifierad här och kan kräva separat hantering.</p>
+        <p class="kPrivacyNote" id="accountDeletionUnavailableNotice" aria-live="polite" aria-atomic="true" hidden>Radering via självservice är inte tillgänglig för kontot just nu. Kontakta <a href="mailto:elton.rustaeus@gmail.com?subject=ExGen%20datafr%C3%A5ga">ExGen för manuell kontroll</a>.</p>
         <p class="kPrivacyNote" id="pilotDeletionNotice" style="display:none">Kontoradering är avstängd i pilotläget eftersom en fullständig raderingsprocess ännu inte är verifierad. Använd inte riktiga elevkonton innan skolan och ExGen har godkänt raderings- och supportvägen. Frågor eller begäran om radering kan skickas till <a href="mailto:elton.rustaeus@gmail.com?subject=ExGen%20datafr%C3%A5ga">den publicerade integritetskontakten</a>. Ingen tidsfrist eller fullständig dataradering utlovas här.</p>
         <div class="kBtnRow">
-          <button class="kBtn kBtnDanger" id="deleteAccountBtn">Radera konto</button>
+          <button class="kBtn kBtnDanger" id="deleteAccountBtn" style="display:none">Radera konto</button>
           <button class="kBtn kBtnDanger" id="logoutBtn">Logga ut</button>
         </div>
       </div>
@@ -575,6 +576,25 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     planRetryBtn.disabled=false;
     planRetryBtn.textContent="Försök igen";
   });
+
+  const deleteAccountBtn=document.getElementById("deleteAccountBtn");
+  const deletionUnavailableNotice=document.getElementById("accountDeletionUnavailableNotice");
+  if(!pilotMode){
+    try{
+      const response=await fetch("/api/check-role",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},
+        body:JSON.stringify({action:"account_deletion_status"})
+      });
+      const status=await response.json();
+      const available=response.ok&&status?.selfServiceAvailable===true;
+      deleteAccountBtn.style.display=available?"":"none";
+      deletionUnavailableNotice.hidden=available;
+    }catch{
+      deleteAccountBtn.style.display="none";
+      deletionUnavailableNotice.hidden=false;
+    }
+  }
 
   /* ── KLASSER ──
      Lärarkortet kräver lärarbehörighet (rollen sätts bara av en admin). Elevkortet visas

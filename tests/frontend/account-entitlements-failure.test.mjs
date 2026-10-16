@@ -16,6 +16,7 @@ async function retryPlan(page) {
 
 try {
   let entitlementCalls = 0;
+  let deletionAvailable = false;
   const { page, close } = await openPage(browser, `${server.url}/konto.html`, {
     width: 390,
     state: { user: { id: "u1", email: "student@example.test" } },
@@ -48,6 +49,9 @@ try {
           },
         } } });
       }
+      if (body.action === "account_deletion_status") {
+        return route.fulfill({ json: { ok: true, selfServiceAvailable: deletionAvailable } });
+      }
       return route.fulfill({ json: { ok: true, allow: true, role: "basic", approved: true, classes: [] } });
     }]] },
   });
@@ -60,6 +64,8 @@ try {
   assert.notEqual(await page.locator("#planBadgeText").innerText(), "GRATIS");
   assert.equal(await page.locator("#upgradeCard").isVisible(), false);
   assert.equal(await page.locator("#manageCard").isVisible(), false);
+  assert.equal(await page.locator("#deleteAccountBtn").isVisible(), false);
+  assert.equal(await page.locator("#accountDeletionUnavailableNotice").isVisible(), true);
 
   await retryPlan(page);
   assert.equal(await page.locator("#planBadgeText").innerText(), "EJ TILLGÄNGLIG");
@@ -86,6 +92,33 @@ try {
   assert.ok(desktopBounds && desktopBounds.x >= 0 && desktopBounds.x + desktopBounds.width <= 1440,
     `plan status fits desktop viewport: ${JSON.stringify(desktopBounds)}`);
   await close();
+
+  deletionAvailable = true;
+  const eligible = await openPage(browser, `${server.url}/konto.html`, {
+    width: 390,
+    state: { user: { id: "u1", email: "student@example.test" } },
+    mocks: { extra: [["**/api/check-role", async (route) => {
+      const body = route.request().postDataJSON();
+      if (body.action === "account_deletion_status") {
+        return route.fulfill({ json: { ok: true, selfServiceAvailable: deletionAvailable } });
+      }
+      if (body.action === "entitlements") {
+        return route.fulfill({ json: { ok: true, entitlements: {
+          role: "gratis",
+          label: "Gratis",
+          price: "0 kr",
+          features: {
+            mockExam: { cap: 3, unlimited: false, period: "week" },
+            perChat: { cap: 5, unlimited: false, period: "week" },
+          },
+        } } });
+      }
+      return route.fulfill({ json: { ok: true, allow: true, role: "gratis", approved: true, classes: [] } });
+    }]] },
+  });
+  await eligible.page.locator("#deleteAccountBtn").waitFor({ state: "visible" });
+  assert.equal(await eligible.page.locator("#accountDeletionUnavailableNotice").isVisible(), false);
+  await eligible.close();
   console.log("account-entitlements-failure: unavailable state, retry, role cards, 390px bounds passed");
 } finally {
   await browser.close();

@@ -236,6 +236,38 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: "Åtgärden är avstängd i pilotläget." });
   }
 
+  if (action === "account_deletion_status") {
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, persona, stripe_customer_id, stripe_subscription_id, swish_expires_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profileError || !profile) {
+        return res.status(503).json({ ok: false, selfServiceAvailable: false });
+      }
+
+      const hasBillingLink = Boolean(
+        profile.stripe_customer_id || profile.stripe_subscription_id || profile.swish_expires_at
+      );
+      if (String(profile.role || "").toLowerCase() !== "gratis" ||
+          profile.persona !== "elev" || hasBillingLink) {
+        return res.status(200).json({ ok: true, selfServiceAvailable: false });
+      }
+
+      const { data: ownedClasses, error: classesError } = await supabase
+        .from("classes")
+        .select("id")
+        .eq("teacher_id", user.id);
+      if (classesError) {
+        return res.status(503).json({ ok: false, selfServiceAvailable: false });
+      }
+      return res.status(200).json({ ok: true, selfServiceAvailable: !ownedClasses?.length });
+    } catch {
+      return res.status(503).json({ ok: false, selfServiceAvailable: false });
+    }
+  }
+
   if (action === "delete_account") {
     if (!hasRecentAuthentication(req.headers.authorization)) {
       return res.status(401).json({

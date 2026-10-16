@@ -75,7 +75,44 @@ function invoke(confirmationEmail = "student@example.test", authAgeSeconds = 0) 
   });
 }
 
+function invokeStatus() {
+  const claims = Buffer.from(JSON.stringify({ sub: userId })).toString("base64url");
+  const req = {
+    method: "POST",
+    headers: { authorization: `Bearer synthetic.${claims}.signature` },
+    body: { action: "account_deletion_status" },
+  };
+  return new Promise((resolve) => {
+    const res = {
+      statusCode: 200,
+      status(value) { this.statusCode = value; return this; },
+      json(body) { resolve({ status: this.statusCode, body }); return this; },
+    };
+    handler(req, res);
+  });
+}
+
 try {
+  mode = "success";
+  calls.length = 0;
+  const eligibility = await invokeStatus();
+  assert.equal(eligibility.status, 200);
+  assert.deepEqual(eligibility.body, { ok: true, selfServiceAvailable: true });
+  assert.equal(calls.some((call) => call.method === "DELETE" || call.url.includes("/auth/v1/logout")), false,
+    "eligibility check is read-only");
+
+  for (const blockedMode of [
+    "billing", "teacher-class", "teacher-persona", "parent-persona", "unknown-persona",
+    "profile-error", "profile-missing", "classes-error",
+  ]) {
+    mode = blockedMode;
+    calls.length = 0;
+    const blocked = await invokeStatus();
+    assert.equal(blocked.body.selfServiceAvailable, false, `${blockedMode} hides self-service`);
+    assert.equal(calls.some((call) => call.method === "DELETE" || call.url.includes("/auth/v1/logout")), false,
+      `${blockedMode} eligibility check does not change the account`);
+  }
+
   mode = "success";
   calls.length = 0;
   const staleAuth = await invoke("student@example.test", 301);
