@@ -60,6 +60,7 @@ for (const f of filer) {
   const src = readFileSync(join(HÄR, f), "utf8");
   if (!/#perInput/.test(src)) continue;
   if (!/perBubble|perStripBtn/.test(src)) continue;   // öppnar inte panelen själv
+  if (!/\.fill\(\s*["']#perInput["']|\.locator\(\s*["']#perInput["']\s*\)\.fill\(/.test(src)) continue;
 
   check(`${f} väntar in att #perInput är synlig innan den skriver`,
     /#perInput["']\s*\)?\s*\.waitFor\(\s*\{\s*state:\s*["']visible["']|waitForSelector\(\s*["']#perInput/.test(src),

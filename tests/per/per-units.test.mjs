@@ -321,7 +321,9 @@ check("kostnad: overifierad prislista ger null, inte en påhittad siffra", () =>
 check("tokens: OpenAI:s usage-objekt normaliseras", () => {
   const t = normalizeUsage({ input_tokens: 120, output_tokens: 40, input_tokens_details: { cached_tokens: 20 } });
   assert.deepEqual(t, { inputTokens: 120, cachedInputTokens: 20, outputTokens: 40 });
-  assert.deepEqual(normalizeUsage(null), { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 });
+  assert.equal(normalizeUsage(null), null);
+  assert.deepEqual(normalizeUsage({ prompt_tokens: 120, completion_tokens: 40, prompt_tokens_details: { cached_tokens: 20 } }),
+    { inputTokens: 120, cachedInputTokens: 20, outputTokens: 40 });
 });
 
 check("nivåsvårighet är konsekvent stigande", () => {

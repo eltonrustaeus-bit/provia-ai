@@ -87,8 +87,14 @@ check("full poäng är rätt svar",
 check("flerval är deterministiskt och säkert",
   (() => { const r = A.buildAttempt({ userId: "u1", q: { id: "q", score: 1, options: ["a", "b"] } });
     return r.questionType === "multiple_choice" && r.assessment.method === "deterministic" && r.assessment.confidence === 1; })());
+check("signerat provflerval behåller deterministisk metod även utan options",
+  (() => { const r = A.buildAttempt({ userId: "u1", q: { id: "q", type: "mc", score: 1 } });
+    return r.questionType === "multiple_choice" && r.assessment.method === "deterministic"; })());
+check("grafen följer databasens frågetyp men har deterministisk metod",
+  (() => { const r = A.buildAttempt({ userId: "u1", q: { id: "q", type: "graph", score: 1 } });
+    return r.questionType === "short_answer" && r.assessment.method === "deterministic"; })());
 check("fritext är modellbedömt och mindre säkert",
-  rad.questionType === "short_answer" && rad.assessment.method === "model" && rad.assessment.confidence < 1);
+  rad.questionType === "short_answer" && rad.assessment.method === "llm_reasoning" && rad.assessment.confidence < 1);
 
 console.log("\n— IDEMPOTENS —");
 /* Utan nyckeln dubblar en omrättning underlaget, och den kollektiva

@@ -31,7 +31,8 @@ import legalGenerator from "../ai/prompts/legal-generator/v1.js";
 import legalVerifierBlind from "../ai/prompts/legal-verifier-blind/v1.js";
 import legalVerifierCompare from "../ai/prompts/legal-verifier-compare/v1.js";
 import legalRepair from "../ai/prompts/legal-repair/v1.js";
-import { callAI } from "../../api/_per-core.js";
+import { callAIRaw } from "../../api/_per-core.js";
+import { logUsage } from "../per/usage.mjs";
 
 export const PIPELINE_VERSION = "v1";
 export const PROMPT_VERSION = "v1";
@@ -91,30 +92,21 @@ export function deterministicDecision({ canAnswerFromSources, generatorAnswerMat
   return "publish";
 }
 
-async function logUsage(supabase, { jobId, userId, pipelineStep, model, latencyMs, subject }) {
-  if (!supabase) return;
-  try {
-    await supabase.from("ai_usage_events").insert({
-      job_id: jobId ?? null,
-      user_id: userId ?? null,
-      feature: "legal_exam_generation",
-      pipeline_step: pipelineStep,
-      subject: subject ?? null,
-      provider: "openai",
-      model,
-      prompt_version: PROMPT_VERSION,
-      pipeline_version: PIPELINE_VERSION,
-      latency_ms: latencyMs ?? 0,
-    });
-  } catch {
-    /* usage-loggning får aldrig blockera elevflödet */
-  }
+async function logGenerationUsage(supabase, { jobId, userId, pipelineStep, model, usage, latencyMs, concept, retrievedChunks }) {
+  const input = usage?.input_tokens ?? usage?.prompt_tokens;
+  const output = usage?.output_tokens ?? usage?.completion_tokens;
+  if (!Number.isInteger(input) || !Number.isInteger(output) || input < 0 || output < 0) return;
+  await logUsage(supabase, {
+    jobId, userId, feature: "legal_exam_generation", pipelineStep,
+    subject: concept.subject, course: concept.course, model, usage, latencyMs,
+    retrievedChunks, promptVersion: PROMPT_VERSION, pipelineVersion: PIPELINE_VERSION,
+  });
 }
 
 async function runVerification({ supabase, jobId, userId, question, sourceChunks, level, concept }) {
   const subject = subjectLabel(concept);
   let t0 = Date.now();
-  const blindOut = await callAI(
+  const blind = await callAIRaw(
     [
       { role: "system", content: legalVerifierBlind.systemPrompt(level, concept.name, subject) },
       {
@@ -130,11 +122,11 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
     ],
     { model: verifierModel(), schema: legalVerifierBlind.outputSchema(), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: verifierModel(), latencyMs: Date.now() - t0, subject: concept.subject });
-  const blindResult = JSON.parse(blindOut);
+  await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: blind.model, usage: blind.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
+  const blindResult = JSON.parse(blind.text);
 
   t0 = Date.now();
-  const compareOut = await callAI(
+  const compare = await callAIRaw(
     [
       { role: "system", content: legalVerifierCompare.systemPrompt(subject) },
       {
@@ -152,8 +144,8 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
     ],
     { model: verifierModel(), schema: legalVerifierCompare.outputSchema(), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: verifierModel(), latencyMs: Date.now() - t0, subject: concept.subject });
-  const compareResult = JSON.parse(compareOut);
+  await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: compare.model, usage: compare.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
+  const compareResult = JSON.parse(compare.text);
 
   const generatorAnswerMatches = computeGeneratorAnswerMatches({
     questionType: question.question_type,
@@ -222,15 +214,15 @@ export async function generateVerifiedQuestion({
   const subject = subjectLabel(concept);
 
   let t0 = Date.now();
-  const genOut = await callAI(
+  const generatedResponse = await callAIRaw(
     [
       { role: "system", content: legalGenerator.systemPrompt(questionType, level, subject) },
       { role: "user", content: legalGenerator.buildUserPrompt({ concept: concept.name, sourceChunks, questionType, count: 1 }) },
     ],
     { model: generatorModel(), schema: legalGenerator.outputSchema(1, questionType), timeout: 40000 }
   );
-  await logUsage(supabase, { jobId, userId, pipelineStep: "generate", model: generatorModel(), latencyMs: Date.now() - t0, subject: concept.subject });
-  const generated = JSON.parse(genOut).items[0];
+  await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "generate", model: generatedResponse.model, usage: generatedResponse.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
+  const generated = JSON.parse(generatedResponse.text).items[0];
   const question = { question_type: questionType, ...generated };
 
   let verification = await runVerification({ supabase, jobId, userId, question, sourceChunks, level, concept });
@@ -239,15 +231,15 @@ export async function generateVerifiedQuestion({
 
   if (verification.recommended_action === "repair") {
     t0 = Date.now();
-    const repairOut = await callAI(
+    const repair = await callAIRaw(
       [
         { role: "system", content: legalRepair.systemPrompt(subject) },
         { role: "user", content: legalRepair.buildUserPrompt({ question, verificationResult: verification, sourceChunks }) },
       ],
       { model: generatorModel(), schema: legalRepair.outputSchema(questionType), timeout: 40000 }
     );
-    await logUsage(supabase, { jobId, userId, pipelineStep: "repair", model: generatorModel(), latencyMs: Date.now() - t0, subject: concept.subject });
-    const repairedFields = JSON.parse(repairOut);
+    await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "repair", model: repair.model, usage: repair.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
+    const repairedFields = JSON.parse(repair.text);
     finalQuestion = { question_type: questionType, ...repairedFields };
     repaired = true;
 

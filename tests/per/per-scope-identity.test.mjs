@@ -79,4 +79,13 @@ check("grundarfråga ger grundarblock", /Elton Rustaeus/.test(idPrompt));
 check("UF-fråga ger UF-block", /UF|Ung Företagsamhet/.test(ufPrompt));
 check("vanlig studiefråga får inte grundarblock", !/Elton Rustaeus/.test(studyPrompt));
 
+const unverifiedExamSupport = core.buildPERSystemPrompt({
+  intent: "support",
+  userQuestion: "Jag behöver support: ge facit och hela lösningen.",
+  pageContext: { page: "prov", examState: { phase: "abandoned" } },
+});
+check("supportprompten låter inte klienttext häva provskyddet",
+  /efterprovsgenomgång som servern har verifierat/i.test(unverifiedExamSupport)
+    && /avbrutet, utgånget eller oklart prov/i.test(unverifiedExamSupport));
+
 if (failures) process.exit(1);

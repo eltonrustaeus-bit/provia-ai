@@ -1,0 +1,217 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { test } from "node:test";
+
+const require = createRequire(import.meta.url);
+const originalFetch = globalThis.fetch;
+const originalEnv = Object.fromEntries([
+  "SUPABASE_URL", "SUPABASE_SECRET_KEY", "EXAM_SIGNING_SECRET",
+].map((key) => [key, process.env[key]]));
+const origin = "https://exam-issuance.test";
+const userId = "11111111-1111-4111-8111-111111111111";
+process.env.SUPABASE_URL = origin;
+process.env.SUPABASE_SECRET_KEY = "sb_secret_synthetic-issuance";
+process.env.EXAM_SIGNING_SECRET = "synthetic-issuance-signing-secret";
+
+const issuance = require("../../api/_exam-issuance.cjs");
+const completion = require("../../api/_exam-completion.cjs");
+const tasks = require("../../api/_grade-task.js");
+const course = "Matematik 1b";
+const pastedText = "En linjär funktion har formen y = kx + m.";
+const question = { id: "q1", type: "mc", points: 1, question: "Vad är k?", options: ["Lutning", "Area"], correct_index: 0 };
+const publicQuestion = {
+  id: question.id, type: question.type, points: question.points, question: question.question, options: question.options,
+  grade_task: tasks.sealQuestion(question, undefined, tasks.hashContext(pastedText, course, userId)),
+};
+const submissionId = completion.submissionId(userId, course, [publicQuestion]);
+const body = {
+  course, pastedText, questions: [publicQuestion],
+  exam_manifest: completion.issueExamManifest(userId, course, pastedText, [publicQuestion]),
+};
+
+const calls = [];
+let state = "active";
+let latestSubmissionId = null;
+let count = 1;
+let fail = false;
+let answerLeaseState = "acquired";
+let issuanceBlocked = false;
+let latestNeedsFreshGrade = false;
+let verifiedLatestResult = false;
+globalThis.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input.url;
+  const method = init.method || "GET";
+  calls.push({ url, method, body: init.body });
+  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (fail) return Response.json({ error: "unavailable" }, { status: 503 });
+  if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(state);
+  if (url.endsWith("/rest/v1/rpc/active_exam_count")) return Response.json(count);
+  if (method === "GET" && url.startsWith(`${origin}/rest/v1/exam_latest_issuances?`)) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId, needs_fresh_verified_exam: latestNeedsFreshGrade }] : []);
+  if (method === "GET" && url.startsWith(`${origin}/rest/v1/mock_results?`)) return Response.json(verifiedLatestResult ? [{ submission_id: latestSubmissionId }] : []);
+  if (url.endsWith("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
+  if (url.endsWith("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.endsWith("/rest/v1/rpc/abandon_exam_issuance")) return Response.json(state === "active" ? "abandoned" : state);
+  if (url.endsWith("/rest/v1/rpc/abandon_all_active_exams")) return Response.json(count);
+  if (url.endsWith("/rest/v1/rpc/persist_graded_exam_result")) return Response.json(state === "active" ? "saved" : state);
+  if (url.includes("/rest/v1/exam_issuances")) {
+    if (method === "POST" && issuanceBlocked) return Response.json({ code: "P0001", message: "PER_ANSWER_IN_PROGRESS" }, { status: 409 });
+    if (method === "POST") return Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 });
+    if (method === "DELETE") return new Response(null, { status: 204 });
+  }
+  throw new Error(`Unexpected synthetic request: ${url}`);
+};
+
+const abandonHandler = (await import("../../api/abandon-exam.js?exam-issuance-gate-test")).default;
+
+async function invokeAbandon(payload, method = "POST", query = {}) {
+  const response = {
+    statusCode: 200,
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+    setHeader() {},
+  };
+  await abandonHandler({ method, headers: { authorization: "Bearer synthetic" }, body: payload, query }, response);
+  return response;
+}
+
+test.after(() => {
+  globalThis.fetch = originalFetch;
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+test("issuance registration and status use server-only credentials and exact submission identity", async () => {
+  calls.length = 0;
+  assert.equal(await issuance.issueExam(userId, submissionId), true);
+  assert.equal(await issuance.examState(userId, submissionId), "active");
+  assert.equal(await issuance.activeExamCount(userId), 1);
+  const insert = calls.find((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST");
+  assert.deepEqual(JSON.parse(insert.body), { user_id: userId, submission_id: submissionId });
+  assert.equal(calls.some((call) => call.url.includes("student@example.invalid")), false);
+});
+
+test("latest issuance status is server-read, user-scoped and fail-closed", async () => {
+  calls.length = 0;
+  assert.equal(await issuance.latestExamState(userId), "none");
+  latestSubmissionId = submissionId;
+  state = "abandoned";
+  try {
+    assert.equal(await issuance.latestExamState(userId), "abandoned");
+    const lookup = calls.find((call) => call.url.startsWith(`${origin}/rest/v1/exam_latest_issuances?`));
+    const query = new URL(lookup.url).searchParams;
+    assert.equal(query.get("user_id"), `eq.${userId}`);
+    assert.equal(query.get("limit"), "1");
+    assert.equal(query.get("select"), "submission_id,needs_fresh_verified_exam");
+    assert.ok(calls.some((call) => call.url.endsWith("/rpc/exam_issuance_state") && call.body.includes(submissionId)));
+    fail = true;
+    assert.equal(await issuance.latestExamState(userId), null);
+  } finally {
+    fail = false;
+    latestSubmissionId = null;
+    state = "active";
+  }
+});
+
+test("legacy history requires a fresh verified issuance; deleted issuance needs a verified result", async () => {
+  latestSubmissionId = submissionId;
+  latestNeedsFreshGrade = true;
+  verifiedLatestResult = false;
+  try {
+    calls.length = 0;
+    assert.equal(await issuance.latestExamState(userId), "missing");
+    assert.equal(calls.some((call) => call.url.endsWith("/rpc/exam_issuance_state")), false);
+
+    latestNeedsFreshGrade = false;
+    state = "missing";
+    assert.equal(await issuance.latestExamState(userId), "missing");
+    assert.ok(calls.some((call) => call.url.includes("verified_at=not.is.null")));
+
+    verifiedLatestResult = true;
+    assert.equal(await issuance.latestExamState(userId), "completed");
+  } finally {
+    latestSubmissionId = null;
+    latestNeedsFreshGrade = false;
+    verifiedLatestResult = false;
+    state = "active";
+  }
+});
+
+test("abandon requires the signed full exam and rejects a completed exam", async () => {
+  calls.length = 0;
+  const forged = await invokeAbandon({ ...body, exam_manifest: "forged" });
+  assert.equal(forged.statusCode, 400);
+  assert.equal(calls.some((call) => call.url.endsWith("/rpc/abandon_exam_issuance")), false);
+  const abandoned = await invokeAbandon(body);
+  assert.equal(abandoned.statusCode, 200);
+  assert.deepEqual(abandoned.body, { ok: true, abandoned: true });
+  assert.equal(calls.filter((call) => call.url.endsWith("/rpc/abandon_exam_issuance")).length, 1);
+  state = "completed";
+  try {
+    calls.length = 0;
+    const completed = await invokeAbandon(body);
+    assert.equal(completed.statusCode, 409);
+    assert.equal(completed.body.error, "EXAM_ALREADY_GRADED");
+    assert.equal(calls.filter((call) => call.url.endsWith("/rpc/abandon_exam_issuance")).length, 1);
+  } finally {
+    state = "active";
+  }
+});
+
+test("fresh-browser recovery counts and abandons undelivered active exams", async () => {
+  count = 2;
+  try {
+    const found = await invokeAbandon(undefined, "GET");
+    assert.deepEqual(found.body, { ok: true, active_count: 2 });
+    const exact = await invokeAbandon(undefined, "GET", { submission_id: submissionId });
+    assert.deepEqual(exact.body, { ok: true, exam_state: "active" });
+    state = "expired";
+    const expired = await invokeAbandon(undefined, "GET", { submission_id: submissionId });
+    assert.deepEqual(expired.body, { ok: true, exam_state: "expired" });
+    state = "active";
+    const malformed = await invokeAbandon(undefined, "GET", { submission_id: "not-an-id" });
+    assert.equal(malformed.statusCode, 400);
+    assert.equal(malformed.body.error, "EXAM_ID_INVALID");
+    const cleared = await invokeAbandon({ abandon_all: true });
+    assert.deepEqual(cleared.body, { ok: true, abandoned_count: 2 });
+  } finally {
+    count = 1;
+  }
+});
+
+test("unknown database state fails closed", async () => {
+  fail = true;
+  try {
+    assert.equal(await issuance.issueExam(userId, submissionId), false);
+    assert.equal(await issuance.examState(userId, submissionId), null);
+    assert.equal(await issuance.activeExamCount(userId), null);
+    const response = await invokeAbandon(body);
+    assert.equal(response.statusCode, 503);
+  } finally {
+    fail = false;
+  }
+});
+
+test("P.E.R answer leases use opaque UUIDs and release only their own lease", async () => {
+  calls.length = 0;
+  const leaseId = "2f1d69a3-4e97-4a61-a36c-a3d0a9497df2";
+  assert.equal(await issuance.acquirePerAnswerLease(userId, leaseId), "acquired");
+  assert.equal(await issuance.releasePerAnswerLease(userId, leaseId), "released");
+  const acquire = calls.find((call) => call.url.endsWith("/rpc/acquire_per_answer_lease"));
+  const release = calls.find((call) => call.url.endsWith("/rpc/release_per_answer_lease"));
+  assert.deepEqual(JSON.parse(acquire.body), { p_user_id: userId, p_lease_id: leaseId });
+  assert.deepEqual(JSON.parse(release.body), { p_user_id: userId, p_lease_id: leaseId });
+  assert.equal(await issuance.acquirePerAnswerLease(userId, "not-a-uuid"), null);
+});
+
+test("issuance fails closed when its database trigger sees an active P.E.R answer lease", async () => {
+  calls.length = 0;
+  issuanceBlocked = true;
+  try {
+    assert.equal(await issuance.issueExam(userId, submissionId), false);
+    assert.ok(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"));
+  } finally {
+    issuanceBlocked = false;
+  }
+});

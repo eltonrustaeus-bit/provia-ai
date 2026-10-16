@@ -25,8 +25,10 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { conceptKey, conceptLabel } from "../api/_concept-tags.js";
+import supabaseKeys from "../api/_supabase-server-key.cjs";
+
+const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 for (const f of [".env.local", ".env.prod"]) {
@@ -45,11 +47,12 @@ const onlyUser = (() => {
   return i > -1 ? process.argv[i + 1] : null;
 })();
 
-for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+for (const key of ["SUPABASE_URL"]) {
   if (!process.env[key]) { console.error(`Saknar ${key} (.env.local). Avbryter.`); process.exit(1); }
 }
+if (!getSupabaseServerKey()) { console.error("Saknar SUPABASE_SECRET_KEY eller SUPABASE_SERVICE_ROLE_KEY (.env.local). Avbryter."); process.exit(1); }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
 
 // Samma tabell som api/grade.js. En andra kopia hade kunnat driva isär.
 const LEVEL_DIFFICULTY = { E: 0.3, C: 0.55, A: 0.8 };

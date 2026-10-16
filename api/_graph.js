@@ -1,0 +1,402 @@
+// Deterministic support for the first graph response type: a straight line
+// represented by two points on an integer coordinate grid.
+const crypto = require("node:crypto");
+const { getExamSigningSecret } = require("./_exam-signing-secret.cjs");
+
+const GRID_MIN = -5;
+const GRID_MAX = 5;
+const SCATTER_POINT_COUNT = 3;
+const MAX_RAW_COORDINATE = 100_000;
+
+function isGridPoint(point) {
+  return point && Number.isSafeInteger(point.x) && Number.isSafeInteger(point.y)
+    && point.x >= GRID_MIN && point.x <= GRID_MAX
+    && point.y >= GRID_MIN && point.y <= GRID_MAX;
+}
+
+function isScaledPoint(point, scale = 1) {
+  return point && Number.isSafeInteger(point.x) && Number.isSafeInteger(point.y)
+    && Math.abs(point.x) <= MAX_RAW_COORDINATE * scale
+    && Math.abs(point.y) <= MAX_RAW_COORDINATE * scale;
+}
+
+function safeAxisLabel(value) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= 32
+    && /\p{L}/u.test(value) && !/[<>\p{C}]/u.test(value);
+}
+
+function parseCoordinateCell(value) {
+  const match = /^([+-]?)(\d+)(?:([.,])(\d{1,3}))?$/.exec(value);
+  if (!match) return null;
+  const precision = match[4]?.length || 0;
+  return { sign: match[1] === "-" ? -1 : 1, whole: match[2], fraction: match[4] || "", precision, text: value };
+}
+
+function niceStep(target) {
+  const power = 10 ** Math.floor(Math.log10(Math.max(1, target)));
+  for (const factor of [1, 2, 5, 10]) {
+    const step = factor * power;
+    if (step >= target) return step;
+  }
+  return power * 10;
+}
+
+function axisFor(values, scale) {
+  const minimum = Math.min(...values), maximum = Math.max(...values);
+  const span = maximum - minimum;
+  const targetStep = span > 0
+    ? span / 6
+    : Math.max(scale, Math.abs(minimum) * 0.2) / 3;
+  let step = niceStep(targetStep);
+  let min = (Math.floor(minimum / step) - 1) * step;
+  let max = (Math.ceil(maximum / step) + 1) * step;
+  while ((max - min) / step > 8) {
+    step = niceStep(step + 1);
+    min = (Math.floor(minimum / step) - 1) * step;
+    max = (Math.ceil(maximum / step) + 1) * step;
+  }
+  return { min, max, step };
+}
+
+function isValidAxis(axis, values, scale) {
+  return axis && Number.isSafeInteger(axis.min) && Number.isSafeInteger(axis.max)
+    && Number.isSafeInteger(axis.step) && axis.step > 0
+    && Math.abs(axis.min) <= MAX_RAW_COORDINATE * scale * 1.5
+    && Math.abs(axis.max) <= MAX_RAW_COORDINATE * scale * 1.5
+    && axis.min < Math.min(...values) && axis.max > Math.max(...values)
+    && (axis.max - axis.min) % axis.step === 0
+    && (axis.max - axis.min) / axis.step >= 2 && (axis.max - axis.min) / axis.step <= 8
+    && JSON.stringify(axis) === JSON.stringify(axisFor(values, scale));
+}
+
+function parsePointTable(text) {
+  const candidates = [];
+  const rows = String(text || "").split(/\r?\n/).map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed.includes("|")) return null;
+    const cells = trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+    return { cells, validWidth: cells.length === 2 };
+  });
+  for (let i = 0; i < rows.length; i++) {
+    const header = rows[i]?.cells;
+    if (!rows[i]?.validWidth || !header.every(safeAxisLabel)) continue;
+    const points = [];
+    let j = i + 1;
+    while (j < rows.length && rows[j]) {
+      if (!rows[j].validWidth) { points.length = 0; break; }
+      const row = rows[j].cells;
+      if (row.every((cell) => /^:?-{3,}:?$/.test(cell))) { j++; continue; }
+      if (!row.every((cell) => parseCoordinateCell(cell))) {
+        points.length = 0;
+        break;
+      }
+      points.push(row.map(parseCoordinateCell));
+      j++;
+    }
+    if (points.length !== SCATTER_POINT_COUNT) continue;
+    const precision = Math.max(...points.flat().map((cell) => cell.precision));
+    const scale = 10 ** precision;
+    const values = points.map(([x, y]) => [x, y].map((cell) => {
+      const fraction = cell.fraction.padEnd(precision, "0");
+      return cell.sign * Number(`${cell.whole}${fraction}`);
+    }));
+    const scaledPoints = values.map(([x, y]) => ({ x, y }));
+    if (scaledPoints.some((point) => !isScaledPoint(point, scale))
+      || new Set(scaledPoints.map((p) => `${p.x}|${p.y}`)).size !== scaledPoints.length) continue;
+    if (precision === 0 && scaledPoints.every((point) => point.x >= GRID_MIN && point.x <= GRID_MAX
+      && point.y >= GRID_MIN && point.y <= GRID_MAX)) {
+      candidates.push({ points: scaledPoints, x_label: header[0], y_label: header[1] });
+      continue;
+    }
+    candidates.push({
+      points: scaledPoints,
+      x_label: header[0],
+      y_label: header[1],
+      coordinate_scale: scale,
+      x_axis: axisFor(scaledPoints.map((point) => point.x), scale),
+      y_axis: axisFor(scaledPoints.map((point) => point.y), scale),
+      source_rows: points.map((row) => row.map((cell) => cell.text)),
+    });
+  }
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function signingSecret() {
+  return getExamSigningSecret();
+}
+
+function taskAad(q) {
+  return JSON.stringify({
+    id: String(q?.id ?? ""),
+    type: String(q?.type || ""),
+    points: Number(q?.points) || 0,
+    question: String(q?.question || ""),
+  });
+}
+
+function sealSpec(q, secret) {
+  const key = secret || signingSecret();
+  if (!key || !isValidSpec(q?.graph_spec)) return "";
+  const iv = crypto.randomBytes(12);
+  const derived = crypto.createHash("sha256").update(key).digest();
+  const cipher = crypto.createCipheriv("aes-256-gcm", derived, iv);
+  cipher.setAAD(Buffer.from(taskAad(q)));
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(q.graph_spec)), cipher.final()]);
+  return ["v1", iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), ciphertext.toString("base64url")].join(".");
+}
+
+function openSpec(q, token, secret) {
+  const key = secret || signingSecret();
+  if (!key || typeof token !== "string") return null;
+  const [version, iv, tag, ciphertext, extra] = token.split(".");
+  if (version !== "v1" || !iv || !tag || !ciphertext || extra) return null;
+  try {
+    const derived = crypto.createHash("sha256").update(key).digest();
+    const decipher = crypto.createDecipheriv("aes-256-gcm", derived, Buffer.from(iv, "base64url"));
+    decipher.setAAD(Buffer.from(taskAad(q)));
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    const plaintext = Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8");
+    const spec = JSON.parse(plaintext);
+    return isValidSpec(spec) ? spec : null;
+  } catch { return null; }
+}
+
+function isValidSpec(spec) {
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) return false;
+  if (spec.kind === "scatter") {
+    const scale = spec.coordinate_scale || 1;
+    const pointsValid = Array.isArray(spec.points) && spec.points.length === SCATTER_POINT_COUNT
+      && spec.points.every((point) => isScaledPoint(point, scale))
+      && new Set(spec.points.map((point) => `${point.x}|${point.y}`)).size === spec.points.length;
+    if (!pointsValid || spec.slope !== null || spec.intercept !== null
+      || !safeAxisLabel(spec.x_label) || !safeAxisLabel(spec.y_label)) return false;
+    if (spec.coordinate_scale === undefined) {
+      return spec.x_axis === undefined && spec.y_axis === undefined && spec.source_rows === undefined
+        && spec.points.every((point) => point.x >= GRID_MIN && point.x <= GRID_MAX
+          && point.y >= GRID_MIN && point.y <= GRID_MAX);
+    }
+    if (![1, 10, 100, 1000].includes(spec.coordinate_scale)
+      || !Array.isArray(spec.source_rows) || spec.source_rows.length !== SCATTER_POINT_COUNT
+      || !spec.source_rows.every((row) => Array.isArray(row) && row.length === 2
+        && row.every((cell) => typeof cell === "string" && parseCoordinateCell(cell)))) return false;
+    return isValidAxis(spec.x_axis, spec.points.map((point) => point.x), spec.coordinate_scale)
+      && isValidAxis(spec.y_axis, spec.points.map((point) => point.y), spec.coordinate_scale)
+      && spec.source_rows.every((row, index) => row.every((cell, axis) => {
+        const parsed = parseCoordinateCell(cell);
+        if (!parsed || parsed.precision > Math.log10(spec.coordinate_scale)) return false;
+        const fraction = parsed.fraction.padEnd(Math.log10(spec.coordinate_scale), "0");
+        const value = parsed.sign * Number(`${parsed.whole}${fraction}`);
+        return value === spec.points[index][axis === 0 ? "x" : "y"];
+      }));
+  }
+  if (spec.kind != null && spec.kind !== "line") return false;
+  if (spec.kind === "line" && (!Array.isArray(spec.points) || spec.points.length !== 0
+    || spec.x_label !== "" || spec.y_label !== "")) return false;
+  if (!Number.isInteger(spec.slope) || spec.slope < -5 || spec.slope > 5) return false;
+  if (!Number.isInteger(spec.intercept) || spec.intercept < -5 || spec.intercept > 5) return false;
+  let visiblePoints = 0;
+  for (let x = GRID_MIN; x <= GRID_MAX; x++) {
+    const y = spec.slope * x + spec.intercept;
+    if (y >= GRID_MIN && y <= GRID_MAX) visiblePoints++;
+  }
+  return visiblePoints >= 2;
+}
+
+function displaySpec(spec) {
+  if (!isValidSpec(spec)) return null;
+  return spec.kind === "scatter"
+    ? {
+      mode: "scatter",
+      point_count: SCATTER_POINT_COUNT,
+      x_label: spec.x_label,
+      y_label: spec.y_label,
+      ...(spec.coordinate_scale === undefined ? {} : {
+        coordinate_scale: spec.coordinate_scale,
+        x_axis: spec.x_axis,
+        y_axis: spec.y_axis,
+      }),
+      source_table: {
+        headers: [spec.x_label, spec.y_label],
+        rows: spec.coordinate_scale === undefined
+          ? spec.points.map((point) => [point.x, point.y])
+          : spec.source_rows,
+      },
+    }
+    : { mode: "line", point_count: 2, x_label: "x", y_label: "y" };
+}
+
+function isValidDisplaySpec(value, spec) {
+  const expected = displaySpec(spec);
+  return expected != null && JSON.stringify(value) === JSON.stringify(expected);
+}
+
+function parseLinearEquations(text) {
+  const equations = [];
+  const pattern = /(?:\by\b|\bf\s*\(\s*x\s*\))\s*=\s*([+-]?\s*(?:\d+\s*\*?\s*)?x|[+-]?\s*x)\s*(?:([+-])\s*(\d+))?(?!\d)(?!\.\d)(?!\s*,\s*\d)(?!\s*[+-]\s*(?:\d|x\b))(?![\w^²³]|\s*[*/^])/gi;
+  for (const match of String(text || "").replace(/[−–]/g, "-").matchAll(pattern)) {
+    const coefficient = match[1].replace(/\s+/g, "").replace(/\*/g, "").toLowerCase();
+    const slope = coefficient === "x" || coefficient === "+x" ? 1
+      : coefficient === "-x" ? -1
+        : Number(coefficient.slice(0, -1));
+    const magnitude = Number(match[3] || 0);
+    const intercept = match[2] === "-" ? -magnitude : magnitude;
+    if (Number.isInteger(slope)) equations.push({ slope, intercept });
+  }
+  const horizontalPattern = /(?:\by\b|\bf\s*\(\s*x\s*\))\s*=\s*([+-]?\s*\d+)(?![\w^²³]|\.\d)(?!\s*,\s*\d)(?!\s*[+-]\s*\d)(?!\s*[*/^])(?!\s*\()/gi;
+  for (const match of String(text || "").replace(/[−–]/g, "-").matchAll(horizontalPattern)) {
+    const intercept = Number(match[1].replace(/\s+/g, ""));
+    if (Number.isInteger(intercept)) equations.push({ slope: 0, intercept });
+  }
+  return equations;
+}
+
+function sourceContainsSpec(text, spec) {
+  if (spec?.kind === "scatter") {
+    const parsed = parsePointTable(text);
+    if (!parsed) return false;
+    const expected = {
+      points: spec.points, x_label: spec.x_label, y_label: spec.y_label,
+      ...(spec.coordinate_scale === undefined ? {} : {
+        coordinate_scale: spec.coordinate_scale, x_axis: spec.x_axis,
+        y_axis: spec.y_axis, source_rows: spec.source_rows,
+      }),
+    };
+    return JSON.stringify(parsed) === JSON.stringify(expected);
+  }
+  return isValidSpec(spec) && parseLinearEquations(text).some((line) =>
+    line.slope === spec.slope && line.intercept === spec.intercept);
+}
+
+function parseAnswer(raw, spec) {
+  let value = raw;
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch { return null; }
+  }
+  const scatter = spec?.kind === "scatter";
+  if (!value || typeof value !== "object" || value.type !== (scatter ? "scatter" : "line") || !Array.isArray(value.points)) return null;
+  if (value.points.length !== (scatter ? SCATTER_POINT_COUNT : 2)) return null;
+  if (scatter) {
+    const points = [];
+    for (const point of value.points) {
+      if (point === null) continue;
+      const xAxis = spec?.kind === "scatter" ? spec.x_axis || { min: GRID_MIN, max: GRID_MAX } : { min: GRID_MIN, max: GRID_MAX };
+      const yAxis = spec?.kind === "scatter" ? spec.y_axis || { min: GRID_MIN, max: GRID_MAX } : { min: GRID_MIN, max: GRID_MAX };
+      if (!isScaledPoint(point, spec?.coordinate_scale || 1) || point.x < xAxis.min || point.x > xAxis.max
+        || point.y < yAxis.min || point.y > yAxis.max) return null;
+      points.push({ x: point.x, y: point.y });
+    }
+    if (!points.length) return null;
+    if (new Set(points.map((point) => `${point.x}|${point.y}`)).size !== points.length) return null;
+    return points;
+  }
+  const points = value.points.map((point) => ({ x: point?.x, y: point?.y }));
+  if (points.some((point) => !isGridPoint(point)) || points[0].x === points[1].x) return null;
+  return points;
+}
+
+function answerIsComplete(raw, spec) {
+  return Boolean(parseAnswer(raw, spec));
+}
+
+function gradeAnswer(raw, spec, lang = "sv") {
+  const english = lang === "en";
+  const points = parseAnswer(raw, spec);
+  if (!points || !isValidSpec(spec)) {
+    return spec?.kind === "scatter"
+      ? { points: 0, max_points: SCATTER_POINT_COUNT, feedback: english
+        ? "Plot all three table values once."
+        : "Placera alla tre tabellvärden en gång.", error_tags: ["graph_answer_incomplete"] }
+      : { points: 0, max_points: 2, feedback: english
+        ? "Plot two points with different x-values on the straight line."
+        : "Markera två punkter med olika x-värden på den räta linjen.", error_tags: ["graph_answer_incomplete"] };
+  }
+  if (spec.kind === "scatter") {
+    const expected = new Set(spec.points.map((point) => `${point.x}|${point.y}`));
+    const correct = points.filter((point) => expected.has(`${point.x}|${point.y}`)).length;
+    return {
+      points: correct,
+      max_points: SCATTER_POINT_COUNT,
+      feedback: lang === "en"
+        ? `${correct} of ${SCATTER_POINT_COUNT} data points match the table.`
+        : `${correct} av ${SCATTER_POINT_COUNT} datapunkter stämmer med tabellen.`,
+      error_tags: correct === SCATTER_POINT_COUNT ? [] : ["graph_data_points_incorrect"],
+    };
+  }
+  const slope = (points[1].y - points[0].y) / (points[1].x - points[0].x);
+  const intercept = points[0].y - slope * points[0].x;
+  const slopeCorrect = Math.abs(slope - spec.slope) < 1e-9;
+  const interceptCorrect = Math.abs(intercept - spec.intercept) < 1e-9;
+  const score = Number(slopeCorrect) + Number(interceptCorrect);
+  const details = english
+    ? [slopeCorrect ? "the slope is correct" : "the slope is incorrect", interceptCorrect ? "the y-intercept is correct" : "the y-intercept is incorrect"]
+    : [slopeCorrect ? "lutningen stämmer" : "lutningen stämmer inte", interceptCorrect ? "skärningen med y-axeln stämmer" : "skärningen med y-axeln stämmer inte"];
+  return {
+    points: score,
+    max_points: 2,
+    feedback: english
+      ? score === 2
+        ? "The graph is correct. Both the slope and y-intercept are correct."
+        : slopeCorrect
+          ? "Correct slope. Check where the line crosses the y-axis; adjust its height without changing its slope."
+          : interceptCorrect
+            ? "Correct y-intercept. Check how much y changes when x increases by one."
+            : `Check both the slope and y-intercept. ${details.join(" and ")}.`
+      : score === 2
+        ? "Grafen stämmer. Både lutningen och skärningen med y-axeln är rätt."
+        : slopeCorrect
+          ? "Rätt lutning. Kontrollera var linjen skär y-axeln; ändra grafens höjd utan att ändra lutningen."
+          : interceptCorrect
+            ? "Rätt skärning med y-axeln. Kontrollera hur många steg y förändras när x ökar ett steg."
+            : `Kontrollera både lutningen och var linjen skär y-axeln. ${details.join(" och ")}.`,
+    error_tags: score === 2 ? [] : ["graph_line_incorrect"],
+  };
+}
+
+function equation(spec) {
+  if (!isValidSpec(spec)) return "";
+  if (spec.slope === 0) return `y = ${spec.intercept}`;
+  const slope = spec.slope === 1 ? "x" : spec.slope === -1 ? "−x" : `${spec.slope}x`;
+  if (spec.intercept === 0) return `y = ${slope}`;
+  return `y = ${slope} ${spec.intercept < 0 ? "−" : "+"} ${Math.abs(spec.intercept)}`;
+}
+
+function questionText(spec, lang = "sv") {
+  if (spec?.kind === "scatter" && isValidSpec(spec)) {
+    return lang === "en"
+      ? "Use the values in the table to plot all three data points on the graph."
+      : "Använd tabellens värden för att placera alla tre datapunkter i diagrammet.";
+  }
+  const target = equation(spec);
+  if (!target) return "";
+  return lang === "en"
+    ? `Draw the graph of ${target}. Mark two clear points. Points are awarded for the correct slope and y-intercept.`
+    : `Rita grafen till ${target}. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.`;
+}
+
+function modelAnswer(spec, lang = "sv") {
+  if (!isValidSpec(spec)) return "";
+  if (spec.kind === "scatter") {
+    const scale = spec.coordinate_scale || 1;
+    const format = (value) => {
+      if (!spec.coordinate_scale) return String(value);
+      const formatted = (value / scale).toFixed(Math.log10(scale)).replace(/\.?0+$/, "");
+      return lang === "en" ? formatted : formatted.replace(".", ",");
+    };
+    const values = spec.points.map((point) => `(${format(point.x)}, ${format(point.y)})`).join(", ");
+    return lang === "en"
+      ? `The data points are ${values}.`
+      : `Datapunkternas koordinater är ${values}.`;
+  }
+  const points = [];
+  for (let x = GRID_MIN; x <= GRID_MAX; x++) {
+    const y = spec.slope * x + spec.intercept;
+    if (y >= GRID_MIN && y <= GRID_MAX) points.push({ x, y });
+  }
+  const first = points[0];
+  const last = points[points.length - 1];
+  return lang === "en"
+    ? `The graph of ${equation(spec)} passes, for example, through the points (${first.x}, ${first.y}) and (${last.x}, ${last.y}).`
+    : `Grafen till ${equation(spec)} går till exempel genom punkterna (${first.x}, ${first.y}) och (${last.x}, ${last.y}).`;
+}
+
+module.exports = { GRID_MIN, GRID_MAX, SCATTER_POINT_COUNT, isValidSpec, displaySpec, isValidDisplaySpec, parsePointTable, parseLinearEquations, sourceContainsSpec, sealSpec, openSpec, parseAnswer, answerIsComplete, gradeAnswer, equation, questionText, modelAnswer };

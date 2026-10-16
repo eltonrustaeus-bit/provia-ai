@@ -1,10 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "./_supabase-server-key.cjs";
 import crypto from "crypto";
 import { BRAND_NAME, SITE_ORIGIN, MAIL_FROM } from "./_site.js";
+import pilotScope from "./_pilot-scope.cjs";
 
-const supabase = createClient(
+const { createSupabaseServerClient } = supabaseKeys;
+const supabase = createSupabaseServerClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 const PLAN_ROLES = { basic: "basic", premium: "premium" };
@@ -270,6 +273,7 @@ async function releaseEvent(eventId) {
 
 // ── Handler ──
 export default async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   const rawBody = await readRawBody(req);

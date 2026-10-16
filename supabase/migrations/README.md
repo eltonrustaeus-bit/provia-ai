@@ -59,13 +59,120 @@ handskrivna migrationer.
 
 ## Konvention
 
-- Filnamn: `ÅÅÅÅMMDD_snake_case.sql`
-- Varje migration har en `_ROLLBACK.sql` bredvid sig. Undantagen är tre migrationer från innan
-  konventionen infördes; de står uppräknade i `scripts/check-migration-files.mjs` och listan
+- Filnamn: befintliga filer kan ha `ÅÅÅÅMMDD_snake_case.sql`; nya filer ska behålla Supabase CLI:s unika
+  `ÅÅÅÅMMDDHHMMSS_snake_case.sql`-version så migrations-ID:n inte kolliderar.
+- Varje migration har en `_ROLLBACK.sql` bredvid sig. Den ska antingen reversera ändringen
+  med dokumenterade konsekvenser eller avsiktligt avbryta om en reversering skulle återöppna
+  en verifierad säkerhetslucka eller bygga på okänt live-schema. En sådan spärr är inte en
+  reversering; den hindrar att en generisk rollback-åtgärd tyst återinför risken. De tre
+  historiska migrationerna utan rollback står i `scripts/check-migration-files.mjs`; listan
   ska aldrig växa.
+- De två RLS-migrationerna från 2026-10-12 har spärrade rollbackfiler: direkt klass-join skulle
+  återöppna den kända vägen runt klasskodskontrollen, och tidigare `user_exams`-policies är
+  inte verifierade. Ändra inte spärren innan ett säkert alternativ har granskats och testats.
+- `20261012103939_harden_idempotent_mock_mastery.sql` är lokal och inte live-verifierad. Dess rollback tar
+  bara bort funktionen/tabellen när ingen mastery-händelse har skrivits; efter första användning
+  avbryter rollbacken hellre än att kasta idempotensnycklar och göra replay möjlig.
+- `20261012103949_restrict_direct_class_joins.sql` och `20261012103946_restrict_anon_rate_limit_table_access.sql`
+  är lokala säkerhetsutkast baserade på read-only live-policy-/grantinspektion 2026-10-12.
+  De är inte applicerade. Verifiera båda i isolerad staging med syntetiska konton och kontrollera
+  service-role-flöden innan en separat appliceringsbekräftelse. Deras rollbackar är avsiktligt spärrade.
+- `20261012103951_restrict_exam_count_rpc_access.sql` är ett separat lokalt utkast från live-inspektion
+  av funktionsdefinitioner/ACL. Det tar bort klientexekvering och låser sökvägen men bevarar
+  `service_role`; externa konsumenter är okända. Argumentnamn/returtyp/ägare har verifierats
+  read-only efter oberoende granskning. Ej applicerat; kräver stagingtest av grants, PostgREST,
+  tidsgränser och serverkonsumenter samt separat appliceringsgodkännande. Rollback är spärrad.
+- `20261012103944_refund_failed_mock_exam_quota.sql` är ett lokalt utkast efter QA-fynd om att felad
+  provgenerering annars förbrukar en slot. `reserve_mock_exam_quota` ökar kvoten och skapar en
+  request-bunden reservation atomärt; timeout kan därför säkert reconcileras. Fel återbetalas en
+  gång, lyckad leverans markeras `consumed`, och reservationer som hängt kvar över två minuter
+  återbetalas när samma användare startar nästa reservation. Avslutade kvitton äldre än 30 dagar
+  städas vid nästa reservation; Auth-radering kaskaderar användarbindningen. Inte applicerad
+  eller live/Postgres-testad. Staging ska testa samtidiga reservationer, dubbel anrop/timeout,
+  dubbel refund/commit, periodbyte, avbruten provider, stale reaping och RPC-fel innan separat
+  appliceringsgodkännande. Lokalt mocktest simulerar också att reserve-commit sker men HTTP-svaret
+  tappas. Rollback är spärrad medan reservationer är aktiva; ingen SQL/Postgres-runtime har körts.
 - Historiska migrationer skrivs inte om. En rättelse blir en ny fil.
 - Kör migrationer via Supabase MCP `apply_migration` eller CLI, **inte** via SQL Editor — annars
   hamnar de inte i ledgern och nästa genomgång får leta i schemat i stället.
+
+### Restrict direct client profile inserts — local draft only
+
+`20261012222700_restrict_profiles_client_insert.sql` was drafted from read-only production catalog metadata on 2026-10-12: `profiles_insert_own` checks only `auth.uid() = id`, anon/authenticated have table INSERT grants, and an Auth trigger already creates the default profile via SECURITY DEFINER. The client-side missing-profile fallback is removed. This migration revokes browser INSERT and drops the self-insert policy; rollback is intentionally blocked. It is not applied or JWT/Postgres-tested. Staging has no app schema; restore/reconcile the approved baseline, verify the trigger/policy and synthetic signup/login behavior, then obtain separate apply approval.
+
+The 2026-10-13 local verification confirms the missing-profile app path signs out and fails closed; `tests/frontend/profile-bootstrap.test.mjs` covers it. The migration remains a draft only: staging `public` and migration ledger are both empty. Do not apply until the authoritative staging schema is restored and a separate DDL approval is recorded.
+
+### Active exam issuance — local draft only
+
+`20261013082230_guard_active_exams.sql` adds server-owned issuance records, an atomic
+grading claim, and grade/abandon RPCs so an active exam cannot receive answer-bearing P.E.R help.
+The result summary and full recovery payload are saved in one database transaction. A retry
+with identical answers can read the saved result without a second provider call or mastery
+update; changed answers are rejected. Recovery is limited to seven days. A service-only
+`purge_expired_exam_issuances()` function removes expired issuance rows and recovery payloads,
+but a reviewed recurring invocation must be configured and verified before a pilot; logical
+expiry alone does **not** physically delete data. It has **not**
+been applied or tested in PostgreSQL. The staging database still lacks the app schema; do not
+run a blanket migration command against it. First restore and reconcile the approved schema,
+including the actual `mock_results` columns, unique constraint and permissions. Then test the
+RPCs with synthetic users, concurrent grade/abandon requests, PostgREST access as
+`anon`/`authenticated`/`service_role`, account and exam-history deletion, and lost-response
+retries. Verify the scheduled cleanup, seven-day recovery boundary, account deletion and
+retention against the school's approved policy before a pilot.
+If a worker disappears after claiming, the draft returns `stale` after two minutes instead of
+automatically regrading an uncertain attempt. The student can then explicitly abandon it and
+generate a fresh exam from retained material. Before enabling this flow, staging must verify
+that stale workers cannot commit and that a concurrent new exam cannot expose an older exam's
+answer-bearing response. The client deduplicates repeated receipts locally and checks the
+account for an existing receipt on recovery. The separate, unapplied
+`20261013093828_user_exam_submission_identity.sql` draft adds a nullable, 32-character
+submission ID and a unique `(user_id, submission_id)` index to `user_exams` so concurrent
+devices cannot create two account rows for the same official exam. The ID comes from the
+server-issued completion receipt. Existing historical rows remain nullable and are not
+backfilled from unverified browser data. The client-side insert remains owner-scoped but is
+not proof that a stored score was produced by the server. The unapplied active-exam migration
+now revokes browser access to `mock_results` and adds a nullable `verified_at` marker, set
+only when its service-only grading RPC saves the official result. Existing rows stay
+unverified. The student report and teacher roster/detail/class-insight routes read only
+marked `mock_results` rows; missing older results are shown as unavailable, never as zero.
+`weak_concept_tags` comes from the server-persisted graded question rows but remains a
+preliminary AI signal, not a validated diagnosis. Read-only production metadata on
+2026-10-13 showed `anon`/`authenticated` INSERT grants and an owner `ALL` policy on
+`mock_results`; the draft revoke is therefore essential, not merely defense in depth.
+P.E.R's exam-derived memory now reads only marked rows; student chat and session hints
+remain unverified self-reports and must not be presented as official results.
+Verify effective grants, RPC execute ACL, marker provenance, forged owner inserts,
+two-account RLS, duplicate-insert and deletion
+behavior in staging before deployment. The same unapplied active-exam draft captures a
+service-only `mock_learning_jobs` row in the result RPC,
+with trusted question types, bounded answers, level, course and learner-loop eligibility
+for replay. A service-only replay RPC applies one job's mastery and eligible attempts in
+one database transaction; the grading and recovery paths invoke it after a saved result.
+A bounded sweep RPC skips retry-backoff jobs so one bad row cannot monopolize the batch,
+but it has no approved schedule. Deleting a verified
+result cascades to its pending answer snapshot. The exam-history route now calls one
+service-only RPC to remove issuances, browser history and verified summaries atomically;
+separate learning scores and concepts remain by design and are disclosed in the UI.
+New mock-attempt rows carry explicit result provenance so the clear RPC can redact their
+raw answers before deleting result summaries; legacy attempts without proven provenance
+are not classified by string-prefix guesswork.
+When the learner loop is disabled, no raw answer is duplicated into the job;
+once replay completes a job, the database requires it to clear the payload. A failed
+replay rolls back its effects and leaves the job pending. **These are source-level contracts,
+not PostgreSQL-verified behavior.** A crash without a later recovery request still needs
+the unscheduled sweep, and pending answer retention has no approved time limit. Do not
+deploy this draft or call the pilot ready until the schedule, retention rule, concurrent
+deletion/replay and two-account PostgreSQL tests are reviewed and complete. The current
+draft still has no maximum physical lifetime for a permanently pending answer snapshot.
+The adjacent rollback file intentionally aborts: dropping the table while the application
+uses it would remove the server-side exam guard. Applying this migration or enabling the
+corresponding app routes requires a separate approval and an isolated deployment plan.
+
+Read-only Supabase metadata checked on 2026-10-13 showed that the current production
+`public.mock_results` table has no `submission_id`, and its migration ledger does not include
+`20261012120017_mock_result_submission_idempotency.sql`. The active-exam migration now fails
+up front unless that earlier column and named unique index exist. This is a dependency finding,
+not permission to apply either migration to production or the schema-empty staging project.
 
 ## Kontrollera drift
 
@@ -84,3 +191,31 @@ select version, name from supabase_migrations.schema_migrations order by version
 
 Jämför namnen mot filerna här. Slår något ut, avgör vilket register som har fel genom att titta
 på **schemat**, inte på det andra registret.
+
+## Verifiable exam completion — local draft only
+
+`20261015111112_require_verified_exam_result_for_exam_state.sql` changes the issuance-state and
+active-exam-count RPCs so only `mock_results.verified_at IS NOT NULL` marks an exam completed.
+Legacy result rows remain unverified and therefore cannot release the P.E.R answer gate. The
+migration has not been applied or PostgreSQL-tested. Staging has no app schema; reconcile and
+restore its approved baseline, then run synthetic active/unverified/verified result tests only
+after separate migration approval. Its rollback intentionally aborts because restoring the
+unverified-row behavior could release answers during an active exam.
+
+## Latest exam issuance marker — local draft only
+
+`20261016120000_preserve_latest_exam_issuance.sql` preserves the latest issuance identity after
+exam details are purged, backfills accounts with surviving exam evidence behind a one-time
+fresh-verified-grade gate, serializes backfill against issuance/result writes, and retains only
+an anonymous gate after the user clears exam history. A verified result for the marked latest
+issuance created after the marker is installed clears that gate; an older result cannot. The API fails closed when the marker is missing or its result cannot
+be checked. Its rollback intentionally aborts because dropping the marker could make an older
+verified exam appear latest again. These are source-level contracts only: PostgreSQL syntax,
+concurrent behavior, effective grants and account erasure remain unverified in a real isolated
+database. If separately approved, deploy the fail-closed API code before applying the migration;
+that order may temporarily block P.E.R but does not reopen answers. Do not apply or deploy this
+draft without separate migration approval and database tests. The migration takes an
+`ACCESS EXCLUSIVE` lock on `exam_issuances` and a `SHARE ROW EXCLUSIVE` lock on `mock_results`
+through commit; issuance and grading requests may wait, so verify table size and schedule an
+approved maintenance window before staging. The marker grants `service_role` select/insert/update
+but no delete; its history-clear RPC retains the gate instead of deleting the marker.

@@ -1,11 +1,13 @@
 ﻿/* Provia Shared — page transitions + welcome animation + P.E.R widget */
 (function () {
   'use strict';
+  var EXGEN_RUNTIME = window.ExGenRuntime;
 
   /* ── PAGE EXIT TRANSITION ── */
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href]');
     if (!a) return;
+    if (a.hasAttribute('data-pv-auth')) return;
     var href = a.getAttribute('href');
     if (!href) return;
     if (href.charAt(0) === '#') return;
@@ -42,6 +44,9 @@
      name could be derived — including someone who registered ten seconds
      earlier — and plain "Välkommen!" only when it had no name at all. */
   function showWelcomeAnim(name, isNew) {
+    // A login greeting must never cover an exam that has already started.
+    if (document.body.classList.contains('xf-in-exam')) return;
+
     var existing = document.getElementById('proviaWelcome');
     if (existing) existing.remove();
 
@@ -80,6 +85,11 @@
     showWelcomeAnim(nameOrEmail || '', isNew);
   };
 
+  window.dismissWelcome = function () {
+    var el = document.getElementById('proviaWelcome');
+    if (el) el.remove();
+  };
+
   /* Redirect-based welcome: set flag before location.reload() or navigate.
      Stored as JSON so the new/returning distinction survives the navigation;
      callers that pass only a name still work and fall back to the device
@@ -110,9 +120,81 @@
 
   /* ── P.E.R FLOATING WIDGET ── */
   var PER_HIST_KEY = 'proviaai_per_history';
+  var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
+  var PER_MEMORY_CLEAR_EPOCH_KEY = 'proviaai_per_memory_clear_epoch';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
+  var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
+  var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
+  var PER_REQUEST_TIMEOUT_MS = 59000;
+
+  var _examHistoryMasked = true;
+  var _serverVerifiedPerHistoryRelease = false;
+  try {
+    if (localStorage.getItem(PER_EXAM_HISTORY_MASK_KEY) === '1') _examHistoryMasked = true;
+  } catch (_) {}
+
+  function currentPilotAccountId() {
+    try {
+      var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
+      return pilotSessionUserId(session) || null;
+    } catch (_) { return null; }
+  }
+
+  function pilotSessionUserId(session) {
+    if (session && session.user && session.user.id) return String(session.user.id);
+    try {
+      var part = String(session && session.access_token || '').split('.')[1];
+      if (!part) return '';
+      part = part.replace(/-/g, '+').replace(/_/g, '/');
+      while (part.length % 4) part += '=';
+      return String(JSON.parse(atob(part)).sub || '');
+    } catch (_) { return ''; }
+  }
+
+  function savePilotPendingQuestion(question, accountIdOverride) {
+    if (EXGEN_RUNTIME.environment !== 'pilot' || String(question).length > 2000) return false;
+    var accountId = arguments.length > 1 ? (accountIdOverride || '') : (currentPilotAccountId() || '');
+    try {
+      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify({
+        question: String(question),
+        savedAt: Date.now(),
+        accountId: accountId || null
+      }));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function abortPerRequestForAccountId(nextAccountId) {
+    var active = _perActiveRequest;
+    if (!active || (active.accountId || null) === (nextAccountId || null)) return;
+    if (active.cancel) active.cancel();
+    var input = document.getElementById('perInput');
+    if (input) input.value = '';
+    var messages = document.getElementById('perMessages');
+    if (messages) messages.innerHTML = '<div class="per-msg teacher">Konto ändrat. P.E.R är redo för en ny fråga.</div>';
+    var button = document.getElementById('perSendBtn');
+    if (button) button.disabled = false;
+  }
+
+  function clearPilotQuestionForAccountChange(session) {
+    if (EXGEN_RUNTIME.environment !== 'pilot') return;
+    try {
+      var raw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      var nextAccountId = pilotSessionUserId(session);
+      if (pending.accountId && nextAccountId && pending.accountId !== nextAccountId) {
+        sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+      } else if (!pending.accountId && nextAccountId) {
+        pending.accountId = nextAccountId;
+        sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify(pending));
+      }
+    } catch (_) {
+      try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
 
   /* ── Sidmanifest ──────────────────────────────────────────────────────────
      Ett kontrakt i stället för åtta gissade nycklar.
@@ -125,7 +207,7 @@
      Fyra tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
      försvinna. Instansen var focus; klassen är tyst nyckelkassering. */
   var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state'];
-  var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase'];
+  var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase', 'submissionId'];
   var _perManifest = null;
 
   /* Hjälpstegen. Nivån är ett ÖNSKEMÅL som skickas med varje anrop; servern
@@ -142,6 +224,7 @@
   var _perHelpCap = null;
   var _perFocusKey = null;
   var _perAskInFlight = '';
+  var _perActiveRequest = null;
 
   function perWarnKeys(obj, allowed, prefix) {
     if (!obj) return;
@@ -180,12 +263,11 @@
       if (typeof m.state.answered === 'number') st.answered = m.state.answered;
       if (typeof m.state.remaining === 'number') st.remaining = m.state.remaining;
       if (typeof m.state.elapsed === 'string') st.elapsed = m.state.elapsed.slice(0, 12);
-      /* phase avgör hur mycket hjälp servern släpper fram (api/explain.js
-         helpCapFor): "exam" håller taket nere, "result" öppnar det helt.
-         Därför godtas bara de två värdena — en okänd sträng faller igenom som
-         "saknas", och saknad phase tolkas serversidigt som prov pågår, alltså
-         det strängaste. Ett fält som styr en spärr får inte kunna bära ett
-         värde ingen har en gren för. */
+      if (typeof m.state.submissionId === 'string' && /^[a-f0-9]{32}$/.test(m.state.submissionId)) {
+        st.submissionId = m.state.submissionId;
+      }
+      /* Fasen hjälper P.E.R att beskriva sidan. Den öppnar aldrig facit utan
+         rättningsbevis från servern. */
       if (m.state.phase === 'exam' || m.state.phase === 'result') st.phase = m.state.phase;
     }
     _perManifest = {
@@ -309,6 +391,8 @@
             text: m.focus.text,
             options: m.focus.options,
             type: m.focus.type,
+            graphMode: m.focus.type === 'graph' && m.focus.graphMode === 'scatter' ? 'scatter'
+              : m.focus.type === 'graph' && m.focus.graphMode === 'line' ? 'line' : undefined,
             category: m.focus.category,
             answer: m.focus.answer,
             answered: !!m.focus.answered
@@ -332,9 +416,13 @@
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
-            var last5 = hist.slice(-5);
-            var avg = last5.reduce(function(s, x) { return s + (Number(x.percent) || 0); }, 0) / last5.length;
-            ctx.userScore = avg / 100;
+            var scored = hist.map(function(x) {
+              return validPercent(x && x.percent);
+            }).filter(function(percent) { return percent !== null; }).slice(-5);
+            if (scored.length) {
+              var avg = scored.reduce(function(s, percent) { return s + percent; }, 0) / scored.length;
+              ctx.userScore = avg / 100;
+            }
           }
         } catch (_) {}
       }
@@ -343,6 +431,13 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function validPercent(value) {
+    if ((typeof value !== 'number' && typeof value !== 'string') ||
+        (typeof value === 'string' && value.trim() === '')) return null;
+    var percent = Number(value);
+    return Number.isFinite(percent) && percent >= 0 && percent <= 100 ? percent : null;
   }
 
   /* Bakåtkompatibel ingång. app.html:1474 och förbättring.html:1258 anropar
@@ -388,14 +483,181 @@
     try { return JSON.parse(localStorage.getItem(PER_HIST_KEY) || '[]'); } catch (_) { return []; }
   }
   function perSaveHist(h) {
+    if (_examHistoryMasked) return;
     try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
   }
+
+  function renderPerHistory(history) {
+    var msgs = document.getElementById('perMessages');
+    if (!msgs) return;
+    msgs.innerHTML = '';
+    (Array.isArray(history) ? history : []).forEach(function (msg) {
+      if (!msg || typeof msg.content !== 'string' || (msg.role !== 'user' && msg.role !== 'assistant')) return;
+      var div = document.createElement('div');
+      div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
+      div.textContent = msg.content;
+      msgs.appendChild(div);
+    });
+    if (!msgs.children.length) {
+      var greeting = document.createElement('div');
+      greeting.className = 'per-msg teacher';
+      greeting.textContent = getContextGreeting();
+      msgs.appendChild(greeting);
+    }
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function perHistoryUsesEnglish() {
+    var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+    if (!language) {
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+    }
+    return language === 'en';
+  }
+
+  function setExamHistoryMasked(masked, persist) {
+    var next = Boolean(masked);
+    if (!next && !_serverVerifiedPerHistoryRelease) return;
+    if (next) _serverVerifiedPerHistoryRelease = false;
+    var shouldPersist = arguments.length < 2 || Boolean(persist);
+    if (next === _examHistoryMasked && !next) return;
+    var msgs = document.getElementById('perMessages');
+    var current = [];
+    if (!next && msgs) {
+      Array.prototype.forEach.call(msgs.querySelectorAll('.per-msg'), function (node) {
+        if (node.classList.contains('per-history-mask-notice') || node.classList.contains('typing')) return;
+        var text = node.textContent.trim();
+        if (!text) return;
+        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text });
+      });
+    }
+    _examHistoryMasked = next;
+    if (shouldPersist) {
+      try {
+        if (next) localStorage.setItem(PER_EXAM_HISTORY_MASK_KEY, '1');
+        else localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
+      } catch (_) {}
+    }
+    if (next) {
+      if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = '';
+      if (msgs) {
+        msgs.innerHTML = '';
+        var notice = document.createElement('div');
+        notice.className = 'per-msg teacher per-history-mask-notice';
+        notice.setAttribute('role', 'status');
+        notice.textContent = perHistoryUsesEnglish()
+          ? 'Earlier P.E.R. conversation is hidden while an exam may be active.'
+          : 'Tidigare P.E.R-samtal är dolt medan ett prov kan vara aktivt.';
+        msgs.appendChild(notice);
+      }
+      return;
+    }
+    var history = perGetHist();
+    if (current.length) history = history.concat(current).slice(-PER_MAX_HIST);
+    if (current.length) {
+      try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(history)); } catch (_) {}
+    }
+    renderPerHistory(history);
+  }
+
+  async function refreshPerHistoryIfVerified() {
+    try {
+      var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
+      var token = session && session.access_token;
+      if (session && session.expires_at
+        && Number(session.expires_at) - 60 <= Date.now() / 1000) return null;
+      if (!token) return null;
+      var response = await fetch('/api/explain', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (!response.ok) return false;
+      var data = await response.json();
+      if (!data || !Array.isArray(data.history)) return false;
+      var history = data.history.filter(function (msg) {
+        return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
+      }).slice(-PER_MAX_HIST);
+      _serverVerifiedPerHistoryRelease = true;
+      _examHistoryMasked = false;
+      try {
+        localStorage.setItem(PER_HIST_KEY, JSON.stringify(history));
+        localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
+      } catch (_) {}
+      if (history.length) {
+        renderPerHistory(history);
+      } else {
+        var msgs = document.getElementById('perMessages');
+        if (msgs) {
+          Array.prototype.forEach.call(msgs.querySelectorAll('.per-history-mask-notice'), function (notice) {
+            notice.remove();
+          });
+          if (!msgs.querySelector('.per-msg')) renderPerHistory([]);
+        }
+      }
+      return history;
+    } catch (_) { return null; }
+  }
+
+  window.addEventListener('storage', function (event) {
+    if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
+      if (event.newValue === '1') setExamHistoryMasked(true);
+      else if (event.newValue === null) refreshPerHistoryIfVerified();
+      return;
+    }
+    if (event.key === PER_MEMORY_CLEAR_EPOCH_KEY && event.newValue && event.newValue !== event.oldValue) {
+      if (window.PER && typeof window.PER.clearAfterServerMemoryClear === 'function') {
+        window.PER.clearAfterServerMemoryClear();
+      }
+    }
+  });
 
   window.PER = (function () {
     var _getToken = null;
     var _open = false;
+    var _pendingInputFocusHandoff = null;
+    var _perFocusOrigin = null;
+
+    function focusPerLauncherOrOrigin() {
+      var bubble = document.getElementById('perBubble');
+      var isVisible = function (element) {
+        return !!(element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      };
+      if (isVisible(bubble)) bubble.focus();
+      else if (isVisible(_perFocusOrigin)) _perFocusOrigin.focus();
+      else {
+        var fallback = document.querySelector('.xg-menu-btn');
+        if (isVisible(fallback)) fallback.focus();
+      }
+    }
     var _nudgeTimer = null;
     var _nudgeShownKey = null;
+
+    function clearInputFocusHandoff(handoff) {
+      if (!handoff || _pendingInputFocusHandoff !== handoff) return;
+      document.removeEventListener('focusin', handoff.onFocusIn, true);
+      _pendingInputFocusHandoff = null;
+    }
+
+    function startInputFocusHandoff(input, expectedFocus) {
+      if (_pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
+      var handoff = { input: input, expectedFocus: expectedFocus, cancelled: false };
+      handoff.onFocusIn = function (event) {
+        if (event.target !== handoff.expectedFocus) {
+          handoff.cancelled = true;
+        }
+      };
+      _pendingInputFocusHandoff = handoff;
+      document.addEventListener('focusin', handoff.onFocusIn, true);
+      return handoff;
+    }
+
+    function completeInputFocusHandoff(handoff) {
+      if (!handoff || _pendingInputFocusHandoff !== handoff) return;
+      var shouldFocus = _open && !handoff.cancelled && document.activeElement === handoff.expectedFocus;
+      clearInputFocusHandoff(handoff);
+      if (shouldFocus) handoff.input.focus();
+    }
 
     function getNudgeKey() {
       try {
@@ -452,13 +714,13 @@
       return p === '/' || p === '' || p.includes('index') || p.includes('pricing');
     }
 
-    /* Hur många frågor en utloggad besökare får ställa per dygn.
+    /* Hur många produktfrågor en utloggad besökare får ställa per dygn.
        Stod tidigare som talet 2 på fyra ställen: gränsen, kvarräknaren,
        etiketten och spärrtexten. En höjning krävde fyra korrekta redigeringar,
        och missades en sa gränsen och texten olika saker för besökaren.
 
        Taket per IP och timme ligger separat i api/explain.js
-       (LANDING_HOURLY_LIMIT) och skyddar OpenAI-kostnaden. Det här talet styr
+       (LANDING_HOURLY_LIMIT). Det här talet styr
        bara vad en enskild webbläsare får, och localStorage går att rensa — det
        är alltså en vänlig gräns, inte ett säkerhetsskydd. */
     var LANDING_FREE_QUESTIONS = 3;
@@ -487,17 +749,29 @@
       if (!bar || !leftEl) return;
       var used = getLandingQuota();
       var left = Math.max(0, LANDING_FREE_QUESTIONS - used);
+      var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+      if (!language) {
+        try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+      }
+      var english = language === 'en';
       leftEl.textContent = left > 0
-        ? left + ' av ' + LANDING_FREE_QUESTIONS + ' gratisfrågor kvar'
-        : 'Gränsen nådd för idag';
+        ? (english ? left + ' of ' + LANDING_FREE_QUESTIONS + ' ExGen questions left' : left + ' av ' + LANDING_FREE_QUESTIONS + ' frågor om ExGen kvar')
+        : (english ? 'Daily limit reached' : 'Gränsen nådd för idag');
+      var link = bar.querySelector('a');
+      if (link) link.textContent = english ? 'Create a free account →' : 'Skapa gratis konto →';
       bar.classList.add('visible');
     }
 
     function addAnswerCTA(div) {
       var btn = document.createElement('a');
-      btn.href = 'app.html';
+      var pilotMode = EXGEN_RUNTIME.environment === 'pilot';
+      btn.href = pilotMode ? '#' : 'app.html';
       btn.className = 'per-answer-cta';
-      btn.textContent = 'Skapa gratis konto — inget kort krävs →';
+      if (pilotMode) {
+        btn.setAttribute('data-pv-auth', 'login');
+        btn.setAttribute('data-pv-force-login', 'true');
+      }
+      btn.textContent = pilotMode ? 'Logga in med skolpilotkonto →' : 'Skapa gratis konto — inget kort krävs →';
       div.appendChild(btn);
     }
 
@@ -568,11 +842,15 @@
       var now = Date.now();
       var lastWeek = hist.filter(function(e) { return e.ts && (now - Number(e.ts)) < 7 * 86400000; });
       if (lastWeek.length < 1) return 'Ny vecka! Dags att komma igång med skolarbetet. Vad vill du fokusera på?';
-      var avg = Math.round(lastWeek.reduce(function(s, e) { return s + (Number(e.percent) || 0); }, 0) / lastWeek.length);
+      var scoredWeek = lastWeek.map(function(e) { return validPercent(e && e.percent); })
+        .filter(function(percent) { return percent !== null; });
+      var scoreSummary = scoredWeek.length
+        ? 'snitt ' + Math.round(scoredWeek.reduce(function(s, percent) { return s + percent; }, 0) / scoredWeek.length) + '% av ' + scoredWeek.length + ' resultat'
+        : 'poängunderlag saknas för att räkna ut ett snitt';
       var cf = {};
       lastWeek.forEach(function(e) { if (e.course) cf[e.course] = (cf[e.course] || 0) + 1; });
       var weakest = Object.keys(cf).sort(function(a, b) { return cf[b] - cf[a]; })[0];
-      return 'Ny vecka! Förra veckan: ' + lastWeek.length + ' prov, snitt ' + avg + '%.'
+      return 'Ny vecka! Förra veckan: ' + lastWeek.length + ' prov, ' + scoreSummary + '.'
         + (weakest ? ' Fokusera extra på ' + weakest + ' idag.' : ' Fortsätt det bra arbetet!')
         + ' Vad kan jag hjälpa dig med?';
     }
@@ -613,6 +891,7 @@
     }
 
     function notifyExamDone(pct, weakCatNames) {
+      if (EXGEN_RUNTIME.environment === 'pilot') return;
       var hist = [];
       try { hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]'); } catch (_) {}
       var totalExams = hist.length + 1;
@@ -634,10 +913,12 @@
         var wAreas = Array.isArray(weakCatNames) ? weakCatNames : [];
         try {
           var lsH = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
-          scores = lsH.slice(-20).map(function(e) { return (Number(e.percent)||0)/100; }).filter(function(s){ return Number.isFinite(s); });
+          scores = lsH.slice(-20).map(function(e) { var p = validPercent(e && e.percent); return p === null ? null : p / 100; })
+            .filter(function(score) { return score !== null; });
         } catch (_) {}
-        scores.push(pct / 100);
-        if (scores.length < 3) { addMsg('Kör fler prov för att se redo-score.', 'teacher'); return; }
+        var currentPercent = validPercent(pct);
+        if (currentPercent !== null) scores.push(currentPercent / 100);
+        if (scores.length < 3) { addMsg('Kör fler prov med giltigt poängunderlag för att se redo-score.', 'teacher'); return; }
         var t = addMsg('Räknar ut din redo-score…', 'teacher typing');
         getToken().then(function(tok) {
           return fetch('/api/explain', {
@@ -663,6 +944,35 @@
 
     function register(fn) { _getToken = fn; }
 
+    function clearAfterServerMemoryClear() {
+      if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
+      try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+      }
+      var input = document.getElementById('perInput');
+      if (input) input.value = '';
+      var sendBtn = document.getElementById('perSendBtn');
+      if (sendBtn) sendBtn.disabled = false;
+      var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+      if (!language) {
+        try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+      }
+      var message = language === 'en'
+        ? 'Saved P.E.R. history and long-term memory were cleared. New conversations may be saved again. Profile facts are managed separately.'
+        : 'Sparad P.E.R-historik och långtidsminne har rensats. Nya samtal kan sparas igen. Profiluppgifter hanteras separat.';
+      var msgs = document.getElementById('perMessages');
+      if (msgs) {
+        var notice = document.createElement('div');
+        notice.className = 'per-msg teacher';
+        notice.setAttribute('role', 'status');
+        notice.textContent = message;
+        msgs.replaceChildren(notice);
+      }
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = message;
+    }
+
     /* En token som gått ut är inte en token.
      *
      * Funktionen returnerade tidigare access_token utan att titta på
@@ -687,10 +997,15 @@
     }
 
     async function getToken() {
-      if (_getToken) try { return await _getToken(); } catch (_) {}
+      if (_getToken) {
+        try {
+          var registeredToken = await _getToken();
+          if (registeredToken) return registeredToken;
+        } catch (_) {}
+      }
       /* Fallback: read Supabase session directly from localStorage */
       try {
-        var raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token');
+        var raw = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
         if (raw) { var s = JSON.parse(raw); return sessionIsLive(s) ? (s.access_token || '') : ''; }
       } catch (_) {}
       return '';
@@ -871,6 +1186,13 @@ function finalizeMsg(div, text) {
           div.appendChild(crow);
         }
       }
+
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) {
+        var spokenReply = div.cloneNode(true);
+        spokenReply.querySelectorAll('button, a, .per-chips').forEach(function (control) { control.remove(); });
+        announcement.textContent = spokenReply.innerText || spokenReply.textContent || cleanText;
+      }
     }
 
     /* Stegen under svaret.
@@ -1003,7 +1325,25 @@ function finalizeMsg(div, text) {
     }
 
     async function send(q, opts) {
-      if (!q) return;
+      if (!q || _perActiveRequest) return;
+      var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
+      function restoreFailedQuestion() {
+        if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
+        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId);
+        if (input) input.value = q;
+        return true;
+      }
+      if (EXGEN_RUNTIME.environment === 'pilot' && String(q).length > 2000) {
+        var longQuestionInput = document.getElementById('perInput');
+        if (longQuestionInput) longQuestionInput.value = q;
+        addMsg('Frågan är för lång för P.E.R. Korta ned den till högst 2 000 tecken.', 'teacher');
+        return;
+      }
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+      }
+      var announcement = document.getElementById('perAnnouncement');
+      if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
          den mot sitt tak — den här raden är hygien, inte spärren. */
       var askLevel = (opts && typeof opts.helpLevel === 'number')
@@ -1033,13 +1373,54 @@ function finalizeMsg(div, text) {
       var typing = addMsg('', 'teacher typing');
       var stopThinking = startThinking(typing, ctxForThinking);
 
-      var hist = perGetHist();
-      var token = await getToken();
+      var hist = _examHistoryMasked ? [] : perGetHist();
+      var requestTimedOut = false;
+      var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var requestState = { cancelled: false, controller: requestController, accountId: requestAccountId, cancel: null };
+      _perActiveRequest = requestState;
+      var rejectRequestDeadline;
+      var requestDeadline = new Promise(function (_, reject) { rejectRequestDeadline = reject; });
+      var reviewTimeout = null;
+      var answerCommitted = false;
+      requestState.cancel = function () {
+        requestState.cancelled = true;
+        if (requestController) requestController.abort();
+        rejectRequestDeadline(new Error('P.E.R request cancelled'));
+      };
+      function requestStillOwned() {
+        if (requestState.cancelled) return false;
+        if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
+        abortPerRequestForAccountId(currentPilotAccountId());
+        return false;
+      }
+      var requestTimeout = setTimeout(function () {
+        requestTimedOut = true;
+        if (requestController) requestController.abort();
+        rejectRequestDeadline(new Error('P.E.R request timed out'));
+      }, PER_REQUEST_TIMEOUT_MS);
 
       try {
+        var token = await Promise.race([getToken(), requestDeadline]);
+        if (!requestStillOwned()) return;
+        if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
         var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'ExGen';
-        var isLandingMode = !token; // 2 free questions for any unauthenticated user, any page
+        var isLandingMode = !token; // Public guide only; study help requires an account.
+
+        if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {
+          stopThinking();
+          try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
+          savePilotPendingQuestion(q);
+          if (input) input.value = q;
+          if (typing) {
+            finalizeMsg(typing, 'P.E.R är tillgänglig för inbjudna skolpilotkonton. Logga in för att fortsätta. Din fråga finns kvar i rutan och skickas inte förrän du trycker Skicka igen.');
+            addAnswerCTA(typing);
+          }
+          if (sendBtn) sendBtn.disabled = false;
+          var pilotMessages = document.getElementById('perMessages');
+          if (pilotMessages) pilotMessages.scrollTop = pilotMessages.scrollHeight;
+          return;
+        }
 
         // Landing quota gate
         if (isLandingMode) {
@@ -1047,7 +1428,7 @@ function finalizeMsg(div, text) {
           if (lq >= LANDING_FREE_QUESTIONS) {
             stopThinking();
             if (typing) {
-              finalizeMsg(typing, 'Du har använt dina **' + LANDING_FREE_QUESTIONS + ' gratisfrågor** för idag.\n\nSkapa ett gratis konto för att fortsätta — det tar 30 sekunder.');
+              finalizeMsg(typing, 'Du har använt dina **' + LANDING_FREE_QUESTIONS + ' frågor om ExGen** för idag.\n\nSkapa ett gratis konto för personlig studiehjälp.');
               addAnswerCTA(typing);
             }
             if (sendBtn) sendBtn.disabled = false;
@@ -1076,6 +1457,11 @@ function finalizeMsg(div, text) {
         } catch (_) {}
 
         var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply };
+        if (opts && opts.examProof) {
+          fetchBodyObj.examReview = true;
+          fetchBodyObj.examProof = opts.examProof;
+          fetchBodyObj.lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en' ? 'en' : 'sv';
+        }
         var fetchHdrs = { 'Content-Type': 'application/json' };
         if (isLandingMode) {
           fetchBodyObj.landingMode = true;
@@ -1084,11 +1470,13 @@ function finalizeMsg(div, text) {
           fetchHdrs['Accept'] = 'text/event-stream';
         }
         var fetchBody = JSON.stringify(fetchBodyObj);
-        var r = await fetch('/api/explain', {
+        var r = await Promise.race([fetch('/api/explain', {
           method: 'POST',
           headers: fetchHdrs,
-          body: fetchBody
-        });
+          body: fetchBody,
+          signal: requestController ? requestController.signal : undefined
+        }), requestDeadline]);
+        if (!requestStillOwned()) return;
 
         var ct = r.headers.get('content-type') || '';
         if (r.ok && ct.includes('text/event-stream')) {
@@ -1097,9 +1485,12 @@ function finalizeMsg(div, text) {
           var sseDecoder = new TextDecoder();
           var sseBuf = '';
           var answerText = '';
+          var streamError = '';
+          var streamComplete = false;
           if (typing) { stopThinking(); typing.className = 'per-msg teacher'; typing.textContent = ''; }
           while (true) {
-            var chunk = await reader.read();
+            var chunk = await Promise.race([reader.read(), requestDeadline]);
+            if (!requestStillOwned()) return;
             if (chunk.done) break;
             sseBuf += sseDecoder.decode(chunk.value, { stream: true });
             var sseLines = sseBuf.split('\n');
@@ -1109,26 +1500,50 @@ function finalizeMsg(div, text) {
               if (!sseLine.startsWith('data: ')) continue;
               try {
                 var ev = JSON.parse(sseLine.slice(6));
+                if (!requestStillOwned()) return;
                 if (ev.delta) {
                   answerText += ev.delta;
                   if (typing) typing.textContent = answerText.replace(PER_MARKERS, '');
                   var msgsEl2 = document.getElementById('perMessages');
                   if (msgsEl2) msgsEl2.scrollTop = msgsEl2.scrollHeight;
                 }
-                if (ev.error && typing) { typing.className = 'per-msg teacher'; typing.textContent = ev.error; }
+                if (ev.error) streamError = String(ev.error);
+                if (ev.done) {
+                  streamComplete = true;
+                  if (!answerCommitted && answerText.trim()) {
+                    answerCommitted = true;
+                    clearTimeout(requestTimeout);
+                    reviewTimeout = setTimeout(function () {
+                      if (requestController) requestController.abort();
+                    }, 22000);
+                    if (typing) {
+                      finalizeMsg(typing, answerText);
+                      stepsAfterAnswer(answerText, isLandingMode);
+                    }
+                  }
+                }
                 if (ev.done && ev.history) perSaveHist(ev.history);
                 /* Rättelsen från självgranskningen. Kommer efter att svaret
                    strömmat färdigt — eleven har redan läst texten, och en
                    synlig rättelse under den är ärligare än att tyst skriva om
                    svaret eller hålla tillbaka det i väntan på granskningen.
                    Bara allvarliga fynd når hit; servern filtrerar resten. */
-                if (ev.granskning && ev.granskning.rättelse) _perRättelse = ev.granskning.rättelse;
+                if (ev.granskning && ev.granskning.rättelse) {
+                  _perRättelse = ev.granskning.rättelse;
+                  if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
+                }
                 // Taket kommer alltid härifrån, aldrig ur en egen uträkning.
                 if (typeof ev.helpCap === 'number') _perHelpCap = ev.helpCap;
               } catch (_) {}
             }
           }
-          if (typing && answerText) {
+          if (!answerCommitted && (streamError || !streamComplete || !answerText.trim())) {
+            restoreFailedQuestion();
+            if (typing) {
+              typing.className = 'per-msg teacher';
+              typing.textContent = streamError || 'Svaret avbröts innan det blev klart. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
+            }
+          } else if (!answerCommitted && typing && answerText) {
             finalizeMsg(typing, answerText);
             if (_perRättelse) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
             stepsAfterAnswer(answerText, isLandingMode);
@@ -1136,24 +1551,47 @@ function finalizeMsg(div, text) {
         } else {
           /* ── JSON fallback ── */
           var data = {};
-          try { data = await r.json(); } catch (_) {}
+          try { data = await Promise.race([r.json(), requestDeadline]); }
+          catch (err) { if (requestTimedOut) throw err; }
+          if (!requestStillOwned()) return;
           stopThinking();
           if (typing) {
             if (r.status === 401) {
-              /* Sista utvägen. getToken() sållar bort utgångna sessioner, men en
-                 token kan ha återkallats server-side eller vara ogiltig av skäl
-                 klienten inte kan se. Då ska besökaren INTE bli utelåst — de har
-                 gratisfrågor kvar och ska kunna använda dem.
-
-                 Sessionen städas bort så att nästa fråga går direkt till
-                 landningsläget i stället för att kosta ett anrop till. */
-              try { localStorage.removeItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
+              /* A rejected token needs a fresh login, but it is not an explicit
+                 sign-out. Keep account-scoped drafts until the user signs out
+                 or authenticates as a different account. */
+              if (EXGEN_RUNTIME.environment === 'pilot') {
+                if (restoreFailedQuestion()) {
+                  try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
+                }
+              } else {
+                try { localStorage.removeItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
+                if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut();
+              }
               typing.className = 'per-msg teacher';
-              typing.textContent = 'Din inloggning har gått ut. Skicka frågan igen så svarar jag — du har gratisfrågor kvar.';
-              updateLandingBar();
+              if (EXGEN_RUNTIME.environment === 'pilot') {
+                typing.textContent = 'Din inloggning har gått ut. Logga in igen med ditt skolpilotkonto. Din fråga finns kvar i rutan och skickas inte förrän du trycker Skicka igen.';
+                addAnswerCTA(typing);
+              } else {
+                typing.textContent = 'Din inloggning har gått ut. Logga in igen för personlig studiehjälp. Utan konto kan jag bara svara på frågor om ExGen.';
+                updateLandingBar();
+              }
             } else if (!r.ok) {
+              restoreFailedQuestion();
               typing.className = 'per-msg teacher';
-              typing.textContent = data.error || 'Fel — försök igen.';
+              if (data.error === 'EXAM_STATE_UNAVAILABLE') {
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.'
+                  : 'Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.';
+                var failureAnnouncement = document.getElementById('perAnnouncement');
+                if (failureAnnouncement) failureAnnouncement.textContent = typing.textContent;
+              } else {
+                typing.textContent = data.error || 'Fel — försök igen.';
+              }
             } else {
               if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
               finalizeMsg(typing, data.answer || 'Inget svar.');
@@ -1165,7 +1603,18 @@ function finalizeMsg(div, text) {
         }
       } catch (_) {
         stopThinking();
-        if (typing) { typing.className = 'per-msg teacher'; typing.textContent = 'Nätverksfel — försök igen.'; }
+        var stillOwned = requestStillOwned();
+        if (stillOwned && !answerCommitted) restoreFailedQuestion();
+        if (stillOwned && !answerCommitted && typing) {
+          typing.className = 'per-msg teacher';
+          typing.textContent = requestTimedOut
+            ? 'P.E.R tog för lång tid att svara. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.'
+            : 'Nätverksfel — frågan finns kvar i rutan. Tryck Skicka igen när du vill försöka på nytt.';
+        }
+      } finally {
+        clearTimeout(requestTimeout);
+        clearTimeout(reviewTimeout);
+        if (_perActiveRequest === requestState) _perActiveRequest = null;
       }
 
       if (sendBtn) sendBtn.disabled = false;
@@ -1174,11 +1623,29 @@ function finalizeMsg(div, text) {
     }
 
     function toggle() {
-      _open = !_open;
+      if (!document.getElementById('perBubble') || !document.getElementById('perPanel')) return;
       var panel = document.getElementById('perPanel');
+      _open = !_open;
+      var focusAfterOpen = document.activeElement;
+      var menuWasOpen = !!document.querySelector('.xg-menu.on');
+      var restoreLauncherFocus = !_open && panel.contains(document.activeElement);
       var bubble = document.getElementById('perBubble');
+      if (_open) _perFocusOrigin = focusAfterOpen && focusAfterOpen !== bubble && !panel.contains(focusAfterOpen) ? focusAfterOpen : null;
+      if (!_open && _pendingInputFocusHandoff) clearInputFocusHandoff(_pendingInputFocusHandoff);
+      if (_open && window.XgShell && typeof window.XgShell.closeMenu === 'function') {
+        window.XgShell.closeMenu();
+        if (menuWasOpen) focusAfterOpen = document.querySelector('.xg-menu-btn');
+      }
       if (panel) panel.classList.toggle('per-open', _open);
-      if (bubble) bubble.classList.toggle('per-open', _open);
+      if (bubble) {
+        bubble.classList.toggle('per-open', _open);
+        bubble.setAttribute('aria-expanded', _open ? 'true' : 'false');
+      }
+      if (document.body && document.body.classList.contains('xf-result')) {
+        document.body.classList.toggle('xf-result-per-open', _open);
+      }
+      var widget = document.getElementById('perWidget');
+      if (widget && widget._syncPerObstruction) widget._syncPerObstruction();
       if (_open) {
         hideNudge();
         /* Update greeting if no real user messages yet */
@@ -1192,7 +1659,12 @@ function finalizeMsg(div, text) {
           }
         }
         var inp = document.getElementById('perInput');
-        if (inp) setTimeout(function () { inp.focus(); }, 50);
+        if (inp) {
+          var handoff = startInputFocusHandoff(inp, focusAfterOpen);
+          if (!menuWasOpen) setTimeout(function () { completeInputFocusHandoff(handoff); }, 50);
+        }
+      } else if (restoreLauncherFocus && bubble) {
+        focusPerLauncherOrOrigin();
       }
     }
 
@@ -1234,7 +1706,7 @@ function finalizeMsg(div, text) {
     }
 
     function initWidget() {
-      if (document.getElementById('perWidget')) return;
+      if (!document.body || document.body.dataset.perWidget === 'off' || document.getElementById('perWidget')) return;
 
       var style = document.createElement('style');
       style.textContent = [
@@ -1259,6 +1731,7 @@ function finalizeMsg(div, text) {
         '#perPanel{display:none;position:absolute;bottom:64px;right:0;width:320px;background:var(--exgen-bg,#FFFFFF);border:1px solid var(--exgen-border,#E4E7EC);border-radius:var(--exgen-radius-lg,20px);box-shadow:0 16px 48px rgba(14,27,42,.28);overflow:hidden;flex-direction:column}',
         '#perPanel.per-open{display:flex;animation:perUp .2s ease}',
         '@keyframes perUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}',
+        '.per-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}',
         '.per-hdr{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--exgen-border,#E4E7EC);background:var(--exgen-bg-secondary,#F8FAFC)}',
         '.per-av{width:32px;height:32px;border-radius:50%;background:rgba(0,183,217,.12);border:1px solid rgba(0,183,217,.28);display:grid;place-items:center;flex-shrink:0;transition:background .2s,border-color .2s;overflow:hidden}',
         '.per-nm{font-weight:700;font-size:13px;color:var(--exgen-text,#1B2430)}',
@@ -1288,8 +1761,11 @@ function finalizeMsg(div, text) {
         '#perNudge:hover{border-color:rgba(0,183,217,.4);background:var(--exgen-bg-secondary,#F8FAFC)}',
         '#perNudge.per-hide{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;pointer-events:none}',
         '#perWidget.per-minimized{transform:scale(.001);opacity:0;pointer-events:none;transition:transform .15s ease,opacity .15s ease}',
+        '#perWidget.per-obstructed{visibility:hidden;pointer-events:none}',
+        '#perWidget.per-menu-obstructed{visibility:hidden;pointer-events:none}',
         '@media(max-width:480px){#perPanel{width:calc(100vw - 32px);right:0;left:auto;max-width:340px}}',
         '@media(max-width:480px){#perWidget{bottom:16px;right:16px}}',
+        '@media(max-width:480px){#perBubble{height:40px;padding:0 8px;gap:4px;font-size:11px}#perBubble svg{width:14px;height:14px}}',
         '#perWidget.per-left{right:auto!important;left:22px!important}',
         '@media(max-width:480px){#perWidget.per-left{left:16px!important}}',
         '#perWidget.per-left #perPanel{right:auto;left:0}',
@@ -1377,12 +1853,13 @@ function finalizeMsg(div, text) {
               '<button class="per-clr" id="perQuizBtn" title="Quiz – P.E.R frågar dig"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-linecap="round"/></svg></button>' +
               '<button class="per-clr" id="perCornerBtn" title="Flytta widget"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
               '<button class="per-clr" id="perSizeBtn" title="Ändra storlek"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>' +
-              '<button class="per-clr" id="perClearBtn" title="Rensa konversation"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+              '<button class="per-clr" id="perClearBtn" title="Rensa konversationen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg></button>' +
+              '<button class="per-clr" id="perCloseBtn" title="Stäng P.E.R" aria-label="Stäng P.E.R"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>' +
             '</div>' +
           '</div>' +
           '<div id="perLandingBar"><span id="perLandingLeft"></span><a href="app.html">Skapa gratis konto →</a></div>' +
           '<div id="perMessages">' +
-            '<div class="per-msg teacher">Vad kan jag hjälpa dig med?</div>' +
+            '<div class="per-msg teacher" id="perGreeting">Vad kan jag hjälpa dig med?</div>' +
           '</div>' +
           '<div class="per-inp-row">' +
             '<input id="perInput" type="text" placeholder="Fråga P.E.R…" autocomplete="off" />' +
@@ -1390,13 +1867,137 @@ function finalizeMsg(div, text) {
             '<button id="perSendBtn">Skicka</button>' +
           '</div>' +
         '</div>' +
-        '<button id="perBubble" title="Fråga P.E.R" aria-label="Fråga P.E.R">'+
+        '<div id="perAnnouncement" class="per-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>' +
+        '<button id="perBubble" title="Fråga P.E.R" aria-label="Fråga P.E.R" aria-controls="perPanel" aria-expanded="false">'+
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v10H9l-4 4V5Z"/></svg>'+
           '<span>P.E.R</span></button>'+
           '<div id="perSees" aria-hidden="true">ser: den här sidan</div>';
       document.body.appendChild(widget);
 
+      // Keep the launcher from covering controls that explicitly opt into
+      // collision protection. The improvement page still exposes its inline
+      // P.E.R action while the floating launcher is temporarily out of view.
+      (function () {
+        var bubble = document.getElementById('perBubble');
+        var frame = 0;
+        function syncObstruction() {
+          frame = 0;
+          if (!bubble) return;
+          if (bubble.classList.contains('per-open')) {
+            widget.classList.remove('per-obstructed');
+            widget.removeAttribute('aria-hidden');
+            return;
+          }
+          if (getComputedStyle(widget).display === 'none') {
+            widget.classList.remove('per-obstructed');
+            widget.removeAttribute('aria-hidden');
+            return;
+          }
+          var bubbleRect = bubble.getBoundingClientRect();
+          var obstructing = null;
+          document.querySelectorAll('[data-per-avoid]').forEach(function (el) {
+            if (obstructing || !el.getClientRects().length) return;
+            var rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 &&
+                rect.left < bubbleRect.right && rect.right > bubbleRect.left &&
+                rect.top < bubbleRect.bottom && rect.bottom > bubbleRect.top) obstructing = el;
+          });
+          if (obstructing && widget.contains(document.activeElement)) {
+            var nextControl = obstructing.querySelector('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled)');
+            if (nextControl) nextControl.focus({ preventScroll: true });
+          }
+          widget.classList.toggle('per-obstructed', !!obstructing);
+          if (obstructing) widget.setAttribute('aria-hidden', 'true');
+          else widget.removeAttribute('aria-hidden');
+        }
+        widget._syncPerObstruction = syncObstruction;
+        function scheduleObstructionCheck() {
+          if (frame) return;
+          frame = requestAnimationFrame(syncObstruction);
+        }
+        window.addEventListener('scroll', scheduleObstructionCheck, { passive: true, capture: true });
+        window.addEventListener('resize', scheduleObstructionCheck, { passive: true });
+        var observer = new MutationObserver(scheduleObstructionCheck);
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+        syncObstruction();
+        document.addEventListener('exgen:menuopen', function () {
+          if (bubble.classList.contains('per-open')) toggle();
+          widget.classList.add('per-menu-obstructed');
+          widget.setAttribute('aria-hidden', 'true');
+        });
+        document.addEventListener('exgen:menuclose', function () {
+          widget.classList.remove('per-menu-obstructed');
+          if (!widget.classList.contains('per-obstructed')) widget.removeAttribute('aria-hidden');
+          scheduleObstructionCheck();
+          var menuButton = document.querySelector('.xg-menu-btn');
+          if (bubble.classList.contains('per-open') && _pendingInputFocusHandoff && _pendingInputFocusHandoff.expectedFocus === menuButton) {
+            completeInputFocusHandoff(_pendingInputFocusHandoff);
+          }
+        });
+      })();
+
+      function perWidgetUsesEnglish() {
+        var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+        if (!language) {
+          try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+        }
+        return language === 'en';
+      }
+
+      function updatePerInputLanguage() {
+        var english = perWidgetUsesEnglish();
+        var input = document.getElementById('perInput');
+        var mic = document.getElementById('perMicBtn');
+        var send = document.getElementById('perSendBtn');
+        var bubble = document.getElementById('perBubble');
+        var quiz = document.getElementById('perQuizBtn');
+        var corner = document.getElementById('perCornerBtn');
+        var size = document.getElementById('perSizeBtn');
+        var clear = document.getElementById('perClearBtn');
+        var close = document.getElementById('perCloseBtn');
+        var greeting = document.getElementById('perGreeting');
+        var landingLink = document.querySelector('#perLandingBar a');
+        var savedCorner = 'br';
+        var savedSize = 'normal';
+        try {
+          savedCorner = localStorage.getItem(PER_CORNER_KEY) || savedCorner;
+          savedSize = localStorage.getItem(PER_SIZE_KEY) || savedSize;
+        } catch (_) {}
+        input.placeholder = english ? 'Ask P.E.R…' : 'Fråga P.E.R…';
+        input.setAttribute('aria-label', english ? 'Ask P.E.R a question' : 'Ställ en fråga till P.E.R');
+        mic.title = english ? 'Speak to P.E.R' : 'Tala med P.E.R';
+        mic.setAttribute('aria-label', mic.title);
+        send.textContent = english ? 'Send' : 'Skicka';
+        send.setAttribute('aria-label', english ? 'Send message to P.E.R' : 'Skicka meddelande till P.E.R');
+        bubble.title = english ? 'Ask P.E.R' : 'Fråga P.E.R';
+        bubble.setAttribute('aria-label', bubble.title);
+        quiz.title = english ? 'Let P.E.R quiz me' : 'Quiz – P.E.R frågar dig';
+        quiz.setAttribute('aria-label', quiz.title);
+        if (corner) {
+          corner.title = english
+            ? (savedCorner === 'bl' ? 'Move P.E.R to bottom right' : 'Move P.E.R to bottom left')
+            : (savedCorner === 'bl' ? 'Flytta P.E.R till nedre högra hörnet' : 'Flytta P.E.R till nedre vänstra hörnet');
+          corner.setAttribute('aria-label', corner.title);
+        }
+        if (size) {
+          size.title = english
+            ? (savedSize === 'large' ? 'Use normal panel size' : 'Enlarge P.E.R panel')
+            : (savedSize === 'large' ? 'Återställ normal storlek' : 'Gör P.E.R större');
+          size.setAttribute('aria-label', size.title);
+        }
+        clear.title = english ? 'Clear conversation' : 'Rensa konversationen';
+        clear.setAttribute('aria-label', clear.title);
+        close.title = english ? 'Close P.E.R' : 'Stäng P.E.R';
+        close.setAttribute('aria-label', close.title);
+        if (greeting && greeting.id === 'perGreeting') greeting.textContent = english ? 'How can I help you?' : 'Vad kan jag hjälpa dig med?';
+        if (landingLink) landingLink.textContent = english ? 'Create a free account →' : 'Skapa gratis konto →';
+      }
+
+      updatePerInputLanguage();
+      window.addEventListener('exgen:languagechange', updatePerInputLanguage);
+
       document.getElementById('perBubble').onclick = toggle;
+      document.getElementById('perCloseBtn').onclick = toggle;
 
       // Never let the widget sit over a focused answer field on mobile — shrink
       // it out of the way instead of guessing a safe position for every keyboard
@@ -1427,9 +2028,33 @@ function finalizeMsg(div, text) {
         }
       };
       document.getElementById('perClearBtn').onclick = function () {
+        var input = document.getElementById('perInput');
+        var hasConversation = perGetHist().some(function (message) { return message.role === 'user'; }) ||
+          !!(input && input.value.trim()) || !!_perActiveRequest;
+        var english = perWidgetUsesEnglish();
+        if (hasConversation && !window.confirm(english
+          ? 'Clear this conversation from this device? Server-stored history and P.E.R memory will remain.'
+          : 'Rensa konversationen från den här enheten? Serverlagrad historik och P.E.R-minne finns kvar.')) return;
+        if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
+        if (EXGEN_RUNTIME.environment === 'pilot') {
+          try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+        }
+        if (input) input.value = '';
+        var sendBtn = document.getElementById('perSendBtn');
+        if (sendBtn) sendBtn.disabled = false;
         var msgs = document.getElementById('perMessages');
-        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">Klart. Vad vill du veta?</div>';
+        var announcement = document.getElementById('perAnnouncement');
+        if (announcement) announcement.textContent = '';
+        var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+        if (!language) {
+          try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+        }
+        var clearMessage = language === 'en'
+          ? 'The conversation was cleared from this device. Server-stored history and P.E.R memory remain.'
+          : 'Samtalet är rensat på den här enheten. Serverlagrad historik och P.E.R-minne finns kvar.';
+        if (msgs) msgs.innerHTML = '<div class="per-msg teacher">' + clearMessage + '</div>';
+        if (announcement) announcement.textContent = clearMessage;
       };
 
       /* ── POSITION & SIZE PERSISTENCE ── */
@@ -1439,7 +2064,14 @@ function finalizeMsg(div, text) {
         if (save) try { localStorage.setItem(PER_CORNER_KEY, corner); } catch(_) {}
         w.classList.toggle('per-left', corner === 'bl');
         var btn = document.getElementById('perCornerBtn');
-        if (btn) btn.innerHTML = corner === 'bl' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+        if (btn) {
+          btn.innerHTML = corner === 'bl' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>';
+          var english = perWidgetUsesEnglish();
+          btn.title = english
+            ? (corner === 'bl' ? 'Move P.E.R to bottom right' : 'Move P.E.R to bottom left')
+            : (corner === 'bl' ? 'Flytta P.E.R till nedre högra hörnet' : 'Flytta P.E.R till nedre vänstra hörnet');
+          btn.setAttribute('aria-label', btn.title);
+        }
       }
       function applyPerSize(size, save) {
         var p = document.getElementById('perPanel');
@@ -1447,7 +2079,12 @@ function finalizeMsg(div, text) {
         if (save) try { localStorage.setItem(PER_SIZE_KEY, size); } catch(_) {}
         p.style.width = size === 'large' ? '380px' : '';
         var btn = document.getElementById('perSizeBtn');
-        if (btn) btn.innerHTML = size === 'large' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+        if (btn) {
+          btn.innerHTML = size === 'large' ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>' : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+          var english = perWidgetUsesEnglish();
+          btn.title = english ? (size === 'large' ? 'Use normal panel size' : 'Enlarge P.E.R panel') : (size === 'large' ? 'Återställ normal storlek' : 'Gör P.E.R större');
+          btn.setAttribute('aria-label', btn.title);
+        }
       }
 
       document.getElementById('perCornerBtn').onclick = function() {
@@ -1535,33 +2172,41 @@ function finalizeMsg(div, text) {
         });
       }
 
-      /* Restore previous history — localStorage first, then sync from Supabase */
+      /* Restore previous history — never expose it while an exam may be active. */
       var hist = perGetHist();
-      if (hist.length > 0) {
-        var msgs = document.getElementById('perMessages');
-        if (msgs) {
-          msgs.innerHTML = '';
-          hist.forEach(function (msg) {
-            var div = document.createElement('div');
-            div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
-            div.textContent = msg.content;
-            msgs.appendChild(div);
-          });
-          msgs.scrollTop = msgs.scrollHeight;
+      // Cached assistant replies stay hidden until the server confirms that no
+      // ungraded issuance is outstanding for this account.
+      setExamHistoryMasked(true, false);
+
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        try {
+          var pendingRaw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+          if (pendingRaw) {
+            sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+            var pending = JSON.parse(pendingRaw);
+            var age = Date.now() - Number(pending.savedAt);
+            var currentSession = null;
+            try { currentSession = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+            var currentAccountId = pilotSessionUserId(currentSession);
+            var accountMatches = pending.accountId
+              ? pending.accountId === currentAccountId
+              : !currentAccountId;
+            if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              perInpEl.value = pending.question;
+              toggle();
+              addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
+            }
+          }
+        } catch (_) {
+          try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
         }
       }
 
       /* Background Supabase sync — load cross-device history */
-      getToken().then(function(tok) {
-        if (!tok) return;
-        fetch('/api/explain', {
-          headers: { 'Authorization': 'Bearer ' + tok }
-        }).then(function(r) {
-          if (!r.ok) return null;
-          return r.json();
-        }).then(function(data) {
-          if (!data || !Array.isArray(data.history) || data.history.length <= hist.length) return;
-          perSaveHist(data.history);
+      refreshPerHistoryIfVerified().then(function(history) {
+          if (_examHistoryMasked) return;
+          if (!Array.isArray(history) || history.length <= hist.length) return;
+          perSaveHist(history);
           /* Only update UI if chat is closed and user hasn't started a new conversation */
           var currentHist = perGetHist();
           var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
@@ -1569,7 +2214,7 @@ function finalizeMsg(div, text) {
             var msgsEl = document.getElementById('perMessages');
             if (msgsEl) {
               msgsEl.innerHTML = '';
-              data.history.forEach(function(msg) {
+              history.forEach(function(msg) {
                 var div = document.createElement('div');
                 div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
                 div.textContent = msg.content;
@@ -1579,18 +2224,18 @@ function finalizeMsg(div, text) {
             }
           }
         }).catch(function() {});
-      });
 
       /* Show quota bar for unauthenticated users on all pages */
       var _hasSession = false;
       try {
-        var _rawSess = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token');
+        var _rawSess = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
         // Samma giltighetsprövning som getToken(). En utgången session ska visa
         // gratisraden, inte dölja den — annars ser besökaren inga frågor kvar
         // samtidigt som de faktiskt har tre.
         if (_rawSess) { _hasSession = sessionIsLive(JSON.parse(_rawSess)); }
       } catch (_) {}
       if (!_hasSession) updateLandingBar();
+      window.addEventListener('exgen:languagechange', function () { if (!_hasSession) updateLandingBar(); });
 
       /* Landing pages: keep P.E.R available without taking over the first view.
          The old first-visit flow opened the full chat automatically after 3.5s.
@@ -1599,7 +2244,9 @@ function finalizeMsg(div, text) {
          remains one click away without covering the page. */
       if (isLanding()) {
         var firstMsg = document.querySelector('#perMessages .per-msg.teacher');
-        if (firstMsg) firstMsg.textContent = 'Vad undrar du om ExGen?';
+        if (firstMsg) firstMsg.textContent = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en'
+          ? 'What would you like to know about ExGen?'
+          : 'Vad undrar du om ExGen?';
         if (isFirstVisit()) {
           markVisited();
           /* Intentionally stay collapsed. P.E.R is represented by the fixed
@@ -1614,7 +2261,14 @@ function finalizeMsg(div, text) {
 
       /* Alt+P keyboard shortcut */
       document.addEventListener('keydown', function(e) {
-        if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        var target = e.target;
+        var isEditable = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        if (e.key === 'Escape' && _open && !document.querySelector('.xg-menu.on')) {
+          e.preventDefault();
+          toggle();
+          return;
+        }
+        if (document.getElementById('perBubble') && e.altKey && (e.key === 'p' || e.key === 'P') && !isEditable) {
           e.preventDefault();
           toggle();
         }
@@ -1627,7 +2281,7 @@ function finalizeMsg(div, text) {
       initWidget();
     }
 
-    return { register: register, send: send, describe: perDescribe, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
+    return { register: register, send: send, describe: perDescribe, setExamHistoryMasked: setExamHistoryMasked, refreshHistoryIfVerified: refreshPerHistoryIfVerified, clearAfterServerMemoryClear: clearAfterServerMemoryClear, _resetNudge: resetNudge, notifyExamDone: notifyExamDone };
   })();
 
   /* ── GLOBAL BOTTOM NAV (inloggad) ── */
@@ -1635,7 +2289,7 @@ function finalizeMsg(div, text) {
     return; // bottom nav removed
     if (document.getElementById('proviaGlobalNav')) return;
     var raw = null;
-    try { raw = localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token'); } catch (_) {}
+    try { raw = localStorage.getItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
     if (!raw) return;
     var sess = null;
     try { sess = JSON.parse(raw); } catch (_) {}
@@ -1706,7 +2360,12 @@ function finalizeMsg(div, text) {
     document.dispatchEvent(new CustomEvent('proviaNavReady'));
 
     window.addEventListener('storage', function(e) {
-      if (e.key !== 'sb-mnmotdluigzeehdjbhbu-auth-token') return;
+      if ((e.key === EXGEN_RUNTIME.authStorageKey || e.key === null) && EXGEN_RUNTIME.environment === 'pilot') {
+        var nextAccountId = null;
+        try { nextAccountId = pilotSessionUserId(JSON.parse(e.key === null ? 'null' : (e.newValue || 'null'))) || null; } catch (_) {}
+        abortPerRequestForAccountId(nextAccountId);
+      }
+      if (e.key !== EXGEN_RUNTIME.authStorageKey) return;
       if (!e.newValue) {
         var el = document.getElementById('proviaGlobalNav');
         if (el) el.remove();
@@ -1731,8 +2390,9 @@ function finalizeMsg(div, text) {
 
     var s = document.createElement('style');
     s.textContent =
-      '#proviaCookieBanner{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9500;' +
+      '#proviaCookieBanner{position:relative;z-index:2;' +
       'width:calc(100% - 24px);max-width:560px;' +
+      'margin:12px auto;' +
       /* Was rgba(243,248,245,.98) with a teal border — green-tinted white
          from the pre-ExGen palette, missed by earlier colour sweeps because
          it is an rgba triplet rather than a searched-for hex. */
@@ -1740,9 +2400,10 @@ function finalizeMsg(div, text) {
       'border:1px solid var(--l2,#E4E7EC);border-radius:14px;' +
       'padding:18px 20px;box-shadow:0 8px 40px rgba(14,27,42,.18);' +
       'font-family:"DM Sans",sans-serif;animation:cookieSlideUp .35s cubic-bezier(.22,.61,.36,1) forwards}' +
-      '@keyframes cookieSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}' +
+      '@keyframes cookieSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}' +
       '#proviaCookieBanner.dismiss{animation:cookieSlideDown .25s ease forwards}' +
-      '@keyframes cookieSlideDown{to{opacity:0;transform:translateX(-50%) translateY(20px)}}' +
+      '@keyframes cookieSlideDown{to{opacity:0;transform:translateY(12px)}}' +
+      '#pvCard .ckInAuth{width:auto;max-width:none;margin:12px 8px 0;border-radius:10px;padding:12px 14px;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}' +
       '.ckRow{display:flex;align-items:flex-start;gap:14px}' +
       '.ckIcon{font-size:22px;flex-shrink:0;line-height:1;padding-top:2px}' +
       '.ckBody{flex:1;min-width:0}' +
@@ -1754,21 +2415,22 @@ function finalizeMsg(div, text) {
       '.ckAccept:hover{background:#00647A;transform:translateY(-1px)}' +
       '.ckDecline{padding:8px 16px;background:none;color:#667085;border:1px solid rgba(0,183,217,.3);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;transition:color .15s,border-color .15s}' +
       '.ckDecline:hover{color:#1B2430;border-color:rgba(0,183,217,.5)}' +
-      '@media(max-width:480px){.ckBtns{flex-direction:column}.ckAccept,.ckDecline{width:100%;text-align:center}}' +
-      '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}}';
+      '@media(max-width:480px){#proviaCookieBanner{padding:12px 14px}.ckRow{gap:8px}.ckIcon{font-size:18px}.ckTitle{font-size:13px;margin-bottom:3px}.ckText{font-size:11px;line-height:1.4;margin-bottom:8px}.ckBtns{flex-direction:row;gap:6px}.ckAccept,.ckDecline{width:auto;min-height:40px;flex:1 1 0;text-align:center;padding:8px 6px;font-size:11px;white-space:normal}}' +
+      '@media(max-width:480px){#proviaCookieBanner{width:calc(100% - 16px)}#pvCard .ckInAuth{margin:12px 0 0;padding:10px 0 12px;border-width:1px 0 0;border-radius:0;background:transparent;box-shadow:none}}';
     document.head.appendChild(s);
 
     var banner = document.createElement('div');
     banner.id = 'proviaCookieBanner';
-    banner.setAttribute('role', 'dialog');
+    banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', 'Cookie-inställningar');
     banner.innerHTML =
       '<div class="ckRow">' +
       '<span class="ckIcon" aria-hidden="true">🍪</span>' +
       '<div class="ckBody">' +
       '<div class="ckTitle">Vi använder cookies</div>' +
-      '<p class="ckText">ExGen sparar din inloggning, progress och inställningar lokalt på din enhet. ' +
-      'Vi använder inga spårningscookies eller annonsverktyg. ' +
+      '<p class="ckText">Webbläsarlagring används för inloggning, inställningar och viss provdata. ' +
+      'Provresultat och studieprogress kan sparas på ditt konto när du är inloggad. ' +
+      'Inga spårningscookies eller annonser används. ' +
       '<a href="/integritetspolicy.html">Läs mer</a></p>' +
       '<div class="ckBtns">' +
       '<button class="ckAccept" id="ckAcceptBtn" type="button">Acceptera alla</button>' +
@@ -1783,7 +2445,14 @@ function finalizeMsg(div, text) {
       setTimeout(function () { banner.remove(); }, 280);
     }
 
-    document.body.appendChild(banner);
+    var main = document.querySelector('main');
+    if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
+    else document.body.insertBefore(banner, document.body.firstElementChild);
+    var openModalBody = document.querySelector('#pvModal.pv-on .pv-bd');
+    if (openModalBody) {
+      banner.classList.add('ckInAuth');
+      openModalBody.insertBefore(banner, openModalBody.firstElementChild);
+    }
     document.getElementById('ckAcceptBtn').addEventListener('click', function () { dismiss('accepted'); });
     document.getElementById('ckDeclineBtn').addEventListener('click', function () { dismiss('necessary'); });
   }
@@ -1843,11 +2512,14 @@ function finalizeMsg(div, text) {
 
   /* ── SHARED LOGIN MODAL ── */
   (function() {
-    var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-    var SUPA_ANON = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
-    var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+    var SUPA_URL  = EXGEN_RUNTIME.supabaseUrl;
+    var SUPA_ANON = EXGEN_RUNTIME.publishableKey;
+    var SUPA_LS   = EXGEN_RUNTIME.authStorageKey;
     var _view     = 'welcome';
     var _open     = false;
+    var _returnFocus = null;
+    var _closeTimer = null;
+    var _backgroundInert = [];
 
     /* Set the first time an account is created or signed into on this device.
        Used to decide whether the dialog should open on "Skapa konto" or on
@@ -1863,20 +2535,25 @@ function finalizeMsg(div, text) {
 
     function isLoggedIn() {
       try {
+        if (EXGEN_RUNTIME.environment === 'pilot' && sessionStorage.getItem(PILOT_REAUTH_REQUIRED_KEY) === '1') return false;
         var s = JSON.parse(localStorage.getItem(SUPA_LS) || '{}');
         if (!s || !s.access_token) return false;
+        var expired = s.expires_at && Number(s.expires_at) * 1000 <= Date.now();
         /* An expired access token is still a live session as long as a refresh
            token is there — supabase-js renews it silently. Only a session that
            is both expired and unrenewable counts as signed out; treating every
            expired token as signed out would show "Logga in" to anyone who left
            a tab open for an hour. */
-        var expired = s.expires_at && Number(s.expires_at) * 1000 <= Date.now();
         if (expired && !s.refresh_token) return false;
         return true;
       } catch (_) { return false; }
     }
     function saveSession(d) {
+      abortPerRequestForAccountId(pilotSessionUserId(d) || null);
+      clearPilotQuestionForAccountChange(d);
       try { localStorage.setItem(SUPA_LS, JSON.stringify(d)); } catch (_) {}
+      try { sessionStorage.removeItem(PILOT_REAUTH_REQUIRED_KEY); } catch (_) {}
+      if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.syncSession();
       rememberAccount();
     }
 
@@ -1892,22 +2569,55 @@ function finalizeMsg(div, text) {
       } catch (_) { return ''; }
     }
 
-    /* Swedish wording for the errors Supabase answers with in English. The
-       dialog is the first thing a new user meets, and "Invalid login
-       credentials" in the middle of a Swedish page reads as a system error
-       rather than a typo they can fix. Unknown messages fall through to a
-       generic line instead of leaking raw API text. */
-    function svError(raw, fallback) {
+    function authText(key) {
+      var language = '';
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang || ''; } catch (_) {}
+      var english = /^en\b/i.test(String(language));
+      var copy = {
+        sv: {
+          emailPasswordRequired:'Fyll i e-post och lösenord.', passwordTooShort:'Lösenordet måste vara minst 8 tecken.',
+          registerLoading:'Skapar konto…', registerSuccess:'Om adressen kan registreras skickar vi en verifieringslänk.',
+          registerError:'Kunde inte skapa kontot. Försök igen.', forgotEmailRequired:'Fyll i din e-post.',
+          forgotLoading:'Skickar…', forgotSuccess:'Kolla mejlen. Finns adressen hos oss ligger en återställningslänk där om en minut.',
+          forgotSent:'Länk skickad', forgotError:'Kunde inte skicka länken. Försök igen.', loginLoading:'Loggar in…',
+          loginError:'Fel e-post eller lösenord.', signIn:'Logga in', create:'Skapa konto', reset:'Skicka återställningslänk',
+          invalidLogin:'Fel e-post eller lösenord.', emailUnconfirmed:'Bekräfta din e-post först — kolla mejlen.',
+          accountExists:'Du har redan ett konto med den adressen.', passwordInvalid:'Lösenordet är för kort — minst 8 tecken.',
+          emailInvalid:'E-postadressen ser inte giltig ut.', rateLimited:'För många försök. Vänta en stund och prova igen.',
+          networkError:'Ingen kontakt med servern. Kolla nätet och försök igen.',
+          googleOpening:'Öppnar Google…', googleCancelled:'Google-inloggningen avbröts.', googleError:'Google-inloggningen gick inte igenom. Försök igen.',
+          pilotGoogleUnavailable:'Google-inloggning är inte tillgänglig i skolpiloten. Logga in med ditt inbjudna skolpilotkonto.'
+        },
+        en: {
+          emailPasswordRequired:'Enter your email and password.', passwordTooShort:'Your password must be at least 8 characters.',
+          registerLoading:'Creating account…', registerSuccess:'If this address can be registered, we will send a confirmation link.',
+          registerError:'Could not create your account. Please try again.', forgotEmailRequired:'Enter your email address.',
+          forgotLoading:'Sending…', forgotSuccess:'Check your email. If the address has an account, a reset link should arrive shortly.',
+          forgotSent:'Link sent', forgotError:'Could not send the link. Please try again.', loginLoading:'Signing in…',
+          loginError:'Incorrect email or password.', signIn:'Sign in', create:'Create account', reset:'Send reset link',
+          invalidLogin:'Incorrect email or password.', emailUnconfirmed:'Confirm your email first. Check your inbox.',
+          accountExists:'An account already exists for this address.', passwordInvalid:'Your password is too short. Use at least 8 characters.',
+          emailInvalid:'Enter a valid email address.', rateLimited:'Too many attempts. Wait a moment and try again.',
+          networkError:'Could not reach the server. Check your connection and try again.',
+          googleOpening:'Opening Google…', googleCancelled:'Google sign-in was cancelled.', googleError:'Google sign-in did not work. Please try again.',
+          pilotGoogleUnavailable:'Google sign-in is unavailable in the school pilot. Sign in with your invited pilot account.'
+        }
+      };
+      return copy[english ? 'en' : 'sv'][key] || key;
+    }
+
+    /* Translate known auth failures and keep unknown provider details private. */
+    function svError(raw, fallbackKey) {
       var m = String(raw || '').toLowerCase();
-      if (!m) return fallback;
-      if (m.indexOf('invalid login credentials') > -1) return 'Fel e-post eller lösenord.';
-      if (m.indexOf('email not confirmed') > -1) return 'Bekräfta din e-post först — kolla mejlen.';
-      if (m.indexOf('already registered') > -1 || m.indexOf('already been registered') > -1) return 'Du har redan ett konto med den adressen.';
-      if (m.indexOf('password should be') > -1 || m.indexOf('password must be') > -1) return 'Lösenordet är för kort — minst 8 tecken.';
-      if (m.indexOf('unable to validate email') > -1 || m.indexOf('invalid email') > -1) return 'E-postadressen ser inte giltig ut.';
-      if (m.indexOf('for security purposes') > -1 || m.indexOf('rate limit') > -1 || m.indexOf('too many') > -1) return 'För många försök. Vänta en stund och prova igen.';
-      if (m.indexOf('failed to fetch') > -1 || m.indexOf('networkerror') > -1 || m.indexOf('load failed') > -1) return 'Ingen kontakt med servern. Kolla nätet och försök igen.';
-      return fallback;
+      if (!m) return authText(fallbackKey);
+      if (m.indexOf('invalid login credentials') > -1) return authText('invalidLogin');
+      if (m.indexOf('email not confirmed') > -1) return authText('emailUnconfirmed');
+      if (m.indexOf('already registered') > -1 || m.indexOf('already been registered') > -1) return authText('accountExists');
+      if (m.indexOf('password should be') > -1 || m.indexOf('password must be') > -1) return authText('passwordInvalid');
+      if (m.indexOf('unable to validate email') > -1 || m.indexOf('invalid email') > -1) return authText('emailInvalid');
+      if (m.indexOf('for security purposes') > -1 || m.indexOf('rate limit') > -1 || m.indexOf('too many') > -1) return authText('rateLimited');
+      if (m.indexOf('failed to fetch') > -1 || m.indexOf('networkerror') > -1 || m.indexOf('load failed') > -1) return authText('networkError');
+      return authText(fallbackKey);
     }
 
     /* The header button is rendered before we know anything, so its label has
@@ -1915,9 +2625,12 @@ function finalizeMsg(div, text) {
        "Mitt konto" while the login dialog is open on the same screen. */
     function syncLoginButtons() {
       var loggedIn = isLoggedIn();
+      var english = !!(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en');
       var btns = document.querySelectorAll('.xg-login-btn');
       for (var i = 0; i < btns.length; i++) {
-        btns[i].textContent = loggedIn ? 'Mitt konto' : 'Logga in';
+        btns[i].textContent = loggedIn
+          ? (english ? 'My account' : 'Mitt konto')
+          : (english ? 'Sign in' : 'Logga in');
       }
     }
 
@@ -1932,12 +2645,13 @@ function finalizeMsg(div, text) {
         /* Scrim is ExGen navy, not the near-black green (rgba(3,8,6,.82)) left
            over from the dark ProviaAI theme, which read as a murky grey-green
            haze over a light turquoise site. */
-        '#pvModal{position:fixed;inset:0;z-index:13000;background:rgba(14,27,42,.60);backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);display:none;align-items:center;justify-content:center;padding:18px;opacity:0;transition:opacity .22s ease}',
+        '#pvModal{position:fixed;inset:0;z-index:13000;background:rgba(14,27,42,.60);backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);display:none;align-items:center;justify-content:center;padding:18px;overflow-y:auto;opacity:0;transition:opacity .22s ease}',
         '#pvModal.pv-on{opacity:1}',
-        '#pvCard{position:relative;background:linear-gradient(180deg,#ffffff,var(--s2,#f8fafc));border:1px solid rgba(0,183,217,.18);border-radius:18px;width:min(412px,100%);overflow:hidden;box-shadow:0 30px 80px -20px rgba(14,27,42,.35);transform:translateY(16px) scale(.96);transition:transform .26s cubic-bezier(.22,.61,.36,1)}',
+        '#pvCard{position:relative;background:linear-gradient(180deg,#ffffff,var(--s2,#f8fafc));border:1px solid rgba(0,183,217,.18);border-radius:18px;width:min(412px,100%);max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;box-shadow:0 30px 80px -20px rgba(14,27,42,.35);transform:translateY(16px) scale(.96);transition:transform .26s cubic-bezier(.22,.61,.36,1)}',
         '#pvModal.pv-on #pvCard{transform:none}',
         '#pvCard::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--a,#00768F),transparent);opacity:.7}',
         '.pv-hd{padding:30px 26px 18px;text-align:center;position:relative}',
+        '@media(max-height:500px){.pv-hd{position:sticky;top:0;z-index:2;padding:10px 18px 8px;background:#fff;border-bottom:1px solid rgba(14,27,42,.1)}.pv-hd img{height:18px!important;margin-bottom:4px!important}.pv-ti{font-size:18px;margin-bottom:2px}.pv-sb{font-size:9px}.pv-cl{top:10px;right:12px}.pv-bd{padding:8px 18px 18px}#pvCard{scroll-padding-top:85px}}',
         /* White-on-white borders here were invisible: the close button is drawn
            on a white card, so it needs dark hairlines, not the light ones the
            dark theme used. */
@@ -1977,6 +2691,9 @@ function finalizeMsg(div, text) {
         '.pv-tg button:hover{text-decoration:underline}',
         '@media(prefers-reduced-motion:reduce){#pvCard,.pv-pm,.pv-se,.pv-vw{transition:none;animation:none}}',
       ].join('');
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        s.textContent += '#pvToReg,#pvVR,#pvVW .pv-dv,#pvVL .pv-tg:not([style]){display:none!important}';
+      }
       document.head.appendChild(s);
     }
 
@@ -2008,7 +2725,7 @@ function finalizeMsg(div, text) {
     }
 
     function startGoogle(btn) {
-      if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Öppnar Google…'; }
+      if (btn) { btn.disabled = true; btn.querySelector('span').textContent = authText('googleOpening'); }
       location.href = SUPA_URL + '/auth/v1/authorize?provider=google&redirect_to='
         + encodeURIComponent(authReturnUrl());
     }
@@ -2020,13 +2737,13 @@ function finalizeMsg(div, text) {
       el.id = 'pvModal';
       el.setAttribute('role', 'dialog');
       el.setAttribute('aria-modal', 'true');
-      el.setAttribute('aria-label', 'Logga in eller skapa konto');
+      el.setAttribute('aria-labelledby', 'pvTi');
       el.innerHTML = '<div id="pvCard">'
         + '<div class="pv-hd">'
           + '<button class="pv-cl" id="pvCl" aria-label="Stäng">✕</button>'
           + '<img src="image/exgen-logo.png" alt="ExGen" style="height:26px;width:auto;margin-bottom:10px">'
           + '<div class="pv-ti" id="pvTi">Välkommen!</div>'
-          + '<div class="pv-sb" id="pvSb">GRATIS ATT STARTA · INGET KORT KRÄVS</div>'
+          + '<div class="pv-sb" id="pvSb">' + (EXGEN_RUNTIME.environment === 'pilot' ? 'SKOLPILOT · INBJUDNA TESTKONTON' : 'GRATIS ATT STARTA · INGET KORT KRÄVS') + '</div>'
         + '</div>'
         + '<div class="pv-bd">'
           + '<div id="pvVW" class="pv-vw pv-vx">'
@@ -2072,7 +2789,22 @@ function finalizeMsg(div, text) {
 
       el.addEventListener('click', function(e) { if (e.target === el) closeModal(); });
       document.getElementById('pvCl').onclick = closeModal;
-      document.addEventListener('keydown', function(e) { if (_open && e.key === 'Escape') closeModal(); });
+      document.addEventListener('keydown', function(e) {
+        if (!_open) return;
+        if (e.key === 'Escape') { closeModal(); return; }
+        if (e.key !== 'Tab') return;
+        var modal = document.getElementById('pvModal');
+        var focusable = modal ? Array.from(modal.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+          .filter(function(node) { return node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden'; }) : [];
+        if (!focusable.length) { e.preventDefault(); return; }
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+          e.preventDefault(); first.focus();
+        }
+      });
       document.getElementById('pvToReg').onclick = function() { switchView('register'); };
       document.getElementById('pvToLog').onclick = function() { switchView('login'); };
       document.getElementById('pvRBk').onclick = function() { switchView('login'); };
@@ -2092,16 +2824,71 @@ function finalizeMsg(div, text) {
     }
 
     function switchView(view) {
+      if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       _view = view;
+      var language = '';
+      try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang || ''; } catch (_) {}
+      var english = /^en\b/i.test(String(language));
+      var pilot = EXGEN_RUNTIME.environment === 'pilot';
       var map = { welcome:'pvVW', register:'pvVR', login:'pvVL', forgot:'pvVF' };
       Object.keys(map).forEach(function(k) {
         var el = document.getElementById(map[k]);
         if (el) el.classList.toggle('pv-vx', k === view);
       });
-      var titles = { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in', forgot:'Återställ lösenord' };
-      var subs = { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
+      var titles = english
+        ? { welcome:'Create your account', register:'Create your account', login:'Sign in', forgot:'Reset password' }
+        : { welcome:'Skapa konto', register:'Skapa konto', login:'Logga in', forgot:'Återställ lösenord' };
+      var subs = english
+        ? pilot
+          ? { welcome:'SCHOOL PILOT · INVITED TEST ACCOUNTS', register:'SCHOOL PILOT · INVITED TEST ACCOUNTS', login:'SCHOOL PILOT · SIGN IN', forgot:'WE WILL EMAIL A LINK' }
+          : { welcome:'FREE TO START · NO CARD REQUIRED', register:'FREE TO START · NO CARD REQUIRED', login:'WELCOME BACK', forgot:'WE WILL EMAIL A LINK' }
+        : pilot
+          ? { welcome:'SKOLPILOT · INBJUDNA TESTKONTON', register:'SKOLPILOT · INBJUDNA TESTKONTON', login:'SKOLPILOT · LOGGA IN', forgot:'VI MEJLAR EN LÄNK' }
+          : { welcome:'GRATIS ATT STARTA · INGET KORT KRÄVS', register:'GRATIS ATT STARTA · INGET KORT KRÄVS', login:'VÄLKOMMEN TILLBAKA', forgot:'VI MEJLAR EN LÄNK' };
       var ti = document.getElementById('pvTi'); if (ti) ti.textContent = titles[view] || '';
       var sb = document.getElementById('pvSb'); if (sb) sb.textContent = subs[view] || '';
+      var labels = english ? {
+        close:'Close', registerChoice:'Create a free account', loginChoice:'Sign in',
+        google:'Continue with Google', emailDivider:'or continue with email',
+        email:'Email', password:'Password', emailPlaceholder:'you@example.com',
+        newPasswordPlaceholder:'At least 8 characters', passwordPlaceholder:'Your password',
+        create:'Create account', signIn:'Sign in', already:'Already have an account? ',
+        newHere:'New here? ', forgot:'Forgot password?', reset:'Send reset link',
+        freeNote:'Free account — no card required.', back:'Back to sign in', or:'or'
+      } : {
+        close:'Stäng', registerChoice:'Skapa gratis konto', loginChoice:'Logga in',
+        google:'Fortsätt med Google', emailDivider:'eller med e-post',
+        email:'E-post', password:'Lösenord', emailPlaceholder:'du@exempel.se',
+        newPasswordPlaceholder:'Minst 8 tecken', passwordPlaceholder:'Ditt lösenord',
+        create:'Skapa konto', signIn:'Logga in', already:'Har du redan ett konto? ',
+        newHere:'Ny här? ', forgot:'Glömt lösenordet?', reset:'Skicka återställningslänk',
+        freeNote:'Gratis konto — inget kort krävs.', back:'Tillbaka till inloggning', or:'eller'
+      };
+      function setText(id, value) { var node = document.getElementById(id); if (node) node.textContent = value; }
+      function setPlaceholder(id, value) { var node = document.getElementById(id); if (node) node.placeholder = value; }
+      setText('pvCl', '×');
+      var close = document.getElementById('pvCl'); if (close) close.setAttribute('aria-label', labels.close);
+      setText('pvToReg', labels.registerChoice); setText('pvToLog', labels.loginChoice);
+      setText('pvRBtn', labels.create); setText('pvLBtn', labels.signIn); setText('pvFBtn', labels.reset);
+      setText('pvToForgot', labels.forgot); setText('pvFBk', labels.back);
+      setText('pvRBk', labels.signIn); setText('pvLBk', labels.create);
+      setPlaceholder('pvRE', labels.emailPlaceholder); setPlaceholder('pvLE', labels.emailPlaceholder); setPlaceholder('pvFE', labels.emailPlaceholder);
+      setPlaceholder('pvRP', labels.newPasswordPlaceholder); setPlaceholder('pvLP', labels.passwordPlaceholder);
+      ['pvRE','pvLE','pvFE'].forEach(function(id) {
+        var label = document.querySelector('label[for="' + id + '"]'); if (label) label.textContent = labels.email;
+      });
+      ['pvRP','pvLP'].forEach(function(id) {
+        var label = document.querySelector('label[for="' + id + '"]'); if (label) label.textContent = labels.password;
+      });
+      document.querySelectorAll('.pv-go span').forEach(function(node) { node.textContent = labels.google; });
+      document.querySelectorAll('.pv-dv:not([data-module="google"])').forEach(function(node) { node.textContent = labels.or; });
+      document.querySelectorAll('.pv-dv[data-module="google"]').forEach(function(node) { node.textContent = labels.emailDivider; });
+      var registerToggle = document.getElementById('pvRBk');
+      if (registerToggle && registerToggle.parentNode) registerToggle.parentNode.firstChild.textContent = labels.already;
+      var loginToggle = document.getElementById('pvLBk');
+      if (loginToggle && loginToggle.parentNode) loginToggle.parentNode.firstChild.textContent = labels.newHere;
+      setText('pvToReg', labels.registerChoice);
+      var note = document.querySelector('#pvVR .pv-hn'); if (note) note.textContent = labels.freeNote;
       var focusMap = { register:'pvRE', login:'pvLE', forgot:'pvFE' };
       if (focusMap[view]) setTimeout(function() { var inp = document.getElementById(focusMap[view]); if (inp) inp.focus(); }, 60);
       /* Reset every error slot, including its colour: doForgot and doRegister
@@ -2112,8 +2899,27 @@ function finalizeMsg(div, text) {
       });
     }
 
-    function openModal(view) {
-      if (isLoggedIn()) return;
+    function placeCookieSettingsInModal(modal) {
+      var banner = document.getElementById('proviaCookieBanner');
+      var body = modal && modal.querySelector('.pv-bd');
+      if (!banner || !body || modal.contains(banner)) return;
+      banner.classList.add('ckInAuth');
+      body.insertBefore(banner, body.firstElementChild);
+    }
+
+    function restoreCookieSettings() {
+      var banner = document.getElementById('proviaCookieBanner');
+      if (!banner || !banner.closest('#pvModal')) return;
+      banner.classList.remove('ckInAuth');
+      var main = document.querySelector('main');
+      if (main && main.parentNode) main.parentNode.insertBefore(banner, main);
+      else document.body.insertBefore(banner, document.body.firstElementChild);
+    }
+
+    function openModal(view, force) {
+      if (isLoggedIn() && !force) return;
+      if (_closeTimer) { clearTimeout(_closeTimer); _closeTimer = null; }
+      if (EXGEN_RUNTIME.environment === 'pilot' && view === 'register') view = 'login';
       /* Every page gate asks for 'register', which is right for a first-time
          visitor and wrong for everyone else — a returning student had to click
          past a signup form to reach the login form. Anyone who has had an
@@ -2121,6 +2927,10 @@ function finalizeMsg(div, text) {
          (the "Skapa konto" buttons inside the dialog) go through switchView
          and are untouched by this. */
       if (view === 'register' && hasAccountBefore()) view = 'login';
+      if (!_open) {
+        var active = document.activeElement;
+        _returnFocus = active && active !== document.body && typeof active.focus === 'function' ? active : null;
+      }
       syncLoginButtons();
       /* Gated pages call this during DOMContentLoaded, while the intro splash
          still owns the screen. Cut the splash short — asking someone to log in
@@ -2132,17 +2942,43 @@ function finalizeMsg(div, text) {
       var ldr = document.getElementById('pageLoader') || document.querySelector('.loader');
       if (ldr) { ldr.classList.add('done'); ldr.classList.add('out'); }
       buildModal();
-      _open = true;
       var el = document.getElementById('pvModal');
+      placeCookieSettingsInModal(el);
+      _open = true;
+      if (!_backgroundInert.length) {
+        _backgroundInert = Array.from(document.body.children).filter(function(node) { return node !== el; }).map(function(node) {
+          var previous = node.inert;
+          node.inert = true;
+          return { node: node, previous: previous };
+        });
+      }
       if (el) { el.style.display = 'flex'; document.body.style.overflow = 'hidden'; requestAnimationFrame(function() { el.classList.add('pv-on'); }); }
       switchView(view || 'register');
+      if (!({ register:1, login:1, forgot:1 })[view || 'register']) {
+        var closeButton = document.getElementById('pvCl');
+        if (closeButton) closeButton.focus();
+      }
     }
 
     function closeModal() {
       _open = false;
       var el = document.getElementById('pvModal');
-      if (el) { el.classList.remove('pv-on'); setTimeout(function() { el.style.display = 'none'; }, 220); }
-      document.body.style.overflow = '';
+      if (_closeTimer) clearTimeout(_closeTimer);
+      if (el) el.classList.remove('pv-on');
+      var returnFocus = _returnFocus;
+      _returnFocus = null;
+      _closeTimer = setTimeout(function() {
+        _closeTimer = null;
+        if (_open) return;
+        if (el) el.style.display = 'none';
+        document.body.style.overflow = '';
+        restoreCookieSettings();
+        _backgroundInert.forEach(function(entry) { if (entry.node.isConnected) entry.node.inert = entry.previous; });
+        _backgroundInert = [];
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') {
+          try { returnFocus.focus({ preventScroll: true }); } catch (_) { returnFocus.focus(); }
+        }
+      }, 220);
     }
 
     function supaPost(path, body) {
@@ -2167,18 +3003,16 @@ function finalizeMsg(div, text) {
 
     function doRegister() {
       var email = (document.getElementById('pvRE').value || '').trim();
-      var pass  = (document.getElementById('pvRP').value || '').trim();
+      var pass  = document.getElementById('pvRP').value || '';
       var errEl = document.getElementById('pvRE2');
       var btn   = document.getElementById('pvRBtn');
       errEl.textContent = '';
-      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
-      if (pass.length < 8) { errEl.textContent = 'Lösenordet måste vara minst 8 tecken.'; return; }
-      btn.disabled = true; btn.textContent = 'Skapar konto…';
-      /* Registration goes through /api/signup, not Supabase's /auth/v1/signup
-         directly. That endpoint is what the in-page forms already use, and it is the only
-         path that confirms the address, sends the welcome mail and notifies
-         the admin. Calling Supabase raw from here meant a user who signed up
-         from the landing page silently got none of that. */
+      if (!email || !pass) { errEl.textContent = authText('emailPasswordRequired'); return; }
+      if (pass.length < 8) { errEl.textContent = authText('passwordTooShort'); return; }
+      btn.disabled = true; btn.textContent = authText('registerLoading');
+      /* The endpoint creates an unconfirmed signup and sends one generic
+         confirmation response, so the form must never infer whether an email
+         address already has an account. */
       fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2189,37 +3023,13 @@ function finalizeMsg(div, text) {
           return d;
         });
       }).then(function(d) {
-        if (d.session && d.session.access_token) {
-          var isNew = !hasAccountBefore();
-          saveSession(d.session); closeModal();
-          /* Hand the welcome animation to the destination page instead of
-             playing it here and then throwing it away in the navigation —
-             the same welcome flow uses. Saves 2.6s of dead wait. */
-          if (window.triggerWelcome) window.triggerWelcome(email, isNew);
-          pvAfterAuth();
-        } else {
-          errEl.style.color = 'var(--a,#00768F)';
-          errEl.textContent = 'Kontot är skapat — logga in för att komma igång.';
-          btn.disabled = false; btn.textContent = 'Skapa konto';
-        }
+        errEl.style.color = 'var(--a,#00768F)';
+        errEl.textContent = authText('registerSuccess');
+        btn.disabled = false; btn.textContent = authText('create');
       }).catch(function(e) {
-        btn.disabled = false; btn.textContent = 'Skapa konto';
+        btn.disabled = false; btn.textContent = authText('create');
         errEl.style.color = '';
-        /* "Already registered" is not really an error — the person has an
-           account and picked the wrong form. Move them to the login view with
-           the address already filled in rather than making them retype it. */
-        if (/already (been )?registered/i.test(String(e.message || ''))) {
-          switchView('login');
-          var le = document.getElementById('pvLE');
-          if (le) le.value = email;
-          var lp = document.getElementById('pvLP');
-          if (lp) setTimeout(function() { lp.focus(); }, 80);
-          var lerr = document.getElementById('pvLE2');
-          if (lerr) { lerr.style.color = 'var(--a,#00768F)'; lerr.textContent = 'Du har redan ett konto — logga in här.'; }
-          rememberAccount();
-          return;
-        }
-        errEl.textContent = svError(e.message, 'Kunde inte skapa kontot. Försök igen.');
+        errEl.textContent = svError(e.message, 'registerError');
       });
     }
 
@@ -2228,37 +3038,37 @@ function finalizeMsg(div, text) {
       var errEl = document.getElementById('pvFE2');
       var btn   = document.getElementById('pvFBtn');
       errEl.style.color = ''; errEl.textContent = '';
-      if (!email) { errEl.textContent = 'Fyll i din e-post.'; return; }
-      btn.disabled = true; btn.textContent = 'Skickar…';
+      if (!email) { errEl.textContent = authText('forgotEmailRequired'); return; }
+      btn.disabled = true; btn.textContent = authText('forgotLoading');
       var redirect = location.origin + '/aterstall.html';
       supaPost('recover?redirect_to=' + encodeURIComponent(redirect), { email: email }).then(function() {
         /* Supabase answers 200 whether or not the address exists, and the
            wording keeps it that way — confirming which addresses have
            accounts would hand out a user list to anyone who asks. */
         errEl.style.color = 'var(--a,#00768F)';
-        errEl.textContent = 'Kolla mejlen. Finns adressen hos oss ligger en återställningslänk där om en minut.';
-        btn.textContent = 'Länk skickad';
+        errEl.textContent = authText('forgotSuccess');
+        btn.textContent = authText('forgotSent');
       }).catch(function(e) {
-        errEl.textContent = svError(e.message, 'Kunde inte skicka länken. Försök igen.');
-        btn.disabled = false; btn.textContent = 'Skicka återställningslänk';
+        errEl.textContent = svError(e.message, 'forgotError');
+        btn.disabled = false; btn.textContent = authText('reset');
       });
     }
 
     function doLogin() {
       var email = (document.getElementById('pvLE').value || '').trim();
-      var pass  = (document.getElementById('pvLP').value || '').trim();
+      var pass  = document.getElementById('pvLP').value || '';
       var errEl = document.getElementById('pvLE2');
       var btn   = document.getElementById('pvLBtn');
       errEl.textContent = '';
-      if (!email || !pass) { errEl.textContent = 'Fyll i e-post och lösenord.'; return; }
-      btn.disabled = true; btn.textContent = 'Loggar in…';
+      if (!email || !pass) { errEl.textContent = authText('emailPasswordRequired'); return; }
+      btn.disabled = true; btn.textContent = authText('loginLoading');
       supaPost('token?grant_type=password', { email: email, password: pass }).then(function(d) {
         saveSession(d); closeModal();
         if (window.triggerWelcome) window.triggerWelcome(email, false);
-        location.reload();
+        pvAfterAuth();
       }).catch(function(e) {
-        errEl.textContent = svError(e.message, 'Fel e-post eller lösenord.');
-        btn.disabled = false; btn.textContent = 'Logga in';
+        errEl.textContent = svError(e.message, 'loginError');
+        btn.disabled = false; btn.textContent = authText('signIn');
       });
     }
 
@@ -2270,9 +3080,11 @@ function finalizeMsg(div, text) {
     // Logged-out → open the modal; logged-in → let the element do its thing (e.g. navigate).
     document.addEventListener('click', function(e) {
       var t = e.target.closest && e.target.closest('[data-pv-auth]');
-      if (!t || isLoggedIn()) return;
+      if (!t) return;
+      var forcePilotLogin = EXGEN_RUNTIME.environment === 'pilot' && t.getAttribute('data-pv-force-login') === 'true';
+      if (isLoggedIn() && !forcePilotLogin) return;
       e.preventDefault();
-      openModal(t.getAttribute('data-pv-auth') || 'register');
+      openModal(t.getAttribute('data-pv-auth') || 'register', forcePilotLogin);
     });
 
     /* ── RETURN FROM GOOGLE ──
@@ -2326,14 +3138,25 @@ function finalizeMsg(div, text) {
           var el = document.getElementById('pvLE2');
           if (!el) return;
           el.textContent = cancelled
-            ? 'Google-inloggningen avbröts.'
-            : svError(msg, 'Google-inloggningen gick inte igenom. Försök igen.');
+            ? authText('googleCancelled')
+            : svError(msg, 'googleError');
         });
         return;
       }
 
       var token = q.get('access_token');
       if (!token) return;
+
+      var email = jwtEmail(token);
+      clean();
+      if (EXGEN_RUNTIME.environment === 'pilot') {
+        onReady(function() {
+          openModal('login');
+          var message = document.getElementById('pvLE2');
+          if (message) message.textContent = authText('pilotGoogleUnavailable');
+        });
+        return;
+      }
 
       var ttl = Number(q.get('expires_in') || 3600);
       saveSession({
@@ -2343,9 +3166,6 @@ function finalizeMsg(div, text) {
         expires_at: Math.floor(Date.now() / 1000) + ttl,
         token_type: q.get('token_type') || 'bearer'
       });
-      clean();
-
-      var email = jwtEmail(token);
 
       /* Supabase creates the user itself on this path, so the signup branch
          never runs and nothing would send the welcome mail. This is the same
@@ -2381,6 +3201,7 @@ function finalizeMsg(div, text) {
     } else {
       syncLoginButtons();
     }
+    window.addEventListener('exgen:languagechange', syncLoginButtons);
   })();
 
 })();

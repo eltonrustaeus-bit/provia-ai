@@ -94,7 +94,7 @@ const pick = page => page.evaluate(() => {
 
 // Markerar en fråga utan att anta HUR markeringen ser ut. Idag är det en
 // kryssruta inuti raden; efter Del B är det raden själv. Båda vägarna går
-// genom togglePickId, som är beteendet som ska överleva.
+// genom togglePickKey, som är beteendet som ska överleva.
 // Returnerar false i stället för att kasta. En kontroll som inte kan utföras
 // ska bli röd bland de andra, inte döda körningen innan någon hunnit skriva ut
 // sitt resultat.
@@ -203,18 +203,20 @@ async function mark(page, id) {
 {
   const { ctx, page } = await mk(3, "felbank");
   const p0 = await pick(page);
-  ok("2a inget markerat från start", !p0 || !p0.ids || p0.ids.length === 0, JSON.stringify(p0));
+  ok("2a inget markerat från start", !p0 || !p0.keys || p0.keys.length === 0, JSON.stringify(p0));
 
   await mark(page, "m1");
   await page.waitForTimeout(300);
   const p1 = await pick(page);
-  ok("2b markeringen hamnar i LS_TRAIN_PICK", !!p1 && p1.ids.map(String).includes("m1"), JSON.stringify(p1));
+  const m1Key = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").find(item => item.id === "m1")?.mistake_key);
+  ok("2b markeringen hamnar i LS_TRAIN_PICK", !!p1 && !!m1Key && p1.keys.map(String).includes(m1Key), JSON.stringify({ p1, m1Key }));
   ok("2c räknaren visar ett", /\b1\b/.test((await page.textContent("#selCountPill")) || ""), (await page.textContent("#selCountPill")) || "");
 
   await mark(page, "m3");
   await page.waitForTimeout(300);
   const p2 = await pick(page);
-  ok("2d två markerade", p2.ids.length === 2, JSON.stringify(p2.ids));
+  const expectedKeys = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").filter(item => ["m1", "m3"].includes(item.id)).map(item => item.mistake_key));
+  ok("2d två markerade", p2.keys.length === 2 && expectedKeys.every(key => p2.keys.includes(key)), JSON.stringify({ picked: p2.keys, expectedKeys }));
   ok("2e räknaren följer med", /\b2\b/.test((await page.textContent("#selCountPill")) || ""));
   await ctx.close();
 }
@@ -229,7 +231,8 @@ async function mark(page, id) {
   // träningsprovet byggs. Att kräva att den överlever hade varit att kräva att
   // överlämningen misslyckas.
   const handed = await pick(page);
-  ok("3a urvalet är överlämnat vid klick", !!handed && handed.ids.map(String).join(",") === "m2", JSON.stringify(handed));
+  const m2Key = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").find(item => item.id === "m2")?.mistake_key);
+  ok("3a urvalet är överlämnat vid klick", !!handed && !!m2Key && handed.keys.map(String).includes(m2Key), JSON.stringify({ handed, m2Key }));
 
   await reveal(page, "#trainSelectedBtn");
   await page.click("#trainSelectedBtn");
@@ -247,7 +250,7 @@ async function mark(page, id) {
   await page.click("#clearSelectionBtn");
   await page.waitForTimeout(500);
   const p = await pick(page);
-  ok("4a lagringen är tom", !p || p.ids.length === 0, JSON.stringify(p));
+  ok("4a lagringen är tom", !p || p.keys.length === 0, JSON.stringify(p));
   /* Kontrollen krävde tidigare att texten innehöll siffran 0 ("0 valda").
      Åtgärdsraden säger nu "Markera det du vill träna" i tomt läge — samma sak
      sagt bättre: en instruktion i stället för en avläsning av ingenting.
@@ -304,10 +307,10 @@ async function mark(page, id) {
   await ctx.close();
 }
 
-// ── 6: rapportgrinden går vid tre prov ───────────────────────────────────
+// ── 6: lokal historik avgör inte om servern kan skapa rapport ───────────
 {
   const { ctx, page } = await mk(2, "rapport");
-  ok("6a avstängd vid två prov", await page.isDisabled("#genReportBtn"));
+  ok("6a tillgänglig vid två lokala prov; servern verifierar", await page.isEnabled("#genReportBtn"));
   await ctx.close();
 }
 {

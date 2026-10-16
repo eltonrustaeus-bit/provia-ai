@@ -24,7 +24,7 @@ async function check(name, fn) {
 function fakeEmbeddingFetch(embedding = new Array(EMBEDDING_DIMENSIONS).fill(0.01)) {
   return async () => ({
     ok: true,
-    json: async () => ({ data: [{ embedding }] }),
+    json: async () => ({ model: "text-embedding-3-small", usage: { prompt_tokens: 4, total_tokens: 4 }, data: [{ embedding }] }),
   });
 }
 
@@ -37,7 +37,23 @@ await check("getEmbedding kastar utan text", async () => {
 });
 
 await check("getEmbedding returnerar vektor med rätt dimension", async () => {
-  const emb = await getEmbedding("anbud och accept", { apiKey: "sk-test", fetchImpl: fakeEmbeddingFetch() });
+  let usageEvent;
+  const emb = await getEmbedding("anbud och accept", {
+    apiKey: "sk-test", fetchImpl: fakeEmbeddingFetch(),
+    onUsage: (event) => { usageEvent = event; },
+  });
+  assert.equal(emb.length, EMBEDDING_DIMENSIONS);
+  assert.deepEqual({ model: usageEvent.model, usage: usageEvent.usage }, {
+    model: "text-embedding-3-small", usage: { prompt_tokens: 4, total_tokens: 4 },
+  });
+  assert.equal(typeof usageEvent.latencyMs, "number");
+});
+
+await check("fel i usage-callback påverkar inte embeddingresultatet", async () => {
+  const emb = await getEmbedding("anbud och accept", {
+    apiKey: "sk-test", fetchImpl: fakeEmbeddingFetch(),
+    onUsage: async () => { throw new Error("synthetic telemetry failure"); },
+  });
   assert.equal(emb.length, EMBEDDING_DIMENSIONS);
 });
 
@@ -80,6 +96,21 @@ await check("retrieveChunks anropar match_knowledge_chunks RPC med rätt default
   assert.equal(capturedArgs.p_vec_weight, 0.6);
   assert.equal(capturedArgs.p_include_pending, false, "produktionsdefault måste vara false (§18/§24)");
   assert.equal(result.length, 1);
+});
+
+await check("retrieveChunks skickar vidare metadata för embeddingkostnad utan text eller vektor", async () => {
+  let usage;
+  const fakeSupabase = { rpc: async () => ({ data: [], error: null }) };
+  await retrieveChunks(fakeSupabase, "synthetic query", {
+    apiKey: "sk-test",
+    fetchImpl: fakeEmbeddingFetch(),
+    onEmbeddingUsage: (event) => { usage = event; },
+  });
+  assert.equal(usage.model, "text-embedding-3-small");
+  assert.deepEqual(usage.usage, { prompt_tokens: 4, total_tokens: 4 });
+  assert.equal(typeof usage.latencyMs, "number");
+  assert.equal(Object.hasOwn(usage, "text"), false);
+  assert.equal(Object.hasOwn(usage, "embedding"), false);
 });
 
 await check("retrieveChunks respekterar includePending=true (Fas 4-testläge mot pending-korpus)", async () => {

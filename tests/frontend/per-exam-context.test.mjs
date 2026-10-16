@@ -11,17 +11,30 @@ const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
 const EXAM = {
-  title: "Prov", level: "C",
-  questions: Array.from({ length: 3 }, (_, n) => ({
-    id: "q" + (n + 1), type: "mc", points: 2,
-    question: "Fråga nummer " + (n + 1) + " om cellandning",
-    options: ["Alfa", "Beta", "Gamma", "Delta"], correct_index: 1,
+  title: "Prov", level: "C", exam_manifest: `v2.${"a".repeat(32)}.synthetic`,
+  questions: Array.from({ length: 4 }, (_, n) => ({
+    id: "q" + (n + 1), type: n >= 2 ? "graph" : "mc", points: n >= 2 ? 3 : 2,
+    question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen"
+      : n === 3 ? "Fråga nummer 4 med okänt grafmetadata"
+        : "Fråga nummer " + (n + 1) + " om cellandning",
+    options: n >= 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n >= 2 ? -1 : 1,
+    ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } }
+      : n === 3 ? { graph_ui: { mode: "future", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
     topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
-    model_answer: "Beta", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
+    model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
+    scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
   }))
 };
 
 let lastExplain = null;
+let examStateUnavailable = false;
+let activeExamCount = 0;
+let historyAllowed = true;
+const activeExamCountCalls = [];
+const SAVED_PER_HISTORY = [
+  { role: "user", content: "Explain my old practice result." },
+  { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42." },
+];
 const R = report("per-exam-context");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
@@ -33,10 +46,26 @@ const page = await ctx.newPage();
 // registreras sist och därmed vinner.
 await mockApis(page, {
   extra: [
-    ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+    ["**/api/generate-exam", r => {
+      historyAllowed = false;
+      r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+    }],
+    ["**/api/abandon-exam**", r => {
+      activeExamCountCalls.push({ method: r.request().method(), url: r.request().url() });
+      const url = new URL(r.request().url());
+      r.fulfill({ json: url.searchParams.has("submission_id")
+        ? { ok: true, exam_state: "active" }
+        : { ok: true, active_count: activeExamCount } });
+    }],
     ["**/api/explain", r => {
+      if (r.request().method() === "GET") {
+        if (historyAllowed) r.fulfill({ json: { ok: true, history: SAVED_PER_HISTORY } });
+        else r.fulfill({ status: 409, json: { error: "PER_HISTORY_LOCKED" } });
+        return;
+      }
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
-      r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
+      if (examStateUnavailable) r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
+      else r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
     }],
   ],
 });
@@ -44,6 +73,12 @@ await seed(page);
 
 await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null, null, { timeout: 5000 });
+await page.evaluate(history => {
+  localStorage.setItem("proviaai_per_history", JSON.stringify(history));
+  window.PER.setExamHistoryMasked(true);
+  window.PER.setExamHistoryMasked(false);
+}, SAVED_PER_HISTORY);
 await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
 await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
 await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);
@@ -54,15 +89,38 @@ await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); awai
 await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 await page.waitForTimeout(300);
+const historyDuringExam = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+}));
+ok("P.E.R hides cached full solutions after an exam opens", !historyDuringExam.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")
+  && /dolt|hidden/i.test(historyDuringExam.visible));
+ok("hiding exam history preserves the original local transcript", JSON.stringify(historyDuringExam.stored) === JSON.stringify(SAVED_PER_HISTORY), JSON.stringify(historyDuringExam.stored));
+ok("active exam history mask persists for same-browser navigation", historyDuringExam.mask === "1");
+
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+await page.evaluate(() => window.PER.setExamHistoryMasked(false));
+const historyBeforeResume = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+}));
+ok("reload keeps historical solutions hidden until the active exam is verified", historyBeforeResume.mask === "1"
+  && !historyBeforeResume.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"), JSON.stringify(historyBeforeResume));
+await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.ghost");
+await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+ok("verified exam resume keeps the old solution hidden", await page.locator("#perMessages").innerText().then(text => !text.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")));
 
 // ── T1: manifestet finns direkt, utan att hjälpknappen tryckts ────────────
 const t1 = await page.evaluate(() => window.__perTestCtx());
 ok("T1a fokus satt utan knapptryck", t1.currentQuestion?.number === 1, JSON.stringify(t1.currentQuestion));
-ok("T1b targets finns för alla frågor", t1.targets?.length === 3 && t1.targets[2].id === "q3", JSON.stringify(t1.targets));
+ok("T1b targets finns för alla frågor", t1.targets?.length === 4 && t1.targets[3].id === "q4", JSON.stringify(t1.targets));
 // phase är signalen servern räknar hjälptaket ur (api/explain.js helpCapFor).
 // Saknas den tolkas provet som pågående med taket 2 — vilket ser rimligt ut och
 // därför aldrig märks. Den måste finnas, och den måste vara "exam" här.
 ok("T1c phase är exam under provet", t1.examState?.phase === "exam", JSON.stringify(t1.examState));
+ok("T1c1 aktivt provs id finns i det serverbundna sammanhanget", t1.examState?.submissionId === "a".repeat(32), JSON.stringify(t1.examState));
 ok("T1d answered är falskt innan eleven rört frågan", t1.currentQuestion?.answered === false,
    String(t1.currentQuestion?.answered));
 
@@ -86,11 +144,16 @@ await page.fill("#perInput", "hjälp mig med frågan");
 await page.click("#perSendBtn");
 await page.waitForTimeout(900);
 ok("T4a explain anropades", !!lastExplain);
+ok("T4a1 active exam requests do not include prior P.E.R transcripts", Array.isArray(lastExplain?.history) && lastExplain.history.length === 0,
+  JSON.stringify(lastExplain?.history));
+ok("T4a1 färdigt P.E.R-svar annonseras", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
 ok("T4b rätt frågenummer i kroppen", lastExplain?.pageContext?.currentQuestion?.number === 3,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4c frågetexten i kroppen", /Fråga nummer 3/.test(lastExplain?.pageContext?.currentQuestion?.text || ""));
+ok("T4c1 scatterläge följer med för rätt aktiv fråga", lastExplain?.pageContext?.currentQuestion?.graphMode === "scatter",
+   JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 ok("T4d targets i kroppen utan go", Array.isArray(lastExplain?.pageContext?.targets)
-   && lastExplain.pageContext.targets.length === 3
+   && lastExplain.pageContext.targets.length === 4
    && lastExplain.pageContext.targets.every(t => t.go === undefined),
    JSON.stringify(lastExplain?.pageContext?.targets));
 ok("T4e provstatus i kroppen", typeof lastExplain?.pageContext?.examState?.answered === "number",
@@ -101,6 +164,51 @@ ok("T4e provstatus i kroppen", typeof lastExplain?.pageContext?.examState?.answe
 // och bara här.
 ok("T4f phase följer med ut på nätverket", lastExplain?.pageContext?.examState?.phase === "exam",
    JSON.stringify(lastExplain?.pageContext?.examState));
+ok("T4g provets submission-id följer med till servern", lastExplain?.pageContext?.examState?.submissionId === "a".repeat(32),
+   JSON.stringify(lastExplain?.pageContext?.examState));
+
+// Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
+await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);
+await page.click(".xf-ask"); await page.waitForTimeout(400);
+await page.fill("#perInput", "Hur ska jag tänka om grafen?");
+await page.click("#perSendBtn");
+ok("T4h1 föregående svar nollställs före nästa fråga", (await page.locator("#perAnnouncement").innerText()) === "");
+await page.waitForTimeout(900);
+ok("T4h2 identiskt nytt svar annonseras igen", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
+ok("T4h okänt grafmetadata når P.E.R utan linjeantagande",
+   lastExplain?.pageContext?.currentQuestion?.graphMode === undefined,
+   JSON.stringify(lastExplain?.pageContext?.currentQuestion));
+ok("T4i frågetypen finns kvar för serverns neutrala grafvägledning",
+   lastExplain?.pageContext?.currentQuestion?.type === "graph");
+
+// A missing server status must stay fail-closed without exposing an internal
+// error code or leaving the learner with a consumed question.
+examStateUnavailable = true;
+const swedishRetry = "Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.";
+await page.fill("#perInput", "Hur ska jag tänka?");
+await page.click("#perSendBtn");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "kan därför inte hjälpa med en enskild provfråga" }).last().waitFor();
+ok("T4j svensk status visar en trygg återförsöksväg", (await page.locator("#perMessages").innerText()).includes(swedishRetry));
+ok("T4k svenskt fel återställer frågan och låser upp Skicka", await page.locator("#perInput").inputValue() === "Hur ska jag tänka?"
+   && await page.locator("#perSendBtn").isEnabled());
+ok("T4l skärmläsarregionen annonserar samma besked", await page.locator("#perAnnouncement").innerText() === swedishRetry);
+
+await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
+ok("språkbyte under prov bevarar öppna P.E.R-panelen", await page.locator("#perPanel").isVisible()
+  && await page.locator("#perBubble").getAttribute("aria-expanded") === "true");
+ok("språkbyte bevarar elevens oskickade P.E.R-fråga", await page.locator("#perInput").inputValue() === "Hur ska jag tänka?");
+await page.locator("#perInput").waitFor({ state: "visible" });
+const englishRetry = "I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.";
+await page.fill("#perInput", "How should I think about this?");
+await page.click("#perSendBtn");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+ok("T4m English status explains the safe retry", (await page.locator("#perMessages").innerText()).includes(englishRetry));
+ok("T4n English retry also preserves the question and send action", await page.locator("#perInput").inputValue() === "How should I think about this?"
+   && await page.locator("#perSendBtn").isEnabled());
+ok("T4o English failure is announced without exposing its API code", await page.locator("#perAnnouncement").innerText() === englishRetry
+   && !(await page.locator("#perMessages").innerText()).includes("EXAM_STATE_UNAVAILABLE"));
+await page.evaluate(() => document.getElementById("langBtnDesktop")?.click());
+examStateUnavailable = false;
 
 // ── T5: påhittat id ritar ingen knapp ─────────────────────────────────────
 await page.evaluate(() => {
@@ -120,6 +228,10 @@ ok("T5c svarstexten står kvar", /Här är svaret/.test(t5.html));
 
 // ── T6: giltigt id ger en knapp som navigerar ─────────────────────────────
 await page.evaluate(() => {
+  document.body.classList.add("xf-per-open");
+  document.getElementById("perPanel")?.classList.add("per-open");
+});
+await page.evaluate(() => {
   const msgs = document.getElementById("perMessages");
   const div = document.createElement("div");
   msgs.appendChild(div);
@@ -130,7 +242,7 @@ const t6label = await page.evaluate(() => {
   return ctas.length ? ctas[ctas.length - 1].textContent : "";
 });
 ok("T6a knapp med målets etikett", t6label === "Fråga 1 →", t6label);
-await page.click("#perMessages .per-nav-cta >> nth=-1");
+await page.locator("#perMessages .per-nav-cta").last().click({ force: true });
 await page.waitForTimeout(300);
 const t6 = await page.evaluate(() => window.__perTestCtx());
 ok("T6b klicket flyttade till fråga 1", t6.currentQuestion?.number === 1, String(t6.currentQuestion?.number));
@@ -205,14 +317,18 @@ ok("T8b sidan svarar fortfarande", await page.evaluate(() => typeof window.PER?.
 // manifestet. Eleven som lämnade in ett prov och stod på resultatskärmen och
 // frågade "varför fick jag så lågt?" fick svar om provets sista fråga i
 // stället för om resultatet, eftersom __perManifest fortfarande pekade dit.
-await page.route("**/api/grade", r => r.fulfill({ json: { ok: true, result: {
-  total_points: 4, max_points: 6,
+await page.route("**/api/grade", r => {
+  historyAllowed = true;
+  r.fulfill({ json: { ok: true, exam_proof: `v2.${"d".repeat(32)}.syntheticCompletionProof`, result: {
+  total_points: 4, max_points: 9,
   per_question: [
     { id: "q1", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" },
     { id: "q2", points: 0, max_points: 2, feedback: "fel", model_answer: "Beta" },
-    { id: "q3", points: 2, max_points: 2, feedback: "bra", model_answer: "Beta" }
+    { id: "q3", points: 2, max_points: 3, feedback: "delvis", model_answer: "Beta" },
+    { id: "q4", points: 0, max_points: 3, feedback: "fel", model_answer: "Beta" }
   ]
-} } }));
+} } });
+});
 
 // T8 skrev över manifestet med ett eget testmanifest utan fokus. Navigera till
 // en riktig fråga så att publish() sätter ett äkta manifest igen — annars
@@ -223,10 +339,20 @@ ok("T9a manifestet pekar på en fråga innan inlämning", beforeSubmit.currentQu
    JSON.stringify(beforeSubmit.currentQuestion));
 
 page.once("dialog", d => d.accept().catch(() => {}));
-await page.click(".xf-dot >> nth=2"); await page.waitForTimeout(200);
+await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(200);
 await page.click(".xf-exam-nav .xf-btn.primary"); // "Lämna in" på sista frågan, 2 obesvarade → confirm()
 await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
 await page.waitForTimeout(200);
+await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null
+  && (document.getElementById("perMessages")?.innerText || "").includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"), null, { timeout: 5000 }).catch(() => null);
+const historyAfterGrade = await page.evaluate(() => ({
+  visible: document.getElementById("perMessages")?.innerText || "",
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+}));
+ok("P.E.R restores the server-approved transcript after the verified result",
+  historyAfterGrade.mask === null && historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
+  JSON.stringify({ mask: historyAfterGrade.mask, visible: historyAfterGrade.visible, calls: activeExamCountCalls }));
 const afterSubmit = await page.evaluate(() => window.__perTestCtx());
 ok("T9b currentQuestion är borta på resultatskärmen", !afterSubmit.currentQuestion, JSON.stringify(afterSubmit.currentQuestion));
 /* T9c löd tidigare "examState är borta på resultatskärmen" och krävde att hela
@@ -245,6 +371,25 @@ ok("T9c examState bär phase result på resultatskärmen", t9state.phase === "re
 ok("T9c2 inga kvarlämnade provsiffror i examState", Object.keys(t9state).join(",") === "phase", JSON.stringify(afterSubmit.examState));
 ok("T9d targets är borta på resultatskärmen", !afterSubmit.targets, JSON.stringify(afterSubmit.targets));
 
+lastExplain = null;
+await page.evaluate(() => document.getElementById("langBtn")?.click());
+const englishReviewLabel = await page.locator("#xf .xf-screen[data-screen='result'] .xf-review-action").nth(1).textContent();
+ok("efterprovshjälpen följer valt engelskt språk", englishReviewLabel?.trim() === "✦ Explain my grading", englishReviewLabel || "saknas");
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=1");
+await page.waitForTimeout(350);
+ok("T9e efterprovsknappen använder den verifierade förklaringsvägen",
+   lastExplain?.examReview === true && lastExplain?.examProof?.selectedQuestionId === "q2" &&
+   lastExplain?.examProof?.questions?.length === 4 && lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`,
+   JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, count: lastExplain.examProof.questions?.length }));
+ok("engelskt språk och engelskt önskemål följer med serveranropet",
+   lastExplain?.lang === "en" && lastExplain?.userQuestion === "Please explain my grading on question 2 step by step",
+   JSON.stringify({ lang: lastExplain?.lang, question: lastExplain?.userQuestion }));
+ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
+   JSON.stringify(lastExplain?.examProof?.answers) === JSON.stringify([
+     { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }, { id: "q4", answer: "" }
+   ]), JSON.stringify(lastExplain?.examProof?.answers));
+await page.evaluate(() => document.getElementById("langBtn")?.click());
+
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid
 // varje klick, debouncen (publishSoon, 500ms) berörs aldrig där. Kortsvar
@@ -254,7 +399,7 @@ ok("T9d targets är borta på resultatskärmen", !afterSubmit.targets, JSON.stri
 // nytt mot ett S.exam som fortfarande finns kvar, mitt på resultatskärmen.
 // Kräver type:"short"; T9:s type:"mc" kan per konstruktion aldrig fånga det.
 const EXAM_SHORT = {
-  title: "Prov", level: "C",
+  title: "Prov", level: "C", exam_manifest: "synthetic-short-manifest",
   questions: Array.from({ length: 3 }, (_, n) => ({
     id: "s" + (n + 1), type: "short", points: 2,
     question: "Kortsvarsfråga " + (n + 1) + " om cellandning",
@@ -269,7 +414,7 @@ await mockApis(page2, {
   extra: [
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM_SHORT)), meta: { quota: { enforced: false } } } })],
     ["**/api/explain", r => r.fulfill({ json: { ok: true, answer: "Svar." } })],
-    ["**/api/grade", r => r.fulfill({ json: { ok: true, result: {
+    ["**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"e".repeat(32)}.syntheticShortProof`, result: {
       total_points: 6, max_points: 6,
       per_question: [
         { id: "s1", points: 2, max_points: 2, feedback: "bra", model_answer: "svar" },

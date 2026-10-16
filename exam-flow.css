@@ -101,10 +101,12 @@
 body.xf-in-exam .xg-header,
 body.xf-in-exam .xg-utility-bar,
 body.xf-in-exam #betaBanner,
+body.xf-in-exam #proviaGlobalNav,
 body.xf-in-exam .xg-footer,
 body.xf-grading .xg-header,
 body.xf-grading .xg-utility-bar,
 body.xf-grading #betaBanner,
+body.xf-grading #proviaGlobalNav,
 body.xf-grading .xg-footer { display: none !important; }
 
 /* Under rättningen finns inget att fråga om — provet är inlämnat och svaren
@@ -112,6 +114,18 @@ body.xf-grading .xg-footer { display: none !important; }
    mörka ytan (z-index 9999 mot 70) och inbjuda till en fråga som inte längre
    kan påverka någonting. */
 body.xf-grading #perWidget { display: none !important; }
+
+/* On the results page, contextual P.E.R actions remain in the question cards.
+   Hide the floating shortcut so it cannot cover feedback or the next-practice
+   card; reveal it again while the learner has the chat open so it can be closed. */
+body.xf-result #perBubble { display: none !important; }
+body.xf-result.xf-result-per-open #perBubble { display: inline-flex !important; }
+
+/* The exam review already ends with a P.E.R action beside its guidance.
+   Keep the floating shortcut out of that narrow footer so it cannot cover
+   the last lines on mobile. */
+body.xf-contract #perBubble { display: none !important; }
+body.xf-contract .xf-contract-per { flex: 0 0 auto; }
 
 /* Stegen är slut när provet börjar; en halvfull linje överst hade bara sagt
    emot provets egen räknare. */
@@ -142,49 +156,70 @@ body.xf-grading .xf-progress { display: none; }
   flex: 1;
 }
 
+.xf-exam-exit {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--xf-line);
+  border-radius: var(--exgen-radius-sm);
+  background: transparent;
+  color: var(--xf-ink-2);
+  font: 22px/1 "DM Sans", sans-serif;
+  cursor: pointer;
+}
+
+.xf-exam-exit:hover, .xf-exam-exit:focus-visible { color: var(--xf-ink); border-color: var(--xf-ink-2); }
+.xf-exam-exit:disabled { opacity: .5; cursor: wait; }
+
+@media (max-width: 600px) {
+  .xf-exam-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 44px;
+    grid-template-areas: "count time exit" "dots dots dots";
+    gap: 4px 8px;
+    padding: 10px 12px;
+  }
+  .xf-exam-top > span:first-child { grid-area: count; }
+  .xf-exam-time { grid-area: time; }
+  .xf-exam-exit { grid-area: exit; }
+  .xf-exam-dots { grid-area: dots; flex: none; }
+}
+
+.xf-exam-time { white-space: nowrap; }
+
 .xf-dot {
   position: relative;
-  width: 7px;
-  height: 7px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--xf-line);
+  background: transparent;
   border: 0;
   padding: 0;
   cursor: pointer;
   transition: all var(--exgen-motion-fast) var(--exgen-motion-ease);
 }
 
-/* Klickytan ligger i ett pseudoelement, så pricken kan vara 7px medan tummen
-   får något att sikta på — och raden behåller sin höjd, eftersom pseudoelement
-   inte deltar i flexlayouten.
-
-   Två saker styr formen, och båda är mätta, inte gissade.
-
-   Bredden stannar på 12px: exakt prickens delning (7px prick + 5px gap). En
-   bredare yta lägger sig över grannprickens mitt, och eftersom senare syskon
-   målas överst skulle ett träff mitt på pricken aktivera nästa fråga i stället.
-   12px är alltså det bredaste som går utan att en avsiktlig träff hamnar fel.
-
-   Höjden är 44px men växer nedåt från prickens överkant, inte åt båda hållen.
-   Vid 20 frågor på 390px bryts raden i två, med samma 12px mellan raderna. En
-   centrerad 44px-yta lät då undre radens prickar täcka de övres helt — mätt:
-   prick 7–10 gick inte längre att träffa. Nedåt behåller varje prick i övre
-   raden sina 12px runt sin egen mitt, och undre raden får hela ytan. Extraytan
-   hamnar dessutom där tummen faktiskt hamnar när den underskjuter en kontroll
-   högst upp på skärmen. */
-.xf-dot::after {
+.xf-dot::before {
   content: "";
   position: absolute;
-  left: 50%;
-  margin-left: -6px;
-  top: 0;
-  width: 12px;
-  height: 44px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--xf-line);
+  transition: inherit;
 }
 
-.xf-dot.done { background: var(--xf-accent); }
-.xf-dot.here { background: var(--xf-accent); transform: scale(1.55); }
-.xf-dot:hover { opacity: .7; }
+.xf-dot.done::before,
+.xf-dot.here::before { background: var(--xf-accent); }
+.xf-dot.here::before { transform: scale(1.55); }
+.xf-dot:hover::before { opacity: .7; }
+.xf-dot:focus-visible { outline: 2px solid var(--xf-accent); outline-offset: 1px; }
 
 /* Arket. Marginalen till vänster är gutter för frågenumret, precis som på ett
    utskrivet prov. */
@@ -235,6 +270,48 @@ body.xf-grading .xf-progress { display: none; }
   font-weight: var(--exgen-weight-medium);
   margin: 0 0 24px;
   white-space: pre-wrap;
+}
+
+.xf-q-text:focus-visible {
+  outline: 2px solid var(--xf-accent);
+  outline-offset: 4px;
+}
+
+.xf-source-table-wrap {
+  margin: -4px 0 22px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.xf-source-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--xf-ink);
+  font-size: var(--exgen-text-base);
+  line-height: var(--exgen-leading-normal);
+  text-align: left;
+}
+
+.xf-source-table caption {
+  padding: 0 0 8px;
+  color: var(--xf-ink-2);
+  font-size: var(--exgen-text-sm);
+  text-align: left;
+}
+
+.xf-source-table th,
+.xf-source-table td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--xf-line);
+  overflow-wrap: anywhere;
+}
+
+.xf-source-table th {
+  font-weight: var(--exgen-weight-medium);
+}
+
+.xf-source-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--xf-line);
 }
 
 .xf-mc { display: grid; gap: 9px; }
@@ -301,6 +378,43 @@ body.xf-grading .xf-progress { display: none; }
 .xf-answer:focus {
   border-color: var(--xf-accent);
   box-shadow: 0 0 0 3px var(--xf-accent-soft);
+}
+
+.graph-answer { width: 100%; max-width: 460px; margin: 22px auto; }
+.graph-answer-hint { margin: 0 0 12px; color: var(--xf-ink-2); font-size: var(--exgen-text-sm); line-height: var(--exgen-leading-relaxed); }
+.graph-axis-captions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin: 0 0 8px; color: var(--xf-ink-2); font-size: var(--exgen-text-sm); line-height: var(--exgen-leading-relaxed); }
+.graph-axis-captions span { min-width: 0; overflow-wrap: anywhere; }
+.graph-point-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.graph-point-tabs button, .graph-clear {
+  min-height: 40px; padding: 8px 12px; border: 1px solid var(--xf-line); border-radius: var(--exgen-radius-sm);
+  background: var(--s); color: var(--xf-ink); font: inherit; cursor: pointer;
+}
+.graph-point-tabs button.active { border-color: var(--xf-accent); color: var(--xf-accent); background: var(--xf-accent-soft); }
+.graph-answer svg { display: block; width: 100%; max-width: 360px; margin: 0 auto; background: var(--s); border: 1px solid var(--xf-line); border-radius: var(--exgen-radius-sm); touch-action: manipulation; cursor: crosshair; }
+.graph-answer svg:focus-visible { outline: 3px solid var(--xf-accent); outline-offset: 3px; }
+.graph-cursor circle { fill: none; stroke: var(--xf-accent); stroke-width: 2; pointer-events: none; }
+.graph-sr-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.graph-grid line { stroke: var(--xf-line); stroke-width: .7; }
+.graph-axes line { stroke: var(--xf-ink-2); stroke-width: 1.6; }
+.graph-tick-labels text { fill: var(--xf-ink-2); font: 9px var(--exgen-font-mono); pointer-events: none; }
+.graph-answer--scaled .graph-tick-labels text { font-size: 9.5px; }
+.graph-tick-labels .graph-axis-name { fill: var(--xf-ink); font-size: 8px; font-weight: 600; }
+.graph-student-line { stroke: var(--xf-accent); stroke-width: 2.5; }
+.graph-mark circle { fill: var(--xf-accent); stroke: var(--s); stroke-width: 1.5; }
+.graph-mark text { fill: #fff; font: 10px var(--exgen-font-mono); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.graph-coordinate-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 10px; }
+.graph-answer--scatter .graph-coordinate-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.graph-coordinate-fields label { display: grid; gap: 5px; color: var(--xf-ink-2); font-size: 12px; }
+.graph-coordinate-fields input { width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; border: 1px solid var(--xf-line); border-radius: var(--exgen-radius-sm); padding: 8px; color: var(--xf-ink); background: var(--s); font: inherit; }
+.graph-coordinate-fields input[aria-invalid="true"] { border-color: var(--danger); }
+.graph-validation-message { margin: 0 0 10px; color: var(--danger); font-size: var(--exgen-text-sm); line-height: var(--exgen-leading-relaxed); }
+.graph-clear { font-size: var(--exgen-text-sm); }
+
+@media (max-width: 600px) {
+  .xf-input,
+  .xf-area,
+  .xf-answer,
+  .graph-coordinate-fields input { font-size: 16px; }
 }
 
 .xf-ask {
@@ -378,26 +492,31 @@ body.xf-in-exam.xf-per-open #perWidget {
   bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* Panelen över arket på en telefon.
-   Uppmätt vid 390x700: #perPanel ligger på y 268–552 medan svarsalternativen
-   ligger på 250–450. Panelen täckte alltså alternativen medan P.E.R:s svar
-   handlade om just dem — och den enda befintliga kontrollen mot det var tom
-   (rectsOverlap läste left/right/top/bottom ur en boundingBox som bara har
-   x/y/width/height, och returnerade därför alltid false).
-
-   På en 700px hög skärm finns ~200px mellan toppraden och panelens överkant.
-   En fråga med fyra alternativ behöver ~350px. Att visa båda samtidigt går
-   inte, och att låtsas annat vore att designa för en skärm som inte finns.
-
-   Kravet som DÄREMOT går att hålla är att ingenting är instängt: varje del av
-   arket ska gå att scrolla upp i det synliga bandet ovanför panelen. Arket är
-   en egen scroller (.xf-sheet-wrap), så det räcker att ge den luft under sig
-   som motsvarar panelens fotavtryck — 70vh max-höjd plus de 148px den är lyft.
-   js/exam-flow.js scrollar dessutom fram frågans början när panelen öppnas, så
-   eleven slipper göra det själv. */
 @media (max-width: 600px) {
-  body.xf-in-exam.xf-per-open .xf-sheet-wrap {
-    padding-bottom: calc(70vh + 160px);
+  body.xf-in-exam.xf-per-open #perWidget.xf-per-inline {
+    position: static !important;
+    inset: auto !important;
+    width: 100%;
+    margin-top: 16px;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: auto;
+  }
+
+  body.xf-in-exam.xf-per-open #perWidget.xf-per-inline #perPanel {
+    position: static !important;
+    inset: auto !important;
+    width: 100%;
+    max-width: none;
+    max-height: min(42vh, 340px);
+    max-height: min(42dvh, 340px);
+    margin-top: 8px;
+    box-shadow: var(--exgen-shadow-sm);
+  }
+
+  .xf-per-dock {
+    margin-top: 16px;
   }
 }
 
@@ -431,6 +550,39 @@ body.xf-in-exam.xf-per-open #perWidget {
   line-height: 1;
   padding: 0 0 0 4px;
   align-self: flex-start;
+}
+
+.xf-question-quality-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  color: var(--xf-ink-2);
+  background: var(--s2);
+  border: 1px solid var(--xf-line);
+  border-left: 2px solid var(--xf-accent);
+  border-radius: var(--exgen-radius-sm);
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-normal);
+}
+
+.xf-question-quality-note p { flex: 1; min-width: 0; margin: 0; }
+
+.xf-question-quality-note button {
+  flex: 0 0 auto;
+  padding: 1px 3px;
+  color: var(--xf-ink-2);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.xf-question-quality-note button:focus-visible {
+  outline: 2px solid var(--xf-accent);
+  outline-offset: 2px;
 }
 
 /* ══ RÄTTNINGEN ══════════════════════════════════════════════════════════════
@@ -502,6 +654,20 @@ body.xf-in-exam.xf-per-open #perWidget {
 
 .xf-scores.solo { grid-template-columns: 1fr; }
 
+.xf-save-warning {
+  margin: 0 0 var(--exgen-space-6);
+  padding: var(--exgen-space-4);
+  border: 1px solid var(--exgen-error);
+  background: var(--exgen-bg-secondary);
+}
+
+.xf-save-warning p { margin: 0 0 var(--exgen-space-3); line-height: var(--exgen-leading-normal); }
+.xf-save-warning .xf-btn { min-height: 40px; }
+.xf-save-warning.saved { color: var(--exgen-success-text); border-color: var(--exgen-success); }
+.xf-pending-saves[hidden] { display: none; }
+.xf-pending-list { display: flex; flex-wrap: wrap; gap: var(--exgen-space-2); }
+.xf-pending-list .xf-btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
 @media (max-width: 460px) { .xf-scores { grid-template-columns: 1fr; } }
 
 .xf-score {
@@ -563,6 +729,10 @@ body.xf-in-exam.xf-per-open #perWidget {
   color: var(--xf-ink-2);
 }
 
+.xf-score span,
+.xf-next p,
+.xf-next-actions .xf-btn.ghost { color: var(--t2); }
+
 .xf-next-list,
 .xf-next-actions {
   display: flex;
@@ -611,11 +781,34 @@ body.xf-in-exam.xf-per-open #perWidget {
 .xf-item-head b.miss { color: var(--exgen-error-text); }
 .xf-item-head b.full { color: var(--exgen-success-text); }
 
+@media (max-width: 860px) {
+  /* Leave a clear rail for the fixed P.E.R control beside result scores. */
+  #xf .xf-screen[data-screen="result"] .xf-item-head { padding-right: 112px; }
+}
+
 .xf-item-q {
   font-size: var(--exgen-text-sm);
   font-weight: var(--exgen-weight-medium);
   line-height: var(--exgen-leading-normal);
   margin-bottom: 10px;
+}
+
+.xf-item-own {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.xf-item-label {
+  color: var(--xf-ink-2);
+  font-family: var(--exgen-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--exgen-tracking-wide);
 }
 
 .xf-item-fb {
@@ -642,6 +835,19 @@ body.xf-in-exam.xf-per-open #perWidget {
   text-transform: uppercase;
   color: var(--xf-ink-2);
   margin-bottom: 6px;
+}
+
+.xf-graph-retry { margin-top: 14px; }
+.xf-graph-retry-panel { display: grid; gap: 10px; margin-top: 12px; }
+.xf-graph-retry-panel[hidden],
+.xf-item-model[hidden] { display: none; }
+.xf-review-action { margin-top: 12px; }
+.xf-graph-retry-status {
+  min-height: 1.5em;
+  margin: 0;
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
+  color: var(--xf-ink-2);
 }
 
 /* Källraden: exakt vilken del av elevens eget material frågan byggde på.
@@ -674,6 +880,82 @@ body.xf-in-exam.xf-per-open #perWidget {
 .xf-cov span.weak {
   border-color: var(--exgen-warning);
   color: var(--exgen-warning-text);
+}
+
+.xf-focus {
+  min-width: 0;
+  margin: 0 0 var(--exgen-space-6);
+  padding: 0;
+  border: 0;
+}
+
+.xf-focus legend { padding: 0; }
+
+.xf-focus-help,
+.xf-focus-note {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--xf-ink-2);
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
+}
+
+.xf-focus-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 9px 0 0;
+}
+
+.xf-focus-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 5px 9px;
+  border: 1px solid var(--xf-line);
+  border-radius: var(--exgen-radius-sm);
+  background: var(--s);
+  color: var(--xf-ink);
+  font-size: var(--exgen-text-xs);
+  line-height: var(--exgen-leading-normal);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.xf-focus-option.selected {
+  border-color: var(--xf-accent);
+  background: var(--xf-accent-soft);
+}
+
+.xf-focus-option input {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--xf-accent);
+}
+
+.xf-focus-option:focus-within {
+  outline: var(--exgen-focus-ring);
+  outline-offset: var(--exgen-focus-offset);
+}
+
+@media (max-width: 520px) {
+  body.xf-contract .xf-screen[data-screen="contract"] {
+    padding-top: 16px;
+  }
+
+  body.xf-contract .xf-screen[data-screen="contract"] .xf-card {
+    padding: 18px;
+  }
+
+  body.xf-contract .xf-screen[data-screen="contract"] .xf-row {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -736,4 +1018,11 @@ body.xf-in-exam.xf-per-open #perWidget {
 
 .xf-photo-note.bad {
   color: var(--danger);
+}
+
+.xf-graph-limit-note {
+  margin: 12px 0 0;
+  color: var(--xf-ink-2);
+  font-size: var(--exgen-text-sm);
+  line-height: var(--exgen-leading-relaxed);
 }

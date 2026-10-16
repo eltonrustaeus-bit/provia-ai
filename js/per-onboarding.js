@@ -14,9 +14,8 @@
 (function () {
   "use strict";
 
-  var SESSION_KEY = "sb-mnmotdluigzeehdjbhbu-auth-token";
+  var SESSION_KEY = window.ExGenRuntime.authStorageKey;
   var CATALOG_URL = "/config/education-catalog.web.json";
-  var SKIP_KEY = "exgen_onboarding_dismissed";
 
   function token() {
     try {
@@ -170,6 +169,11 @@
 
     var host = el("div", { id: "perOb", role: "dialog", "aria-modal": "true", "aria-label": "Lär känna P.E.R." });
     var card = el("div", { id: "perObCard" });
+    var returnFocus = document.activeElement;
+    if (!returnFocus || returnFocus === document.getElementById("xf")
+        || !returnFocus.closest || !returnFocus.closest("#xf")) {
+      returnFocus = document.getElementById("xf");
+    }
     host.appendChild(card);
     document.body.appendChild(host);
 
@@ -179,10 +183,13 @@
       document.documentElement.classList.remove("perOb-lock");
       document.removeEventListener("keydown", onKey);
       host.remove();
+      var target = returnFocus && returnFocus.isConnected && returnFocus.getClientRects().length
+        ? returnFocus
+        : document.getElementById("xf");
+      if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
     }
 
     function skip() {
-      try { localStorage.setItem(SKIP_KEY, "1"); } catch (_) {}
       /* Ett överhoppat svar är också ett svar: onboarded_at sätts, så
          introduktionen inte möter samma person vid varje inloggning.
          Inga värden skickas med. */
@@ -577,7 +584,6 @@
 
   function boot() {
     if (!token()) return;
-    try { if (localStorage.getItem(SKIP_KEY)) return; } catch (_) {}
     api("onboarding_state").then(function (d) {
       if (d && d.show === true) start();
     }).catch(function () { /* introduktionen är aldrig värd att fela på */ });

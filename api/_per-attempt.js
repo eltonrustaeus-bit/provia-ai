@@ -115,8 +115,9 @@ export function buildAttempt({ userId, q = {}, conceptId = null, level = "E", ex
   const poäng = normaliseraPoäng(q.score ?? q.points ?? null);
   if (poäng === null) return null;
 
-  const typ = q.options || q.option_a || q.type === "multiple_choice"
+  const typ = q.options || q.option_a || q.type === "multiple_choice" || q.type === "mc"
     ? "multiple_choice" : "short_answer";
+  const deterministic = typ === "multiple_choice" || q.type === "graph";
 
   return {
     userId,
@@ -132,10 +133,8 @@ export function buildAttempt({ userId, q = {}, conceptId = null, level = "E", ex
     assessment: {
       is_correct: poäng >= 0.999,
       score: poäng,
-      // Rättningen är en modellbedömning, inte en facitjämförelse. 0.7 speglar
-      // det: säker nog att räkna på, inte säker nog att påstå något enskilt om.
-      confidence: typ === "multiple_choice" ? 1 : 0.7,
-      method: typ === "multiple_choice" ? "deterministic" : "model",
+      confidence: deterministic ? 1 : 0.7,
+      method: deterministic ? "deterministic" : "llm_reasoning",
       dimensions: q.dimensions ?? null,
       error_code: q.error_code ?? null,
       error_severity: q.error_severity ?? null,

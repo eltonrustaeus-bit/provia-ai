@@ -1,0 +1,618 @@
+import assert from "node:assert/strict";
+import { Readable } from "node:stream";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const grade = require("../../api/grade.js");
+const tasks = require("../../api/_grade-task.js");
+const graphTasks = require("../../api/_graph.js");
+
+const oldEnv = {
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  EXAM_SIGNING_SECRET: process.env.EXAM_SIGNING_SECRET,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+};
+const oldFetch = globalThis.fetch;
+const userId = "11111111-1111-4111-8111-111111111111";
+const origin = "https://grade-handler.test";
+const secret = "local-only-signing-secret";
+const calls = [];
+let mockResultMode = "insert";
+let savedResultPresent = true;
+let learnerLoopEnabled = false;
+let issuanceState = "active";
+let activeExamCount = 0;
+let savedCanonicalResult = null;
+let savedFingerprint = null;
+let replayFails = false;
+
+process.env.SUPABASE_URL = origin;
+process.env.SUPABASE_SERVICE_ROLE_KEY = "local-only-service-role";
+process.env.EXAM_SIGNING_SECRET = secret;
+process.env.OPENAI_API_KEY = "";
+globalThis.fetch = async (input, init = {}) => {
+  const url = String(input);
+  calls.push({ url, method: init.method || "GET", body: init.body || null, headers: init.headers || {} });
+  if (url === `${origin}/auth/v1/user`) {
+    return Response.json({ id: userId, email: "student@example.invalid" });
+  }
+  if (url === `${origin}/rest/v1/rpc/consume_anon_rate`) {
+    return Response.json({ ok: true, count: 1, limit: 20 });
+  }
+  if (url === `${origin}/rest/v1/rpc/exam_issuance_state`) return Response.json(issuanceState);
+  if (url === `${origin}/rest/v1/rpc/active_exam_count`) return Response.json(activeExamCount);
+  if (url === `${origin}/rest/v1/rpc/claim_exam_grading`) {
+    const fingerprint = JSON.parse(init.body).p_answer_fingerprint;
+    if (issuanceState === "completed") return Response.json(fingerprint === savedFingerprint ? "completed" : "conflict");
+    if (issuanceState === "grading") return Response.json(fingerprint === savedFingerprint ? "pending" : "conflict");
+    if (issuanceState !== "active") return Response.json(issuanceState);
+    savedFingerprint = fingerprint;
+    issuanceState = "grading";
+    return Response.json("claimed");
+  }
+  if (url === `${origin}/rest/v1/rpc/release_exam_grading`) {
+    if (issuanceState === "completed") return Response.json("completed");
+    issuanceState = "active";
+    savedFingerprint = null;
+    return Response.json("released");
+  }
+  if (url === `${origin}/rest/v1/rpc/recover_graded_exam_result`) return Response.json(savedCanonicalResult);
+  if (url === `${origin}/rest/v1/rpc/try_replay_mock_learning_job`) {
+    return replayFails ? new Response(null, { status: 503 }) : Response.json("processed");
+  }
+  if (url === `${origin}/rest/v1/rpc/persist_graded_exam_result`) {
+    if (mockResultMode === "error") return new Response(null, { status: 500 });
+    if (mockResultMode === "duplicate") {
+      issuanceState = "completed";
+      return Response.json("duplicate");
+    }
+    savedCanonicalResult = JSON.parse(init.body).p_result_payload;
+    issuanceState = "completed";
+    return Response.json("saved");
+  }
+  if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
+    ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
+    : []);
+  if (url.includes("/rest/v1/mock_results")) return Response.json(savedResultPresent ? { num_questions: 1 } : null);
+  if (url.includes("/rest/v1/concepts")) {
+    return init.method === "POST"
+      ? Response.json([{ id: "22222222-2222-4222-8222-222222222222" }], { status: 201 })
+      : Response.json([]);
+  }
+  if (url.includes("/rest/v1/student_attempts")) {
+    return Response.json([{ id: "33333333-3333-4333-8333-333333333333" }], { status: 201 });
+  }
+  return new Response(null, { status: 204 });
+};
+
+function invoke(body) {
+  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  req.method = "POST";
+  req.headers = { authorization: "Bearer local-test-token" };
+  return new Promise((resolve) => {
+    const res = {
+      statusCode: 200,
+      headers: {},
+      setHeader(name, value) { this.headers[name] = value; },
+      end(raw) { resolve({ status: this.statusCode, headers: this.headers, body: JSON.parse(raw) }); },
+    };
+    grade(req, res);
+  });
+}
+
+try {
+  const question = {
+    id: "graph-1",
+    type: "graph",
+    points: 2,
+    question: "Rita grafen till y = x.",
+    options: [],
+    concept_tag: "linjära funktioner",
+    graph_spec: { slope: 1, intercept: 0 },
+    model_answer: "Linjen går genom origo.",
+  };
+  const course = "Matematik 2b";
+  const material = "y = x";
+  const contextHash = tasks.hashContext(material, course, userId);
+  const publicQuestion = {
+    id: question.id,
+    type: question.type,
+    points: question.points,
+    question: question.question,
+    options: [],
+    grade_task: tasks.sealQuestion(question, secret, contextHash),
+  };
+  assert.ok(publicQuestion.grade_task, "graph task is signed for the synthetic user and context");
+  const manifest = require("../../api/_exam-completion.cjs")
+    .issueExamManifest(userId, course, material, [publicQuestion]);
+  const examProof = {
+    receipt: require("../../api/_exam-completion.cjs").issueCompletion(userId, course, [publicQuestion]),
+    course, material, questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+    selectedQuestionId: question.id,
+  };
+
+  const beforeProof = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry",
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(beforeProof.status, 403, "graph practice cannot reveal an answer before verified completion");
+  calls.length = 0;
+  savedResultPresent = false;
+  const deletedResult = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(deletedResult.status, 403, "deleting a graded result revokes graph practice access");
+  savedResultPresent = true;
+  calls.length = 0;
+
+  const response = await invoke({
+    lang: "sv",
+    course,
+    pastedText: material,
+    mode: "graph_practice_retry",
+    examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.practice, true);
+  assert.equal(response.body.exam_proof, undefined, "a graph retry cannot mint a completion proof");
+  assert.equal(response.body.result.correct, true);
+  assert.equal(response.body.result.points, 2);
+  assert.equal(response.body.result.model_answer, "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).");
+  assert.ok(calls.some((call) => call.url === `${origin}/rest/v1/rpc/consume_anon_rate`), "the actual handler checks the server quota");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"), "a practice retry does not save an official result");
+  assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")), "a practice retry does not update mastery");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic graph retry does not call the AI provider");
+
+  calls.length = 0;
+  const englishRetry = await invoke({
+    lang: "en",
+    course,
+    pastedText: material,
+    mode: "graph_practice_retry",
+    examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(englishRetry.status, 200);
+  assert.equal(englishRetry.body.result.feedback, "The graph is correct. Both the slope and y-intercept are correct.");
+  assert.equal(englishRetry.body.result.model_answer, "The graph of y = x passes, for example, through the points (-5, -5) and (5, 5).");
+
+  const validWrongGraph = await invoke({
+    lang: "sv",
+    course,
+    pastedText: material,
+    exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
+  });
+  assert.equal(validWrongGraph.status, 200, "a complete but incorrect graph is still a valid scored attempt");
+  assert.ok(validWrongGraph.body.exam_proof, "official grading mints a completion proof");
+  assert.equal(require("../../api/_exam-completion.cjs").verifyCompletion({
+    receipt: validWrongGraph.body.exam_proof,
+    course,
+    material,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
+    selectedQuestionId: question.id,
+  }, userId)?.question?.id, question.id, "the proof opens only for the graded signed question");
+  assert.equal(validWrongGraph.body.result.per_question[0].points, 1,
+    "the valid horizontal line gets credit for its correct y-intercept only");
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+
+  calls.length = 0;
+  const blankGraph = await invoke({
+    lang: "sv", course, pastedText: material, exam_manifest: manifest,
+    questions: [publicQuestion], answers: [{ id: question.id, answer: "" }],
+  });
+  assert.equal(blankGraph.status, 200, "a deliberately unanswered graph can finish the exam");
+  assert.equal(blankGraph.body.result.total_points, 0);
+  assert.deepEqual(blankGraph.body.result.per_question[0], {
+    id: question.id, points: 0, max_points: 2,
+    feedback: "Obesvarad. Du placerade inga punkter.",
+    model_answer: "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).",
+    concept_tag: "", error_tags: [], unanswered: true,
+  });
+  const blankWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.ok(blankWrite, "the blank submission is persisted as an official result");
+  const blankPayload = JSON.parse(blankWrite.body);
+  assert.equal(blankPayload.p_concept_tags.length, 0, "skipping is not a concept attempt");
+  assert.deepEqual(blankPayload.p_error_tags, [], "skipping is not an observed error type");
+  assert.equal(blankPayload.p_learning_payload.rows[0].concept_key, "", "skipping cannot lower mastery");
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+
+  for (const skippedQuestion of [
+    { id: "mc-blank", type: "mc", points: 1, question: "Vad är lutning?", options: ["Ändring i y per x", "Skärning"], correct_index: 0, model_answer: "Ändring i y per x", concept_tag: "lutning" },
+    { id: "short-blank", type: "short", points: 2, question: "Beskriv lutning.", options: [], model_answer: "Ändringen i y när x ökar ett steg.", concept_tag: "lutning" },
+  ]) {
+    const signed = {
+      id: skippedQuestion.id, type: skippedQuestion.type, points: skippedQuestion.points,
+      question: skippedQuestion.question, options: skippedQuestion.options,
+      grade_task: tasks.sealQuestion(skippedQuestion, secret, contextHash),
+    };
+    assert.ok(signed.grade_task);
+    calls.length = 0;
+    const skipped = await invoke({
+      lang: "sv", course, pastedText: material,
+      exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, [signed]),
+      questions: [signed], answers: [{ id: skippedQuestion.id, answer: "   " }],
+    });
+    assert.equal(skipped.status, 200, `${skippedQuestion.type} can be submitted blank`);
+    assert.equal(skipped.body.result.total_points, 0);
+    assert.equal(skipped.body.result.per_question[0].unanswered, true);
+    assert.equal(skipped.body.result.per_question[0].concept_tag, "");
+    assert.deepEqual(skipped.body.result.per_question[0].error_tags, []);
+    assert.ok(calls.every((call) => !call.url.includes("openai.com")), "blank answers do not need AI grading");
+    const write = JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body);
+    assert.deepEqual(write.p_error_tags, [], "unanswered is not forwarded to P.E.R or teacher error summaries");
+    assert.equal(write.p_learning_payload.rows[0].concept_key, "", "blank answers do not affect mastery");
+    issuanceState = "active";
+    savedCanonicalResult = null;
+    savedFingerprint = null;
+  }
+
+  const malformedGraphAnswers = [
+    "not-json",
+    JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }] }),
+    JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: -1, y: 1 }] }),
+    JSON.stringify({ type: "curve", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }),
+    JSON.stringify({ type: "line", points: [{ x: -99, y: 0 }, { x: 1, y: 1 }] }),
+  ];
+  for (const invalidAnswer of malformedGraphAnswers) {
+    calls.length = 0;
+    const invalidGraph = await invoke({
+      lang: "sv",
+      course,
+      pastedText: material,
+      exam_manifest: manifest,
+      questions: [publicQuestion],
+      answers: [{ id: question.id, answer: invalidAnswer }],
+    });
+    assert.equal(invalidGraph.status, 400, `structurally invalid graph answer is rejected: ${invalidAnswer}`);
+    assert.equal(invalidGraph.body.error, "GRAPH_ANSWER_INVALID");
+    assert.equal(calls.some((call) => call.url.includes("/rest/v1/mock_results")), false,
+      "an invalid graph answer cannot be persisted as a zero-score result");
+    assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
+      "an invalid graph answer cannot update mastery");
+    assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false,
+      "an invalid graph answer cannot create learner-loop attempts");
+  }
+
+  calls.length = 0;
+  const officialRequest = {
+    lang: "sv",
+    course,
+    pastedText: material,
+    exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  };
+  replayFails = true;
+  const official = await invoke(officialRequest);
+  assert.equal(official.status, 200);
+  assert.equal(official.body.persistence.mock_result_saved, true);
+  assert.deepEqual(official.body.result, {
+    total_points: 2,
+    max_points: 2,
+    per_question: [{
+      id: question.id,
+      points: 2,
+      max_points: 2,
+      feedback: "Grafen stämmer. Både lutningen och skärningen med y-axeln är rätt.",
+      model_answer: "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).",
+      concept_tag: "linjära funktioner",
+      error_tags: [],
+    }],
+  });
+  const saved = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.ok(saved, "the official graph submission writes its result through the persistence path");
+  const savedPayload = JSON.parse(saved.body);
+  const { p_learning_payload: learningPayload, ...resultPayload } = savedPayload;
+  assert.deepEqual({ ...resultPayload, p_submission_id: undefined }, {
+    p_user_id: userId,
+    p_submission_id: undefined,
+    p_course: course,
+    p_percent: 100,
+    p_num_questions: 1,
+    p_concept_tags: ["linjära funktioner"],
+    p_error_tags: [],
+    p_answer_fingerprint: savedPayload.p_answer_fingerprint,
+    p_result_payload: official.body.result,
+  });
+  assert.equal(learningPayload.version, 1);
+  assert.equal(learningPayload.level, "C");
+  assert.equal(learningPayload.course, course);
+  assert.equal(learningPayload.learner_loop_enabled, false);
+  assert.ok(learningPayload.rows[0].concept_key);
+  assert.ok(learningPayload.rows[0].concept_slug);
+  assert.deepEqual(learningPayload.rows.map((row) => [row.id, row.type, row.student_answer, row.points, row.max_points]),
+    [[question.id, "graph", "", 2, 2]],
+    "the durable job snapshot uses the trusted task type without retaining an answer when the learner loop is off");
+  assert.match(savedPayload.p_submission_id, /^[a-f0-9]{32}$/);
+  assert.match(savedPayload.p_answer_fingerprint, /^[a-f0-9]{64}$/);
+  const resultWriteIndex = calls.indexOf(saved);
+  const replayIndex = calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job"));
+  assert.ok(replayIndex > resultWriteIndex,
+    "the atomic learning replay starts only after the official result has been persisted");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")), "deterministic official graph grading does not call the AI provider");
+
+  replayFails = false;
+  calls.length = 0;
+  const recovered = await invoke(officialRequest);
+  assert.equal(recovered.status, 200, "a lost response can be recovered from the saved canonical result");
+  assert.equal(recovered.body.recovered, true);
+  assert.deepEqual(recovered.body.result, official.body.result);
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")), false,
+    "recovery does not charge another grading request");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")), false,
+    "recovery cannot rewrite the official score");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), true,
+    "recovery retries pending learning effects without another grade or quota charge");
+
+  calls.length = 0;
+  const changedAnswers = await invoke({ ...officialRequest, answers: [{ id: question.id,
+    answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }] });
+  assert.equal(changedAnswers.status, 409);
+  assert.equal(changedAnswers.body.error, "EXAM_ANSWERS_CONFLICT");
+  assert.equal(changedAnswers.body.result, undefined);
+
+  activeExamCount = 1;
+  const blockedRecovery = await invoke(officialRequest);
+  assert.equal(blockedRecovery.status, 409);
+  assert.equal(blockedRecovery.body.error, "EXAM_ACTIVE", "another active exam blocks facit even after saving");
+  activeExamCount = 0;
+
+  issuanceState = "grading";
+  const pending = await invoke(officialRequest);
+  assert.equal(pending.status, 409);
+  assert.equal(pending.body.error, "EXAM_GRADING_IN_PROGRESS");
+  issuanceState = "completed";
+
+  for (const [state, expectedError] of [["abandoned", "EXAM_NOT_ACTIVE"], [null, "EXAM_STATE_UNAVAILABLE"]]) {
+    issuanceState = state;
+    calls.length = 0;
+    const blocked = await invoke({
+      lang: "sv", course, pastedText: material, exam_manifest: manifest,
+      questions: [publicQuestion],
+      answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+    });
+    assert.equal(blocked.body.error, expectedError);
+    assert.equal(blocked.body.result, undefined);
+    assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")), false,
+      "inactive and unknown issuance are rejected before grading quota");
+  }
+  issuanceState = "active";
+
+  activeExamCount = 1;
+  calls.length = 0;
+  const blockedPractice = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(blockedPractice.status, 409);
+  assert.equal(blockedPractice.body.error, "EXAM_ACTIVE");
+  assert.equal(blockedPractice.body.result, undefined);
+  activeExamCount = 0;
+
+  mockResultMode = "duplicate";
+  learnerLoopEnabled = true;
+  issuanceState = "active";
+  calls.length = 0;
+  const conflictingReplay = await invoke({
+    lang: "sv", course, pastedText: material, exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }) }],
+  });
+  assert.equal(conflictingReplay.status, 503, "an uncertain duplicate write cannot display a new score");
+  assert.equal(conflictingReplay.body.error, "EXAM_RESULT_RECOVERY_REQUIRED");
+  assert.equal(conflictingReplay.body.result, undefined, "the conflicting score is never returned");
+  assert.equal(conflictingReplay.body.exam_proof, undefined, "a duplicate cannot mint another completion proof");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
+  assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false);
+  const duplicateWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.equal(JSON.parse(duplicateWrite.body).p_submission_id, savedPayload.p_submission_id);
+  assert.equal(JSON.parse(duplicateWrite.body).p_learning_payload.learner_loop_enabled, true);
+  assert.equal(JSON.parse(duplicateWrite.body).p_learning_payload.rows[0].student_answer,
+    JSON.stringify({ type: "line", points: [{ x: -1, y: 0 }, { x: 1, y: 0 }] }),
+    "eligible attempt replay retains the bounded original answer");
+
+  mockResultMode = "error";
+  learnerLoopEnabled = true;
+  issuanceState = "active";
+  savedFingerprint = null;
+  calls.length = 0;
+  const replay = await invoke({
+    lang: "sv",
+    course,
+    pastedText: material,
+    exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(replay.status, 503);
+  assert.equal(replay.body.error, "EXAM_RESULT_NOT_SAVED",
+    "failed persistence cannot be shown as a completed exam result");
+  assert.equal(replay.body.exam_proof, undefined, "failed persistence cannot mint a post-exam proof");
+  assert.equal(replay.body.result, undefined, "failed persistence cannot reveal model answers");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/apply_mock_mastery_once")), false,
+    "a failed result write cannot create mastery without a persisted result");
+  assert.equal(calls.some((call) => call.url.includes("/rest/v1/student_attempts")), false,
+    "a failed result write cannot create learner-loop attempts without a persisted result");
+  const savedRows = calls.filter((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.equal(savedRows.length, 1, "a replay makes one bounded persistence attempt");
+  assert.equal(JSON.parse(savedRows[0].body).p_submission_id, savedPayload.p_submission_id,
+    "replaying the same signed exam uses the same idempotency key");
+
+  mockResultMode = "insert";
+  issuanceState = "active";
+  calls.length = 0;
+  const recoveredReplay = await invoke({
+    lang: "sv",
+    course,
+    pastedText: material,
+    exam_manifest: manifest,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(recoveredReplay.body.persistence.mock_result_saved, true,
+    "a later successful idempotent write is acknowledged");
+  assert.ok(recoveredReplay.body.exam_proof, "confirmed persistence restores post-exam review");
+  assert.ok(calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")) >
+    calls.findIndex((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")),
+  "a recovered result write enables transactional learning replay only after persistence succeeds");
+  assert.equal(JSON.parse(calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")).body)
+    .p_learning_payload.learner_loop_enabled, true,
+    "the eventual worker retains eligible learner-loop attempts in the durable snapshot");
+
+  const scienceCourse = "Biologi 1";
+  const scienceMaterial = "Tid (min) | Syrehalt (mg/L)\n--- | ---\n0 | 4\n1 | 3\n2 | 1";
+  const scienceSpec = {
+    kind: "scatter", slope: null, intercept: null,
+    points: [{ x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 }],
+    x_label: "Tid (min)", y_label: "Syrehalt (mg/L)",
+  };
+  const scienceQuestion = {
+    id: "science-graph-1", type: "graph", points: 3,
+    question: graphTasks.questionText(scienceSpec), options: [],
+    concept_tag: "tolka mätdata", graph_spec: scienceSpec,
+    graph_ui: graphTasks.displaySpec(scienceSpec),
+    model_answer: graphTasks.modelAnswer(scienceSpec),
+  };
+  const scienceContextHash = tasks.hashContext(scienceMaterial, scienceCourse, userId);
+  const publicScienceQuestion = {
+    id: scienceQuestion.id, type: scienceQuestion.type, points: scienceQuestion.points,
+    question: scienceQuestion.question, options: [], graph_ui: scienceQuestion.graph_ui,
+    grade_task: tasks.sealQuestion(scienceQuestion, secret, scienceContextHash),
+  };
+  assert.ok(publicScienceQuestion.grade_task, "the source-bound science graph is signed");
+  const scienceManifest = require("../../api/_exam-completion.cjs")
+    .issueExamManifest(userId, scienceCourse, scienceMaterial, [publicScienceQuestion]);
+  const scienceAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 2, y: 1 }, { x: 0, y: 4 }, { x: 1, y: 2 },
+  ] });
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+  mockResultMode = "insert";
+  learnerLoopEnabled = false;
+  calls.length = 0;
+  const officialScience = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    exam_manifest: scienceManifest, questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceAnswer }],
+  });
+  assert.equal(officialScience.status, 200, "the official handler accepts a valid non-math scatter task");
+  assert.deepEqual(officialScience.body.result, {
+    total_points: 2, max_points: 3,
+    per_question: [{
+      id: scienceQuestion.id, points: 2, max_points: 3,
+      feedback: "2 av 3 datapunkter stämmer med tabellen.",
+      model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
+      concept_tag: "tolka mätdata", error_tags: ["graph_data_points_incorrect"],
+    }],
+  }, "the incomplete science graph earns only its correct source-table points");
+  const scienceWrite = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
+  assert.ok(scienceWrite, "the official science score follows the canonical persistence path");
+  assert.deepEqual(JSON.parse(scienceWrite.body).p_result_payload, officialScience.body.result);
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "deterministic science graph grading does not call the AI provider");
+
+  const partialScienceAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 0, y: 4 }, null, { x: 2, y: 1 },
+  ] });
+  issuanceState = "active";
+  savedCanonicalResult = null;
+  savedFingerprint = null;
+  calls.length = 0;
+  const officialPartialScience = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    exam_manifest: scienceManifest, questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: partialScienceAnswer }],
+  });
+  assert.equal(officialPartialScience.status, 200,
+    "the official grade handler accepts a scatter answer with one omitted point");
+  assert.equal(officialPartialScience.body.result.total_points, 2,
+    "the official score preserves credit for the two correct plotted observations");
+  assert.deepEqual(officialPartialScience.body.result.per_question[0], {
+    id: scienceQuestion.id, points: 2, max_points: 3,
+    feedback: "2 av 3 datapunkter stämmer med tabellen.",
+    model_answer: "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
+    concept_tag: "tolka mätdata", error_tags: ["graph_data_points_incorrect"],
+  });
+  assert.ok(!officialPartialScience.body.result.per_question[0].unanswered,
+    "a partial scatter attempt is not mislabeled as unanswered");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")),
+    "the partial official result uses canonical persistence");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "partial scatter scoring stays deterministic and does not call the AI provider");
+
+  const scienceExamProof = {
+    receipt: officialScience.body.exam_proof,
+    course: scienceCourse,
+    material: scienceMaterial,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceAnswer }],
+    selectedQuestionId: scienceQuestion.id,
+  };
+  const scienceWrongRetryAnswer = JSON.stringify({ type: "scatter", points: [
+    { x: 0, y: 4 }, { x: 1, y: 2 }, { x: 2, y: 1 },
+  ] });
+  calls.length = 0;
+  const scienceWrongRetry = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    mode: "graph_practice_retry", examProof: scienceExamProof,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: scienceWrongRetryAnswer }],
+  });
+  assert.equal(scienceWrongRetry.status, 200);
+  assert.equal(scienceWrongRetry.body.practice, true);
+  assert.equal(scienceWrongRetry.body.result.correct, false);
+  assert.equal(scienceWrongRetry.body.result.points, 2);
+  assert.equal(scienceWrongRetry.body.result.model_answer, "", "a wrong retry does not reveal the full answer");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"),
+    "a science retry does not overwrite official results");
+  assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")),
+    "a science retry does not change mastery");
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")),
+    "a science retry remains deterministic");
+
+  calls.length = 0;
+  const scienceCorrectRetry = await invoke({
+    lang: "sv", course: scienceCourse, pastedText: scienceMaterial,
+    mode: "graph_practice_retry", examProof: scienceExamProof,
+    questions: [publicScienceQuestion],
+    answers: [{ id: scienceQuestion.id, answer: JSON.stringify({ type: "scatter", points: [
+      { x: 0, y: 4 }, { x: 1, y: 3 }, { x: 2, y: 1 },
+    ] }) }],
+  });
+  assert.equal(scienceCorrectRetry.status, 200);
+  assert.equal(scienceCorrectRetry.body.result.correct, true);
+  assert.equal(scienceCorrectRetry.body.result.points, 3);
+  assert.equal(scienceCorrectRetry.body.result.model_answer,
+    "Datapunkternas koordinater är (0, 4), (1, 3), (2, 1).",
+  "full answer appears only after the learner completes the signed scatter retry correctly");
+  assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"));
+  assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")));
+  assert.ok(!calls.some((call) => call.url.includes("openai.com")));
+
+  console.log("grade handler graph: signed task, server quota, deterministic score, retry isolation, and official persistence passed");
+} finally {
+  globalThis.fetch = oldFetch;
+  for (const [key, value] of Object.entries(oldEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}

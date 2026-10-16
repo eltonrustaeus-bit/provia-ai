@@ -1,18 +1,9 @@
 import { ROOT, serve, openPage, report } from "./_harness.mjs";
 // Beteendekontrakt för pricing.html.
 //
-// Skrivet FÖRE ombyggnaden i Del C steg 2 och kört mot den oförändrade sidan.
-// Samma skäl som i forbattring-behaviour.mjs: ett test som aldrig sett det
-// gamla beteendet kan inte bevisa att det överlevde. Varje kontroll nedan är
-// grön på dagens markup och ska vara grön på den ombyggda, utan att en enda av
-// dem skrivs om.
-//
-// Därför frågar testet aldrig efter en klass som ombyggnaden tänker byta
-// (.planBadge, .planCta, .faqA, .compareTable). Det frågar efter vad besökaren
-// kan göra och se: att de tre planerna finns och kostar rätt, att P.E.R kan
-// skicka en dit, att rösten säger sanning om den egna användningen, att märket
-// pekar ut rätt plan, att köpknappen leder vidare, att varje FAQ-svar går att
-// nå, och att avstängda moduler inte läcker in i jämförelsen.
+// Behavior contract for pricing.html: published prices and capabilities stay
+// visible, local cache data cannot misstate server-controlled quota, every
+// plan leads somewhere, and payment failures keep a usable support path.
 //
 // Fällor, alla bekräftade i projektet tidigare:
 //   1. js/site-gate.js POSTar /api/check-role och gör location.replace("/snart.html")
@@ -24,9 +15,8 @@ import { ROOT, serve, openPage, report } from "./_harness.mjs";
 //      Kontexten körs därför med reducedMotion:"reduce" — sidans egen
 //      rm-gren hoppar över både GSAP, sifferräknaren och muspekaren, och
 //      korten står stilla på sina riktiga värden från första bildrutan.
-//   4. Rösten (setPricingVoice längst ned i body) läser localStorage vid parse,
-//      alltså före shared.js som laddas med defer. Seedning måste ske i
-//      addInitScript, inte efter goto.
+//   4. Session state is seeded before navigation because app scripts read it
+//      during initial document parsing.
 //
 // Användning:  node tests/frontend/pricing-behaviour.mjs
 
@@ -50,21 +40,34 @@ const weekStart = new Date(new Date(now).setHours(0, 0, 0, 0)).getTime() - wd * 
 // framtiden — annars beror testet på vilken veckodag det körs.
 const inWeek = n => Array.from({ length: n }, (_, i) => ({ ts: weekStart + 3600e3 + i * 60e3, course: "Biologi 1", pct: 70 }));
 
-/* seed: { role, history, profileRole, session, width }
+/* seed: { role, history, profileRole, profile, session, width }
    Servern, mockarna, sessionen och splash-förbikopplingen kommer från
    _harness.mjs; det som står kvar här är sidans egna data. */
 async function mk(s = {}) {
+  const signedIn = !!s.session || !!s.role || !!s.history?.length;
+  const extra = s.backendDisabled ? [
+    ["**/js/exgen-runtime.js", route => route.fulfill({
+      contentType: "application/javascript",
+      body: `window.ExGenRuntime = Object.freeze({ environment: "unconfigured", projectRef: "", supabaseUrl: "", publishableKey: "", appOrigin: "http://localhost", authStorageKey: "exgen-test-auth-token" });`,
+    })],
+    ["**/supabase.min.js", route => route.fulfill({
+      contentType: "application/javascript",
+      body: "window.supabase = { createClient() { throw new Error('client created without runtime config'); } };",
+    })],
+  ] : [];
   return openPage(browser, `${srv.url}/pricing.html`, {
-    width: s.width || 1280, height: 900, reducedMotion: "reduce", settle: 900,
+    width: s.width || 1280, height: 900, reducedMotion: s.reducedMotion || "reduce", settle: s.settle ?? 900,
+    initScript: s.initScript,
     mocks: {
       role: s.role || "gratis",
       // Registreras efter den generella **/rest/v1/**, annars äts den upp.
-      profiles: s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
+      profiles: s.profile ? [{ id: "u1", ...s.profile }] : s.profileRole ? [{ id: "u1", role: s.profileRole }] : null,
+      extra,
     },
     state: {
-      signedIn: !!s.session,
+      signedIn,
       role: s.role || null,
-      storage: { proviaai_history: s.history || [] },
+      storage: { proviaai_history: s.history || [], ...(signedIn ? { exgen_local_data_owner: "u1" } : {}) },
     },
   });
 }
@@ -74,6 +77,59 @@ const PLANS = [
   { id: "plan-basic", name: "Basic", amount: "29" },
   { id: "plan-premium", name: "Premium", amount: "79" },
 ];
+
+// Public pricing must remain readable in isolated previews without backend credentials.
+{
+  const { ctx, page } = await mk({ backendDisabled: true });
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.waitForTimeout(100);
+  const content = await page.locator("main").innerText();
+  ok("0e backend-avstängd plansida visar priser", content.includes("Premium") && content.includes("Basic"));
+  const premiumDescription = await page.locator("#plan-premium .planDesc").innerText();
+  ok("0n Premium beskriver funktioner utan att utlova läranderesultat",
+    premiumDescription === "Personlig AI-coach och träning utifrån dina misstag." && !/maxa resultaten/i.test(premiumDescription));
+  const premiumFeatures = await page.locator("#plan-premium .featureList").innerText();
+  ok("0o Premium undviker obestyrkt löfte om full ämnesprogression",
+    /P\.E\.R Coach: personliga övningsförslag från sparade prov och felbank/i.test(premiumFeatures) &&
+    /AI-genererad övningsrapport från dina prov \(minst 3 verifierat rättade\)/i.test(premiumFeatures) &&
+    !/personlig studieplan|personlig plan|Lärarrapport|inför utvecklingssamtal|full progression över alla ämnen/i.test(premiumFeatures));
+  const impact = await page.locator("#zonImpact").innerText();
+  const impactStatus = await page.locator("#zonImpact .impactStatus").innerText();
+  const impactHeading = await page.locator("#zonImpact").getAttribute("aria-labelledby");
+  ok("0h Impact skiljer plan från nuläge", /En plan för att göra studiestöd tillgängligt för fler/i.test(impact) && /vår plan för att fler elever.*via skolor/i.test(impact) && /Under utveckling/i.test(impact));
+  ok("0i Impact lovar inte elevmånader eller effektresultat", /köp är ännu inte kopplade till Impact/i.test(impact) && /inga Impact-siffror/i.test(impact) && !/2 elevmånader|10 elevmånader/i.test(impact));
+  ok("0p Impact klargör att finansiering, skolåtkomst och användning inte registreras ännu",
+    /registrerar ännu inte reserverad Impact-finansiering, tilldelad skolåtkomst eller använda elevmånader/i.test(impactStatus));
+  ok("0l Impact skiljer tillgång från läranderesultat", /tillgång för en elev under en månad, inte ett löfte om förbättrat resultat/i.test(impact) && /Finansierad, aktiverad och använd tillgång ska redovisas var för sig/i.test(impact));
+  ok("0m Impact kräver kostnadsunderlag och skolgodkännande", /AI, drift och betalningar kostar/i.test(impact) && /skolans godkännande behövs/i.test(impact));
+  ok("0j Impact-sektionen har en tillgänglig rubrik", impactHeading === "impact-title" && await page.locator(`#${impactHeading}`).isVisible());
+  ok("0k planpriser och checkoutknappar finns kvar", await page.locator("#plan-basic .planAmt").innerText() === "29" && await page.locator("#plan-premium .planAmt").innerText() === "79" && await page.locator("#btn-basic").count() === 1 && await page.locator("#btn-premium").count() === 1);
+  ok("0f backend-avstängd plansida släpper laddaren", await page.locator("#ldr").evaluate(el => el.classList.contains("out")));
+  ok("0g backend-avstängd plansida initierar ingen Supabase-klient", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+// Published prices remain exact even when the visitor has not requested reduced motion.
+{
+  const { ctx, page } = await mk({
+    reducedMotion: "no-preference",
+    initScript: () => {
+      window.__planAmountSnapshots = [];
+      new MutationObserver(() => {
+        window.__planAmountSnapshots.push(...Array.from(document.querySelectorAll(".planAmt"), el => el.textContent.trim()));
+      }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
+    },
+  });
+  await page.waitForTimeout(1100);
+  const values = await page.evaluate(() => [
+    ...window.__planAmountSnapshots,
+    ...Array.from(document.querySelectorAll(".planAmt"), el => el.textContent.trim()),
+  ]);
+  ok("planpriser ändras inte till mellanvärden vid normal rörelseinställning",
+    values.length > 0 && values.every(value => ["0", "29", "79"].includes(value)), JSON.stringify(values));
+  await ctx.close();
+}
 
 // Priset utan att veta vilket element som bär det. Sidan renderar "0 kr för
 // alltid" respektive "29 kr / månad"; kontrollen är att beloppet står i
@@ -104,6 +160,24 @@ const amountIn = (page, id) => page.evaluate(cid => {
   });
   ok("0d sidan öppnar med P.E.R:s röst", !!voice && voice.orb && voice.say.length > 0, JSON.stringify(voice));
   await ctx.close();
+}
+
+// Signed-in plan buttons retain their exact server checkout contract.
+{
+  for (const plan of ["basic", "premium"]) {
+    const { ctx, page } = await mk({ session: true, role: "gratis" });
+    let requestedPlan = null;
+    page.on("dialog", dialog => dialog.dismiss());
+    await page.route("**/api/create-checkout-session", async route => {
+      requestedPlan = route.request().postDataJSON()?.plan ?? null;
+      await route.fulfill({ json: { message: "synthetic checkout test" } });
+    });
+    const response = page.waitForResponse(res => res.url().endsWith("/api/create-checkout-session"));
+    await page.locator(`#btn-${plan}`).click();
+    await response;
+    ok(`4d inloggad ${plan}-knapp skickar rätt checkout-plan`, requestedPlan === plan, String(requestedPlan));
+    await ctx.close();
+  }
 }
 
 // ── 1: P.E.R kan skicka besökaren till en enskild plan ───────────────────
@@ -143,75 +217,50 @@ const amountIn = (page, id) => page.evaluate(cid => {
   await ctx.close();
 }
 
-// ── 2: rösten säger sanning om den egna användningen ─────────────────────
-// Prissidans enda uppgift är att svara på "behöver JAG betala?". Svaret beror
-// på vad besökaren gjort, och de fem grenarna nedan är hela det svaret.
+// ── 2: pricing never treats local history as authoritative quota ─────────
 const voiceOf = page => page.evaluate(() => {
   const m = document.querySelector("main");
   return ((m && m.innerText) || "").replace(/\s+/g, " ").slice(0, 600);
 });
 
 {
-  const { ctx, page } = await mk();               // utloggad, ingen historik
-  const t = await voiceOf(page);
-  ok("2a utan data står markupens standardtext kvar", /Börja gratis/i.test(t), t.slice(0, 120));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ history: inWeek(1) });
-  const t = await voiceOf(page);
-  ok("2b under taket räknas proven den här veckan", /1 prov den här veckan/i.test(t), t.slice(0, 160));
-  ok("2c och besked om att det inte finns skäl att betala", /2 kvar/.test(t), t.slice(0, 200));
-  await ctx.close();
-}
-{
   const { ctx, page } = await mk({ history: inWeek(3) });
-  const t = await voiceOf(page);
-  ok("2d vid taket sägs det rakt ut", /slagit i taket/i.test(t), t.slice(0, 200));
+  const baseline = await voiceOf(page);
+  ok("2a prissidans huvudbudskap är generellt och begripligt", /Välj stödet som passar din studietakt/i.test(baseline));
+  ok("2b lokal historik visas inte som återstående veckokvot", !/\d+ prov den här veckan|\d+ kvar|slagit i taket/i.test(baseline), baseline.slice(0, 200));
+  ok("2c lokal historik visas inte som kontosäker månadsräkning", !/\d+ av 30 prov/i.test(baseline), baseline.slice(0, 200));
   await ctx.close();
 }
 {
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(4) });
+  const { ctx, page } = await mk({ role: "basic", history: inWeek(28) });
   const t = await voiceOf(page);
-  ok("2e Basic får sin egen räkning mot 30", /Du har Basic/i.test(t) && /4 av 30/.test(t), t.slice(0, 200));
+  ok("2d inloggad Basic får samma neutrala huvudbudskap", /Välj stödet som passar din studietakt/i.test(t), t.slice(0, 180));
+  ok("2e browserhistorik ändrar inte planrekommendationer", !/rekommenderas för dig|du närmar dig taket/i.test(t), t.slice(0, 240));
   await ctx.close();
 }
 {
-  const { ctx, page } = await mk({ role: "premium", history: inWeek(2) });
+  const { ctx, page } = await mk({ role: "premium", history: inWeek(30) });
   const t = await voiceOf(page);
-  ok("2f Premium får besked om att inga tak gäller", /Du har Premium/i.test(t) && /Inga tak/i.test(t), t.slice(0, 200));
+  ok("2f Premium får samma neutrala huvudbudskap", /Välj stödet som passar din studietakt/i.test(t), t.slice(0, 180));
   await ctx.close();
 }
 
-// ── 3: märket pekar ut den plan besökaren faktiskt har ───────────────────
-// Läser kortets egen text i stället för .planBadge, så att märket får byta
-// element i ombyggnaden.
+// ── 3: plan facts are consistent across the cards and comparison ─────────
 const cardText = (page, id) => page.evaluate(cid => {
   const el = document.getElementById(cid);
   return el ? (el.innerText || "").replace(/\s+/g, " ") : "";
 }, id);
 
 {
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(1) });
-  ok("3a Basic märks som din plan", /Basic — din plan/i.test(await cardText(page, "plan-basic")));
-  // Rösten har just sagt att Basic räcker. Då får inte kortet bredvid säga
-  // "Rekommenderas" — sidan skulle säga emot sig själv i samma synfält.
-  ok("3b ingen rekommendation medan Basic räcker", !/Rekommenderas/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ role: "basic", history: inWeek(26) });
-  ok("3c nära taket rekommenderas Premium", /rekommenderas för dig/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk({ history: inWeek(3) });
-  ok("3d gratisanvändare vid taket rekommenderas Basic", /rekommenderas för dig/i.test(await cardText(page, "plan-basic")), await cardText(page, "plan-basic"));
-  await ctx.close();
-}
-{
-  const { ctx, page } = await mk();               // ingen data alls
-  ok("3e utan data står markupens Premium-tips kvar", /Rekommenderas/i.test(await cardText(page, "plan-premium")), await cardText(page, "plan-premium"));
+  const { ctx, page } = await mk({ role: "basic", history: inWeek(30) });
+  const plans = await Promise.all(["plan-gratis", "plan-basic", "plan-premium"].map(id => cardText(page, id)));
+  ok("3a inga kort påstår sig vara personligt rekommenderade", !plans.some(text => /rekommenderas för dig|— rekommenderas/i.test(text)), plans.join(" | ").slice(0, 240));
+  const rows = await page.locator("main table tbody tr").allInnerTexts();
+  const accountHistory = rows.find(row => row.startsWith("Kontohistorik när du är inloggad")) || "";
+  const deviceSync = rows.find(row => row.startsWith("Synk mellan enheter när du är inloggad")) || "";
+  ok("3b kontohistorik visas för alla tre planer", (accountHistory.match(/✓/g) || []).length === 3, accountHistory);
+  ok("3c enhetssynk är tydligt villkorad av inloggning", (deviceSync.match(/✓/g) || []).length === 3, deviceSync);
+  ok("3d kvot förklaras som serverstyrd och skild från lokal historik", /Provkvoten kontrolleras av ExGen[\s\S]*historiken som visas på den här enheten/i.test(await page.locator("#zonJamfor").innerText()));
   await ctx.close();
 }
 
@@ -250,6 +299,23 @@ const cardText = (page, id) => page.evaluate(cid => {
   const { ctx, page } = await mk({ session: true, role: "basic", profileRole: "basic" });
   await page.waitForTimeout(1200);
   ok("5b synlig för betalande", await page.locator("#manageSubSection").isVisible());
+  ok("5c utan Stripe-kund visas supportväg i stället för trasig portal", await page.locator("#manageSubSupport").isVisible() && !(await page.locator("#manageSubBtn").isVisible()));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await mk({ session: true, role: "basic", profile: { role: "basic", stripe_customer_id: "cus_test" } });
+  await page.waitForTimeout(1200);
+  ok("5d Stripe-kund får portal-knappen", await page.locator("#manageSubBtn").isVisible() && !(await page.locator("#manageSubSupport").isVisible()));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await mk({ session: true, role: "basic", profile: { role: "basic", stripe_customer_id: "cus_test" } });
+  await page.waitForTimeout(1200);
+  await page.route("**/api/check-role", route => route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "portal_unavailable", message: "Kunde inte öppna betalningsportalen just nu. Försök igen senare." }) }));
+  await page.locator("#manageSubBtn").click();
+  await page.waitForFunction(() => document.getElementById("manageSubSupport")?.getBoundingClientRect().height > 0);
+  ok("5e portal-API-fel visar betalningshjälp direkt", await page.locator("#manageSubSupport").isVisible());
+  ok("5f portalfelet är uppläst via statusregion", /Kunde inte öppna betalningsportalen/i.test(await page.locator("#manageSubMessage").innerText()));
   await ctx.close();
 }
 
@@ -259,12 +325,13 @@ const cardText = (page, id) => page.evaluate(cid => {
 // redan är det nått, annars klickas frågan först.
 const FAQ = [
   ["Kan jag testa gratis", "kortuppgifter"],
-  ["Hur avbokar jag", "prenumerationsportalen"],
+  ["Hur avbokar jag", "betalningsportalen"],
   ["om jag nedgraderar", "finns kvar"],
   ["hela klassen eller skolan", "skolpaket"],
 ];
 {
   const { ctx, page } = await mk();
+  ok("6b FAQ-frågor har rubriksemantik", await page.getByRole("heading", { name: "Hur avbokar jag mitt medlemskap?", level: 3 }).count() === 1);
   for (const [q, a] of FAQ) {
     const shown = await page.evaluate(async ([qq, aa]) => {
       const vis = t => Array.from(document.querySelectorAll("main *")).some(el => {
@@ -305,7 +372,7 @@ const FAQ = [
   ok("7a jämförelsen har rader", t.visible > 0, JSON.stringify({ total: t.total, visible: t.visible }));
   ok("7b fyra kolumner: funktion + tre planer", t.cols === 4, String(t.cols));
   ok("7c gamla produktgrenar finns inte i tabellen", !/Repetitionsläge|Vägmärken|Teoriprov/i.test(t.allText), t.allText.slice(0, 160));
-  ok("7d studieraderna finns kvar", /Lärarrapport/.test(t.text) && /Felbank/.test(t.text), t.text.slice(0, 200));
+  ok("7d premiumverktygen beskrivs konkret", /P\.E\.R Coach – övningsförslag/.test(t.text) && /AI-genererad övningsrapport/.test(t.text) && /Felbank/.test(t.text), t.text.slice(0, 200));
   await ctx.close();
 }
 
@@ -382,6 +449,17 @@ for (const width of [360, 390, 430]) {
   ok(`9a jämförelsen ryms vid ${width}px`, !t.needsScroll, JSON.stringify(t));
   ok(`9b sidan scrollar inte i sidled vid ${width}px`, !t.bodyScrolls, JSON.stringify(t));
   ok(`9c ingen cell är klippt vid ${width}px`, t.clipped.length === 0, t.clipped.join(" | "));
+  const impact = await page.locator("#zonImpact").boundingBox();
+  const impactBounds = await page.evaluate(() => {
+    const section = document.querySelector("#zonImpact");
+    const parts = [...section.querySelectorAll("h2,.impactCopy,.impactStatus")];
+    const rects = parts.map(el => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width, clipped: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 };
+    });
+    return { rects, viewport: innerWidth };
+  });
+  ok(`9d hela Impact-sektionen ryms vid ${width}px`, !!impact && impactBounds.rects.length === 3 && impactBounds.rects.every(r => r.left >= 0 && r.right <= impactBounds.viewport + 1 && r.width > 0 && !r.clipped), JSON.stringify(impactBounds));
   await ctx.close();
 }
 

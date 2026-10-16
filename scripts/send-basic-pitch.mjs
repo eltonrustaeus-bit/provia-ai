@@ -7,21 +7,23 @@
  * SKICKA PÅ RIKTIGT:
  *   node scripts/send-basic-pitch.mjs --send
  *
- * Kräver env-variabler: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
+ * Kräver env-variabler: SUPABASE_URL, SUPABASE_SECRET_KEY (eller legacy fallback), RESEND_API_KEY
  */
 
-import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "../api/_supabase-server-key.cjs";
+
+const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 
 const DRY_RUN = !process.argv.includes("--send");
 
 const SUPABASE_URL     = process.env.SUPABASE_URL;
-const SUPABASE_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_KEY     = getSupabaseServerKey();
 const RESEND_API_KEY   = process.env.RESEND_API_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) { console.error("Saknar SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
+if (!SUPABASE_URL || !SUPABASE_KEY) { console.error("Saknar SUPABASE_URL eller SUPABASE_SECRET_KEY / SUPABASE_SERVICE_ROLE_KEY"); process.exit(1); }
 if (!DRY_RUN && !RESEND_API_KEY)    { console.error("Saknar RESEND_API_KEY"); process.exit(1); }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+const supabase = createSupabaseServerClient(SUPABASE_URL, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
 

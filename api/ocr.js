@@ -1,5 +1,8 @@
 // api/ocr.js (CommonJS / Vercel Serverless)
 // Extract text from imageDataUrl using OpenAI (multimodal)
+const { getSupabaseServerKey, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const pilotScope = require("./_pilot-scope.cjs");
+const { logAiUsage } = require("./_ai-usage.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -27,8 +30,8 @@ async function requireAuth(req) {
       process.env.SUPABASE_URL + "/auth/v1/user",
       {
         headers: {
+          ...getSupabaseAdminHeaders(),
           "Authorization": "Bearer " + token,
-          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY
         },
         signal: AbortSignal.timeout(5000)
       }
@@ -45,7 +48,7 @@ async function requireAuth(req) {
  * med readable:false. Klienten skiljer på "jag kunde inte tyda bilden" och
  * "något gick sönder", och eleven ska aldrig se ett tekniskt fel för att de
  * fotade i dålig belysning. */
-async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey }) {
+async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey, userId, tier }) {
   const S = require("./_solution-ocr.js");
   const sanitize = await import("../src/per/sanitize.mjs");
 
@@ -73,6 +76,7 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey })
   };
 
   let data;
+  const startedAt = Date.now();
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -86,8 +90,13 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey })
     }
     if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status });
   } catch (e) {
-    return json(res, 500, { ok: false, error: "Server error", details: String(e) });
+    return json(res, 500, { ok: false, error: "Server error" });
   }
+
+  await logAiUsage({
+    userId, tier, feature: "ocr", step: "generate",
+    model: data?.model || model, usage: data?.usage, latencyMs: Date.now() - startedAt,
+  }, { timeoutMs: 750 });
 
   const parsed = S.parseSolutionResponse(data);
   if (!parsed.readable) {
@@ -108,6 +117,7 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey })
 }
 
 module.exports = async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "Use POST" });
@@ -117,18 +127,19 @@ module.exports = async function handler(req, res) {
   if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
 
   // OCR requires Basic or higher
+  let role = "gratis";
   try {
     const profRes = await fetch(
       process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + user.id,
       {
         headers: {
-          "apikey": process.env.SUPABASE_SERVICE_ROLE_KEY,
+          ...getSupabaseAdminHeaders(),
         },
         signal: AbortSignal.timeout(5000)
       }
     );
     const profData = await profRes.json();
-    const role = String(profData?.[0]?.role || "gratis");
+    role = String(profData?.[0]?.role || "gratis");
     if (!["basic", "premium", "admin", "user"].includes(role)) {
       return json(res, 403, { ok: false, error: "OCR requires Basic or Premium" });
     }
@@ -137,16 +148,60 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
-  const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB base64
+  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) {
+    return json(res, 503, { ok: false, error: "OCR is temporarily unavailable" });
+  }
+  try {
+    const quotaResponse = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/consume_anon_rate", {
+      method: "POST",
+      headers: {
+        ...getSupabaseAdminHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_bucket: "ocr:" + user.id,
+        p_window_key: new Date().toISOString().slice(0, 13),
+        p_limit: 12,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const quota = quotaResponse.ok ? await quotaResponse.json() : null;
+    if (!quota) return json(res, 503, { ok: false, error: "OCR is temporarily unavailable" });
+    if (quota.ok === false) return json(res, 429, { ok: false, error: "Too many OCR requests. Try again later." });
+  } catch {
+    return json(res, 503, { ok: false, error: "OCR is temporarily unavailable" });
+  }
+
+  const MAX_IMAGE_BYTES = 3.8 * 1024 * 1024;
+  const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
   const chunks = [];
-  req.on("data", (c) => chunks.push(c));
+  let received = 0;
+  let responded = false;
+  const fail = (status, error) => {
+    if (responded) return;
+    responded = true;
+    return json(res, status, { ok: false, error });
+  };
+  req.on("data", (c) => {
+    received += c.length;
+    if (received > MAX_BODY_BYTES) {
+      chunks.length = 0;
+      fail(413, "Request body too large");
+      return;
+    }
+    if (!responded) chunks.push(c);
+  });
+  req.on("error", () => fail(400, "Request stream error"));
+  req.on("aborted", () => fail(400, "Request aborted"));
   req.on("end", async () => {
+    if (responded) return;
+    responded = true;
     let p;
     try {
       const raw = Buffer.concat(chunks).toString("utf8");
       p = raw ? JSON.parse(raw) : {};
-    } catch (e) { return json(res, 400, { ok: false, error: "Invalid JSON", details: String(e) }); }
+    } catch { return json(res, 400, { ok: false, error: "Invalid JSON" }); }
 
     const imageDataUrl = String(p.imageDataUrl || "");
     const lang = (p.lang === "en") ? "en" : "sv";
@@ -154,14 +209,14 @@ module.exports = async function handler(req, res) {
       return json(res, 400, { ok: false, error: "Missing/invalid imageDataUrl" });
     }
     if (imageDataUrl.length > MAX_IMAGE_BYTES) {
-      return json(res, 413, { ok: false, error: "Image too large (max 10 MB)" });
+      return json(res, 413, { ok: false, error: "Image too large (max 3.8 MB)" });
     }
 
     /* ── Elevlösning ──────────────────────────────────────────────────────
        Egen gren, eget kontrakt. Utan mode gäller materialvägen nedan exakt
        som förut — app.html skickar inget mode och påverkas därför inte. */
     if (p.mode === "solution") {
-      return handleSolution(res, { imageDataUrl, lang, questionText: p.questionText, apiKey });
+      return handleSolution(res, { imageDataUrl, lang, questionText: p.questionText, apiKey, userId: user.id, tier: role });
     }
 
     const model = pickModel();
@@ -171,6 +226,7 @@ module.exports = async function handler(req, res) {
         ? "Du är OCR. Extrahera all text exakt från bilden. Returnera bara ren text utan extra förklaringar."
         : "You are OCR. Extract all text exactly from the image. Return only plain text with no extra commentary.";
 
+    const startedAt = Date.now();
     try {
       const payload = {
         model,
@@ -198,7 +254,12 @@ module.exports = async function handler(req, res) {
       try { data = JSON.parse(rawBody); } catch {
         return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
       }
-      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status, details: data });
+      if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status });
+
+      await logAiUsage({
+        userId: user.id, tier: role, feature: "ocr", step: "generate",
+        model: data?.model || model, usage: data?.usage, latencyMs: Date.now() - startedAt,
+      }, { timeoutMs: 750 });
 
       const text =
         (Array.isArray(data.output) &&
@@ -208,8 +269,8 @@ module.exports = async function handler(req, res) {
         "";
 
       return json(res, 200, { ok: true, text: String(text || "").trim() });
-    } catch (e) {
-      return json(res, 500, { ok: false, error: "Server error", details: String(e) });
+    } catch {
+      return json(res, 500, { ok: false, error: "Server error" });
     }
   });
 };

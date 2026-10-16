@@ -16,11 +16,12 @@ import path from "node:path";
 //   node tests/frontend/exam-flow.viewports.mjs
 //
 // Fristående Node-skript som använder repots egen playwright-dep. Ingen runner.
-// Exitkod 0 = allt grönt.
+// Exitkod 0 = inga medel/allvarliga fynd; LÅG redovisas för manuell bedömning.
 
 
 const OUT = process.env.OUT_DIR || resolve(ROOT, ".test-out");
 const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
+const axeSource = fs.readFileSync(resolve(ROOT, "node_modules/axe-core/axe.min.js"), "utf8");
 
 const SHOT = OUT;
 fs.mkdirSync(SHOT, { recursive: true });
@@ -47,7 +48,7 @@ function mkExam(n, long) {
           source_references: ["Avsnittet om anaerob nedbrytning"], model_answer: "Vid syrebrist…",
           scoring_rubric: { parts: [{ description: "Orsak", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } });
   }
-  return { title: "Prov", level: "C", questions: qs };
+  return { title: "Prov", level: "C", exam_manifest: `v2.${"b".repeat(32)}.synthetic`, questions: qs };
 }
 
 function mkResult(exam, long) {
@@ -78,7 +79,12 @@ async function newPage(opts, exam) {
   // Baslagret från _harness.mjs; provgenereringen och rättningen sist.
   await mockApis(page, { extra: [
     ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam, meta: { quota: { enforced: false } } } })],
-    ["**/api/grade", r => r.fulfill({ json: { ok: true, result: mkResult(exam, true) } })],
+    ["**/api/grade", r => r.fulfill({ json: {
+      ok: true,
+      exam_proof: `v2.${"f".repeat(32)}.syntheticViewportProof`,
+      persistence: { mock_result_saved: true },
+      result: mkResult(exam, true),
+    } })],
   ] });
   await seed(page);
   return { ctx, page };
@@ -96,9 +102,25 @@ async function toContract(page) {
   await page.waitForTimeout(250);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
     "Cellandning sker i mitokondrien. Glykolysen sker i cytoplasman och ger 2 ATP. Citronsyracykeln sker i mitokondriens matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos. Mjölksyra ansamlas i muskeln vid syrebrist under hårt arbete.");
+  const materialFont = await page.locator("#xf .xf-screen[data-screen='material'] .xf-area")
+    .evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+  const viewportWidth = page.viewportSize().width;
+  if (viewportWidth <= 640 && materialFont < 16) {
+    add("MEDEL", `${viewportWidth}px`, `Materialfältets text är ${materialFont}px och kan utlösa iOS-zoom`, ".xf-area", "Använd minst 16px i mobila inmatningsfält");
+  }
   await page.waitForTimeout(200);
   await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
   await page.waitForTimeout(250);
+}
+
+async function axeViolations(page) {
+  await page.evaluate(axeSource);
+  return page.evaluate(async () => {
+    const result = await window.axe.run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } });
+    return result.violations.map(({ id, impact, help, nodes }) => ({
+      id, impact, help, targets: nodes.map(node => node.target.join(" ")),
+    }));
+  });
 }
 
 const overflow = page => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1
@@ -125,6 +147,12 @@ for (const [label, w, h] of VIEWS) {
   await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${SHOT}/exam-${label.replace(/\s/g, "_")}.png` });
+  if (["390x844", "1440x900"].includes(label)) {
+    const violations = await axeViolations(page);
+    if (violations.length) {
+      add("HÖG", label, `WCAG 2 A/AA-fynd i aktivt prov: ${JSON.stringify(violations)}`, ".xf-exam", "Åtgärda tillgänglighetsfyndet och behåll regressionstestet");
+    }
+  }
 
   const o2 = await overflow(page);
   if (o2.over) add("HÖG", label, `Horisontell scroll i provläget (${o2.sw}px i ${o2.w}px)`, ".xf-exam", "Se .xf-sheet/.xf-exam-top");
@@ -136,6 +164,21 @@ for (const [label, w, h] of VIEWS) {
   });
   if (chrome.header) add("HÖG", label, "Sidhuvudet syns fortfarande i provläget", ".xg-header", "body.xf-in-exam-regeln träffar inte");
   if (chrome.util || chrome.beta) add("MEDEL", label, "Utility-bar eller betabanner syns i provläget", ".xg-utility-bar/#betaBanner", "Samma regel");
+
+  const legacyNavHidden = await page.evaluate(() => {
+    const nav = document.createElement("nav");
+    nav.id = "proviaGlobalNav";
+    document.body.appendChild(nav);
+    const hiddenInExam = getComputedStyle(nav).display === "none";
+    document.body.classList.remove("xf-in-exam");
+    document.body.classList.add("xf-grading");
+    const hiddenInGrading = getComputedStyle(nav).display === "none";
+    document.body.classList.remove("xf-grading");
+    document.body.classList.add("xf-in-exam");
+    nav.remove();
+    return hiddenInExam && hiddenInGrading;
+  });
+  if (!legacyNavHidden) add("HÖG", label, "Den globala mobilmenyn visas över prov eller rättning", "#proviaGlobalNav", "Dölj menyn i båda lägena");
 
   // fasta element som överlappar
   const boxes = await page.evaluate(() => {
@@ -155,11 +198,16 @@ for (const [label, w, h] of VIEWS) {
       const e = document.querySelector(sel);
       if (!e) return;
       const r = e.getBoundingClientRect();
-      if (r.width < 44 || r.height < 44) out.push({ sel, w: Math.round(r.width), h: Math.round(r.height) });
+      if (!r.width || !r.height) return;
+      const after = getComputedStyle(e, "::after");
+      const w = Math.max(r.width, after.content === "none" ? 0 : parseFloat(after.width) || 0);
+      const h = Math.max(r.height, after.content === "none" ? 0 : parseFloat(after.height) || 0);
+      const minimum = sel === ".xf-dot" ? 24 : 44;
+      if (w < minimum || h < minimum) out.push({ sel, w: Math.round(w), h: Math.round(h), minimum });
     });
     return out;
   });
-  taps.forEach(t => add(w <= 480 ? "MEDEL" : "LÅG", label, `Tap-target ${t.sel} är ${t.w}×${t.h} px (< 44×44)`, t.sel, "Öka klickytan med padding eller pseudo-element"));
+  taps.forEach(t => add(w <= 480 ? "MEDEL" : "LÅG", label, `Tap-target ${t.sel} är ${t.w}×${t.h} px (< ${t.minimum}×${t.minimum})`, t.sel, "Öka klickytan utan att låta den gå in över en grannkontroll"));
 
   await ctx.close();
 }
@@ -214,9 +262,13 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
       if (n) n.click();
     }
   });
-  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 20000 }).catch(() => {});
+  await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 20000 });
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${SHOT}/q20-result-${w}.png` });
+  const resultAxe = await axeViolations(page);
+  if (resultAxe.length) {
+    add("HÖG", label, `WCAG 2 A/AA-fynd på resultatsidan: ${JSON.stringify(resultAxe)}`, "#xf .xf-screen[data-screen='result']", "Åtgärda tillgänglighetsfyndet och behåll regressionstestet");
+  }
   const o3 = await overflow(page);
   if (o3.over) add("HÖG", label, `Horisontell scroll på resultatskärmen (${o3.sw}px i ${o3.w}px)`, ".xf-item", "Kolla långa modellsvar/källrader");
   const resH = await page.evaluate(() => Math.round(document.body.scrollHeight));
@@ -232,7 +284,31 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   await page.waitForSelector("#xf .xf-screen.on");
   await page.waitForTimeout(600);
 
-  // hur många tabbar innan man når "Skapa prov"?
+  // Use the skip link first, as a keyboard user can, then verify focus enters
+  // the visible exam landmark before counting the remaining tab stops.
+  await page.keyboard.press("Tab");
+  const skipStart = await page.evaluate(() => {
+    const link = document.querySelector("#appSkipLink");
+    const target = link && document.querySelector(link.getAttribute("href"));
+    return {
+      first: document.activeElement === link,
+      href: link?.getAttribute("href") || "",
+      hidden: !target || target.hasAttribute("hidden") || target.getClientRects().length === 0,
+    };
+  });
+  if (!skipStart.first) add("MEDEL", "tangentbord", "Skip-länken är inte den första tabbplatsen", "#appSkipLink", "Kontrollera DOM-ordningen");
+  else if (skipStart.hidden) add("HÖG", "tangentbord", `Skip-länken pekar på en dold eller saknad målsektion (${skipStart.href})`, "app.html .skip-link", "Peka på den synliga huvudytan");
+  else {
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(40);
+    const landedOnMain = await page.evaluate(() => {
+      const target = document.querySelector(document.querySelector("#appSkipLink")?.getAttribute("href") || "");
+      return Boolean(target && document.activeElement === target);
+    });
+    if (!landedOnMain) add("MEDEL", "tangentbord", "Skip-länken navigerar men flyttar inte fokus till målsektionen", "#appSkipLink", "Säkerställ fokuserbart mål");
+  }
+
+  // Count remaining tabs after the skip-link action.
   let tabs = 0, reached = false;
   for (; tabs < 60; tabs++) {
     const f = await page.evaluate(() => {
@@ -242,8 +318,8 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
     if (/xf-btn primary/.test(f.cls) && /Skapa prov/.test(f.txt)) { reached = true; break; }
     await page.keyboard.press("Tab");
   }
-  if (!reached) add("MEDEL", "tangentbord", "Nådde inte 'Skapa prov' inom 60 tabbar", "#xf", "Kontrollera tabordning");
-  else if (tabs > 12) add("MEDEL", "tangentbord", `${tabs} tabbtryck krävs innan startknappen nås — hela sidhuvudet ligger före`, "#xf", "Skip-länk till #xf (pekar i dag på dolt <main>)");
+  if (!reached) add("MEDEL", "tangentbord", "Nådde inte 'Skapa prov' inom 60 tabbar efter skip-länken", "#xf", "Kontrollera tabordning");
+  else if (tabs > 2) add("MEDEL", "tangentbord", `${tabs} tabbtryck krävs efter skip-länken innan startknappen nås`, "#xf", "Kontrollera första interaktiva kontrollen");
 
   // fokus efter skärmbyte
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
@@ -256,7 +332,7 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   if (focusAfter.isBody || !focusAfter.inActive)
     add("MEDEL", "tangentbord", "Fokus flyttas inte till den nya skärmen vid steg­byte — det hamnar på body eller på en knapp som försvunnit", "js/exam-flow.js screen()", "Ge aktiv skärms rubrik tabindex=-1 och fokusera den");
 
-  // skip-länk
+  // The link must continue to target a visible region after the screen changes.
   const skip = await page.evaluate(() => {
     const a = document.querySelector(".skip-link");
     if (!a) return null;
@@ -265,16 +341,16 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
     return { href, targetHidden: t ? t.hasAttribute("hidden") : "saknas" };
   });
   if (skip && skip.targetHidden === true)
-    add("HÖG", "tangentbord", `Skip-länken pekar på ${skip.href} som är hidden — tangentbordshoppet landar i ingenting`, "app.html .skip-link", "Peka på #xf");
+    add("HÖG", "tangentbord", `Skip-länken pekar på ${skip.href} som är hidden — tangentbordshoppet landar i ingenting`, "app.html .skip-link", "Peka på synlig målsektion");
 
   // landmark + h1
   const sem = await page.evaluate(() => ({
     mains: document.querySelectorAll("main:not([hidden])").length,
-    h1: document.querySelectorAll("h1").length,
+    h1: [...document.querySelectorAll("h1")].filter(h => h.getClientRects().length > 0).length,
     xfRole: document.getElementById("xf")?.getAttribute("role") || null
   }));
   if (sem.mains === 0 && !sem.xfRole) add("MEDEL", "semantik", "Sidan har ingen synlig <main>-landmark (den enda är hidden) och #xf saknar role", "#xf", "Gör #xf till <main> eller sätt role=main");
-  if (sem.h1 > 1) add("MEDEL", "semantik", `${sem.h1} st <h1> i DOM samtidigt (en per flödesskärm)`, ".xf-say", "En h1 för sidan, skärmrubriker som h2");
+  if (sem.h1 > 1) add("MEDEL", "semantik", `${sem.h1} st synliga <h1> samtidigt`, "h1", "Kontrollera sidans rubrikstruktur");
 
   await ctx.close();
 }
@@ -290,12 +366,15 @@ for (const [label, w, h] of [["390x844 · 20 frågor", 390, 844], ["1440x900 · 
   await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
   await page.waitForTimeout(300);
   const anim = await page.evaluate(() => {
+    // Chromium serializes a CSS token of 0ms as 0.00001s; ignore that
+    // sub-millisecond rounding while still catching motion a user can see.
+    const hasMeaningfulDuration = value => String(value).split(",").some(part => parseFloat(part) > 0.001);
     const bad = [];
     document.querySelectorAll(".xf-orb, .xf-sheet, .xf-mc-opt, .xf-progress i").forEach(e => {
       const s = getComputedStyle(e);
       const after = getComputedStyle(e, "::after");
-      if (s.transitionDuration !== "0s" && s.transitionDuration !== "" ) bad.push(e.className + " transition " + s.transitionDuration);
-      if (after.animationName && after.animationName !== "none" && after.animationDuration !== "0s") bad.push(e.className + "::after " + after.animationName);
+      if (hasMeaningfulDuration(s.transitionDuration)) bad.push(e.className + " transition " + s.transitionDuration);
+      if (after.animationName && after.animationName !== "none" && hasMeaningfulDuration(after.animationDuration)) bad.push(e.className + "::after " + after.animationName);
     });
     return bad.slice(0, 6);
   });
@@ -409,3 +488,4 @@ console.log("\n════ VISUELL GRANSKNING ════\n");
 if (!findings.length) console.log("inga fynd");
 findings.forEach(f => console.log(`${f.sev} | ${f.ctx} | ${f.what}\n   → ${f.where} — ${f.fix}\n`));
 console.log("skärmbilder:", fs.readdirSync(SHOT).join(", "));
+if (findings.some(finding => finding.sev !== "LÅG")) process.exitCode = 1;

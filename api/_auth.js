@@ -1,8 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "./_supabase-server-key.cjs";
 
-const supabase = createClient(
+const { createSupabaseServerClient } = supabaseKeys;
+
+const supabase = createSupabaseServerClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 /**

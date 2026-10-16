@@ -182,7 +182,8 @@ OPENAI_API_KEY              # OpenAI
 OPENAI_MODEL                # optional, default: gpt-4o-mini
 OPENAI_MODEL_MATH           # optional, default: OPENAI_MODEL
 SUPABASE_URL                # Supabase project URL
-SUPABASE_SERVICE_ROLE_KEY   # Supabase service key (server-side only, never expose)
+SUPABASE_SECRET_KEY         # Supabase server secret (preferred; server-side only, never expose)
+SUPABASE_SERVICE_ROLE_KEY   # Legacy fallback during key migration (server-side only, never expose)
 RESEND_API_KEY              # Email (welcome + admin notifications)
 STRIPE_SECRET_KEY           # Stripe
 STRIPE_WEBHOOK_SECRET       # Stripe webhook signature

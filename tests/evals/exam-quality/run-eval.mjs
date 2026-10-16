@@ -246,7 +246,8 @@ async function runOnce(fixture, runIndex) {
     judgeCallOk: false, judged: 0, judgeAgreed: 0, keyErrors: 0, ambiguous: 0, lowConfidenceDisagreements: 0,
     disagreements: [],
     latency: { generateMs: 0, verifyMs: 0, judgeMs: 0 },
-    usage: { generator: emptyUsage(), verifier: emptyUsage(), judge: emptyUsage() },
+    usage: { generator: emptyUsage(), verifier: emptyUsage(), solver: emptyUsage(), judge: emptyUsage() },
+    usageMeasured: { verifier: false, solver: false },
     errors: [],
   };
 
@@ -301,6 +302,10 @@ async function runOnce(fixture, runIndex) {
       : Promise.resolve({ perQuestion: new Map(), callOk: false, solved: 0, model: null }),
   ]);
   rec.latency.verifyMs = Date.now() - tVerify;
+  rec.usage.verifier = readUsage({ usage: v.usage });
+  rec.usage.solver = readUsage({ usage: sv.usage });
+  rec.usageMeasured.verifier = Boolean(v.usage);
+  rec.usageMeasured.solver = Boolean(sv.usage);
   rec.solverCallOk = sv.callOk;
   rec.solverModel = sv.model;
   if (prevSolverEnv === undefined) delete process.env.OPENAI_SOLVER_MODEL;
@@ -368,9 +373,7 @@ async function runOnce(fixture, runIndex) {
     else rec.lowConfidenceDisagreements++;
   }
 
-  // The verifier's own usage isn't returned by verifyQuestions(); attribute it
-  // from the token counts we can see. Left at zero rather than estimated, and
-  // called out in the summary so the cost figure is never silently wrong.
+  // Provider usage is reported separately from the unverified price table.
   return rec;
 }
 
@@ -425,7 +428,8 @@ async function main() {
         judgeCallOk: false, judged: 0, judgeAgreed: 0, keyErrors: 0, ambiguous: 0,
         lowConfidenceDisagreements: 0, disagreements: [],
         latency: { generateMs: 0, verifyMs: 0, judgeMs: 0 },
-        usage: { generator: emptyUsage(), verifier: emptyUsage(), judge: emptyUsage() },
+        usage: { generator: emptyUsage(), verifier: emptyUsage(), solver: emptyUsage(), judge: emptyUsage() },
+        usageMeasured: { verifier: false, solver: false },
         errors: [`crashed: ${String(e)}`],
       };
     }
@@ -458,8 +462,13 @@ async function main() {
     ambiguous: sum(r => r.ambiguous),
     lowConfidenceDisagreements: sum(r => r.lowConfidenceDisagreements),
   };
-  const genUsage = emptyUsage(); const judgeUsage = emptyUsage();
-  for (const r of records) { addUsage(genUsage, r.usage.generator); addUsage(judgeUsage, r.usage.judge); }
+  const genUsage = emptyUsage(); const verifierUsage = emptyUsage(); const solverUsage = emptyUsage(); const judgeUsage = emptyUsage();
+  for (const r of records) {
+    addUsage(genUsage, r.usage.generator);
+    addUsage(verifierUsage, r.usage.verifier);
+    addUsage(solverUsage, r.usage.solver);
+    addUsage(judgeUsage, r.usage.judge);
+  }
   const genCost = priceOf(GEN_MODEL, genUsage);
 
   const flagCounts = {};
@@ -505,9 +514,11 @@ async function main() {
     console.log(`  ** VARNING: p95 över produktionens 45 s timeout i generate-exam.js **`);
   }
   console.log(`  Generatortokens           in ${genUsage.in}  ut ${genUsage.out}  (varav resonemang ${genUsage.reasoning})`);
-  console.log(`  Generatorkostnad          ${genCost.priced ? `$${genCost.usd.toFixed(4)} för ${totals.exams} prov  =  $${(genCost.usd / totals.exams).toFixed(4)}/prov` : "okänt pris för modellen"}`);
+  console.log(`  Generatorkostnad          ${genCost.priced ? `$${genCost.usd.toFixed(4)} för ${totals.exams} prov  =  $${(genCost.usd / totals.exams).toFixed(4)}/prov` : "okänt pris för modellen"}  (historisk prislista, ej total)`);
+  console.log(`  Granskartokens            in ${verifierUsage.in}  ut ${verifierUsage.out}  (${sum(r => Number(r.usageMeasured.verifier))}/${totals.exams} uppmätta)`);
+  console.log(`  Lösartokens               in ${solverUsage.in}  ut ${solverUsage.out}  (${sum(r => Number(r.usageMeasured.solver))}/${totals.exams} uppmätta)`);
   console.log(`  Domarens tokens           in ${judgeUsage.in}  ut ${judgeUsage.out}  (mätkostnad, ej produktionskostnad)`);
-  console.log(`  Not: verifierarens tokenförbrukning mäts inte här — verifyQuestions() returnerar den inte.`);
+  console.log(`  Not: prislistan är inte verifierad för aktuella modeller och summan ovan omfattar bara generatorn.`);
 
   console.log(`\n  Per ämne:`);
   for (const p of perFixture) {
@@ -535,7 +546,7 @@ async function main() {
   writeFileSync(resultPath, JSON.stringify({
     config: { GEN_MODEL, VERIFIER_MODEL, JUDGE_MODEL, RUNS, NUM_QUESTIONS, fixtures: selected.map(f => f.id), judgeConfidenceFloor: JUDGE_CONFIDENCE_FLOOR },
     wallMs, totals, perFixture, dropCounts, flagCounts,
-    usage: { generator: genUsage, judge: judgeUsage },
+    usage: { generator: genUsage, verifier: verifierUsage, solver: solverUsage, judge: judgeUsage },
     cost: { generatorUsd: genCost.priced ? genCost.usd : null },
     latency: { generateP50Ms: percentile(genLatencies, 0.5), generateP95Ms: percentile(genLatencies, 0.95) },
     records,

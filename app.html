@@ -1,12 +1,13 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
 <meta charset="utf-8" />
-  <script src="/js/intro-splash.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="js/exgen-modules.js"></script>
-<script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+<script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
 <title>ExGen – App</title>
 <meta name="description" content="Klistra in ditt eget kursmaterial och få ett prov tillbaka — rättat med poäng, motivering och modellsvar på varje fråga. ExGen är studieplattformen för grundskolan och gymnasiet." />
 <link rel="canonical" href="https://exgen.se/app.html" />
@@ -38,6 +39,7 @@
 <script src="js/exgen-shell.js" defer></script>
 <script src="shared.js" defer></script>
 <script src="js/per-onboarding.js" defer></script>
+<script src="js/graph-answer.js" defer></script>
 <script src="js/exam-flow.js" defer></script>
 <style>
 /* ── APP-SPECIFIC ── */
@@ -45,8 +47,27 @@
 /* LAYOUT */
 .wrap{max-width:var(--max);margin:0 auto;padding:32px 24px;position:relative;z-index:1}
 @media(max-width:480px){.wrap{padding:20px 16px}}
+.xg-language-desktop{display:none;min-height:40px;align-items:center;justify-content:center;padding:0 12px;border:1px solid var(--exgen-border,#E4E7EC);border-radius:6px;background:transparent;color:var(--exgen-text,#1B2430);font:600 13px 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.xg-language-desktop:hover{background:var(--exgen-bg-secondary,#F8FAFC);border-color:var(--exgen-text-secondary,#667085)}
+.xg-language-desktop:focus-visible{outline:2px solid var(--a,#00768F);outline-offset:2px}
+@media(min-width:861px){.xg-language-desktop{display:inline-flex}}
 /* Override has-gnav padding during exam steps */
 body.exam-mode{padding-bottom:0!important}
+body.app-locked #xf,body.app-locked #main-content,body.app-locked #perWidget,body.app-locked #gradingOverlay{display:none!important}
+#authGate[hidden]{display:none}
+.app-locked #authGate{display:flex}
+#authGate{min-height:calc(100vh - 220px);max-width:680px;margin:0 auto;padding:64px 24px;flex-direction:column;align-items:flex-start;justify-content:center}
+.authGateEyebrow{font:500 12px 'DM Mono',monospace;color:var(--a);text-transform:uppercase;margin-bottom:18px}
+.authGateTitle{font:700 36px/1.15 'DM Sans',sans-serif;color:var(--t);margin:0 0 14px}
+.authGateText{font:400 16px/1.6 'DM Sans',sans-serif;color:var(--t2);max-width:520px;margin:0 0 28px}
+.authGateActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.authGateAction,.authGateLogin{min-height:48px;padding:0 22px;border:1px solid transparent;border-radius:6px;font:700 15px 'DM Sans',sans-serif;cursor:pointer}
+.authGateAction{background:var(--a);color:#fff}
+.authGateLogin{border-color:var(--exgen-border,#E4E7EC);background:transparent;color:var(--t)}
+.authGateAction:hover{background:var(--a2)}
+.authGateLogin:hover{background:var(--exgen-bg-secondary,#F8FAFC)}
+.authGateAction:focus-visible,.authGateLogin:focus-visible{outline:2px solid var(--t);outline-offset:3px}
+@media(max-width:600px){#authGate{min-height:calc(100vh - 180px);padding:40px 20px}.authGateTitle{font-size:28px}.authGateActions{width:100%;flex-direction:column;align-items:stretch}.authGateAction,.authGateLogin{width:100%}}
 
 /* HERO */
 .hero{padding:40px 0 24px}
@@ -180,6 +201,9 @@ transition:border-color .16s ease,background .28s ease,color .28s ease,box-shado
 select:focus,input[type="text"]:focus,input[type="email"]:focus,input[type="password"]:focus,textarea:focus{
 border-color:var(--l2);box-shadow:0 0 0 3px rgba(0,183,217,.08);
 }
+@media(max-width:640px){
+select,input[type="text"],input[type="email"],input[type="password"],textarea{font-size:16px}
+}
 textarea{min-height:160px;resize:vertical;line-height:1.6}
 select option{background:var(--s);color:var(--t)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -191,6 +215,10 @@ font-family:'DM Mono',monospace;font-size:11.5px;font-weight:400;
 color:var(--t3);margin-top:8px;line-height:1.5;word-break:break-word;
 }
 .stxt.ok{color:var(--ok)} .stxt.bad{color:var(--danger)} .stxt.warn{color:var(--warn)}
+html[data-exgen-environment="pilot"] .uploadBox,
+html[data-exgen-environment="pilot"] .quotaBannerLink,
+html[data-exgen-environment="pilot"] #improveBanner,
+html[data-exgen-environment="pilot"] #improveBtnInline{display:none!important}
 
 /* SPINNER */
 .spinner{
@@ -483,11 +511,10 @@ white-space:nowrap;
 </style>
 
 </head>
-<body>
+<body class="app-locked">
 
-<!-- Pekar på #xf, inte på #main-content: det senare är den dolda wizarden, och
-     ett tangentbordshopp dit landar i ingenting. -->
-<a href="#xf" class="skip-link">Hoppa till innehåll</a>
+<!-- Hopplänken leder till den synliga huvudytan och uppdateras vid upplåsning. -->
+<a href="#authGate" class="skip-link" id="appSkipLink">Hoppa till innehåll</a>
 
 <div id="pageLoader" class="pageLoader" aria-hidden="true">
 <div style="display:grid;place-items:center">
@@ -510,10 +537,22 @@ white-space:nowrap;
 <div data-xg-header></div>
 
 <div id="betaBanner" style="background:#f8fafc;border-bottom:1px solid rgba(0,183,217,.2);padding:9px 48px 9px 16px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'DM Mono',monospace;font-size:11px;color:#667085;position:relative;flex-wrap:wrap">
-  <span>ExGen är i tidig fas — småfel kan förekomma. Vi vill gärna höra vad du tycker och vad du saknar!</span>
+  <span id="betaBannerText">ExGen är i tidig fas — småfel kan förekomma.</span>
+  <a id="betaFeedbackLink" href="mailto:elton.rustaeus@gmail.com?subject=ExGen%20feedback" style="color:#0369a1;text-decoration:underline;text-underline-offset:2px">Skicka feedback</a>
+  <span id="betaPrivacyHint">Skicka inte personuppgifter eller provsvar.</span>
   <button onclick="document.getElementById('betaBanner').style.display='none';sessionStorage.setItem('betaDismissed','1')" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#667085;cursor:pointer;font-size:16px;line-height:1;padding:4px 6px" aria-label="Stäng">✕</button>
 </div>
 <script>if(sessionStorage.getItem('betaDismissed')==='1'){var _b=document.getElementById('betaBanner');if(_b)_b.style.display='none'}</script>
+
+<main id="authGate" tabindex="-1">
+  <span class="authGateEyebrow" id="authGateEyebrow">Mockprov</span>
+  <h1 class="authGateTitle" id="authGateTitle">Ditt studiematerial börjar här.</h1>
+  <p class="authGateText" id="authGateText">Logga in för att skapa ett prov av ditt material och fortsätta där du slutade.</p>
+  <div class="authGateActions" id="authGateActions">
+    <button class="authGateAction" id="authGateAction" type="button">Skapa konto</button>
+    <button class="authGateLogin" id="authGateLogin" type="button">Logga in</button>
+  </div>
+</main>
 
 <!-- Den P.E.R-ledda provskaparen. Ytan bor i js/exam-flow.js; motorn nedanför
      (kvot, generering, rättning, felbank, persistens) är oförändrad och körs
@@ -538,7 +577,7 @@ white-space:nowrap;
 </div>
 </div>
 
-<!-- QUOTA BANNER — visas när användaren är nära eller vid gränsen -->
+<!-- QUOTA BANNER — reserverad för serverbekräftade kvotbesked -->
 <div class="quotaBanner" id="quotaBanner">
 <div class="quotaBannerTxt" id="quotaBannerTxt"></div>
 <a class="quotaBannerLink" href="pricing.html">Uppgradera →</a>
@@ -589,6 +628,7 @@ white-space:nowrap;
 <div class="sBody">
 <label class="fieldLabel" for="pastedText" id="tPasteLabel">Studiematerial</label>
 <textarea id="pastedText" placeholder="Rubriker → punktlista → definitioner/formler → exempel"></textarea>
+<div class="stxt" id="materialCounter" role="status" aria-live="polite"></div>
 <div class="uploadBox" style="margin-top:16px">
 <div class="uploadTop">
 <span class="uploadTitle" id="tOcrTitle">Bild → OCR (valfritt)</span>
@@ -655,6 +695,7 @@ white-space:nowrap;
 <option value="mix" selected id="qtMix">Blandat</option>
 <option value="mc" id="qtMc">Flervalsfrågor</option>
 <option value="short" id="qtShort">Kortsvar</option>
+<option value="graph" id="qtGraph">Interaktiv graf</option>
 </select>
 </div>
 <div>
@@ -742,8 +783,8 @@ Rätta prov
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://mnmotdluigzeehdjbhbu.supabase.co".trim();
-const SUPABASE_ANON_KEY_RAW = "sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN";
+const SUPABASE_URL = window.ExGenRuntime.supabaseUrl.trim();
+const SUPABASE_ANON_KEY_RAW = window.ExGenRuntime.publishableKey;
 const SUPABASE_ANON_KEY = (SUPABASE_ANON_KEY_RAW || "").trim();
 const ACCESS_FLAG_KEY = "proviaai_app_access";
 const LS_HISTORY = "proviaai_history";
@@ -754,10 +795,10 @@ const LS_TRAIN_PICK = "proviaai_train_pick";
 const LS_UI_OPEN = "proviaai_ui_open";
 const LS_CUSTOM_COURSES = "proviaai_custom_courses";
 const LS_ROLE = "proviaai_role";
-const LS_PENDING_ANSWERS = "proviaai_pending_answers"; // answers saved before grading, cleared on success
+const LS_PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
 
 // ── QUOTA CONSTANTS PER ROLL ──────────────────────────────────────────
-// Gratis: 3 prov per vecka (räknat måndag–söndag) — måste matcha api/_provia-rules.js
+// Gratis: 3 prov per vecka (måndag–söndag i svensk tid) — måste matcha api/_provia-rules.js
 // Basic:  30 prov per månad (kalendermånad)
 // Premium: obegränsat
 const ROLE_LIMITS = {
@@ -781,22 +822,32 @@ function escapeHtml(s){
 }
 
 let LANG = localStorage.getItem("proviaai_lang") || "sv";
+let selectedExamFocusTerms = [];
+const MATERIAL_CHAR_LIMIT = 12000;
 // Nuvarande roll — laddas från Supabase vid inloggning, cachas i localStorage
 let currentRole = localStorage.getItem(LS_ROLE) || "gratis";
 
 const T = {
 sv:{
   brandTag:"Studieplattform för skolan",
+  authGateEyebrow:"Mockprov",authGateTitle:"Ditt studiematerial börjar här.",
+  authGateText:"Logga in eller skapa konto för att göra ett prov av ditt material och fortsätta där du slutade.",
+  authPilotGateText:"Endast elever med ett inbjudet skolpilotkonto kan logga in här. Använd kontot du fått. Saknar du inloggningsuppgifter? Be personen som bjöd in dig om hjälp.",
+  authGateAction:"Skapa konto",authGateLogin:"Logga in",
+  authPendingEyebrow:"Kontot väntar",authPendingTitle:"Ditt konto väntar på godkännande.",
+  authPendingText:"Du kan inte skapa prov ännu. Kontakta den som bjöd in dig om du behöver hjälp.",
+  authPendingAction:"Kontrollera igen",
   m1:"01 — Material",m2:"02 — Inställningar",m3:"03 — Mockprov",m4:"04 — Rättning",
   mImprove:"Min utveckling",mLang:"English",mLogout:"Logga ut",
   step1:"Material",step1Sub:"Klistra in texten du pluggar på — rubriker, definitioner, formler, exempel",
   pasteLabel:"Studiematerial",pastePH:"Rubriker → punktlista → definitioner/formler → exempel",
+  materialTooLong:"Materialet är för långt. Korta ner det till högst 12 000 tecken innan du fortsätter.",
   ocrTitle:"Bild → OCR (valfritt)",ocrBtn:"OCR till material",
   ocrHint:"Tips: tydlig bild rakt ovanifrån, bra ljus, hög kontrast.",
   tip:"Tips: rubriker + punktlistor ger mer exakta frågor och bättre rättning.",
   step2:"Inställningar",step2Sub:"Nivå och antal är förifyllda — kör direkt eller justera. Sen skapas ditt prov",
   level:"Nivå (E / C / A)",course:"Ämne / Kurs",coursePH:"Ex: Matematik 2b",
-  qType:"Frågetyp",qtMix:"Blandat",qtMc:"Flervalsfrågor",qtShort:"Kortsvar",
+  qType:"Frågetyp",qtMix:"Blandat",qtMc:"Flervalsfrågor",qtShort:"Kortsvar",qtGraph:"Interaktiv graf",
   num:"Antal frågor",
   gen:"Skapa mockprov",grade:"Rätta prov",clear:"Rensa",
   debug:"Debug",
@@ -813,6 +864,8 @@ sv:{
   trainLoaded:"Träningsläge: materialet är byggt av dina valda misstag. Skapa ett nytt mockprov.",
   quotaHitWeek:"Du har använt dina 3 gratis prov den här veckan. Uppgradera till Basic för 30 prov/månad.",
   quotaHitMonth:"Du har nått månadsgränsen. Uppgradera till Premium för obegränsat.",
+  quotaPilotWeek:"Du har använt veckans prov i testversionen. Du kan skapa nya prov på måndag. Kontakta den som bjöd in dig om du behöver hjälp.",
+  quotaPilotMonth:"Du har använt månadens prov i testversionen. Du kan skapa nya prov nästa månad. Kontakta den som bjöd in dig om du behöver hjälp.",
   openSection:"Öppna",closeSection:"Stäng",
   wLabel0:"Material",wLabel1:"Inställningar",wLabel2:"Mockprov",wLabel3:"Rättning",
   wNext0:"Nästa: Inställningar →",wHint0:"Klistra in ditt studiematerial ovan",
@@ -824,16 +877,24 @@ sv:{
 },
 en:{
   brandTag:"A study platform for school",
+  authGateEyebrow:"Practice exam",authGateTitle:"Start with your study material.",
+  authGateText:"Sign in or create an account to make an exam from your material and pick up where you left off.",
+  authPilotGateText:"Only students invited to the school pilot can sign in here. Use the account you were given. Need help with your sign-in details? Contact the person who invited you.",
+  authGateAction:"Create an account",authGateLogin:"Sign in",
+  authPendingEyebrow:"Account pending",authPendingTitle:"Your account is awaiting approval.",
+  authPendingText:"You cannot create exams yet. Contact the person who invited you if you need help.",
+  authPendingAction:"Check again",
   m1:"01 — Material",m2:"02 — Settings",m3:"03 — Mock exam",m4:"04 — Grading",
   mImprove:"My progress",mLang:"Svenska",mLogout:"Log out",
   step1:"Material",step1Sub:"Paste the material you're studying — headings, definitions, formulas, examples",
   pasteLabel:"Study material",pastePH:"Headings → bullet points → definitions/formulas → examples",
+  materialTooLong:"The material is too long. Shorten it to 12,000 characters or fewer before continuing.",
   ocrTitle:"Image → OCR (optional)",ocrBtn:"OCR into material",
   ocrHint:"Tip: sharp photo from above, good light, high contrast.",
   tip:"Tip: headings + bullet points produce more accurate questions and grading.",
   step2:"Settings",step2Sub:"Level and count are pre-filled — run as is or adjust. Then your exam is created",
   level:"Level (E / C / A)",course:"Subject / Course",coursePH:"e.g., Math / History",
-  qType:"Question type",qtMix:"Mixed",qtMc:"Multiple choice",qtShort:"Short answer",
+  qType:"Question type",qtMix:"Mixed",qtMc:"Multiple choice",qtShort:"Short answer",qtGraph:"Interactive graph",
   num:"Number of questions",
   gen:"Generate mock exam",grade:"Grade exam",clear:"Clear",
   debug:"Debug",
@@ -850,6 +911,8 @@ en:{
   trainLoaded:"Training mode: material built from your selected mistakes. Generate a new mock exam.",
   quotaHitWeek:"You've used your 3 free exams this week. Upgrade to Basic for 30/month.",
   quotaHitMonth:"You've reached the monthly limit. Upgrade to Premium for unlimited.",
+  quotaPilotWeek:"You've used this week's exams in the test version. You can create more on Monday. Contact the person who invited you if you need help.",
+  quotaPilotMonth:"You've used this month's exams in the test version. You can create more next month. Contact the person who invited you if you need help.",
   openSection:"Open",closeSection:"Close",
   wLabel0:"Material",wLabel1:"Settings",wLabel2:"Mock exam",wLabel3:"Grading",
   wNext0:"Next: Settings →",wHint0:"Paste your study material above",
@@ -862,9 +925,17 @@ en:{
 };
 
 // ── QUOTA HELPERS ────────────────────────────────────────────────────
-// Returnerar ISO-veckonyckel "YYYY-Www" för current week (måndag-baserad)
+// Kvotperioder följer svensk tid, även om elevens enhet har en annan tidszon.
+function stockholmQuotaDate(d = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Stockholm", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(d);
+  const value = type => Number(parts.find(part => part.type === type)?.value);
+  return new Date(Date.UTC(value("year"), value("month") - 1, value("day")));
+}
+// Returnerar ISO-veckonyckel "YYYY-Www" (måndag–söndag i svensk tid).
 function isoWeekKey(d = new Date()) {
-  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const tmp = stockholmQuotaDate(d);
   tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
   const week = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
@@ -872,7 +943,7 @@ function isoWeekKey(d = new Date()) {
 }
 // Returnerar "YYYY-MM" för aktuell månad
 function monthKey(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  return stockholmQuotaDate(d).toISOString().slice(0, 7);
 }
 
 function quotaStorageKey(role, uid) {
@@ -901,18 +972,17 @@ async function bumpQuotaCount() {
   localStorage.setItem(key, String(cur + 1));
 }
 
-// Returnerar { allowed: bool, count: number, limit: number, period: string }
-async function checkQuota() {
-  const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
-  if (cfg.limit === Infinity) return { allowed: true, count: 0, limit: Infinity, period: cfg.period };
-  const count = await readQuotaCount();
-  return { allowed: count < cfg.limit, count, limit: cfg.limit, period: cfg.period };
+function quotaLimitMessage(period) {
+  const pilot = window.ExGenRuntime.environment === "pilot";
+  const copy = T[LANG];
+  return period === "week"
+    ? (pilot ? copy.quotaPilotWeek : copy.quotaHitWeek)
+    : (pilot ? copy.quotaPilotMonth : copy.quotaHitMonth);
 }
 
 async function refreshQuotaUi() {
   const ms = $("miniState");
   const banner = $("quotaBanner");
-  const bannerTxt = $("quotaBannerTxt");
   const rp = $("rolePill");
 
   // Uppdatera roll-pill i menyn
@@ -923,7 +993,7 @@ async function refreshQuotaUi() {
 
   // Dölj OCR för gratis
   const ocrBox = document.querySelector(".uploadBox");
-  if (ocrBox) ocrBox.style.display = currentRole === "gratis" ? "none" : "";
+  if (ocrBox) ocrBox.style.display = window.ExGenRuntime.environment === "pilot" || currentRole === "gratis" ? "none" : "";
 
   const cfg = ROLE_LIMITS[currentRole] || ROLE_LIMITS.gratis;
 
@@ -934,32 +1004,17 @@ async function refreshQuotaUi() {
   }
 
   const count = await readQuotaCount();
-  const left = Math.max(cfg.limit - count, 0);
   const periodLabel = cfg.period === "week"
     ? (LANG === "sv" ? "vecka" : "week")
     : (LANG === "sv" ? "månad" : "month");
 
   if (ms) {
     ms.textContent = LANG === "sv"
-      ? `PROV DENNA ${periodLabel.toUpperCase()}: ${count}/${cfg.limit} · KVAR: ${left}`
-      : `EXAMS THIS ${periodLabel.toUpperCase()}: ${count}/${cfg.limit} · LEFT: ${left}`;
+      ? `SENAST KÄNDA PROV DENNA ${periodLabel.toUpperCase()}: ${count} · SERVERN KONTROLLERAR KVOTEN VID SKAPANDE`
+      : `LAST KNOWN EXAMS THIS ${periodLabel.toUpperCase()}: ${count} · SERVER CHECKS QUOTA WHEN CREATING`;
   }
 
-  // Visa banner när ≤ 1 kvar eller vid gränsen
-  if (banner && bannerTxt) {
-    if (left === 0) {
-      const msg = cfg.period === "week" ? T[LANG].quotaHitWeek : T[LANG].quotaHitMonth;
-      bannerTxt.innerHTML = `<strong>${LANG === "sv" ? "Gränsen nådd." : "Limit reached."}</strong> ${msg}`;
-      banner.classList.add("show");
-    } else if (left === 1) {
-      bannerTxt.innerHTML = LANG === "sv"
-        ? `<strong>1 prov kvar</strong> denna ${periodLabel}. Uppgradera för mer.`
-        : `<strong>1 exam left</strong> this ${periodLabel}. Upgrade for more.`;
-      banner.classList.add("show");
-    } else {
-      banner.classList.remove("show");
-    }
-  }
+  if (banner) banner.classList.remove("show");
 }
 
 function showDebug(txt){ const w=$("debugWrap"),p=$("debug"); if(!w||!p)return; w.style.display="block"; p.textContent=txt||""; }
@@ -974,24 +1029,35 @@ window.addEventListener("unhandledrejection",(e)=>reportErr(e.reason));
 
 const USE_SUPABASE=typeof SUPABASE_URL==="string"&&SUPABASE_URL.startsWith("http")&&typeof SUPABASE_ANON_KEY==="string"&&SUPABASE_ANON_KEY.length>40;
 const SupabaseGlobal=(typeof window!=="undefined")?window.supabase:null;
-const db=(USE_SUPABASE&&SupabaseGlobal&&typeof SupabaseGlobal.createClient==="function")?SupabaseGlobal.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+const db=(USE_SUPABASE&&SupabaseGlobal&&typeof SupabaseGlobal.createClient==="function")?SupabaseGlobal.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{storageKey:window.ExGenRuntime.authStorageKey}}):null;
 
 async function getAccessToken(){ if(!db) return ""; try{ const {data,error}=await db.auth.getSession(); if(error)return""; return data?.session?.access_token||""; }catch{return "";} }
 async function postJson(path,payload,opts){
   // Never throws — always resolves {ok,status,raw,data,timedOut,networkError}.
-  // A missing client timeout was the root cause of the "loads forever, no error,
-  // no retry" grading hang: if the server stalled, this await never settled.
+  // Bound token lookup, fetch, and response reading; any one may stall.
   const timeoutMs=(opts&&Number(opts.timeoutMs))||45000;
   const ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
-  const timer=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs):null;
+  let timedOut=false;
+  let timer=null;
+  const timeout=new Promise((_,reject)=>{
+    timer=setTimeout(()=>{
+      timedOut=true;
+      if(ctrl)ctrl.abort();
+      const err=new Error("Request timed out"); err.name="AbortError"; reject(err);
+    },timeoutMs);
+  });
   try{
-    const token=await getAccessToken(); const headers={"Content-Type":"application/json"};
-    if(token) headers["Authorization"]=`Bearer ${token}`;
-    const resp=await fetch(path,{method:"POST",headers,body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined});
-    const raw=await resp.text(); let data=null; try{data=JSON.parse(raw);}catch{}
-    return{ok:resp.ok,status:resp.status,raw,data,timedOut:false,networkError:false};
+    return await Promise.race([
+      (async()=>{
+        const token=opts?.token??await getAccessToken(); const headers={"Content-Type":"application/json"};
+        if(token) headers["Authorization"]=`Bearer ${token}`;
+        const resp=await fetch(path,{method:"POST",headers,body:JSON.stringify(payload),signal:ctrl?ctrl.signal:undefined});
+        const raw=await resp.text(); let data=null; try{data=JSON.parse(raw);}catch{}
+        return{ok:resp.ok,status:resp.status,raw,data,timedOut:false,networkError:false};
+      })(),
+      timeout,
+    ]);
   }catch(err){
-    const timedOut=!!(ctrl&&ctrl.signal&&ctrl.signal.aborted);
     return{ok:false,status:0,raw:"",data:null,timedOut,networkError:!timedOut,error:String(err&&err.message||err)};
   }finally{ if(timer)clearTimeout(timer); }
 }
@@ -1017,43 +1083,170 @@ async function refreshServerEntitlements(){
   }catch{}
 }
 
-async function saveExamToAccount({material,course,level,qType,exam,answers,result}){
-  if(!db)return{ok:false,error:"Supabase not configured"};
-  const userId=await getUserId(); if(!userId)return{ok:false,error:"Not logged in"};
-  const row={user_id:userId,course:course||null,level:level||null,qtype:qType||null,material:material||"",exam:exam||null,answers:answers||null,result:result||null,created_at:new Date().toISOString()};
+function pendingExamKey(userId){return LS_PENDING_EXAMS_PREFIX+String(userId||"");}
+function readPendingExams(userId){try{const v=JSON.parse(localStorage.getItem(pendingExamKey(userId))||"[]");return Array.isArray(v)?v:[];}catch{return[];}}
+function writePendingExams(userId,rows){try{const key=pendingExamKey(userId);localStorage.setItem(key,JSON.stringify(rows));return JSON.stringify(JSON.parse(localStorage.getItem(key)||"null"))===JSON.stringify(rows);}catch{return false;}}
+function newLocalExamId(){try{return crypto.randomUUID();}catch{return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}}
+function submissionIdFromProof(proof){const match=typeof proof==="string"?proof.match(/^v2\.([a-f0-9]{32})\.[A-Za-z0-9_-]+$/):null;return match?match[1]:null;}
+function queuePendingExam(row){const rows=readPendingExams(row.user_id);if(rows.some(x=>x.local_id===row.local_id))return true;if(rows.length>=100)return false;rows.push(row);return writePendingExams(row.user_id,rows);}
+function removePendingExam(userId,localId){const rows=readPendingExams(userId).filter(x=>x.local_id!==localId);return writePendingExams(userId,rows);}
+function stableJSON(value){if(Array.isArray(value))return"["+value.map(stableJSON).join(",")+"]";if(value&&typeof value==="object")return"{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+stableJSON(value[k])).join(",")+"}";return JSON.stringify(value);}
+function canonicalTimestamp(value){
+  const input=String(value||""),match=input.match(/^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2})(?::(\d{2}))?(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/i);
+  if(!match)return input;
+  const base=Date.parse(`${match[1]}T${match[2]}:${match[3]||"00"}${match[5]||""}`);
+  if(!Number.isFinite(base))return input;
+  const seconds=new Date(Math.floor(base/1000)*1000).toISOString().replace(".000Z","");
+  const fraction=String(match[4]||"").replace(/0+$/g,"");
+  return`${seconds}${fraction?`.${fraction}`:""}Z`;
+}
+function legacyTrainingBatchId(record){
+  const exam=record?.exam&&typeof record.exam==="object"?{...record.exam}:null;
+  if(exam)delete exam.training_batch_id;
+  const input=stableJSON([canonicalTimestamp(record?.created_at),String(record?.course||""),String(record?.level||""),String(record?.qtype||record?.qType||""),String(record?.material||""),exam,record?.answers||null,record?.result||null]);
+  const lanes=[2166136261,0x9e3779b9,0x85ebca6b,0xc2b2ae35],primes=[16777619,2246822519,3266489917,668265263];
+  for(let i=0;i<input.length;i++){const c=input.charCodeAt(i);for(let lane=0;lane<lanes.length;lane++)lanes[lane]=Math.imul(lanes[lane]^c,primes[lane]);}
+  return`legacy-${lanes.map(value=>(value>>>0).toString(16).padStart(8,"0")).join("")}`;
+}
+function sameExamPayload(a,b){
+  if(stableJSON(a||null)===stableJSON(b||null))return true;
+  const aBatch=String(a?.training_batch_id||""),bBatch=String(b?.training_batch_id||"");
+  if(aBatch&&bBatch)return false;
+  const withoutBatch=exam=>{if(!exam||typeof exam!=="object"||Array.isArray(exam))return exam;const copy={...exam};delete copy.training_batch_id;return copy;};
+  return stableJSON(withoutBatch(a)||null)===stableJSON(withoutBatch(b)||null);
+}
+function sameSavedExam(a,b){if(a.submission_id&&b.submission_id)return a.submission_id===b.submission_id;return canonicalTimestamp(a.created_at)===canonicalTimestamp(b.created_at)&&String(a.course||"")===String(b.course||"")&&String(a.level||"")===String(b.level||"")&&String(a.qtype||"")===String(b.qtype||"")&&String(a.material||"")===String(b.material||"")&&sameExamPayload(a.exam,b.exam)&&stableJSON(a.answers||null)===stableJSON(b.answers||null)&&stableJSON(a.result||null)===stableJSON(b.result||null);}
+function migrateTrainingPick(oldMistakes,newMistakes){
+  const pick=lsGetObj(LS_TRAIN_PICK);if(!Array.isArray(pick?.keys)||!pick.keys.length)return;
+  const nextKeys=new Set((newMistakes||[]).map(item=>String(item?.mistake_key||""))),available=new Map();
+  const signature=item=>stableJSON([Number(item?.ts||0),String(item?.course||""),String(item?.id||""),String(item?.question||""),String(item?.user_answer||""),String(item?.feedback||""),String(item?.model_answer||""),Number(item?.points||0),Number(item?.max_points||0)]);
+  (newMistakes||[]).forEach(item=>{const key=signature(item);if(!available.has(key))available.set(key,[]);available.get(key).push(String(item?.mistake_key||""));});
+  const oldByKey=new Map((oldMistakes||[]).map(item=>[String(item?.mistake_key||""),item])),consumed=new Set(),mapped=[];
+  for(const selected of pick.keys.map(String)){
+    if(nextKeys.has(selected)){mapped.push(selected);continue;}
+    const legacy=oldByKey.get(selected),bucket=legacy?available.get(signature(legacy)):null;
+    const replacement=bucket?.find(key=>key&&!consumed.has(key));
+    if(replacement){mapped.push(replacement);consumed.add(replacement);}
+    else mapped.push(selected);
+  }
+  const keys=Array.from(new Set(mapped));
+  if(keys.length!==pick.keys.length||keys.some((key,index)=>key!==String(pick.keys[index]||"")))lsSet(LS_TRAIN_PICK,{...pick,keys});
+}
+async function saveExamToAccount(record,{checkExisting=false}={}){
+  if(!db)return{ok:false,attempted:false,error:"Supabase not configured"};
+  const userId=await getUserId(); if(!userId)return{ok:false,attempted:false,error:"Not logged in"};
+  if(record.user_id&&record.user_id!==userId)return{ok:false,attempted:false,error:"Account changed"};
+  const createdAt=record.created_at||new Date().toISOString(),identityRecord={...record,created_at:createdAt};
+  const batchId=String(record.exam?.training_batch_id||record.submission_id||legacyTrainingBatchId(identityRecord));
+  const exam=record.exam&&batchId?{...record.exam,training_batch_id:batchId}:record.exam||null;
+  const row={user_id:userId,submission_id:record.submission_id||null,course:record.course||null,level:record.level||null,qtype:record.qtype||record.qType||null,material:record.material||"",exam,answers:record.answers||null,result:record.result||null,created_at:createdAt};
+  const columns="id,submission_id,created_at,course,level,qtype,material,exam,answers,result";
+  const receipt=typeof row.exam?.submission_receipt==="string"?row.exam.submission_receipt:"";
+  const existingQuery=()=>{
+    const query=db.from("user_exams").select(columns).eq("user_id",userId);
+    return row.submission_id?query.eq("submission_id",row.submission_id).limit(1):query.eq("created_at",row.created_at).limit(5);
+  };
+  const alreadySaved=(saved)=>row.submission_id
+    ?saved?.submission_id===row.submission_id
+    :sameSavedExam(saved,row);
+  const findSaved=async()=>{
+    const existing=await existingQuery();
+    if(existing.error)return{error:existing.error,saved:false};
+    if((existing.data||[]).some(alreadySaved))return{saved:true};
+    if(row.submission_id&&receipt){
+      const legacy=await db.from("user_exams").select(columns).eq("user_id",userId).is("submission_id",null).contains("exam",{submission_receipt:receipt}).limit(5);
+      if(legacy.error)return{error:legacy.error,saved:false};
+      if((legacy.data||[]).some(saved=>saved?.exam?.submission_receipt===receipt))return{saved:true};
+    }
+    return{saved:false};
+  };
+  if(checkExisting){
+    const existing=await findSaved();
+    if(existing.error)return{ok:false,attempted:true,error:"Could not verify existing save"};
+    if(existing.saved)return{ok:true,attempted:true,alreadySaved:true};
+  }
   const{data,error}=await db.from("user_exams").insert([row]).select("id");
-  if(error)return{ok:false,error:error.message||String(error)};
-  return{ok:true,id:Array.isArray(data)&&data[0]?data[0].id:null};
+  if(error){
+    if(checkExisting||error.code==="23505"){
+      const verify=await findSaved();
+      if(!verify.error&&verify.saved)return{ok:true,attempted:true,alreadySaved:true};
+    }
+    return{ok:false,attempted:true,error:error.message||String(error)};
+  }
+  return{ok:true,attempted:true,id:Array.isArray(data)&&data[0]?data[0].id:null};
+}
+let currentUnsavedAccountExam=null;
+async function retryPendingExamSave(localId){
+  const userId=await getUserId(); if(!userId)return{ok:false,error:"Not signed in"};
+  const queued=readPendingExams(userId).find(row=>row.local_id===localId);
+  const record=queued||(currentUnsavedAccountExam?.local_id===localId?currentUnsavedAccountExam:null);
+  if(!record||record.user_id!==userId)return{ok:false,error:"Pending result not found for this account"};
+  const saved=await saveExamToAccount(record,{checkExisting:true});
+  if(!saved.ok)return saved;
+  removePendingExam(userId,localId);
+  if(currentUnsavedAccountExam?.local_id===localId)currentUnsavedAccountExam=null;
+  await loadExamsFromAccountToLocal(false);
+  return{ok:true};
+}
+async function getPendingAccountSaves(){
+  const userId=await getUserId();
+  if(!userId)return[];
+  return readPendingExams(userId).filter(row=>row&&row.user_id===userId&&row.local_id);
 }
 
 function mergeMistakesFromExamRows(rows){
   const out=[];
+  const idOf=value=>typeof value==="string"?(value.trim()?value:""):typeof value==="number"&&Number.isFinite(value)?String(value):"";
+  const scoreOf=value=>{
+    if(typeof value==="number")return Number.isFinite(value)?value:null;
+    if(typeof value!=="string")return null;
+    const text=value.trim();
+    if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text))return null;
+    const number=Number(text); return Number.isFinite(number)?number:null;
+  };
   (rows||[]).forEach(r=>{
     const createdTs=Date.parse(r.created_at)||0;
     const exam=r.exam||null,result=r.result||null,answers=r.answers||null;
-    const qById=new Map(((exam&&exam.questions)?exam.questions:[]).map(q=>[String(q.id),q]));
-    const aById=new Map((Array.isArray(answers)?answers:[]).map(a=>[String(a.id),String(a.answer||"")]));
+    const batchId=String(exam?.training_batch_id||r.submission_id||legacyTrainingBatchId(r));
+    const qById=new Map();
+    (exam&&Array.isArray(exam.questions)?exam.questions:[]).forEach(q=>{const id=q&&typeof q==="object"?idOf(q.id):"";if(id)qById.set(id,q);});
+    const aById=new Map();
+    (Array.isArray(answers)?answers:[]).forEach(a=>{const id=a&&typeof a==="object"?idOf(a.id):"";if(id)aById.set(id,String(a.answer||""));});
     const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
-    per.forEach(item=>{
-      const got=Number(item.points||0),mx=Number(item.max_points||0);
-      if(mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
-        out.push({ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
+    per.forEach((item,questionIndex)=>{
+      if(!item||typeof item!=="object")return;
+      const got=scoreOf(item.points),mx=scoreOf(item.max_points),qid=idOf(item.id),q=qid?qById.get(qid):null;
+      if(item.unanswered!==true&&q&&typeof q.question==="string"&&q.question.trim()&&got!==null&&mx!==null&&mx>0&&got>=0&&got<=mx&&got<mx){
+        out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
     });
   });
   while(out.length>200)out.shift(); return out;
 }
 
-async function loadExamsFromAccountToLocal(){
+async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
   if(!db)return; const uid=await getUserId(); if(!uid)return;
-  const{data,error}=await db.from("user_exams").select("id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
+  const{data,error}=await db.from("user_exams").select("id,submission_id,created_at,course,level,qtype,material,exam,answers,result").eq("user_id",uid).order("created_at",{ascending:true}).limit(500);
   if(error)return;
-  const filtered=data||[];
-  const history=filtered.map(r=>({ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",total_points:r.result?.total_points??0,max_points:r.result?.max_points??0,percent:(r.result?.max_points>0)?Math.round((r.result.total_points/r.result.max_points)*100):0}));
+  const remote=data||[]; const queued=readPendingExams(uid);
+  const pending=queued.filter(local=>!remote.some(saved=>sameSavedExam(saved,local)));
+  if(pending.length!==queued.length)writePendingExams(uid,pending);
+  const filtered=[...remote,...pending.map(row=>({...row,local_only:true}))].sort((a,b)=>(Date.parse(a.created_at)||0)-(Date.parse(b.created_at)||0));
+  const history=filtered.map(r=>{
+    const totalRaw=r.result?.total_points,maxRaw=r.result?.max_points;
+    const total=Number(totalRaw),maximum=Number(maxRaw);
+    const hasScore=(typeof totalRaw==="number"||typeof totalRaw==="string")&&!(typeof totalRaw==="string"&&totalRaw.trim()==="")
+      &&(typeof maxRaw==="number"||typeof maxRaw==="string")&&!(typeof maxRaw==="string"&&maxRaw.trim()==="")
+      &&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
+    return{ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",
+      total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null,accountSaved:!r.local_only};
+  });
   lsSet(LS_HISTORY,history);
   const last=filtered&&filtered.length?filtered[filtered.length-1]:null;
-  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
+  if(last){lsSet(LS_LAST,{ts:Date.parse(last.created_at)||Date.now(),attempt:history[history.length-1],exam:last.exam,result:last.result,examProof:last.exam?.submission_receipt||null,training_batch_id:last.exam?.training_batch_id||last.submission_id||legacyTrainingBatchId(last),accountSaved:!last.local_only});if(typeof last.material==="string")localStorage.setItem(LS_MATERIAL,last.material);}
   else{try{localStorage.removeItem(LS_LAST);}catch{}}
-  lsSet(LS_MISTAKES,mergeMistakesFromExamRows(filtered));
+  const oldMistakes=lsGetArray(LS_MISTAKES),newMistakes=mergeMistakesFromExamRows(filtered);
+  migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
+  if(notifyHistoryUpdate)window.dispatchEvent(new Event("exgen:history-updated"));
 }
 
 async function ensureUserProfileRow(){
@@ -1121,7 +1314,7 @@ function setWizardStep(step,opts={}){
 }
 function initWizard(){
   document.querySelectorAll(".wStep[data-step]").forEach(btn=>{const step=parseInt(btn.dataset.step,10);btn.addEventListener("click",()=>setWizardStep(step));});
-  onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}setWizardStep(1);});
+  onClick("wNext0",()=>{const mat=(pastedTextEl()?.value||"").trim();if(!mat){setStatus(T[LANG].needMat,"bad");return;}if(Array.from(mat).length>MATERIAL_CHAR_LIMIT){setStatus(materialTooLongMessage(),"bad");return;}setWizardStep(1);});
   onClick("wBack1",()=>setWizardStep(0));
   onClick("wBack2",()=>setWizardStep(1));
   onClick("wNext2",async()=>{const g=$("gradeBtn");if(g&&!g.disabled)g.click();});
@@ -1206,16 +1399,19 @@ function initCourseLibrary(){
 
 function applyLang(){
   const t=T[LANG];
+  const english=LANG==="en";
+  document.documentElement.lang=LANG==="en"?"en":"sv";
   const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
   set("brandTag",t.brandTag);
   set("m1",t.m1);set("m2",t.m2);set("m3",t.m3);set("m4",t.m4);
   set("mImprove",t.mImprove);set("mLang",t.mLang);set("mLogout",t.mLogout);set("langPill",LANG.toUpperCase());
   set("tStep1",t.step1);set("tStep1Sub",t.step1Sub);set("tPasteLabel",t.pasteLabel);
   const pt=$("pastedText");if(pt)pt.placeholder=t.pastePH;
+  updateMaterialCounter();
   set("tOcrTitle",t.ocrTitle);set("ocrBtn",t.ocrBtn);set("tOcrHint",t.ocrHint);set("formatHint",t.tip);
   set("tStep2",t.step2);set("tStep2Sub",t.step2Sub);set("tLevel",t.level);set("tCourse",t.course);
   const c=$("course");if(c)c.placeholder=t.coursePH;
-  set("tQType",t.qType);set("qtMix",t.qtMix);set("qtMc",t.qtMc);set("qtShort",t.qtShort);set("tNum",t.num);
+  set("tQType",t.qType);set("qtMix",t.qtMix);set("qtMc",t.qtMc);set("qtShort",t.qtShort);set("qtGraph",t.qtGraph);set("tNum",t.num);
   set("generateExamBtn",t.gen);set("gradeBtn",t.grade);set("clearBtn",t.clear);
   set("improveBtnInline",t.mImprove);set("debugTitle",t.debug);
   set("tStep3",t.step3);set("tStep4",t.step4);set("footerText",t.footer);
@@ -1225,6 +1421,51 @@ function applyLang(){
   set("wBack1",t.wBack);set("wBack2",t.wBack);set("wBack3",t.wBack);
   set("wNext2",t.wNext2);set("wRestart",t.wRestart);
   set("heroSubText",t.heroSub);set("howtoTitle",t.howtoTitle);set("howtoText",t.howtoText);
+  renderAuthGate();
+  const appSkipLink=$("appSkipLink");if(appSkipLink)appSkipLink.textContent=english?"Skip to content":"Hoppa till innehåll";
+  const brandTag=document.querySelector(".xg-brand-tag");
+  if(brandTag)brandTag.textContent=english?"School study platform":"Studieplattform för skolan";
+  const navLabels={"index.html":english?"Home":"Hem","app.html":english?"Practice exam":"Mockprov","förbättring.html":english?"My progress":"Min utveckling","pricing.html":english?"Pricing":"Priser"};
+  document.querySelectorAll(".xg-nav-link, .xg-menu-item").forEach(item=>{
+    const href=item.getAttribute("href");
+    if(item.classList.contains("xg-nav-link")){
+      if(href&&navLabels[href])item.textContent=navLabels[href];
+      return;
+    }
+    const label=item.querySelector("span:nth-child(2)");
+    if(!label)return;
+    const scroll=item.getAttribute("data-scroll");
+    if(href&&navLabels[href])label.textContent=navLabels[href];
+    else if(item.id==="xgLogout")label.textContent=english?"Log out":"Logga ut";
+    else if(item.id==="langBtn")label.textContent=english?"Svenska":"English";
+    else if(item.id==="cancelSubBtn")label.textContent=english?"Manage subscription":"Hantera prenumeration";
+    else if(scroll){
+      const scrollLabels={"#material":english?"01 — Material":"01 — Material","#settings":english?"02 — Settings":"02 — Inställningar","#exam":english?"03 — Practice exam":"03 — Mockprov","#result":english?"04 — Grading":"04 — Rättning"};
+      if(scrollLabels[scroll])label.textContent=scrollLabels[scroll];
+    }
+  });
+  const mainNav=document.querySelector(".xg-nav");
+  if(mainNav)mainNav.setAttribute("aria-label",english?"Main navigation":"Huvudnavigation");
+  const menu=document.querySelector(".xg-menu");
+  if(menu)menu.setAttribute("aria-label",english?"Menu":"Meny");
+  const menuButton=document.querySelector(".xg-menu-btn");
+  if(menuButton)menuButton.setAttribute("aria-label",english?"Menu":"Meny");
+  const logoutPill=document.querySelector("#xgLogout .xg-menu-pill");
+  if(logoutPill)logoutPill.textContent=english?"Lock":"Lås";
+  const privacyLink=document.querySelector('.xg-utility-right a[href="integritetspolicy.html"]');
+  if(privacyLink)privacyLink.textContent=english?"Privacy policy":"Integritetspolicy";
+  const betaText=document.getElementById("betaBannerText");
+  if(betaText)betaText.textContent=english
+    ?"ExGen is in an early stage. Small issues may occur."
+    :"ExGen är i tidig fas — småfel kan förekomma.";
+  const betaFeedbackLink=document.getElementById("betaFeedbackLink");
+  if(betaFeedbackLink)betaFeedbackLink.textContent=english?"Send feedback":"Skicka feedback";
+  const betaPrivacyHint=document.getElementById("betaPrivacyHint");
+  if(betaPrivacyHint)betaPrivacyHint.textContent=english
+    ?"Do not include personal data or exam answers."
+    :"Skicka inte personuppgifter eller provsvar.";
+  const betaClose=document.querySelector("#betaBanner button");
+  if(betaClose)betaClose.setAttribute("aria-label",english?"Dismiss":"Stäng");
   const eb=$("examBody"),rb=$("resultBody"),em=$("examMeta"),rm=$("resultMeta");
   if(em&&eb&&!eb.children.length)em.textContent=t.noExam;
   if(rm&&rb&&!rb.children.length)rm.textContent=t.noGrade;
@@ -1234,6 +1475,19 @@ function applyLang(){
   if(sc)sc.textContent=(LANG==="sv")?"Spara i min lista":"Save to my list";
 }
 
+function updateMaterialCounter(){
+  const input=$("pastedText"), counter=$("materialCounter");
+  if(!input||!counter)return;
+  const count=Array.from(input.value).length;
+  const over=count>MATERIAL_CHAR_LIMIT;
+  counter.className="stxt"+(over?" bad":"");
+  counter.textContent=LANG==="sv"
+    ? `${count.toLocaleString("sv-SE")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("sv-SE")} tecken · ${over?"Korta ner materialet innan du fortsätter.":"Hela texten används."}`
+    : `${count.toLocaleString("en-US")} / ${MATERIAL_CHAR_LIMIT.toLocaleString("en-US")} characters · ${over?"Shorten the material before continuing.":"All entered text is used."}`;
+}
+
+function materialTooLongMessage(){return T[LANG].materialTooLong;}
+
 const spinWrap=()=>$("spinWrap"),miniStateEl=()=>$("miniState"),statusEl=()=>$("status");
 const pastedTextEl=()=>$("pastedText"),levelEl=()=>$("level"),courseEl=()=>$("course");
 const qTypeEl=()=>$("qType"),numQuestionsEl=()=>$("numQuestions");
@@ -1241,6 +1495,8 @@ const examMetaEl=()=>$("examMeta"),examBodyEl=()=>$("examBody");
 const resultMetaEl=()=>$("resultMeta"),resultBodyEl=()=>$("resultBody");
 const imageInputEl=()=>$("imageInput"),ocrStatusEl=()=>$("ocrStatus");
 let currentExam=null;
+let currentExamProof=null;
+let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
 
 function setBusy(isBusy,label){
@@ -1261,27 +1517,94 @@ function hideGradingOverlay(){
 function setStatus(txt,kind){ const s=statusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function setOcrStatus(txt,kind){ const s=ocrStatusEl();if(!s)return;s.className="stxt"+(kind?" "+kind:"");s.textContent=txt||""; }
 function isUnlocked(){ return localStorage.getItem(ACCESS_FLAG_KEY)==="true"; }
-function showLock(){
-  // shared.js is deferred, so it may not have defined the opener yet. If it
-  // never does, the whole shared layer (nav, cookie banner, P.E.R) is missing
-  // too, so send the visitor to the landing page rather than leaving them on
-  // a gated page with nothing to click.
-  if(window.openProviaLogin){ window.openProviaLogin('register'); return; }
-  let n=0; const iv=setInterval(()=>{
-    if(window.openProviaLogin){ clearInterval(iv); window.openProviaLogin('register'); }
-    else if(++n>50){ clearInterval(iv); location.href="index.html"; }
-  },60);
+let verifiedUserId=null;
+let accountPendingApproval=false;
+let relockingForAuthChange=false;
+function renderAuthGate(){
+  const t=T[LANG],prefix=accountPendingApproval?"authPending":"authGate";
+  const pilot=window.ExGenRuntime?.environment==="pilot";
+  $("authGateEyebrow").textContent=t[prefix+"Eyebrow"];
+  $("authGateTitle").textContent=t[prefix+"Title"];
+  $("authGateText").textContent=pilot&&!accountPendingApproval?t.authPilotGateText:t[prefix+"Text"];
+  $("authGateAction").textContent=accountPendingApproval?t.authPendingAction:pilot?t.authGateLogin:t.authGateAction;
+  const login=$("authGateLogin");if(login){login.textContent=t.authGateLogin;login.hidden=accountPendingApproval||pilot;}
 }
-function hideLock(){ document.documentElement.style.overflow="";document.body.style.overflow=""; if(window.closeProviaLogin)window.closeProviaLogin(); }
-// Gate errors ("account pending approval", SDK failures) used to render inside
-// the removed overlay; they surface as a toast now so they are still seen.
+function showLock(){
+  document.body.classList.add("app-locked");
+  const gate=$("authGate");if(gate)gate.hidden=false;
+  const skip=$("appSkipLink");if(skip)skip.href="#authGate";
+  renderAuthGate();
+}
+function hideLock(){
+  document.body.classList.remove("app-locked");
+  const gate=$("authGate");if(gate)gate.hidden=true;
+  const skip=$("appSkipLink");if(skip)skip.href="#xf";
+  document.documentElement.style.overflow="";document.body.style.overflow="";
+  if(window.closeProviaLogin)window.closeProviaLogin();
+}
+function authUserId(value){
+  try{return JSON.parse(value)?.user?.id||null;}catch{return null;}
+}
+function relockForAuthChange(){
+  if(!verifiedUserId||relockingForAuthChange)return;
+  relockingForAuthChange=true;
+  verifiedUserId=null;
+  document.body.classList.add("app-locked");
+  location.reload();
+}
+window.addEventListener("storage",event=>{
+  const key=window.ExGenRuntime?.authStorageKey;
+  if(!key||!verifiedUserId||(event.key!==key&&event.key!==null))return;
+  const value=event.key===null?localStorage.getItem(key):event.newValue;
+  if(authUserId(value)!==verifiedUserId)relockForAuthChange();
+});
+if(db)db.auth.onAuthStateChange((event,session)=>{
+  if(!verifiedUserId)return;
+  if(event==="SIGNED_OUT"||(event==="SIGNED_IN"&&session?.user?.id!==verifiedUserId))relockForAuthChange();
+});
+// Transient verification errors are surfaced as a toast; pending approval has
+// a persistent message in the gate instead.
 function setLockError(msg){ if(msg&&window.showToast)window.showToast(msg,"bad",5000); }
-async function logout(){
+async function logout(options={}){
+  const signOutUserId=verifiedUserId;
+  if(!options.skipLocalDataConfirm&&signOutUserId&&window.ExGenLocalDataBoundary?.hasLocalExamData(signOutUserId)){
+    const keepData=confirm(LANG==="sv"
+      ? "Ett provutkast eller osynkat provresultat finns kvar i webbläsaren. Vill du behålla det lokalt för samma konto och logga ut? Lokal lagring är inte krypterad."
+      : "An unfinished exam or unsynced result remains in this browser. Keep it locally for the same account and sign out? Local storage is not encrypted.");
+    if(!keepData){
+      const discardData=confirm(LANG==="sv"
+        ? "Ta bort det här kontots lokala provutkast, svar och osynkade resultat och logga ut? Andra kontons lokala data påverkas inte."
+        : "Delete this account's local exam draft, answers and unsynced results, then sign out? Other accounts' local data will not be affected.");
+      if(!discardData)return;
+      window.ExGenExamDrafts?.discardForUser(signOutUserId);
+      if(window.ExGenLocalDataBoundary?.clearLocalExamData(signOutUserId)===false){
+        setLockError(LANG==="sv"?"Lokala provdata kunde inte rensas. Du är fortfarande inloggad.":"Local exam data could not be cleared. You are still signed in.");
+        return;
+      }
+    }else{
+      window.ExGenExamDrafts?.flush();
+    }
+  }
+  if(options.skipLocalDataConfirm&&signOutUserId)window.ExGenExamDrafts?.flush();
+  if(signOutUserId){
+    const{data:beforeSignOut,error:sessionError}=await db.auth.getSession().catch(()=>({data:null,error:true}));
+    if(sessionError||beforeSignOut?.session?.user?.id!==signOutUserId){
+      setLockError(LANG==="sv"?"Kontot ändrades innan utloggningen. Ingen annan kontos lokala data rensades.":"The account changed before sign-out. No other account's local data was cleared.");
+      location.reload();
+      return;
+    }
+  }
+  verifiedUserId=null;
+  accountPendingApproval=false;
+  document.body.classList.add("app-locked");
   localStorage.removeItem(ACCESS_FLAG_KEY);
   localStorage.removeItem(LS_ROLE);
   currentRole = "gratis";
   window.XgShell&&window.XgShell.closeMenu();
   if(db){try{await db.auth.signOut();}catch{}}
+  const{data:afterSignOut}=db?await db.auth.getSession().catch(()=>({data:null})):({data:null});
+  if(afterSignOut?.session?.user?.id){location.reload();return;}
+  window.ExGenLocalDataBoundary?.clearForSignOut();
   showLock();
   await refreshQuotaUi();
 }
@@ -1293,32 +1616,59 @@ async function checkApprovalAndUnlock(session){
   const{data:prof,error}=await db.from("profiles").select("approved,role").eq("id",user.id).maybeSingle();
   if(error){setLockError(String(error.message||error));return false;}
   if(!prof){
-    // Profil saknas — skapa den direkt (trigger kanske inte hann)
-    await db.from("profiles").insert([{id:user.id,approved:true,role:"gratis"}]);
-    currentRole = "gratis";
+    await logout({skipLocalDataConfirm:true});
+    setLockError(LANG==="sv"?"Kontot kunde inte verifieras. Kontakta den som bjöd in dig.":"Your account could not be verified. Contact the person who invited you.");
+    return false;
   } else {
-    if(!prof.approved){setLockError(LANG==="sv"?"Kontot väntar på godkännande.":"Account pending approval.");showLock();return false;}
+    if(!prof.approved){verifiedUserId=null;accountPendingApproval=true;showLock();return false;}
     currentRole = prof.role || "gratis";
   }
+  accountPendingApproval=false;
   localStorage.setItem(LS_ROLE, currentRole);
   await refreshServerEntitlements();
   setLockError("");
+  verifiedUserId=user.id;
   hideLock();
   if(window.PER) window.PER.register(async () => (await db.auth.getSession())?.data?.session?.access_token || "");
   /* Show welcome animation */
   const _wEmail = session?.user?.email || '';
-  if (window.showWelcome) setTimeout(() => window.showWelcome(_wEmail), 60);
+  const _hasPendingSave = readPendingExams(user.id).some(row => row && row.user_id === user.id);
+  if (window.showWelcome && !_hasPendingSave) setTimeout(() => window.showWelcome(_wEmail), 60);
   return true;
+}
+
+async function handleAuthGateAction(){
+  if(!accountPendingApproval){window.openProviaLogin?.(window.ExGenRuntime?.environment==="pilot"?"login":"register",true);return;}
+  const button=$("authGateAction");button.disabled=true;
+  try{
+    const {data,error}=await db.auth.getSession();
+    if(error)throw error;
+    if(!data?.session){accountPendingApproval=false;showLock();return;}
+    const ok=await checkApprovalAndUnlock(data.session);
+    if(ok){await loadExamsFromAccountToLocal();await refreshQuotaUi();runTrainModeIfRequested();}
+  }catch(error){setLockError(String(error?.message||error));}
+  finally{button.disabled=false;}
+}
+function handleAuthGateLogin(){
+  if(window.openProviaLogin)window.openProviaLogin("login",true);
+  else location.href="index.html";
 }
 
 // signInEmail()/signUpEmail() lived here and drove the removed inline
 // overlay. shared.js's dialog owns both flows now, including the reset
 // path these two never had.
 
-function buildTrainingMaterialFromMistakes(mistakes,pickedIds){
-  const src=Array.isArray(mistakes)?mistakes:[],idSet=(Array.isArray(pickedIds)&&pickedIds.length)?new Set(pickedIds.map(x=>String(x))):null;
-  const filtered=idSet?src.filter(m=>idSet.has(String(m.id))):src,recent=filtered.slice(-30).reverse();
-  const course=(courseEl()?.value||"").trim();
+function buildTrainingMaterialFromMistakes(mistakes,selectedKeys,courseOverride){
+  const course=String(courseOverride==null?courseEl()?.value||"":courseOverride).trim();
+  const courseKey=value=>String(value||"").trim().replace(/\s+/g," ").toLowerCase();
+  const selectedCourse=courseKey(course);
+  const src=Array.isArray(mistakes)?mistakes:[],keySet=selectedKeys===null?null:new Set((Array.isArray(selectedKeys)?selectedKeys:[]).map(String));
+  const filtered=src.filter((m,index)=>{
+    const fallbackKey=`legacy:${Number(m?.ts||0)}:${m?.course||''}:${m?.id||''}:${m?.question||''}:${index}`;
+    if(keySet&&!keySet.has(String(m?.mistake_key||fallbackKey)))return false;
+    return !selectedCourse||courseKey(m.course)===selectedCourse;
+  }),recent=filtered.slice(-30).reverse();
+  if(!recent.length)return "";
   const hSv=`TRÄNING PÅ DINA MISSTAG\n${course?`Kurs: ${course}\n`:""}Instruktion: Skapa prov som bara testar dessa svaga delar.\n\n`;
   const hEn=`TRAINING FROM YOUR MISTAKES\n${course?`Course: ${course}\n`:""}Instruction: Generate exams that focus only on these weak areas.\n\n`;
   const blocks=recent.map((m,i)=>{
@@ -1346,8 +1696,22 @@ function runTrainModeIfRequested(){
     if(window.showToast)window.showToast(msg,"bad",5000);
     return;
   }
-  const pick=lsGetObj(LS_TRAIN_PICK),pickedIds=Array.isArray(pick?.ids)?pick.ids:[];
-  const mat=buildTrainingMaterialFromMistakes(mistakes,pickedIds);
+  const pick=lsGetObj(LS_TRAIN_PICK),pickedKeys=Array.isArray(pick?.keys)?pick.keys.map(String):[];
+  const mode=pick?.mode==="all"?"all":"selected";
+  if(mode!=="all"&&!pickedKeys.length){
+    const msg=LANG==="sv"?"Markera minst ett misstag i felbanken innan du startar träningen.":"Select at least one mistake in the mistake bank before starting practice.";
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
+  // Use the same course for the material header and the generation request;
+  // the hidden wizard field may still contain a previous course.
+  const course=String(mode==="all"?"":pick&&Object.prototype.hasOwnProperty.call(pick,"course")?pick.course||"":courseEl()?.value||"").trim();
+  const mat=buildTrainingMaterialFromMistakes(mistakes,mode==="all"?null:pickedKeys,course);
+  if(!mat){
+    const msg=LANG==="sv"?"De valda misstagen finns inte kvar. Gå tillbaka och markera dem igen.":"Those selected mistakes are no longer available. Go back and select them again.";
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
   if(pastedTextEl())pastedTextEl().value=mat;
   try{localStorage.setItem(LS_MATERIAL,mat);}catch{}
   if(qTypeEl())qTypeEl().value="mix";
@@ -1355,8 +1719,6 @@ function runTrainModeIfRequested(){
 
   // Kursen tas från felbankens eget val när det finns; annars får flödet gissa
   // utifrån historiken.
-  const course=String(pick?.course||courseEl()?.value||"").trim();
-
   // js/exam-flow.js definierar __xfPrefill först i boot(), som väntar in den
   // här filens motorbrygga. Ordningen är alltså inte given — polla kort.
   let n=0;
@@ -1450,8 +1812,6 @@ function isRenderableQuestion(q){
   if(type==="mc"){
     if(!Array.isArray(q.options)||q.options.length<2)return false;
     if(q.options.some(o=>!String(o??"").trim()))return false;              // no empty options
-    const ci=q.correct_index;
-    if(!Number.isInteger(ci)||ci<0||ci>=q.options.length)return false;     // answer key must point at a real option
     const norm=q.options.map(o=>String(o).trim().toLowerCase());
     if(new Set(norm).size!==norm.length)return false;                      // duplicate/overlapping options
   }
@@ -1459,19 +1819,20 @@ function isRenderableQuestion(q){
 }
 
 function renderExam(exam){
-  currentExam=exam; const t=T[LANG];
+  const t=T[LANG];
+  currentExamProof=null;
+  currentExamAnswers=null;
+  let graphToolUnavailable=false;
   const rawQs=Array.isArray(exam.questions)?exam.questions:[];
   const qs=rawQs.filter(isRenderableQuestion);
   const droppedCount=rawQs.length-qs.length;
-  currentExam.questions=qs; // only renderable questions proceed to answering + grading
-  if(qs.length===0){
+  if(qs.length===0||droppedCount>0){
+    currentExam=null;
     setStatus(LANG==="sv"?"Provet kunde inte skapas med tillräcklig kvalitet. Försök generera igen.":"The exam could not be built with sufficient quality. Please generate again.","bad");
     const g=$("gradeBtn");if(g)g.disabled=true;
-    return;
+    return false;
   }
-  if(droppedCount>0){
-    showToast(LANG==="sv"?`${droppedCount} fråga(or) uteslöts pga kvalitetskontroll.`:`${droppedCount} question(s) were excluded by the quality check.`,"warn");
-  }
+  currentExam=exam;
   const em=examMetaEl(),eb=examBodyEl(),rm=resultMetaEl(),rb=resultBodyEl();
   if(em)em.textContent=LANG==="sv"
     ?`${qs.length} frågor · Nivå ${exam.level||"—"} — besvara allt och tryck Rätta prov`
@@ -1504,10 +1865,36 @@ function renderExam(exam){
       });
       box.appendChild(group);eb?.appendChild(box);return;
     }
-    const ans=document.createElement("textarea"); ans.className="answerTa"; ans.placeholder=t.writeAnswer; ans.dataset.qid=qid;
-    box.appendChild(ans);eb?.appendChild(box);
+    if(q.type==="graph"){
+      if(typeof window.ExGenGraphAnswer==="function"){
+        const widget=document.createElement("div");widget.className="legacyGraphAnswer";widget.dataset.qid=qid;
+        const graphUi=q.graph_ui;
+        const source=graphUi&&graphUi.mode==="scatter"?graphUi.source_table:null;
+        if(source&&Array.isArray(source.headers)&&source.headers.length===2&&Array.isArray(source.rows)&&source.rows.length===3
+          &&source.headers.every(value=>typeof value==="string"&&value.length<=32)
+          &&source.rows.every(row=>Array.isArray(row)&&row.length===2&&row.every(value=>Number.isSafeInteger(value)||(typeof value==="string"&&/^[+-]?\d+(?:[.,]\d{1,3})?$/.test(value))))){
+          const wrap=document.createElement("div");wrap.className="xf-source-table-wrap";
+          const table=document.createElement("table");table.className="xf-source-table";
+          const caption=document.createElement("caption");caption.textContent=LANG==="en"?"Values from your material":"Värden från materialet";table.appendChild(caption);
+          const thead=document.createElement("thead"),headerRow=document.createElement("tr");
+          source.headers.forEach(label=>{const cell=document.createElement("th");cell.scope="col";cell.textContent=label;headerRow.appendChild(cell);});
+          thead.appendChild(headerRow);table.appendChild(thead);
+          const tbody=document.createElement("tbody");source.rows.forEach(row=>{const tr=document.createElement("tr");row.forEach(value=>{const cell=document.createElement("td");cell.textContent=String(value);tr.appendChild(cell);});tbody.appendChild(tr);});
+          table.appendChild(tbody);wrap.appendChild(table);box.appendChild(wrap);
+        }
+        const graphInput=window.ExGenGraphAnswer(widget,"",function(){},LANG,graphUi);graphInput.dataset.qid=qid;box.appendChild(widget);
+      }else{
+        const unavailable=document.createElement("p");unavailable.className="graph-tool-error";
+        unavailable.setAttribute("role","alert");
+        unavailable.textContent=LANG==="sv"?"Grafverktyget kunde inte laddas. Ladda om sidan innan du fortsätter.":"The graph tool could not load. Reload the page before continuing.";
+        box.appendChild(unavailable);graphToolUnavailable=true;
+      }
+    }else{
+      const ans=document.createElement("textarea"); ans.className="answerTa"; ans.placeholder=t.writeAnswer; ans.dataset.qid=qid;box.appendChild(ans);
+    }
+    eb?.appendChild(box);
   });
-  const g=$("gradeBtn");if(g)g.disabled=qs.length===0;
+  const g=$("gradeBtn");if(g)g.disabled=qs.length===0||graphToolUnavailable;
   staggerIn(Array.from(eb.querySelectorAll(".qBox")),50);
   // Inject exam questions into P.E.R context so PER can see "fråga 3" etc.
   if (window.setPerContext) {
@@ -1525,6 +1912,7 @@ function renderExam(exam){
   }
   // Visa flytande rätta-bar
   const fb=$("floatingGradeBar");if(fb&&qs.length>0)fb.classList.add("show");
+  return true;
 }
 
 // After grading: colour + symbol the original MC options and lock them.
@@ -1591,7 +1979,7 @@ function clearAll(){
   if(qTypeEl())qTypeEl().value="mix";
   if(numQuestionsEl())numQuestionsEl().value="12";
   if(imageInputEl())imageInputEl().value="";
-  setOcrStatus("");currentExam=null;
+  setOcrStatus("");currentExam=null;currentExamProof=null;currentExamAnswers=null;
   const chk=document.getElementById("useCustomCourse"),cs=document.getElementById("courseSearch"),cc=document.getElementById("customCourse"),st=document.getElementById("coursePickerStatus");
   if(chk)chk.checked=false;if(cs)cs.value="";if(cc)cc.value="";if(st)st.textContent="";
   try{if(cc)cc.disabled=true;if(cs)cs.disabled=false;}catch{}
@@ -1614,6 +2002,35 @@ try{
   initWizard();
   initCourseLibrary();
   applyLang();
+  pastedTextEl()?.addEventListener("input",updateMaterialCounter);
+  $("authGateAction")?.addEventListener("click",handleAuthGateAction);
+  $("authGateLogin")?.addEventListener("click",handleAuthGateLogin);
+  const headerActions=document.querySelector(".xg-header-right");
+  let desktopLangBtn=null;
+  if(headerActions){
+    desktopLangBtn=document.createElement("button");
+    desktopLangBtn.type="button";
+    desktopLangBtn.id="langBtnDesktop";
+    desktopLangBtn.className="xg-language-desktop";
+    desktopLangBtn.setAttribute("aria-label",LANG==="sv"?"Switch language to English":"Byt språk till svenska");
+    desktopLangBtn.textContent=LANG==="sv"?"English":"Svenska";
+    headerActions.insertBefore(desktopLangBtn,headerActions.firstChild);
+  }
+  function changeAppLanguage(){
+    LANG=(LANG==="sv")?"en":"sv";
+    localStorage.setItem("proviaai_lang",LANG);
+    applyLang();
+    if(desktopLangBtn){
+      desktopLangBtn.textContent=LANG==="sv"?"English":"Svenska";
+      desktopLangBtn.setAttribute("aria-label",LANG==="sv"?"Switch language to English":"Byt språk till svenska");
+    }
+    const mobileLabel=document.querySelector("#langBtn span:nth-child(2)");
+    if(mobileLabel)mobileLabel.textContent=LANG==="sv"?"English":"Svenska";
+    window.dispatchEvent(new Event("exgen:languagechange"));
+    refreshQuotaUi().catch(()=>{});
+    window.XgShell&&window.XgShell.closeMenu();
+    runTrainModeIfRequested();
+  }
   initReveal();
   hidePageLoader();
   await refreshQuotaUi();
@@ -1652,7 +2069,8 @@ try{
       const el=document.querySelector(sel); if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
     });
   }
-  onClick("langBtn",async()=>{LANG=(LANG==="sv")?"en":"sv";localStorage.setItem("proviaai_lang",LANG);applyLang();await refreshQuotaUi();window.XgShell&&window.XgShell.closeMenu();runTrainModeIfRequested();});
+  onClick("langBtn",changeAppLanguage);
+  if(desktopLangBtn)desktopLangBtn.addEventListener("click",changeAppLanguage);
 
   // Show/hide account links based on login + role
   // #kontoLink är borta — kontot nås numera bara via kontoknappen i headern,
@@ -1687,6 +2105,7 @@ try{
   onClick("xgLogout",async()=>{await logout();});
 
   onClick("ocrBtn",async()=>{
+    if(window.ExGenRuntime.environment === "pilot")return;
     if(currentRole==="gratis"){window.location.href="pricing.html";return;}
     hideDebug();const t=T[LANG];const inp=imageInputEl();const file=inp?.files&&inp.files[0];
     if(!file){setOcrStatus(t.ocrNoFile,"bad");return;}
@@ -1696,7 +2115,7 @@ try{
       const res=await postJson("/api/ocr",{imageDataUrl:dataUrl,lang:LANG});
       if(!res.ok||!res.data||!res.data.ok){setBusy(false);setOcrStatus(`OCR error (HTTP ${res.status}).`,"bad");showDebug(res.raw);return;}
       const extracted=String(res.data.text||"").trim();
-      if(extracted){const prefix=(LANG==="sv")?"\n\n--- OCR (bild) ---\n":"\n\n--- OCR (image) ---\n";const base=(pastedTextEl()?.value||"").trim();if(pastedTextEl())pastedTextEl().value=(base?base+prefix:"")+extracted+"\n";}
+      if(extracted){const prefix=(LANG==="sv")?"\n\n--- OCR (bild) ---\n":"\n\n--- OCR (image) ---\n";const base=(pastedTextEl()?.value||"").trim();if(pastedTextEl()){pastedTextEl().value=(base?base+prefix:"")+extracted+"\n";updateMaterialCounter();}}
       setBusy(false);setOcrStatus(t.ocrDone,"ok");
     }catch(e){setBusy(false);setOcrStatus("OCR error.","bad");reportErr(e);}
   });
@@ -1710,31 +2129,42 @@ try{
     hideDebug();setStatus("");const t=T[LANG];
     const pastedText=(pastedTextEl()?.value||"").trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
-
-    // ── QUOTA CHECK (klientside) ──────────────────────────────────────
-    const quota = await checkQuota();
-    if(!quota.allowed){
-      const msg = (ROLE_LIMITS[currentRole]?.period === "week") ? t.quotaHitWeek : t.quotaHitMonth;
-      setStatus(msg, "bad");
-      await refreshQuotaUi();
-      return {ok:false,error:msg,quota:true};
-    }
-    // ─────────────────────────────────────────────────────────────────
+    if(Array.from(pastedText).length>MATERIAL_CHAR_LIMIT){const message=materialTooLongMessage();setStatus(message,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:message};}
 
     const qType=qTypeEl()?.value||"mix";
-    if(!["mix","mc","short"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
-    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:Number(numQuestionsEl()?.value||12)};
+    if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
+    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12),focusTerms:selectedExamFocusTerms};
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
-    if(res.status===429&&res.data){
+    if(res.status===429&&res.data?.error==="Quota exceeded"){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
-      setBusy(false);setStatus(res.data?.error||t.quotaHitMonth,"bad");await refreshQuotaUi();
-      return {ok:false,error:res.data?.message||res.data?.error||t.quotaHitMonth,quota:true};
+      const msg = quotaLimitMessage(res.data.period || ROLE_LIMITS[currentRole]?.period);
+      setBusy(false);setStatus(msg,"bad");await refreshQuotaUi();
+      return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
-      setBusy(false);setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);
+      setBusy(false);
+      if(res.data?.error==="MATERIAL_TOO_LONG"){
+        const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message};
+      }
+      if(res.data?.error==="GRAPH_GENERATION_REJECTED"||res.data?.error==="GRAPH_MATERIAL_UNSUPPORTED"){
+        const message=res.data.message||(LANG==="sv"
+          ?"Grafuppgiften kunde inte skapas utifrån materialet. Kontrollera grafkraven och försök igen."
+          :"The graph question could not be created from this material. Check the graph requirements and try again.");
+        const eb=examBodyEl();
+        if(eb?.querySelector(".skelBox")){eb.replaceChildren();const em=examMetaEl();if(em)em.textContent=t.noExam;}
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message};
+      }
+      if(res.data?.error==="quality_review_unavailable"){
+        setStatus(res.data.message||"Kvalitetskontrollen kunde inte slutföras. Försök igen.","bad");
+        hideDebug();
+        return {ok:false,error:res.data.message||res.data.error};
+      }
+      setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);
       // 504 från generate-exam.js bär ett läsbart meddelande om att provet inte
       // hann byggas — visa det i stället för en HTTP-kod.
       return {ok:false,error:res.data?.message||res.data?.error||`Provet kunde inte skapas (fel ${res.status}).`};
@@ -1750,7 +2180,8 @@ try{
     await refreshQuotaUi();
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-    renderExam(res.data.exam);setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
+    if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
+    setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
 
     // Uppdatera floating bar hint med antal frågor
     const fh=$("floatingGradeHint");
@@ -1770,6 +2201,12 @@ try{
     if(isGrading)return {ok:false,error:"Rättning pågår redan."};
     hideDebug();const t=T[LANG];
     if(!currentExam||!Array.isArray(currentExam.questions)||currentExam.questions.length===0){setStatus(t.genFirst,"bad");return {ok:false,error:t.genFirst};}
+    if(!currentExam.exam_manifest){
+      const message=LANG==="sv"
+        ?"Provet skapades med en äldre version och kan inte rättas säkert. Skapa ett nytt prov."
+        :"This exam was created with an older version and cannot be graded safely. Generate a new exam.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
     let answers;
     if(Array.isArray(answersOverride)){
       answers=answersOverride.map(a=>({id:String(a.id),answer:String(a.answer||"").trim()}));
@@ -1778,14 +2215,20 @@ try{
       currentExam.questions.forEach((q,idx)=>{
         const qid=String(q.id??(idx+1));
         if(q.type==="mc"){const hidden=document.querySelector(`input.mcAnswer[data-qid="${CSS.escape(qid)}"]`);answers.push({id:qid,answer:(hidden?.value||"").trim()});}
+        else if(q.type==="graph"){const input=document.querySelector(`input.graphAnswer[data-qid="${CSS.escape(qid)}"]`);answers.push({id:qid,answer:(input?.value||"").trim()});}
         else{const ta=document.querySelector(`textarea.answerTa[data-qid="${CSS.escape(qid)}"]`);answers.push({id:qid,answer:(ta?.value||"").trim()});}
       });
     }
     const pastedText=(pastedTextEl()?.value||"").trim();
-    const payload={lang:LANG,pastedText,questions:currentExam.questions,answers};
-    // Persist answers up front so a failed/timed-out grading never loses the user's work.
-    try{lsSet(LS_PENDING_ANSWERS,{ts:Date.now(),answers});}catch{}
-
+    if(Array.from(pastedText).length>MATERIAL_CHAR_LIMIT){const message=materialTooLongMessage();setStatus(message,"bad");return {ok:false,error:message};}
+    const payload={lang:LANG,course:(courseEl()?.value||"").trim(),pastedText,questions:currentExam.questions,answers,exam_manifest:currentExam.exam_manifest};
+    let gradingSession=null;
+    try{const snapshot=await db?.auth.getSession();if(!snapshot?.error)gradingSession=snapshot?.data?.session||null;}catch{}
+    const gradingOwnerId=gradingSession?.user?.id||"";
+    if(!gradingOwnerId||!gradingSession?.access_token){
+      const msg=LANG==="sv"?"Logga in igen innan du lämnar in provet. Dina svar finns kvar.":"Sign in again before submitting the exam. Your answers are still here.";
+      setStatus(msg,"bad");return {ok:false,error:msg};
+    }
     isGrading=true;
     setBusy(true,t.gradeWorking);setStatus(t.gradeWorking,"");
     // Den P.E.R-ledda ytan visar sin egen rättningsskärm. Två överlägg ovanpå
@@ -1795,53 +2238,144 @@ try{
     try{
       // Sit just above the 60s server maxDuration (vercel.json) so a server-side
       // error/504 reaches us before the client aborts. grade.js aborts OpenAI at 45s.
-      res=await postJson("/api/grade",payload,{timeoutMs:62000});
+      res=await postJson("/api/grade",payload,{timeoutMs:62000,token:gradingSession.access_token});
     }finally{
       if(!answersOverride)hideGradingOverlay();
     }
 
     try{
       if(!res||!res.ok||!res.data||!res.data.ok){
-        const msg = res&&res.timedOut
-          ? (LANG==="sv"?"Rättningen tog längre tid än vanligt och avbröts. Dina svar är sparade — tryck Rätta prov igen.":"Grading took longer than usual and was cancelled. Your answers are saved — press Grade again.")
+        if(res?.data?.error==="MATERIAL_TOO_LONG"){
+          const message=materialTooLongMessage();setStatus(message,"bad");showToast(message,"bad");
+          return {ok:false,error:message};
+        }
+        const providerUnavailable = res?.data?.error === "grading_provider_unavailable";
+        const alreadyGraded = res?.data?.error === "EXAM_ALREADY_GRADED";
+        const inactiveExam = res?.data?.error === "EXAM_NOT_ACTIVE";
+        const unsavedResult = res?.data?.error === "EXAM_RESULT_NOT_SAVED";
+        const stateUnavailable = res?.data?.error === "EXAM_STATE_UNAVAILABLE";
+        const gradingPending = res?.data?.error === "EXAM_GRADING_IN_PROGRESS";
+        const gradingInterrupted = res?.data?.error === "EXAM_GRADING_INTERRUPTED";
+        const answerConflict = res?.data?.error === "EXAM_ANSWERS_CONFLICT";
+        const recoveryRequired = res?.data?.error === "EXAM_RESULT_RECOVERY_REQUIRED";
+        const resultExpired = res?.data?.error === "EXAM_RESULT_EXPIRED";
+        const anotherExamActive = res?.data?.error === "EXAM_ACTIVE";
+        const msg = alreadyGraded
+          ? (LANG==="sv"?"Det här provet har redan rättats. Inget nytt resultat visades. Kontrollera provhistoriken eller kontakta support om det saknas.":"This exam has already been graded. No new result was shown. Check your history or contact support if it is missing.")
+          : gradingPending
+          ? (LANG==="sv"?"Rättningen pågår redan. Vänta en stund och försök hämta resultatet igen. Dina svar finns kvar.":"Grading is already in progress. Wait a moment, then try to retrieve the result again. Your answers are still here.")
+          : gradingInterrupted
+          ? (LANG==="sv"?"Rättningen avbröts utan bekräftat resultat. Avsluta provet och skapa ett nytt av ditt material; de här svaren rättas inte automatiskt igen.":"Grading was interrupted without a confirmed result. Close the exam and create a new one from your material; these answers will not be graded automatically again.")
+          : answerConflict
+          ? (LANG==="sv"?"Provet har redan lämnats in med andra svar. De här svaren kan inte ersätta inlämningen.":"This exam was submitted with different answers. These answers cannot replace that submission.")
+          : recoveryRequired
+          ? (LANG==="sv"?"Resultatet kan redan ha sparats. Dina svar finns kvar; försök hämta samma resultat igen.":"The result may already be saved. Your answers are still here; try to retrieve the same result again.")
+          : resultExpired
+          ? (LANG==="sv"?"Resultatet kan inte längre hämtas här. Kontrollera provhistoriken eller kontakta support.":"This result can no longer be retrieved here. Check your exam history or contact support.")
+          : anotherExamActive
+          ? (LANG==="sv"?"Ett annat prov pågår. Avsluta det innan du visar resultat och facit här.":"Another exam is active. Finish it before viewing this result and its answers.")
+          : inactiveExam
+          ? (LANG==="sv"?"Det här provet är inte längre aktivt och kan inte lämnas in. Avsluta det och skapa ett nytt prov av ditt material.":"This exam is no longer active and cannot be submitted. Close it and create a new exam from your material.")
+          : unsavedResult
+          ? (LANG==="sv"?"Resultatet kunde inte sparas. Inget facit visades och dina svar finns kvar. Försök igen.":"The result could not be saved. No answer key was shown and your answers are still here. Try again.")
+          : stateUnavailable
+          ? (LANG==="sv"?"Provstatus kunde inte kontrolleras. Dina svar finns kvar. Försök igen när anslutningen fungerar.":"Exam status could not be checked. Your answers are still here. Try again when the connection works.")
+          : res&&res.timedOut
+          ? (LANG==="sv"?"Rättningen tog för lång tid och avbröts. Dina svar finns kvar på sidan — försök igen.":"Grading timed out. Your answers are still on this page — try again.")
           : res&&res.networkError
-            ? (LANG==="sv"?"Nätverksfel vid rättning. Dina svar är sparade — försök igen.":"Network error while grading. Your answers are saved — try again.")
-            : (LANG==="sv"?`Rättningen kunde inte slutföras (fel ${res?res.status:0}). Dina svar är sparade — försök igen.`:`Grading could not complete (error ${res?res.status:0}). Your answers are saved — try again.`);
+            ? (LANG==="sv"?"Nätverksfel vid rättning. Dina svar finns kvar på sidan — försök igen.":"Network error while grading. Your answers are still on this page — try again.")
+            : providerUnavailable
+              ? (LANG==="sv"?"AI-rättningen kunde inte slutföras. Dina svar finns kvar på sidan — försök igen.":"AI grading could not be completed. Your answers are still on this page — try again.")
+              : (LANG==="sv"?`Rättningen kunde inte slutföras (fel ${res?res.status:0}). Dina svar finns kvar på sidan — försök igen.`:`Grading could not complete (error ${res?res.status:0}). Your answers are still on this page — try again.`);
         setStatus(msg,"bad");showToast(msg,"bad");
         if(res&&res.raw)showDebug(res.raw);
         return {ok:false,error:msg}; // finally re-enables the button → retry is always available
       }
       const result=res.data.result;
       if(!result||!Array.isArray(result.per_question)||result.per_question.length===0){
-        const msg=LANG==="sv"?"Rättningssvaret var ofullständigt. Dina svar är sparade — försök igen.":"The grading response was incomplete. Your answers are saved — try again.";
+        const msg=LANG==="sv"?"Rättningssvaret var ofullständigt. Dina svar finns kvar på sidan — försök igen.":"The grading response was incomplete. Your answers are still on this page — try again.";
         setStatus(msg,"bad");showToast(msg,"bad");return {ok:false,error:msg};
       }
-      renderResult(result);
-      // Post-grading persistence is best-effort — a failure here must not wipe the visible result.
-      /* Profilraden skapas fortfarande här; mastery skrivs av api/grade.js. */
+      const examProof=res.data.exam_proof||null;
+      const submissionId=submissionIdFromProof(examProof);
+      if(!submissionId){
+        const msg=LANG==="sv"?"Provets sparnyckel saknas. Resultatet visas inte förrän det kan verifieras; dina svar finns kvar.":"The exam save key is missing. The result is hidden until it can be verified; your answers are still here.";
+        setStatus(msg,"bad");showToast(msg,"bad");return {ok:false,error:msg};
+      }
+      if((await getUserId().catch(()=>""))!==gradingOwnerId||currentExam?.exam_manifest!==payload.exam_manifest){
+        const msg=LANG==="sv"?"Kontot eller provet ändrades medan rättningen pågick. Resultatet visades inte här. Gå tillbaka till rätt konto.":"The account or exam changed while grading. The result was not shown here. Return to the correct account.";
+        setStatus(msg,"bad");return {ok:false,error:msg};
+      }
       try{await ensureUserProfileRow();}catch{}
-      try{await saveExamToAccount({material:pastedText,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},answers,result});}catch{}
+      if((await getUserId().catch(()=>""))!==gradingOwnerId){
+        const msg=LANG==="sv"?"Kontot ändrades medan resultatet hämtades. Inget sparades här.":"The account changed while retrieving the result. Nothing was saved here.";
+        setStatus(msg,"bad");return {ok:false,error:msg};
+      }
+      const previous=lsGetObj(LS_LAST);
+      currentExamAnswers=payload.answers.map(a=>({id:String(a.id),answer:String(a.answer)}));
+      if(examProof&&previous?.examProof===examProof){
+        renderResult(result);
+        currentExamProof=examProof;
+        let accountSaveFailed=!previous.accountSaved;
+        if(accountSaveFailed){
+          const userId=await getUserId().catch(()=>"");
+          const queued=userId?readPendingExams(userId).find(row=>row.exam?.submission_receipt===examProof):null;
+          if(queued){
+            const retry=await retryPendingExamSave(queued.local_id).catch(()=>({ok:false}));
+            accountSaveFailed=!retry.ok;
+            if(retry.ok)lsSet(LS_LAST,{...previous,accountSaved:true});
+          }
+        }
+        setWizardStep(3);
+        setStatus(accountSaveFailed
+          ? (LANG==="sv"?"Resultatet visas, men kontosparningen behöver fortfarande bekräftas.":"The result is shown, but account saving still needs confirmation.")
+          : t.gradeDone,accountSaveFailed?"bad":"ok");
+        return {ok:true,result,examProof,persistence:{accountSaveFailed}};
+      }
+      renderResult(result);
+      /* Mastery skrivs av api/grade.js; resultatet visas först efter ägarkontroll. */
       const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
-      const attempt={ts,course:(courseEl()?.value||"").trim(),level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
+      const courseName=(courseEl()?.value||"").trim();
+      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
+      const userId=gradingOwnerId;
+      const localId=newLocalExamId();
+      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
+      let accountSaveFailed=!db||!userId,localCopySaved=false;
+      if(userId){
+        localCopySaved=queuePendingExam(accountRecord);
+        currentUnsavedAccountExam=accountRecord;
+        let accountSave;
+        try{accountSave=await saveExamToAccount(accountRecord,{checkExisting:!!res.data.recovered});}catch{accountSave={ok:false,attempted:true};}
+        if((await getUserId().catch(()=>""))!==gradingOwnerId||currentExam?.exam_manifest!==payload.exam_manifest){
+          currentUnsavedAccountExam=null;
+          const msg=LANG==="sv"?"Kontot ändrades medan resultatet sparades. Resultatet sparades inte i den nya sessionens historik.":"The account changed while the result was saving. It was not added to the new session's history.";
+          setStatus(msg,"bad");return {ok:false,error:msg};
+        }
+        accountSaveFailed=!accountSave?.ok;
+        if(accountSave?.ok){removePendingExam(userId,localId);currentUnsavedAccountExam=null;}
+      }
+      attempt.accountSaved=!!userId&&!accountSaveFailed;
       const history=lsGetArray(LS_HISTORY);history.push(attempt);while(history.length>60)history.shift();lsSet(LS_HISTORY,history);
-      lsSet(LS_LAST,{ts,attempt,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[]},result});
+      lsSet(LS_LAST,{ts,attempt,exam:accountRecord.exam,result,examProof,training_batch_id:localId,accountSaved:!!userId&&!accountSaveFailed});
       const mistakes=lsGetArray(LS_MISTAKES);
       // Samma id-fallback som rendering och rättning använder. Med bara String(q.id??"")
       // kollapsade alla frågor utan id på tom sträng, och felbanken sparade då
       // fel frågetext och fel elevsvar för var och en av dem.
       const qById=new Map((currentExam.questions||[]).map((q,idx)=>[String(q.id??(idx+1)),q]));
       const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
-      (result.per_question||[]).forEach(item=>{
+      (result.per_question||[]).forEach((item,questionIndex)=>{
         const got=Number(item.points||0),m=Number(item.max_points||0);
-        if(m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
+        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({mistake_key:`exam:${localId}:${questionIndex}`,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
       try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
-      try{lsRemove(LS_PENDING_ANSWERS);}catch{}
-      setStatus(t.gradeDone,"ok");showToast(t.gradeDone,"ok");setWizardStep(3);
-      return {ok:true,result};
+      const analyticsSaveFailed=res?.data?.persistence?.mock_result_saved===false;
+      const saveWarning=accountSaveFailed?(localCopySaved?(LANG==="sv"?"Resultatet finns kvar på den här enheten men syns inte i ditt konto eller för läraren ännu.":"The result is kept on this device but is not in your account or visible to your teacher yet."):(LANG==="sv"?"Kontosparningen kunde inte bekräftas och webbläsaren kunde inte säkra en lokal kopia. Lämna inte sidan innan du sparat resultatet på annat sätt.":"Account saving could not be confirmed and the browser could not keep a local copy. Do not leave before saving the result another way.")):analyticsSaveFailed?(LANG==="sv"?"Rättningen är sparad i ditt konto, men lärarens resultatsammanställning kunde inte bekräftas.":"Your graded exam is saved to your account, but the teacher's result summary could not be confirmed."):"";
+      setStatus(saveWarning||t.gradeDone,accountSaveFailed?"bad":"ok");if(!accountSaveFailed)showToast(t.gradeDone,"ok");setWizardStep(3);
+      currentExamProof=examProof;
+      return {ok:true,result,examProof:currentExamProof,persistence:{accountSaveFailed,localCopySaved,localId:accountSaveFailed&&userId?localId:null,message:saveWarning}};
     }catch(err){
-      const msg=LANG==="sv"?"Ett fel uppstod efter rättningen. Dina svar är sparade.":"An error occurred after grading. Your answers are saved.";
+      const msg=LANG==="sv"?"Ett oväntat fel uppstod efter rättningen. Kontrollera om resultatet sparats innan du skickar in igen.":"An unexpected error occurred after grading. Check whether the result was saved before submitting again.";
       setStatus(msg,"bad");showToast(msg,"bad");showDebug(String(err&&err.message||err));
       return {ok:false,error:msg};
     }finally{
@@ -1853,36 +2387,75 @@ try{
 
   onClick("clearBtn", async () => {
     if (!confirm(LANG === "sv"
-      ? "Rensa ALL provhistorik och misstag?\n\nDetta tar bort dina prov och felbank lokalt och från ditt konto. Kan inte ångras."
-      : "Clear ALL exam history and mistakes?\n\nThis removes your exams and mistake bank locally and from your account. Cannot be undone.")) return;
+      ? "Rensa sparade provdata?\n\nExGen försöker radera provposter och resultatsammanfattningar från kontot och tar bort detta kontos lokala provutkast, svar, osynkade resultat och provhistorik från enheten. Lokal data kan försvinna även om serverraderingen inte kan bekräftas. P.E.R:s minne och kunskapsöversikten påverkas inte. Kan inte ångras."
+      : "Clear saved exam data?\n\nExGen will try to delete exam records and result summaries from your account and remove this account's local exam draft, answers, unsynced results and exam history from this device. Local data may be lost even if server deletion cannot be confirmed. P.E.R memory and the learning overview are unchanged. This cannot be undone.")) return;
+
+    let clearSession = null;
+    try {
+      const { data, error } = db ? await db.auth.getSession() : { data: null, error: true };
+      if (!error) clearSession = data?.session || null;
+    } catch (_) {}
+    const clearUserId = clearSession?.user?.id || null;
 
     const btn = $("clearBtn");
     if (btn) { btn.disabled = true; btn.textContent = "…"; }
 
-    // 1. Delete from Supabase account
+    // Local history can still be cleared when the account delete fails, but
+    // the UI must not claim that remote data was removed without confirmation.
+    let remoteHistoryDeleted = false;
     if (db) {
       try {
-        const token = await getAccessToken();
+        const token = clearSession?.access_token || "";
         if (token) {
-          await fetch("/api/check-role", {
+          const response = await fetch("/api/check-role", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
             body: JSON.stringify({ action: "delete_exams" })
           });
+          const payload = await response.json().catch(() => null);
+          remoteHistoryDeleted = response.ok && payload?.ok === true;
         }
       } catch (_) {}
+    }
+
+    const localExamDataCleared = clearUserId
+      ? window.ExGenLocalDataBoundary?.clearLocalExamData(clearUserId) !== false
+      : false;
+    if (clearUserId) {
+      window.ExGenExamDrafts?.discardForUser(clearUserId);
+    }
+    const localDataOwner = localStorage.getItem("exgen_local_data_owner");
+    if ((clearUserId || localDataOwner) && localDataOwner !== clearUserId) {
+      if (btn) { btn.disabled = false; btn.textContent = T[LANG]?.clear || "Rensa"; }
+      const message = !clearUserId
+        ? (LANG === "sv" ? "Kontosessionen kunde inte verifieras. Lokal data lämnades orörd." : "The account session could not be verified. Local data was left untouched.")
+        : remoteHistoryDeleted
+          ? (LANG === "sv"
+            ? "Kontot byttes. Serverraderingen slutfördes för det ursprungliga kontot; delad lokal data lämnades orörd."
+            : "The account changed. Server deletion completed for the original account; shared local data was left untouched.")
+          : (LANG === "sv"
+            ? "Kontot byttes. Kontodata kunde inte bekräftas raderad; delad lokal data lämnades orörd."
+            : "The account changed. Account deletion could not be confirmed; shared local data was left untouched.");
+      showToast(message, "bad");
+      return;
     }
 
     // 2. Clear all local history, mistakes, and cached data
     [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => {
       try { localStorage.removeItem(k); } catch (_) {}
     });
+    currentUnsavedAccountExam=null;
 
     // 3. Reset current session UI
     clearAll();
 
     if (btn) { btn.disabled = false; btn.textContent = T[LANG]?.clear || "Rensa"; }
-    showToast(LANG === "sv" ? "Allt rensat — lokalt + konto." : "All data cleared — local + account.", "ok");
+    const message = !localExamDataCleared
+      ? (LANG === "sv" ? "Delad lokal historik rensades, men kontots provutkast eller osynkade resultat kunde inte bekräftas raderade." : "Shared local history was cleared, but this account's exam draft or unsynced results could not be confirmed deleted.")
+      : remoteHistoryDeleted
+        ? (LANG === "sv" ? "Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte." : "Exam records and result summaries are cleared. P.E.R memory and learning overview are unchanged.")
+        : (LANG === "sv" ? "Lokal historik rensad. Kontodata kunde inte bekräftas raderad." : "Local history cleared. Account data deletion could not be confirmed.");
+    showToast(message, remoteHistoryDeleted && localExamDataCleared ? "ok" : "bad");
   });
 
   // Floating grade-knapp kör samma som gradeBtn
@@ -1897,12 +2470,14 @@ try{
   // runGrade läser därifrån — samma fält, samma validering, en väg in.
   window.ExGenEngine = {
     ready: true,
-    setInputs({ course, level, qType, num, material }) {
+    language() { return LANG === "en" ? "en" : "sv"; },
+    setInputs({ course, level, qType, num, material, focusTerms }) {
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
-      if (qTypeEl()) qTypeEl().value = ["mix","mc","short"].includes(qType) ? qType : "mix";
+      if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
       if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 12)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
+      selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den
       // gamla vyn, och så att clearAll() inte skriver tillbaka ett gammalt val.
       const search = document.getElementById("courseSearch");
@@ -1910,6 +2485,107 @@ try{
     },
     generate() { return runGenerate(); },
     grade(answers) { return runGrade(answers); },
+    async abandonExam() {
+      if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
+        return { ok: false, error: "Provet kan inte verifieras. Ladda om sidan och försök igen." };
+      }
+      const response = await postJson("/api/abandon-exam", {
+        course: (courseEl()?.value || "").trim(),
+        pastedText: (pastedTextEl()?.value || "").trim(),
+        questions: currentExam.questions,
+        exam_manifest: currentExam.exam_manifest,
+      }, { timeoutMs: 10000 });
+      const alreadyInactive = response?.status === 409 &&
+        ["EXAM_ALREADY_GRADED", "EXAM_NOT_ACTIVE"].includes(response.data?.error);
+      if (response?.data?.error === "EXAM_GRADING_IN_PROGRESS") {
+        return { ok: false, error: LANG === "sv"
+          ? "Rättningen pågår. Vänta tills den är klar innan du avslutar provet."
+          : "Grading is in progress. Wait for it to finish before closing the exam." };
+      }
+      if (!alreadyInactive && (!response?.ok || !response.data?.ok || !response.data?.abandoned)) {
+        return { ok: false, error: "Provet kunde inte avslutas säkert. Försök igen när anslutningen fungerar." };
+      }
+      currentExam = null;
+      currentExamProof = null;
+      currentExamAnswers = null;
+      const grade = $("gradeBtn");
+      if (grade) grade.disabled = true;
+      return { ok: true };
+    },
+    async activeExamCount() {
+      const token = await getAccessToken();
+      if (!token) return null;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const response = await fetch("/api/abandon-exam", {
+          headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+        });
+        const data = await response.json();
+        return response.ok && data?.ok && Number.isSafeInteger(data.active_count)
+          ? data.active_count : null;
+      } catch { return null; }
+      finally { clearTimeout(timer); }
+    },
+    async examState(examManifest) {
+      const submissionId = submissionIdFromProof(examManifest);
+      const token = await getAccessToken();
+      if (!submissionId || !token) return null;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const query = new URLSearchParams({ submission_id: submissionId });
+        const response = await fetch(`/api/abandon-exam?${query}`, {
+          headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+        });
+        const data = await response.json();
+        return response.ok && data?.ok && ["active", "grading", "completed", "abandoned", "expired", "missing"].includes(data.exam_state)
+          ? data.exam_state : null;
+      } catch { return null; }
+      finally { clearTimeout(timer); }
+    },
+    async abandonAllActiveExams() {
+      const response = await postJson("/api/abandon-exam", { abandon_all: true }, { timeoutMs: 10000 });
+      if (!response?.ok || !response.data?.ok || !Number.isSafeInteger(response.data.abandoned_count)) {
+        return { ok: false };
+      }
+      currentExam = null;
+      currentExamProof = null;
+      currentExamAnswers = null;
+      const grade = $("gradeBtn");
+      if (grade) grade.disabled = true;
+      return { ok: true, count: response.data.abandoned_count };
+    },
+    retryAccountSave(localId) { return retryPendingExamSave(localId); },
+    getPendingAccountSaves() { return getPendingAccountSaves(); },
+    async gradeGraphRetry(questionId, answer) {
+      const question = currentExam?.questions?.find((q) => String(q.id) === String(questionId));
+      if (!question || question.type !== "graph" || !question.grade_task || !currentExamProof ||
+          !Array.isArray(currentExamAnswers) || currentExamAnswers.length !== currentExam?.questions?.length) {
+        return { ok: false, error: "Grafuppgiften kunde inte verifieras. Skapa ett nytt prov." };
+      }
+      const payload = {
+        mode: "graph_practice_retry",
+        lang: LANG,
+        course: (courseEl()?.value || "").trim(),
+        pastedText: (pastedTextEl()?.value || "").trim(),
+        questions: [question],
+        examProof: {
+          receipt: currentExamProof,
+          course: (courseEl()?.value || "").trim(),
+          material: (pastedTextEl()?.value || "").trim(),
+          questions: currentExam.questions,
+          answers: currentExamAnswers,
+          selectedQuestionId: String(question.id),
+        },
+        answers: [{ id: String(question.id), answer: String(answer || "") }],
+      };
+      const response = await postJson("/api/grade", payload, { timeoutMs: 20000 });
+      if (!response?.ok || !response.data?.ok || !response.data?.practice || !response.data?.result) {
+        return { ok: false, error: response?.data?.error || "Försöket kunde inte kontrolleras. Försök igen." };
+      }
+      return { ok: true, result: response.data.result };
+    },
     getExam() { return currentExam; },
     role() { return currentRole; },
     /* Återlämnar ett prov till motorn utan att generera om det. Behövs när
@@ -1918,25 +2594,30 @@ try{
        först" — mitt i ett prov eleven redan skrivit klart. Ingen kvot dras,
        inget OpenAI-anrop görs; det är samma prov, bara tillbaka i minnet. */
     adoptExam(exam) {
-      if (!exam || !Array.isArray(exam.questions) || !exam.questions.length) return false;
+      if (!exam || !exam.exam_manifest || !Array.isArray(exam.questions) || !exam.questions.length) return false;
       currentExam = exam;
+      currentExamProof = null;
+      currentExamAnswers = null;
       const g = $("gradeBtn"); if (g) g.disabled = false;
       return true;
     },
     // OCR går via samma endpoint och samma rollspärr som ocrBtn. Returnerar
     // texten i stället för att skriva den i ett fält — flödet äger sin egen ruta.
     async ocr(file) {
+      if (window.ExGenRuntime?.environment === "pilot") {
+        return { ok: false, error: LANG === "sv" ? "Bildinläsning är inte tillgänglig i skolpiloten." : "Image reading is not available in the school pilot." };
+      }
       if (currentRole === "gratis") {
-        return { ok: false, error: "OCR ingår i Basic och uppåt.", upgrade: true };
+        return { ok: false, error: LANG === "sv" ? "OCR ingår i Basic och uppåt." : "OCR is included with Basic and above.", upgrade: true };
       }
       try {
         const dataUrl = await fileToDataUrl(file);
         const res = await postJson("/api/ocr", { imageDataUrl: dataUrl, lang: LANG });
-        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         return { ok: true, text: String(res.data.text || "").trim() };
       } catch (e) {
         reportErr(e);
-        return { ok: false, error: "Kunde inte läsa bilden." };
+        return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
       }
     },
 
@@ -1949,20 +2630,23 @@ try{
      * Returnerar hela kontraktet vidare (readable/confidence/uncertain) så att
      * provflödet kan visa eleven vad avläsningen tvekade på. */
     async readSolution(file, questionText) {
+      if (window.ExGenRuntime?.environment === "pilot") {
+        return { ok: false, error: LANG === "sv" ? "Fotoinlämning är inte tillgänglig i skolpiloten." : "Photo answers are not available in the school pilot." };
+      }
       if (currentRole === "gratis") {
-        return { ok: false, error: "Fotoinlämning ingår i Basic och uppåt.", upgrade: true };
+        return { ok: false, error: LANG === "sv" ? "Fotoinlämning ingår i Basic och uppåt." : "Photo answers are included with Basic and above.", upgrade: true };
       }
       try {
         const dataUrl = await downscaleImage(file, 1600, 0.85);
-        if (!dataUrl) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (!dataUrl) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         const res = await postJson("/api/ocr", {
           mode: "solution",
           imageDataUrl: dataUrl,
           questionText: String(questionText || "").slice(0, 2000),
           lang: LANG
         });
-        if (res.status === 403) return { ok: false, error: "Fotoinlämning ingår i Basic och uppåt.", upgrade: true };
-        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: "Kunde inte läsa bilden." };
+        if (res.status === 403) return { ok: false, error: LANG === "sv" ? "Fotoinlämning ingår i Basic och uppåt." : "Photo answers are included with Basic and above.", upgrade: true };
+        if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
         return {
           ok: true,
           readable: res.data.readable === true,
@@ -1972,7 +2656,7 @@ try{
         };
       } catch (e) {
         reportErr(e);
-        return { ok: false, error: "Kunde inte läsa bilden." };
+        return { ok: false, error: LANG === "sv" ? "Kunde inte läsa bilden." : "Could not read the image." };
       }
     }
   };

@@ -1,5 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
+import supabaseKeys from "./_supabase-server-key.cjs";
 import { BRAND_NAME, SITE_ORIGIN, MAIL_FROM } from "./_site.js";
 import { PER_REGISTRY } from "./_per-registry.js";
 import { attachActivity } from "./_per-brain.js";
@@ -16,6 +17,9 @@ import {
   supabaseStore, beginRegistration, finishRegistration,
   beginAuthentication, finishAuthentication, rpConfig,
 } from "./_admin-passkey.js";
+import pilotScope from "./_pilot-scope.cjs";
+
+const { createSupabaseServerClient } = supabaseKeys;
 
 function buildPitchHtml(email) {
   return `<!DOCTYPE html>
@@ -76,9 +80,9 @@ function buildPitchHtml(email) {
 const VALID_ROLES = ["gratis", "basic", "premium", "admin", "teacher"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const supabase = createClient(
+const supabase = createSupabaseServerClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 async function requireAdmin(req, res) {
@@ -150,6 +154,7 @@ async function requireOwner(req, res) {
 }
 
 export default async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ ok: false });
 
   const { action, targetId, role } = req.body || {};
@@ -429,8 +434,11 @@ export default async function handler(req, res) {
     if (!verifyRecoveryCode(req.body?.kod, rad.code_hash, rad.salt)) {
       return res.status(400).json({ ok: false, error: "koden stämmer inte" });
     }
-    // Engångs. Markeras förbrukad INNAN token utfärdas.
-    await supabaseStore(supabase).markRecoveryUsed(user.id);
+    // Atomically consume the unused row before issuing a token; concurrent
+    // redemption attempts can produce at most one successful step-up.
+    const consumed = await supabaseStore(supabase).markRecoveryUsed(user.id);
+    if (consumed.error) return res.status(503).json({ ok: false, error: "recovery_unavailable" });
+    if (!consumed.used) return res.status(400).json({ ok: false, error: "ingen giltig kod" });
     return res.status(200).json({ ok: true, stepUp: mintStepUp(user.id) });
   }
 

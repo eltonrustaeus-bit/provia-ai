@@ -63,24 +63,36 @@ is written to `*__disagreements.json` — read them before drawing conclusions.*
 The judge is evidence, not an oracle.
 
 **Delivery rate.** `generate-exam.js` filters out every question the verifier
-rejects and never regenerates to replace them, so an exam is shipped short. A
-student who asked for 12 questions can receive 5. A stronger generator should
-show up here as a higher delivered/requested ratio, not just a lower error rate.
+rejects. When more than 30% of a non-graph exam without multiple-choice items
+are rejected, and more than 44 seconds remain in the handler budget, it may
+make one bounded whole-exam regeneration attempt. That window reserves up to 15
+seconds for generation, 15 seconds for parallel review/solving, and 14 seconds
+for finalization. The replacement batch must pass the structural
+gate and verifier; regenerated multiple-choice items also need the independent
+blind solver. A retry replaces the original only when it delivers more fully
+approved questions. If generation, verification, or solving fails, only
+questions already approved in the first batch can be delivered. Graph retries
+remain off until a graph-specific cross-round fixture is covered. Track the
+delivered/requested ratio alongside error rate so a safer generator does not
+silently become unusably short.
 
 **Gate drops and soft flags**, counted per issue code, so it is visible whether
 a rule is doing work or never firing.
 
-**Latency p50/p95.** `generate-exam.js` aborts at 45 s. Reasoning models are
-slower, and a timeout gives the student nothing at all — worse than a flawed
-question. The runner prints a warning when p95 crosses that line.
+**Latency p50/p95.** The API function has a 60-second ceiling and divides the
+remaining time between generation, independent review, and response delivery.
+Reasoning models can be slower; a timeout can prevent an exam from being
+delivered. The runner prints a warning when p95 crosses its configured
+threshold.
 
 **Token use and cost**, from the price table in `run-eval.mjs` (checked against
 <https://developers.openai.com/api/docs/pricing> on 2026-08-01). Reasoning
 tokens are reported separately, since they bill as output and are the reason a
 reasoning model costs more than a naive input/output estimate suggests.
-The verifier's own token use is **not** captured — `verifyQuestions()` does not
-return it — so the printed cost is the generator's only. Do not read it as the
-total.
+The verifier and solver now return provider usage and the runner reports their
+tokens separately, including how many calls had measured usage. The price table
+is historical, and the displayed cost is still the generator's only. Do not
+read it as current pricing or a total production cost.
 
 ## First finding: subject routing was wrong before any model was swapped
 

@@ -23,7 +23,7 @@ const browser = await chromium.launch();
 async function openSubjectStep({ breakCatalog = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
-  await mockApis(page);
+  await mockApis(page, { profiles: { id: "u1", approved: true, role: "premium" } });
   await page.route("**/api/check-role", r => r.fulfill({ json: { allow: true, ok: true, role: "premium", approved: true } }));
   if (breakCatalog) {
     await page.route("**/config/education-catalog.web.json", r => r.fulfill({ status: 500, body: "" }));
@@ -105,11 +105,30 @@ try {
     await t.close();
   }
 
+  // Empty-course validation is programmatically associated and announced.
+  {
+    const t = await openSubjectStep();
+    const page = t.page;
+    const input = page.locator("#xf input[list='xfCourseList']");
+    await page.locator("#xf button:visible", { hasText: /Vidare/ }).first().click();
+    const error = page.locator("#xfCourseError");
+    R.ok("tomt kursfält annonserar valideringsfelet", await error.getAttribute("role") === "alert");
+    R.ok("valideringsfelet är kopplat till kursfältet",
+      (await input.getAttribute("aria-describedby")).split(/\s+/).includes("xfCourseError") &&
+      await input.getAttribute("aria-invalid") === "true");
+    await input.fill("Biologi 1");
+    R.ok("felet och aria-invalid rensas när eleven skriver",
+      await input.getAttribute("aria-invalid") === null && (await error.textContent()) === "");
+    await t.close();
+  }
+
   // Fältet är fortfarande fritext.
   {
     const t = await openSubjectStep();
     const page = t.page;
     await page.locator("#xf input[list='xfCourseList']").fill("Kurs vi aldrig hört talas om");
+    R.ok("okänd kurs får en tydlig men icke blockerande förklaring",
+      (await page.locator("#xfCourseCatalogNotice").textContent()).includes("kan inte bekräfta kursplanen"));
     await page.locator("#xf button:visible", { hasText: /Vidare/ }).first().click();
     await page.waitForTimeout(500);
     R.ok("en kurs utanför katalogen stoppas inte",
@@ -124,6 +143,8 @@ try {
     const rows = await suggest(page, "Matematik");
     R.ok("utan katalog ges inga förslag, men inget kraschar", rows.length === 0);
     await page.locator("#xf input[list='xfCourseList']").fill("Matematik 1b");
+    R.ok("när kurskatalogen saknas förklaras osäkerheten",
+      (await page.locator("#xfCourseCatalogNotice").textContent()).includes("kunde inte kontrolleras"));
     await page.locator("#xf button:visible", { hasText: /Vidare/ }).first().click();
     await page.waitForTimeout(500);
     R.ok("provskaparen fungerar ändå",

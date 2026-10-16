@@ -22,48 +22,25 @@
  *
  *  0 motfråga · 1 begreppet · 2 metoden steg för steg · 3 fullständig lösning
  *
- *  | Läge                          | Tak |
- *  |-------------------------------|-----|
- *  | prov pågår, inget försök      |  1  |
- *  | prov pågår, försök gjort      |  2  |
- *  | efter inlämning               |  3  |
- *  | ingen provkontext             |  3  |
- *  | phase saknas, provkontext finns| 2  |
+ *  | Läge                                     | Tak |
+ *  |------------------------------------------|-----|
+ *  | fri modellhjälp i prov/oklar pilotstatus | 1 |
+ *  | fast, svarsfri ledtrådsstege under prov  | 2 |
+ *  | fri studiefråga utanför pilot            | 3 |
  *
- *  Sista raden är avsiktlig: en äldre klient som ännu inte lärt sig skicka
- *  phase ska inte kunna få facit av misstag. Saknas information gäller den
- *  tolkning som skyddar eleven — samma princip som spärren själv.
+ *  Fullständig hjälp om en rättad fråga hanteras separat efter att servern
+ *  verifierat ett bevis från rättningen. Klientens phase är inte ett sådant bevis.
+ *  `sendActiveExamGuidance` har en separat fast stege: nivåerna 0-2 är
+ *  fördefinierade ledtrådar utan facit och skickas inte till en modell.
  */
-export function helpCapFor(pageContext) {
-  const q = pageContext && pageContext.currentQuestion;
-
-  // Inlämnat prov först. Ordningen är inte kosmetisk: läses "ingen fråga" före
-  // "inlämnat" sätts taket av att en fråga SAKNAS i stället för av att provet är
-  // ÖVER, och de två är inte samma sak. Idag ger båda vägarna 3, eftersom
-  // closeExam() i js/exam-flow.js nollställer manifestet vid inlämning — men den
-  // dag resultatskärmen bär en fråga igen (felgenomgången i etapp 4: "förklara
-  // fråga 4 som du fick fel på") ska svaret komma ur rätt skäl.
-  // Fyndet kommer från spår B. Kontrakt: C5b.
-  //
-  // Jämförelsen kräver en riktig sträng. En klient som skickar ett objekt med
-  // toString() === "result" ska inte kunna öppna facit; === mot en sträng ger
-  // false för allt som inte ÄR strängen.
-  const phase = pageContext && pageContext.examState && pageContext.examState.phase;
-  if (phase === "result") return 3;
-
-  // Ingen provfråga i sikte — eleven pluggar fritt, inget att skydda.
-  // Kravet på en icke-tom text är inte kosmetiskt: ett tomt frågeobjekt är
-  // inte ett prov, och att behandla det som ett hade låst hjälpen på sidor
-  // som inte har med prov att göra.
-  if (!q || typeof q.text !== "string" || !q.text.trim()) return 3;
-
-  // Strikt true. "true" som sträng, 1, eller ett sanningsvärde som råkar vara
-  // sant räknas inte som ett äkta försök — annars sänker en slarvig klient
-  // skyddet utan att någon märker det.
-  if (phase === "exam" && q.answered !== true) return 1;
-
-  // Provet pågår, eller så vet vi inte vilket läge klienten är i.
-  return 2;
+export function helpCapFor(pageContext, { pilotMode = false } = {}) {
+  if (pilotMode) return 1;
+  const q = pageContext?.currentQuestion;
+  const phase = pageContext?.examState?.phase;
+  if (phase === "exam" || phase === "result" ||
+      pageContext?.page === "prov" || pageContext?.page === "resultat" ||
+      (typeof q?.text === "string" && q.text.trim())) return 1;
+  return 3;
 }
 
 /** Startnivån när klienten inte skickar någon.

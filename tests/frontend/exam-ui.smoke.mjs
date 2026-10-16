@@ -17,11 +17,9 @@
 // isn't installed. Usage:  node tests/frontend/exam-ui.smoke.mjs
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join } from "node:path";
+import { ROOT, serve, mockApis, seed } from "./_harness.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const appUrl = pathToFileURL(join(here, "..", "..", "app.html")).href;
+const server = await serve(ROOT, { indexFile: "app.html" });
 
 let failures = 0;
 const check = (name, cond) => {
@@ -33,20 +31,18 @@ let browser;
 try {
   browser = await chromium.launch();
 } catch (e) {
+  await server.close();
   console.log(`  SKIP  chromium not launchable (${String(e.message).split("\n")[0]})`);
   process.exit(0);
 }
 
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); // iPhone-ish
-  // Don't let the external Supabase CDN / auth calls hang the boot.
-  await page.route("**/*", (route) => {
-    const u = route.request().url();
-    if (u.startsWith("file://")) return route.continue();
-    return route.abort();
-  });
-  await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => typeof window.renderExam === "function", null, { timeout: 10000 });
+  await mockApis(page);
+  await seed(page);
+  await page.route("https://**/*", (route) => route.abort());
+  await page.goto(`${server.url}/app.html`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.readyState === "complete" && typeof window.renderExam === "function", null, { timeout: 10000 });
   // Kill CSS transitions so colour assertions read the resolved target, not a mid-animation value.
   await page.addStyleTag({ content: "*{transition:none!important;animation:none!important}" });
 
@@ -107,6 +103,7 @@ try {
   check("after grading: options locked", graded.locked === true);
 } finally {
   await browser.close();
+  await server.close();
 }
 
 if (failures) { console.error(`\n${failures} check(s) failed.`); process.exit(1); }

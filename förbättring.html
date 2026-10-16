@@ -1,12 +1,13 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
-  <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – Min utveckling</title>
   <!-- Kräver konto. En sökträff hit landar på en inloggningsruta, inte på innehåll. -->
   <meta name="robots" content="noindex, follow" />
@@ -247,12 +248,22 @@
 
     /* P.E.R:s röst kommer från exgen-ui.css (.xf-per/.xf-orb/.xf-say/.xf-sub).
        Sidan hade en egen kopia här tills det delade lagret bröts ut. */
-
     .coachText{font-size:13px;color:var(--t2);line-height:1.72;white-space:pre-wrap}
 
     /* ── CHART ── */
     .chartWrap{margin-top:14px;border:1px solid var(--l);border-radius:var(--exgen-radius-sm);background:var(--s2);padding:18px 18px 14px;transition:background .28s ease,border-color .28s ease}
+    .chartFallbackList{margin:10px 0 0;padding-left:22px;display:grid;gap:5px;color:var(--t2);font-size:var(--exgen-text-sm)}
     .chartLabel{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px}
+    .chartSummary{margin:-4px 0 10px;color:var(--t2);font-size:var(--exgen-text-sm);line-height:1.5}
+    .chartData{margin-top:8px;color:var(--t2);font-size:var(--exgen-text-sm)}
+    .chartData summary{width:fit-content;color:var(--a2);cursor:pointer;padding:5px 0}
+    .chartData summary:focus-visible{outline:2px solid var(--a2);outline-offset:3px}
+    .chartData table{width:100%;border-collapse:collapse;margin-top:8px;font-size:var(--exgen-text-sm)}
+    .chartData caption{text-align:left;color:var(--t3);padding-bottom:5px}
+    .chartData th,.chartData td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--l);font-weight:400}
+    .chartData th{color:var(--t3);font-weight:600}
+    .chartData th:last-child,.chartData td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+    @media(max-width:600px){.chartData[open]{padding-bottom:72px}}
 
     /* ── MISTAKE GRID ── */
     /* En kolumn. Måttet är 580px, så minmax(300px,1fr) gav ändå aldrig två —
@@ -416,10 +427,10 @@
       LS_PER_COACH_CACHE='proviaai_per_coach_cache';
 
     /* ── SUPABASE ── */
-    const SB_URL='https://mnmotdluigzeehdjbhbu.supabase.co'.trim();
-    const SB_KEY='sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN'.trim();
+    const SB_URL=window.ExGenRuntime.supabaseUrl.trim();
+    const SB_KEY=window.ExGenRuntime.publishableKey.trim();
     const SBG=typeof window!=='undefined'?window.supabase:null;
-    const db=(SB_URL.startsWith('http')&&SB_KEY.length>40&&SBG?.createClient)?SBG.createClient(SB_URL,SB_KEY):null;
+    const db=(SB_URL.startsWith('http')&&SB_KEY.length>40&&SBG?.createClient)?SBG.createClient(SB_URL,SB_KEY,{auth:{storageKey:window.ExGenRuntime.authStorageKey}}):null;
 
     async function getUserId(){if(!db)return null;const{data,error}=await db.auth.getUser();if(error)return null;return data?.user?.id||null;}
     async function fetchUserExams(){
@@ -429,20 +440,20 @@
       if(error)return{ok:false,error:error.message||String(error)};
       return{ok:true,rows:data||[]};
     }
-    async function deleteAllUserExamsFromAccount(){
+    async function deleteAllUserExamsFromAccount(session){
       if(!db) return{ok:false,error:'Supabase not configured'};
-      const uid=await getUserId();
+      const uid=session?.user?.id||'';
       if(!uid) return{ok:false,error:'Not logged in'};
       try{
-        const{data:sd}=await db.auth.getSession();
-        const token=sd?.session?.access_token||'';
+        const token=session?.access_token||'';
+        if(!token)return{ok:false,error:'Not logged in'};
         const r=await fetch('/api/check-role',{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
           body:JSON.stringify({action:'delete_exams'})
         });
         const data=await r.json();
-        if(!r.ok) return{ok:false,error:data?.error||'delete failed'};
+        if(!r.ok||data?.ok!==true) return{ok:false,error:data?.error||'delete failed'};
         return{ok:true};
       }catch(e){
         return{ok:false,error:String(e)};
@@ -480,13 +491,13 @@
     /* ── ACCESS GATE ── */
     function disablePage(){
       const m=document.querySelector('main.wrap');
-      if(m){m.style.pointerEvents='none';m.style.opacity='0.55';}
+      if(m){m.style.pointerEvents='none';m.setAttribute('aria-disabled','true');}
       $('syncBtn')?.setAttribute('disabled','disabled');
       // resetBtn låses ALDRIG – användaren ska alltid kunna rensa sin data
     }
     function enablePage(){
       const m=document.querySelector('main.wrap');
-      if(m){m.style.pointerEvents='';m.style.opacity='';}
+      if(m){m.style.pointerEvents='';m.removeAttribute('aria-disabled');}
       $('resetBtn')?.removeAttribute('disabled');
       $('syncBtn')?.removeAttribute('disabled');
     }
@@ -502,7 +513,7 @@
         const txt=await r.text();let j=null;try{j=JSON.parse(txt);}catch{}
         if(!r.ok)return{ok:false,reason:'api_error',detail:(j?.error)?String(j.error):'non-200'};
         const role=String(j?.role||'');
-        return(role==='premium'||role==='admin')?{ok:true,role}:{ok:false,reason:'no_access',role};
+        return(role==='premium'||role==='user'||role==='admin')?{ok:true,role}:{ok:false,reason:'no_access',role};
       }catch(e){return{ok:false,reason:'api_error',detail:String(e)};}
     }
     /* Åtkomstfel skrivs i P.E.R:s röst på ingången i stället för i en egen
@@ -527,8 +538,9 @@
     }
 
     /* ── COACH LOGIC ── */
-    function avgPct(arr){const a=(arr||[]).map(x=>Number(x.percent)||0).filter(n=>Number.isFinite(n));if(!a.length)return 0;return Math.round(a.reduce((s,n)=>s+n,0)/a.length);}
-    function computeTrend(h){if(h.length<2)return null;const l=h.slice(-3),p=h.slice(-6,-3),avg=a=>a.reduce((s,x)=>s+(Number(x.percent)||0),0)/Math.max(1,a.length),a1=avg(l);if(!p.length)return{delta:a1-(Number(h[0].percent)||0)};return{delta:a1-avg(p)};}
+    function avgPct(arr){const a=(arr||[]).map(x=>chartPercent(x?.percent)).filter(n=>n!==null);if(!a.length)return null;return Math.round(a.reduce((s,n)=>s+n,0)/a.length);}
+    function scoredHistory(h){return(h||[]).filter(x=>chartPercent(x?.percent)!==null);}
+    function computeTrend(h){const scores=scoredHistory(h);if(scores.length<2)return null;const recent=scores.slice(-3),previous=scores.slice(-6,-3);if(previous.length)return{delta:avgPct(recent)-avgPct(previous)};const values=scores.map(x=>chartPercent(x.percent));return{delta:values[values.length-1]-values[0]};}
     function mostMistakeCourse(m){const map=new Map();(m||[]).forEach(x=>{const c=String(x.course||'').trim();if(c)map.set(c,(map.get(c)||0)+1);});let best={course:'',n:0};for(const[c,n]of map.entries())if(n>best.n)best={course:c,n};return best;}
 
     /* Etiketter för grade.js:s error_tags. Bodde i i18n-tabellen tills den
@@ -581,11 +593,25 @@
     }
 
     /* ── PICK / SELECTION ── */
-    function mKey(m){return`${Number(m.ts||0)}:${m.course||''}:${m.id||''}:${m.question||''}`;}
-    function getPick(){return lsObj(LS_TRAIN_PICK)||{ids:[],course:''};}
+    function ensureMistakeKeys(rows){
+      const seen=new Set();let changed=false;
+      const normalized=(Array.isArray(rows)?rows:[]).map((m,index)=>{
+        if(!m||typeof m!=='object'||Array.isArray(m))return m;
+        let key=String(m.mistake_key||'');
+        if(!key)key=`legacy:${Number(m.ts||0)}:${m.course||''}:${m.id||''}:${m.question||''}:${index}`;
+        if(seen.has(key))key=`${key}:${index}`;
+        seen.add(key);
+        if(key!==m.mistake_key){changed=true;return{...m,mistake_key:key};}
+        return m;
+      });
+      if(changed)lsSet(LS_MISTAKES,normalized);
+      return normalized;
+    }
+    function mKey(m){return String(m?.mistake_key||'');}
+    function getPick(){const p=lsObj(LS_TRAIN_PICK)||{};return{keys:Array.isArray(p.keys)?p.keys.map(String):[],mode:p.mode==='all'?'all':'selected',course:String(p.course||'')};}
     function setPick(p){lsSet(LS_TRAIN_PICK,p);updateSelPill();}
-    function togglePickId(id){const p=getPick(),ids=Array.isArray(p.ids)?p.ids.map(x=>String(x)):[],sid=String(id),set=new Set(ids);if(set.has(sid))set.delete(sid);else set.add(sid);p.ids=Array.from(set);p.course=String($('courseFilter')?.value||'');setPick(p);}
-    function clearPick(){setPick({ids:[],course:String($('courseFilter')?.value||'')});}
+    function togglePickKey(key){const p=getPick(),keys=new Set(p.keys),skey=String(key);if(keys.has(skey))keys.delete(skey);else keys.add(skey);p.keys=Array.from(keys);p.mode='selected';p.course=String($('courseFilter')?.value||'');setPick(p);}
+    function clearPick(){setPick({keys:[],mode:'selected',course:String($('courseFilter')?.value||'')});}
     /* Räknaren äger radens tillstånd: texten, mätaren, om primärhandlingen går
        att trycka på och om "Rensa" alls syns. Ett enda ställe, så raden inte kan
        säga en sak och bete sig som en annan.
@@ -596,7 +622,7 @@
     function updateSelPill(){
       const el=$('selCountPill'); if(!el)return;
       const p=getPick();
-      const n=Array.isArray(p.ids)?p.ids.length:0;
+      const n=Array.isArray(p.keys)?p.keys.length:0;
       const totalt=document.querySelectorAll('#mistakeList .xf-opt').length;
 
       el.textContent = n
@@ -614,7 +640,7 @@
       const clear=$('clearSelectionBtn');
       if(clear) clear.hidden = n === 0;
     }
-    function removeMistake(m){const all=lsArr(LS_MISTAKES),k=mKey(m);lsSet(LS_MISTAKES,all.filter(x=>mKey(x)!==k));const p=getPick(),ids=(Array.isArray(p.ids)?p.ids:[]).map(String),sid=String(m.id);if(ids.includes(sid)){p.ids=ids.filter(x=>x!==sid);setPick(p);}}
+    function removeMistake(m){const all=lsArr(LS_MISTAKES),k=mKey(m);lsSet(LS_MISTAKES,all.filter(x=>mKey(x)!==k));const p=getPick();if(p.keys.includes(k)){p.keys=p.keys.filter(x=>x!==k);setPick(p);}}
 
     /* ── PER COACH ── */
     const PER_COACH_TTL = 24 * 60 * 60 * 1000;
@@ -628,7 +654,7 @@
       const token=sd?.session?.access_token||'';
       if(!token) return null;
 
-      const avg5=h.slice(-5).reduce((s,x)=>s+(Number(x.percent)||0),0)/Math.max(1,Math.min(5,h.length));
+      const avg5=avgPct(scoredHistory(h).slice(-5));
       const courseFreq={};
       m.slice(-30).forEach(x=>{const c=String(x.course||'').trim();if(c)courseFreq[c]=(courseFreq[c]||0)+1;});
       const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
@@ -637,7 +663,7 @@
 
       const context=[
         `${h.length} prov gjorda.`,
-        `Snitt senaste 5: ${Math.round(avg5)}%.`,
+        avg5===null?'Resultatsnitt saknas eftersom prov saknar poängunderlag.':`Snitt av prov med poängunderlag, senaste 5: ${avg5}%.`,
         topCourses?`Mest misstag i: ${topCourses}.`:'',
         recentQ?`Senaste misstag: ${recentQ}.`:''
       ].filter(Boolean).join(' ');
@@ -669,8 +695,9 @@
     }
 
     /* ── TEACHER REPORT ── */
-    function getReportCache(){const o=lsObj(LS_TEACHER_REPORT_CACHE);return(o&&typeof o==='object')?o:{};}
-    function setReportCache(c){lsSet(LS_TEACHER_REPORT_CACHE,c);}
+    try{localStorage.removeItem(LS_TEACHER_REPORT_CACHE);}catch{}
+    let reportCount=0;
+    let reportOwner=null;
     /* Vilken kurs eleven tittar på. Väljaren bor i felbank-skärmen, men alla
        fem skärmar ritas av renderAll() så elementet finns i DOM:en oavsett
        vilken som är framme. Beroendet är osynligt och därför samlat här och
@@ -678,10 +705,18 @@
        tyst börja omfatta alla kurser om felbanken en dag ritas lazily. */
     function currentCourse(){ return String($('courseFilter')?.value||'').trim(); }
     window.__reportScopeForTest=()=>currentCourse();
-    function reportCacheKey(){return currentCourse()||'__all__';}
     async function fetchReport(payload){
-      const res=await fetch('/api/teacher-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const data=await res.json();if(!res.ok)throw new Error(data?.error||'failed');return String(data?.report||data?.tips||'');
+      const{data:sd}=await db.auth.getSession();
+      const token=sd?.session?.access_token||'';
+      const owner=sd?.session?.user?.id||'';
+      if(!token)throw new Error('Logga in igen för att skapa rapporten.');
+      const res=await fetch('/api/teacher-report',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)});
+      const{data:current}=await db.auth.getSession();
+      if(!owner||current?.session?.user?.id!==owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+      const data=await res.json();if(!res.ok)throw new Error(data?.error||'Kunde inte skapa rapport.');
+      const{data:afterRead}=await db.auth.getSession();
+      if(afterRead?.session?.user?.id!==owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+      return {text:String(data?.report||''),count:Number(data?.exams_count||0),owner};
     }
     function setReportText(t){const b=$('reportBox');if(b)b.textContent=t;}
     function setReportStatus(t,c){const s=$('reportStatus');if(!s)return;s.textContent=t;s.className='statusText'+(c?' '+c:'');}
@@ -696,17 +731,66 @@
 
     /* ── CHART ── */
     let _chart=null;
+    function renderChartFallback(wrap,canvas,data){
+      canvas.hidden=true;
+      const fallback=document.createElement('div');
+      fallback.id='chartFallback';
+      fallback.className='chartFallback';
+      fallback.setAttribute('role','status');
+      fallback.setAttribute('aria-live','polite');
+      const message=document.createElement('p');
+      message.textContent='Grafen kunde inte laddas. Resultaten finns i den utfällbara tabellen.';
+      const list=document.createElement('ol');
+      list.className='chartFallbackList';
+      data.slice(-5).forEach(item=>{
+        const row=document.createElement('li');
+        const date=chartDate(item.ts,{month:'short',day:'numeric'});
+        const percent=chartPercent(item.percent);
+        row.textContent=`${date}: ${percent!==null?`${percent}%`:'Resultat saknas'}`;
+        list.appendChild(row);
+      });
+      fallback.append(message,list);
+      wrap.appendChild(fallback);
+    }
+    function chartDate(value,options){
+      const time=typeof value==='number'?value:Date.parse(value);
+      return Number.isFinite(time)&&time>0?new Date(time).toLocaleDateString(undefined,options):'Datum saknas';
+    }
+    function chartPercent(value){
+      if((typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&value.trim()===''))return null;
+      const percent=Number(value);
+      return Number.isFinite(percent)&&percent>=0&&percent<=100?percent:null;
+    }
+    function renderChartTable(data){
+      const rows=$('chartDataRows');if(!rows)return;
+      rows.replaceChildren();
+      data.forEach(item=>{
+        const row=document.createElement('tr');
+        const dateCell=document.createElement('td');
+        dateCell.textContent=chartDate(item.ts,{year:'numeric',month:'short',day:'numeric'});
+        const resultCell=document.createElement('td');
+        const percent=chartPercent(item.percent);
+        resultCell.textContent=percent!==null?`${percent}%`:'Resultat saknas';
+        row.append(dateCell,resultCell);
+        rows.appendChild(row);
+      });
+    }
     function renderChart(h){
       const wrap=$('chartWrap'),canvas=$('progressChart');if(!wrap||!canvas)return;
+      $('chartFallback')?.remove();
+      canvas.hidden=false;
       if(!h||h.length<2){wrap.style.display='none';if(_chart){_chart.destroy();_chart=null;}return;}
       wrap.style.display='block';
       const data=h.slice(-20);
-      const labels=data.map(x=>new Date(x.ts||Date.now()).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'}));
-      const values=data.map(x=>Number(x.percent||0));
+      renderChartTable(data);
+      canvas.setAttribute('aria-label',`Resultatgraf med ${data.length} prov. Resultaten visas i procent över tid.`);
+      const labels=data.map(x=>chartDate(x.ts,{month:'2-digit',day:'2-digit'}));
+      const values=data.map(x=>chartPercent(x.percent));
       const grid='rgba(0,183,217,.07)',tick='#667085';
       const line='#00768F',fill='rgba(0,183,217,.08)';
       if(_chart){_chart.destroy();_chart=null;}
-      _chart=new Chart(canvas,{
+      if(typeof Chart!=='function'){renderChartFallback(wrap,canvas,data);return;}
+      try{_chart=new Chart(canvas,{
         type:'line',
         data:{labels,datasets:[{data:values,borderColor:line,backgroundColor:fill,borderWidth:2,pointBackgroundColor:line,pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:3.5,pointHoverRadius:5,fill:true,tension:0.4}]},
         options:{
@@ -717,11 +801,12 @@
             y:{min:0,max:100,grid:{color:grid,drawBorder:false},ticks:{color:tick,font:{size:10,weight:'500',family:'DM Mono'},callback:v=>v+'%',stepSize:25},border:{display:false}}
           }
         }
-      });
+      });}catch{_chart=null;renderChartFallback(wrap,canvas,data);}
     }
 
     /* ── RENDER MISTAKES ── */
     function renderMistakes(mistakes,courseFilter){
+      mistakes=ensureMistakeKeys(mistakes);
       const list=$('mistakeList'),st=$('mistakeStatus');
       list.innerHTML='';
       const course=(courseFilter||'').trim();
@@ -768,7 +853,7 @@
       const shownConcept=CONCEPT_FILTER==='__none__'?'Otaggade':CONCEPT_FILTER;
       const scope=[course,shownConcept].filter(Boolean).join(' › ');
       st.textContent=`${filtered.length} misstag${scope?' · '+scope:''}`;st.className='statusText';
-      const pick=getPick(),pickSet=new Set((Array.isArray(pick.ids)?pick.ids:[]).map(x=>String(x)));
+      const pick=getPick(),pickSet=new Set(pick.keys);
       /* Hur många gånger varje begrepp återkommer i det eleven ser just nu.
          Det är den enda signalen som säger vad som ska prioriteras — fyra
          identiska kort säger ingenting om vilket misstag som är ett mönster
@@ -785,7 +870,7 @@
         // kunde bära.
         const d=document.createElement('article');
         const date=new Date(m.ts||Date.now()).toLocaleDateString(undefined,{month:'2-digit',day:'2-digit'});
-        const isPicked=pickSet.has(String(m.id)),cKey=tipsCKey(m),hasCached=!!(tc[cKey]);
+        const key=mKey(m),isPicked=pickSet.has(key),cKey=tipsCKey(m),tipsId='per-tips-'+encodeURIComponent(key),hasCached=!!(tc[cKey]);
         const cTag=conceptOf(m),eTags=errorTagsOf(m).slice(0,3);
         const antal=cTag?(begreppsAntal[cTag]||0):0;
         d.className='xfMiss'+(isPicked?' sel':'');
@@ -805,16 +890,16 @@
           : '';
 
         d.innerHTML=`
-          <button type="button" class="xf-opt xfMissRow" data-id="${esc(m.id)}"
+          <button type="button" class="xf-opt xfMissRow" data-id="${esc(m.id)}" data-mistake-key="${esc(key)}"
                   aria-pressed="${isPicked?'true':'false'}">
             ${huvudHtml}
             <span class="xfMissQ">${esc(m.question||'')}</span>
             <span class="xfMissMeta">${esc((m.course||'').trim()||'ingen kurs')} · ${date}</span>
           </button>
-          <div class="xfMissMore">
+          <div class="xfMissMore" data-per-avoid>
             <button type="button" class="xfDisclose" aria-expanded="false">Visa svar</button>
             <button class="xfDisclose doneBtn" type="button">Klar</button>
-            <button class="xfDisclose tipsBtnEl" type="button">P.E.R-tips${hasCached?' <span class="xfCached">cache</span>':''}</button>
+            <button class="xfDisclose tipsBtnEl" type="button" aria-expanded="false" aria-controls="${esc(tipsId)}">P.E.R-tips${hasCached?' <span class="xfCached">cache</span>':''}</button>
           </div>
           <div class="xf-note xfMissDetail" hidden>
             <div class="mFL">Ditt svar</div>
@@ -825,7 +910,7 @@
             <div class="mFL">Modellsvar</div>
             <div class="mFV">${esc(m.model_answer||'—')}</div>
           </div>
-          <div class="tipsBox tipsBoxEl" style="display:none"></div>`;
+          <div class="tipsBox tipsBoxEl" id="${esc(tipsId)}" role="status" aria-live="polite" aria-atomic="true" hidden></div>`;
 
         // Markering: hela raden.
         /* Markeringen sitter på KORTET, inte bara på frågeraden. Kortet är
@@ -837,8 +922,8 @@
            Eleven markerade i blindo. */
         const rad=d.querySelector('.xfMissRow');
         rad?.addEventListener('click',()=>{
-          togglePickId(m.id);
-          const valt=(getPick().ids||[]).map(String).includes(String(m.id));
+          togglePickKey(key);
+          const valt=getPick().keys.includes(key);
           d.classList.toggle('sel',valt);
           rad.setAttribute('aria-pressed',valt?'true':'false');
         });
@@ -855,12 +940,14 @@
         });
         d.querySelector('.doneBtn')?.addEventListener('click',()=>{removeMistake(m);renderAll();});
         const tBtn=d.querySelector('.tipsBtnEl'),tBox=d.querySelector('.tipsBoxEl');
-        const isTipsVis=()=>tBox.style.display!=='none';
+        const isTipsVis=()=>!tBox.hasAttribute('hidden');
         tBtn?.addEventListener('click',async()=>{
-          if(isTipsVis()){tBox.style.display='none';tBox.textContent='';return;}
+          if(isTipsVis()){tBox.setAttribute('hidden','');tBox.textContent='';tBtn.setAttribute('aria-expanded','false');return;}
+          tBtn.setAttribute('aria-expanded','true');
           const cache=getTipsCache(),cached=cache[cKey];
-          if(cached){tBox.style.display='block';tBox.textContent=String(cached);return;}
-          tBtn.setAttribute('disabled','disabled');tBox.style.display='block';tBox.textContent='P.E.R analyserar…';
+          tBox.removeAttribute('hidden');
+          if(cached){tBox.textContent=String(cached);return;}
+          tBtn.setAttribute('disabled','disabled');tBox.textContent='P.E.R analyserar…';
           try{const text=await fetchTips(m),norm=String(text||'').trim();if(!norm){tBox.textContent='Kunde inte hämta tips — försök igen.';}else{const c2=getTipsCache();c2[cKey]=norm;setTipsCache(c2);tBox.textContent=norm;}}
           catch{tBox.textContent='Kunde inte hämta tips — försök igen.';}
           finally{tBtn.removeAttribute('disabled');}
@@ -906,7 +993,8 @@
         // som gjorde något.
         const b=document.createElement('button');b.type='button';b.className='xf-opt';
         const date=new Date(x.ts||Date.now()).toLocaleDateString(undefined,{year:'numeric',month:'2-digit',day:'2-digit'});
-        b.innerHTML=`${esc(x.course||'Ingen kurs')}<small>${date} · ${esc(x.level||'—')} · ${Number(x.percent||0)}%</small>`;
+        const percent=chartPercent(x.percent);
+        b.innerHTML=`${esc(x.course||'Ingen kurs')}<small>${date} · ${esc(x.level||'—')} · ${percent===null?'Resultat saknas':`${percent}%`}</small>`;
         b.addEventListener('click',()=>{
           /* Kursväljaren bor i felbank-skärmen, som ritas om av skärmbytet.
              Värdet måste därför sparas i valet, inte skrivas i en select som
@@ -933,56 +1021,86 @@
     }
 
     /* ── TEACHER REPORT STATE ── */
-    function renderReportState(h){
-      const n=Array.isArray(h)?h.length:0;
-      if(n<3){setReportStatus(`Minst 3 prov krävs. Du har ${n}.`,'warn');setGenEnabled(false);setCopyEnabled(false);setReportPill('',false);setReportText('—');return;}
-      setReportStatus(`Redo – ${n} prov`,'ok');setGenEnabled(true);
-      const cache=getReportCache(),key=reportCacheKey(),cached=cache[key];
-      if(cached&&typeof cached.text==='string'&&cached.text.trim()){setReportText(cached.text);setCopyEnabled(true);setReportPill(`${Number(cached.n||n)} prov`,true);}
-      else{setReportText('—');setCopyEnabled(false);setReportPill('',false);}
+    function renderReportState(){
+      setReportStatus('Rapporten kräver minst 3 verifierat rättade övningsprov.','');setGenEnabled(true);
+      reportCount=0;reportOwner=null;setReportText('—');setCopyEnabled(false);setReportPill('',false);
     }
 
     /* ── GENERATE REPORT ── */
     async function generateReport(){
-      const h=lsArr(LS_HISTORY),m=lsArr(LS_MISTAKES),n=h.length;
-      if(n<3){setReportStatus(`Minst 3 prov krävs. Du har ${n}.`,'warn');setReportText('—');setCopyEnabled(false);setReportPill('',false);return;}
+      reportCount=0;reportOwner=null;
       setGenEnabled(false);setCopyEnabled(false);setReportStatus('Skapar rapport…','');setReportText('');setReportPill('',false);showLoad();
       const course=currentCourse();
-      const fH=course?h.filter(x=>String(x.course||'').trim()===course):h;
-      const fM=course?m.filter(x=>String(x.course||'').trim()===course):m;
-      const rN=fH.length;
-      if(rN<3){setReportStatus(`Minst 3 prov krävs. Du har ${rN}.`,'warn');setReportText('—');setGenEnabled(true);hideLoad();return;}
       try{
-        const text=await fetchReport({course:course||'',exams_count:rN,history:fH.slice(-10),mistakes:fM.slice(-50)});
-        const norm=String(text||'').trim();
-        if(!norm){setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');setGenEnabled(true);return;}
-        const cache=getReportCache(),key=reportCacheKey();cache[key]={ts:Date.now(),n:rN,text:norm};setReportCache(cache);
-        setReportStatus(`Redo – ${rN} prov`,'ok');setReportText(norm);setCopyEnabled(true);setReportPill(`${rN} prov`,true);
-      }catch{setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');}
+        const report=await fetchReport({course:course||''});
+        const{data:current}=await db.auth.getSession();
+        if(current?.session?.user?.id!==report.owner)throw new Error('Kontot ändrades medan rapporten skapades. Försök igen på rätt konto.');
+        const norm=report.text.trim();
+        if(!norm||report.count<3){setReportStatus('Kunde inte skapa rapport.','bad');setReportText('—');return;}
+        reportCount=report.count;
+        reportOwner=report.owner;
+        setReportStatus(`Redo – ${report.count} verifierade prov`,'ok');setReportText(norm);setCopyEnabled(true);setReportPill(`${report.count} prov`,true);
+      }catch(e){setReportStatus(e?.message||'Kunde inte skapa rapport.','bad');setReportText('—');}
       finally{hideLoad();setGenEnabled(true);}
     }
     async function copyReport(){
+      const{data:current}=await db.auth.getSession();
+      if(!reportOwner||current?.session?.user?.id!==reportOwner){renderReportState();return;}
       const text=String($('reportBox')?.textContent||'').trim();
       if(!text||text==='—')return;
       try{
         await navigator.clipboard.writeText(text);setReportPill('Kopierad ✓',true);
-        setTimeout(()=>{const cache=getReportCache(),key=reportCacheKey(),cached=cache[key],based=cached?.n?Number(cached.n):lsArr(LS_HISTORY).length;if(based>=3)setReportPill(`${based} prov`,true);else setReportPill('',false);},1400);
+        setTimeout(()=>{if(reportCount>=3)setReportPill(`${reportCount} prov`,true);else setReportPill('',false);},1400);
       }catch{}
     }
 
     /* ── SYNC ── */
+    function stableJSON(value){if(Array.isArray(value))return'['+value.map(stableJSON).join(',')+']';if(value&&typeof value==='object')return'{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableJSON(value[k])).join(',')+'}';return JSON.stringify(value);}
+    function canonicalTimestamp(value){
+      const input=String(value||''),match=input.match(/^(\d{4}-\d{2}-\d{2})[Tt ](\d{2}:\d{2})(?::(\d{2}))?(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/i);
+      if(!match)return input;
+      const base=Date.parse(`${match[1]}T${match[2]}:${match[3]||'00'}${match[5]||''}`);
+      if(!Number.isFinite(base))return input;
+      const seconds=new Date(Math.floor(base/1000)*1000).toISOString().replace('.000Z','');
+      const fraction=String(match[4]||'').replace(/0+$/g,'');
+      return`${seconds}${fraction?'.'+fraction:''}Z`;
+    }
+    function legacyTrainingBatchId(record){
+      const exam=record?.exam&&typeof record.exam==='object'?{...record.exam}:null;
+      if(exam)delete exam.training_batch_id;
+      const input=stableJSON([canonicalTimestamp(record?.created_at),String(record?.course||''),String(record?.level||''),String(record?.qtype||record?.qType||''),String(record?.material||''),exam,record?.answers||null,record?.result||null]);
+      const lanes=[2166136261,0x9e3779b9,0x85ebca6b,0xc2b2ae35],primes=[16777619,2246822519,3266489917,668265263];
+      for(let i=0;i<input.length;i++){const c=input.charCodeAt(i);for(let lane=0;lane<lanes.length;lane++)lanes[lane]=Math.imul(lanes[lane]^c,primes[lane]);}
+      return'legacy-'+lanes.map(value=>(value>>>0).toString(16).padStart(8,'0')).join('');
+    }
+    function stableMistakeSignature(item){return stableJSON([Number(item?.ts||0),String(item?.course||''),String(item?.id||''),String(item?.question||''),String(item?.user_answer||''),String(item?.feedback||''),String(item?.model_answer||''),Number(item?.points||0),Number(item?.max_points||0)]);}
+    function migrateTrainingPick(oldMistakes,newMistakes){
+      const pick=lsObj(LS_TRAIN_PICK);if(!Array.isArray(pick?.keys)||!pick.keys.length)return;
+      const nextKeys=new Set((newMistakes||[]).map(item=>String(item?.mistake_key||''))),available=new Map();
+      (newMistakes||[]).forEach(item=>{const sig=stableMistakeSignature(item);if(!available.has(sig))available.set(sig,[]);available.get(sig).push(String(item?.mistake_key||''));});
+      const oldByKey=new Map((oldMistakes||[]).map(item=>[String(item?.mistake_key||''),item])),consumed=new Set(),mapped=[];
+      for(const selected of pick.keys.map(String)){
+        if(nextKeys.has(selected)){mapped.push(selected);continue;}
+        const legacy=oldByKey.get(selected),bucket=legacy?available.get(stableMistakeSignature(legacy)):null;
+        const replacement=bucket?.find(key=>key&&!consumed.has(key));
+        if(replacement){mapped.push(replacement);consumed.add(replacement);}else mapped.push(selected);
+      }
+      const keys=Array.from(new Set(mapped));
+      if(keys.length!==pick.keys.length||keys.some((key,index)=>key!==String(pick.keys[index]||'')))lsSet(LS_TRAIN_PICK,{...pick,keys});
+    }
     function mergeMistakes(rows){
       const out=[];
       (rows||[]).forEach(r=>{
         const cTs=Date.parse(r.created_at)||0;
         const exam=r.exam||null,result=r.result||null,answers=r.answers||null;
+        const batchId=String(exam?.training_batch_id||r.submission_id||legacyTrainingBatchId(r));
         const qById=new Map(((exam&&exam.questions)?exam.questions:[]).map(q=>[String(q.id),q]));
         const aById=new Map((Array.isArray(answers)?answers:[]).map(a=>[String(a.id),String(a.answer||'')]));
         const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
-        per.forEach(item=>{
+        per.forEach((item,questionIndex)=>{
           const got=Number(item.points||0),mx=Number(item.max_points||0);
           if(mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
-            out.push({ts:cTs||Date.now(),course:r.course||'',level:r.level||'C',qType:q.type||(r.qtype||'mix'),id:qid,question:String(q.question||''),user_answer:String(aById.get(qid)||''),feedback:String(item.feedback||''),model_answer:String(item.model_answer||''),points:got,max_points:mx,concept_tag:String(item.concept_tag||''),error_tags:Array.isArray(item.error_tags)?item.error_tags:[]});}
+            out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:cTs||Date.now(),course:r.course||'',level:r.level||'C',qType:q.type||(r.qtype||'mix'),id:qid,question:String(q.question||''),user_answer:String(aById.get(qid)||''),feedback:String(item.feedback||''),model_answer:String(item.model_answer||''),points:got,max_points:mx,concept_tag:String(item.concept_tag||''),error_tags:Array.isArray(item.error_tags)?item.error_tags:[]});}
         });
       });
       while(out.length>200)out.shift();return out;
@@ -995,12 +1113,18 @@
       const r=await fetchUserExams();
       if(!r.ok){if(st){st.textContent=String(r.error||'Sync error');st.className='statusText bad';}if(syncBtn)syncBtn.removeAttribute('disabled');return;}
       const rows=r.rows||[];
-      const h=rows.map(row=>({ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:row.result?.total_points??0,max_points:row.result?.max_points??0,percent:(row.result?.max_points>0)?Math.round((row.result.total_points/row.result.max_points)*100):0}));
+      const h=rows.map(row=>{
+        const totalRaw=row.result?.total_points,maxRaw=row.result?.max_points;
+        const total=Number(totalRaw),maximum=Number(maxRaw);
+        const hasScore=(typeof totalRaw==='number'||typeof totalRaw==='string')&&!(typeof totalRaw==='string'&&totalRaw.trim()==='')&&(typeof maxRaw==='number'||typeof maxRaw==='string')&&!(typeof maxRaw==='string'&&maxRaw.trim()==='')&&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
+        return {ts:Date.parse(row.created_at)||Date.now(),course:row.course||'',level:row.level||'C',qType:row.qtype||'mix',total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null};
+      });
       lsSet(LS_HISTORY,h);
       const last2=rows.length?rows[rows.length-1]:null;
       if(last2){lsSet(LS_LAST,{ts:Date.parse(last2.created_at)||Date.now(),attempt:h[h.length-1],exam:last2.exam,result:last2.result});if(typeof last2.material==='string')localStorage.setItem(LS_MATERIAL,last2.material);}
       else localStorage.removeItem(LS_LAST);
-      lsSet(LS_MISTAKES,mergeMistakes(rows));
+      const oldMistakes=lsArr(LS_MISTAKES),newMistakes=mergeMistakes(rows);
+      migrateTrainingPick(oldMistakes,newMistakes);lsSet(LS_MISTAKES,newMistakes);
       if(st){st.textContent='Synkat';st.className='statusText ok';}
       if(syncBtn)syncBtn.removeAttribute('disabled');
       renderAll();
@@ -1112,8 +1236,8 @@
        ta säger varför — en spärrad knapp utan skäl är en återvändsgränd. */
     function renderHem(){
       const {h,m}=data();
-      const recent=h.slice(-5);
-      const avg=recent.length?Math.round(recent.reduce((a,x)=>a+(Number(x.percent)||0),0)/recent.length):0;
+      const scoredRecent=scoredHistory(h).slice(-5);
+      const avg=avgPct(scoredRecent);
 
       if(!h.length){
         flow.say('hem','Här samlas det du missar.',
@@ -1122,10 +1246,11 @@
         const tally={};
         m.forEach(x=>{const c=String(x.course||'').trim();if(c)tally[c]=(tally[c]||0)+1;});
         const top=Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0];
+        const progressText=avg===null
+          ? 'Poängunderlag saknas för att räkna ut ett snitt ännu.'
+          : `Snittet är ${avg} % över dina senaste ${scoredRecent.length} prov med resultat.`;
         flow.say('hem',`Du har ${m.length} sparade fel.`,
-          (top&&tally[top]>1)
-            ? `${tally[top]} av dem i ${top}. Du ligger på ${avg} % över dina senaste prov.`
-            : `Du ligger på ${avg} % över dina senaste ${recent.length} prov.`);
+          (top&&tally[top]>1)?`${tally[top]} av dem i ${top}. ${progressText}`:progressText);
       }
 
       const body=flow.body('hem');
@@ -1135,7 +1260,7 @@
       body.appendChild(opts);
 
       const mostC=mostMistakeCourse(m);
-      const lastP=h.length?Number(h[h.length-1].percent||0):0;
+      const lastP=h.length?chartPercent(h[h.length-1].percent):null;
       const cache=getCoachCache();
 
       [
@@ -1143,14 +1268,14 @@
           small:m.length?`${m.length} fel${mostC.course?' · flest i '+mostC.course:''}`:'Inga sparade fel just nu',
           av:!m.length },
         { go:'prov', label:'Se dina prov',
-          small:h.length?`${h.length} prov · senaste ${lastP} %`:'Inga prov ännu',
+          small:h.length?`${h.length} prov · senaste ${lastP===null?'resultat saknas':`${lastP} %`}`:'Inga prov ännu',
           av:!h.length },
         { go:'coach', label:'Fråga P.E.R vad du ska göra',
           small:isCoachCacheFresh(cache)?'analys från senaste dygnet':'ny analys av din historik',
           av:!h.length },
-        { go:'rapport', label:'Rapport till läraren',
-          small:h.length>=3?`${h.length} prov · redo`:`kräver 3 prov, du har ${h.length}`,
-          av:h.length<3 }
+        { go:'rapport', label:'Skapa övningsrapport',
+          small:'minst 3 verifierat rättade prov',
+          av:false }
       ].forEach(v=>{
         const b=document.createElement('button');
         b.type='button'; b.className='xf-opt'; b.dataset.go=v.go; b.disabled=!!v.av;
@@ -1224,7 +1349,8 @@
         const p=getPick();
         /* Knappen är avstängd utan urval, men villkoret står kvar som andra
            spärr: disabled är ett gränssnittstillstånd, inte en garanti. */
-        if(!p.ids||!p.ids.length)return;
+        if(!p.keys.length)return;
+        p.mode='selected';setPick(p);
         window.location.href='app.html#train';
       });
     }
@@ -1251,15 +1377,15 @@
 
       const chart=document.createElement('div');
       chart.className='xf-card chartWrap'; chart.id='chartWrap'; chart.style.display='none';
-      chart.innerHTML='<div class="xf-eyebrow">Resultatutveckling</div><canvas id="progressChart"></canvas>';
+      chart.innerHTML='<div class="xf-eyebrow">Resultatutveckling</div><p class="chartSummary" id="chartSummary">Resultaten visas i procent över tid. Öppna tabellen för exakta datum och värden.</p><canvas id="progressChart" role="img" aria-describedby="chartSummary"></canvas><details class="chartData"><summary>Visa resultat som tabell</summary><table><caption>Provresultat i samma ordning som grafen</caption><thead><tr><th scope="col">Datum</th><th scope="col">Resultat</th></tr></thead><tbody id="chartDataRows"></tbody></table></details>';
       body.appendChild(chart);
 
       const wrap=document.createElement('div'); wrap.className='xf-opts'; wrap.id='examList';
       body.appendChild(wrap);
 
       renderExamList(d.h,'');
-      renderChart(d.h);
       $('syncBtn').addEventListener('click',async()=>{await syncFromAccount();});
+      renderChart(d.h);
     }
 
     /* ── COACH ── analysen hämtas vid inträde. Den satt förut bakom en knapp
@@ -1289,7 +1415,8 @@
 
       const lastA=(last&&last.attempt)?last.attempt:h[h.length-1];
       if(lastA){
-        $('lastText').textContent=`${Number(lastA.percent||0)} % · ${lastA.level||'—'} · `+
+        const lastPercent=chartPercent(lastA.percent);
+        $('lastText').textContent=`${lastPercent===null?'Resultat saknas':`${lastPercent} %`} · ${lastA.level||'—'} · `+
           ((lastA.course||'').trim()||'Ingen kurs');
       }
       const tr=computeTrend(h);
@@ -1330,12 +1457,10 @@
       box.parentNode.appendChild(b);
     }
 
-    /* ── LÄRARRAPPORT ── */
+    /* ── ÖVNINGSRAPPORT ── */
     function renderRapport(){
-      const d=data(), n=d.h.length;
-      flow.say('rapport','Rapport till läraren', n>=3
-        ? `En sammanfattning av ${n} prov som du kan kopiera och visa.`
-        : `Kräver minst tre rättade prov. Du har ${n}.`);
+      flow.say('rapport','AI-övningsrapport',
+        'En AI-sammanfattning av dina rättade övningsprov. Använd som samtalsunderlag, inte som betyg eller säker kunskapsbedömning. Minst tre verifierat rättade prov krävs.');
 
       const body=flow.body('rapport');
       backBtn(body);
@@ -1346,7 +1471,7 @@
 
       const act=document.createElement('div');
       act.className='xf-act xfReportAct';
-      act.innerHTML='<button class="xf-btn" id="genReportBtn" type="button">Skapa rapport</button>'+
+      act.innerHTML='<button class="xf-btn" id="genReportBtn" type="button">Skapa övningsrapport</button>'+
         '<button class="xf-btn ghost" id="copyReportBtn" type="button" disabled>Kopiera</button>'+
         '<span class="xf-chip" id="reportPill" style="display:none">—</span>';
       body.appendChild(act);
@@ -1362,7 +1487,7 @@
         '<div class="xf-card reportBox" id="reportBox">—</div>';
       body.appendChild(wrap);
 
-      renderReportState(d.h);
+      renderReportState();
       $('genReportBtn').addEventListener('click',()=>generateReport());
       $('copyReportBtn').addEventListener('click',()=>copyReport());
     }
@@ -1373,8 +1498,8 @@
     const PER_TARGETS=[
       { id:'felbank', label:'Felbank',      hint:'frågor du tappat poäng på, med modellsvar', go:function(){flow.show('felbank');} },
       { id:'prov',    label:'Prov',         hint:'alla rättade prov och resultatgrafen',      go:function(){flow.show('prov');} },
-      { id:'coach',   label:'Coach',        hint:'personlig studieplan från misstagen',       go:function(){flow.show('coach');} },
-      { id:'rapport', label:'Lärarrapport', hint:'sammanfattning att visa läraren',           go:function(){flow.show('rapport');} }
+      { id:'coach',   label:'Coach',        hint:'övningsförslag från provhistorik och felbank', go:function(){flow.show('coach');} },
+      { id:'rapport', label:'Övningsrapport', hint:'AI-sammanfattning från minst 3 verifierat rättade prov', go:function(){flow.show('rapport');} }
     ];
 
     function pushPerContext(){
@@ -1387,9 +1512,10 @@
         return acc;
       },{});
       const weakAreas=Object.keys(areaCounts).sort((a,b)=>areaCounts[b]-areaCounts[a]).slice(0,5);
+      const recentAverage=avgPct(scoredHistory(h).slice(-5));
       window.setPerContext({
         page:'förbättring',
-        userScore:avgPct(h.slice(-5))/100,
+        userScore:recentAverage===null?undefined:recentAverage/100,
         weakAreas,
         examState:{answered:h.length,remaining:0},
         targets:PER_TARGETS
@@ -1398,6 +1524,7 @@
          finns ingen väg tillbaka ut. */
       window.__perManifestForTest={targets:PER_TARGETS};
     }
+    document.addEventListener('DOMContentLoaded',pushPerContext,{once:true});
 
     function renderAll(){
       renderHem(); renderFelbank(); renderProv(); renderCoach(); renderRapport();
@@ -1413,6 +1540,9 @@
     /* Skärmen som just öppnades ska visa aktuell data — annars står coachen
        kvar på siffror från innan senaste synk. */
     flow.on(()=>renderAll());
+    db?.auth?.onAuthStateChange?.((_event,session)=>{
+      if(reportOwner&&session?.user?.id!==reportOwner)renderReportState();
+    });
 
     /* ── RENSA ALL DATA ──
        Knappen kommer från window.XG_MENU_EXTRA och renderas av
@@ -1422,17 +1552,42 @@
       const btn=$('resetBtn');
       if(!btn)return;
       btn.addEventListener('click',async()=>{
+        if(!window.confirm('Rensa sparade provdata? ExGen försöker radera provposter och resultatsammanfattningar från kontot och tar bort detta kontots lokala provutkast, svar, osynkade resultat och provhistorik från enheten. Lokal data kan försvinna även om serverraderingen inte kan bekräftas. P.E.R-minne och kunskapsöversikt påverkas inte. Kan inte ångras.'))return;
         btn.setAttribute('disabled','disabled');
-        if(db){
+        let clearSession=null;
+        try{
+          const{data,error}=db?await db.auth.getSession():{data:null,error:true};
+          if(!error)clearSession=data?.session||null;
+        }catch{}
+        const clearUserId=clearSession?.user?.id||null;
+        let remoteHistoryDeleted=false;
+        if(db&&clearSession?.access_token){
           try{
-            const r=await deleteAllUserExamsFromAccount();
+            const r=await deleteAllUserExamsFromAccount(clearSession);
+            remoteHistoryDeleted=r.ok;
             if(!r.ok)console.warn('Supabase delete failed:',r.error);
           }catch(e){console.warn('Supabase delete error:',e);}
         }
-        [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
+        const localExamDataCleared=clearUserId
+          ?window.ExGenLocalDataBoundary?.clearLocalExamData(clearUserId)!==false
+          :false;
+        const localDataOwner=localStorage.getItem('exgen_local_data_owner');
+        if((clearUserId||localDataOwner)&&localDataOwner!==clearUserId){
+          btn.removeAttribute('disabled');
+          window.alert(!clearUserId
+            ? 'Kontosessionen kunde inte verifieras. Lokal data lämnades orörd.'
+            : remoteHistoryDeleted
+              ? 'Kontot byttes. Serverraderingen slutfördes för det ursprungliga kontot; delad lokal data lämnades orörd.'
+              : 'Kontot byttes. Kontodata kunde inte bekräftas raderad; delad lokal data lämnades orörd.');
+          return;
+        }
+        [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_SMART_TIPS_CACHE,
          LS_TEACHER_REPORT_CACHE,LS_PER_COACH_CACHE,LS_CLEAR_TS].forEach(k=>localStorage.removeItem(k));
         renderAll();
         btn.removeAttribute('disabled');
+        if(!localExamDataCleared)window.alert('Delad lokal historik rensades, men kontots provutkast eller osynkade resultat kunde inte bekräftas raderade.');
+        else if(remoteHistoryDeleted) window.alert('Provposter och resultatsammanfattningar är rensade. P.E.R-minne och kunskapsöversikt påverkas inte.');
+        else window.alert('Lokal historik rensad. Kontodata kunde inte bekräftas raderad. Försök igen när anslutningen fungerar.');
       });
     });
 

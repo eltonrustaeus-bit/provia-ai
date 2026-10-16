@@ -1,7 +1,9 @@
 <!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Återställ lösenord – ExGen</title>
@@ -53,14 +55,10 @@
   .rsLink:hover{text-decoration:underline}
   .rsView{display:none}
   .rsView.on{display:block}
-  /* shared.js mounts the P.E.R assistant on every page it loads. Someone who
-     is locked out of their account has one job here, and a chat bubble is not
-     it — hide it on this page only. */
-  #perWidget{display:none!important}
   @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
-<body>
+<body data-per-widget="off">
 
 <main class="rsWrap">
   <div class="rsCard">
@@ -97,9 +95,9 @@
 
 <script>
 (function () {
-  var SUPA_URL  = 'https://mnmotdluigzeehdjbhbu.supabase.co';
-  var SUPA_ANON = 'sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN';
-  var SUPA_LS   = 'sb-mnmotdluigzeehdjbhbu-auth-token';
+  var SUPA_URL  = window.ExGenRuntime.supabaseUrl;
+  var SUPA_ANON = window.ExGenRuntime.publishableKey;
+  var SUPA_LS   = window.ExGenRuntime.authStorageKey;
 
   var $ = function (id) { return document.getElementById(id); };
   function view(id) {

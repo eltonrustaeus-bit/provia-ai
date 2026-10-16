@@ -126,6 +126,14 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
     ["gratis att börja", /gratis/i],
   ];
   for (const [name, re] of CLAIMS) ok(`1 löftet finns: ${name}`, re.test(t), t.slice(0, 0));
+  const hero = (await page.locator(".heroSub").innerText()).replace(/\s+/g, " ");
+  ok("1 felbanken anges som Premium-funktion", /Premium/.test(hero) && /felbank/i.test(hero));
+  const bankLabels = await page.locator(".featLabel").allInnerTexts();
+  ok("1 Premium-nivån märks ut i felbankssektionen",
+    bankLabels.some(label => /felbank.*premium/i.test(label)), bankLabels.join(" | "));
+  ok("1 P.E.R beskriver stöd utan att garantera felfrihet",
+    /återkopplingen tar stöd i dina svar och det material som finns tillgängligt/i.test(t) &&
+    !/aldrig (på )?gissningar/i.test(t));
   await ctx.close();
 }
 
@@ -329,6 +337,116 @@ const textOf = page => page.evaluate(() => (document.body.innerText || "").repla
   }));
   ok("11a ingen vågrät scroll på 390px", m.overflow <= 1, String(m.overflow));
   ok("11b sidan har innehåll på mobil", m.docH > 1500 && m.h1 > 10, JSON.stringify(m));
+  await ctx.close();
+}
+
+// ── 12: example-material choices expose single-selection radio semantics ──
+{
+  const { ctx, page } = await mk();
+  const group = page.getByRole("radiogroup", { name: "Välj exempelmaterial" });
+  const radios = page.getByRole("radio");
+  const biology = page.getByRole("radio", { name: "Biologi" });
+  const history = page.getByRole("radio", { name: "Historia" });
+  const math = page.getByRole("radio", { name: "Matematik" });
+  ok("12a exemplen tillhör en namngiven radiogrupp", await group.count() === 1);
+  ok("12a2 radiogruppen deklarerar horisontell orientering", await group.getAttribute("aria-orientation") === "horizontal");
+  ok("12b exakt ett exempel är markerat", await radios.count() === 3 &&
+    await page.locator('#demoChips [role="radio"][aria-checked="true"]').count() === 1);
+  ok("12c bara valt exempel ingår i tabbordningen", await biology.getAttribute("tabindex") === "0" &&
+    await history.getAttribute("tabindex") === "-1" && await math.getAttribute("tabindex") === "-1");
+  const demo = await page.evaluate(() => ({
+    label: document.querySelector("label[for='demoMaterial']")?.textContent.trim(),
+    readonly: document.querySelector("#demoMaterial")?.hasAttribute("readonly"),
+    description: document.querySelector("#demoHur")?.textContent.trim(),
+  }));
+  ok("12c2 demo anger ett förskrivet, skrivskyddat exempel",
+    demo.label === "Exempelmaterial" && demo.readonly && /förskrivet exempel/i.test(demo.description),
+    JSON.stringify(demo));
+  ok("12c3 knappen lovar att visa en exempelfråga",
+    await page.locator("#demoGo").innerText() === "Visa exempelfrågan");
+
+  await biology.focus();
+  await biology.press("ArrowRight");
+  ok("12d högerpil väljer nästa material och flyttar fokus", await history.getAttribute("aria-checked") === "true" &&
+    await history.evaluate(el => el === document.activeElement));
+  ok("12e valt material synkas till det skrivskyddade exempelområdet",
+    /Versaillesfreden|Tyskland/.test(await page.locator("#demoMaterial").inputValue()) &&
+    await page.locator("#demoMaterial").getAttribute("readonly") !== null);
+
+  await biology.focus();
+  await biology.press("ArrowLeft");
+  ok("12e2 vänsterpil går runt till sista alternativet", await math.getAttribute("aria-checked") === "true" &&
+    await math.evaluate(el => el === document.activeElement));
+  await math.press("ArrowRight");
+  ok("12e3 högerpil går runt till första alternativet", await biology.getAttribute("aria-checked") === "true" &&
+    await biology.evaluate(el => el === document.activeElement));
+
+  await page.evaluate(() => {
+    window.__radioArrowDownPrevented = null;
+    document.getElementById("demoChips").addEventListener("keydown", event => {
+      if (event.key === "ArrowDown") window.__radioArrowDownPrevented = event.defaultPrevented;
+    });
+  });
+  await biology.press("ArrowDown");
+  ok("12e4 nedpil behåller sidans vanliga tangentbordsbeteende", await page.evaluate(() => window.__radioArrowDownPrevented === false) &&
+    await biology.getAttribute("aria-checked") === "true");
+
+  await math.click();
+  ok("12e5 klick uppdaterar valt radioalternativ", await math.getAttribute("aria-checked") === "true" &&
+    await math.getAttribute("tabindex") === "0");
+
+  await history.press("End");
+  ok("12f End väljer sista materialet", await math.getAttribute("aria-checked") === "true" &&
+    await math.evaluate(el => el === document.activeElement));
+  await math.press("Home");
+  ok("12g Home väljer första materialet", await biology.getAttribute("aria-checked") === "true" &&
+    await biology.evaluate(el => el === document.activeElement));
+  await biology.press("Tab");
+  ok("12h Tab går vidare till materialfältet", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
+  await ctx.close();
+}
+
+// ── 13: landing demo never leaves focus in a hidden step ──────────────────
+{
+  const { ctx, page } = await mk({ width: 390, height: 844 });
+  await page.locator("#demoMaterial").waitFor();
+  const overlap = await page.evaluate(() => {
+    const button = document.querySelector("#demoGo").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    return button.left < bubble.right && button.right > bubble.left &&
+      button.top < bubble.bottom && button.bottom > bubble.top;
+  });
+  ok("13b mobilens P.E.R-kontroll skymmer inte demoknappen", !overlap);
+  const noteOverlap = await page.evaluate(() => {
+    const note = document.querySelector("#demoHur").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    return note.left < bubble.right && note.right > bubble.left &&
+      note.top < bubble.bottom && note.bottom > bubble.top;
+  });
+  ok("13e mobilens P.E.R-kontroll skymmer inte demoförklaringen", !noteOverlap);
+  await page.setViewportSize({ width: 320, height: 720 });
+  const narrowOverlap = await page.evaluate(() => {
+    const note = document.querySelector("#demoHur").getBoundingClientRect();
+    const button = document.querySelector("#demoGo").getBoundingClientRect();
+    const bubble = document.querySelector("#perBubble").getBoundingClientRect();
+    const intersects = rect => rect.left < bubble.right && rect.right > bubble.left &&
+      rect.top < bubble.bottom && rect.bottom > bubble.top;
+    return { note: intersects(note), button: intersects(button) };
+  });
+  ok("13f demoanteckning och knapp är fria från P.E.R vid 320px",
+    !narrowOverlap.note && !narrowOverlap.button, JSON.stringify(narrowOverlap));
+
+  await page.locator("#demoGo").click();
+  await page.locator("#demoBack").click();
+  ok("13c byt material flyttar fokus till synligt materialfält", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
+  await page.locator("#demoGo").click();
+  await page.locator("#demoSvar").fill("Jag minns bara en del av svaret.");
+  await page.locator("#demoGrade").click();
+  ok("13a rättningen annonseras som status och får fokus", await page.locator("#demoScore").getAttribute("role") === "status" &&
+    await page.locator("#demoScore").evaluate(el => el === document.activeElement) &&
+    /av \d+ poäng/.test(await page.locator("#demoScore").textContent()));
+  await page.locator("#demoRestart").click();
+  ok("13d gör om flyttar fokus till synligt materialfält", await page.locator("#demoMaterial").evaluate(el => el === document.activeElement));
   await ctx.close();
 }
 

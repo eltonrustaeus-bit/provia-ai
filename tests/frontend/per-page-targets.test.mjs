@@ -54,13 +54,33 @@ async function mk(path) {
   // klickas (toggle() i shared.js). app.html:s eget test öppnar panelen
   // indirekt via ".xf-ask"; här finns ingen sådan genväg, så vi klickar
   // bubblan direkt.
+  const controls = await page.locator("#perBubble").getAttribute("aria-controls");
+  ok("T1d1 P.E.R-knappen pekar ut panelen", controls === "perPanel" && controls === await page.locator("#perPanel").getAttribute("id"));
+  ok("T1d2 panelen börjar stängd enligt ARIA", await page.locator("#perBubble").getAttribute("aria-expanded") === "false");
+  await page.click("#perBubble");
+  const opened = await page.locator("#perPanel").evaluate(el => el.classList.contains("per-open"));
+  ok("T1d3 öppnad panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "true" && opened);
+  ok("T1d4 slutligt svar har en artig, atomisk statusregion", await page.locator("#perAnnouncement").getAttribute("role") === "status" && await page.locator("#perAnnouncement").getAttribute("aria-live") === "polite" && await page.locator("#perAnnouncement").getAttribute("aria-atomic") === "true");
+  ok("T1d4a statusregion finns kvar utanför den dolda panelen", await page.locator("#perAnnouncement").evaluate(el => el.parentElement.id === "perWidget"));
+  ok("T1d5 meddelandelistan annonserar inte varje token", await page.locator("#perMessages").getAttribute("aria-live") === null);
+  await page.evaluate(() => {
+    const partial = document.createElement("div");
+    partial.id = "perPartialTest";
+    partial.className = "per-msg teacher typing";
+    partial.textContent = "Del av svaret";
+    document.getElementById("perMessages").appendChild(partial);
+  });
+  ok("T1d6 delvis svar annonseras inte", (await page.locator("#perAnnouncement").textContent()) === "");
+  await page.click("#perBubble");
+  const closed = await page.locator("#perPanel").evaluate(el => el.classList.contains("per-open"));
+  ok("T1d7 stängd panel annonseras", await page.locator("#perBubble").getAttribute("aria-expanded") === "false" && !closed);
+  ok("T1d7a statusregion är fortfarande tillgänglig när panelen stängs", await page.locator("#perAnnouncement").evaluate(el => getComputedStyle(el).display !== "none" && el.getBoundingClientRect().width > 0));
   await page.click("#perBubble");
   await page.evaluate(() => {
-    const msgs = document.getElementById("perMessages");
-    const div = document.createElement("div");
-    msgs.appendChild(div);
-    window.__perFinalize(div, "Premium kostar 79 kr i månaden.\n[GOTO:#premium]");
+    window.__perFinalize(document.getElementById("perPartialTest"), "Premium kostar 79 kr i månaden.\n[GOTO:#premium]");
   });
+  ok("T1d8 färdigt svar annonseras", (await page.locator("#perAnnouncement").innerText()).includes("Premium kostar 79 kr i månaden."));
+  ok("T1d8a navigeringsknapp blandas inte in i uppläsningen", !(await page.locator("#perAnnouncement").innerText()).includes("Premium →"));
   const label = await page.textContent("#perMessages .per-nav-cta >> nth=-1");
   ok("T1d knappen bär planens namn", label === "Premium →", String(label));
   await page.click("#perMessages .per-nav-cta >> nth=-1");

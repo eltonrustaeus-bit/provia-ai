@@ -1,8 +1,9 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+<script src="/js/exgen-runtime.js"></script>
+<script src="/js/account-storage.js"></script>
 <meta charset="utf-8" />
-  <script src="/js/intro-splash.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="js/exgen-modules.js"></script>
 <title>Integritetspolicy – ExGen</title>
@@ -39,13 +40,14 @@
 .cookieTable tr:last-child td{border-bottom:none}
 .pill{display:inline-block;padding:2px 8px;border-radius:var(--exgen-radius-pill);font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
 .pill.nec{background:rgba(0,183,217,.1);color:var(--a);border:1px solid rgba(0,183,217,.25)}
-.pill.func{background:rgba(244,200,66,.08);color:#f4c842;border:1px solid rgba(244,200,66,.2)}
+.pill.func{background:rgba(244,200,66,.08);color:#6b4f00;border:1px solid rgba(244,200,66,.2)}
 .resetBtn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:none;border:1px solid var(--l2);border-radius:var(--exgen-radius-md);color:var(--t2);font-size:13px;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;margin-top:4px}
 .resetBtn:hover{border-color:var(--a);color:var(--a)}
+footer .fLink{text-decoration:underline;text-underline-offset:2px}
 </style>
 
 </head>
-<body>
+<body data-per-widget="off">
 
 <div data-xg-header></div>
 
@@ -53,29 +55,34 @@
 <div class="policyWrap">
 
   <h1>Integritetspolicy</h1>
-  <p class="lead">Uppdaterad 19 augusti 2026 · exgen.se</p>
+  <p class="lead">Uppdaterad 12 oktober 2026 · exgen.se</p>
 
   <h2>Vad vi samlar in</h2>
   <p>ExGen samlar in minimal data för att kunna erbjuda tjänsten. Vi använder <strong>inga spårningscookies, inga annonsnätverk och inga tredjepartsanalysverktyg</strong>.</p>
   <ul>
     <li><strong>Kontoinformation</strong>: e-postadress och lösenord (hashad) vid registrering. Lagras i Supabase (EU-region).</li>
     <li><strong>Studieprogress</strong>: dina provresultat, felbanken och kategoriframsteg. Lagras i Supabase kopplat till ditt konto.</li>
-    <li><strong>Lokalt på din enhet</strong>: inloggningssession, cached AI-förklaringar. Se tabellen nedan.</li>
+    <li><strong>Profil och anpassning</strong>: om du fyller i P.E.R:s introduktion kan uppgifter som skolform, årskurs, program, skola, ämnen, mål, provdatum och önskat hjälpsätt sparas på ditt konto. P.E.R kan också spara sammanfattade studiesignaler från användningen.</li>
+    <li><strong>P.E.R-samtal</strong>: upp till 40 meddelanden i den senaste chatthistoriken samt ett separat långtidsminne kan sparas på ditt konto för att anpassa hjälpen. Du kan granska och ta bort profiluppgifter samt rensa P.E.R-minnet under Konto. Efter 90 dagar används långtidsminnet inte längre som profil. Radering försöks när P.E.R senare läser in minnet, men detta är inte en garanterad automatisk radering eller maxlagringstid. Du kan rensa minnet när som helst under Konto.</li>
+    <li><strong>Innehåll du skickar till AI</strong>: beroende på funktion kan studiematerial, frågor, svar, text från uppladdade bilder och relevanta studiesignaler behandlas av OpenAI för att skapa prov, rätta svar, läsa text eller ge hjälp. Lärarens klassinsikt körs först när minst fem elever har provdata. AI:n får då antal elever, klassens genomsnitt avrundat till närmaste tiotal procent och begrepp som återkommer hos minst tre elever, med antal. Inga elevvisa rader, namn, e-postadresser eller klassnamn skickas. Aggregat kan fortfarande vara personuppgifter och kräver skolans godkända upplägg.</li>
+    <li><strong>Lokalt på din enhet</strong>: inloggningssession, sparad provhistorik, felbank, material och väntande svar samt cachade AI-förklaringar. Om ett rättat prov inte kan sparas till kontot behålls en reservkopia med prov, svar och resultat i en lokal kö avgränsad till det inloggade kontot, tills sparningen lyckas eller du rensar lokal data. Se tabellen nedan.</li>
   </ul>
 
   <h2>Cookies &amp; lokal lagring</h2>
-  <p>Vi använder <code>localStorage</code> (webbläsarlagring, inte traditionella cookies) för att spara din session och inställningar. Inga data delas med tredje part för marknadsföring.</p>
+  <p>Vi använder <code>localStorage</code> (webbläsarlagring, inte traditionella cookies) för session, provdata och inställningar. Uppgifterna finns kvar tills de rensas av ExGen eller webbläsardata tas bort. Att rensa webbläsaren raderar inte automatiskt uppgifter som sparats på kontot. Inga data delas med tredje part för marknadsföring.</p>
 
-  <div class="tableScroll">
+  <div class="tableScroll" role="region" aria-label="Lokal lagring i webbläsaren" tabindex="0">
   <table class="cookieTable">
     <thead>
-      <tr><th>Nyckel</th><th>Syfte</th><th>Typ</th><th>Varaktighet</th></tr>
+      <tr><th>Exempel på nyckel</th><th>Syfte</th><th>Typ</th><th>Varaktighet</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>sb-…-auth-token</code></td><td>Inloggningssession (Supabase Auth)</td><td><span class="pill nec">Nödvändig</span></td><td>Till utloggning</td></tr>
-      <tr><td><code>proviaai_expl_cache</code></td><td>Cachade AI-förklaringar</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
-      <tr><td><code>proviaai_per_hist</code></td><td>P.E.R-chatthistorik (lokal)</td><td><span class="pill func">Funktionell</span></td><td>Permanent</td></tr>
-      <tr><td><code>proviaai_cookie_consent</code></td><td>Ditt val i cookie-bannern</td><td><span class="pill nec">Nödvändig</span></td><td>Permanent</td></tr>
+      <tr><td><code>sb-…-auth-token</code></td><td>Inloggningssession (Supabase Auth)</td><td><span class="pill nec">Nödvändig</span></td><td>Tills utloggning eller sessionsutgång</td></tr>
+      <tr><td><code>proviaai_history</code>, <code>proviaai_mistakes</code>, <code>proviaai_last_result</code>, <code>proviaai_last_material</code>, <code>proviaai_pending_answers</code>, <code>proviaai_pending_exams:…</code></td><td>Lokal provhistorik, felbank, studiematerial, ej rättade svar och kontospecifika reservkopior av prov som ännu inte sparats i molnet</td><td><span class="pill func">Funktionell</span></td><td>Reservkopian tas bort efter bekräftad molnsparning eller rensning; övriga uppgifter tills rensning i appen eller webbläsaren</td></tr>
+      <tr><td><code>proviaai_per_history</code>, <code>proviaai_teacher_insight_…</code>, <code>proviaai_*_cache</code></td><td>Lokal P.E.R-historik samt cachade coach-, rapport- och klassinsikter</td><td><span class="pill func">Funktionell</span></td><td>Tills cache rensas eller webbläsardata tas bort</td></tr>
+      <tr><td><code>proviaai_quota_…</code>, <code>proviaai_role</code>, <code>proviaai_user_name</code>, <code>proviaai_name</code>, <code>proviaai_app_access</code>, <code>proviaai_lang</code>, <code>proviaai_ui_open</code>, <code>proviaai_custom_courses</code>, <code>proviaai_per_corner</code>, <code>proviaai_per_size</code></td><td>Lokal kvotvisning, konto-/kvotidentifierare, visningsnamn och användarinställningar</td><td><span class="pill func">Funktionell</span></td><td>Tills webbläsardata tas bort; kvotens auktoritativa kontroll sker på servern</td></tr>
+      <tr><td><code>provia_per_intro_v1</code>, <code>proviaai_readiness_nudge_…</code>, <code>proviaai_lq_…</code>, <code>proviaai_coach_week</code>, <code>exgen_has_account</code></td><td>Första-besök-status, påminnelser, besöksräknare och lokal kontostatus</td><td><span class="pill func">Funktionell</span></td><td>Datumstyrda räknare byts ut; övriga ligger kvar tills webbläsardata tas bort</td></tr>
+      <tr><td><code>proviaai_cookie_consent</code></td><td>Ditt val i cookie-bannern</td><td><span class="pill nec">Nödvändig</span></td><td>Tills du återställer valet eller tar bort webbläsardata</td></tr>
     </tbody>
   </table>
   </div>
@@ -83,7 +90,8 @@
   <h2>Tredjepartstjänster</h2>
   <ul>
     <li><strong>Supabase</strong> (databas &amp; auth) — EU-region (Frankfurt). <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase integritetspolicy</a></li>
-    <li><strong>OpenAI</strong> (AI-förklaringar) — dina svar skickas till OpenAI för att generera förklaringar. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI integritetspolicy</a></li>
+    <li><strong>OpenAI</strong> (AI-funktioner) — innehåll som behövs för den funktion du använder kan skickas för att skapa prov, rätta eller förklara svar, läsa bildtext och skapa lärarstöd. Skicka inte känsliga personuppgifter i studiematerial eller chattar. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">OpenAI integritetspolicy</a></li>
+    <li><strong>Resend</strong> (transaktionsmejl) — e-postadress och uppgifter som behövs för välkomst- och kontomejl skickas för leverans. Registreringsaviseringar med elevens e-post eller konto-ID skickas inte till en separat administratörsmail.</li>
     <li><strong>Stripe</strong> (betalning) — om du uppgraderar. Kortuppgifter hanteras enbart av Stripe. <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe integritetspolicy</a></li>
     <li><strong>Vercel</strong> (hosting) — serverloggar inkl. IP-adress (ingen spårning). <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel integritetspolicy</a></li>
     <li><strong>Google Fonts</strong> — typsnitt laddas från Google. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google integritetspolicy</a></li>
@@ -91,6 +99,7 @@
 
   <h2>Dina rättigheter (GDPR)</h2>
   <p>Du har rätt att begära ut, rätta eller radera dina uppgifter. Kontakta oss på <a href="mailto:elton.rustaeus@gmail.com">elton.rustaeus@gmail.com</a> så hjälper vi dig.</p>
+  <p>Uppgifter i P.E.R:s profil och minne kan hanteras från Konto. Radering av profil eller minne tar inte automatiskt bort sparade provresultat, som hanteras separat. Förfrågningar om radering av konto eller andra uppgifter görs via kontaktadressen ovan.</p>
   <p>Du kan radera all lokal data direkt i din webbläsare via <em>Inställningar → Webbplatsdata → exgen.se</em>.</p>
 
   <h2>Återställ cookie-inställningar</h2>

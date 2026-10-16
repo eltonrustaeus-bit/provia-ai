@@ -36,7 +36,8 @@ try {
 // sida trots att regeln fanns — måttet gällde en sida där den aldrig lästes.
 // Varje framtida kontroll som rör utseende behöver stilmallen här.
 async function boot(opts = {}) {
-  const { ctx, page } = await openPage(browser, `${srv.url}/integritetspolicy.html`, {
+  const { fragment = "", ...screenOptions } = opts;
+  const { ctx, page } = await openPage(browser, `${srv.url}/integritetspolicy.html${fragment}`, {
     width: 1280, height: 900, reducedMotion: "reduce",
     waitUntil: "domcontentloaded", settle: 300,
   });
@@ -49,7 +50,7 @@ async function boot(opts = {}) {
       screens: ["hem", "a", "b"],
       title: "Testsida",
     }, o));
-  }, opts);
+  }, screenOptions);
   return { ctx, page };
 }
 
@@ -234,12 +235,9 @@ async function boot(opts = {}) {
 }
 
 
-// S14: fokus flyttas till rubriken, men utan att måla en ring. Rubriken är inte
-// interaktiv — tabindex="-1" finns bara för att gå att fokusera programmatiskt
-// — men Chromium låter den ändå matcha :focus-visible och rita sin egen ram.
-// För den som ser är hela skärmbytet återkopplingen. Kontrollen kräver båda:
-// fokus MÅSTE flytta (annars tappar skärmläsaren var den är) och ringen får
-// INTE synas.
+// S14: fokus flyttas till rubriken och har en synlig markering. Rubriken är
+// inte interaktiv — tabindex="-1" finns för programmatiskt fokus — men den
+// visuella återkopplingen hjälper tangentbordsanvändare att följa skärmbytet.
 {
   const { ctx, page } = await boot();
   await page.evaluate(() => window.flow.show("a"));
@@ -247,8 +245,33 @@ async function boot(opts = {}) {
     const h = document.querySelector('[data-screen="a"] .xf-say');
     return { fokuserad: document.activeElement === h, outline: getComputedStyle(h).outlineStyle };
   });
-  ok("S14 fokus flyttas till rubriken utan att rita en ring",
-    v.fokuserad && v.outline === "none", JSON.stringify(v));
+  ok("S14 fokus flyttas till rubriken med synlig markering",
+    v.fokuserad && v.outline !== "none", JSON.stringify(v));
+  await ctx.close();
+}
+
+// S15: initial rendering is not a user-initiated screen change. Do not leave a
+// decorative focus ring on the first heading before the learner acts.
+{
+  const { ctx, page } = await boot();
+  const v = await page.evaluate(() => {
+    const h = document.querySelector('[data-screen="hem"] .xf-say');
+    return { fokuserad: document.activeElement === h, focusVisible: h.matches(":focus-visible") };
+  });
+  ok("S15 startskärmen har ingen fokusmarkering före elevens första handling",
+    !v.fokuserad && !v.focusVisible, JSON.stringify(v));
+  await ctx.close();
+}
+
+// S16: a direct link is an intentional entry point and should focus its target.
+{
+  const { ctx, page } = await boot({ fragment: "#felbank", hash: true, screens: ["hem", "felbank"], useHash: true });
+  const v = await page.evaluate(() => {
+    const h = document.querySelector('[data-screen="felbank"] .xf-say');
+    return { fokuserad: document.activeElement === h, focusVisible: h.matches(":focus-visible") };
+  });
+  ok("S16 djuplänk fokuserar den skärm som länken pekar på",
+    v.fokuserad, JSON.stringify(v));
   await ctx.close();
 }
 

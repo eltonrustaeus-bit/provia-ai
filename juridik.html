@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="sv">
 <head>
+<script src="/js/exgen-runtime.js"></script>
 <!-- Måste ligga först i <head>, blockerande, som på varje annan skyddad sida —
      annars hinner body målas innan grinden svarar. Saknades här: sidan är
      olänkad och noindex, men under underhållsfönstret var den den enda sida på
@@ -151,7 +152,7 @@ ul.plain li { margin-bottom: 4px; }
 <script>
 (function () {
   "use strict";
-  var SUPA_LS = "sb-mnmotdluigzeehdjbhbu-auth-token";
+  var SUPA_LS = window.ExGenRuntime.authStorageKey;
   var state = { question: null, concept: null, level: "E", helpLevel: 0 };
 
   function el(id) { return document.getElementById(id); }

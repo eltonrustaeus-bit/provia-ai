@@ -1,16 +1,18 @@
 ﻿<!doctype html>
 <html lang="sv">
 <head>
+  <script src="/js/exgen-runtime.js"></script>
+  <script src="/js/pilot-public-surface.js"></script>
   <script src="/js/site-gate.js"></script>
+  <script src="/js/account-storage.js"></script>
   <meta charset="utf-8" />
-  <script src="/js/intro-splash.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="js/exgen-modules.js"></script>
-  <script>if(location.hostname.includes("vercel.app")){location.replace("https://exgen.se"+location.pathname+location.search)}</script>
+  <script>if(window.ExGenRuntime.environment === "production" && location.hostname.includes("vercel.app")){location.replace(window.ExGenRuntime.appOrigin+location.pathname+location.search)}</script>
   <title>ExGen – AI-driven studieapp för elever och studenter</title>
-  <meta name="description" content="ExGen är studieplattformen för grundskolan och gymnasiet. Klistra in ditt material och få ett prov med rättning, modellsvar och förklaring på varje fråga — plus en felbank som visar exakt vad du behöver träna på." />
+  <meta name="description" content="ExGen gör prov på ditt kursmaterial med rättning, modellsvar och förklaringar. Premium samlar missade begrepp i en felbank där du kan träna vidare." />
   <meta property="og:title" content="ExGen – AI-driven studieapp för elever och studenter" />
-  <meta property="og:description" content="Gör prov på ditt eget kursmaterial, få rättning med modellsvar och en felbank som visar exakt vad du behöver träna på. Gratis att starta." />
+  <meta property="og:description" content="Gör prov på ditt eget kursmaterial och få rättning med modellsvar och förklaringar. Premium samlar missade begrepp i en felbank. Gratis att starta." />
   <meta property="og:image" content="https://exgen.se/image/exgen-og.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -21,7 +23,7 @@
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="ExGen – AI-driven studieapp för elever och studenter" />
-  <meta name="twitter:description" content="Gör prov på ditt eget kursmaterial, få rättning med modellsvar och en felbank som visar exakt vad du behöver träna på. Gratis att starta." />
+  <meta name="twitter:description" content="Gör prov på ditt eget kursmaterial och få rättning med modellsvar och förklaringar. Premium samlar missade begrepp i en felbank. Gratis att starta." />
   <meta name="twitter:image" content="https://exgen.se/image/exgen-og.jpg" />
   <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
   <link rel="icon" type="image/png" sizes="192x192" href="/image/favicon-192.png" />
@@ -55,7 +57,7 @@
           "height": 131
         },
         "image": "https://exgen.se/image/exgen-og.jpg",
-        "description": "ExGen är en AI-driven studieplattform för grundskolan och gymnasiet. Eleven laddar upp sitt eget material och får ett prov med rättning, modellsvar och en felbank på begreppsnivå.",
+        "description": "ExGen är en AI-driven studieplattform för grundskolan och gymnasiet. Eleven gör prov på eget material och får rättning, modellsvar och förklaringar. Premium erbjuder en sparad felbank på begreppsnivå.",
         "areaServed": {
           "@type": "Country",
           "name": "Sverige"
@@ -86,6 +88,17 @@
   <!-- Mobilmenyns bindning. Låg tidigare inline i fem kopior. -->
     <noscript><style>.rev,.reveal{opacity:1!important;transform:none!important}</style></noscript>
   <style>
+  .pilotEntryOnly,.pilotBlockOnly,.pilotInlineOnly{display:none!important}
+  html[data-exgen-environment="pilot"] .publicOnly{display:none!important}
+  html[data-exgen-environment="pilot"] .pilotEntryOnly{display:inline-flex!important}
+  html[data-exgen-environment="pilot"] .pilotBlockOnly{display:block!important}
+  html[data-exgen-environment="pilot"] .pilotInlineOnly{display:inline!important}
+  html[data-exgen-environment="pilot"] #pricingStrip,
+  html[data-exgen-environment="pilot"] #parentPricingItem,
+  html[data-exgen-environment="pilot"] #faq-1,
+  html[data-exgen-environment="pilot"] #faq-4,
+  html[data-exgen-environment="pilot"] #faq-6,
+  html[data-exgen-environment="pilot"] .xg-footer a[href="pricing.html"]{display:none!important}
   /* ═══════════════════════════════════
      INDEX 2.0 — skolfokus (grundskola + gymnasium)
   ═══════════════════════════════════ */
@@ -118,6 +131,23 @@
     overflow:hidden;
     padding:48px 0 56px;
   }
+
+  .account-deletion-notice {
+    width:min(720px,calc(100% - 32px));
+    box-sizing:border-box;
+    margin:20px auto 0;
+    padding:18px 20px;
+    border:1px solid color-mix(in srgb,var(--exgen-error) 28%,var(--exgen-border));
+    border-left:4px solid var(--exgen-error);
+    border-radius:8px;
+    background:color-mix(in srgb,var(--exgen-error) 6%,var(--exgen-bg));
+    color:var(--exgen-text);
+  }
+  .account-deletion-notice[hidden] { display:none; }
+  .account-deletion-notice h2 { margin:0 0 8px; font-size:18px; line-height:1.35; }
+  .account-deletion-notice p { margin:0; line-height:1.55; }
+  .account-deletion-notice a { display:inline-block; margin-top:10px; color:var(--exgen-error-text); font-weight:600; text-underline-offset:3px; }
+  .account-deletion-notice .account-deletion-notice__privacy { margin-top:8px; color:var(--exgen-text-secondary); font-size:13px; }
 
   /* Background — one soft top-centred wash plus a faint, heavily masked
      grid for texture. The previous treatment (full-bleed gradient + two
@@ -331,6 +361,12 @@
                box-shadow var(--exgen-motion-fast) var(--exgen-motion-ease);
   }
   .demoArea:focus { border-color:var(--a);box-shadow:0 0 0 3px rgba(0,118,143,.07); }
+  .demoArea[readonly]{resize:none;cursor:default}
+
+  @media(max-width:480px){
+    #demoMaterial{height:84px;min-height:84px}
+    #demoHur{max-width:calc(100% - 56px)}
+  }
 
   .demoGo {
     display:flex;align-items:center;justify-content:center;
@@ -444,7 +480,7 @@
   .parentT { font-weight:700;font-size:15px;color:var(--t);letter-spacing:-.02em;margin-bottom:6px; }
   .parentD { font-size:var(--fs-sm);color:var(--t2);line-height:1.65; }
   .parentNote { font-size:var(--exgen-text-xs);color:var(--t3);margin:var(--exgen-space-6) 0 0; }
-  .parentNote a { color:var(--a); }
+  .parentNote a { color:var(--a);text-decoration:underline;text-underline-offset:2px; }
 
   /* ── ETIKETT ──
      Fem regler med exakt samma deklarationer stod på var sitt håll i den här
@@ -675,6 +711,19 @@
 <!-- HEADER -->
 <div data-xg-header></div>
 
+<section id="accountDeletionNotice" class="account-deletion-notice" role="alert" aria-labelledby="accountDeletionNoticeTitle" hidden>
+  <div>
+    <h2 id="accountDeletionNoticeTitle">Kontoraderingen kunde inte bekräftas</h2>
+    <p>Du har loggats ut, men raderingen har inte kunnat bekräftas. Kontot eller tillhörande uppgifter kan därför finnas kvar. Kontakta ExGen så hjälper vi dig att kontrollera statusen.</p>
+    <a href="mailto:elton.rustaeus@gmail.com?subject=ExGen%20kontoradering">Kontakta ExGen support</a>
+    <p class="account-deletion-notice__privacy">Skicka inte lösenord eller provsvar i ditt meddelande.</p>
+  </div>
+</section>
+<script>
+  if (new URLSearchParams(window.location.search).get("accountDeletion") === "unconfirmed") {
+    document.getElementById("accountDeletionNotice").hidden = false;
+  }
+</script>
 
 <main id="main-content">
 
@@ -694,15 +743,17 @@
         </h1>
 
         <p class="heroSub">
-          Provet byggs på det ni faktiskt läser — inte på en färdig frågebank. Varje svar får poäng, ett modellsvar och en förklaring, och det du missar samlas i en felbank du kan träna om.
+          Provet byggs på det ni faktiskt läser — inte på en färdig frågebank. Varje svar får poäng, modellsvar och förklaring. Med Premium samlas missade begrepp i en felbank där du kan träna vidare.
         </p>
 
         <div class="heroCtas" id="heroCtas">
           <div class="heroBtns">
-            <a class="ctaBtn" href="app.html" data-pv-auth="register">Skapa ditt första prov</a>
+            <a class="ctaBtn publicOnly" href="app.html" data-pv-auth="register">Skapa ditt första prov</a>
+            <a class="ctaBtn pilotEntryOnly" href="app.html" data-pv-auth="login">Logga in med skolpilotkonto</a>
           </div>
           <div class="heroMeta">
-            <p class="heroFine">Gratis att börja · inget kort krävs</p>
+            <p class="heroFine publicOnly">Gratis att börja · inget kort krävs</p>
+            <p class="heroFine pilotBlockOnly">Endast för inbjudna skolpilotkonton</p>
           </div>
         </div>
 
@@ -734,11 +785,11 @@
               <span class="demoEye">Prova direkt</span>
               <span class="demoFree">Utan konto</span>
             </div>
-            <div class="demoChips" id="demoChips" role="group" aria-label="Välj exempelmaterial"></div>
-            <label class="demoLbl" for="demoMaterial">Ditt material</label>
-            <textarea class="demoArea" id="demoMaterial" rows="6" spellcheck="false"></textarea>
-            <button class="demoGo" id="demoGo" type="button">Gör ett prov på det här</button>
-            <p class="demoNote" id="demoHur">Exemplen är förskrivna, så demon svarar direkt. I appen läser P.E.R din egen text och skriver frågorna utifrån den.</p>
+            <div class="demoChips" id="demoChips" role="radiogroup" aria-orientation="horizontal" aria-label="Välj exempelmaterial"></div>
+            <label class="demoLbl" for="demoMaterial">Exempelmaterial</label>
+            <textarea class="demoArea" id="demoMaterial" rows="6" spellcheck="false" readonly aria-describedby="demoHur"></textarea>
+            <button class="demoGo" id="demoGo" type="button">Visa exempelfrågan</button>
+            <p class="demoNote" id="demoHur">Förskrivet exempel, rättat mot nyckelbegrepp. Prova ditt eget material i appen.</p>
           </div>
 
           <!-- Steg 2: frågan -->
@@ -761,7 +812,7 @@
               <button class="demoBack" id="demoRestart" type="button">Gör om</button>
             </div>
             <div class="demoScoreRow">
-              <span class="demoScore" id="demoScore"></span>
+              <span class="demoScore" id="demoScore" role="status" aria-live="polite" tabindex="-1"></span>
               <div class="demoBar" aria-hidden="true"><div class="demoBarFill" id="demoBarFill"></div></div>
             </div>
             <ul class="demoKeys" id="demoKeys"></ul>
@@ -773,7 +824,8 @@
               <span class="demoBankEye">Felbank</span>
               <p id="demoBankText"></p>
             </div>
-            <a class="demoGo demoGo--final" href="app.html" data-pv-auth="register">Fortsätt med ditt eget material</a>
+            <a class="demoGo demoGo--final publicOnly" href="app.html" data-pv-auth="register">Fortsätt med ditt eget material</a>
+            <a class="demoGo demoGo--final pilotEntryOnly" href="app.html" data-pv-auth="login">Logga in med skolpilotkonto</a>
           </div>
 
         </div>
@@ -805,9 +857,9 @@
 
         <div class="feat rev d2">
           <span class="featIcon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
-          <div class="featLabel">Felbank</div>
-          <div class="featT">Dina luckor samlas på ett ställe</div>
-          <div class="featD">Allt du svarar fel på sparas med begrepp och feltyp. Du kan träna om precis de frågorna — och se om det faktiskt sitter nästa gång.</div>
+          <div class="featLabel">Felbank · Premium</div>
+          <div class="featT">Träna vidare på det du missar</div>
+          <div class="featD">Premium samlar missade begrepp och feltyper, så att du kan träna vidare på rätt saker och följa om de sitter nästa gång.</div>
         </div>
 
       </div>
@@ -822,12 +874,12 @@
       <p class="secEye">P.E.R — Progressive Evidence Reasoning</p>
       <h2 class="secTitle">Ser vilken fråga du sitter på</h2>
       <p class="secLead">
-        P.E.R vet vilket prov och vilken fråga du jobbar på just nu, och kommer ihåg vilka ämnen du brukar svara fel på. Svaret blir specifikt för din situation, inte ett generellt AI-svar.
+        P.E.R följer frågan du arbetar med och använder dina svar och tillgängligt studiematerial som stöd. Under ett aktivt prov får du vägledning utan facit; efter inlämning och rättning kan du gå igenom svaret steg för steg.
       </p>
       <!-- Bokstäverna speglar api/_per-name.js. Ändras innebörden där ska den ändras här. -->
       <ul class="perMeaning">
-        <li><b>Progressive</b> — hjälpen trappas. Du får en motfråga först, full lösning bara när du behöver den.</li>
-        <li><b>Evidence</b> — bedömningen vilar på dina svar och din felbank, aldrig på gissningar.</li>
+        <li><b>Progressive</b> — hjälpen trappas. Under provet får du ledtrådar, inte färdiga svar; full förklaring kommer efter inlämning och rättning.</li>
+        <li><b>Evidence</b> — återkopplingen tar stöd i dina svar och det material som finns tillgängligt.</li>
         <li><b>Reasoning</b> — du får tankegången, inte bara facit.</li>
       </ul>
       <div class="secAct">
@@ -854,7 +906,7 @@
         <div class="step">
           <div class="stepNum stepNum--accent">03</div>
           <div class="stepT">Bygg på misstagen</div>
-          <div class="stepD">Systemet minns dina misstag och fokuserar träningen dit du behöver den mest.</div>
+          <div class="stepD">Med Premium samlas missade begrepp så att du kan träna vidare där du behöver det mest.</div>
         </div>
       </div>
     </section>
@@ -865,12 +917,12 @@
       <h2 class="secTitle">Vanliga frågor</h2>
 
       <div class="faqList">
-      <div class="faqItem">
+      <div class="faqItem" id="faq-1">
         <button class="faqQ" id="faq-1-q" type="button" aria-expanded="false" aria-controls="faq-1-answer">
           <span>Är det gratis att använda?</span>
           <div class="faqIco" aria-hidden="true">+</div>
         </button>
-        <div class="faqA" id="faq-1-answer" role="region" aria-labelledby="faq-1-q" hidden>Ja, 3 prov i veckan är gratis — inget kort krävs. Basic (29 kr/mån) ger 30 prov i månaden och felbank, Premium (79 kr/mån) obegränsat plus AI-coach.</div>
+        <div class="faqA" id="faq-1-answer" role="region" aria-labelledby="faq-1-q" hidden>Ja, 3 prov i veckan är gratis — inget kort krävs. Basic (29 kr/mån) ger 30 prov i månaden, historik och synk mellan enheter. Premium (79 kr/mån) ger obegränsade prov, felbank och AI-coach.</div>
       </div>
 
       <div class="faqItem">
@@ -889,7 +941,7 @@
         <div class="faqA" id="faq-3-answer" role="region" aria-labelledby="faq-3-q" hidden>Nej. ExGen skriver inte dina inlämningar — det gör prov på material du redan ska kunna, rättar dem och visar vad du missat. Det är studieteknik, ungefär som att göra gamla prov, fast på just din kurs. Ingen betygssättning sker här.</div>
       </div>
 
-      <div class="faqItem">
+      <div class="faqItem" id="faq-4">
         <button class="faqQ" id="faq-4-q" type="button" aria-expanded="false" aria-controls="faq-4-answer">
           <span>Kan jag avbryta prenumerationen när som helst?</span>
           <div class="faqIco" aria-hidden="true">+</div>
@@ -905,7 +957,7 @@
         <div class="faqA" id="faq-5-answer" role="region" aria-labelledby="faq-5-q" hidden>Ja, optimerat för mobil. Träna var som helst — alla sidor fungerar på telefon och surfplatta.</div>
       </div>
 
-      <div class="faqItem">
+      <div class="faqItem" id="faq-6">
         <button class="faqQ" id="faq-6-q" type="button" aria-expanded="false" aria-controls="faq-6-answer">
           <span>Vad händer när gratiskvoten tar slut?</span>
           <div class="faqIco" aria-hidden="true">+</div>
@@ -934,9 +986,13 @@
           <div class="parentT">Inga svar skrivs åt eleven</div>
           <div class="parentD">ExGen gör inte inlämningsuppgifter. Det ställer frågor på sådant eleven redan ska kunna, rättar svaren och visar vad som saknades. Ingen betygssättning sker här.</div>
         </div>
-        <div class="parentItem">
+        <div class="parentItem" id="parentPricingItem">
           <div class="parentT">0 kr att pröva</div>
           <div class="parentD">Tre prov i veckan är gratis och kräver inget kort. Vill ni ha mer kostar det 29 eller 79 kr i månaden, utan bindningstid.</div>
+        </div>
+        <div class="parentItem pilotBlockOnly">
+          <div class="parentT">Tillgång via skolpilot</div>
+          <div class="parentD">Testversionen är endast tillgänglig för inbjudna skolpilotkonton. Registrering och köp är inte öppna i pilotläget.</div>
         </div>
       </div>
       <p class="parentNote">
@@ -945,7 +1001,7 @@
     </section>
 
     <!-- ═══ PRICING ═══ -->
-    <section class="pricingStrip rev" aria-label="Priser">
+    <section class="pricingStrip rev publicOnly" id="pricingStrip" aria-label="Priser">
       <div class="pCard">
         <div class="pLeft">
           <div class="pEye">Priser &amp; medlemskap</div>
@@ -981,19 +1037,10 @@
 </main>
 
 <footer class="xg-footer">
-  <div style="display:flex;align-items:center;justify-content:center;margin-bottom:12px">
-    <a href="https://ungdrive.se" target="_blank" rel="noopener" aria-label="Backed by UngDrive"
-       style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;
-              border:1px solid var(--exgen-border,#E4E7EC);border-radius:var(--exgen-radius-pill);padding:4px 11px">
-      <img src="/image/ungdrive-icon.png" width="14" height="14"
-           style="border-radius:3px;opacity:.85" alt="UngDrive">
-      <span style="font:500 10px 'DM Mono',monospace;letter-spacing:.05em">Backed by UngDrive</span>
-    </a>
-  </div>
   <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap">
     <span>© <span id="yr"></span> ExGen</span>
     <span>·</span>
-    <a href="pricing.html">Priser</a>
+    <a class="publicOnly" href="pricing.html">Priser</a>
     <span>·</span>
     <a href="app.html">Mockprov</a>
     <span>·</span>
@@ -1092,9 +1139,24 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
     aktiv = ex;
     els.material.value = ex.material;
     [].forEach.call(els.chips.children, function(c){
-      c.classList.toggle("sel", c.dataset.id === ex.id);
-      c.setAttribute("aria-pressed", c.dataset.id === ex.id ? "true" : "false");
+      var selected = c.dataset.id === ex.id;
+      c.classList.toggle("sel", selected);
+      c.setAttribute("aria-checked", selected ? "true" : "false");
+      c.tabIndex = selected ? 0 : -1;
     });
+  }
+
+  function moveSelection(current, key){
+    var radios = Array.prototype.slice.call(els.chips.querySelectorAll('[role="radio"]'));
+    var index = radios.indexOf(current);
+    if (!radios.length || index < 0) return;
+    var next = key === "Home" ? 0
+      : key === "End" ? radios.length - 1
+      : (index + ((key === "ArrowRight" || key === "ArrowDown") ? 1 : radios.length - 1)) % radios.length;
+    var selected = data.filter(function(ex){ return ex.id === radios[next].dataset.id; })[0];
+    if (!selected) return;
+    valj(selected);
+    radios[next].focus();
   }
 
   function tillFraga(){
@@ -1127,18 +1189,23 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
 
     var missade = res.filter(function(r){ return !r.traff; });
     els.bank.textContent = missade.length
-      ? "Det här hade sparats som en lucka att träna om: " +
-        missade.map(function(m){ return m.term; }).join(", ") + "."
-      : "Inget att spara den här gången — allt i modellsvaret fanns med. "
-        + "I appen läggs bara det du missar i felbanken.";
+      ? "Exemplet markerar de här begreppen som missade: " +
+        missade.map(function(m){ return m.term; }).join(", ") +
+        ". I appen ingår sparad felbank och fortsatt träning i Premium."
+      : "I det här exemplet fanns nyckelbegreppen med. I appen ingår sparad felbank och fortsatt träning i Premium.";
 
     show("rattning");
+    els.score.focus({ preventScroll: true });
   }
 
   els.go.addEventListener("click", tillFraga);
   els.grade.addEventListener("click", tillRattning);
-  els.back.addEventListener("click", function(){ show("material"); });
-  els.restart.addEventListener("click", function(){ show("material"); });
+  function tillMaterial(){
+    show("material");
+    els.material.focus({ preventScroll: true });
+  }
+  els.back.addEventListener("click", tillMaterial);
+  els.restart.addEventListener("click", tillMaterial);
 
   /* Enter i svarsrutan ska inte skicka — svaren är flera meningar. Cmd/Ctrl+Enter
      rättar, som i appen. */
@@ -1155,9 +1222,17 @@ document.getElementById("perStripBtn")?.addEventListener("click",()=>{document.g
         var b = document.createElement("button");
         b.type = "button";
         b.className = "demoChip";
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", "false");
+        b.tabIndex = -1;
         b.dataset.id = ex.id;
         b.textContent = ex.etikett;
         b.addEventListener("click", function(){ valj(ex); });
+        b.addEventListener("keydown", function(e){
+          if (["ArrowRight", "ArrowLeft", "Home", "End"].indexOf(e.key) === -1) return;
+          e.preventDefault();
+          moveSelection(b, e.key);
+        });
         els.chips.appendChild(b);
       });
       valj(data[0]);
@@ -1201,9 +1276,10 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
 <!-- VISITOR BOTTOM NAV — hidden by shared.js when user is logged in -->
 <!-- JOIN CTA — appears after scrolling past hero -->
-<div id="joinCta" class="joinCta" aria-hidden="true" role="complementary">
-  <span class="joinCtaTxt">Gratis att starta<br>Inget kort krävs</span>
-  <button class="joinCtaBtn" id="joinCtaBtn" type="button">Skapa konto</button>
+<div id="joinCta" class="joinCta" aria-hidden="true" inert role="complementary">
+  <span class="joinCtaTxt publicOnly">Gratis att starta<br>Inget kort krävs</span>
+  <span class="joinCtaTxt pilotBlockOnly">Endast för inbjudna skolpilotkonton</span>
+  <button class="joinCtaBtn" id="joinCtaBtn" type="button"><span class="publicOnly">Skapa konto</span><span class="pilotInlineOnly">Logga in</span></button>
 </div>
 
 <!-- Landing CTA bar — the auth modal is the shared shared.js pvModal -->
@@ -1224,6 +1300,7 @@ document.querySelectorAll(".faqQ").forEach(q=>{
       shown = past;
       jc.classList.toggle('show', shown);
       jc.setAttribute('aria-hidden', shown ? 'false' : 'true');
+      jc.inert = !shown;
       document.body.classList.toggle('joincta-on', shown);  // lift P.E.R bubble clear of the bar
     }
   }
@@ -1234,10 +1311,10 @@ document.querySelectorAll(".faqQ").forEach(q=>{
 
   var joinBtn = document.getElementById('joinCtaBtn');
   if (joinBtn) joinBtn.addEventListener('click', function(){
-    document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: 'register' } }));
+    document.dispatchEvent(new CustomEvent('proviaOpenLogin', { detail: { view: window.ExGenRuntime.environment === 'pilot' ? 'login' : 'register' } }));
   });
 
-  document.addEventListener('proviaNavReady', function(){ if (jc) { jc.style.display = 'none'; document.body.classList.remove('joincta-on'); } });
+  document.addEventListener('proviaNavReady', function(){ if (jc) { jc.style.display = 'none'; jc.inert = true; jc.setAttribute('aria-hidden', 'true'); document.body.classList.remove('joincta-on'); } });
 })();
 </script>
 </body>

@@ -21,6 +21,7 @@ export async function getEmbedding(text, opts = {}) {
   if (!apiKey) throw new Error("OPENAI_API_KEY saknas");
   if (!text || !text.trim()) throw new Error("text är obligatorisk för embedding");
 
+  const startedAt = Date.now();
   const res = await doFetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
@@ -36,6 +37,11 @@ export async function getEmbedding(text, opts = {}) {
   }
 
   const data = await res.json();
+  if (typeof opts.onUsage === "function" && data?.usage) {
+    try {
+      await opts.onUsage({ model: data.model || model, usage: data.usage, latencyMs: Date.now() - startedAt });
+    } catch { /* Usage telemetry must never block retrieval. */ }
+  }
   const embedding = data?.data?.[0]?.embedding;
   if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
     throw new Error(
@@ -61,8 +67,11 @@ export async function retrieveChunks(supabase, queryText, opts = {}) {
   if (!supabase) throw new Error("supabase-klient är obligatorisk");
   if (!queryText || !queryText.trim()) throw new Error("queryText är obligatorisk");
 
-  const embedding =
-    opts.embedding ?? (await getEmbedding(queryText, { apiKey: opts.apiKey, fetchImpl: opts.fetchImpl }));
+  const embedding = opts.embedding ?? (await getEmbedding(queryText, {
+    apiKey: opts.apiKey,
+    fetchImpl: opts.fetchImpl,
+    onUsage: opts.onEmbeddingUsage,
+  }));
 
   const { data, error } = await supabase.rpc("match_knowledge_chunks", {
     p_query_embedding: embedding,

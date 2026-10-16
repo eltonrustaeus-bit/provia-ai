@@ -3,20 +3,22 @@
 //
 //   node bot-testing/cleanup.mjs           # list what WOULD be deleted
 //   node bot-testing/cleanup.mjs --delete  # actually delete
-import { createClient } from "@supabase/supabase-js";
 import { loadEnv } from "./lib/env.mjs";
+import supabaseKeys from "../api/_supabase-server-key.cjs";
+
+const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 
 loadEnv();
 const DELETE = process.argv.includes("--delete");
 const MARKER = "+proviabot_";
 
 const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const key = getSupabaseServerKey();
 if (!url || !key) {
-  console.error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY saknas i .env.local");
+  console.error("SUPABASE_URL / SUPABASE_SECRET_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas i .env.local");
   process.exit(1);
 }
-const sb = createClient(url, key, { auth: { persistSession: false } });
+const sb = createSupabaseServerClient(url, { auth: { persistSession: false, autoRefreshToken: false } });
 
 async function main() {
   const victims = [];

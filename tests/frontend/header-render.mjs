@@ -256,18 +256,27 @@ const FACIT = ["index.html", "app.html", "förbättring.html", "pricing.html"];
   await ctx.close();
 }
 
-// H12: ingen extern förfrågan för märkesikonen. Sju av åtta sidor hämtade en
-// 1024px-bild från ungdrive.se för att rita den i 12x12 — på en sajt med en
-// integritetspolicy, och för varje besökare.
+// H12: the shared shell must not imply an unverified UngDrive endorsement.
 {
   const { ctx, page } = await open(1280);
   const v = await page.evaluate(() => {
-    const img = document.querySelector(".xg-utility-badge img");
-    return img ? img.getAttribute("src") : null;
+    return {
+      badge: !!document.querySelector(".xg-utility-badge"),
+      barText: document.querySelector(".xg-utility-bar")?.innerText || "",
+      externalImage: [...document.querySelectorAll(".xg-utility-bar img")]
+        .some(img => /^https?:/i.test(img.getAttribute("src") || "")),
+    };
   });
-  ok("H12 märkesikonen hämtas lokalt, inte från ungdrive.se",
-    !!v && !/^https?:/i.test(v), String(v));
+  ok("H12 delat sidhuvud påstår inte obekräftat UngDrive-stöd",
+    !v.badge && !/UngDrive/i.test(v.barText) && !v.externalImage, JSON.stringify(v));
   await ctx.close();
+}
+
+// H14: the standalone public landing page must not make that same claim.
+{
+  const src = fs.readFileSync(join(ROOT, "index.html"), "utf8");
+  ok("H14 startsidan saknar obekräftat UngDrive-stöd",
+    !/Backed by\s*UngDrive|ungdrive-icon\.png/i.test(src));
 }
 
 } catch (e) { crash = e; }

@@ -103,7 +103,7 @@ try {
     await fråga(t.page, "hej");
     const msgs = await t.page.locator("#perMessages").innerText();
     R.ok("401 visar inte inloggningsväggen", !msgs.includes("Logga in för att chatta"), msgs.slice(-140).trim());
-    R.ok("401 säger att gratisfrågor finns kvar", /gratisfrågor kvar/i.test(msgs), msgs.slice(-140).trim());
+    R.ok("401 förklarar att personlig studiehjälp kräver inloggning", /Logga in igen för personlig studiehjälp/i.test(msgs), msgs.slice(-140).trim());
     R.ok("den döda sessionen städas bort",
       await t.page.evaluate(k => localStorage.getItem(k) === null, AUTH_KEY));
     R.ok("gratisraden visas efter städningen", await t.page.locator("#perLandingBar").isVisible());

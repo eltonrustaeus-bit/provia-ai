@@ -220,11 +220,6 @@ export const PER_GRAPH = {
       "typ": "flagga"
     },
     {
-      "id": "flagga:per_learner_loop_enabled",
-      "etikett": "per_learner_loop_enabled",
-      "typ": "flagga"
-    },
-    {
       "id": "flagga:legal_shadow_mode",
       "etikett": "legal_shadow_mode",
       "typ": "flagga"
@@ -237,6 +232,11 @@ export const PER_GRAPH = {
     {
       "id": "flagga:legal_rag_enabled",
       "etikett": "legal_rag_enabled",
+      "typ": "flagga"
+    },
+    {
+      "id": "flagga:per_learner_loop_enabled",
+      "etikett": "per_learner_loop_enabled",
       "typ": "flagga"
     },
     {
@@ -270,16 +270,6 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
-      "id": "tabell:user_exams",
-      "etikett": "user_exams",
-      "typ": "tabell"
-    },
-    {
-      "id": "tabell:per_sessions",
-      "etikett": "per_sessions",
-      "typ": "tabell"
-    },
-    {
       "id": "tabell:profiles",
       "etikett": "profiles",
       "typ": "tabell"
@@ -305,13 +295,18 @@ export const PER_GRAPH = {
       "typ": "tabell"
     },
     {
+      "id": "tabell:classes",
+      "etikett": "classes",
+      "typ": "tabell"
+    },
+    {
       "id": "tabell:user_profiles",
       "etikett": "user_profiles",
       "typ": "tabell"
     },
     {
-      "id": "tabell:classes",
-      "etikett": "classes",
+      "id": "tabell:per_sessions",
+      "etikett": "per_sessions",
       "typ": "tabell"
     }
   ],
@@ -482,6 +477,10 @@ export const PER_GRAPH = {
     },
     {
       "från": "teacher-report",
+      "till": "provia-rules"
+    },
+    {
+      "från": "teacher-report",
       "till": "per-name"
     },
     {
@@ -499,10 +498,6 @@ export const PER_GRAPH = {
     {
       "från": "explain",
       "till": "flagga:per_legal_rag_enabled"
-    },
-    {
-      "från": "grade",
-      "till": "flagga:per_learner_loop_enabled"
     },
     {
       "från": "per-attempt",
@@ -527,14 +522,6 @@ export const PER_GRAPH = {
     {
       "från": "per-memory",
       "till": "tabell:mock_results"
-    },
-    {
-      "från": "per-memory",
-      "till": "tabell:user_exams"
-    },
-    {
-      "från": "per-memory",
-      "till": "tabell:per_sessions"
     },
     {
       "från": "admin",
@@ -574,23 +561,27 @@ export const PER_GRAPH = {
     },
     {
       "från": "check-role",
-      "till": "tabell:user_exams"
-    },
-    {
-      "från": "check-role",
-      "till": "tabell:user_profiles"
+      "till": "tabell:mock_results"
     },
     {
       "från": "check-role",
       "till": "tabell:classes"
     },
     {
-      "från": "explain",
-      "till": "tabell:feature_flags"
+      "från": "check-role",
+      "till": "tabell:user_profiles"
     },
     {
       "från": "explain",
       "till": "tabell:profiles"
+    },
+    {
+      "från": "explain",
+      "till": "tabell:mock_results"
+    },
+    {
+      "från": "explain",
+      "till": "tabell:feature_flags"
     },
     {
       "från": "explain",
@@ -599,6 +590,18 @@ export const PER_GRAPH = {
     {
       "från": "explain",
       "till": "tabell:user_profiles"
+    },
+    {
+      "från": "grade",
+      "till": "tabell:mock_results"
+    },
+    {
+      "från": "teacher-report",
+      "till": "tabell:profiles"
+    },
+    {
+      "från": "teacher-report",
+      "till": "tabell:mock_results"
     }
   ]
 };

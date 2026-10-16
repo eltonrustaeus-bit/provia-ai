@@ -1,10 +1,14 @@
 import { requireAuth } from "./_auth.js";
 import { createClient } from "@supabase/supabase-js";
+import supabaseKeys from "./_supabase-server-key.cjs";
 import { BRAND_NAME, SITE_ORIGIN } from "./_site.js";
+import pilotScope from "./_pilot-scope.cjs";
 
-const supabase = createClient(
+const { createSupabaseServerClient } = supabaseKeys;
+
+const supabase = createSupabaseServerClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 const clean = s => (s || "").replace(/^﻿/, "").trim();
@@ -34,10 +38,11 @@ async function stripePost(path, params, key) {
     body: stripeBody(params),
   });
   const json = await res.json();
-  return { ok: res.ok, json };
+  return { ok: res.ok, status: res.status, json };
 }
 
 export default async function handler(req, res) {
+  if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
   try {
@@ -83,7 +88,7 @@ export default async function handler(req, res) {
         email: user.email || "",
         "metadata[supabase_user_id]": user.id,
       }, stripeKey);
-      if (!ok) return res.status(500).json({ error: "Customer creation failed", details: cust });
+      if (!ok) return res.status(502).json({ error: "customer_creation_failed", message: "Betalningen kunde inte startas just nu. Försök igen senare." });
       stripeCustomerId = cust.id;
       await supabase.from("profiles").upsert(
         { id: user.id, stripe_customer_id: stripeCustomerId },
@@ -125,10 +130,10 @@ export default async function handler(req, res) {
       };
     }
 
-    const { ok, json: session } = await stripePost("/v1/checkout/sessions", sessionParams, stripeKey);
+    const { ok, status, json: session } = await stripePost("/v1/checkout/sessions", sessionParams, stripeKey);
 
     if (!ok) {
-      console.error("Stripe session error:", JSON.stringify(session));
+      console.error("Stripe checkout session creation failed", status);
       return res.status(500).json({ error: "Session creation failed" });
     }
 

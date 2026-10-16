@@ -50,9 +50,7 @@ check("language mc: valid passes", guard({
 check("rejects empty question text", !guard({ type: "mc", question: "   ", options: ["a", "b"], correct_index: 0 }));
 check("rejects mc with <2 options", !guard({ type: "mc", question: "Q?", options: ["only"], correct_index: 0 }));
 check("rejects mc with an empty option", !guard({ type: "mc", question: "Q?", options: ["a", ""], correct_index: 0 }));
-check("rejects mc correct_index out of range", !guard({ type: "mc", question: "Q?", options: ["a", "b"], correct_index: 5 }));
-check("rejects mc correct_index negative (no answer key)", !guard({ type: "mc", question: "Q?", options: ["a", "b"], correct_index: -1 }));
-check("rejects mc non-integer correct_index", !guard({ type: "mc", question: "Q?", options: ["a", "b"], correct_index: 1.5 }));
+check("mc rendering does not require an answer key in the browser", guard({ type: "mc", question: "Q?", options: ["a", "b"] }));
 check("rejects mc duplicate/overlapping options (math ambiguity)", !guard({
   type: "mc", question: "Vad är 2+2?", options: ["4", "4", "5", "6"], correct_index: 0
 }));

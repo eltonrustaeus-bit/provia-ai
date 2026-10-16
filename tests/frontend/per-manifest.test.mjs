@@ -195,6 +195,26 @@ const t14 = await page.evaluate(() => {
 ok("T14a knappen anropar inte ett försvunnet måls gamla go()", t14.calls === 0, JSON.stringify(t14));
 ok("T14b knappen ger besked i stället för en tyst no-op", t14.disabled === true && /Inte längre tillgänglig/.test(t14.text || ""), JSON.stringify(t14));
 
+// ── T15-T16: poänglösa försök får inte bli nollor i P.E.R:s snitt ──────────
+const t15 = await page.evaluate(() => {
+  window.clearPerContext();
+  localStorage.setItem("proviaai_history", JSON.stringify([
+    { percent: 20 }, { percent: 40 }, { percent: 60 }, { percent: 80 }, { percent: 100 },
+    { percent: null }, { percent: -1 }, { percent: 101 }, { percent: "" }
+  ]));
+  return window.__perTestCtx();
+});
+ok("T15 snittet använder de fem senaste poängsatta proven", Math.abs((t15.userScore ?? 0) - 0.6) < 1e-9, String(t15.userScore));
+
+const t16 = await page.evaluate(() => {
+  window.clearPerContext();
+  localStorage.setItem("proviaai_history", JSON.stringify([
+    { percent: null }, { percent: "" }, { percent: "saknas" }, { percent: false }, { percent: -1 }, { percent: 101 }
+  ]));
+  return window.__perTestCtx();
+});
+ok("T16 poänglös historik ger inget nollsnitt", !Object.hasOwn(t16, "userScore"), JSON.stringify(t16));
+
 await ctx.close();
 await browser.close();
 await srv.close();

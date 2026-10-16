@@ -29,7 +29,7 @@
      than branding. Reads the Supabase session key directly, the same way
      shared.js already does. */
   try {
-    var sess = JSON.parse(localStorage.getItem('sb-mnmotdluigzeehdjbhbu-auth-token') || '{}');
+    var sess = JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || '{}');
     if (sess && sess.access_token) return;
   } catch (_) { /* unreadable storage → treat as signed out and show splash */ }
 

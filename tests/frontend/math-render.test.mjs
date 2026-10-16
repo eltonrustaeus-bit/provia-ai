@@ -30,11 +30,11 @@ const q = (id, question, type = "short") => ({
   scoring_rubric: { parts: [{ description: "Metod", points: 2 }], full_score_requirements: "", partial_credit_notes: "" },
 });
 
-const MATTEPROV = { title: "Matteprov", level: "C", questions: [
+const MATTEPROV = { title: "Matteprov", level: "C", exam_manifest: "synthetic-math-manifest", questions: [
   q("m1", "Lös ekvationen $3x + 7 = 22$. Visa din lösning."),
   q("m2", "Beräkna $\\frac{3}{4} + \\frac{1}{6}$."),
 ]};
-const TEXTPROV = { title: "Historieprov", level: "C", questions: [
+const TEXTPROV = { title: "Historieprov", level: "C", exam_manifest: "synthetic-history-manifest", questions: [
   q("h1", "Beskriv orsakerna till franska revolutionen."),
 ]};
 
@@ -66,7 +66,7 @@ async function öppna(exam, ämne) {
       ["**/api/grade", async r => {
         let b = {}; try { b = JSON.parse(r.request().postData() || "{}"); } catch {}
         const qs = b.questions || [];
-        return r.fulfill({ json: { ok: true, result: {
+        return r.fulfill({ json: { ok: true, exam_proof: `v2.${"c".repeat(32)}.syntheticMathProof`, result: {
           total_points: 2, max_points: 4 * qs.length,
           per_question: qs.map(x => ({
             id: String(x.id), points: 2, max_points: 4,

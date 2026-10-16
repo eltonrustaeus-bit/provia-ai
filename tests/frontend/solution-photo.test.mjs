@@ -24,7 +24,7 @@ const browser = await chromium.launch();
 const EXAM = {
   title: "Matteprov", level: "C",
   questions: [
-    { id: "m1", type: "mc", points: 2, question: "Vad är $2+2$?", options: ["3", "4", "5", "6"], correct_index: 1, topic: "Aritmetik", cognitive_level: "minnas", source_references: ["s.1"], model_answer: "4", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
+    { id: "m1", type: "mc", points: 2, question: "Vad är $2+2$?", options: ["3", "4", "5", "6"], correct_index: 1, topic: "Aritmetik", source_references: ["s.1"], model_answer: "4", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "m2", type: "short", points: 4, question: "Lös ekvationen $3x + 7 = 22$. Visa din lösning.", options: [], correct_index: -1, topic: "Ekvationer", cognitive_level: "tillämpa", source_references: ["s.4"], model_answer: "x = 5", scoring_rubric: { parts: [{ description: "Uträkning", points: 2 }], full_score_requirements: "", partial_credit_notes: "" } },
     { id: "m3", type: "mc", points: 2, question: "Vad är $10/2$?", options: ["2", "5", "10", "20"], correct_index: 1, topic: "Division", cognitive_level: "minnas", source_references: ["s.6"], model_answer: "5", scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" } },
   ],
@@ -33,7 +33,7 @@ const EXAM = {
 const LÄST = { ok: true, readable: true, text: "$3x + 7 = 22$\n$3x = 15$\n$x = 8$", confidence: 0.92, uncertain: [] };
 
 /* ocr: vad /api/ocr ska svara. role: elevens roll (styr rollspärren). */
-async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium" } = {}) {
+async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium", language = "sv" } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   const anrop = [];
@@ -54,7 +54,7 @@ async function öppna({ ocr = LÄST, ocrStatus = 200, role = "premium" } = {}) {
       }],
     ],
   });
-  await seed(page, { user: { id: "u1", email: "u1@t.se" }, role });
+  await seed(page, { user: { id: "u1", email: "u1@t.se" }, role, lang: language });
   await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
@@ -94,6 +94,79 @@ try {
     R.ok("K2 flervalsfråga får ingen kameraknapp", await t.page.locator(".xf-photo-btn").count() === 0);
     await till(t.page, 3);
     R.ok("K2 gäller även sista flervalsfrågan", await t.page.locator(".xf-photo-btn").count() === 0);
+    await t.close();
+  }
+
+  /* ── Engelsk lokalisering ───────────────────────────────────────────────── */
+  {
+    const t = await öppna({ language: "en" });
+    await till(t.page, 2);
+    const answer = t.page.locator(".xf-answer");
+    R.ok("K9 fritextfältet har engelsk platshållare", await answer.getAttribute("placeholder") === "Your answer…");
+    R.ok("K9 fritextfältet har engelsk skärmläsaretikett", await answer.getAttribute("aria-label") === "Answer to question 2");
+    const meta = t.page.locator(".xf-q-head span");
+    R.ok("K9 kognitiv nivå översätts till engelska", await meta.nth(0).innerText() === "APPLY", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten använder engelska plural", await meta.nth(1).innerText() === "4 POINTS", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 1);
+    R.ok("K9 saknad kognitiv nivå får engelsk reservetikett", await meta.nth(0).innerText() === "TASK", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten fungerar även med flertal", await meta.nth(1).innerText() === "2 POINTS", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 2);
+    R.ok("K9 fotoknappen är lokaliserad", /Add a photo/.test(await t.page.locator(".xf-photo-btn").innerText()));
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K9 bekräftelse om avläsning är på engelska", /Check that the transcription is correct/.test(note), note);
+    await t.page.evaluate(() => document.getElementById("langBtnDesktop").click());
+    R.ok("K9 språkbyte uppdaterar fritextfältet mitt i provet",
+      await answer.getAttribute("placeholder") === "Ditt svar…",
+      await answer.getAttribute("placeholder"));
+    R.ok("K9 språkbyte uppdaterar fotoknappen mitt i provet",
+      /Fota din lösning/.test(await t.page.locator(".xf-photo-btn").innerText()),
+      await t.page.locator(".xf-photo-btn").innerText());
+    R.ok("K9 kognitiv nivå följer språkbytet mitt i provet", await meta.nth(0).innerText() === "TILLÄMPA", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 poängetiketten följer språkbytet mitt i provet", await meta.nth(1).innerText() === "4 P", JSON.stringify(await meta.allInnerTexts()));
+    await till(t.page, 1);
+    R.ok("K9 svensk reservetikett behålls när nivån saknas", await meta.nth(0).innerText() === "UPPGIFT", JSON.stringify(await meta.allInnerTexts()));
+    R.ok("K9 svensk poängförkortning behålls", await meta.nth(1).innerText() === "2 P", JSON.stringify(await meta.allInnerTexts()));
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", ocr: { ok: false } });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 OCR-fel är på engelska", note === "Could not read the image.", note);
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", ocr: { ok: true, readable: false, text: "", confidence: 0.1, uncertain: [] } });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 oläslig bild får engelsk vägledning", /I couldn't read the image clearly/.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna({
+      language: "en",
+      ocr: { ok: true, readable: true, text: "$x = 15$", confidence: 0.42, uncertain: ["line 1: could be 15 or 45"] },
+    });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K10 osäkra delar kommuniceras på engelska", /I was unsure about: line 1/.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna({ language: "en", role: "gratis" });
+    await till(t.page, 2);
+    await lämna(t.page);
+    await t.page.waitForTimeout(900);
+    const note = await t.page.locator(".xf-photo-note").innerText();
+    R.ok("K11 behörighetsbeskedet är på engelska", /Photo answers are included with Basic and above/.test(note), note);
     await t.close();
   }
 
@@ -174,6 +247,10 @@ try {
       await t.page.locator(".xf-answer").inputValue());
     const note = await t.page.locator(".xf-photo-note").innerText();
     R.ok("K5 eleven får veta varför", /kunde inte tyda/i.test(note), note);
+    R.ok("K5 OCR-felet annonseras som status",
+      await t.page.locator(".xf-photo-note").getAttribute("role") === "status" &&
+      await t.page.locator(".xf-photo-note").getAttribute("aria-live") === "polite" &&
+      await t.page.locator(".xf-photo-note").getAttribute("aria-atomic") === "true");
     await t.close();
   }
   {
@@ -184,6 +261,36 @@ try {
     const note = await t.page.locator(".xf-photo-note").innerText();
     R.ok("K8 gratisroll får ett begripligt besked", /Basic/i.test(note), note);
     R.ok("K8 inget tekniskt fel visas", !/error|500|failed/i.test(note), note);
+    await t.close();
+  }
+  {
+    const t = await öppna();
+    await till(t.page, 2);
+    await t.page.evaluate(() => {
+      window.photoReadCalls = 0;
+      window.photoUnhandledRejection = false;
+      window.addEventListener("unhandledrejection", () => { window.photoUnhandledRejection = true; });
+      window.ExGenEngine.readSolution = () => {
+        window.photoReadCalls++;
+        if (window.photoReadCalls === 1) return Promise.reject(new Error("synthetic read failure"));
+        return Promise.resolve({ ok: true, readable: true, text: "x = 5", confidence: 0.95, uncertain: [] });
+      };
+    });
+    await lämna(t.page);
+    await t.page.waitForFunction(() => {
+      const button = document.querySelector(".xf-photo-btn");
+      const note = document.querySelector(".xf-photo-note");
+      return button && !button.disabled && note && note.textContent.includes("Försök igen");
+    });
+    R.ok("K12 ett avvisat OCR-löfte återställer knappen", !(await t.page.locator(".xf-photo-btn").isDisabled()));
+    R.ok("K12 ett avvisat OCR-löfte visar återhämtningsråd", /Försök igen eller skriv svaret/.test(await t.page.locator(".xf-photo-note").innerText()));
+    R.ok("K12 filfältet nollställs så samma bild kan väljas igen", await t.page.locator(".xf-photo-input").inputValue() === "");
+    R.ok("K12 avvisat OCR-löfte blir hanterat", !(await t.page.evaluate(() => window.photoUnhandledRejection)));
+
+    await lämna(t.page);
+    await t.page.waitForFunction(() => document.querySelector(".xf-photo-note")?.textContent.includes("Kontrollera att det stämmer"));
+    R.ok("K12 eleven kan skicka samma bild igen efter felet", await t.page.evaluate(() => window.photoReadCalls) === 2);
+    R.ok("K12 lyckad återförsökning når svarsrutan", /x = 5/.test(await t.page.locator(".xf-answer").inputValue()));
     await t.close();
   }
 } catch (e) {

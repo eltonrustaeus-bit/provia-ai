@@ -129,6 +129,12 @@ check("keeps open question with a valid scoring_rubric.parts array", (() => {
   return g.questions.length === 1 && g.dropped.length === 0;
 })());
 
+check("drops open question when scoring_rubric parts do not sum to max points", (() => {
+  const rubric = { parts: [{ description: "Definition", points: 1 }, { description: "Exempel", points: 1 }], full_score_requirements: "Definition och exempel.", partial_credit_notes: "" };
+  const g = A.gateExam({ questions: [{ id: "18", type: "short", question: "Förklara X.", options: [], correct_index: -1, points: 4, cognitive_level: "förstå", model_answer: "...", scoring_rubric: rubric }] }, { profile: "generic" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("scoring_rubric_points_mismatch");
+})());
+
 check("keeps open question with legacy rubric text and no scoring_rubric (backward compat)", (() => {
   const g = A.gateExam({ questions: [{ id: "12", type: "short", question: "Förklara X.", options: [], correct_index: -1, points: 2, cognitive_level: "förstå", model_answer: "...", rubric: "gammal rubric-text" }] }, { profile: "generic" });
   return g.questions.length === 1;
