@@ -61,6 +61,8 @@ let resultPresent = true;
 let activeCount = 0;
 let issuanceState = "active";
 let latestSubmissionId = null;
+const issuanceStateBySubmission = new Map();
+let latestIssuanceAtLease = null;
 let answerLeaseState = "acquired";
 let providerUnavailable = false;
 let reviewResultUnavailable = false;
@@ -70,12 +72,22 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push({ url, body: init.body || "" });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "student@example.invalid" });
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
-  if (url.includes("/rest/v1/rpc/exam_issuance_state")) return Response.json(issuanceState);
+  if (url.includes("/rest/v1/rpc/exam_issuance_state")) {
+    const payload = JSON.parse(init.body || "{}");
+    return Response.json(issuanceStateBySubmission.get(payload.p_submission_id) || issuanceState);
+  }
   if (url.includes("/rest/v1/exam_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
   if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
     { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
   ]});
-  if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json(answerLeaseState);
+  if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) {
+    if (latestIssuanceAtLease) {
+      latestSubmissionId = latestIssuanceAtLease.submissionId;
+      issuanceState = latestIssuanceAtLease.state;
+      latestIssuanceAtLease = null;
+    }
+    return Response.json(answerLeaseState);
+  }
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/rpc/recover_graded_exam_result")) {
     if (reviewResultUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
@@ -706,8 +718,10 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
 
     calls.length = 0;
     const abandonedReview = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } }, "POST", "application/json");
-    assert.equal(abandonedReview.statusCode, 403);
-    assert.match(abandonedReview.body.error, /kunde inte verifieras som rättat/i);
+    assert.equal(abandonedReview.statusCode, 200);
+    assert.equal(abandonedReview.body.examState, "abandoned");
+    assert.equal(abandonedReview.body.helpCap, 0);
+    assert.match(abandonedReview.body.answer, /rättningen har verifierats/i);
     assert.ok(calls.every(({ url }) => !url.includes("recover_graded_exam_result") && !url.includes("openai.com") &&
       !url.includes("consume_per_chat_quota")), JSON.stringify(calls));
 
@@ -734,6 +748,69 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     latestSubmissionId = null;
     if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = priorPilotMode;
+  }
+});
+
+test("an older verified exam cannot bypass a newer ungraded exam", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId };
+  const olderSubmissionId = proof.receipt.split(".")[1];
+  try {
+    activeCount = 0;
+    issuanceState = "abandoned";
+    latestSubmissionId = "b".repeat(32);
+    issuanceStateBySubmission.set(olderSubmissionId, "completed");
+
+    calls.length = 0;
+    const ordinary = await invoke({
+      userQuestion: "Give me the exact answer",
+      pageContext: { page: "studies", examState: { submissionId: olderSubmissionId } },
+    });
+    assert.equal(ordinary.statusCode, 200);
+    assert.equal(ordinary.body.examState, "abandoned");
+    assert.equal(ordinary.body.helpCap, 2);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+
+    calls.length = 0;
+    const review = await invoke({ examReview: true, examProof: proof });
+    assert.equal(review.statusCode, 200);
+    assert.equal(review.body.examActive, false);
+    assert.equal(review.body.examState, "abandoned");
+    assert.equal(review.body.helpCap, 0);
+    assert.match(review.body.answer, /without giving the answer|utan att visa facit|utan att ge svaret/i);
+    assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/mock_results") &&
+      !url.includes("recover_graded_exam_result") && !url.includes("consume_per_chat_quota") &&
+      !url.includes("openai.com") && !url.includes("acquire_per_answer_lease")));
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    issuanceStateBySubmission.delete(olderSubmissionId);
+  }
+});
+
+test("a newly abandoned issuance between status read and answer lease stays answer-gated", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId };
+  try {
+    activeCount = 0;
+    issuanceState = "completed";
+    latestSubmissionId = proof.receipt.split(".")[1];
+    latestIssuanceAtLease = { submissionId: "c".repeat(32), state: "abandoned" };
+    calls.length = 0;
+
+    const response = await invoke({ userQuestion: "Give me the exact answer", helpLevel: 3 });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.examState, "abandoned");
+    assert.equal(response.body.helpCap, 2);
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.some(({ url }) => url.includes("release_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("consume_per_chat_quota")));
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    latestIssuanceAtLease = null;
   }
 });
 

@@ -469,12 +469,20 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   }
   if (body.examReview === true) {
     const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+    const requiresVerifiedGrade = ["unverified", "abandoned", "expired", "missing"].includes(issuanceState);
     res.setHeader("Cache-Control", "no-store");
     return res.json({
       answer: en
-        ? "Review of a completed exam is available after your current exam is submitted. During this exam, P.E.R can help you think through the question without showing answers."
-        : "Genomgången av ett tidigare prov öppnas när du har lämnat in ditt pågående prov. Under tiden kan P.E.R hjälpa dig att tänka kring frågan utan att visa facit.",
-      helpCap: 0, helpLevelUsed: 0, examActive: true, reviewDeferred: true,
+        ? (requiresVerifiedGrade
+          ? "Full exam review unlocks only after an exam has been submitted and grading is verified. P.E.R can still help with the method, without giving the answer."
+          : "Review of a completed exam is available after your current exam is submitted. During this exam, P.E.R can help you think through the question without showing answers.")
+        : (requiresVerifiedGrade
+          ? "Fullständig provgenomgång öppnas först när ett prov har lämnats in och rättningen har verifierats. P.E.R kan fortfarande hjälpa dig med metoden utan att ge svaret."
+          : "Genomgången av ett tidigare prov öppnas när du har lämnat in ditt pågående prov. Under tiden kan P.E.R hjälpa dig att tänka kring frågan utan att visa facit."),
+      helpCap: 0, helpLevelUsed: 0,
+      examActive: issuanceState === "active" || issuanceState === "grading",
+      examState: issuanceState,
+      reviewDeferred: true,
     });
   }
   const currentQuestion = body.pageContext?.currentQuestion;
@@ -642,7 +650,16 @@ async function gateActiveExam(req, res, body, user) {
       res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
       return true;
     }
-    if (activeCount === 0) return false;
+    if (activeCount === 0) {
+      const latestState = await examIssuance.latestExamState(user.id);
+      if (latestState === null) {
+        res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+        return true;
+      }
+      if (latestState === "none" || latestState === "completed") return false;
+      sendActiveExamGuidance(req, res, body, latestState);
+      return true;
+    }
     sendActiveExamGuidance(req, res, body);
     return true;
   }
@@ -667,6 +684,15 @@ async function gateActiveExam(req, res, body, user) {
     }
     if (activeCount > 0) {
       sendActiveExamGuidance(req, res, body);
+      return true;
+    }
+    const latestState = await examIssuance.latestExamState(user.id);
+    if (latestState === null) {
+      res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+      return true;
+    }
+    if (latestState !== "none" && latestState !== "completed") {
+      sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
     if (state !== "completed") {
@@ -731,13 +757,34 @@ async function gateActiveExam(req, res, body, user) {
 async function acquirePerAnswerLease(user, lease) {
   lease.userId = user.id;
   lease.leaseId = randomUUID();
-  return examIssuance.acquirePerAnswerLease(user.id, lease.leaseId);
+  const outcome = await examIssuance.acquirePerAnswerLease(user.id, lease.leaseId);
+  if (outcome !== "acquired") {
+    if (outcome !== null) {
+      lease.userId = null;
+      lease.leaseId = null;
+    }
+    return outcome;
+  }
+
+  // The database lease prevents a new issuance from being inserted. Re-read
+  // the latest status while holding it to close the gap between the earlier
+  // status check and lease acquisition.
+  const latestState = await examIssuance.latestExamState(user.id);
+  if (latestState === "none" || latestState === "completed") return "acquired";
+  await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
+  lease.userId = null;
+  lease.leaseId = null;
+  return latestState === null ? null : "ungraded_exam";
 }
 
 function rejectLeaseOutcome(req, res, body, outcome, { history = false } = {}) {
   if (outcome === "exam_active") {
     if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
     sendActiveExamGuidance(req, res, body);
+    return true;
+  }
+  if (outcome === "ungraded_exam") {
+    sendActiveExamGuidance(req, res, body, "abandoned");
     return true;
   }
   if (outcome === "busy") return res.status(409).json({ error: "PER_REQUEST_IN_PROGRESS" });
