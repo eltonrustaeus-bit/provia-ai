@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const handler = require("../../api/generate-exam.js");
 const savedFetch = global.fetch;
+const savedConsoleError = console.error;
 const savedEnv = Object.fromEntries(["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "EXAM_SIGNING_SECRET", "OPENAI_API_KEY"]
   .map((key) => [key, process.env[key]]));
 for (const [key, value] of Object.entries({
@@ -77,6 +78,8 @@ global.fetch = async (url, init = {}) => {
 };
 
 try {
+  const errorLogs = [];
+  console.error = (line) => errorLogs.push(String(line));
   const req = Readable.from([Buffer.from(JSON.stringify({
     lang: "sv", level: "C", course: "Matematik 1b", qType: "graph", numQuestions: 1,
     pastedText: "Den räta linjen ges av y = 2x + 1.",
@@ -98,9 +101,16 @@ try {
   assert.equal(refundRequest.p_user_id, "synthetic-student");
   assert.equal(refundRequest.p_period_key, reserveRequest.p_period_key, "refund reuses the reservation period key");
   assert.equal(refundRequest.p_request_id.length > 0, true);
+  const failureEvent = errorLogs.map((line) => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).find((event) => event?.event === "exam_generation_failed");
+  assert.equal(failureEvent?.stage, "quota_finalization");
+  assert.equal(failureEvent?.requestId, reserveRequest.p_request_id);
+  assert.doesNotMatch(JSON.stringify(failureEvent), /synthetic timeout|synthetic-student|test-only-openai-key/);
   console.log("mock exam quota commit timeout: consumed reservation is compensated after undelivered exam");
 } finally {
   global.fetch = savedFetch;
+  console.error = savedConsoleError;
   for (const [key, value] of Object.entries(savedEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

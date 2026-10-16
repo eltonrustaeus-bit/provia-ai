@@ -61,6 +61,10 @@ let verifierRejectQuestionId = null;
 let solverRejectQuestionId = null;
 let regenerationQuestions = null;
 let throwOnRepair = false;
+let issuanceUnavailable = false;
+const failureLogs = [];
+const previousConsoleError = console.error;
+console.error = (line) => failureLogs.push(String(line));
 
 function outputResponse(value) {
   return Response.json({
@@ -99,9 +103,12 @@ globalThis.fetch = async (input, init = {}) => {
     gradingState = "completed";
     return Response.json("saved");
   }
-  if (url.includes("/rest/v1/exam_issuances")) return method === "POST"
-    ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
-    : new Response(null, { status: 204 });
+  if (url.includes("/rest/v1/exam_issuances")) {
+    if (method === "POST" && issuanceUnavailable) return Response.json({ message: "synthetic schema unavailable" }, { status: 503 });
+    return method === "POST"
+      ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
+      : new Response(null, { status: 204 });
+  }
   if (url.includes("/rest/v1/mock_results")) return Response.json({ num_questions: 1 });
   if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
@@ -884,6 +891,28 @@ try {
   assert.equal(mismatchUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an unsupported generated graph is not persisted and does not update mastery");
 
+  calls.length = 0;
+  activeQuestions = questions;
+  issuanceUnavailable = true;
+  const issuanceFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course: "Matematik 1b",
+    pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+  });
+  issuanceUnavailable = false;
+  assert.equal(issuanceFailure.status, 500, "a failed exam issuance is never returned as a usable exam");
+  assert.equal(issuanceFailure.body.error, "exam_generation_failed");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,
+    "an unissued exam never commits quota");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")), true,
+    "an unissued exam refunds its reserved quota");
+  assert.equal(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "DELETE"), true,
+    "a failed issuance cleans up any partial row");
+  const issuanceEvent = failureLogs.map((line) => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).find((event) => event?.event === "exam_generation_failed" && event.stage === "exam_issuance");
+  assert.ok(issuanceEvent, "the privacy-safe diagnostic identifies the exam issuance stage");
+  assert.doesNotMatch(JSON.stringify(issuanceEvent), /synthetic schema unavailable|Träna addition|synthetic-user-token/);
+
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")));
   for (const call of calls.filter((item) => item.url.startsWith(`${origin}/rest/v1/`))) {
     assert.equal(call.headers.apikey, "sb_secret_synthetic_only");
@@ -891,8 +920,8 @@ try {
   }
   assert.equal(calls.find((call) => call.url.startsWith(`${origin}/auth/v1/user`)).headers.authorization,
     "Bearer synthetic-user-token");
-  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 2,
-    "after the call log is reset, only the timed-out and mismatched graph generations reach the provider");
+  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 3,
+    "after the call log is reset, only the timed-out, mismatched graph, and issuance-failure generations reach the provider");
   const allowedSupabaseRoutes = [
     `${origin}/auth/v1/user`,
     `${origin}/rest/v1/profiles?select=role&id=eq.${userId}`,
@@ -904,13 +933,16 @@ try {
     `${origin}/rest/v1/rpc/try_replay_mock_learning_job`,
     `${origin}/rest/v1/rpc/persist_graded_exam_result`,
     `${origin}/rest/v1/ai_usage_events`,
+    `${origin}/rest/v1/exam_issuances`,
     `${origin}/rest/v1/feature_flags?select=key%2Cenabled%2Callowed_user_ids&key=in.%28per_learner_loop_enabled%29`,
+    ...calls.filter((call) => call.url.startsWith(`${origin}/rest/v1/exam_issuances`)).map((call) => call.url),
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),
     `unexpected mock route: ${calls.map((call) => call.url).filter((url) => url !== "https://api.openai.com/v1/responses" && !allowedSupabaseRoutes.includes(url)).join(", ")}`);
   console.log("offline exam pipeline: MC and supported graph flows passed; unsupported source and mismatched generated graph are rejected safely");
 } finally {
   globalThis.fetch = previousFetch;
+  console.error = previousConsoleError;
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

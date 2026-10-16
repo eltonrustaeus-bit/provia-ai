@@ -1073,6 +1073,7 @@ module.exports = async function handler(req, res) {
     await logMockExamUsage(usageEvents);
   }
   let cleaned = false;
+  let failureStage = "generation_setup";
   async function fail(status, payload) {
     if (!cleaned) {
       cleaned = true;
@@ -1125,12 +1126,14 @@ module.exports = async function handler(req, res) {
     }
     const generationBudget = budget.remaining() - (canVerify ? VERIFIER_RESERVE_MS : 0);
 
+    failureStage = "model_generation";
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget });
     recordUsage("generate", gen.model || model, gen.usage, gen.latencyMs);
     if (!gen.ok) {
       return fail(502, { ok: false, error: "OpenAI error", status: gen.status, details: gen.details });
     }
 
+    failureStage = "question_normalization";
     const salvage = salvageExamJson(gen.text);
     let exam = salvage.exam;
     const truncated = salvage.truncated;
@@ -1156,6 +1159,7 @@ module.exports = async function handler(req, res) {
     }
     exam = normalizedInitial.exam;
 
+    failureStage = "quality_review";
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
     let gate = assessment.gateExam(exam, { profile: subjectProfile });
     if (truncated) {
@@ -1430,6 +1434,7 @@ module.exports = async function handler(req, res) {
     // secrets or internal fields — akey_sig, verifier scores, prompt text — may
     // reach the client). Strip them from a shallow-copied exam for the response
     // only; the original exam.questions objects (used above) are left untouched.
+    failureStage = "grade_task_sealing";
     const clientExam = {
       ...exam,
       questions: exam.questions.map((q) => {
@@ -1443,18 +1448,23 @@ module.exports = async function handler(req, res) {
         return clientQuestion;
       }),
     };
+    failureStage = "exam_manifest";
     clientExam.exam_manifest = examCompletion.issueExamManifest(user.id, course, pastedText, clientExam.questions);
     if (!clientExam.exam_manifest) throw new Error("Exam manifest unavailable");
     issuedSubmissionId = examCompletion.submissionId(user.id, course, clientExam.questions);
+    failureStage = "exam_issuance";
     if (!await examIssuance.issueExam(user.id, issuedSubmissionId)) {
       throw new Error("Exam issuance unavailable");
     }
 
     if (quota.enforced && !quota.unlimited) {
+      failureStage = "quota_finalization";
       const committed = await commitMockExamQuota(user.id, quotaPeriod, quotaRequestId);
       if (!committed) throw new Error("Mock quota finalization unavailable");
     }
+    failureStage = "usage_flush";
     await flushUsage();
+    failureStage = "response_delivery";
     return json(res, 200, {
       ok: true,
       exam: clientExam,
@@ -1480,7 +1490,13 @@ module.exports = async function handler(req, res) {
         }
       }
     });
-  } catch (e) {
+  } catch {
+    console.error(JSON.stringify({
+      event: "exam_generation_failed",
+      requestId: quotaRequestId,
+      stage: failureStage,
+      elapsedMs: budget.elapsed(),
+    }));
     return fail(500, {
       ok: false,
       error: "exam_generation_failed",
