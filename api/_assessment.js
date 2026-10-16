@@ -231,6 +231,12 @@ function generalQualityIssues(q) {
       const parts = q.scoring_rubric && Array.isArray(q.scoring_rubric.parts) ? q.scoring_rubric.parts : null;
       const validParts = parts && parts.length > 0 && parts.every(p => p && String(p.description || "").trim() && Number(p.points) > 0);
       if (!validParts) issues.push("scoring_rubric_missing_for_open");
+      else {
+        const rubricPoints = parts.reduce((sum, part) => sum + Number(part.points), 0);
+        if (!Number.isFinite(rubricPoints) || Math.abs(rubricPoints - Number(q.points)) > 1e-9) {
+          issues.push("scoring_rubric_points_mismatch");
+        }
+      }
     }
   }
   // leaked internal instructions
@@ -479,7 +485,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
-  "cognitive_level_missing", "scoring_rubric_missing_for_open", "law_deprecated_terminology",
+  "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
   "graph_spec_invalid",
 ]);

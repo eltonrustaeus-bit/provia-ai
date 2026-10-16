@@ -51,6 +51,7 @@ const origin = "https://grading-output.synthetic.invalid";
 const userId = "33333333-3333-4333-8333-333333333333";
 const signingSecret = "synthetic-invalid-output-secret";
 let providerOutput = "";
+let providerInput = null;
 const calls = [];
 const usageBatches = [];
 let issuanceState = "active";
@@ -92,6 +93,7 @@ globalThis.fetch = async (input, init = {}) => {
     return new Response(null, { status: 201 });
   }
   if (url === "https://api.openai.com/v1/responses") {
+    providerInput = JSON.parse(body.input.find((part) => part.role === "user").content);
     return Response.json({ model: "measured-grade-model", usage: { input_tokens: 55, output_tokens: 13 }, output_text: providerOutput });
   }
   throw new Error(`Unexpected synthetic request: ${url}`);
@@ -127,6 +129,7 @@ try {
       options: [],
       rubric: "Ge en kort förklaring med stöd i materialet.",
       model_answer: "En kort beskrivning.",
+      accepted_answers: ["Medborgare väljer sina representanter i fria val."],
       concept_tag: "demokrati",
     };
     return {
@@ -182,6 +185,8 @@ try {
   })) });
   const graded = await invoke(body);
   assert.equal(graded.status, 200, JSON.stringify({ body: graded.body, persistedPayload, issuanceState }));
+  assert.deepEqual(providerInput.items[0].accepted_answers, ["Medborgare väljer sina representanter i fria val."],
+    "the grader receives alternative phrasings from the signed grading task");
   assert.deepEqual(graded.body.result.per_question.map((item) => item.model_answer), [
     "En kort beskrivning.", "En kort beskrivning.",
   ], "the signed answer key is returned instead of a contradictory grader answer");
