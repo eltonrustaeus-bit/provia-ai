@@ -34,6 +34,9 @@ const CANNOT_JUDGE = -2;
 // Above this, a disagreement is treated as a real mismatch rather than solver
 // uncertainty. Chosen so that a hesitant solver cannot delete a sound question.
 const DEFAULT_MISMATCH_CONFIDENCE = 0.7;
+// A matching answer is not enough when the solver itself says it is unsure.
+// This is a conservative quality gate, not a calibrated probability claim.
+const MIN_APPROVAL_CONFIDENCE = 0.7;
 
 // The solver sees the material so that questions grounded in the pasted text
 // remain answerable, but a whole 200 000-character paste would dominate the
@@ -174,6 +177,9 @@ function decideKeep(verdict, question) {
   if (!Number.isInteger(question.correct_index) || onlyTrue !== question.correct_index) {
     return { keep: false, reason: "solver_disagrees_on_key" };
   }
+  if (verdict.confidence < MIN_APPROVAL_CONFIDENCE) {
+    return { keep: false, reason: "solver_low_confidence" };
+  }
   return { keep: true, reason: "solver_agrees" };
 }
 
@@ -267,5 +273,6 @@ module.exports = {
   NO_SINGLE_ANSWER,
   CANNOT_JUDGE,
   DEFAULT_MISMATCH_CONFIDENCE,
+  MIN_APPROVAL_CONFIDENCE,
   MATERIAL_CHAR_CAP,
 };

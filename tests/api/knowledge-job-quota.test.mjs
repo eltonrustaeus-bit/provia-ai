@@ -35,4 +35,10 @@ assert.match(atomicFunction, /insert into public\.per_quota_counters[\s\S]*?on c
 assert.match(atomicFunction, /if v_used > p_limit then[\s\S]*?used = greatest\(0, used - 1\)/i);
 assert.match(migration, /grant\s+execute on function public\.per_consume_daily_quota\(uuid, text, integer\) to service_role/i);
 
+assert.match(api, /ANSWER_BEARING_LEARNER_OPS[\s\S]*?per_diagnose[\s\S]*?per_answer[\s\S]*?per_coach/);
+assert.match(api, /acquirePerAnswerLease\(user\.id, leaseId\)/);
+assert.match(api, /latestExamState\(user\.id\)/);
+assert.match(api, /latestState !== "none" && latestState !== "completed"/);
+assert.match(api, /finally\s*\{\s*await examIssuance\.releasePerAnswerLease\(user\.id, leaseId\)/);
+
 console.log("knowledge job quota: atomic reservation and failure handling contract passed");

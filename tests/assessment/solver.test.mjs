@@ -32,8 +32,19 @@ check("keeps when the solver lands on the same option", (() => {
   return d.keep === true && d.reason === "solver_agrees";
 })());
 
-check("keeps a valid, consistent verdict at zero confidence", (() => {
-  return S.decideKeep(verdict(q, 1, [false, true, false], 0), q).keep === true;
+check("drops an otherwise matching verdict at zero confidence", (() => {
+  const d = S.decideKeep(verdict(q, 1, [false, true, false], 0), q);
+  return d.keep === false && d.reason === "solver_low_confidence";
+})());
+
+check("drops a matching verdict below the approval threshold", (() => {
+  const d = S.decideKeep(verdict(q, 1, [false, true, false], S.MIN_APPROVAL_CONFIDENCE - 0.01), q);
+  return d.keep === false && d.reason === "solver_low_confidence";
+})());
+
+check("keeps a matching verdict at the approval threshold", (() => {
+  const d = S.decideKeep(verdict(q, 1, [false, true, false], S.MIN_APPROVAL_CONFIDENCE), q);
+  return d.keep === true && d.reason === "solver_agrees";
 })());
 
 // ── the dominant defect: several options correct ───────────────────────────

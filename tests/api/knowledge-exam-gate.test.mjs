@@ -1,0 +1,103 @@
+import assert from "node:assert/strict";
+import { test, after } from "node:test";
+
+const originalFetch = globalThis.fetch;
+const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "EXGEN_PILOT_MODE", "VERCEL", "VERCEL_ENV", "VERCEL_TARGET_ENV"];
+const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+const origin = "https://knowledge-exam-gate.test";
+const userId = "11111111-1111-4111-8111-111111111111";
+const submissionId = "a".repeat(32);
+process.env.SUPABASE_URL = origin;
+process.env.SUPABASE_SECRET_KEY = "sb_secret_synthetic-knowledge-gate";
+process.env.EXGEN_PILOT_MODE = "false";
+delete process.env.VERCEL;
+delete process.env.VERCEL_ENV;
+delete process.env.VERCEL_TARGET_ENV;
+
+let activeCount = 1;
+let leaseResult = "exam_active";
+let latestSubmission = null;
+let issuanceState = "active";
+let failState = false;
+const calls = [];
+globalThis.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input.url;
+  const method = init.method || "GET";
+  calls.push({ url, method });
+  if (url.endsWith("/auth/v1/user")) return Response.json({ id: userId });
+  if (url.includes("/rest/v1/feature_flags?")) {
+    return Response.json(["knowledge_engine_enabled", "legal_rag_enabled", "per_learner_loop_enabled"]
+      .map((key) => ({ key, enabled: true, allowed_user_ids: [] })));
+  }
+  if (url.endsWith("/rpc/active_exam_count")) return Response.json(activeCount);
+  if (url.endsWith("/rpc/acquire_per_answer_lease")) return Response.json(leaseResult);
+  if (url.endsWith("/rpc/release_per_answer_lease")) return Response.json("released");
+  if (url.includes("/rest/v1/exam_issuances?")) {
+    return Response.json(latestSubmission ? [{ submission_id: latestSubmission }] : []);
+  }
+  if (url.endsWith("/rpc/exam_issuance_state")) {
+    return failState ? Response.json({ error: "unavailable" }, { status: 503 }) : Response.json(issuanceState);
+  }
+  throw new Error(`Unexpected synthetic request: ${url}`);
+};
+
+const handler = (await import(`../../api/knowledge.js?knowledge-exam-gate-test`)).default;
+
+async function invoke() {
+  const response = {
+    statusCode: 200,
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+    setHeader() {},
+  };
+  await handler({
+    method: "POST",
+    headers: { authorization: "Bearer synthetic" },
+    body: { op: "per_coach", concept_id: "concept-1", question_id: "question-1" },
+  }, response);
+  return response;
+}
+
+after(() => {
+  globalThis.fetch = originalFetch;
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+test("learner coach stops during an active exam before quota or model work", async () => {
+  calls.length = 0;
+  activeCount = 1;
+  leaseResult = "exam_active";
+  const response = await invoke();
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED");
+  assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
+  assert.equal(calls.some(({ url }) => url.includes("consume_per_chat_quota")), false);
+  assert.equal(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")), false);
+});
+
+test("abandoned or unknown grading state stays gated and releases its answer lease", async () => {
+  calls.length = 0;
+  activeCount = 0;
+  leaseResult = "acquired";
+  latestSubmission = submissionId;
+  issuanceState = "abandoned";
+  failState = false;
+  const response = await invoke();
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.error, "EXAM_REVIEW_REQUIRED");
+  assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")));
+  assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
+
+  calls.length = 0;
+  failState = true;
+  const unknown = await invoke();
+  failState = false;
+  assert.equal(unknown.statusCode, 503);
+  assert.equal(unknown.body.error, "EXAM_STATE_UNAVAILABLE");
+  assert.ok(calls.some(({ url }) => url.endsWith("/rpc/release_per_answer_lease")));
+  assert.equal(calls.some(({ url }) => url.includes("openai.com")), false);
+  latestSubmission = null;
+});

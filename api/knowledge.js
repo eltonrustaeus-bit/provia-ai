@@ -19,6 +19,8 @@ import supabaseKeys from "./_supabase-server-key.cjs";
 import { requireAuth } from "./_auth.js";
 import { flagsEnabled as sharedFlagsEnabled } from "./_flags.js";
 import pilotScope from "./_pilot-scope.cjs";
+import { randomUUID } from "node:crypto";
+import examIssuance from "./_exam-issuance.cjs";
 // DYNAMISK import, inte statisk. package.json saknar "type": "module", så Vercel kompilerar
 // api/*.js till CommonJS medan .mjs-filerna förblir äkta ESM. En statisk import blir då ett
 // require() av ESM och kraschar hela funktionen vid inladdning:
@@ -447,6 +449,38 @@ const LEARNER_OPS = {
   per_profile: opPerProfile,
 };
 
+const ANSWER_BEARING_LEARNER_OPS = new Set(["per_diagnose", "per_answer", "per_coach"]);
+
+async function runAnswerBearingLearnerOp(req, res, user, op) {
+  const leaseId = randomUUID();
+  const lease = await examIssuance.acquirePerAnswerLease(user.id, leaseId);
+  if (lease === "exam_active") {
+    return res.status(409).json({
+      error: "EXAM_REVIEW_REQUIRED",
+      message: "Jag kan hjälpa dig att tänka på metoden, men inte ge facit under ett prov. Fullständig genomgång blir tillgänglig efter verifierad rättning.",
+      examActive: true,
+    });
+  }
+  if (lease !== "acquired") {
+    return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+  }
+
+  try {
+    const latestState = await examIssuance.latestExamState(user.id);
+    if (latestState === null) return res.status(503).json({ error: "EXAM_STATE_UNAVAILABLE" });
+    if (latestState !== "none" && latestState !== "completed") {
+      return res.status(409).json({
+        error: "EXAM_REVIEW_REQUIRED",
+        message: "Fullständiga svar och lösningar blir tillgängliga först efter verifierad rättning.",
+        examState: latestState,
+      });
+    }
+    return await LEARNER_OPS[op](req, res, user);
+  } finally {
+    await examIssuance.releasePerAnswerLease(user.id, leaseId);
+  }
+}
+
 export default async function handler(req, res) {
   if (pilotScope.denyOutOfScopePilotRoute(req, res)) return;
   if (req.method !== "POST") {
@@ -464,6 +498,7 @@ export default async function handler(req, res) {
     if (!(await flagsEnabled(["knowledge_engine_enabled", "legal_rag_enabled", "per_learner_loop_enabled"], user.id))) {
       return res.status(403).json({ error: "P.E.R. elevläge är inte aktiverat för det här kontot" });
     }
+    if (ANSWER_BEARING_LEARNER_OPS.has(op)) return runAnswerBearingLearnerOp(req, res, user, op);
     return LEARNER_OPS[op](req, res, user);
   }
 
