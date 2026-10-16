@@ -111,7 +111,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
       proviaai_per_corner: "bl",
       proviaai_per_size: "large",
     });
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const initialHeadingFocus = await page.evaluate(() => {
       const heading = document.querySelector("#xf .xf-screen.on .xf-say");
@@ -187,7 +187,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
 }
 
 async function toExam(page) {
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
@@ -202,7 +202,7 @@ async function toExam(page) {
 }
 
 async function toMaterial(page) {
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
@@ -292,7 +292,7 @@ async function toMaterial(page) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "long-training-material-user");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
     await page.evaluate(() => window.__xfPrefill("y".repeat(12001), "Biologi 1"));
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
@@ -350,7 +350,7 @@ async function toMaterial(page) {
   const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "language-wizard");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const desktopLanguage = page.locator("#langBtnDesktop");
     ok("desktop har ett synligt språkval", await desktopLanguage.isVisible());
@@ -470,7 +470,7 @@ async function toMaterial(page) {
   const { ctx, page, errs } = await mk({ viewport: { width: 390, height: 844 } });
   try {
     await signIn(page, "language-mobile");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     ok("desktop-språkknappen döljs på mobil", !(await page.locator("#langBtnDesktop").isVisible()));
     await page.click(".xg-menu-btn");
@@ -500,7 +500,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "wizard-progress");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const state = () => page.locator("#xf .xf-progress").evaluate(node => ({
       role: node.getAttribute("role"), min: node.getAttribute("aria-valuemin"),
@@ -649,7 +649,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       draft.ts = Date.now();
       localStorage.setItem(key, JSON.stringify(draft));
     }, oldStart);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
     await page.getByText(/har avslutats eller gått ut/).waitFor({ timeout: 5000 });
@@ -946,7 +946,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.fill(".xf-answer", "syntetiskt svar");
     await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
     await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
     await page.waitForSelector(".xf-exam.on");
@@ -1006,9 +1006,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   // elev B på samma webbläsare
   const b = await mk();
   await signIn(b.page, "elev-B");
-  await b.page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await b.page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await b.page.evaluate(() => localStorage.setItem("exgen_flow_draft_elev-A", JSON.stringify({ ts: Date.now(), uid: "elev-A", exam: { questions: [{ id: "x", question: "hemlig fråga" }] }, answers: { x: "elev A:s svar" } })));
-  await b.page.reload({ waitUntil: "networkidle" });
+  await b.page.reload({ waitUntil: "domcontentloaded" });
   await b.page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await b.page.waitForTimeout(500);
   const txt = await b.page.textContent("#xf .xf-screen[data-screen='start'] .xf-body");
@@ -1048,7 +1048,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 {
   const { ctx, page } = await mk();
   await signIn(page, "u1");
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.waitForTimeout(400);
   const sem = await page.evaluate(() => ({
@@ -1093,7 +1093,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   });
   // loadExamsFromAccountToLocal() skriver över felbanken från servern vid varje
   // laddning, så den måste sättas efter att den körts — annars testar vi tomt.
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1200);
   await page.evaluate(() => {
     localStorage.setItem("proviaai_mistakes", JSON.stringify([
@@ -1102,7 +1102,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ]));
     localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
-  await page.goto(`${srv.url}/app.html#train`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html#train`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3000);
   const st = await page.evaluate(() => {
     const on = document.querySelector("#xf .xf-screen.on");
@@ -1126,7 +1126,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await toExam(page);
   await page.click(".xf-mc-opt >> nth=1");
   await page.waitForTimeout(3200);   // klockan måste hinna passera 00:02
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.waitForTimeout(500);
   const hasResume = await page.evaluate(() => !!Array.from(document.querySelectorAll(".xf-btn")).find(b => /Fortsätt provet/.test(b.textContent)));
@@ -1208,14 +1208,14 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 {
   const { ctx, page } = await mk();
   await signIn(page, "u1");
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.setItem("exgen_flow_draft_u1", JSON.stringify({
     ts: Date.now(), uid: "u1", course: "Biologi 1", level: "C", qType: "mc", num: 3,
     material: "Cellandning sker i mitokondrien.",
     exam: { questions: [{ id: "old-1", question: "Var sker cellandningen?" }] },
     answers: { "old-1": "I mitokondrien" },
   })));
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
   ok("T7d gammalt utkast erbjuds inte som fortsatt prov",
     await page.getByRole("button", { name: "Fortsätt provet du började" }).count() === 0);
@@ -1364,7 +1364,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "u1");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     const recovery = page.locator(".xf-exam-recovery");
     await recovery.waitFor({ state: "visible", timeout: 8000 });
     ok("T10a förlorat prov kan upptäckas utan lokalt utkast", await recovery.textContent().then(text => /Ett prov finns kvar/.test(text)));
