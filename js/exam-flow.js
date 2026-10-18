@@ -1190,7 +1190,7 @@
     var act = el("div", "xf-act");
     var go = el("button", "xf-btn primary", tx("Stämmer — vidare", "Looks good — continue"));
     go.type = "button";
-    go.addEventListener("click", stepMaterial);
+    go.addEventListener("click", function () { stepMaterial(); });
     act.appendChild(go);
 
     var adj = el("button", "xf-btn quiet", tx("Ändra", "Adjust"));

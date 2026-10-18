@@ -211,6 +211,20 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// A click handler receives the PointerEvent as its first argument. The material
+// step accepts an optional user-facing message, so passing the handler directly
+// used to render "[object PointerEvent]" in the alert region.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "material-navigation-user");
+    await toMaterial(page);
+    ok("materialsteget visar inget klickobjekt som felmeddelande",
+      (await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").innerText()).trim() === "");
+    ok("materialnavigeringen saknar sidfel", errs.length === 0, errs.join(" | "));
+  } finally { await ctx.close(); }
+}
+
 // Free-plan students see the OCR requirement before opening the camera; paid
 // plans retain the direct image-input control.
 {
