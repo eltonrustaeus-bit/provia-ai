@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node tools/prepare-vercel-runtime.mjs",
   "outputDirectory": ".",
   "git": {
     "deploymentEnabled": {

@@ -54,6 +54,26 @@ test("function plans include only each route's local module closure and runtime 
   assert.notDeepEqual(plans.explain.sourceFiles, plans.grade.sourceFiles);
 });
 
+test("candidate functions are bundled into isolated Node handlers", async (t) => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "exgen-candidate-esm-"));
+  const target = path.join(parent, "candidate");
+  t.after(() => rm(parent, { recursive: true, force: true }));
+
+  buildCandidate(target);
+
+  for (const route of PILOT_ROUTES) {
+    const functionRoot = path.join(
+      target,
+      ".vercel/output/functions",
+      `api/${route}.func`,
+    );
+    const config = JSON.parse(await readFile(path.join(functionRoot, ".vc-config.json"), "utf8"));
+    assert.equal(config.handler, "index.cjs");
+    assert.ok(await readFile(path.join(functionRoot, "index.cjs")));
+    assert.equal(existsSync(path.join(functionRoot, "server")), false);
+  }
+});
+
 test("function planner fails closed on computed imports or unresolved local modules", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "exgen-candidate-import-plan-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -202,19 +222,19 @@ test("candidate integrity verification scans server source inside function packa
     "candidate verification rejects public social metadata reintroduced after sanitization");
   await writeFile(pilotAppHtml, sanitizedPilotApp);
 
-  process.env.SUPABASE_URL = "https://synthetic-staging.invalid";
+  process.env.SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test_only_012345678901234567890123456789";
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   try {
     for (const route of PILOT_ROUTES) {
       const functionRoot = path.join(target, `.vercel/output/functions/api/${route}.func`);
-      const handlerPath = path.join(functionRoot, `server/api/${route}.js`);
+      const handlerPath = path.join(functionRoot, "index.cjs");
       const imported = await import(pathToFileURL(handlerPath).href);
-      assert.equal(typeof (imported.default || imported.handler), "function", `${route} handler should import`);
+      const handler = imported.default?.default || imported.default || imported.handler;
+      assert.equal(typeof handler, "function", `${route} handler should import`);
       for (const dataFile of manifest.functionInputs[route].dataFiles) {
         const name = dataFile.slice("config/".length);
         assert.ok(await readFile(path.join(functionRoot, "config", name)));
-        assert.ok(await readFile(path.join(functionRoot, "server/config", name)));
       }
     }
   } finally {
@@ -223,7 +243,7 @@ test("candidate integrity verification scans server source inside function packa
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   }
 
-  const handler = path.join(target, ".vercel/output/functions/api/check-role.func/server/api/check-role.js");
+  const handler = path.join(target, ".vercel/output/functions/api/check-role.func/index.cjs");
   const originalHandler = await readFile(handler);
   await writeFile(handler, Buffer.concat([originalHandler, Buffer.from("\n// changed content with an unchanged path\n")]));
   assert.throws(() => verifyCandidateOutput(target), /output SHA-256 does not match its manifest/);
