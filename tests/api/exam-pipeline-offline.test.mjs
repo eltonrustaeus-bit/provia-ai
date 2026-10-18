@@ -368,10 +368,29 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(solverRejectedRetry.status, 200, JSON.stringify(solverRejectedRetry.body));
-  assert.deepEqual(solverRejectedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "a retry that does not improve the count falls back only to first-round approved questions");
-  assert.equal(solverRejectedRetry.body.meta.solver.checked, 3,
-    "fallback metadata remains tied to the authoritative first-round solver result");
+  assert.deepEqual(solverRejectedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-fallback-2"],
+    "approved retry questions fill missing slots without displacing first-round approvals");
+  assert.equal(solverRejectedRetry.body.meta.verifier.checked, 6,
+    "verifier metadata counts both independently reviewed rounds");
+  assert.equal(solverRejectedRetry.body.meta.verifier.approved, 5,
+    "verifier metadata counts approvals across both review rounds, independently of solver decisions");
+  assert.equal(solverRejectedRetry.body.meta.solver.checked, 6,
+    "solver metadata counts both independently checked rounds");
+  assert.equal(solverRejectedRetry.body.meta.verifier.rejected, 1,
+    "a solver rejection is not mislabeled as a verifier rejection");
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions.map((question, index) => ({
+    ...question,
+    id: `retry-same-stem-${index + 1}`,
+    question: "Hur löser du 10 + 4?",
+  }));
+  const duplicateStemRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(duplicateStemRetry.status, 200, JSON.stringify(duplicateStemRetry.body));
+  assert.deepEqual(duplicateStemRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-same-stem-1"],
+    "identical approved retry questions are deduplicated before filling missing slots");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -431,7 +450,7 @@ try {
   });
   assert.equal(malformedRetry.status, 200, JSON.stringify(malformedRetry.body));
   assert.deepEqual(malformedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "duplicate retry IDs are rejected before review and cannot displace the safe first-round subset");
+    "a retry batch with duplicate IDs is rejected before review and preserves only first-round approvals");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;

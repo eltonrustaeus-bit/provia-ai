@@ -1236,8 +1236,10 @@ module.exports = async function handler(req, res) {
               q.detected_issues = [...(q.detected_issues || []), decision.reason];
             }
           }
-          if (verifierOk && solverOk) { approvedIds.add(String(q.id)); verifierOutcome.approved++; }
-          else { rejectedIds.push(String(q.id)); verifierOutcome.rejected++; }
+          if (verifierOk) verifierOutcome.approved++;
+          else verifierOutcome.rejected++;
+          if (verifierOk && solverOk) approvedIds.add(String(q.id));
+          else rejectedIds.push(String(q.id));
         }
         // Tracks whichever verifier result map is currently authoritative for
         // per-question stamping below — round 1 unless a regeneration round
@@ -1313,15 +1315,78 @@ module.exports = async function handler(req, res) {
                         }
                       }
                       outcome2.checked++;
-                      if (verifierOk && solverOk) { kept.push(q); outcome2.approved++; }
+                      if (verifierOk) outcome2.approved++;
                       else outcome2.rejected++;
+                      if (verifierOk && solverOk) kept.push(q);
                     }
-                    if (kept.length > round1ApprovedQuestions.length) {
-                      exam = { ...normalized2.exam, questions: kept };
-                      gate = candidateGate;
-                      activeVerifierMap = v2.perQuestion;
-                      verifierOutcome = outcome2;
-                      solverOutcome = solverOutcome2;
+                    const retryUniqueQuestions = [];
+                    const retryIds = new Set();
+                    const retryStems = new Set();
+                    for (const q of kept) {
+                      const id = String(q.id);
+                      const stem = String(q.question || "").normalize("NFKC").toLowerCase()
+                        .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+                      if (retryIds.has(id) || !stem || retryStems.has(stem)) continue;
+                      retryIds.add(id);
+                      retryStems.add(stem);
+                      retryUniqueQuestions.push(q);
+                    }
+                    const completeRetry = retryUniqueQuestions.length >= numQuestions;
+                    const combinedQuestions = completeRetry
+                      ? retryUniqueQuestions.slice(0, numQuestions)
+                      : [...round1ApprovedQuestions];
+                    const combinedIds = new Set(combinedQuestions.map(q => String(q.id)));
+                    const combinedStems = new Set(combinedQuestions.map(q => String(q.question || "")
+                      .normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()));
+                    if (!completeRetry) {
+                      for (const q of retryUniqueQuestions) {
+                        const id = String(q.id);
+                        const stem = String(q.question || "").normalize("NFKC").toLowerCase()
+                          .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+                        if (combinedQuestions.length >= numQuestions) break;
+                        if (combinedIds.has(id) || !stem || combinedStems.has(stem)) continue;
+                        combinedIds.add(id);
+                        combinedStems.add(stem);
+                        combinedQuestions.push(q);
+                      }
+                    }
+                    if (combinedQuestions.length > round1ApprovedQuestions.length) {
+                      exam = { ...exam, questions: combinedQuestions };
+                      if (completeRetry) {
+                        gate = candidateGate;
+                        activeVerifierMap = v2.perQuestion;
+                        verifierOutcome = outcome2;
+                        solverOutcome = solverOutcome2;
+                      } else {
+                        const totalChecked = verifierOutcome.checked + outcome2.checked;
+                        const combinedVerifierMap = new Map(v1.perQuestion);
+                        for (const q of retryUniqueQuestions) {
+                          if (round1ApprovedQuestions.some(original => String(original.id) === String(q.id))) continue;
+                          combinedVerifierMap.set(String(q.id), v2.perQuestion.get(String(q.id)));
+                        }
+                        activeVerifierMap = combinedVerifierMap;
+                        verifierOutcome = {
+                          checked: totalChecked,
+                          approved: verifierOutcome.approved + outcome2.approved,
+                          rejected: verifierOutcome.rejected + outcome2.rejected,
+                          callOk: v1.callOk && v2.callOk,
+                        };
+                        solverOutcome = {
+                          checked: solverOutcome.checked + solverOutcome2.checked,
+                          rejected: solverOutcome.rejected + solverOutcome2.rejected,
+                          callOk: solverOutcome.callOk && solverOutcome2.callOk,
+                          model: solverOutcome2.model || solverOutcome.model,
+                          reasons: { ...solverOutcome.reasons },
+                        };
+                        for (const [reason, count] of Object.entries(solverOutcome2.reasons)) {
+                          solverOutcome.reasons[reason] = (solverOutcome.reasons[reason] || 0) + count;
+                        }
+                        gate = {
+                          ...round1Gate,
+                          dropped: [...round1Gate.dropped, ...candidateGate.dropped],
+                          flagged: [...round1Gate.flagged, ...candidateGate.flagged],
+                        };
+                      }
                       regenerationSucceeded = true;
                     }
                   }
