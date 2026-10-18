@@ -221,6 +221,14 @@ async function toMaterial(page) {
     await toMaterial(page);
     ok("materialsteget visar inget klickobjekt som felmeddelande",
       (await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").innerText()).trim() === "");
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Kort syntetiskt material för återgångstest.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.locator("#xf .xf-screen[data-screen='contract']")
+      .getByRole("button", { name: /Tillbaka|Back/ }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+    ok("återgång från provöversikten visar inget klickobjekt som felmeddelande",
+      (await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").innerText()).trim() === "");
     ok("materialnavigeringen saknar sidfel", errs.length === 0, errs.join(" | "));
   } finally { await ctx.close(); }
 }

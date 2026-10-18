@@ -1500,7 +1500,7 @@
       bubble.click();
       perButton.setAttribute("aria-expanded", panel.classList.contains("per-open") ? "true" : "false");
     });
-    act.appendChild(backBtn(stepMaterial));
+    act.appendChild(backBtn(function () { stepMaterial(); }));
     act.appendChild(perButton);
     b.appendChild(act);
 
