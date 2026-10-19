@@ -332,6 +332,44 @@ try {
   assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
     "both questions still pass the solver check");
 
+  const biologyCourse = "Biologi 1";
+  const biologyMaterial = "Fotosyntes sker i kloroplasterna. Växten använder ljusenergi, vatten och koldioxid för att bilda glukos och syre.";
+  activeQuestions = questions.map((question, index) => ({
+    ...question,
+    id: `biology-${index + 1}`,
+    question: [
+      "Var sker fotosyntesen i växtcellen?",
+      "Vilka ämnen använder växten i fotosyntesen?",
+      "Vilka ämnen bildas enligt materialet?",
+    ][index],
+    options: [
+      ["I cellkärnan", "I kloroplasterna", "I cellmembranet"],
+      ["Vatten och koldioxid", "Glukos och syre", "Protein och kväve"],
+      ["Glukos och syre", "Vatten och koldioxid", "Klorofyll och kväve"],
+    ][index],
+    correct_index: index === 2 ? 0 : 1,
+    model_answer: ["I kloroplasterna", "Vatten och koldioxid", "Glukos och syre"][index],
+    topic: "Fotosyntes",
+    subtopic: "Fotosyntesens reaktanter och produkter",
+    concept_tag: "Fotosyntes",
+    learning_objective: "Beskriva fotosyntesens plats, reaktanter och produkter.",
+    source_references: [["kloroplasterna"], ["vatten och koldioxid"], ["glukos och syre"]][index],
+  }));
+  const biologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(biologyExam.status, 200, JSON.stringify(biologyExam.body));
+  assert.equal(biologyExam.body.exam.questions.length, 3,
+    "a realistic three-question biology exam completes the full generation pipeline");
+  assert.equal(biologyExam.body.meta.verifier.approved, 3);
+  assert.equal(biologyExam.body.meta.solver.checked, 3);
+  assert.ok(biologyExam.body.exam.questions.every((question) =>
+    question.source_references.every((reference) => biologyMaterial.toLowerCase().includes(reference.toLowerCase()))),
+  "biology question references are grounded in the submitted source material");
+  assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
+    "the independent reviewer receives the synthetic biology source material");
+  activeQuestions = questions;
+
   calls.length = 0;
   quotaDenied = true;
   const quotaDeniedExam = await invoke(generateExam, {
