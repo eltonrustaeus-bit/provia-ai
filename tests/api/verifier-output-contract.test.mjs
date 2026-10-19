@@ -146,9 +146,15 @@ assert.equal(transmitted.questions[0].rubric, "En poäng för x = 2.");
 assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_rubric);
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
+assert.match(buildVerifierPrompt("sv"), /ordagrant förekommande källhänvisning räcker inte/i);
+assert.match(buildVerifierPrompt("sv"), /Jämför frågorna sinsemellan/i);
+assert.match(buildVerifierPrompt("en"), /exact source quote is not enough/i);
+assert.match(buildVerifierPrompt("en"), /Compare questions with each other/i);
 assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och returnera exakt ett resultat/i);
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
+assert.equal(decideApproval({ ...validOpenReview, source_alignment: 0.59 }), false,
+  "an exact source quote cannot override a below-threshold source-alignment decision");
 assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");
 
 const malformedOption = {

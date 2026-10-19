@@ -1,5 +1,15 @@
 # ExGen: checklista for skolpilot
 
+## Lokal uppfoljning efter Preview — 2026-10-19
+
+- P.E.R.-fel vid HTTP-fel, avbruten strom eller natverksfel annonseras nu aven via befintlig `role=status`/`aria-live=polite`-region. Webblasarregressionen kontrollerar att felet annonseras och visas, att elevens fraga ligger kvar och att Skicka kan anvandas igen.
+- Verifierarprompten pa svenska och engelska sager nu uttryckligen att ett ordagrant citat inte styrker ett motsagt pastaende och att dubbletter/nara parafraser ska avvisas. Den deterministiska grinden avvisar redan `source_alignment` under 0,6; detta fortydligar den modellberoende granskningen men ar inte en garanti for att modellen alltid upptacker motsagelser.
+- Riktad verifiering efter andringarna: prov/assessment 5/5 testfiler; P.E.R.-felannonsering 9/9; prov-/P.E.R.-browserflode 66/66; materialkontext 39/39; isolerat passkey-test 25/25; syntaxkontroller passerade.
+- Sekventiell fullsvit pa 170 testfiler avslutades efter drygt tio minuter med ett rapporterat fel i `tests/frontend/per-passkey.test.mjs`. Isolerad omkorning passerade 25/25. Fullsviten raknas darfor inte som helt gron; orsaken klassas som icke reproducerad flakighet tills den kan aterupprepas.
+- Dessa andringar ar lokala i denna notering. Ingen live-AI eller stagingkorsning gjordes eftersom staginginloggning fortfarande inte fungerar. Nasta steg ar att publicera en Preview fran exakt commit och, nar autentisering fungerar, gora ett avgransat syntetiskt liveflode.
+
+**PILOT NOT READY.** Modellbaserad källsemantik och trefrågekapacitet är inte livevaliderade; fullsviten hade en icke-reproducerad passkey-testfail.
+
 ## Senaste uppfoljning — 2026-10-19 (commit `80eeb49`)
 
 - Provbegaran validerar nu att varje godkand fraga matchar elevens valda format (`mc`, `short`, eller en tillaten blandning). Formatfel stoppas i den deterministiska grinden bade efter forstagenerering och efter reparation; regressionen visar att fel format inte nar verifierare eller losare.
