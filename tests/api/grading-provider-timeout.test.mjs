@@ -90,6 +90,8 @@ try {
   assert.equal(response.body.error, "grading_provider_unavailable");
   assert.match(response.body.message, /Rättningen kunde inte slutföras/);
   assert.match(response.body.message, /Rättningen kunde inte slutföras/);
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/release_exam_grading")).length, 1,
+    "a provider timeout releases the grading claim so the same attempt can be retried");
   assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 1);
   assert.equal(calls.some((call) => call.url.includes("/rest/v1/mock_results")), false,
     "a provider timeout must not be recorded as a zero or completed result");
