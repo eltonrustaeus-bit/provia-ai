@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
-const result = (id, approved) => ({ id, approved });
+const result = (id, approved) => ({ id, approved, option_quality: [] });
 
 async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs) {
   const originalFetch = globalThis.fetch;
@@ -130,6 +130,40 @@ assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och retur
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
 assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");
+
+const malformedOption = {
+  id: "mc-bad-option", type: "mc", question: "Vad är 3 + 2?",
+  options: ["4", "5", "Kesäkten", "6"], correct_index: 1,
+  points: 1, cognitive_level: "minnas",
+};
+const malformedOptionReview = await runWithResults([{
+  ...result(malformedOption.id, true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  option_quality: [true, true, false, true], issues: [], required_changes: [],
+}], [malformedOption]);
+assert.equal(malformedOptionReview.outcome.callOk, true, "a structured option-quality rejection is a completed review");
+assert.equal(decideApproval(malformedOptionReview.outcome.perQuestion.get(malformedOption.id)), false,
+  "one nonsense distractor vetoes an otherwise high-scoring MC question");
+assert.match(buildVerifierPrompt("sv"), /bedöma VARJE alternativ/i);
+assert.match(buildVerifierPrompt("sv"), /Godkänn legitima facktermer/i);
+
+const missingOptionReview = await runWithResults([{
+  ...result(malformedOption.id, true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  option_quality: [true, true, true], issues: [], required_changes: [],
+}], [malformedOption]);
+assert.equal(decideApproval(missingOptionReview.outcome.perQuestion.get(malformedOption.id)), false,
+  "an option-quality list with the wrong number of entries fails closed");
+
+const absentOptionReviewResult = { ...result(malformedOption.id, true) };
+delete absentOptionReviewResult.option_quality;
+const absentOptionReview = await runWithResults([{
+  ...absentOptionReviewResult, factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  issues: [], required_changes: [],
+}], [malformedOption]);
+assert.equal(decideApproval(absentOptionReview.outcome.perQuestion.get(malformedOption.id)), false,
+  "a missing per-option judgment fails closed even if a mocked provider ignores the strict schema");
 const boundedMaterial = await runWithResults([needsRevision], [openQuestion], "m".repeat(12050));
 const boundedInput = JSON.parse(boundedMaterial.requestBody.input.find((item) => item.role === "user").content);
 assert.equal(boundedInput.source_material.length, 12000, "source context is capped before the paid review request");

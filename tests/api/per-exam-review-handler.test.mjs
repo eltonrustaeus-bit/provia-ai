@@ -1500,6 +1500,9 @@ test("all answer-producing P.E.R modes stay behind the active-exam hint gate", a
   activeCount = 1;
   const modes = [
     { userQuestion: "Reveal ANSWER_MARKER", pageContext: { currentQuestion: { type: "short" } } },
+    { userQuestion: "Vad betyder fotosyntes?", pageContext: { currentQuestion: {
+      type: "short", question: "Definiera fotosyntes", model_answer: "DEFINITION_ANSWER_MARKER",
+    } } },
     { tipsMode: true, question: "Q_MARKER", model_answer: "ANSWER_MARKER" },
     { legalMode: true, userQuestion: "LEGAL_ANSWER_MARKER" },
     { question: "Q_MARKER", correct: "ANSWER_MARKER" },
@@ -1514,6 +1517,7 @@ test("all answer-producing P.E.R modes stay behind the active-exam hint gate", a
       assert.equal(response.statusCode, 200);
       assert.equal(response.body.examActive, true);
       assert.equal(response.body.helpLevelUsed, 0);
+      assert.doesNotMatch(response.body.answer, /ANSWER_MARKER|DEFINITION_ANSWER_MARKER/);
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
     }
   } finally {

@@ -78,7 +78,7 @@ export const POLYA = Object.freeze([
 export function buildPedagogyBlock({ abilities = [], isMath = false, helpLevel = null } = {}) {
   const delar = ["## HUR DU UNDERVISAR"];
 
-  delar.push(`Undervisning är inte att svara. Det är att flytta eleven från där de står till där de kan ta nästa steg själva.
+  delar.push(`Undervisning är mer än att ge ett svar. Det är att flytta eleven från där de står till där de kan ta nästa steg själva.
 
 **Börja med vad de redan kan.** Ett svar som börjar i deras eget resonemang håller; ett som börjar i din förklaring måste de först översätta.
 
@@ -86,10 +86,14 @@ export function buildPedagogyBlock({ abilities = [], isMath = false, helpLevel =
 
 **Låt eleven göra det sista steget.** Om du kan sluta en mening tidigare och låta dem fylla i — gör det.
 
-**Visa hellre än berätta när det går.** Ett genomräknat exempel på ett LIKNANDE tal lär ut metoden utan att lösa elevens uppgift. Använd andra siffror än de i uppgiften, alltid.`);
+**Visa hellre än berätta när det går.** Ett genomräknat exempel på ett LIKNANDE tal lär ut metoden utan att lösa elevens uppgift. Använd andra siffror än de i uppgiften, alltid.
+
+När eleven arbetar med en konkret uppgift: börja med en liten, relevant ledtråd om nästa steg och låt eleven göra själva steget. När eleven frågar efter en definition eller ett faktabegrepp: svara kort och korrekt direkt, och koppla sedan begreppet till elevens arbete. Ställ inte en motfråga i stället för ett enkelt svar.`);
 
   if (helpLevel === 0 || helpLevel === 1) {
-    delar.push(`**Just nu bad eleven om ${helpLevel === 0 ? "en ledtråd" : "en förklaring"}, inte om lösningen.** Det vanligaste sättet att svika det är att förklara så utförligt att uppgiften är löst på köpet. Stanna innan sista steget.`);
+    delar.push(helpLevel === 0
+      ? `**Just nu bad eleven om en ledtråd, inte om lösningen.** Ge en enda konkret ledtråd för uppgiften och stanna innan sista steget. Vid en ren definitionsfråga får själva begreppet förklaras kort; gör inte om faktasvaret till ett quiz.`
+      : `**Just nu bad eleven om en förklaring, inte om hela lösningen.** Förklara konceptet med ett konkret exempel, men stanna innan elevens uppgift är löst på köpet.`);
   }
 
   if (isMath) {

@@ -20,7 +20,7 @@ function check(name, fn) { try { fn(); ok(name); } catch (e) { fail(name, e); } 
 const good = {
   id: "1", approved: true, factual_accuracy: 0.95, ambiguity_score: 0.05,
   difficulty_match: 0.9, source_alignment: 0.9, scoring_quality: 0.9, language_quality: 0.95,
-  issues: [], required_changes: [],
+  option_quality: [], issues: [], required_changes: [],
 };
 
 check("approves a high-confidence, low-ambiguity result", () => {
@@ -84,6 +84,16 @@ check("verifier schema constrains all six scores to the 0-1 interval", () => {
 
 check("rejects when there are any required_changes, even with good scores", () => {
   assert.equal(V.decideApproval({ ...good, required_changes: ["förtydliga alternativ B"] }), false);
+});
+
+check("rejects a question when any distractor is marked incoherent", () => {
+  assert.equal(V.decideApproval({ ...good, option_quality: [true, false, true] }), false);
+});
+
+check("option-quality is required by the structured verifier schema", () => {
+  const item = V.buildVerifierSchema().schema.properties.results.items;
+  assert.ok(item.required.includes("option_quality"));
+  assert.equal(item.properties.option_quality.items.type, "boolean");
 });
 
 check("custom thresholds are respected", () => {

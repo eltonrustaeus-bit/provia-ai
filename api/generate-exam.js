@@ -1543,7 +1543,14 @@ module.exports = async function handler(req, res) {
                  Number(vres.language_quality)) / 6
               ).toFixed(2))
             : null;
-          q.detected_issues = vres && Array.isArray(vres.issues) ? vres.issues : [];
+          const optionQualityFailed = vres && (
+            vres.option_quality_contract_ok === false ||
+            (Array.isArray(vres.option_quality) && vres.option_quality.some((quality) => quality !== true))
+          );
+          q.detected_issues = [
+            ...(vres && Array.isArray(vres.issues) ? vres.issues : []),
+            ...(optionQualityFailed ? ["option_quality_failed"] : []),
+          ];
         }
       } else {
         // Ordinary AI-authored questions must not be delivered without a successful

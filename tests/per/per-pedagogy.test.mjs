@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const P = await import(join(root, "api", "_per-pedagogy.js"));
+const C = await import(join(root, "api", "_per-core.js"));
 
 let failures = 0;
 const check = (n, c, d = "") => {
@@ -81,6 +82,8 @@ console.log("\n— HJÄLPNIVÅN 0 OCH 1 FÅR EN EGEN VARNING —");
    utförligt att uppgiften är löst på köpet. */
 const ledtråd = P.buildPedagogyBlock({ abilities: förmågor, helpLevel: 0 });
 check("hjälpnivå 0 varnar för att lösa uppgiften", /bad eleven om en ledtråd/i.test(ledtråd));
+check("övningsfråga får en konkret ledtråd före elevens nästa steg", /börja med en liten, relevant ledtråd/i.test(ledtråd));
+check("definitionsfråga får ett kort faktasvar, inte ett quiz", /svara kort och korrekt direkt/i.test(ledtråd) && /faktasvaret till ett quiz/i.test(ledtråd));
 check("hjälpnivå 1 varnar också", /bad eleven om en förklaring/i.test(P.buildPedagogyBlock({ helpLevel: 1 })));
 check("hjälpnivå 3 varnar inte", !/bad eleven om/i.test(P.buildPedagogyBlock({ helpLevel: 3 })));
 check("utan hjälpnivå varnar den inte heller", !/bad eleven om/i.test(P.buildPedagogyBlock({})));
@@ -117,6 +120,18 @@ check("låt eleven ta sista steget", /sista steget/i.test(ejMatte));
 check("exempel ska använda ANDRA siffror", /[Aa]ndra siffror/.test(ejMatte));
 check("blocket är väsentligt större än de 154 tecken det ersätter",
   ejMatte.length > 800, `${ejMatte.length} tecken`);
+
+console.log("\n— LEVEL 0 SKILJER UPPGIFT FRÅN BEGREPPSFRÅGA —");
+const levelZeroPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Vad betyder fotosyntes?",
+  helpLevel: 0,
+});
+check("systemprompten leder med en uppgiftsledtråd när eleven övar",
+  /EN kort, specifik ledtråd/i.test(levelZeroPrompt) && /Ge inte facit/i.test(levelZeroPrompt));
+check("systemprompten tillåter ett kort direkt begreppssvar",
+  /svara kort och direkt på begreppet/i.test(levelZeroPrompt));
+check("systemprompten inte kräver en motfråga för varje faktasvar",
+  /Undvik motfrågor som ersätter ett enkelt faktasvar/i.test(levelZeroPrompt));
 
 console.log(failures ? `\n${failures} FEL\n` : "\nAllt grönt\n");
 process.exit(failures ? 1 : 0);

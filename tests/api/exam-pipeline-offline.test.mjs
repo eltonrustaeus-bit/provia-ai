@@ -114,6 +114,7 @@ let verifierUnavailableInitially = false;
 let solverThrowsForRetry = false;
 let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
+let verifierRejectOptionId = null;
 let solverRejectQuestionId = null;
 let regenerationQuestions = null;
 let throwOnRepair = false;
@@ -212,7 +213,10 @@ globalThis.fetch = async (input, init = {}) => {
         return {
         id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
-        language_quality: 1, issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
+        language_quality: 1, option_quality: Array.isArray(q.options)
+          ? q.options.map((_, index) => !(q.id === verifierRejectOptionId && index === 2))
+          : [],
+        issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
         required_changes: rejected ? ["Rätta exempelsvaret."] : [],
       }; }) });
     }
@@ -437,6 +441,29 @@ try {
   });
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
     "a successfully generated exam commits its reserved quota");
+
+  const badOptionQuestions = questions.map((question) => question.id === "q-1"
+    ? { ...question, options: ["4", "5", "Kesäkten"] }
+    : question);
+  const repairedOptionQuestions = badOptionQuestions.map((question, index) => ({
+    ...question,
+    id: `option-repair-${index + 1}`,
+    options: [["4", "5", "6"], ["2", "3", "4"], ["6", "9", "12"]][index],
+  }));
+  activeQuestions = badOptionQuestions;
+  regenerationQuestions = repairedOptionQuestions;
+  verifierRejectOptionId = "q-1";
+  const nonsenseOptionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierRejectOptionId = null;
+  activeQuestions = questions;
+  regenerationQuestions = null;
+  assert.equal(nonsenseOptionExam.status, 200, JSON.stringify(nonsenseOptionExam.body));
+  assert.equal(nonsenseOptionExam.body.exam.questions.length, 3,
+    "a bounded repair can replace a batch after a verifier flags a malformed option");
+  assert.equal(nonsenseOptionExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "an MC item with a nonsense distractor is withheld from the learner-facing exam");
 
   const retryOptions = [["4", "5", "7"], ["1", "3", "5"], ["8", "9", "10"]];
   const repairedQuestions = questions.map((question, index) => ({

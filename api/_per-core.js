@@ -309,7 +309,7 @@ export function buildPERSystemPrompt({
     ? 'FEYNMAN-LÄGE: Eleven förklarar ett koncept för dig. Lyssna aktivt. Identifiera exakt var förklaringen brister eller är ytlig — ge konkret feedback på vad som stämmer och vad som saknas. Ställ en uppföljningsfråga om förklaringen är för övergripande.'
     : celebrating
     ? 'FRAMGÅNG: Bekräfta resultatet i en mening — äkta, inte överdrivet. Ge direkt ett konkret nästa steg för att hålla trenden.'
-    : helpLevel <= 0 ? 'Ställ EN motfråga som tvingar eleven att tänka rätt. Ge INTE svaret. Om eleven redan är på rätt spår — bekräfta kortfattat och skjut dem ett steg vidare.'
+    : helpLevel <= 0 ? 'Om eleven arbetar med en konkret uppgift: börja med EN kort, specifik ledtråd om nästa användbara steg och bjud in eleven att prova det. Ge inte facit, rätt alternativ eller uppgiftens sista lösningssteg. Om eleven i stället frågar efter en definition eller ett faktabegrepp: svara kort och direkt på begreppet, koppla det till elevens arbete när det hjälper och ställ bara en följdfråga om den för eleven vidare. Undvik motfrågor som ersätter ett enkelt faktasvar.'
     : helpLevel === 1 ? 'Förklara KONCEPTET bakom — inte svaret. Obligatoriskt: ett konkret exempel. Avsluta med "Hur tänker du nu?"'
     : helpLevel === 2 ? 'Steg-för-steg lösning. Varje steg på egen rad. Visa logiken, inte bara resultatet.'
     : 'Fullständig lösning + 1 alternativ angreppsvinkel om det finns.';
@@ -335,7 +335,7 @@ export function buildPERSystemPrompt({
   const svarsSteg1 = quiz || feynman
     ? 'Börja med frågan respektive lyssnandet — ingen intro'
     : helpLevel <= 0
-    ? 'Börja med motfrågan — ingen intro, ingen omskrivning av elevens fråga'
+    ? 'Börja med den konkreta ledtråden för en uppgift eller det korta begreppssvaret för en direkt faktabegäran — ingen intro eller omskrivning av elevens fråga'
     : helpLevel === 1
     ? 'Börja med begreppet — ingen intro'
     : 'Svara kärnfrågan direkt — ingen intro';
