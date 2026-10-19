@@ -89,6 +89,7 @@ let solverRejectQuestionId = null;
 let regenerationQuestions = null;
 let throwOnRepair = false;
 let issuanceUnavailable = false;
+let quotaDenied = false;
 let lastInvokeCallStart = 0;
 const failureLogs = [];
 const previousConsoleError = console.error;
@@ -111,6 +112,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
   if (url.startsWith(`${origin}/rest/v1/user_profiles?select=mastery`)) return Response.json([]);
   if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
+    if (quotaDenied) return Response.json({ ok: false, count: 3, limit: 3, period: "synthetic", unlimited: false });
     return Response.json({ ok: true, count: 1, limit: 3, period: "synthetic", unlimited: false });
   }
   if (url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) return Response.json({ committed: true });
@@ -258,6 +260,28 @@ try {
     "unsupported graph formats and line bounds are rejected before model traffic");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
     "unsupported graph formats and line bounds do not consume a mock-exam quota");
+
+  calls.length = 0;
+  quotaDenied = true;
+  const quotaDeniedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: "Matematik 1b",
+    pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+  });
+  quotaDenied = false;
+  assert.equal(quotaDeniedExam.status, 429, "a denied mock-exam quota is returned before generation");
+  assert.equal(quotaDeniedExam.body.periodUnit, "week", "the quota response exposes the weekly unit");
+  assert.match(quotaDeniedExam.body.period, /^\d{4}-W\d{2}$/,
+    "the quota response exposes its captured ISO week period");
+  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 0,
+    "a quota denial never calls the model");
+  assert.equal(calls.filter((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST").length, 0,
+    "a quota denial never creates a usable exam issuance");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")
+    || call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")
+    || call.url.endsWith("/rest/v1/ai_usage_events")), false,
+  "a denied reservation triggers no commit, refund, or model-usage write");
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1,
+    "the request checks quota exactly once");
 
   activeQuestions = questions.map((question, index) => ({
     ...question,
