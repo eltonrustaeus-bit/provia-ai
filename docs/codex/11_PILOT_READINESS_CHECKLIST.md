@@ -6,7 +6,8 @@
 - Verifierarprompten pa svenska och engelska sager nu uttryckligen att ett ordagrant citat inte styrker ett motsagt pastaende och att dubbletter/nara parafraser ska avvisas. Den deterministiska grinden avvisar redan `source_alignment` under 0,6; detta fortydligar den modellberoende granskningen men ar inte en garanti for att modellen alltid upptacker motsagelser.
 - Riktad verifiering efter andringarna: prov/assessment 5/5 testfiler; P.E.R.-felannonsering 9/9; prov-/P.E.R.-browserflode 66/66; materialkontext 39/39; isolerat passkey-test 25/25; syntaxkontroller passerade.
 - Sekventiell fullsvit pa 170 testfiler avslutades efter drygt tio minuter med ett rapporterat fel i `tests/frontend/per-passkey.test.mjs`. Isolerad omkorning passerade 25/25. Fullsviten raknas darfor inte som helt gron; orsaken klassas som icke reproducerad flakighet tills den kan aterupprepas.
-- Dessa andringar ar lokala i denna notering. Ingen live-AI eller stagingkorsning gjordes eftersom staginginloggning fortfarande inte fungerar. Nasta steg ar att publicera en Preview fran exakt commit och, nar autentisering fungerar, gora ett avgransat syntetiskt liveflode.
+- Commit `40eb20f` ar pushad till pilotbranchen. Vercel Preview `dpl_4g7eAd9pfxp1EmXfxwM4JXNTZLZa` ar `READY`, target `preview`, fran exakt SHA `40eb20f`; checklistandringen och felannonseringsfixen ar darfor ute i denna Preview. Ingen live-AI eller stagingkorsning gjordes eftersom staginginloggning fortfarande inte fungerar.
+- Nasta steg ar att aterfa stagingautentisering och darefter gora ett avgransat syntetiskt liveflode. Ingen `main`-merge, produktionsdeploy, Auth-/databasandring eller stagingradering gjordes.
 
 **PILOT NOT READY.** Modellbaserad källsemantik och trefrågekapacitet är inte livevaliderade; fullsviten hade en icke-reproducerad passkey-testfail.
 
