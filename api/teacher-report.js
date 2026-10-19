@@ -7,13 +7,13 @@ import { normalizeRole } from "./_provia-rules.js";
 
 import { randomUUID } from "node:crypto";
 import { perRole } from "./_per-name.js";
-const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
+const { getSupabaseUrl, getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
 const { logAiUsage } = aiUsage;
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 async function loadReportEntitlement(userId) {
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return { unavailable: true };
-  const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) return { unavailable: true };
+  const supabase = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
   const { data, error } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
   if (error) return { unavailable: true };
   const role = normalizeRole(data?.role);
@@ -21,8 +21,8 @@ async function loadReportEntitlement(userId) {
 }
 
 async function consumeReportQuota(userId) {
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return { unavailable: true };
-  const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) return { unavailable: true };
+  const supabase = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
   const day = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase.rpc("consume_anon_rate", {
     p_bucket: "teacher-report:" + userId,
@@ -34,8 +34,8 @@ async function consumeReportQuota(userId) {
 }
 
 async function loadOwnedExamHistory(userId, courseFilter) {
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) throw new Error("History unavailable");
-  const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) throw new Error("History unavailable");
+  const supabase = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
   const wanted = String(courseFilter || "").trim().toLocaleLowerCase("sv-SE");
   let query = supabase
     .from("mock_results")

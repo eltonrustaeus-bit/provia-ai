@@ -53,8 +53,8 @@ async function laddaModuler() {
   return _mod;
 }
 
-const { createSupabaseServerClient } = supabaseKeys;
-const supabase = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
+const supabase = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
 
 // Codex-granskning 2026-07-27 (CR-PER-008, ACCEPTERAD): flaggkontrollen läste bara `enabled` och
 // ignorerade `allowed_user_ids`, trots att kolumnen finns i schemat sedan Fas 1 just för att kunna

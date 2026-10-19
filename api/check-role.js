@@ -17,8 +17,8 @@ const { isPilotActionAllowed, isPilotMode } = pilotScope;
 const { logAiUsage } = aiUsage;
 
 import { perRole } from "./_per-name.js";
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const { getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
+const { getSupabaseUrl, getSupabaseServerKey, createSupabaseServerClient } = supabaseKeys;
+const SUPABASE_URL = getSupabaseUrl();
 const SERVICE_ROLE_KEY = getSupabaseServerKey();
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {

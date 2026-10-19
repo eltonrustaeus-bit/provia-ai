@@ -4,10 +4,10 @@ import supabaseKeys from "./_supabase-server-key.cjs";
 import { BRAND_NAME, SITE_ORIGIN } from "./_site.js";
 import pilotScope from "./_pilot-scope.cjs";
 
-const { createSupabaseServerClient } = supabaseKeys;
+const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 
 const supabase = createSupabaseServerClient(
-  process.env.SUPABASE_URL,
+  getSupabaseUrl(),
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 

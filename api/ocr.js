@@ -1,6 +1,6 @@
 // api/ocr.js (CommonJS / Vercel Serverless)
 // Extract text from imageDataUrl using OpenAI (multimodal)
-const { getSupabaseServerKey, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const pilotScope = require("./_pilot-scope.cjs");
 const { logAiUsage } = require("./_ai-usage.cjs");
 
@@ -27,7 +27,7 @@ async function requireAuth(req) {
   if (!token) return null;
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/auth/v1/user",
+      getSupabaseUrl() + "/auth/v1/user",
       {
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -130,7 +130,7 @@ module.exports = async function handler(req, res) {
   let role = "gratis";
   try {
     const profRes = await fetch(
-      process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + user.id,
+      getSupabaseUrl() + "/rest/v1/profiles?select=role&id=eq." + user.id,
       {
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -148,11 +148,11 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return json(res, 500, { ok: false, error: "Missing OPENAI_API_KEY" });
 
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) {
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) {
     return json(res, 503, { ok: false, error: "OCR is temporarily unavailable" });
   }
   try {
-    const quotaResponse = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/consume_anon_rate", {
+    const quotaResponse = await fetch(getSupabaseUrl() + "/rest/v1/rpc/consume_anon_rate", {
       method: "POST",
       headers: {
         ...getSupabaseAdminHeaders(),

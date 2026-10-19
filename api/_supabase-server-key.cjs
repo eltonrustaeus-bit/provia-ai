@@ -41,6 +41,15 @@ function isNonProductionTarget(env = process.env) {
     targets.some((target) => target !== "production") || isPilotRuntime(env);
 }
 
+function getSupabaseUrl(env = process.env) {
+  if (isPilotRuntime(env)) {
+    const pilotUrl = env.EXGEN_PILOT_SUPABASE_URL;
+    if (!pilotUrl) throw new Error("Pilot runtime requires EXGEN_PILOT_SUPABASE_URL.");
+    return pilotUrl;
+  }
+  return env.SUPABASE_URL || "";
+}
+
 function assertSupabaseTargetAllowed(url, env = process.env) {
   let hostname = "";
   let protocol = "";
@@ -70,12 +79,12 @@ function assertSupabaseTargetAllowed(url, env = process.env) {
 }
 
 function getSupabaseServerKey(env = process.env) {
-  assertSupabaseTargetAllowed(env.SUPABASE_URL, env);
+  assertSupabaseTargetAllowed(getSupabaseUrl(env), env);
   return env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "";
 }
 
 function getSupabaseAdminHeaders(env = process.env) {
-  assertSupabaseTargetAllowed(env.SUPABASE_URL, env);
+  assertSupabaseTargetAllowed(getSupabaseUrl(env), env);
   const key = getSupabaseServerKey(env);
   if (!key) return {};
   const headers = { apikey: key };
@@ -117,4 +126,4 @@ function createSupabaseServerClient(url, options = {}, env = process.env) {
   });
 }
 
-module.exports = { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed, isPilotRuntime };
+module.exports = { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed, isPilotRuntime };

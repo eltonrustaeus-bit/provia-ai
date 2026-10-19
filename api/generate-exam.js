@@ -13,7 +13,7 @@ const gradeTasks = require("./_grade-task.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
-const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
 const materialInput = require("./_material.cjs");
 
@@ -377,7 +377,7 @@ async function requireAuth(req) {
   if (!token) return null;
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/auth/v1/user",
+      getSupabaseUrl() + "/auth/v1/user",
       {
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -403,7 +403,7 @@ async function loadCentralRules() {
 async function loadUserRole(userId) {
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/rest/v1/profiles?select=role&id=eq." + encodeURIComponent(userId),
+      getSupabaseUrl() + "/rest/v1/profiles?select=role&id=eq." + encodeURIComponent(userId),
       {
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -432,7 +432,7 @@ async function consumeMockExamQuota(userId, limit, periodKey, requestId) {
     };
   }
 
-  const r = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/reserve_mock_exam_quota", {
+  const r = await fetch(getSupabaseUrl() + "/rest/v1/rpc/reserve_mock_exam_quota", {
     method: "POST",
     headers: {
       ...getSupabaseAdminHeaders(),
@@ -471,7 +471,7 @@ async function consumeMockExamQuota(userId, limit, periodKey, requestId) {
 
 async function refundMockExamQuota(userId, period, requestId) {
   try {
-    const r = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/refund_mock_exam_quota", {
+    const r = await fetch(getSupabaseUrl() + "/rest/v1/rpc/refund_mock_exam_quota", {
       method: "POST",
       headers: {
         ...getSupabaseAdminHeaders(),
@@ -495,7 +495,7 @@ async function refundMockExamQuota(userId, period, requestId) {
 async function commitMockExamQuota(userId, period, requestId) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const r = await fetch(process.env.SUPABASE_URL + "/rest/v1/rpc/commit_mock_exam_quota", {
+      const r = await fetch(getSupabaseUrl() + "/rest/v1/rpc/commit_mock_exam_quota", {
         method: "POST",
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -585,7 +585,7 @@ async function buildAdaptiveFocus(userId, { numQuestions, lang }) {
   if (!userId) return "";
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/rest/v1/user_profiles?select=mastery&id=eq." + encodeURIComponent(userId),
+      getSupabaseUrl() + "/rest/v1/user_profiles?select=mastery&id=eq." + encodeURIComponent(userId),
       {
         headers: {
           ...getSupabaseAdminHeaders(),

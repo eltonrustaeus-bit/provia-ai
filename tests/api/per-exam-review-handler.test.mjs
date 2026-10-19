@@ -5,11 +5,12 @@ import { test } from "node:test";
 const require = createRequire(import.meta.url);
 const originalFetch = globalThis.fetch;
 const originalEnv = Object.fromEntries([
-  "SUPABASE_URL", "SUPABASE_SECRET_KEY", "EXAM_SIGNING_SECRET", "OPENAI_API_KEY", "EXGEN_PILOT_MODE",
+  "SUPABASE_URL", "EXGEN_PILOT_SUPABASE_URL", "SUPABASE_SECRET_KEY", "EXAM_SIGNING_SECRET", "OPENAI_API_KEY", "EXGEN_PILOT_MODE",
 ].map((key) => [key, process.env[key]]));
 const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "11111111-1111-4111-8111-111111111111";
 process.env.SUPABASE_URL = origin;
+process.env.EXGEN_PILOT_SUPABASE_URL = origin;
 process.env.SUPABASE_SECRET_KEY = "sb_secret_synthetic-per-review";
 process.env.EXAM_SIGNING_SECRET = "synthetic-review-signing-secret";
 process.env.OPENAI_API_KEY = "synthetic-provider-key";

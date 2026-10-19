@@ -1,4 +1,4 @@
-const { getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseAdminHeaders, getSupabaseServerKey } = require("./_supabase-server-key.cjs");
 
 const MAX_DB_INTEGER = 2_147_483_647;
 const STEPS = new Set(["embed", "generate", "verify_compare", "verify_blind", "repair", "grade", "validate", "assemble"]);
@@ -43,9 +43,11 @@ function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, mode
 
 async function logAiUsage(inputs, { env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 1500 } = {}) {
   const events = (Array.isArray(inputs) ? inputs : [inputs]).map(usageEvent).filter(Boolean);
-  if (!events.length || !env.SUPABASE_URL || !getSupabaseServerKey(env)) return false;
+  if (!events.length) return false;
   try {
-    const response = await fetchImpl(`${env.SUPABASE_URL}/rest/v1/ai_usage_events`, {
+    const supabaseUrl = getSupabaseUrl(env);
+    if (!supabaseUrl || !getSupabaseServerKey(env)) return false;
+    const response = await fetchImpl(`${supabaseUrl}/rest/v1/ai_usage_events`, {
       method: "POST",
       headers: { ...getSupabaseAdminHeaders(env), "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify(events),

@@ -15,7 +15,7 @@ const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
-const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
 const { sanitizeHistory } = require("./_student-history.cjs");
 const materialInput = require("./_material.cjs");
@@ -283,8 +283,8 @@ async function buildLearningPayload(level, course, attemptRows, learnerLoopEnabl
 let _sb = null;
 async function supabaseClient() {
   if (_sb) return _sb;
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return null;
-  _sb = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) return null;
+  _sb = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
   return _sb;
 }
 
@@ -328,7 +328,7 @@ async function requireAuth(req) {
   if (!token) return null;
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/auth/v1/user",
+      getSupabaseUrl() + "/auth/v1/user",
       {
         headers: {
           ...getSupabaseAdminHeaders(),

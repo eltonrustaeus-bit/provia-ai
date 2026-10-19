@@ -102,3 +102,19 @@ test("telemetry failure is fail-open and cannot fabricate a zero-cost row", asyn
     console.warn = originalWarn;
   }
 });
+
+test("pilot telemetry fails open when its branch-scoped staging URL is missing", async () => {
+  const env = {
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    VERCEL_TARGET_ENV: "preview",
+    EXGEN_PILOT_MODE: "true",
+    SUPABASE_URL: "https://production.supabase.invalid",
+    SUPABASE_SECRET_KEY: "sb_secret_synthetic",
+  };
+  const result = await logMockExamUsage(sample, {
+    env,
+    fetchImpl: () => { throw new Error("must not send without a staging URL"); },
+  });
+  assert.equal(result, false);
+});

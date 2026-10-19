@@ -135,7 +135,7 @@ function buildVerificationHtml(email, actionLink) {
 }
 
 const supabase = supabaseKeys.createSupabaseServerClient(
-  process.env.SUPABASE_URL,
+  supabaseKeys.getSupabaseUrl(),
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
@@ -221,7 +221,7 @@ async function consumeSignupQuota(req) {
 
   const bucket = createHash("sha256").update(ip).digest("hex");
   try {
-    const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/consume_anon_rate`, {
+    const response = await fetch(`${supabaseKeys.getSupabaseUrl()}/rest/v1/rpc/consume_anon_rate`, {
       method: "POST",
       headers: {
         ...supabaseKeys.getSupabaseAdminHeaders(),
@@ -263,7 +263,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Password must be 8–200 characters" });
   }
 
-  if (!process.env.SUPABASE_URL || !supabaseKeys.getSupabaseServerKey() || !process.env.RESEND_API_KEY) {
+  if (!supabaseKeys.getSupabaseUrl() || !supabaseKeys.getSupabaseServerKey() || !process.env.RESEND_API_KEY) {
     return res.status(503).json({ error: "Registrering är tillfälligt otillgänglig." });
   }
 

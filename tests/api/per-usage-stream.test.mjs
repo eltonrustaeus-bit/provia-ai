@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const oldFetch = globalThis.fetch;
-const keys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PILOT_MODE", "OPENAI_MODEL"];
+const keys = ["SUPABASE_URL", "EXGEN_PILOT_SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PILOT_MODE", "OPENAI_MODEL"];
 const oldEnv = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "44444444-4444-4444-8444-444444444444";
 const memoryEpoch = "55555555-5555-4555-8555-555555555555";
 Object.assign(process.env, {
   SUPABASE_URL: origin,
+  EXGEN_PILOT_SUPABASE_URL: origin,
   SUPABASE_SECRET_KEY: "sb_secret_synthetic_stream",
   OPENAI_API_KEY: "synthetic-provider-key",
   EXGEN_PILOT_MODE: "true",

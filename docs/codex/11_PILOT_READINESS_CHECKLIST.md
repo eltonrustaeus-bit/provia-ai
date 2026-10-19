@@ -116,3 +116,15 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Ingen staginginloggning, betald providerutvardering eller nytt liveprov gjordes. Pilotstatus kvarstar NOT READY tills syntetiskt stagingflode och skolans operativa godkannanden ar verifierade.
 - [x] Vercel-ID:t `prj_i91LIdfjxVzLJnSoELHc0RlluNg2` fran den tidigare godkanda projektatgarden returnerar 404. Namnet `provia-ai-pilot-feature-20261019` returnerar nu ett annat projekt-ID; detta andra projekt lamnades orort och ska inte raderas under det tidigare godkannandet.
 - [x] Commit `bca9524` ar pushad till pilotgrenen. Grenens `vercel.json` har `deploymentEnabled: false`; darfor skapades ingen ny Preview. Ingen manuell deployment, merge till `main` eller Production-andring gjordes.
+
+## Lokal uppfoljning — 2026-10-19 (Preview-databasval)
+
+- [x] Vercel-miljometadata visar en branch-scopad `EXGEN_PILOT_SUPABASE_URL` och en separat delad `SUPABASE_URL`; de krypterade vardena har inte lasits. Previewn kan darfor inte antas anvanda ratt projekt bara utifran dashboardens env-lista.
+- [x] Kodsokning fann att server-API:er tidigare anvande `process.env.SUPABASE_URL` direkt. Ny `getSupabaseUrl()` valjer `EXGEN_PILOT_SUPABASE_URL` for pilot/Preview och failar stangt om den saknas; verifierad Production anvander fortsatt `SUPABASE_URL` och befintlig projektgrans.
+- [x] Berorda Supabase-anrop i auth, provgenerering, rattning, P.E.R, OCR, signup, kunskap, lararrapport, admin och betalningshooks gar nu via samma resolver.
+- [x] Fokuserad URL-/pilot-/P.E.R-testsvit passerade 76/76; hela offline-sviten med `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0.
+- [x] Branchregeln i `vercel.json` ar uttryckligen aktiverad endast for `codex/exgen-school-pilot-review-2026-10-13` efter godkannande av Preview; detta ska inte skapa eller promovera Production.
+- [ ] Ny Preview, faktisk API-servermiljo, e-postaterstallning och inloggning ar inte verifierade. Anvandaren uppger att inloggning inte fungerar; ingen live AI-anropning eller syntetisk provkorning har gjorts.
+- [ ] Mojlig miljo-mismatch ar en stark kod-/konfigurationskandidat, inte bevisad rotorsak till inloggningsfelet. Nasta steg efter Preview ar att verifiera dess commit och staginganslutning utan att lasa hemligheter, sedan testa Auth-callback och syntetiskt flode efter fungerande konto.
+
+**PILOT NOT READY.** Lokal kod och full offline-svit ar verifierade. Nasta blockerande bevis ar en ny branch-Preview som faktiskt kan autentisera mot staging och klara syntetiska prov-/P.E.R-floden.

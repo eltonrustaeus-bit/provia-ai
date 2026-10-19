@@ -30,7 +30,7 @@ import pilotScope from "./_pilot-scope.cjs";
 import examCompletion from "./_exam-completion.cjs";
 import examIssuance from "./_exam-issuance.cjs";
 import graphAnswers from "./_graph.js";
-const { createSupabaseServerClient } = supabaseKeys;
+const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 const { logAiUsage } = aiUsage;
 const { publicGuideAnswer } = publicGuide;
 const { denyOutOfScopePilotRoute, isPilotExplainRequestAllowed, isPilotMode } = pilotScope;
@@ -41,7 +41,7 @@ const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fr
 const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
 
 const supabase = createSupabaseServerClient(
-  process.env.SUPABASE_URL,
+  getSupabaseUrl(),
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 

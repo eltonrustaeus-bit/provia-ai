@@ -1,7 +1,7 @@
-const { getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 
 function endpoint(path) {
-  const url = process.env.SUPABASE_URL;
+  const url = getSupabaseUrl();
   const headers = getSupabaseAdminHeaders();
   if (!url || !headers.apikey) return null;
   return { url: `${url}/rest/v1/${path}`, headers };
