@@ -20,6 +20,9 @@ const base = {
   pastedText: material, isMath: false
 };
 const withoutFocus = generator.buildExamPrompts(base).userPrompt;
+assert.match(withoutFocus, /C: eleven ska förklara eller tillämpa centralt innehåll/);
+assert.match(withoutFocus, /undvik flera dolda delkrav/);
+assert.match(withoutFocus, /poängsättningen stödjer/);
 const withFocus = generator.buildExamPrompts({ ...base, selectedFocusTerms: ["klorofyll"] }).userPrompt;
 assert.notEqual(withFocus, withoutFocus);
 assert.match(withFocus, /Elevens valda fokusbegrepp \(ord från materialet\): klorofyll/);
@@ -29,7 +32,13 @@ assert.equal(generator.buildExamPrompts({ ...base, selectedFocusTerms: ["saknas"
   "unsupported client terms do not affect the model instruction");
 
 const english = generator.buildExamPrompts({ ...base, lang: "en", selectedFocusTerms: ["klorofyll"] }).userPrompt;
+assert.match(english, /C: the student should explain or apply central content/);
+assert.match(english, /avoid hidden sub-requirements/);
+assert.doesNotMatch(english, /Sätt cognitive_level/);
 assert.match(english, /Student-selected focus terms \(words from the source\): klorofyll/);
 assert.match(english, /do not invent content or promise complete coverage/);
+
+assert.match(generator.buildExamPrompts({ ...base, level: "E" }).userPrompt, /E: pröva ett centralt begrepp/);
+assert.match(generator.buildExamPrompts({ ...base, level: "A" }).userPrompt, /A: pröva självständig analys/);
 
 console.log("exam-focus-terms: all assertions passed");

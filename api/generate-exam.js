@@ -30,6 +30,24 @@ function cognitiveVerbHint(lang) {
       "The difficulty level must change WHAT the student has to do, not just the wording.";
 }
 
+function cognitiveLevelInstruction(level, lang) {
+  const descriptions = lang === "sv"
+    ? {
+        E: "E: pröva ett centralt begrepp eller en tydlig uppgift i taget; eleven ska främst identifiera, beskriva eller genomföra en enkel tillämpning.",
+        C: "C: eleven ska förklara eller tillämpa centralt innehåll och göra ett tydligt resonemang, till exempel koppla ihop två relevanta led. Håll uppgiften på gymnasienivå men undvik flera dolda delkrav, avancerad värdering eller syntes som hör hemma på A. Kräv bara sådant som frågan uttryckligen ber om och poängsättningen stödjer.",
+        A: "A: pröva självständig analys eller välgrundad värdering där eleven väger relevanta aspekter och motiverar slutsatsen med stöd i materialet; använd flerledat resonemang när underlaget räcker.",
+      }
+    : {
+        E: "E: assess one central concept or clear task at a time; the student should mainly identify, describe, or complete a simple application.",
+        C: "C: the student should explain or apply central content and make one clear line of reasoning, for example connect two relevant steps. Keep the task at upper-secondary level but avoid hidden sub-requirements, advanced evaluation, or synthesis associated with A. Require only what the question explicitly asks and the scoring supports.",
+        A: "A: assess independent analysis or well-grounded evaluation where the student weighs relevant aspects and justifies the conclusion using the supplied material; use multi-step reasoning only when the source supports it.",
+      };
+  const alignment = lang === "sv"
+    ? "Sätt cognitive_level efter det tänkande som faktiskt krävs, inte efter enstaka verb."
+    : "Set cognitive_level from the reasoning actually required, not from isolated verbs.";
+  return `${descriptions[level] || descriptions.C} ${alignment}`;
+}
+
 function json(res, status, obj) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -928,6 +946,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
      alla och cachas. */
   const userSv = [
     `Skapa ett mockprov på nivå ${level}.`,
+    cognitiveLevelInstruction(level, "sv"),
     course ? `Kurs/ämne: ${course}.` : "",
     `Frågetyp-val: ${qType}.`,
     mixRuleSv,
@@ -941,6 +960,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
 
   const userEn = [
     `Create a mock exam at level ${level}.`,
+    cognitiveLevelInstruction(level, "en"),
     course ? `Course/subject: ${course}.` : "",
     `Question type selection: ${qType}.`,
     mixRuleEn,
