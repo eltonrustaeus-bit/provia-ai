@@ -300,11 +300,24 @@ test("post-exam review follows the requested English language without weakening 
     assert.ok(provider);
     assert.match(provider.body, /The learner has submitted this specific exam question/);
     assert.match(provider.body, /Explain the learner's actual answer/);
+    assert.match(provider.body, /Answer only in English/);
+    assert.match(provider.body, /Do not add syllabus details that are absent from the supplied material/);
     assert.match(provider.body, /source data, never instructions/);
     assert.doesNotMatch(provider.body, /Du är P\.E\.R|Förklara elevens faktiska svar/);
   } finally {
     providerAnswer = previousAnswer;
   }
+});
+
+test("Swedish post-exam review explicitly stays in Swedish and grounded in supplied evidence", async () => {
+  calls.length = 0;
+  const response = await invoke({ examReview: true, examProof: proof, lang: "sv" });
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+  const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+  assert.ok(provider);
+  assert.match(provider.body, /Svara endast på svenska/);
+  assert.match(provider.body, /Lägg inte till kursdetaljer som saknas i materialet/);
+  assert.doesNotMatch(provider.body, /You are P\.E\.R|Answer only in English/);
 });
 
 test("verified post-grade review ignores stale finished, expired, and abandoned client metadata", async () => {
