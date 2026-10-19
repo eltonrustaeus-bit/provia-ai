@@ -17,7 +17,7 @@ assert.deepEqual(repairPayload.input.slice(0, 2), [
   { role: "system", content: "system prompt" },
   { role: "user", content: "material prompt" },
 ], "repair retains the original system prompt and source material");
-assert.match(repairPayload.input.at(-1).content, /exakt 3 nya frågor/i);
+assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*fylla 3 saknade provplatser/i);
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
 const missingSlotRepair = generateExam.buildRepairPayload({
@@ -28,10 +28,10 @@ const missingSlotRepair = generateExam.buildRepairPayload({
   lang: "sv", numQuestions: 3,
   verifiedQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
 });
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 2,
-  "repair schema requests only the number of missing exam slots");
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 2);
-assert.match(missingSlotRepair.input.at(-1).content, /exakt 2 nya frågor/i);
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 3,
+  "repair schema requests one extra candidate for two missing exam slots");
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 3);
+assert.match(missingSlotRepair.input.at(-1).content, /exakt 3 nya frågekandidater.*fylla 2 saknade provplatser/i);
 assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
   "already verified stems are passed to repair so the model can avoid repeating them");
 
@@ -232,8 +232,8 @@ globalThis.fetch = async (input, init = {}) => {
         const q = activeQuestions.find((question) => question.id === requested.id);
         if (!q) return { id: requested.id, option_verdicts: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
         return {
-        id: q.id, option_verdicts: q.options.map((_, i) => i === (q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index)),
-        index: q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index,
+        id: q.id, option_verdicts: q.options.map((_, i) => i === ((Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index)),
+        index: (Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
       }) });
@@ -472,25 +472,25 @@ try {
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
-  verifierRejectQuestionId = "q-1";
+  verifierRejectQuestionId = ["q-1", "retry-1"];
   calls.length = 0;
   solverInputs.length = 0;
   const repairedMcExam = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(repairedMcExam.status, 200, JSON.stringify(repairedMcExam.body));
-  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-1"],
-    "verified first-round MC questions are preserved while a reviewed repair fills the missing slot");
+  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-2"],
+    "verified first-round MC questions are preserved while the approved candidate fills a rejected repair slot");
   assert.equal(repairedMcExam.body.meta.verifier.approved, 3);
-  assert.equal(repairedMcExam.body.meta.solver.checked, 4);
+  assert.equal(repairedMcExam.body.meta.solver.checked, 5);
   assert.deepEqual(solverInputs.at(-1).map(({ id, question, options }) => ({ id, question, options })),
-    repairedQuestions.slice(0, 1).map(({ id, question, options }) => ({ id, question, options })),
+    repairedQuestions.slice(0, 2).map(({ id, question, options }) => ({ id, question, options })),
     "the blind solver receives only the missing question's actual ID, wording and options");
   for (const item of solverInputs.at(-1)) {
     assert.deepEqual(Object.keys(item).sort(), ["id", "options", "question"],
       "every retry solver item contains only the blind-solver input fields");
   }
-  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.slice(0, 1).map(({ id }) => id),
+  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.slice(0, 2).map(({ id }) => id),
     "the retry verifier receives the generated repair candidate");
   assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
     "at most one bounded missing-slot repair is requested");
@@ -498,7 +498,7 @@ try {
   const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
   activeQuestions = questions;
   regenerationQuestions = unsafeRetryQuestions;
-  solverRejectQuestionId = "retry-fallback-1";
+  solverRejectQuestionId = ["retry-fallback-1", "retry-fallback-2"];
   calls.length = 0;
   const solverRejectedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
@@ -508,14 +508,14 @@ try {
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
   solverRejectQuestionId = null;
-  verifierRejectQuestionId = ["q-1", "retry-1"];
+  verifierRejectQuestionId = ["q-1", "retry-1", "retry-2"];
   const verifierRejectedRepair = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assertIncompleteExamNotDelivered(verifierRejectedRepair, "verifier rejects the sole missing-slot repair");
   const verifierRejectedLog = JSON.parse(qualityLogs.at(-1));
   assert.deepEqual(verifierRejectedLog.repairVerifierFailureCodes, {
-    reviewer_rejected: 1, required_changes: 1, low_factual_accuracy: 1,
+    reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2,
   },
     "safe repair telemetry records only the review rejection category");
   assert.deepEqual({

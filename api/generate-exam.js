@@ -955,16 +955,17 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, verifiedQuestions = [] }) {
+function buildRepairPayload(payload, { lang, numQuestions, verifiedQuestions = [], candidateCount }) {
   const verified = Array.isArray(verifiedQuestions) ? verifiedQuestions : [];
-  const repairCount = Math.max(1, numQuestions - verified.length);
+  const missingSlots = Math.max(1, numQuestions - verified.length);
+  const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || missingSlots + 1));
   const verifiedStems = verified.map((question) => ({
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
   }));
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question${repairCount === 1 ? "" : "s"} of the already selected type and level to fill the missing exam slots. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Do not repeat these already verified questions: ${JSON.stringify(verifiedStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} ${repairCount === 1 ? "ny fråga" : "nya frågor"} av den redan valda typen och nivån för att fylla de saknade platserna. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Upprepa inte de här redan verifierade frågorna: ${JSON.stringify(verifiedStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Do not repeat these already verified questions: ${JSON.stringify(verifiedStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Upprepa inte de här redan verifierade frågorna: ${JSON.stringify(verifiedStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1353,9 +1354,10 @@ module.exports = async function handler(req, res) {
           const regenStartedAt = Date.now();
           let data2 = null;
           try {
-            const repairCount = Math.max(1, numQuestions - round1ApprovedQuestions.length);
+            const repairSlots = Math.max(1, numQuestions - round1ApprovedQuestions.length);
+            const repairCount = Math.min(6, repairSlots + 1);
             const repairPayload = buildRepairPayload(payload, {
-              lang, numQuestions, verifiedQuestions: round1ApprovedQuestions,
+              lang, numQuestions, verifiedQuestions: round1ApprovedQuestions, candidateCount: repairCount,
             });
             repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {
