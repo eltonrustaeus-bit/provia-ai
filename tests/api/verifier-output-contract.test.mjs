@@ -129,6 +129,10 @@ assert.equal(validOpenReview.option_quality_contract_ok, true,
   "an empty option list is a complete quality review for a short-answer item");
 assert.equal(decideApproval(validOpenReview), true,
   "a valid reviewed short-answer question still passes the deterministic gate");
+assert.equal(decideApproval({ ...validOpenReview, required_changes: undefined }), false,
+  "a missing required_changes list fails closed");
+assert.equal(decideApproval({ ...validOpenReview, required_changes: "" }), false,
+  "a non-array required_changes value fails closed");
 const needsRevision = {
   id: "open-1", approved: false, factual_accuracy: 0.2, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 0.2, language_quality: 1,
