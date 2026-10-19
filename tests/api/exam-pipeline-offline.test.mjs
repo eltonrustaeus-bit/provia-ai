@@ -96,6 +96,28 @@ const questions = [
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
 }));
 
+const underfilledNormalization = generateExam.normalizeGeneratedExam({ questions: structuredClone(questions.slice(0, 2)) }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(underfilledNormalization.exam?.questions.length, 2,
+  "a non-empty underfilled response can reach the bounded repair path");
+const overfilledNormalization = generateExam.normalizeGeneratedExam({ questions: [
+  ...structuredClone(questions),
+  { ...structuredClone(questions[0]), id: "extra-q", model_answer: "PRIVATE_MODEL_ANSWER_SENTINEL" },
+] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(overfilledNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
+assert.equal(overfilledNormalization.failure?.payload.exam, undefined,
+  "a question-count error never includes raw generated questions or answers");
+assert.equal(JSON.stringify(overfilledNormalization.failure?.payload).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false);
+const emptyNormalization = generateExam.normalizeGeneratedExam({ questions: [] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(emptyNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
+assert.equal(emptyNormalization.failure?.payload.exam, undefined,
+  "an empty model response also returns no raw exam object");
+
 const duplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "zero-first", question: "Vad får man som nollställ för funktionen y = 3x - 6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
   { ...questions[1], id: "zero-paraphrase", question: "Vad är nollstället för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
@@ -555,6 +577,46 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  generationTextOverride = JSON.stringify({
+    title: "Underfyllt syntetiskt prov", level: "C", questions: questions.slice(0, 2),
+  });
+  calls.length = 0;
+  const underfilledExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  generationTextOverride = null;
+  regenerationQuestions = null;
+  assert.equal(underfilledExam.status, 200, JSON.stringify(underfilledExam.body));
+  assert.deepEqual(underfilledExam.body.exam.questions.map((question) => question.id), ["q-1", "q-2", "retry-1"],
+    "two valid initial questions are reviewed and one bounded repair fills the third slot");
+  const underfilledRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.stream !== true);
+  assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
+  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 2,
+    "one missing slot requests two repair candidates to retain one if quality checks reject the other");
+  assert.equal(calls.filter((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST").length, 1,
+    "only the complete three-question set is issued");
+  activeQuestions = questions;
+
+  generationTextOverride = JSON.stringify({
+    title: "Underfyllt syntetiskt prov", level: "C",
+    questions: questions.slice(0, 2).map((question, index) => index === 1
+      ? { ...question, model_answer: "PRIVATE_MODEL_ANSWER_SENTINEL" }
+      : question),
+  });
+  throwOnRepair = true;
+  const failedUnderfilledRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  generationTextOverride = null;
+  throwOnRepair = false;
+  assertIncompleteExamNotDelivered(failedUnderfilledRepair, "underfilled response whose bounded repair fails");
+  assert.equal(JSON.stringify(failedUnderfilledRepair.body).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false,
+    "failed repair never returns the model answer or raw generated exam");
+  activeQuestions = questions;
 
   activeQuestions = questions.map((question, index) => index === 0
     ? { ...question, source_references: ["A reference absent from the supplied material"] }

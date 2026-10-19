@@ -98,7 +98,13 @@ function normalizeGeneratedExam(exam, {
   qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions, truncated = false,
 }) {
   if (!Array.isArray(exam?.questions) || exam.questions.length === 0) {
-    return { failure: { status: 500, payload: { ok: false, error: "Schema mismatch", exam } } };
+    return { failure: { status: 502, payload: {
+      ok: false,
+      error: "GENERATION_QUESTION_COUNT_INVALID",
+      requested: numQuestions,
+      received: Array.isArray(exam?.questions) ? exam.questions.length : null,
+      message: lang === "en" ? "The exam could not be completed. Please try again." : "Provet kunde inte färdigställas. Försök igen.",
+    } } };
   }
   if (truncated) {
     exam.questions = keepQuestionsWithValidIds(exam.questions);
@@ -116,8 +122,14 @@ function normalizeGeneratedExam(exam, {
       message: "Provet kunde inte färdigställas. Försök igen.",
     } } };
   }
-  if (!truncated && exam.questions.length !== numQuestions) {
-    return { failure: { status: 500, payload: { ok: false, error: "Schema mismatch", exam } } };
+  if (!truncated && exam.questions.length > numQuestions) {
+    return { failure: { status: 502, payload: {
+      ok: false,
+      error: "GENERATION_QUESTION_COUNT_INVALID",
+      requested: numQuestions,
+      received: exam.questions.length,
+      message: lang === "en" ? "The exam could not be completed. Please try again." : "Provet kunde inte färdigställas. Försök igen.",
+    } } };
   }
 
   const reject = (reason, detail = {}) => truncated ? null : { reason, detail };

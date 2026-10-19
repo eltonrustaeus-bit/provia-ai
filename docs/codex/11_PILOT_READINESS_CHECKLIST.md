@@ -124,7 +124,35 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [x] Berorda Supabase-anrop i auth, provgenerering, rattning, P.E.R, OCR, signup, kunskap, lararrapport, admin och betalningshooks gar nu via samma resolver.
 - [x] Fokuserad URL-/pilot-/P.E.R-testsvit passerade 76/76; hela offline-sviten med `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0.
 - [x] Branchregeln i `vercel.json` ar uttryckligen aktiverad endast for `codex/exgen-school-pilot-review-2026-10-13` efter godkannande av Preview; detta ska inte skapa eller promovera Production.
-- [ ] Ny Preview, faktisk API-servermiljo, e-postaterstallning och inloggning ar inte verifierade. Anvandaren uppger att inloggning inte fungerar; ingen live AI-anropning eller syntetisk provkorning har gjorts.
-- [ ] Mojlig miljo-mismatch ar en stark kod-/konfigurationskandidat, inte bevisad rotorsak till inloggningsfelet. Nasta steg efter Preview ar att verifiera dess commit och staginganslutning utan att lasa hemligheter, sedan testa Auth-callback och syntetiskt flode efter fungerande konto.
+- [x] Ny Preview `dpl_F269tBdfhqFb7n5E6jU4pmTLnNz6` ar READY fran commit `e4b4168` och visar appens inloggningsgrind pa `https://provia-r0wpmfdtm-eltons-projects-4adfb1a3.vercel.app/app.html`. Detta bevisar inte autentisering eller fungerande server-API.
+- [x] En unauthenticated `GET /api/explain` i Preview returnerade `{"error":"Unauthorized"}` i webblasaren. Funktionen startar och nekar korrekt en saknad session; detta verifierar inte ett autentiserat Supabase-anrop.
+- [x] Stagingens URL Configuration visar Site URL `http://localhost:3000` och en aldre Preview-aterstallningsadress. Varken Site URL eller SMTP har andrats.
+- [x] Supabase Auth URL Configuration visar den exakta Preview-callbacken `https://provia-r0wpmfdtm-eltons-projects-4adfb1a3.vercel.app/aterstall.html` i Redirect URLs (2 URL:er totalt). Site URL ar fortsatt `http://localhost:3000`; inga andra Auth-falt andrades.
+- [x] Read-only Auth-kontroll visar att bada befintliga stagingprofiler ar bekraftade och har tidigare lyckade inloggningar. Ingen Auth-logg syntes for dem under senaste timmen; detta faststaller inte om aktuellt fel ar losenord eller Preview-/projektkoppling.
+- [x] Supabase Auth > Emails > SMTP Settings visar att `Enable custom SMTP` ar av. Standardutskick ar darfor inte verifierad aterstallningsvag for en extern adress.
+- [x] Vercel aterbekraftar aktuell Preview som READY fran exakt `e4b4168` pa feature-branchen. Projektet har SSO-skydd; en obehorig HTTP-kontroll omdirigerades av Vercel (302) fore appen. Inga error-loggar fanns for deploymenten senaste 30 minuterna; franvaro av loggar bevisar inte att ett inloggningsforsok natt API:t.
+- [x] Full offline-svit koren sekventiellt pa aktuell feature-HEAD; samtliga 171 testfiler avslutades med exit 0. Detta ar mockad/lokal evidens, inte verifiering av modellkvalitet eller PostgreSQL-beteende.
+- [x] Tva oberoende read-only-granskningar av aktuell HEAD: aktivt provs P.E.R-gate ser fail-closed ut i API-testad kod; inga tydliga facitlackor hittades. Generatorns semantiska kallstod, sprakplausibilitet och normal 3-fragekapacitet beror fortfarande delvis pa modellbedomning; granskare/losare kan anvanda samma modell om separata env-modeller saknas.
+- [ ] Rattnings-RPC:er saknar saker takeover av en stale claim efter processkrasch; API:t avbryter efter tva minuter. En kontrollerad provider-timeout kan slappa claimen, men stale-aterhamtning/fencing ar inte testad eller implementerad. Migrationsbeteendet ar inte exekverat mot PostgreSQL: API-tester mockar RPC-svar och migrationstester granskar SQL-text. Lokal miljo saknar Supabase CLI, Docker och `psql`.
+- [ ] Oberoende granskning fann aven att claim/persist kan behandla en obekraftad `mock_results`-rad med samma submission-ID som fardig/dubblett, medan den senare state-grinden kraver `verified_at`. Ingen stagingforekomst ar verifierad; lagg till DB-beteendetest innan riskbedomning eller andring.
+- [ ] Anvandaren kan fortfarande inte logga in. Standard-SMTP ar avstangd och aterstallningsmejl kan darfor inte anvandas som verifierad losning. Ingen ny profil har skapats, och ingen live AI-anropning eller syntetisk provkorning har gjorts. Nasta steg ar att anvandaren skapar ett nytt unikt syntetiskt stagingkonto i Supabase Dashboard med `Auto confirm user?` aktiverat och anger losenordet sjalv; testet fortsatter sedan i samma Preview.
 
-**PILOT NOT READY.** Lokal kod och full offline-svit ar verifierade. Nasta blockerande bevis ar en ny branch-Preview som faktiskt kan autentisera mot staging och klara syntetiska prov-/P.E.R-floden.
+**PILOT NOT READY.** Lokal kod och full offline-svit ar verifierade. Aktuell branch-Preview och callback ar verifierade, men staginginloggning/live API- och AI-flode, PostgreSQL-test av rattnings-RPC:er samt skolans operativa godkannanden aterstar.
+
+## Uppfoljning — 2026-10-19 (stagingblocker och rattnings-QA)
+
+- [x] Supabase Dashboard visar fortfarande det tomma formularet `Create a new user`; inget nytt stagingkonto har skapats. `Auto confirm user?` ar ikryssad och formularet uppger att inget bekraftelsemejl skickas.
+- [x] Den exakta regressionsfragan med matematikalternativet `Kesäkten` passerar inte den deterministiska formatgrinden. Reparationsfallet och verifierarens outputkontrakt passerade i `tests/api/exam-pipeline-offline.test.mjs`, `tests/assessment/assessment.test.mjs` och `tests/api/verifier-output-contract.test.mjs` (3/3 testfiler). Modellanrop och Supabase ar mockade.
+- [x] Oberoende skrivskyddad granskning bekraftade att gammal grading-claim kan strandas efter processkrasch och att grading-RPC:er behandlar vilken matchande `mock_results`-rad som helst som slutford, medan senare state-kontroll kraver `verified_at`. Om motsvarande stagingdata finns ar inte verifierat.
+- [ ] En lokal migreringskandidat lagger till fencing-token for stale-claim-overtagning och ersatter endast overifierade resultatsammanfattningar efter godkand serverratning. Den ar inte applicerad. Nuvarande tester bevisar inte SQL-beteendet mot PostgreSQL eller commit-genomfort/HTTP-svar-bortfall; disposable PostgreSQL-test kravs fore staginggodkannande.
+- [ ] Ingen Auth-profil, stagingdata, SMTP-installning eller databas har andrats i denna uppfoljning. Nasta live-steg ar ett nytt syntetiskt konto som anvandaren skapar i det oppna Dashboard-formularet med ett lokalt valt losenord; efter autentisering kor endast ett litet syntetiskt Preview/stagingflode.
+
+**PILOT NOT READY.** Genereringsregressionen ar lokalt verifierad. Stagingautentisering och liveflode ar blockerade; rattnings-RPC-riskerna kraver en separat migrering och faktisk PostgreSQL-verifiering.
+
+## Lokal uppfoljning — 2026-10-19 (ofullstandiga provsvar)
+
+- [x] Ett icke-tomt modellresultat med farre fragor an begart tillats ga vidare till den befintliga enda reparationsrundan. Ett tomt eller overfullt resultat returnerar ett generiskt, strukturerat 502-fel utan modellens provobjekt, facit eller svarsalternativ.
+- [x] Regressionstester tackar reparationsframgang till komplett trefrageprov, kontroll av reparationsbegaran och att misslyckad reparation varken levererar delprov eller exponerar modellfacit. Den riktade `tests/api/exam-pipeline-offline.test.mjs` passerar; modell- och Supabase-anrop ar mockade.
+- [ ] Detta ar lokal kod-/mockevidens, inte en ny Preview eller live AI-korning. Inloggning till staging ar fortfarande blockerad; graderingsmigreringen ar oprovad mot riktig PostgreSQL.
+
+**PILOT NOT READY.**
