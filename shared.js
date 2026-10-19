@@ -1595,6 +1595,7 @@ function finalizeMsg(div, text) {
                   try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
                 }
               } else {
+                restoreFailedQuestion();
                 try { localStorage.removeItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
                 if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut();
               }

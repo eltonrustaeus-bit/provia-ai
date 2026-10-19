@@ -45,6 +45,12 @@ async function runFailure(label, failRequest, expected) {
 }
 
 try {
+  await runFailure("HTTP 401", route => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ error: "AUTH_REQUIRED" }),
+  }), text => text.includes("inloggning har gått ut"));
+
   await runFailure("HTTP 503", route => route.fulfill({
     status: 503,
     contentType: "application/json",
