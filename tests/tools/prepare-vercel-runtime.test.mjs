@@ -8,7 +8,7 @@ import { prepareVercelRuntime } from "../../tools/prepare-vercel-runtime.mjs";
 const pilotEnv = {
   VERCEL_ENV: "preview",
   EXGEN_PILOT_MODE: "true",
-  EXGEN_PILOT_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+  EXGEN_PILOT_SUPABASE_URL: "https://yhcinqejsocpmmetazpz.supabase.co",
   EXGEN_PILOT_PUBLISHABLE_KEY: "sb_publishable_abcdefghijklmnopqrstuvwxyz123456",
   EXGEN_PILOT_APP_ORIGIN: "https://pilot.example.test",
 };
@@ -23,7 +23,7 @@ test("Preview build writes only the validated public pilot runtime", async (t) =
 
   assert.deepEqual(result, { changed: true, environment: "pilot" });
   assert.match(output, /"environment": "pilot"/);
-  assert.match(output, /abcdefghijklmnopqrst/);
+  assert.match(output, /yhcinqejsocpmmetazpz/);
   assert.doesNotMatch(output, /mnmotdluigzeehdjbhbu|sb_secret_|sk-proj-/);
 });
 

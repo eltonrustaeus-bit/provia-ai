@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { renderPilotRuntimeConfig } from "../../tools/render-pilot-runtime-config.mjs";
 
 const target = {
-  supabaseUrl: "https://abcdefghijklmnopqrst.supabase.co",
+  supabaseUrl: "https://yhcinqejsocpmmetazpz.supabase.co",
   publishableKey: "sb_publishable_abcdefghijklmnopqrstuvwxyz123456",
   appOrigin: "https://pilot.example.test",
 };
@@ -17,15 +17,16 @@ const target = {
 test("pilot runtime renderer binds URL, project ref, key, origin and auth storage to staging", () => {
   const output = renderPilotRuntimeConfig(target);
   assert.match(output, /"environment": "pilot"/);
-  assert.match(output, /"projectRef": "abcdefghijklmnopqrst"/);
-  assert.match(output, /"authStorageKey": "sb-abcdefghijklmnopqrst-auth-token"/);
-  assert.match(output, /"supabaseUrl": "https:\/\/abcdefghijklmnopqrst\.supabase\.co"/);
+  assert.match(output, /"projectRef": "yhcinqejsocpmmetazpz"/);
+  assert.match(output, /"authStorageKey": "sb-yhcinqejsocpmmetazpz-auth-token"/);
+  assert.match(output, /"supabaseUrl": "https:\/\/yhcinqejsocpmmetazpz\.supabase\.co"/);
   assert.match(output, /"appOrigin": "https:\/\/pilot\.example\.test"/);
   assert.doesNotMatch(output, /mnmotdluigzeehdjbhbu|sb_publishable_T541A0HFXsw0zQRAhIy0kA_x0hcsfVN/);
 });
 
 test("pilot runtime renderer fails closed for production, invalid target, missing key or insecure origin", () => {
   assert.throws(() => renderPilotRuntimeConfig({ ...target, supabaseUrl: "https://mnmotdluigzeehdjbhbu.supabase.co" }), /cannot target the production/);
+  assert.throws(() => renderPilotRuntimeConfig({ ...target, supabaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }), /approved ExGen staging project/);
   assert.throws(() => renderPilotRuntimeConfig({ ...target, supabaseUrl: "http://abcdefghijklmnopqrst.supabase.co" }), /plain HTTPS/);
   assert.throws(() => renderPilotRuntimeConfig({ ...target, supabaseUrl: "https://not-a-project.supabase.co" }), /plain HTTPS/);
   assert.throws(() => renderPilotRuntimeConfig({ ...target, publishableKey: "" }), /publishable key is required/);
