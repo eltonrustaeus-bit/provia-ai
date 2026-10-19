@@ -18,6 +18,7 @@ Object.assign(process.env, {
 const requests = [];
 let activeCount = 0;
 let staleMemory = false;
+let failStreamingAfterDelta = false;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
@@ -41,6 +42,18 @@ globalThis.fetch = async (input, init = {}) => {
       : Response.json([]);
   }
   if (url === "https://api.openai.com/v1/chat/completions") {
+    if (failStreamingAfterDelta) {
+      const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
+      const bodyStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(partial));
+        },
+        pull(controller) {
+          controller.error(new Error("synthetic provider stream reset"));
+        },
+      });
+      return new Response(bodyStream, { status: 200 });
+    }
     const delta = { choices: [{ delta: { content: "Börja med att hitta ett begrepp i ditt material." } }] };
     const usage = { model: "measured-stream-model", choices: [], usage: { prompt_tokens: 90, completion_tokens: 21 } };
     return new Response(`data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n`, { status: 200 });
@@ -105,6 +118,24 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.equal(usageWrite.body[0].input_tokens, 90);
   assert.equal(usageWrite.body[0].output_tokens, 21);
   assert.doesNotMatch(JSON.stringify(usageWrite.body), /Hur börjar jag|Börja med att hitta/);
+});
+
+test("streaming P.E.R ends safely when the provider stream fails after a partial answer", async () => {
+  requests.length = 0;
+  failStreamingAfterDelta = true;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    failStreamingAfterDelta = false;
+  }
+
+  const payload = res.chunks.join("");
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.ended, true);
+  assert.match(payload, /Börja med en ledtråd/);
+  assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
+  assert.doesNotMatch(payload, /synthetic provider stream reset/);
 });
 
 test("JSON P.E.R records Responses usage and preserves the answer", async () => {
