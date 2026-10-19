@@ -632,9 +632,11 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const requestId = "12345678-1234-4234-8234-123456789abc";
     await page.route("**/api/generate-exam", route => route.fulfill({
-      status: 500, json: { ok: false, error: "exam_generation_failed", requestId },
+      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance" },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Steg: provstart/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
     await page.waitForFunction(() => /Referens: 12345678-1234-4234-8234-123456789abc/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
     const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
@@ -642,6 +644,19 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("genereringsfel visar en säker korrelationsreferens i ett sammanhållet larm",
       errorA11y.role === "alert" && errorA11y.atomic === "true",
       JSON.stringify(errorA11y));
+    ok("genereringsfel visar bara en tillåten, begriplig serverfas",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes("Steg: provstart") && !text.includes("exam_issuance")));
+    const qualityMessage = "Kvalitetskontrollen kunde inte godkänna tillräckligt många unika frågor. Inget prov lämnades ut; försök igen.";
+    await page.route("**/api/generate-exam", route => route.fulfill({
+      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction((message) => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes(message), qualityMessage, { timeout: 5000 });
+    ok("ofullständigt prov visar kvalitetsfelet i stället för en HTTP-kod",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(qualityMessage) && !text.includes("Error (HTTP 502)")));
     await page.route("**/api/generate-exam", route => route.abort("failed"));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Anslutningen bröts/.test(
