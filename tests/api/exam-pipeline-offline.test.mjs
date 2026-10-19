@@ -17,9 +17,23 @@ assert.deepEqual(repairPayload.input.slice(0, 2), [
   { role: "system", content: "system prompt" },
   { role: "user", content: "material prompt" },
 ], "repair retains the original system prompt and source material");
-assert.match(repairPayload.input.at(-1).content, /exakt 3 frågor/i);
+assert.match(repairPayload.input.at(-1).content, /exakt 3 nya frågor/i);
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+const missingSlotRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  verifiedQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
+});
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 2,
+  "repair schema requests only the number of missing exam slots");
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 2);
+assert.match(missingSlotRepair.input.at(-1).content, /exakt 2 nya frågor/i);
+assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
+  "already verified stems are passed to repair so the model can avoid repeating them");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -173,8 +187,9 @@ globalThis.fetch = async (input, init = {}) => {
     if (schemaName === "mock_exam_schema") {
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       if (!regenerationQuestions) throw new Error("unexpected synthetic repair request");
-      activeQuestions = regenerationQuestions;
-      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: regenerationQuestions });
+      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || regenerationQuestions.length;
+      activeQuestions = regenerationQuestions.slice(0, repairCount);
+      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: activeQuestions });
     }
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
@@ -441,21 +456,21 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(repairedMcExam.status, 200, JSON.stringify(repairedMcExam.body));
-  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["retry-1", "retry-2", "retry-3"],
-    "a regenerated MC batch replaces the first only after all items pass the verifier and blind solver");
+  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-1"],
+    "verified first-round MC questions are preserved while a reviewed repair fills the missing slot");
   assert.equal(repairedMcExam.body.meta.verifier.approved, 3);
-  assert.equal(repairedMcExam.body.meta.solver.checked, 3);
+  assert.equal(repairedMcExam.body.meta.solver.checked, 4);
   assert.deepEqual(solverInputs.at(-1).map(({ id, question, options }) => ({ id, question, options })),
-    repairedQuestions.map(({ id, question, options }) => ({ id, question, options })),
-    "the blind solver receives the actual regenerated IDs, wording and options");
+    repairedQuestions.slice(0, 1).map(({ id, question, options }) => ({ id, question, options })),
+    "the blind solver receives only the missing question's actual ID, wording and options");
   for (const item of solverInputs.at(-1)) {
     assert.deepEqual(Object.keys(item).sort(), ["id", "options", "question"],
       "every retry solver item contains only the blind-solver input fields");
   }
-  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.map(({ id }) => id),
-    "the retry verifier receives that same regenerated batch");
+  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.slice(0, 1).map(({ id }) => id),
+    "the retry verifier receives the generated repair candidate");
   assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
-    "at most one bounded whole-exam retry is requested");
+    "at most one bounded missing-slot repair is requested");
 
   const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
   activeQuestions = questions;
@@ -465,17 +480,7 @@ try {
   const solverRejectedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assert.equal(solverRejectedRetry.status, 200, JSON.stringify(solverRejectedRetry.body));
-  assert.deepEqual(solverRejectedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-fallback-2"],
-    "approved retry questions fill missing slots without displacing first-round approvals");
-  assert.equal(solverRejectedRetry.body.meta.verifier.checked, 6,
-    "verifier metadata counts both independently reviewed rounds");
-  assert.equal(solverRejectedRetry.body.meta.verifier.approved, 5,
-    "verifier metadata counts approvals across both review rounds, independently of solver decisions");
-  assert.equal(solverRejectedRetry.body.meta.solver.checked, 6,
-    "solver metadata counts both independently checked rounds");
-  assert.equal(solverRejectedRetry.body.meta.verifier.rejected, 1,
-    "a solver rejection is not mislabeled as a verifier rejection");
+  assertIncompleteExamNotDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions.map((question, index) => ({
@@ -526,19 +531,6 @@ try {
   });
   solverThrowsForRetry = false;
   assertIncompleteExamNotDelivered(solverTimeoutRetry, "retry solver timeout");
-
-  activeQuestions = questions;
-  regenerationQuestions = [
-    { ...repairedQuestions[0], id: "retry-duplicate" },
-    { ...repairedQuestions[1], id: "retry-duplicate" },
-    { ...repairedQuestions[2], id: "retry-last" },
-  ];
-  solverRejectQuestionId = null;
-  calls.length = 0;
-  const malformedRetry = await invoke(generateExam, {
-    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
-  });
-  assertIncompleteExamNotDelivered(malformedRetry, "retry batch with duplicate IDs");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;

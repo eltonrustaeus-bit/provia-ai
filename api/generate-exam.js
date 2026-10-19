@@ -955,12 +955,19 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions }) {
+function buildRepairPayload(payload, { lang, numQuestions, verifiedQuestions = [] }) {
+  const verified = Array.isArray(verifiedQuestions) ? verifiedQuestions : [];
+  const repairCount = Math.max(1, numQuestions - verified.length);
+  const verifiedStems = verified.map((question) => ({
+    concept: question?.concept_tag || question?.topic || "",
+    question: question?.question || "",
+  }));
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create a fresh, complete set of exactly ${numQuestions} questions of the already selected type and level. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa en ny, komplett uppsättning med exakt ${numQuestions} frågor av den redan valda typen och nivån. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question${repairCount === 1 ? "" : "s"} of the already selected type and level to fill the missing exam slots. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Do not repeat these already verified questions: ${JSON.stringify(verifiedStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} ${repairCount === 1 ? "ny fråga" : "nya frågor"} av den redan valda typen och nivån för att fylla de saknade platserna. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Upprepa inte de här redan verifierade frågorna: ${JSON.stringify(verifiedStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
+    text: { ...payload.text, format: buildMockExamSchema(repairCount) },
     input: [
       ...(Array.isArray(payload?.input) ? payload.input : []),
       { role: "user", content: instruction },
@@ -1311,7 +1318,10 @@ module.exports = async function handler(req, res) {
           const regenStartedAt = Date.now();
           let data2 = null;
           try {
-            const repairPayload = buildRepairPayload(payload, { lang, numQuestions });
+            const repairCount = Math.max(1, numQuestions - round1ApprovedQuestions.length);
+            const repairPayload = buildRepairPayload(payload, {
+              lang, numQuestions, verifiedQuestions: round1ApprovedQuestions,
+            });
             const r2 = await fetch("https://api.openai.com/v1/responses", {
               method: "POST",
               headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -1325,7 +1335,7 @@ module.exports = async function handler(req, res) {
               const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
               let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
               const normalized2 = exam2 && normalizeGeneratedExam(exam2, {
-                qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions, truncated: false,
+                qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions: repairCount, truncated: false,
               });
               if (normalized2?.exam) {
                 const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile });
@@ -1376,7 +1386,7 @@ module.exports = async function handler(req, res) {
                       retryIds.add(id);
                       retryUniqueQuestions.push(q);
                     }
-                    const completeRetry = retryUniqueQuestions.length >= numQuestions;
+                    const completeRetry = round1ApprovedQuestions.length === 0 && retryUniqueQuestions.length >= numQuestions;
                     const combinedQuestions = completeRetry
                       ? retryUniqueQuestions.slice(0, numQuestions)
                       : [...round1ApprovedQuestions];
