@@ -86,6 +86,12 @@ await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await pag
 await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre.");
 await page.waitForTimeout(150);
 await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await page.waitForTimeout(200);
+await page.evaluate(() => { document.querySelector("#pastedText").value = "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre."; });
+const preExamContext = await page.evaluate(() => {
+  window.PER.describe({ page: "app" });
+  return window.__perTestCtx();
+});
+ok("P.E.R får aktuellt studiematerial före provstart", /Cellandning sker i mitokondrien/.test(preExamContext.studyMaterial || ""));
 await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 await page.waitForTimeout(300);
@@ -146,6 +152,8 @@ await page.waitForTimeout(900);
 ok("T4a explain anropades", !!lastExplain);
 ok("T4a1 active exam requests do not include prior P.E.R transcripts", Array.isArray(lastExplain?.history) && lastExplain.history.length === 0,
   JSON.stringify(lastExplain?.history));
+ok("T4a2 active exam requests do not include study material", !lastExplain?.pageContext?.studyMaterial,
+  String(lastExplain?.pageContext?.studyMaterial || ""));
 ok("T4a1 färdigt P.E.R-svar annonseras", (await page.locator("#perAnnouncement").innerText()) === "Svar från P.E.R.");
 ok("T4b rätt frågenummer i kroppen", lastExplain?.pageContext?.currentQuestion?.number === 3,
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));

@@ -1498,6 +1498,10 @@ let currentExam=null;
 let currentExamProof=null;
 let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
+window.__getPerStudyMaterial=function(){
+  if(currentExam)return "";
+  return String(pastedTextEl()?.value||"").trim().slice(0,6000);
+};
 
 function setBusy(isBusy,label){
   const sw=spinWrap(),ms=miniStateEl();

@@ -574,6 +574,40 @@ try {
   activeQuestions = questions;
   regenerationQuestions = null;
 
+  activeQuestions = questions.map((question, index) => index === 0
+    ? {
+        ...question,
+        type: "short",
+        options: [],
+        correct_index: -1,
+        scoring_rubric: {
+          parts: [{ description: "Relevant svar", points: 1 }],
+          full_score_requirements: "Svaret stammer fran materialet.",
+          partial_credit_notes: "Ge poang for korrekt del av svaret.",
+        },
+      }
+    : question);
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  const verifierCountBeforeWrongType = verifierInputs.length;
+  const solverCountBeforeWrongType = solverInputs.length;
+  const wrongTypeExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(wrongTypeExam.status, 200, JSON.stringify(wrongTypeExam.body));
+  assert.equal(wrongTypeExam.body.exam.questions.length, 3,
+    "a valid question in the wrong requested format is replaced through bounded repair");
+  assert.equal(verifierInputs.slice(verifierCountBeforeWrongType)
+    .some((batch) => batch.questions.some((question) => question.id === "q-1")), false,
+  "a short-answer item is not reviewed for a multiple-choice request");
+  assert.equal(solverInputs.slice(solverCountBeforeWrongType)
+    .some((batch) => batch.some((question) => question.id === "q-1")), false,
+  "a short-answer item is not solved for a multiple-choice request");
+  assert.equal(wrongTypeExam.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "the mismatched question is never delivered");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
   activeQuestions = [
     { ...questions[0], id: "duplicate-zero-a", question: "Vad är 2 + 3?" },
     { ...questions[0], id: "duplicate-zero-b", question: "Vad får man som 2 + 3?" },

@@ -414,6 +414,14 @@
         }
       }
 
+      /* P.E.R. may use the material currently being prepared in ordinary
+         study mode. Never attach it to an exam/result context. */
+      if (ctx.page === 'app' && !ctx.currentQuestion && !ctx.examState
+          && typeof window.__getPerStudyMaterial === 'function') {
+        var studyMaterial = String(window.__getPerStudyMaterial() || '').trim().slice(0, 6000);
+        if (studyMaterial) ctx.studyMaterial = studyMaterial;
+      }
+
       /* Elevens snitt ur lokal historik — bara om ingen sida angett något.
          Tidigare kördes det här blocket alltid och skrev över sidans värde.
          förbättring.html räknar sitt snitt på historik synkad från servern;

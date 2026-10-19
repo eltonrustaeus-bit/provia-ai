@@ -113,6 +113,13 @@ export function buildPERContextPack({
   if (level) pageContext.level = level;
   if (mode) pageContext.mode = mode;
 
+  const examContextDeclared = Boolean(raw.currentQuestion || raw.examState)
+    || ["prov", "resultat", "exam", "exam-result"].includes(page);
+  if (!examContextDeclared && typeof raw.studyMaterial === "string") {
+    const studyMaterial = raw.studyMaterial.replace(/\u0000/g, "").trim().slice(0, 6000);
+    if (studyMaterial) pageContext.studyMaterial = studyMaterial;
+  }
+
   const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360 });
   if (currentQuestion) {
     pageContext.currentQuestion = currentQuestion;

@@ -1240,7 +1240,11 @@ module.exports = async function handler(req, res) {
 
     failureStage = "quality_review";
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
-    let gate = assessment.gateExam(exam, { profile: subjectProfile, requireSourceReferences: true });
+    let gate = assessment.gateExam(exam, {
+      profile: subjectProfile,
+      requireSourceReferences: true,
+      requestedQuestionType: qType,
+    });
     if (truncated) {
       const seenIds = new Set();
       gate.questions = gate.questions.filter((question) => {
@@ -1422,7 +1426,11 @@ module.exports = async function handler(req, res) {
                 qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions: repairCount, truncated: false,
               });
               if (normalized2?.exam) {
-                const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile, requireSourceReferences: true });
+                const candidateGate = assessment.gateExam(normalized2.exam, {
+                  profile: subjectProfile,
+                  requireSourceReferences: true,
+                  requestedQuestionType: qType,
+                });
                 const candidateQuestions = candidateGate.questions;
                 repairCandidateCount = candidateQuestions.length;
                 if (candidateQuestions.length > 0) {
