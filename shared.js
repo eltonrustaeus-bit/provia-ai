@@ -3065,7 +3065,8 @@ function finalizeMsg(div, text) {
       errEl.style.color = ''; errEl.textContent = '';
       if (!email) { errEl.textContent = authText('forgotEmailRequired'); return; }
       btn.disabled = true; btn.textContent = authText('forgotLoading');
-      var redirect = location.origin + '/aterstall.html';
+      var appOrigin = String(window.ExGenRuntime?.appOrigin || '').trim().replace(/\/+$/, '');
+      var redirect = (appOrigin || location.origin) + '/aterstall.html';
       supaPost('recover?redirect_to=' + encodeURIComponent(redirect), { email: email }).then(function() {
         /* Supabase answers 200 whether or not the address exists, and the
            wording keeps it that way — confirming which addresses have

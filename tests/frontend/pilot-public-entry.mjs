@@ -9,20 +9,20 @@ const ok = (name, condition, detail = "") => R.ok(name, condition, detail);
 const axeSource = await readFile(`${ROOT}/node_modules/axe-core/axe.min.js`, "utf8");
 let crash = null;
 
-const runtime = environment => `window.ExGenRuntime = Object.freeze({
+const runtime = (environment, appOrigin = "http://localhost") => `window.ExGenRuntime = Object.freeze({
   environment: ${JSON.stringify(environment)}, projectRef: "exgen-test-project",
   supabaseUrl: "https://exgen-test-project.invalid", publishableKey: "sb_publishable_synthetic_frontend_test_key_only_000000",
-  appOrigin: "http://localhost", authStorageKey: ${JSON.stringify(AUTH_KEY)}
+  appOrigin: ${JSON.stringify(appOrigin)}, authStorageKey: ${JSON.stringify(AUTH_KEY)}
 });`;
 
-async function open(path, environment, width = 1280, state = { signedIn: false, role: null }) {
+async function open(path, environment, width = 1280, state = { signedIn: false, role: null }, appOrigin = "http://localhost") {
   return openPage(browser, `${srv.url}/${path}`, {
     width, height: 900, reducedMotion: "reduce", settle: 500,
     state,
     mocks: {
       role: state.role || "gratis",
       extra: [
-        ["**/js/exgen-runtime.js", route => route.fulfill({ contentType: "application/javascript", body: runtime(environment) })],
+        ["**/js/exgen-runtime.js", route => route.fulfill({ contentType: "application/javascript", body: runtime(environment, appOrigin) })],
         ["**ungdrive.se/**", route => route.abort()],
       ],
     },
@@ -65,6 +65,24 @@ try {
     await page.locator(".pilotPricingIntro a").click();
     const pricingModal = await page.locator("#pvModal").innerText();
     ok("prissidans inloggningsväg öppnar pilotkontots inloggning", /SKOLPILOT · LOGGA IN/.test(pricingModal), `${page.url()} · ${pricingModal.slice(0, 100)}`);
+    await close();
+  }
+
+  {
+    const appOrigin = "https://pilot.example.test";
+    const { page, close } = await open("index.html", "pilot", 1280, { signedIn: false, role: null }, appOrigin);
+    let recoveryUrl = null;
+    await page.route("**/auth/v1/recover?**", async route => {
+      recoveryUrl = route.request().url();
+      await route.fulfill({ json: {} });
+    });
+    await page.locator("a[data-pv-auth='login']").first().click();
+    await page.locator("#pvToForgot").click();
+    await page.locator("#pvFE").fill("synthetic@example.test");
+    await page.locator("#pvFBtn").click();
+    await page.waitForFunction(() => document.querySelector("#pvFE2")?.textContent?.includes("Kolla mejlen"));
+    const redirect = recoveryUrl ? new URL(recoveryUrl).searchParams.get("redirect_to") : null;
+    ok("lösenordsåterställning använder Pilot-runtime-originens stabila callback", redirect === `${appOrigin}/aterstall.html`, String(redirect));
     await close();
   }
 
