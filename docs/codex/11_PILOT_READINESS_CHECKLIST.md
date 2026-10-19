@@ -1,5 +1,13 @@
 # ExGen: checklista for skolpilot
 
+## Senaste Preview — 2026-10-19 (commit `3d42396`)
+
+- P.E.R:s utgangna vanliga inloggningssession behaller nu elevens oskickade fraga i inmatningen medan anvandaren loggas ut. Den nya browserregressionen omfattar HTTP 401, HTTP 503, natverksfel och avbruten strom och passerade 12/12; varje fel annonseras, syns i chatten och ateraktiverar Skicka.
+- Commit `3d42396` ar pushad till pilotbranchen. Vercel Preview `dpl_AsBzCd1TMVVTCwSLj74Y8sMqrFmG` ar `READY`, target `preview`, fran exakt SHA `3d42396`.
+- Inga staging-AI-anrop gjordes eftersom staginginloggning fortsatt ar blockerad. Ingen `main`-merge, produktionsdeploy, Auth-/databasandring eller stagingradering gjordes.
+
+**PILOT NOT READY.** Livegenerering, P.E.R., rattning och sparning i staging ar fortfarande overifierade.
+
 ## Lokal uppfoljning efter Preview — 2026-10-19
 
 - P.E.R.-fel vid HTTP-fel, avbruten strom eller natverksfel annonseras nu aven via befintlig `role=status`/`aria-live=polite`-region. Webblasarregressionen kontrollerar att felet annonseras och visas, att elevens fraga ligger kvar och att Skicka kan anvandas igen.
