@@ -1,5 +1,17 @@
 # ExGen: checklista for skolpilot
 
+## Aktuell statuskontroll — 2026-10-19
+
+- Bekraftad Preview `dpl_AsBzCd1TMVVTCwSLj74Y8sMqrFmG` ar READY fran kodcommit `3d42396` pa pilotbranchen. Den publika runtime-konfigurationen hamtades autentiserat fran just deploymenten och verifierades utan att visa nyckelvardet: pilotlage, stagingref `yhcinqejsocpmmetazpz` och appOrigin `provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app`. Supabase-projektet `exgen-pilot-staging` ar `ACTIVE_HEALTHY`.
+- Supabase Redirect URLs visar den enda godkanda aterstallningscallbacken `https://provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app/aterstall.html`. Site URL ar fortsatt `http://localhost:3000`; SMTP-installning har inte andrats.
+- Avgransade Auth-loggar 2026-10-19 visar fyra `/token`-forsok med `grant_type=password` och status 200 (15:20-15:53 UTC), samt senare lyckade `refresh_token`-anrop till 18:36 UTC. Tidigare `invalid_credentials`-forsok finns kvar. Loggfragan exponerade inga identitetsfalt, sa detta bevisar inte vilken Preview-flik eller anvandarhandling som lyckades och motsager inte direkt anvandarens uppgift att inloggning nu misslyckas.
+- Den generiska 200-responsen fran `/recover` bevisar fortfarande inte mejlleverans. Ingen aterstallning skickades av Codex efter callbackandringen. Standard-SMTP:s leverans till mottagaren ar inte verifierad.
+- Vercel runtime-loggar for den senaste Previewn gav ingen matchning pa `exam_quality_rejected` under en 30-minutersfraga. Detta ar inte bevis for att ingen annan korning skett; Hobby-loggretention gav fel nar en bredare period efterfragades.
+- Lokala riktade tester: provpipeline/verifierare, rattningsaterhamtning, completion-proof, session recovery, P.E.R.-provkontext och felannonsering gav godkanda filresultat. Separat efter den nya HTTP-502-regressionen passerade `grading-recovery-concurrency.test.mjs` och `grading-provider-timeout.test.mjs` (2/2). Full offline-svit ar inte omkord i denna uppfoljning.
+- Nasta live-steg ar att anvandaren provar den stabila branch-Previewn ovan och rapporterar endast vilket fel som visas. Om inloggningen lyckas, kor avgransat syntetiskt prov/P.E.R./rattning/sparning. Om den misslyckas, samla en ny Auth-loggkontroll utan e-post eller andra identifierare; andringar av losenord, SMTP, roll, kvot, stagingdata, `main` och Production kraver fortsatt separat beslut.
+
+**PILOT NOT READY.** Livekvalitet, providerprestanda, rattning och sparning ar inte verifierade i aktuell staging-Preview.
+
 ## Senaste Preview — 2026-10-19 (commit `3d42396`)
 
 - P.E.R:s utgangna vanliga inloggningssession behaller nu elevens oskickade fraga i inmatningen medan anvandaren loggas ut. Den nya browserregressionen omfattar HTTP 401, HTTP 503, natverksfel och avbruten strom och passerade 12/12; varje fel annonseras, syns i chatten och ateraktiverar Skicka.

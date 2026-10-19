@@ -40,11 +40,13 @@ const body = {
 
 let state = "active";
 let fingerprint = null;
+let lastClaimFingerprint = null;
 let result = null;
 let activeCount = 0;
 let providerCalls = 0;
 let quotaCalls = 0;
 let saveCalls = 0;
+let releasedClaims = [];
 let staleClaim = false;
 let failNextProvider = false;
 let finishProvider;
@@ -68,6 +70,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
     if (staleClaim) return Response.json("stale");
     const given = JSON.parse(init.body).p_answer_fingerprint;
+    lastClaimFingerprint = given;
     if (state === "completed") return Response.json(given === fingerprint ? "completed" : "conflict");
     if (state === "grading") return Response.json(given === fingerprint ? "pending" : "conflict");
     if (state !== "active") return Response.json(state);
@@ -76,6 +79,7 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json("claimed");
   }
   if (url.endsWith("/rest/v1/rpc/release_exam_grading")) {
+    releasedClaims.push(JSON.parse(init.body));
     state = "active";
     fingerprint = null;
     return Response.json("released");
@@ -97,7 +101,10 @@ globalThis.fetch = async (input, init = {}) => {
     providerCalls++;
     if (failNextProvider) {
       failNextProvider = false;
-      throw new DOMException("Synthetic provider outage", "AbortError");
+      return new Response(JSON.stringify({ error: { message: "Synthetic upstream failure" } }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     providerStarted();
     await providerGate;
@@ -174,12 +181,19 @@ try {
   const providerCallsBeforeRetry = providerCalls;
   const quotaCallsBeforeRetry = quotaCalls;
   const saveCallsBeforeRetry = saveCalls;
+  releasedClaims = [];
   failNextProvider = true;
   const providerFailure = await invoke(body);
   assert.equal(providerFailure.status, 502);
   assert.equal(providerFailure.body.error, "grading_provider_unavailable");
   assert.equal(state, "active", "a controlled provider failure releases the exact grading claim");
   assert.equal(saveCalls, saveCallsBeforeRetry, "a failed first attempt cannot persist a partial score");
+  assert.equal(result, null, "an upstream HTTP 502 cannot leave a recoverable partial result");
+  assert.deepEqual(releasedClaims, [{
+    p_user_id: userId,
+    p_submission_id: submissionId,
+    p_answer_fingerprint: lastClaimFingerprint,
+  }], "only the exact failed submission and answer fingerprint are released");
 
   const retried = await invoke(body);
   assert.equal(retried.status, 200, "the same signed submission can be graded after a controlled provider failure");
