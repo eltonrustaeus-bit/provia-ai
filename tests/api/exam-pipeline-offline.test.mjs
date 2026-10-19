@@ -611,6 +611,23 @@ try {
   verifierRejectQuestionId = null;
 
   activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = ["q-1", "q-2", "q-3", "retry-1", "retry-2", "retry-3"];
+  const noApprovedQuestions = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(noApprovedQuestions, "all generated questions fail review");
+  const noApprovedLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(noApprovedLog.finalQuestionCount, 0);
+  assert.deepEqual(noApprovedLog.initialVerifierFailureCodes, {
+    reviewer_rejected: 3, required_changes: 3, low_factual_accuracy: 3,
+  }, "zero-question rejection records safe aggregate reviewer categories");
+  assert.equal(Object.hasOwn(noApprovedLog, "questions"), false);
+  assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
+    "zero-question diagnostics never include generated question text");
+  verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
   regenerationQuestions = repairedQuestions.map((question, index) => ({
     ...question,
     id: `retry-same-stem-${index + 1}`,

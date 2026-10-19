@@ -1255,7 +1255,22 @@ module.exports = async function handler(req, res) {
     let repairDuplicateCount = 0;
     let repairCrossRoundDuplicateCount = 0;
     let combinedQuestionCount = 0;
+    const initialVerifierFailureCodes = {};
     const repairVerifierFailureCodes = {};
+    const collectVerifierFailureCodes = (vres) => {
+      const codes = [];
+      if (!vres) codes.push("missing_review_result");
+      if (vres && vres.approved !== true) codes.push("reviewer_rejected");
+      if (Array.isArray(vres?.required_changes) && vres.required_changes.length > 0) codes.push("required_changes");
+      if (Number(vres?.factual_accuracy) < 0.75) codes.push("low_factual_accuracy");
+      if (Number(vres?.ambiguity_score) > 0.2) codes.push("high_ambiguity");
+      if (Number(vres?.difficulty_match) < 0.6) codes.push("difficulty_mismatch");
+      if (Number(vres?.source_alignment) < 0.6) codes.push("low_source_alignment");
+      if (Number(vres?.scoring_quality) < 0.6) codes.push("low_scoring_quality");
+      if (Number(vres?.language_quality) < 0.6) codes.push("low_language_quality");
+      if (codes.length === 0) codes.push("review_thresholds");
+      return codes;
+    };
     if (exam.questions.length > 0 && budget.remaining() < MIN_VERIFIER_MS) {
       verifierSkipped = true;
       for (const q of exam.questions) {
@@ -1316,7 +1331,12 @@ module.exports = async function handler(req, res) {
             }
           }
           if (verifierOk) verifierOutcome.approved++;
-          else verifierOutcome.rejected++;
+          else {
+            verifierOutcome.rejected++;
+            for (const code of collectVerifierFailureCodes(vres)) {
+              initialVerifierFailureCodes[code] = (initialVerifierFailureCodes[code] || 0) + 1;
+            }
+          }
           if (verifierOk && solverOk) approvedIds.add(String(q.id));
           else rejectedIds.push(String(q.id));
         }
@@ -1406,17 +1426,9 @@ module.exports = async function handler(req, res) {
                       const vres = v2.perQuestion.get(String(q.id));
                       const verifierOk = !!(vres && verifier.decideApproval(vres));
                       if (!verifierOk) {
-                        const codes = [];
-                        if (!vres || vres.approved !== true) codes.push("reviewer_rejected");
-                        if (Array.isArray(vres?.required_changes) && vres.required_changes.length > 0) codes.push("required_changes");
-                        if (Number(vres?.factual_accuracy) < 0.75) codes.push("low_factual_accuracy");
-                        if (Number(vres?.ambiguity_score) > 0.2) codes.push("high_ambiguity");
-                        if (Number(vres?.difficulty_match) < 0.6) codes.push("difficulty_mismatch");
-                        if (Number(vres?.source_alignment) < 0.6) codes.push("low_source_alignment");
-                        if (Number(vres?.scoring_quality) < 0.6) codes.push("low_scoring_quality");
-                        if (Number(vres?.language_quality) < 0.6) codes.push("low_language_quality");
-                        if (codes.length === 0) codes.push("review_thresholds");
-                        for (const code of codes) repairVerifierFailureCodes[code] = (repairVerifierFailureCodes[code] || 0) + 1;
+                        for (const code of collectVerifierFailureCodes(vres)) {
+                          repairVerifierFailureCodes[code] = (repairVerifierFailureCodes[code] || 0) + 1;
+                        }
                       }
                       let solverOk = q.type !== "mc";
                       if (q.type === "mc") {
@@ -1591,7 +1603,25 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (exam.questions.length > 0 && exam.questions.length < numQuestions) {
+    if (exam.questions.length === 0 && !solverOutcome.callOk && solverOutcome.checked > 0) {
+      return fail(503, {
+        ok: false,
+        error: "independent_check_unavailable",
+        requestId: quotaRequestId,
+        message: lang === "en"
+          ? "The independent answer check could not be completed. No exam was delivered; please try again."
+          : "Den oberoende facitkontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen."
+      });
+    }
+
+    if (exam.questions.length < numQuestions) {
+      const structuralIssueCounts = {};
+      for (const item of gate.dropped) {
+        for (const issue of item.issues || []) {
+          if (!/^[a-z][a-z0-9_]{0,63}$/.test(issue)) continue;
+          structuralIssueCounts[issue] = (structuralIssueCounts[issue] || 0) + 1;
+        }
+      }
       console.log(JSON.stringify({
         event: "exam_quality_rejected",
         requestId: quotaRequestId,
@@ -1603,10 +1633,12 @@ module.exports = async function handler(req, res) {
         generationMs: gen.latencyMs,
         structurallyDropped: gate.dropped.length,
         structurallyFlagged: gate.flagged.length,
+        structuralIssueCounts,
         verifierChecked: verifierOutcome.checked,
         verifierApproved: verifierOutcome.approved,
         verifierRejected: verifierOutcome.rejected,
         verifierCallOk: verifierOutcome.callOk,
+        initialVerifierFailureCodes,
         repairAttempted,
         repairFailureStage,
         repairCandidateCount,
@@ -1634,26 +1666,6 @@ module.exports = async function handler(req, res) {
         message: lang === "en"
           ? "There were not enough distinct questions that could be verified. No exam was delivered. Add relevant course material or narrow the topic, then try again."
           : "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen."
-      });
-    }
-
-    if (exam.questions.length === 0 && !solverOutcome.callOk && solverOutcome.checked > 0) {
-      return fail(503, {
-        ok: false,
-        error: "independent_check_unavailable",
-        message: lang === "en"
-          ? "The independent answer check could not be completed. No exam was delivered; please try again."
-          : "Den oberoende facitkontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen."
-      });
-    }
-
-    if (exam.questions.length === 0) {
-      return fail(502, {
-        ok: false,
-        error: lang === "en"
-          ? "No questions passed the quality review. No exam was delivered. Add relevant course material or narrow the topic, then try again."
-          : "Inga frågor klarade kvalitetsgranskningen. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen.",
-        gate: { profile: subjectProfile, dropped: gate.dropped },
       });
     }
 
