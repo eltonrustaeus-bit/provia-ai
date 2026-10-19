@@ -47,7 +47,7 @@ assert.match(generatorApi, /qType !== "graph"\s*&&\s*regenerationTimeoutMs !== n
 assert.match(generatorApi, /REGENERATION_REVIEW_TIMEOUT_MS = 15_000/, "the optional retry review has a bounded timeout");
 assert.match(generatorApi, /REGENERATION_POST_REVIEW_RESERVE_MS = 14_000/, "regeneration reserves time for issue, quota and usage finalization");
 assert.match(generatorApi, /solver\.solveQuestions\(candidateQuestions/, "regenerated MC items receive a fresh independent blind-solver check");
-assert.match(generatorApi, /kept\.length > round1ApprovedQuestions\.length/, "a retry replaces the first batch only when it yields more fully approved questions");
+assert.match(generatorApi, /combinedQuestions\.length > round1ApprovedQuestions\.length/, "a retry replaces the first batch only when it yields more fully approved questions");
 assert.match(generatorApi, /verifier\.verifyQuestions\(candidateQuestions,[\s\S]*?timeoutMs:/, "retry verification receives the remaining bounded timeout");
 assert.match(generatorApi, /keep: false, reason: "solver_unavailable"/, "multiple-choice items fail closed when the independent solver is unavailable");
 assert.match(ocrApi, /p_bucket: "ocr:" \+ user\.id/, "OCR calls are rate limited per account");

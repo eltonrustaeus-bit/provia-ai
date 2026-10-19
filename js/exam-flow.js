@@ -576,7 +576,7 @@
       courses: courses,
       level: lvl,
       qType: qType,
-      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 12, 3, 20) : 12,
+      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 3, 3, 20) : 3,
       missCountFor: function (course) {
         var c = String(course || "").trim().toLowerCase();
         return miss.filter(function (m) {

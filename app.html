@@ -701,7 +701,7 @@ white-space:nowrap;
 <div>
 <label class="fieldLabel" for="numQuestions" id="tNum">Antal frågor</label>
 <select id="numQuestions">
-<option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
+<option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
 <option>9</option><option>10</option><option>11</option><option>12</option>
 <option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
 </select>
@@ -1715,7 +1715,7 @@ function runTrainModeIfRequested(){
   if(pastedTextEl())pastedTextEl().value=mat;
   try{localStorage.setItem(LS_MATERIAL,mat);}catch{}
   if(qTypeEl())qTypeEl().value="mix";
-  if(numQuestionsEl())numQuestionsEl().value="12";
+  if(numQuestionsEl())numQuestionsEl().value="3";
 
   // Kursen tas från felbankens eget val när det finns; annars får flödet gissa
   // utifrån historiken.
@@ -1977,7 +1977,7 @@ function clearAll(){
   if(courseEl())courseEl().value="";
   if(levelEl())levelEl().value="C";
   if(qTypeEl())qTypeEl().value="mix";
-  if(numQuestionsEl())numQuestionsEl().value="12";
+  if(numQuestionsEl())numQuestionsEl().value="3";
   if(imageInputEl())imageInputEl().value="";
   setOcrStatus("");currentExam=null;currentExamProof=null;currentExamAnswers=null;
   const chk=document.getElementById("useCustomCourse"),cs=document.getElementById("courseSearch"),cc=document.getElementById("customCourse"),st=document.getElementById("coursePickerStatus");
@@ -2133,8 +2133,8 @@ try{
 
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
-    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12),focusTerms:selectedExamFocusTerms};
-    showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
+    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||3),focusTerms:selectedExamFocusTerms};
+    showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
@@ -2371,7 +2371,7 @@ try{
       /* Mastery skrivs av api/grade.js; resultatet visas först efter ägarkontroll. */
       const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
       const courseName=(courseEl()?.value||"").trim();
-      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
+      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||3),total_points:total,max_points:max,percent};
       const userId=gradingOwnerId;
       const localId=newLocalExamId();
       const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
@@ -2510,7 +2510,7 @@ try{
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
-      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 12)));
+      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 3)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
       selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den

@@ -80,8 +80,8 @@ try {
   await page.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
   await page.waitForSelector(".xf-exam.on .xf-question-quality-note");
 
-  assert.equal(generatedRequest?.numQuestions, 12, "the learner's selected exam size reaches generation");
-  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 12 questions.*1 question is ready/i);
+  assert.equal(generatedRequest?.numQuestions, 3, "the fast default exam size reaches generation");
+  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 3 questions.*1 question is ready/i);
   const noteLayout = await page.locator(".xf-question-quality-note").evaluate((note) => {
     const noteRect = note.getBoundingClientRect();
     const questionRect = document.querySelector(".xf-exam.on .xf-q-text").getBoundingClientRect();

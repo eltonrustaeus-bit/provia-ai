@@ -175,8 +175,8 @@ try {
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
   const countChips = page.locator("#xf .xf-screen[data-screen='aim'] .xf-chips").nth(2);
   await page.getByRole("button", { name: "Blandat" }).click();
-  assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "12",
-    "switching out of graph mode restores a valid general exam size");
+  assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "3",
+    "switching out of graph mode restores the fast default exam size");
   assert.equal(await countChips.getByRole("button", { name: "1", exact: true }).isDisabled(), true,
     "one-question count is unavailable for non-graph exams");
   await countChips.getByRole("button", { name: "6", exact: true }).click();

@@ -335,6 +335,21 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await incompleteStreamPage.locator("#perInput").inputValue(), QUESTION,
       "an SSE response without its completion event is not treated as a finished answer");
 
+    const interruptedProviderPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8" },
+        body: 'data: {"delta":"Börja med en ledtråd."}\n\ndata: {"error":"P.E.R är tillfälligt otillgänglig. Försök igen senare."}\n\n'
+      }));
+    await interruptedProviderPage.locator("#perBubble").click();
+    await interruptedProviderPage.locator("#perInput").fill(QUESTION);
+    await interruptedProviderPage.locator("#perSendBtn").click();
+    await interruptedProviderPage.locator("#perMessages").getByText("P.E.R är tillfälligt otillgänglig. Försök igen senare.").waitFor();
+    assert.equal(await interruptedProviderPage.locator("#perInput").inputValue(), QUESTION,
+      "a provider error after partial output restores the question instead of presenting a partial answer");
+    assert.equal(await interruptedProviderPage.locator("#perMessages").getByText("Börja med en ledtråd.").count(), 0,
+      "partial streamed content is not shown as a completed answer after a provider error");
+
     const completeStreamPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       route => route.fulfill({
         status: 200,

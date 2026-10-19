@@ -263,6 +263,14 @@ try {
     "unsupported graph formats and line bounds do not consume a mock-exam quota");
 
   calls.length = 0;
+  const defaultSizedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc",
+  });
+  assert.equal(defaultSizedExam.status, 200, JSON.stringify(defaultSizedExam.body));
+  assert.equal(defaultSizedExam.body.exam.questions.length, 3,
+    "the API defaults requests without a question count to a complete fast exam");
+
+  calls.length = 0;
   quotaDenied = true;
   const quotaDeniedExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 1b",

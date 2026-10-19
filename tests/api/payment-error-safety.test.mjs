@@ -21,10 +21,10 @@ const cancelRoute = roleApi.slice(cancelStart, cancelEnd);
 assert.doesNotMatch(cancelRoute, /details:\s*result\b/);
 assert.match(cancelRoute, /cancellation_failed[\s\S]*?Prenumerationen kunde inte avslutas/);
 
-const quotaStart = generator.indexOf("quota = await consumeMockExamQuota");
+const quotaStart = generator.indexOf("try {\n    [quota, focusInstruction] = await Promise.all");
 const quotaEnd = generator.indexOf("if (!quota.ok)", quotaStart);
 const quotaRoute = generator.slice(quotaStart, quotaEnd);
-assert.match(quotaRoute, /catch\s*\{\s*await refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\);\s*return json\(res, 503/,
+assert.match(quotaRoute, /catch\s*\{[\s\S]*?await refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\);[\s\S]*?return json\(res, 503/,
   "an ambiguous reservation error is reconciled before returning a generic response");
 assert.doesNotMatch(quotaRoute, /details:|String\(e\)|e\.details/);
 
