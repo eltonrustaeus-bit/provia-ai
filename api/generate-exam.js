@@ -1305,7 +1305,7 @@ module.exports = async function handler(req, res) {
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
       const [v1, s1] = await Promise.all([
-        verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang, material: pastedText }),
+        verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level }),
         solver.solveQuestions(exam.questions, {
           apiKey, model, subjectProfile, lang, pastedText,
           material: pastedText,
@@ -1425,7 +1425,7 @@ module.exports = async function handler(req, res) {
                   repairFailureStage = "repair_verification";
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
-                      apiKey, model, subjectProfile, lang, material: pastedText,
+                      apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),
                     solver.solveQuestions(candidateQuestions, {

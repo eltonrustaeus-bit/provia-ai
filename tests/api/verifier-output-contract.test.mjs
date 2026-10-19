@@ -7,7 +7,7 @@ const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApprova
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, option_quality: [] });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -25,7 +25,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs, targetLevel }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -45,6 +45,11 @@ assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra re
 assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
   "schema inspection without a question count remains backward compatible");
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
+const levelBoundReview = await runWithResults([result("q1", true)], [question("q1")], "", undefined, "C");
+assert.match(levelBoundReview.requestBody.input[0].content, /selected exam level is C/i);
+assert.match(levelBoundReview.requestBody.input[0].content, /difficulty_match against this target/i);
+assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /valda provnivå är C/i);
+assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /två relevanta led/i);
 const boundedReview = await runWithResults([result("q1", true)], [question("q1")], "", 6_500);
 assert.equal(boundedReview.requestTimeoutMs, 6_500, "retry can bound the reviewer to the remaining function budget");
 const cappedReview = await runWithResults([result("q1", true)], [question("q1")], "", 60_000);
