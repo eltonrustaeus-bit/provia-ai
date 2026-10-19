@@ -1480,6 +1480,25 @@ module.exports = async function handler(req, res) {
     }
 
     if (exam.questions.length > 0 && exam.questions.length < numQuestions) {
+      console.log(JSON.stringify({
+        event: "exam_quality_rejected",
+        failure: "incomplete_exam",
+        subjectProfile,
+        numRequested: numQuestions,
+        truncated,
+        elapsedMs: budget.elapsed(),
+        generationMs: gen.latencyMs,
+        structurallyDropped: gate.dropped.length,
+        structurallyFlagged: gate.flagged.length,
+        verifierChecked: verifierOutcome.checked,
+        verifierApproved: verifierOutcome.approved,
+        verifierRejected: verifierOutcome.rejected,
+        verifierCallOk: verifierOutcome.callOk,
+        solverChecked: solverOutcome.checked,
+        solverRejected: solverOutcome.rejected,
+        solverCallOk: solverOutcome.callOk,
+        finalQuestionCount: exam.questions.length,
+      }));
       return fail(502, {
         ok: false,
         error: "incomplete_exam",
