@@ -118,6 +118,17 @@ const openQuestion = {
   scoring_rubric: { parts: [{ description: "x = 2", points: 1 }], full_score_requirements: "x = 2", partial_credit_notes: "" },
   source_references: ["2x = 4"],
 };
+const validOpenQuestion = { ...openQuestion, model_answer: "x = 2", rubric: "En poäng för x = 2." };
+const validOpenResponse = await runWithResults([{
+  id: validOpenQuestion.id, approved: true, factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  option_quality: [], issues: [], required_changes: [],
+}], [validOpenQuestion], "Ekvationer: 2x = 4.");
+const validOpenReview = validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id);
+assert.equal(validOpenReview.option_quality_contract_ok, true,
+  "an empty option list is a complete quality review for a short-answer item");
+assert.equal(decideApproval(validOpenReview), true,
+  "a valid reviewed short-answer question still passes the deterministic gate");
 const needsRevision = {
   id: "open-1", approved: false, factual_accuracy: 0.2, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 0.2, language_quality: 1,

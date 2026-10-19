@@ -89,7 +89,7 @@ function decideApproval(r, thresholds) {
   if (!r || typeof r !== "object") return false;
   if (r.approved !== true) return false;
   if (Array.isArray(r.required_changes) && r.required_changes.length > 0) return false;
-  if (r.option_quality_contract_ok === false ||
+  if (r.option_quality_contract_ok !== true ||
       (Array.isArray(r.option_quality) && r.option_quality.some((quality) => quality !== true))) return false;
   const scores = [
     r.factual_accuracy,

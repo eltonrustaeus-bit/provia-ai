@@ -20,7 +20,7 @@ function check(name, fn) { try { fn(); ok(name); } catch (e) { fail(name, e); } 
 const good = {
   id: "1", approved: true, factual_accuracy: 0.95, ambiguity_score: 0.05,
   difficulty_match: 0.9, source_alignment: 0.9, scoring_quality: 0.9, language_quality: 0.95,
-  option_quality: [], issues: [], required_changes: [],
+  option_quality: [], option_quality_contract_ok: true, issues: [], required_changes: [],
 };
 
 check("approves a high-confidence, low-ambiguity result", () => {
@@ -88,6 +88,11 @@ check("rejects when there are any required_changes, even with good scores", () =
 
 check("rejects a question when any distractor is marked incoherent", () => {
   assert.equal(V.decideApproval({ ...good, option_quality: [true, false, true] }), false);
+});
+
+check("fails closed unless option-quality contract validation is explicitly true", () => {
+  assert.equal(V.decideApproval({ ...good, option_quality_contract_ok: undefined }), false);
+  assert.equal(V.decideApproval({ ...good, option_quality_contract_ok: false }), false);
 });
 
 check("option-quality is required by the structured verifier schema", () => {
