@@ -596,8 +596,17 @@ const RESPONSE_RESERVE_MS = 3_000;      // serialising and returning the respons
 const VERIFIER_RESERVE_MS = 30_000;
 const MIN_VERIFIER_MS = 8_000;          // below this, skip verification entirely
 const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
+const PRE_GENERATION_RESERVE_MS = 6_000; // quota (5 s) and adaptive focus (4 s) run concurrently, plus margin
 const REGENERATION_REVIEW_TIMEOUT_MS = 15_000; // optional retry; timeout safely falls back to round 1
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
+
+function minimumExamPreflightBudgetMs(qType) {
+  return qType === "graph" ? 0 : MIN_GENERATION_MS + VERIFIER_RESERVE_MS + PRE_GENERATION_RESERVE_MS;
+}
+
+function minimumExamGenerationReviewBudgetMs() {
+  return MIN_GENERATION_MS + VERIFIER_RESERVE_MS;
+}
 
 function regenerationGenerationTimeout(remainingMs) {
   const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + REGENERATION_POST_REVIEW_RESERVE_MS;
@@ -958,8 +967,8 @@ module.exports = async function handler(req, res) {
     return json(res, 503, { ok: false, error: "EXAM_SIGNING_NOT_CONFIGURED" });
   }
 
-  const rules = await loadCentralRules();
-  const role = rules.normalizeRole(await loadUserRole(user.id));
+  const [rules, rawRole] = await Promise.all([loadCentralRules(), loadUserRole(user.id)]);
+  const role = rules.normalizeRole(rawRole);
   const mockLimit = rules.getFeatureLimit(role, "mockExam");
   const entitlements = rules.getEntitlementSnapshot(role);
 
@@ -1025,24 +1034,44 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  // Leave room for the bounded quota request (5 s), adaptive-focus lookup (4 s),
-  // at least one generation window, review, and the reserved response time.
-  if (qType !== "graph" && budget.remaining() < MIN_GENERATION_MS + VERIFIER_RESERVE_MS + 9_000) {
+  const quotaRequestId = crypto.randomUUID();
+  function logBudgetGate(stage, requiredMs) {
+    console.warn(JSON.stringify({
+      event: "exam_generation_budget_gate",
+      requestId: quotaRequestId,
+      stage,
+      elapsedMs: budget.elapsed(),
+      remainingMs: Math.max(0, Math.floor(budget.remaining())),
+      requiredMs,
+      qType,
+      numQuestions,
+    }));
+  }
+
+  // Quota and adaptive-focus requests are independent, so reserve their
+  // concurrent ceiling rather than adding both timeouts to the critical path.
+  const preflightRequiredMs = minimumExamPreflightBudgetMs(qType);
+  if (preflightRequiredMs && budget.remaining() < preflightRequiredMs) {
+    logBudgetGate("preflight", preflightRequiredMs);
     return json(res, 503, {
       ok: false,
       error: "quality_review_unavailable",
+      requestId: quotaRequestId,
       message: lang === "en"
         ? "There is not enough time to generate and check a reliable exam. Please try again."
         : "Det finns inte tid nog att skapa och kvalitetskontrollera ett tillförlitligt prov. Försök igen."
     });
   }
 
-  const quotaRequestId = crypto.randomUUID();
   const quotaPeriod = rules.currentPeriodKey(mockLimit.period);
   let quota;
+  let focusInstruction = "";
   let issuedSubmissionId = null;
   try {
-    quota = await consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId);
+    [quota, focusInstruction] = await Promise.all([
+      consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId),
+      buildAdaptiveFocus(user.id, { numQuestions, lang }),
+    ]);
   } catch {
     await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
     console.error(JSON.stringify({
@@ -1101,11 +1130,6 @@ module.exports = async function handler(req, res) {
     const model = pickModel({ isMath });
     const responseFormat = buildMockExamSchema(numQuestions);
 
-  /* Kunskapsläget hämtas parallellt med att modellen väljs — 4 s timeout och
-     tom sträng vid varje fel, så en långsam profilläsning aldrig kan äta av
-     genereringsbudgeten eller fälla ett prov. */
-    const focusInstruction = await buildAdaptiveFocus(user.id, { numQuestions, lang });
-
     const { systemPrompt, userPrompt } = buildExamPrompts({
       lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms
     });
@@ -1121,11 +1145,14 @@ module.exports = async function handler(req, res) {
 
     // Ordinary AI-authored items need a complete review window. Do not start an
     // expensive generation if the remaining function time cannot accommodate it.
-    const canVerify = budget.remaining() >= MIN_GENERATION_MS + VERIFIER_RESERVE_MS;
+    const generationReviewRequiredMs = minimumExamGenerationReviewBudgetMs();
+    const canVerify = budget.remaining() >= generationReviewRequiredMs;
     if (!canVerify && qType !== "graph") {
+      logBudgetGate("after_quota_and_focus", generationReviewRequiredMs);
       return fail(503, {
         ok: false,
         error: "quality_review_unavailable",
+        requestId: quotaRequestId,
         message: lang === "en"
           ? "There is not enough time to generate and check a reliable exam. Please try again."
           : "Det finns inte tid nog att skapa och kvalitetskontrollera ett tillförlitligt prov. Försök igen."
@@ -1589,6 +1616,8 @@ module.exports.looksLikeMath = looksLikeMath;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
+module.exports.minimumExamPreflightBudgetMs = minimumExamPreflightBudgetMs; // pure — unit-tested
+module.exports.minimumExamGenerationReviewBudgetMs = minimumExamGenerationReviewBudgetMs; // pure — unit-tested
 module.exports.streamGeneration = streamGeneration; // transport — exercised by the eval
 module.exports.refundMockExamQuota = refundMockExamQuota;
 module.exports.commitMockExamQuota = commitMockExamQuota;
