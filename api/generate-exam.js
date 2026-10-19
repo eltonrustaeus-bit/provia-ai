@@ -599,7 +599,8 @@ const VERIFIER_RESERVE_MS = 30_000;
 const MIN_VERIFIER_MS = 8_000;          // below this, skip verification entirely
 const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
 const PRE_GENERATION_RESERVE_MS = 6_000; // quota (5 s) and adaptive focus (4 s) run concurrently, plus margin
-const REGENERATION_REVIEW_TIMEOUT_MS = 15_000; // optional retry; timeout safely falls back to round 1
+const REGENERATION_MIN_GENERATION_MS = 8_000; // a short repair may return a salvageable complete set
+const REGENERATION_REVIEW_TIMEOUT_MS = 10_000; // optional retry; timeout safely falls back to round 1
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
 
 function minimumExamPreflightBudgetMs(qType) {
@@ -612,7 +613,7 @@ function minimumExamGenerationReviewBudgetMs() {
 
 function regenerationGenerationTimeout(remainingMs) {
   const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + REGENERATION_POST_REVIEW_RESERVE_MS;
-  if (remainingMs <= MIN_GENERATION_MS + verificationAndFinalization) return null;
+  if (remainingMs <= REGENERATION_MIN_GENERATION_MS + verificationAndFinalization) return null;
   return remainingMs - verificationAndFinalization;
 }
 

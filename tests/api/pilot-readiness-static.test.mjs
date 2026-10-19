@@ -44,7 +44,8 @@ assert.match(generatorApi, /correct_index, model_answer, rubric, scoring_rubric,
 assert.match(generatorApi, /bytes > 64 \* 1024/, "exam generation request is capped while streaming");
 assert.match(generatorApi, /error: "quality_review_unavailable"/, "ordinary exams are not delivered when review is unavailable");
 assert.match(generatorApi, /qType !== "graph"\s*&&\s*regenerationTimeoutMs !== null/, "regeneration stays limited to supported non-graph exams with enough time");
-assert.match(generatorApi, /REGENERATION_REVIEW_TIMEOUT_MS = 15_000/, "the optional retry review has a bounded timeout");
+assert.match(generatorApi, /REGENERATION_MIN_GENERATION_MS = 8_000/, "the optional repair generation has a realistic minimum window");
+assert.match(generatorApi, /REGENERATION_REVIEW_TIMEOUT_MS = 10_000/, "the optional retry review has a bounded timeout");
 assert.match(generatorApi, /REGENERATION_POST_REVIEW_RESERVE_MS = 14_000/, "regeneration reserves time for issue, quota and usage finalization");
 assert.match(generatorApi, /solver\.solveQuestions\(candidateQuestions/, "regenerated MC items receive a fresh independent blind-solver check");
 assert.match(generatorApi, /combinedQuestions\.length > round1ApprovedQuestions\.length/, "a retry replaces the first batch only when it yields more fully approved questions");
