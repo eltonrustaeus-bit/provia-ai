@@ -1248,6 +1248,12 @@ module.exports = async function handler(req, res) {
     let repairVerifierChecked = 0;
     let repairVerifierApproved = 0;
     let repairVerifierFailure = null;
+    let round1ApprovedCount = 0;
+    let round1UniqueApprovedCount = 0;
+    let repairUniqueApprovedCount = 0;
+    let repairDuplicateCount = 0;
+    let repairCrossRoundDuplicateCount = 0;
+    let combinedQuestionCount = 0;
     const repairVerifierFailureCodes = {};
     if (exam.questions.length > 0 && budget.remaining() < MIN_VERIFIER_MS) {
       verifierSkipped = true;
@@ -1331,7 +1337,17 @@ module.exports = async function handler(req, res) {
         if (needsRepair && canRegenerate) {
           repairAttempted = true;
           const originalGatedQuestions = exam.questions;
-          const round1ApprovedQuestions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
+          const round1ApprovedCandidates = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
+          round1ApprovedCount = round1ApprovedCandidates.length;
+          const round1ApprovedQuestions = [];
+          const round1ApprovedIds = new Set();
+          for (const q of round1ApprovedCandidates) {
+            const id = String(q.id);
+            if (round1ApprovedIds.has(id) || round1ApprovedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
+            round1ApprovedIds.add(id);
+            round1ApprovedQuestions.push(q);
+          }
+          round1UniqueApprovedCount = round1ApprovedQuestions.length;
           const round1Gate = gate;
           let regenerationSucceeded = false;
           const regenStartedAt = Date.now();
@@ -1423,10 +1439,14 @@ module.exports = async function handler(req, res) {
                     const retryIds = new Set();
                     for (const q of kept) {
                       const id = String(q.id);
-                      if (retryIds.has(id) || retryUniqueQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
+                      if (retryIds.has(id) || retryUniqueQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
+                        repairDuplicateCount++;
+                        continue;
+                      }
                       retryIds.add(id);
                       retryUniqueQuestions.push(q);
                     }
+                    repairUniqueApprovedCount = retryUniqueQuestions.length;
                     const completeRetry = round1ApprovedQuestions.length === 0 && retryUniqueQuestions.length >= numQuestions;
                     const combinedQuestions = completeRetry
                       ? retryUniqueQuestions.slice(0, numQuestions)
@@ -1436,11 +1456,18 @@ module.exports = async function handler(req, res) {
                       for (const q of retryUniqueQuestions) {
                         const id = String(q.id);
                         if (combinedQuestions.length >= numQuestions) break;
-                        if (combinedIds.has(id) || combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
+                        if (combinedIds.has(id) || combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
+                          repairCrossRoundDuplicateCount++;
+                          continue;
+                        }
                         combinedIds.add(id);
                         combinedQuestions.push(q);
                       }
                     }
+                    combinedQuestionCount = combinedQuestions.length;
+                    repairFailureStage = combinedQuestionCount < numQuestions
+                      ? "insufficient_unique_repair"
+                      : "repair_combined";
                     if (combinedQuestions.length > round1ApprovedQuestions.length) {
                       exam = { ...exam, questions: combinedQuestions };
                       if (completeRetry) {
@@ -1578,6 +1605,12 @@ module.exports = async function handler(req, res) {
         repairVerifierApproved,
         repairVerifierFailure,
         repairVerifierFailureCodes,
+        round1ApprovedCount,
+        round1UniqueApprovedCount,
+        repairUniqueApprovedCount,
+        repairDuplicateCount,
+        repairCrossRoundDuplicateCount,
+        combinedQuestionCount,
         solverChecked: solverOutcome.checked,
         solverRejected: solverOutcome.rejected,
         solverCallOk: solverOutcome.callOk,

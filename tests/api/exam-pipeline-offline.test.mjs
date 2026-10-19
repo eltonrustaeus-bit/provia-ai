@@ -504,6 +504,22 @@ try {
     reviewer_rejected: 1, required_changes: 1, low_factual_accuracy: 1,
   },
     "safe repair telemetry records only the review rejection category");
+  assert.deepEqual({
+    round1ApprovedCount: verifierRejectedLog.round1ApprovedCount,
+    round1UniqueApprovedCount: verifierRejectedLog.round1UniqueApprovedCount,
+    repairUniqueApprovedCount: verifierRejectedLog.repairUniqueApprovedCount,
+    repairDuplicateCount: verifierRejectedLog.repairDuplicateCount,
+    repairCrossRoundDuplicateCount: verifierRejectedLog.repairCrossRoundDuplicateCount,
+    combinedQuestionCount: verifierRejectedLog.combinedQuestionCount,
+  }, {
+    round1ApprovedCount: 2,
+    round1UniqueApprovedCount: 2,
+    repairUniqueApprovedCount: 0,
+    repairDuplicateCount: 0,
+    repairCrossRoundDuplicateCount: 0,
+    combinedQuestionCount: 2,
+  }, "incomplete repair telemetry reports only approved/unique counts");
+  assert.equal(verifierRejectedLog.repairFailureStage, "insufficient_unique_repair");
   verifierRejectQuestionId = null;
 
   activeQuestions = questions;
