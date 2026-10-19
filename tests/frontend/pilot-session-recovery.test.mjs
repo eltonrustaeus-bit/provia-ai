@@ -178,12 +178,27 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(afterLogin.auth.user.id, "account-a");
     assert.equal(explainPosts, 1, "restoration never resends or charges the question automatically");
 
+    const reviewQuestion = "Förklara min rättning på fråga 1 steg för steg";
+    const reviewProof = {
+      receipt: "v2.synthetic-signed-completion-receipt",
+      course: "Matematik 1b",
+      material: "Syntetiskt material om linjära funktioner.",
+      questions: [{ id: "synthetic-question", question: "Vad visar m?", grade_task: "synthetic-grade-task" }],
+      answers: [{ id: "synthetic-question", answer: "Syntetiskt elevsvar." }],
+      selectedQuestionId: "synthetic-question"
+    };
+
     const switchPage = await openPilotPage(makeSession("account-a"), "account-b");
     await switchPage.locator("#perBubble").click();
-    await switchPage.locator("#perInput").waitFor({ state: "visible" });
-    await switchPage.locator("#perInput").fill(QUESTION);
-    await switchPage.locator("#perSendBtn").click();
+    await switchPage.evaluate(({ question, proof }) => window.PER.send(question, {
+      helpLevel: 3,
+      examProof: proof
+    }), { question: reviewQuestion, proof: reviewProof });
     await switchPage.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
+    const accountAReview = JSON.parse(await switchPage.evaluate(() =>
+      sessionStorage.getItem("exgen_pilot_pending_per_question")));
+    assert.deepEqual(accountAReview.requestOptions.examProof, reviewProof,
+      "the failed review is bound to account A before reauthentication");
     await switchPage.locator(".per-answer-cta").click();
     await switchPage.locator("#pvLE").fill("account-b@example.test");
     await switchPage.locator("#pvLP").fill("synthetic-password");
@@ -218,14 +233,6 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await expiredPage.locator("#perInput").inputValue(), QUESTION,
       "an expired-but-refreshable stale session does not trap the pilot login CTA");
 
-    const reviewProof = {
-      receipt: "v2.synthetic-signed-completion-receipt",
-      course: "Matematik 1b",
-      material: "Syntetiskt material om linjära funktioner.",
-      questions: [{ id: "synthetic-question", question: "Vad visar m?", grade_task: "synthetic-grade-task" }],
-      answers: [{ id: "synthetic-question", answer: "Syntetiskt elevsvar." }],
-      selectedQuestionId: "synthetic-question"
-    };
     let reviewRetryCalls = 0;
     let reviewRetryBody = null;
     const reviewRecoveryPage = await openPilotPage(makeSession("account-a"), "account-a", null, async route => {
@@ -239,7 +246,6 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       });
     });
     await reviewRecoveryPage.locator("#perBubble").click();
-    const reviewQuestion = "Förklara min rättning på fråga 1 steg för steg";
     await reviewRecoveryPage.evaluate(({ question, proof }) => window.PER.send(question, {
       helpLevel: 3,
       examProof: proof
