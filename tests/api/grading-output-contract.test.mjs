@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 const require = createRequire(import.meta.url);
 const grade = require("../../api/grade.js");
 const tasks = require("../../api/_grade-task.js");
-const { validateNonMcGradeOutput, normalizeChoice } = grade;
+const { normalizeGradeFeedback, validateNonMcGradeOutput, normalizeChoice } = grade;
 const source = await readFile(new URL("../../api/grade.js", import.meta.url), "utf8");
 const expected = [{ id: "q1", max_points: 2 }, { id: "q2", max_points: 2 }];
 const row = (id) => ({
@@ -39,6 +39,21 @@ assert.equal(normalizeChoice("A"), "A");
 assert.equal(normalizeChoice("F."), "F");
 assert.equal(normalizeChoice("A-not-an-answer"), "", "an option prefix cannot turn arbitrary text into a selection");
 assert.equal(normalizeChoice("answer A"), "", "only an explicit option token is accepted");
+assert.equal(
+  normalizeGradeFeedback("Poäng: 2/2. Du saknar ändå en del för full poäng.", 2, 2, "sv"),
+  "Poäng: 2/2. Ditt svar uppfyller bedömningskriterierna för full poäng.",
+  "full-credit feedback cannot contradict the awarded score"
+);
+assert.equal(
+  normalizeGradeFeedback("Score: 1/2. Partially correct.", 1, 2, "en"),
+  "Score: 1/2. Partially correct.",
+  "partial-credit feedback remains available"
+);
+assert.equal(
+  normalizeGradeFeedback("Score: 2/2. Something is still missing.", 2, 2, "en"),
+  "Score: 2/2. Your answer meets the grading criteria for full credit.",
+  "English full-credit feedback also matches the awarded score"
+);
 const guardIndex = source.indexOf("if (!validateNonMcGradeOutput(graded, nonMcPack))");
 const persistIndex = source.indexOf("persistGradedSubmission({", guardIndex);
 assert.ok(guardIndex >= 0 && persistIndex > guardIndex,
@@ -193,6 +208,23 @@ try {
   assert.deepEqual(persistedPayload.per_question.map((item) => item.model_answer), [
     "En kort beskrivning.", "En kort beskrivning.",
   ], "the saved exam result also preserves the signed answer key");
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerOutput = JSON.stringify({ per_question: expected.map((item) => ({
+    ...row(item.id),
+    points: 2,
+    feedback: "Poäng: 2/2. Du saknar ändå en del för full poäng.",
+  })) });
+  const fullCredit = await invoke(body);
+  assert.equal(fullCredit.status, 200, JSON.stringify(fullCredit.body));
+  assert.deepEqual(fullCredit.body.result.per_question.map((item) => item.feedback), [
+    "Poäng: 2/2. Ditt svar uppfyller bedömningskriterierna för full poäng.",
+    "Poäng: 2/2. Ditt svar uppfyller bedömningskriterierna för full poäng.",
+  ], "the persisted response replaces contradictory model feedback for full-credit answers");
+  assert.deepEqual(persistedPayload.per_question.map((item) => item.feedback),
+    fullCredit.body.result.per_question.map((item) => item.feedback),
+    "the stored result and displayed result use the same normalized feedback");
 } finally {
   globalThis.fetch = oldFetch;
   for (const [key, value] of Object.entries(oldEnv)) {

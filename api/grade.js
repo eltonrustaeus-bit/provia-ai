@@ -81,6 +81,15 @@ function clampAwardedPoints(rawPoints, trustedMaxPoints) {
   return clamp(rawPoints || 0, 0, Number.isFinite(maxPoints) ? Math.max(0, maxPoints) : 0);
 }
 
+function normalizeGradeFeedback(feedback, points, maxPoints, lang) {
+  if (maxPoints > 0 && points === maxPoints) {
+    return lang === "sv"
+      ? `Poäng: ${points}/${maxPoints}. Ditt svar uppfyller bedömningskriterierna för full poäng.`
+      : `Score: ${points}/${maxPoints}. Your answer meets the grading criteria for full credit.`;
+  }
+  return String(feedback || "");
+}
+
 function validateNonMcGradeOutput(graded, expectedItems) {
   if (!graded || typeof graded !== "object" || !Array.isArray(graded.per_question) ||
       graded.per_question.length !== expectedItems.length) return false;
@@ -778,6 +787,7 @@ module.exports = async function handler(req, res) {
       "2) Poäng: points måste vara tal inom [0..max_points]. max_points måste matcha uppgiften. " +
       "Om items[].scoring_rubric finns: bedöm VARJE del i scoring_rubric.parts för sig och summera — nämn i feedback vilka delar som gavs poäng. " +
       "Kräv ALDRIG mer än vad scoring_rubric.full_score_requirements uttryckligen listar för full poäng.\n" +
+      "Feedback får inte påstå att något saknas om det inte uttryckligen krävs av scoring_rubric. Om svaret får full poäng, säg inte att något mer behövs för full poäng.\n" +
       "3) Feedback (kort och precis):\n" +
       "   - Börja med 1 rad: 'Poäng: X/Y.'\n" +
       "   - Sedan 2–5 korta punkter: (a) vad som var korrekt, (b) vad som saknas/fel, (c) exakt vad som krävs för full poäng.\n" +
@@ -849,6 +859,7 @@ module.exports = async function handler(req, res) {
       "2) Scoring: points must be within [0..max_points]. max_points must match the item. " +
       "If items[].scoring_rubric exists: assess each part in scoring_rubric.parts separately and sum — mention in feedback which parts received points. " +
       "Never require more than what scoring_rubric.full_score_requirements explicitly lists for full score.\n" +
+      "Feedback must not claim something is missing unless scoring_rubric explicitly requires it. If full credit is awarded, do not say anything else is needed for full credit.\n" +
       "3) Feedback:\n" +
       "   - Start with: 'Score: X/Y.'\n" +
       "   - 2–5 bullets: correct parts, missing/incorrect, what is required for full score.\n" +
@@ -951,7 +962,7 @@ module.exports = async function handler(req, res) {
           id: String(got.id),
           points: pts,
           max_points: mp,
-          feedback: String(got.feedback || ""),
+          feedback: normalizeGradeFeedback(got.feedback, pts, mp, lang),
           // The signed grading task is the source of truth when it carries an
           // answer key; a grader-model response must not replace that key.
           model_answer: String(item.model_answer || got.model_answer || item.rubric || ""),
@@ -998,5 +1009,6 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.clampAwardedPoints = clampAwardedPoints;
+module.exports.normalizeGradeFeedback = normalizeGradeFeedback;
 module.exports.validateNonMcGradeOutput = validateNonMcGradeOutput;
 module.exports.normalizeChoice = normalizeChoice;
