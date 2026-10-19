@@ -216,11 +216,14 @@ globalThis.fetch = async (input, init = {}) => {
         const rejected = Array.isArray(verifierRejectQuestionId)
           ? verifierRejectQuestionId.includes(q.id)
           : q.id === verifierRejectQuestionId;
+        const optionRejected = Array.isArray(verifierRejectOptionId)
+          ? verifierRejectOptionId.includes(q.id)
+          : q.id === verifierRejectOptionId;
         return {
         id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
         language_quality: 1, option_quality: Array.isArray(q.options)
-          ? q.options.map((_, index) => !(q.id === verifierRejectOptionId && index === 2))
+          ? q.options.map((_, index) => !(optionRejected && index === 2))
           : [],
         issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
         required_changes: rejected ? ["Rätta exempelsvaret."] : [],
@@ -626,6 +629,25 @@ try {
   assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
     "zero-question diagnostics never include generated question text");
   verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = [
+    ...repairedQuestions,
+    { ...repairedQuestions[0], id: "retry-4", question: "Vad är 4 + 4?", options: ["7", "8", "9"], correct_index: 1, model_answer: "8" },
+  ];
+  verifierRejectOptionId = ["q-1", "q-2", "q-3", "retry-1", "retry-2", "retry-3", "retry-4"];
+  const optionQualityRejected = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(optionQualityRejected, "option-quality audit rejection");
+  const optionQualityLog = JSON.parse(qualityLogs.at(-1));
+  assert.deepEqual(optionQualityLog.initialVerifierFailureCodes, {
+    option_quality_failed: 3,
+  }, "option plausibility failures have their own content-free diagnostic category");
+  assert.deepEqual(optionQualityLog.repairVerifierFailureCodes, {
+    option_quality_failed: 4,
+  }, `repair option plausibility failures are distinguished from other review failures: ${JSON.stringify(optionQualityLog)}`);
+  verifierRejectOptionId = null;
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions.map((question, index) => ({

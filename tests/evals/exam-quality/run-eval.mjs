@@ -296,7 +296,9 @@ async function runOnce(fixture, runIndex) {
   // adding the solver is the extra wall time over the verifier alone, not the
   // solver's own latency.
   const [v, sv] = await Promise.all([
-    V.verifyQuestions(gate.questions, { apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv" }),
+    V.verifyQuestions(gate.questions, {
+      apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", targetLevel: fixture.level,
+    }),
     SOLVER_ENABLED
       ? S.solveQuestions(gate.questions, { apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", material: fixture.material })
       : Promise.resolve({ perQuestion: new Map(), callOk: false, solved: 0, model: null }),

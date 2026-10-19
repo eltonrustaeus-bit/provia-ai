@@ -1288,6 +1288,10 @@ module.exports = async function handler(req, res) {
       if (Number(vres?.source_alignment) < 0.6) codes.push("low_source_alignment");
       if (Number(vres?.scoring_quality) < 0.6) codes.push("low_scoring_quality");
       if (Number(vres?.language_quality) < 0.6) codes.push("low_language_quality");
+      if (vres?.option_quality_contract_ok === false) codes.push("option_quality_contract_failed");
+      if (Array.isArray(vres?.option_quality) && vres.option_quality.some((quality) => quality !== true)) {
+        codes.push("option_quality_failed");
+      }
       if (codes.length === 0) codes.push("review_thresholds");
       return codes;
     };
