@@ -60,6 +60,7 @@ try {
     apiKey: "synthetic", model: "synthetic", timeoutMs: 1_000,
   });
   assert.equal(timedOutReview.callOk, false, "an actually expired retry reviewer signal fails closed");
+  assert.equal(timedOutReview.failureReason, "timeout", "safe diagnostics classify timeout without provider error text");
   assert.equal(verifierTimeoutSignal.aborted, true, "the bounded verifier request is aborted at its timeout");
 } finally {
   clearTimeout(verifierTimeoutKeeper);
@@ -72,6 +73,7 @@ for (const results of [
 ]) {
   const duplicate = await runWithResults(results);
   assert.equal(duplicate.outcome.callOk, false, "duplicate reviewer IDs fail closed regardless of order");
+  assert.equal(duplicate.outcome.failureReason, "invalid_result_id");
   assert.equal(duplicate.outcome.perQuestion.size, 0, "failed output exposes no partial decisions");
   assert.equal(duplicate.outcome.usage.input_tokens, 31, "a paid but invalid review retains usage metadata");
 }
@@ -88,6 +90,7 @@ for (const results of [
 
 const duplicateInput = await runWithResults([result("q1", true)], [question("q1"), question("q1")]);
 assert.equal(duplicateInput.outcome.callOk, false, "duplicate source IDs fail before reviewer dispatch");
+assert.equal(duplicateInput.outcome.failureReason, "invalid_review_input");
 assert.equal(duplicateInput.fetchCalls, 0, "malformed source IDs trigger no external call");
 
 for (const malformedId of [undefined, "", "   ", 7]) {

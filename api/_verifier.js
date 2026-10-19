@@ -207,10 +207,13 @@ async function verifyQuestions(questions, opts) {
   const reviewPayload = JSON.stringify(reviewInput);
 
   const reviewModel = verifierModel(model);
-  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel, usage: null, latencyMs: 0 };
+  const failed = { perQuestion: new Map(), callOk: false, model: reviewModel, usage: null, latencyMs: 0, failureReason: null };
   const expectedIds = new Set(items.map((item) => item.id));
   if (items.length === 0 || items.some((item) => !item.id.trim()) || expectedIds.size !== items.length ||
-      !reviewInputWithinLimits(reviewInput) || reviewPayload.length > REVIEW_PAYLOAD_CHAR_CAP) return failed;
+      !reviewInputWithinLimits(reviewInput) || reviewPayload.length > REVIEW_PAYLOAD_CHAR_CAP) {
+    failed.failureReason = "invalid_review_input";
+    return failed;
+  }
 
   const startedAt = Date.now();
   try {
@@ -227,30 +230,36 @@ async function verifyQuestions(questions, opts) {
       }),
       signal: AbortSignal.timeout(requestTimeoutMs)
     });
-    if (!r.ok) return failed;
+    if (!r.ok) {
+      failed.failureReason = `http_${r.status}`;
+      return failed;
+    }
     const raw = await r.text();
     let data;
-    try { data = JSON.parse(raw); } catch { return failed; }
+    try { data = JSON.parse(raw); } catch { failed.failureReason = "invalid_response_json"; return failed; }
     failed.usage = data?.usage || null;
     failed.model = data?.model || reviewModel;
     failed.latencyMs = Date.now() - startedAt;
     const outputText = extractOutputText(data);
-    if (!outputText) return failed;
+    if (!outputText) { failed.failureReason = "missing_output_text"; return failed; }
     let parsed;
-    try { parsed = JSON.parse(outputText); } catch { return failed; }
+    try { parsed = JSON.parse(outputText); } catch { failed.failureReason = "invalid_output_json"; return failed; }
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.results) || parsed.results.length !== items.length) {
+      failed.failureReason = "result_count_mismatch";
       return failed;
     }
     const perQuestion = new Map();
     for (const res of parsed.results) {
       if (!res || typeof res !== "object" || typeof res.id !== "string" || !expectedIds.has(res.id) || perQuestion.has(res.id)) {
+        failed.failureReason = "invalid_result_id";
         return failed;
       }
       perQuestion.set(res.id, res);
     }
-    if (perQuestion.size !== expectedIds.size) return failed;
+    if (perQuestion.size !== expectedIds.size) { failed.failureReason = "missing_result"; return failed; }
     return { perQuestion, callOk: true, model: failed.model, usage: failed.usage, latencyMs: failed.latencyMs };
-  } catch {
+  } catch (error) {
+    failed.failureReason = error?.name === "TimeoutError" || error?.name === "AbortError" ? "timeout" : "request_error";
     return failed;
   }
 }

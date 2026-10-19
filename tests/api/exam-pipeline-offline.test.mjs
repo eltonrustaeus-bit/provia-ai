@@ -121,7 +121,10 @@ let quotaDenied = false;
 let lastInvokeCallStart = 0;
 const failureLogs = [];
 const previousConsoleError = console.error;
+const qualityLogs = [];
+const previousConsoleLog = console.log;
 console.error = (line) => failureLogs.push(String(line));
+console.log = (line) => qualityLogs.push(String(line));
 
 function outputResponse(value) {
   return Response.json({
@@ -200,12 +203,16 @@ globalThis.fetch = async (input, init = {}) => {
       if (verifierUnavailableForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         return new Response("synthetic retry verifier outage", { status: 503 });
       }
-      return outputResponse({ results: reviewInput.questions.map((q) => ({
-        id: q.id, approved: q.id !== verifierRejectQuestionId, factual_accuracy: q.id === verifierRejectQuestionId ? 0.2 : 1, ambiguity_score: 0,
+      return outputResponse({ results: reviewInput.questions.map((q) => {
+        const rejected = Array.isArray(verifierRejectQuestionId)
+          ? verifierRejectQuestionId.includes(q.id)
+          : q.id === verifierRejectQuestionId;
+        return {
+        id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
-        language_quality: 1, issues: q.id === verifierRejectQuestionId ? ["Exempelsvaret motsäger frågan."] : [],
-        required_changes: q.id === verifierRejectQuestionId ? ["Rätta exempelsvaret."] : [],
-      })) });
+        language_quality: 1, issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
+        required_changes: rejected ? ["Rätta exempelsvaret."] : [],
+      }; }) });
     }
     if (schemaName === "exam_solver_schema") {
       const userContent = body.input.find((item) => item.role === "user")?.content || "";
@@ -483,11 +490,27 @@ try {
   assertIncompleteExamNotDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
 
   activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  solverRejectQuestionId = null;
+  verifierRejectQuestionId = ["q-1", "retry-1"];
+  const verifierRejectedRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(verifierRejectedRepair, "verifier rejects the sole missing-slot repair");
+  const verifierRejectedLog = JSON.parse(qualityLogs.at(-1));
+  assert.deepEqual(verifierRejectedLog.repairVerifierFailureCodes, {
+    reviewer_rejected: 1, required_changes: 1, low_factual_accuracy: 1,
+  },
+    "safe repair telemetry records only the review rejection category");
+  verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
   regenerationQuestions = repairedQuestions.map((question, index) => ({
     ...question,
     id: `retry-same-stem-${index + 1}`,
     question: "Hur löser du 10 + 4?",
   }));
+  verifierRejectQuestionId = "q-1";
   const duplicateStemRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
@@ -1046,6 +1069,7 @@ try {
 } finally {
   globalThis.fetch = previousFetch;
   console.error = previousConsoleError;
+  console.log = previousConsoleLog;
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

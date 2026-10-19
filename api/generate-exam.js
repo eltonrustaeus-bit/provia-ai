@@ -1241,6 +1241,14 @@ module.exports = async function handler(req, res) {
     // The deterministic graph contract can stand without model review; other
     // question types must not be delivered unless the reviewer completes.
     let verifierSkipped = false;
+    let repairAttempted = false;
+    let repairFailureStage = null;
+    let repairCandidateCount = 0;
+    let repairVerifierCallOk = null;
+    let repairVerifierChecked = 0;
+    let repairVerifierApproved = 0;
+    let repairVerifierFailure = null;
+    const repairVerifierFailureCodes = {};
     if (exam.questions.length > 0 && budget.remaining() < MIN_VERIFIER_MS) {
       verifierSkipped = true;
       for (const q of exam.questions) {
@@ -1311,6 +1319,7 @@ module.exports = async function handler(req, res) {
         const needsRepair = exam.questions.length < numQuestions
           || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
         if (needsRepair && canRegenerate) {
+          repairAttempted = true;
           const originalGatedQuestions = exam.questions;
           const round1ApprovedQuestions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
           const round1Gate = gate;
@@ -1322,6 +1331,7 @@ module.exports = async function handler(req, res) {
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, verifiedQuestions: round1ApprovedQuestions,
             });
+            repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {
               method: "POST",
               headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -1329,9 +1339,11 @@ module.exports = async function handler(req, res) {
               // Preserve time for independent review plus delivery finalization.
               signal: AbortSignal.timeout(regenerationTimeoutMs)
             });
+            repairFailureStage = "generation_response";
             const raw2 = await r2.text();
             try { data2 = JSON.parse(raw2); } catch { data2 = null; }
             if (r2.ok && data2) {
+              repairFailureStage = "repair_normalization";
               const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
               let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
               const normalized2 = exam2 && normalizeGeneratedExam(exam2, {
@@ -1340,7 +1352,9 @@ module.exports = async function handler(req, res) {
               if (normalized2?.exam) {
                 const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile });
                 const candidateQuestions = candidateGate.questions;
+                repairCandidateCount = candidateQuestions.length;
                 if (candidateQuestions.length > 0) {
+                  repairFailureStage = "repair_verification";
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       apiKey, model, subjectProfile, lang, material: pastedText,
@@ -1353,6 +1367,9 @@ module.exports = async function handler(req, res) {
                   ]);
                   recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
                   recordUsage("verify_blind", s2.model, s2.usage, s2.latencyMs);
+                  repairVerifierCallOk = v2.callOk;
+                  repairVerifierChecked = v2.callOk ? candidateQuestions.length : 0;
+                  repairVerifierFailure = v2.failureReason || null;
                   const kept = [];
                   const outcome2 = { checked: 0, approved: 0, rejected: 0, callOk: v2.callOk };
                   const solverOutcome2 = { checked: 0, rejected: 0, callOk: s2.callOk, model: s2.model, reasons: {} };
@@ -1360,6 +1377,19 @@ module.exports = async function handler(req, res) {
                     for (const q of candidateQuestions) {
                       const vres = v2.perQuestion.get(String(q.id));
                       const verifierOk = !!(vres && verifier.decideApproval(vres));
+                      if (!verifierOk) {
+                        const codes = [];
+                        if (!vres || vres.approved !== true) codes.push("reviewer_rejected");
+                        if (Array.isArray(vres?.required_changes) && vres.required_changes.length > 0) codes.push("required_changes");
+                        if (Number(vres?.factual_accuracy) < 0.75) codes.push("low_factual_accuracy");
+                        if (Number(vres?.ambiguity_score) > 0.2) codes.push("high_ambiguity");
+                        if (Number(vres?.difficulty_match) < 0.6) codes.push("difficulty_mismatch");
+                        if (Number(vres?.source_alignment) < 0.6) codes.push("low_source_alignment");
+                        if (Number(vres?.scoring_quality) < 0.6) codes.push("low_scoring_quality");
+                        if (Number(vres?.language_quality) < 0.6) codes.push("low_language_quality");
+                        if (codes.length === 0) codes.push("review_thresholds");
+                        for (const code of codes) repairVerifierFailureCodes[code] = (repairVerifierFailureCodes[code] || 0) + 1;
+                      }
                       let solverOk = q.type !== "mc";
                       if (q.type === "mc") {
                         const decision = s2.callOk
@@ -1378,6 +1408,7 @@ module.exports = async function handler(req, res) {
                       else outcome2.rejected++;
                       if (verifierOk && solverOk) kept.push(q);
                     }
+                    repairVerifierApproved = kept.length;
                     const retryUniqueQuestions = [];
                     const retryIds = new Set();
                     for (const q of kept) {
@@ -1522,6 +1553,14 @@ module.exports = async function handler(req, res) {
         verifierApproved: verifierOutcome.approved,
         verifierRejected: verifierOutcome.rejected,
         verifierCallOk: verifierOutcome.callOk,
+        repairAttempted,
+        repairFailureStage,
+        repairCandidateCount,
+        repairVerifierCallOk,
+        repairVerifierChecked,
+        repairVerifierApproved,
+        repairVerifierFailure,
+        repairVerifierFailureCodes,
         solverChecked: solverOutcome.checked,
         solverRejected: solverOutcome.rejected,
         solverCallOk: solverOutcome.callOk,
