@@ -96,6 +96,12 @@ function assertIncompleteExamNotDelivered(response, scenario) {
   assert.equal(response.status, 502, `${scenario}: ${JSON.stringify(response.body)}`);
   assert.equal(response.body.error, "incomplete_exam", `${scenario}: explicit incomplete-exam error`);
   assert.equal(response.body.exam, undefined, `${scenario}: no partial exam is exposed`);
+  const diagnostic = JSON.parse(qualityLogs.at(-1));
+  assert.equal(diagnostic.event, "exam_quality_rejected", `${scenario}: safe diagnostic event is emitted`);
+  assert.equal(diagnostic.requestId, response.body.requestId, `${scenario}: event correlates to the client request`);
+  assert.equal(typeof diagnostic.solverReasons, "object", `${scenario}: solver rejection categories are aggregated`);
+  assert.equal(JSON.stringify(diagnostic).includes("Vi tränar addition, subtraktion och multiplikation med heltal."), false,
+    `${scenario}: diagnostic omits submitted study material`);
   const requestCalls = calls.slice(lastInvokeCallStart);
   assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")
     && call.body?.p_request_id === response.body.requestId), true, `${scenario}: reserved quota is refunded`);
@@ -234,9 +240,10 @@ globalThis.fetch = async (input, init = {}) => {
       }
       return outputResponse({ results: requestedQuestions.map((requested) => {
         const q = activeQuestions.find((question) => question.id === requested.id);
-        if (!q) return { id: requested.id, option_verdicts: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
+        if (!q) return { id: requested.id, option_verdicts: [], option_plausibility: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
         return {
         id: q.id, option_verdicts: q.options.map((_, i) => i === ((Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index)),
+        option_plausibility: q.options.map((option) => option !== "Kesäkten"),
         index: (Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
@@ -452,7 +459,7 @@ try {
   }));
   activeQuestions = badOptionQuestions;
   regenerationQuestions = repairedOptionQuestions;
-  verifierRejectOptionId = "q-1";
+  verifierRejectOptionId = null;
   const nonsenseOptionExam = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
@@ -461,7 +468,9 @@ try {
   regenerationQuestions = null;
   assert.equal(nonsenseOptionExam.status, 200, JSON.stringify(nonsenseOptionExam.body));
   assert.equal(nonsenseOptionExam.body.exam.questions.length, 3,
-    "a bounded repair can replace a batch after a verifier flags a malformed option");
+    "a bounded repair can replace a batch when the independent solver flags a malformed option");
+  assert.equal(nonsenseOptionExam.body.meta.solver.reasons.solver_implausible_option, 1,
+    "the solver's independent plausibility verdict is the reason the nonsense item is withheld");
   assert.equal(nonsenseOptionExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
     "an MC item with a nonsense distractor is withheld from the learner-facing exam");
 

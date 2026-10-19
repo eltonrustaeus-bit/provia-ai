@@ -1594,6 +1594,7 @@ module.exports = async function handler(req, res) {
     if (exam.questions.length > 0 && exam.questions.length < numQuestions) {
       console.log(JSON.stringify({
         event: "exam_quality_rejected",
+        requestId: quotaRequestId,
         failure: "incomplete_exam",
         subjectProfile,
         numRequested: numQuestions,
@@ -1623,6 +1624,7 @@ module.exports = async function handler(req, res) {
         solverChecked: solverOutcome.checked,
         solverRejected: solverOutcome.rejected,
         solverCallOk: solverOutcome.callOk,
+        solverReasons: solverOutcome.reasons,
         finalQuestionCount: exam.questions.length,
       }));
       return fail(502, {

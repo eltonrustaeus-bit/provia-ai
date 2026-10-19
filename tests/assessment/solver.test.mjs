@@ -22,7 +22,8 @@ const check = (name, cond) => {
 
 const q = { id: "1", type: "mc", options: ["a", "b", "c"], correct_index: 1 };
 const verdict = (question, index, optionVerdicts, confidence = 0.9) => ({
-  id: question.id, index, option_verdicts: optionVerdicts, confidence, reason: "r"
+  id: question.id, index, option_verdicts: optionVerdicts,
+  option_plausibility: question.options.map(() => true), confidence, reason: "r"
 });
 const goodVerdict = verdict(q, 1, [false, true, false]);
 
@@ -45,6 +46,23 @@ check("drops a matching verdict below the approval threshold", (() => {
 check("keeps a matching verdict at the approval threshold", (() => {
   const d = S.decideKeep(verdict(q, 1, [false, true, false], S.MIN_APPROVAL_CONFIDENCE), q);
   return d.keep === true && d.reason === "solver_agrees";
+})());
+
+check("drops a nonsense distractor even when the answer key matches", (() => {
+  const nonsense = { id: "n", type: "mc", correct_index: 1,
+    options: ["4", "5", "Kesäkten", "6"] };
+  const audited = {
+    ...verdict(nonsense, 1, [false, true, false, false]),
+    option_plausibility: [true, true, false, true],
+  };
+  const d = S.decideKeep(audited, nonsense);
+  return d.keep === false && d.reason === "solver_implausible_option";
+})());
+
+check("drops a missing or incomplete plausibility audit", (() => {
+  const missing = { ...goodVerdict, option_plausibility: undefined };
+  const short = { ...goodVerdict, option_plausibility: [true, true] };
+  return !S.decideKeep(missing, q).keep && !S.decideKeep(short, q).keep;
 })());
 
 // ── the dominant defect: several options correct ───────────────────────────
@@ -242,6 +260,14 @@ check("schema puts option_verdicts before index so the audit happens first", (()
 check("schema requires option_verdicts", (() => {
   const it = S.buildSolverSchema(3).schema.properties.results.items;
   return it.required.includes("option_verdicts") && it.properties.option_verdicts.type === "array";
+})());
+check("schema requires one plausibility verdict per option before the answer index", (() => {
+  const it = S.buildSolverSchema(3).schema.properties.results.items;
+  const required = it.required;
+  return required.includes("option_plausibility")
+    && required.indexOf("option_plausibility") < required.indexOf("index")
+    && it.properties.option_plausibility.type === "array"
+    && it.properties.option_plausibility.items.type === "boolean";
 })());
 
 for (const lang of ["sv", "en"]) {
