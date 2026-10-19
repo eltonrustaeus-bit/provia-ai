@@ -46,6 +46,7 @@ let providerCalls = 0;
 let quotaCalls = 0;
 let saveCalls = 0;
 let staleClaim = false;
+let failNextProvider = false;
 let finishProvider;
 const providerGate = new Promise((resolve) => { finishProvider = resolve; });
 let providerStarted;
@@ -94,6 +95,10 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
   if (url === "https://api.openai.com/v1/responses") {
     providerCalls++;
+    if (failNextProvider) {
+      failNextProvider = false;
+      throw new DOMException("Synthetic provider outage", "AbortError");
+    }
     providerStarted();
     await providerGate;
     return Response.json({ output_text: JSON.stringify({ total_points: 1, max_points: 2,
@@ -163,7 +168,28 @@ try {
   assert.equal(expired.body.error, "EXAM_RESULT_EXPIRED");
   assert.equal(expired.body.result, undefined);
 
-  console.log("grading recovery: concurrent claim, lost response, answer conflict, active gate and TTL passed");
+  state = "active";
+  fingerprint = null;
+  result = null;
+  const providerCallsBeforeRetry = providerCalls;
+  const quotaCallsBeforeRetry = quotaCalls;
+  const saveCallsBeforeRetry = saveCalls;
+  failNextProvider = true;
+  const providerFailure = await invoke(body);
+  assert.equal(providerFailure.status, 502);
+  assert.equal(providerFailure.body.error, "grading_provider_unavailable");
+  assert.equal(state, "active", "a controlled provider failure releases the exact grading claim");
+  assert.equal(saveCalls, saveCallsBeforeRetry, "a failed first attempt cannot persist a partial score");
+
+  const retried = await invoke(body);
+  assert.equal(retried.status, 200, "the same signed submission can be graded after a controlled provider failure");
+  assert.equal(retried.body.persistence.mock_result_saved, true);
+  assert.equal(state, "completed");
+  assert.equal(providerCalls, providerCallsBeforeRetry + 2, "one failed provider call and one successful retry are made");
+  assert.equal(quotaCalls, quotaCallsBeforeRetry + 2, "each explicit grading attempt is rate-limited");
+  assert.equal(saveCalls, saveCallsBeforeRetry + 1, "the successful retry persists exactly one result");
+
+  console.log("grading recovery: provider retry, concurrent claim, lost response, answer conflict, active gate and TTL passed");
 } finally {
   finishProvider();
   globalThis.fetch = oldFetch;
