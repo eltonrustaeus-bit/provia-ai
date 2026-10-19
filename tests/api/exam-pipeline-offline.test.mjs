@@ -110,6 +110,7 @@ let gradingState = "active";
 let solverUnavailable = false;
 let solverUnavailableForRetry = false;
 let verifierUnavailableForRetry = false;
+let verifierUnavailableInitially = false;
 let solverThrowsForRetry = false;
 let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
@@ -197,6 +198,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
       verifierInputs.push(reviewInput);
+      if (verifierUnavailableInitially) return new Response("synthetic verifier outage", { status: 503 });
       if (verifierThrowsForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry verifier timeout");
       }
@@ -527,6 +529,25 @@ try {
   });
   verifierUnavailableForRetry = false;
   assertIncompleteExamNotDelivered(verifierFailedRetry, "retry verifier failure");
+
+  activeQuestions = questions;
+  verifierUnavailableInitially = true;
+  const initialVerifierUnavailable = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierUnavailableInitially = false;
+  assert.equal(initialVerifierUnavailable.status, 503, JSON.stringify(initialVerifierUnavailable.body));
+  assert.equal(initialVerifierUnavailable.body.error, "quality_review_unavailable");
+  const initialVerifierLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(initialVerifierLog.event, "exam_quality_review_unavailable");
+  assert.equal(initialVerifierLog.stage, "initial_verifier");
+  assert.equal(initialVerifierLog.failure, "http_503");
+  assert.ok(Number.isFinite(initialVerifierLog.generationMs));
+  assert.ok(Number.isFinite(initialVerifierLog.verifierLatencyMs));
+  assert.ok(Number.isFinite(initialVerifierLog.elapsedMs));
+  assert.deepEqual(Object.keys(initialVerifierLog).sort(), [
+    "elapsedMs", "event", "failure", "generationMs", "stage", "verifierLatencyMs",
+  ]);
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;

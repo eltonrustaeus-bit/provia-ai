@@ -1275,6 +1275,16 @@ module.exports = async function handler(req, res) {
       solverOutcome.callOk = s1.callOk;
       solverOutcome.model = s1.model;
       verifierOutcome.callOk = v1.callOk;
+      if (!v1.callOk) {
+        console.log(JSON.stringify({
+          event: "exam_quality_review_unavailable",
+          stage: "initial_verifier",
+          failure: v1.failureReason || "verification_failed",
+          generationMs: gen.latencyMs,
+          verifierLatencyMs: v1.latencyMs,
+          elapsedMs: budget.elapsed(),
+        }));
+      }
       if (v1.callOk) {
         const approvedIds = new Set();
         const rejectedIds = [...duplicateQuestionIds];
@@ -1529,6 +1539,13 @@ module.exports = async function handler(req, res) {
     }
 
     if (exam.questions.length > 0 && verifierSkipped && qType !== "graph") {
+      console.log(JSON.stringify({
+        event: "exam_quality_review_unavailable",
+        stage: "initial_verifier",
+        failure: "review_budget_exhausted",
+        generationMs: gen.latencyMs,
+        elapsedMs: budget.elapsed(),
+      }));
       return fail(503, {
         ok: false,
         error: "quality_review_unavailable",
