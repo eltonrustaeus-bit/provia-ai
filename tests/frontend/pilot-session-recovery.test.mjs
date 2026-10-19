@@ -218,6 +218,56 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await expiredPage.locator("#perInput").inputValue(), QUESTION,
       "an expired-but-refreshable stale session does not trap the pilot login CTA");
 
+    const reviewProof = {
+      receipt: "v2.synthetic-signed-completion-receipt",
+      course: "Matematik 1b",
+      material: "Syntetiskt material om linjära funktioner.",
+      questions: [{ id: "synthetic-question", question: "Vad visar m?", grade_task: "synthetic-grade-task" }],
+      answers: [{ id: "synthetic-question", answer: "Syntetiskt elevsvar." }],
+      selectedQuestionId: "synthetic-question"
+    };
+    let reviewRetryCalls = 0;
+    let reviewRetryBody = null;
+    const reviewRecoveryPage = await openPilotPage(makeSession("account-a"), "account-a", null, async route => {
+      reviewRetryCalls++;
+      if (reviewRetryCalls === 1) return route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      reviewRetryBody = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8" },
+        body: 'data: {"delta":"Granskningen är återställd."}\n\ndata: {"done":true,"history":[],"helpCap":3}\n\n'
+      });
+    });
+    await reviewRecoveryPage.locator("#perBubble").click();
+    const reviewQuestion = "Förklara min rättning på fråga 1 steg för steg";
+    await reviewRecoveryPage.evaluate(({ question, proof }) => window.PER.send(question, {
+      helpLevel: 3,
+      examProof: proof
+    }), { question: reviewQuestion, proof: reviewProof });
+    await reviewRecoveryPage.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
+    const savedReview = JSON.parse(await reviewRecoveryPage.evaluate(() =>
+      sessionStorage.getItem("exgen_pilot_pending_per_question")));
+    assert.deepEqual(savedReview.requestOptions, { helpLevel: 3, examProof: reviewProof },
+      "same-account reauthentication temporarily preserves only the signed review request options");
+    await reviewRecoveryPage.locator(".per-answer-cta").click();
+    await reviewRecoveryPage.locator("#pvLE").fill("account-a@example.test");
+    await reviewRecoveryPage.locator("#pvLP").fill("synthetic-password");
+    await Promise.all([
+      reviewRecoveryPage.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      reviewRecoveryPage.locator("#pvLBtn").click()
+    ]);
+    await reviewRecoveryPage.waitForFunction((question) =>
+      [...document.querySelectorAll("#perMessages .per-msg.teacher")].some(el => el.textContent.includes("Din fråga är återställd"))
+      && document.getElementById("perPanel")?.classList.contains("per-open")
+      && document.getElementById("perInput")?.value === question, reviewQuestion, { timeout: 7000 });
+    await reviewRecoveryPage.evaluate(() => document.getElementById("perSendBtn").click());
+    await reviewRecoveryPage.waitForFunction(() =>
+      document.getElementById("perMessages")?.textContent.includes("Granskningen är återställd."), null, { timeout: 7000 });
+    assert.equal(reviewRetryCalls, 2, "the review is retried only after the student presses Send");
+    assert.equal(reviewRetryBody.examReview, true);
+    assert.deepEqual(reviewRetryBody.examProof, reviewProof,
+      "the deliberate post-login retry retains the original signed completion proof");
+
     const sharedContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     contexts.push(sharedContext);
     const tabA = await openPilotPage(makeSession("account-a"), "account-a", sharedContext);

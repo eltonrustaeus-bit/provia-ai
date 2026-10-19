@@ -128,6 +128,7 @@
   var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
+  var _pilotRestoredSend = null;
 
   var _examHistoryMasked = true;
   var _serverVerifiedPerHistoryRelease = false;
@@ -153,15 +154,22 @@
     } catch (_) { return ''; }
   }
 
-  function savePilotPendingQuestion(question, accountIdOverride) {
+  function savePilotPendingQuestion(question, accountIdOverride, requestOptions) {
     if (EXGEN_RUNTIME.environment !== 'pilot' || String(question).length > 2000) return false;
     var accountId = arguments.length > 1 ? (accountIdOverride || '') : (currentPilotAccountId() || '');
     try {
-      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify({
+      var pending = {
         question: String(question),
         savedAt: Date.now(),
         accountId: accountId || null
-      }));
+      };
+      if (requestOptions && requestOptions.examProof) {
+        pending.requestOptions = {
+          helpLevel: requestOptions.helpLevel,
+          examProof: requestOptions.examProof
+        };
+      }
+      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify(pending));
       return true;
     } catch (_) { return false; }
   }
@@ -949,6 +957,7 @@
       try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+        _pilotRestoredSend = null;
       }
       var input = document.getElementById('perInput');
       if (input) input.value = '';
@@ -1324,12 +1333,20 @@ function finalizeMsg(div, text) {
       return div;
     }
 
+    function takeRestoredRequestOptions(question) {
+      var restored = _pilotRestoredSend;
+      _pilotRestoredSend = null;
+      return restored && restored.question === question && restored.accountId === (currentPilotAccountId() || null)
+        ? restored.options
+        : undefined;
+    }
+
     async function send(q, opts) {
       if (!q || _perActiveRequest) return;
       var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
-        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId);
+        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
         if (input) input.value = q;
         return true;
       }
@@ -2019,12 +2036,12 @@ function finalizeMsg(div, text) {
 
       document.getElementById('perSendBtn').onclick = function () {
         var q = (document.getElementById('perInput').value || '').trim();
-        if (q) send(q);
+        if (q) send(q, takeRestoredRequestOptions(q));
       };
       document.getElementById('perInput').onkeydown = function (e) {
         if (e.key === 'Enter') {
           var q = (this.value || '').trim();
-          if (q) send(q);
+          if (q) send(q, takeRestoredRequestOptions(q));
         }
       };
       document.getElementById('perClearBtn').onclick = function () {
@@ -2039,6 +2056,7 @@ function finalizeMsg(div, text) {
         localStorage.removeItem(PER_HIST_KEY);
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+          _pilotRestoredSend = null;
         }
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');
@@ -2192,6 +2210,13 @@ function finalizeMsg(div, text) {
               ? pending.accountId === currentAccountId
               : !currentAccountId;
             if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              if (pending.requestOptions && pending.requestOptions.examProof) {
+                _pilotRestoredSend = {
+                  question: pending.question,
+                  accountId: currentAccountId || null,
+                  options: pending.requestOptions
+                };
+              }
               perInpEl.value = pending.question;
               toggle();
               addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
