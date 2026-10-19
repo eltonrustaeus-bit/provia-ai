@@ -1628,6 +1628,7 @@ module.exports = async function handler(req, res) {
       ok: false,
       error: "exam_generation_failed",
       requestId: quotaRequestId,
+      stage: failureStage,
       message: "Provet kunde inte färdigställas. Försök igen."
     });
   }

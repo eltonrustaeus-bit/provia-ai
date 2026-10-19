@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
 const assessment = require("../../api/_assessment.js");
+const gradeTasks = require("../../api/_grade-task.js");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -999,6 +1000,32 @@ try {
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),
     `unexpected mock route: ${calls.map((call) => call.url).filter((url) => url !== "https://api.openai.com/v1/responses" && !allowedSupabaseRoutes.includes(url)).join(", ")}`);
+
+  calls.length = 0;
+  activeQuestions = questions;
+  const sealQuestion = gradeTasks.sealQuestion;
+  gradeTasks.sealQuestion = () => "";
+  let sealingFailure;
+  try {
+    sealingFailure = await invoke(generateExam, {
+      lang: "sv", level: "C", course: "Matematik 1b",
+      pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    gradeTasks.sealQuestion = sealQuestion;
+  }
+  assert.equal(sealingFailure.status, 500);
+  assert.equal(sealingFailure.body.error, "exam_generation_failed");
+  assert.equal(sealingFailure.body.stage, "grade_task_sealing",
+    "the safe response identifies the failure stage without exposing the exception");
+  assert.equal(sealingFailure.body.exam, undefined, "a signing failure never delivers an ungradeable exam");
+  assert.equal(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"), false,
+    "a signing failure does not attempt issuance");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,
+    "a signing failure does not commit the exam quota");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")), true,
+    "a signing failure refunds the reserved exam quota");
+
   console.log("offline exam pipeline: MC and supported graph flows passed; unsupported source and mismatched generated graph are rejected safely");
 } finally {
   globalThis.fetch = previousFetch;
