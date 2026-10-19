@@ -14,5 +14,7 @@ assert.match(app, /<select id="numQuestions">\s*<option>2<\/option><option selec
   "the engine-backed exam form also offers a two-question exam");
 assert.match(app, /Math\.max\(2, Number\(num\) \|\| 3\)/,
   "restoring an exam does not silently raise two questions to three");
+assert.match(flow, /r\.error === "incomplete_exam"[\s\S]*?Lägg till mer relevant material eller avgränsa området tydligare\.[\s\S]*?: tx\("Försök igen, gärna med färre frågor\./,
+  "quality rejections ask for better source material, while other failures may still suggest fewer questions");
 
-console.log("exam-question-count-minimum: 4 assertions passed");
+console.log("exam-question-count-minimum: 5 assertions passed");
