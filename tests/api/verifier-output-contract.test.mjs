@@ -7,7 +7,7 @@ const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApprova
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, option_quality: [] });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -25,7 +25,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs, targetLevel }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs, targetLevel, comparisonQuestions }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -50,6 +50,32 @@ assert.match(levelBoundReview.requestBody.input[0].content, /selected exam level
 assert.match(levelBoundReview.requestBody.input[0].content, /difficulty_match against this target/i);
 assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /valda provnivå är C/i);
 assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /två relevanta led/i);
+assert.match(buildVerifierPrompt("sv"), /comparison_questions.*(?:context only|jämförelseunderlag)/i);
+const comparisonContext = await runWithResults(
+  [result("retry-1", true)],
+  [question("retry-1")],
+  "",
+  undefined,
+  undefined,
+  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", correct_index: 2, model_answer: "Facit ska inte delas." }],
+);
+const comparisonPayload = JSON.parse(comparisonContext.requestBody.input.find((item) => item.role === "user").content);
+assert.deepEqual(comparisonPayload.comparison_questions, [{
+  id: "approved-1", type: "mc", question: "Vilken process frigör energi?",
+}], "repair review receives only approved question identity and wording, not answer keys or rubric");
+assert.deepEqual(comparisonPayload.questions.map(({ id }) => id), ["retry-1"],
+  "comparison-only questions do not change the required review result IDs");
+const oversizedComparison = await runWithResults(
+  [result("retry-1", true)],
+  [question("retry-1")],
+  "",
+  undefined,
+  undefined,
+  Array.from({ length: 21 }, (_, index) => ({ id: `approved-${index}`, question: `Approved ${index}` })),
+);
+assert.equal(oversizedComparison.outcome.callOk, false, "oversized comparison context fails closed");
+assert.equal(oversizedComparison.outcome.failureReason, "invalid_review_input");
+assert.equal(oversizedComparison.fetchCalls, 0, "oversized comparison context makes no provider call");
 const boundedReview = await runWithResults([result("q1", true)], [question("q1")], "", 6_500);
 assert.equal(boundedReview.requestTimeoutMs, 6_500, "retry can bound the reviewer to the remaining function budget");
 const cappedReview = await runWithResults([result("q1", true)], [question("q1")], "", 60_000);
@@ -147,9 +173,9 @@ assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_r
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
 assert.match(buildVerifierPrompt("sv"), /ordagrant förekommande källhänvisning räcker inte/i);
-assert.match(buildVerifierPrompt("sv"), /Jämför frågorna sinsemellan/i);
+assert.match(buildVerifierPrompt("sv"), /Jämför kandidaterna sinsemellan/i);
 assert.match(buildVerifierPrompt("en"), /exact source quote is not enough/i);
-assert.match(buildVerifierPrompt("en"), /Compare questions with each other/i);
+assert.match(buildVerifierPrompt("en"), /Compare candidate questions with each other/i);
 assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och returnera exakt ett resultat/i);
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");

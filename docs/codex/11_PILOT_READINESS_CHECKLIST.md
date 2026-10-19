@@ -106,3 +106,12 @@
 Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 
 **PILOT NOT READY.** Lokala tester och promptforbattringar bevisar inte att Preview, staging eller skolans processer fungerar live. Produktionsmiljo och riktiga elevdata har inte anvants eller andrats i denna genomgang.
+
+## Lokal uppfoljning — 2026-10-19 (provgranskarens reparationskontext)
+
+- [x] Vid begransad reparation far den oberoende verifieraren nu se endast ID, typ och formulering for redan godkanda forstafragor. Facit, alternativ, svarsmallar, rubricer och kallreferenser for dessa jamforelsefragor skickas inte.
+- [x] Verifieraren instrueras att jamfora reparationskandidater med den godkanda kontexten, men ska returnera resultat endast for kandidaterna. Kontext och total granskningspayload ar begransade; overskridna gransvarden stoppas fore provideranrop.
+- [x] Syntetisk regressionskontroll visar att en omskriven kandidat som granskarledet identifierar som dubblett inte levereras, medan den godkanda ursprungsfragan behalls. Detta testar pipelinebeteende, inte faktisk modellprecision pa semantiska dubbletter.
+- [x] Hela offline-testsviten korde sekventiellt efter kodandringen med exitkod 0. Efter den kompletterande dubblettregressionen passerade de tva fokuserade proverifierar-/pipeline-testfilerna (2/2), syntaxkontroller och `git diff --check`.
+- [ ] Ingen staginginloggning, betald providerutvardering eller nytt liveprov gjordes. Pilotstatus kvarstar NOT READY tills syntetiskt stagingflode och skolans operativa godkannanden ar verifierade.
+- [x] Vercel-ID:t `prj_i91LIdfjxVzLJnSoELHc0RlluNg2` fran den tidigare godkanda projektatgarden returnerar 404. Namnet `provia-ai-pilot-feature-20261019` returnerar nu ett annat projekt-ID; detta andra projekt lamnades orort och ska inte raderas under det tidigare godkannandet.

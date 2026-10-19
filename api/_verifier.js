@@ -80,6 +80,14 @@ function reviewInputWithinLimits(input) {
     size += JSON.stringify(question).length;
     if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
   }
+  const comparisons = Array.isArray(input.comparison_questions) ? input.comparison_questions : [];
+  if (comparisons.length > 20) return false;
+  for (const question of comparisons) {
+    if (!question || typeof question.id !== "string" || !question.id.trim() ||
+        typeof question.question !== "string" || question.question.length > 3000) return false;
+    size += JSON.stringify(question).length;
+    if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
+  }
   return true;
 }
 
@@ -179,7 +187,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "För varje kortsvarsfråga: lös uppgiften själv från grunden UTAN att först utgå från model_answer. Jämför sedan ditt svar med model_answer, rubric och scoring_rubric. " +
       "Sätt approved=false och ange required_changes om exempelsvaret är fel, motsägelsefullt, otillräckligt för utlovade poäng eller kräver något som frågan inte efterfrågar. " +
       "Använd source_material som begränsat faktaunderlag för source_alignment; om stödet saknas eller är oklart, sänk source_alignment och godkänn inte ett obestyrkt sakpåstående. " +
-      "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför frågorna sinsemellan och avvisa dubbletter eller nära parafraser som testar samma sak. " +
+      "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Avvisa en kandidat som upprepar eller nära parafraserar samma lärandemål; comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
       "Sätt approved=false om NÅGOT av följande gäller: faktafel, mer än ett rimligt svar, en hittad-på term/kategori/paragraf, " +
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
       "eller en svårighetsgrad som inte matchar cognitive_level. " +
@@ -192,7 +200,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "For every short-answer item, solve the task from scratch BEFORE relying on model_answer. Then compare your answer with model_answer, rubric, and scoring_rubric. " +
       "Set approved=false and explain required_changes if the exemplar is wrong, contradictory, insufficient for the promised points, or requires more than the question asks. " +
       "Use source_material as bounded factual evidence for source_alignment; if support is missing or unclear, lower source_alignment and do not approve unsupported claims. " +
-      "An exact source quote is not enough when the source contradicts or does not support the claim. Compare questions with each other and reject duplicates or near-paraphrases that test the same thing. " +
+      "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Reject a candidate that repeats or near-paraphrases the same learning objective; comparison_questions are context only and must not receive results. " +
       "Set approved=false if ANY of the following apply: factual errors, more than one reasonable answer, a fabricated " +
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match cognitive_level. " +
@@ -221,7 +229,7 @@ function extractOutputText(data) {
 }
 
 async function verifyQuestions(questions, opts) {
-  const { apiKey, model, subjectProfile, lang, material, timeoutMs, targetLevel } = opts || {};
+  const { apiKey, model, subjectProfile, lang, material, timeoutMs, targetLevel, comparisonQuestions } = opts || {};
   const requestTimeoutMs = Math.max(1_000, Math.min(30_000, Number(timeoutMs) || 30_000));
   const sourceQuestions = Array.isArray(questions) ? questions : [];
   const items = sourceQuestions.map(q => ({
@@ -241,6 +249,13 @@ async function verifyQuestions(questions, opts) {
     source_material: materialInput.truncateMaterial(material, SOURCE_MATERIAL_CHAR_CAP),
     questions: items,
   };
+  if (Array.isArray(comparisonQuestions) && comparisonQuestions.length > 0) {
+    reviewInput.comparison_questions = comparisonQuestions.map((q) => ({
+      id: q && typeof q.id === "string" ? q.id : "",
+      type: q?.type,
+      question: q?.question,
+    }));
+  }
   const reviewPayload = JSON.stringify(reviewInput);
 
   const reviewModel = verifierModel(model);

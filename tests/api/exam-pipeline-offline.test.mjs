@@ -140,6 +140,7 @@ let solverThrowsForRetry = false;
 let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
 let verifierRejectOptionId = null;
+let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
 let regenerationQuestions = null;
 let throwOnRepair = false;
@@ -232,9 +233,14 @@ globalThis.fetch = async (input, init = {}) => {
         return new Response("synthetic retry verifier outage", { status: 503 });
       }
       return outputResponse({ results: reviewInput.questions.map((q) => {
-        const rejected = Array.isArray(verifierRejectQuestionId)
+        const explicitlyRejected = Array.isArray(verifierRejectQuestionId)
           ? verifierRejectQuestionId.includes(q.id)
           : q.id === verifierRejectQuestionId;
+        const comparisonDuplicate = verifierRejectComparisonDuplicate &&
+          reviewInput.comparison_questions?.some((approved) =>
+            approved.id === "q-2" && approved.question === "Vad är 7 - 4?" &&
+            q.question === "Beräkna skillnaden mellan sju och fyra.");
+        const rejected = explicitlyRejected || comparisonDuplicate;
         const optionRejected = Array.isArray(verifierRejectOptionId)
           ? verifierRejectOptionId.includes(q.id)
           : q.id === verifierRejectOptionId;
@@ -631,29 +637,42 @@ try {
     "the repaired exam contains three distinct question signatures");
 
   activeQuestions = questions;
-  regenerationQuestions = repairedQuestions;
-  verifierRejectQuestionId = ["q-1", "retry-1"];
+  const nearDuplicateRepair = {
+    ...repairedQuestions[0],
+    id: "retry-1",
+    question: "Beräkna skillnaden mellan sju och fyra.",
+    options: ["2", "3", "4"],
+    correct_index: 1,
+    model_answer: "3",
+  };
+  const duplicateAwareRepair = [nearDuplicateRepair, repairedQuestions[2]];
+  regenerationQuestions = duplicateAwareRepair;
+  verifierRejectQuestionId = "q-1";
+  verifierRejectComparisonDuplicate = true;
   calls.length = 0;
   solverInputs.length = 0;
   const repairedMcExam = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(repairedMcExam.status, 200, JSON.stringify(repairedMcExam.body));
-  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-2"],
-    "verified first-round MC questions are preserved while the approved candidate fills a rejected repair slot");
+  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-3"],
+    "an approved first-round question is preserved and its verifier-identified near-paraphrase is withheld");
   assert.equal(repairedMcExam.body.meta.verifier.approved, 3);
   assert.equal(repairedMcExam.body.meta.solver.checked, 5);
   assert.deepEqual(solverInputs.at(-1).map(({ id, question, options }) => ({ id, question, options })),
-    repairedQuestions.slice(0, 2).map(({ id, question, options }) => ({ id, question, options })),
-    "the blind solver receives only the missing question's actual ID, wording and options");
+    duplicateAwareRepair.map(({ id, question, options }) => ({ id, question, options })),
+    "the blind solver reviews repair candidates only; the verifier controls duplicate rejection");
   for (const item of solverInputs.at(-1)) {
     assert.deepEqual(Object.keys(item).sort(), ["id", "options", "question"],
       "every retry solver item contains only the blind-solver input fields");
   }
-  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.slice(0, 2).map(({ id }) => id),
+  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), duplicateAwareRepair.map(({ id }) => id),
     "the retry verifier receives the generated repair candidate");
+  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question }) => ({ id, type, question })),
+    "the retry verifier gets already approved question wording only as comparison context");
   assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
     "at most one bounded missing-slot repair is requested");
+  verifierRejectComparisonDuplicate = false;
 
   const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
   activeQuestions = questions;

@@ -1438,6 +1438,7 @@ module.exports = async function handler(req, res) {
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
+                      comparisonQuestions: round1ApprovedQuestions,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),
                     solver.solveQuestions(candidateQuestions, {
