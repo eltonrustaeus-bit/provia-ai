@@ -44,6 +44,7 @@ const MIN_APPROVAL_CONFIDENCE = 0.7;
 // is generous; anything beyond it is handled by the CANNOT_JUDGE escape rather
 // than by guessing.
 const materialInput = require("./_material.cjs");
+const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const MATERIAL_CHAR_CAP = 12000;
 
 function solverModel(generatorModel) {
@@ -75,8 +76,8 @@ function buildSolverSchema(n) {
             required: ["id", "option_verdicts", "option_plausibility", "index", "confidence", "reason"],
             properties: {
               id: { type: "string" },
-              option_verdicts: { type: "array", items: { type: "boolean" }, maxItems: 6 },
-              option_plausibility: { type: "array", items: { type: "boolean" }, maxItems: 6 },
+              option_verdicts: { type: "array", items: { type: "boolean" }, maxItems: MAX_MC_OPTIONS },
+              option_plausibility: { type: "array", items: { type: "boolean" }, maxItems: MAX_MC_OPTIONS },
               index: { type: "integer", minimum: -2 },
               confidence: { type: "number" },
               reason: { type: "string" },

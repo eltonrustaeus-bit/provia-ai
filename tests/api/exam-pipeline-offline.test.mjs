@@ -6,7 +6,24 @@ const require = createRequire(import.meta.url);
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
 const assessment = require("../../api/_assessment.js");
+const verifierModule = require("../../api/_verifier.js");
+const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
+
+assert.equal(assessment.MAX_MC_OPTIONS, 5);
+assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.options.maxItems, 5,
+  "generator schema uses the shared maximum of five MC options");
+assert.equal(verifierModule.buildVerifierSchema(1).schema.properties.results.items.properties.option_quality.maxItems, 5,
+  "verifier schema uses the same MC option maximum");
+assert.equal(solverModule.buildSolverSchema(1).schema.properties.results.items.properties.option_verdicts.maxItems, 5,
+  "solver schema uses the same MC option maximum");
+const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
+  id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
+}] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 1,
+});
+assert.equal(sixOptionNormalization.failure?.payload.error, "MC options invalid",
+  "server normalization rejects more than five options even if a provider bypasses its schema");
 
 const repairPayload = generateExam.buildRepairPayload({
   model: "synthetic-model",
@@ -501,6 +518,8 @@ try {
   activeQuestions = badOptionQuestions;
   regenerationQuestions = repairedOptionQuestions;
   verifierRejectOptionId = null;
+  const verifierInputCountBeforeMalformedOption = verifierInputs.length;
+  const solverInputCountBeforeMalformedOption = solverInputs.length;
   const nonsenseOptionExam = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
@@ -509,9 +528,13 @@ try {
   regenerationQuestions = null;
   assert.equal(nonsenseOptionExam.status, 200, JSON.stringify(nonsenseOptionExam.body));
   assert.equal(nonsenseOptionExam.body.exam.questions.length, 3,
-    "a bounded repair can replace a batch when the independent solver flags a malformed option");
-  assert.equal(nonsenseOptionExam.body.meta.solver.reasons.solver_implausible_option, 1,
-    "the solver's independent plausibility verdict is the reason the nonsense item is withheld");
+    "a bounded repair can replace a batch after the deterministic gate flags a malformed option");
+  assert.equal(verifierInputs.slice(verifierInputCountBeforeMalformedOption)
+    .some((batch) => batch.questions.some((question) => question.options.includes("Kesäkten"))), false,
+  "the deterministic gate withholds the malformed distractor before verifier review");
+  assert.equal(solverInputs.slice(solverInputCountBeforeMalformedOption)
+    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
+  "the deterministic gate withholds the malformed distractor before solver review");
   assert.equal(nonsenseOptionExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
     "an MC item with a nonsense distractor is withheld from the learner-facing exam");
 

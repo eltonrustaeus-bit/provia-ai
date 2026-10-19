@@ -174,6 +174,17 @@ check("maths KEEPS compound numeric options ('0 och 4' vs '2 och 4')", (() => {
   return kept(q, "mathematics");
 })());
 
+check("maths drops a lone word-format distractor among numeric choices", (() => {
+  const q = mc({ options: ["4", "5", "Kesäkten"], correct_index: 1 });
+  return !kept(q, "mathematics")
+    && issuesOf(q, "mathematics").includes("math_option_type_mismatch");
+})());
+
+check("maths KEEPS all-word choices even when they are long", (() => {
+  const q = mc({ options: ["Nollproduktmetoden", "pq-formeln", "Kvadratkomplettering"], correct_index: 1 });
+  return kept(q, "mathematics");
+})());
+
 check("maths KEEPS equation options", (() => {
   const q = mc({
     options: ["x² - 13x + 40 = 0", "x² + 13x = 40", "x² - 26x + 40 = 0"],

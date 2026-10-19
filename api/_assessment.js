@@ -12,6 +12,7 @@
 
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
+const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
 // Keep question-integrity keys independent from database credentials.
@@ -386,6 +387,13 @@ const PROFILES = {
         if (vals.length >= 2 && new Set(vals).size !== vals.length) {
           issues.push("math_options_numerically_equal");
         }
+        // This catches malformed distractors such as "Kesäkten" in an
+        // otherwise numeric list. It checks format consistency, not spelling.
+        const wordOptions = q.options.filter(option => /^[\p{L}\p{M}]+(?:[-'][\p{L}\p{M}]+)*$/u.test(String(option || "").trim()));
+        if (vals.length >= 2 && wordOptions.length === 1 && q.options.length - vals.length === 1
+            && String(wordOptions[0]).trim().length >= 5) {
+          issues.push("math_option_type_mismatch");
+        }
       }
       return issues;
     },
@@ -484,7 +492,7 @@ function getProfile(key) { return PROFILES[key] || PROFILES.generic; }
 const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
-  "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
+  "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal", "math_option_type_mismatch",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
   "graph_spec_invalid",
@@ -583,6 +591,7 @@ function gateExam(exam, opts) {
 }
 
 module.exports = {
+  MAX_MC_OPTIONS,
   detectSubjectProfile,
   getProfile,
   PROFILES,

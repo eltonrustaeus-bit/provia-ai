@@ -5,6 +5,8 @@
 // structured, multi-dimension results (spec §7) instead of a bare approved/rejected
 // boolean, so generate-exam.js and its logs can see WHY something failed.
 
+const { MAX_MC_OPTIONS } = require("./_assessment.js");
+
 function buildVerifierSchema(questionCount) {
   return {
     type: "json_schema",
@@ -37,7 +39,7 @@ function buildVerifierSchema(questionCount) {
               source_alignment: { type: "number", minimum: 0, maximum: 1 },
               scoring_quality: { type: "number", minimum: 0, maximum: 1 },
               language_quality: { type: "number", minimum: 0, maximum: 1 },
-              option_quality: { type: "array", items: { type: "boolean" }, maxItems: 6 },
+              option_quality: { type: "array", items: { type: "boolean" }, maxItems: MAX_MC_OPTIONS },
               issues: { type: "array", items: { type: "string" }, maxItems: 10 },
               required_changes: { type: "array", items: { type: "string" }, maxItems: 10 }
             }
@@ -72,7 +74,7 @@ function reviewInputWithinLimits(input) {
     if (typeof question.question === "string" && question.question.length > 3000) return false;
     if (typeof question.model_answer === "string" && question.model_answer.length > 6000) return false;
     if (typeof question.rubric === "string" && question.rubric.length > 3000) return false;
-    if (Array.isArray(question.options) && (question.options.length > 6 || question.options.some(option => typeof option === "string" && option.length > 1000))) return false;
+    if (Array.isArray(question.options) && (question.options.length > MAX_MC_OPTIONS || question.options.some(option => typeof option === "string" && option.length > 1000))) return false;
     if (Array.isArray(question.source_references) && (question.source_references.length > 5 || question.source_references.some(reference => typeof reference === "string" && reference.length > 1000))) return false;
     if (question.scoring_rubric !== undefined && JSON.stringify(question.scoring_rubric).length > 6000) return false;
     size += JSON.stringify(question).length;

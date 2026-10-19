@@ -54,6 +54,12 @@ test("student pilot authentication is login-only for pre-provisioned test accoun
   assert.match(shared, /SKOLPILOT · INBJUDNA TESTKONTON/);
 });
 
+test("expired exam recovery explains that saved answers are removed", async () => {
+  const flow = await readFile(`${ROOT}/js/exam-flow.js`, "utf8");
+  assert.match(flow, /Det tidigare provet har avslutats eller gått ut\. Dina sparade svar tas bort/);
+  assert.match(flow, /The previous exam has ended or expired\. Your saved answers are removed/);
+});
+
 test("pilot P.E.R requires an invited login and suppresses unvalidated readiness scoring", async () => {
   const shared = await readFile(`${ROOT}/shared.js`, "utf8");
   const unauthenticatedGuard = shared.indexOf("isLandingMode && EXGEN_RUNTIME.environment === 'pilot'");

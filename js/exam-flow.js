@@ -769,7 +769,7 @@
             back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
             resumeStatus.textContent = issuanceState === "completed"
               ? tx("Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt.", "This exam has already been submitted. Your material is still here if you want to create a new one.")
-              : tx("Det tidigare provet har avslutats eller gått ut. Materialet finns kvar; skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your material is still here; create a new exam to continue.");
+              : tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar tas bort, men materialet finns kvar. Skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your saved answers are removed, but your material is still here. Create a new exam to continue.");
             back.dataset.expired = "true";
             return;
           }

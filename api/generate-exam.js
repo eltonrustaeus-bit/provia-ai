@@ -196,7 +196,7 @@ function normalizeGeneratedExam(exam, {
       q.question = graphAnswers.questionText(q.graph_spec, lang);
       q.model_answer = graphAnswers.modelAnswer(q.graph_spec, lang);
     } else {
-      if (!Array.isArray(q.options) || q.options.length < 3) {
+      if (!Array.isArray(q.options) || q.options.length < 3 || q.options.length > assessment.MAX_MC_OPTIONS) {
         const failure = reject("MC options invalid", { question: q });
         if (failure) return { failure: { status: 500, payload: { ok: false, error: failure.reason, ...failure.detail } } };
         continue;
@@ -282,7 +282,7 @@ function buildMockExamSchema(numQuestions) {
               type: { type: "string", enum: ["mc", "short", "graph"] },
               points: { type: "number" },
               question: { type: "string" },
-              options: { type: "array", items: { type: "string" }, maxItems: 6 },
+              options: { type: "array", items: { type: "string" }, maxItems: assessment.MAX_MC_OPTIONS },
               correct_index: { type: "integer" },
               rubric: { type: "string" },
               model_answer: { type: "string" },
@@ -1805,6 +1805,7 @@ module.exports.buildRepairPayload = buildRepairPayload;
 module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;
 module.exports.readJsonBody = readJsonBody;
 module.exports.buildMockExamSchema = buildMockExamSchema;
+module.exports.normalizeGeneratedExam = normalizeGeneratedExam;
 module.exports.looksLikeMath = looksLikeMath;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested
