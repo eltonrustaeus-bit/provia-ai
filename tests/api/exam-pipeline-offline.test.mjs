@@ -308,6 +308,20 @@ try {
     "the API defaults requests without a question count to a complete fast exam");
 
   calls.length = 0;
+  activeQuestions = questions.slice(0, 2);
+  const twoQuestionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 2,
+  });
+  activeQuestions = questions;
+  assert.equal(twoQuestionExam.status, 200, JSON.stringify(twoQuestionExam.body));
+  assert.equal(twoQuestionExam.body.exam.questions.length, 2,
+    "a complete two-question exam is delivered when the learner explicitly selects two");
+  assert.equal(twoQuestionExam.body.meta.verifier.approved, 2,
+    "both questions still pass independent review");
+  assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
+    "both questions still pass the solver check");
+
+  calls.length = 0;
   quotaDenied = true;
   const quotaDeniedExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 1b",

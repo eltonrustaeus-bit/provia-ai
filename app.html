@@ -701,7 +701,7 @@ white-space:nowrap;
 <div>
 <label class="fieldLabel" for="numQuestions" id="tNum">Antal frågor</label>
 <select id="numQuestions">
-<option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
+<option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
 <option>9</option><option>10</option><option>11</option><option>12</option>
 <option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
 </select>
@@ -2510,7 +2510,7 @@ try{
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
-      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 3)));
+      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(2, Number(num) || 3)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
       selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den

@@ -576,7 +576,7 @@
       courses: courses,
       level: lvl,
       qType: qType,
-      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 3, 3, 20) : 3,
+      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 3, 2, 20) : 3,
       missCountFor: function (course) {
         var c = String(course || "").trim().toLowerCase();
         return miss.filter(function (m) {
@@ -779,7 +779,7 @@
         S.level = draft.level || "C";
         S.qType = draft.qType || "mix";
         S.num = draft.num || 12;
-        S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 3, 20);
+        S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 2, 20);
         S.material = draft.material || "";
         if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
@@ -1156,19 +1156,19 @@
       rType.querySelector("dd").textContent = typeText[v];
       graphHint.hidden = v !== "graph";
       if (v === "graph") {
-        if (!wasGraph && S.num >= 3) S.nonGraphNum = S.num;
+        if (!wasGraph && S.num >= 2) S.nonGraphNum = S.num;
         S.num = 1;
       } else if (wasGraph) {
-        S.num = clamp(Number(S.nonGraphNum) || d.num, 3, 20);
+        S.num = clamp(Number(S.nonGraphNum) || d.num, 2, 20);
         S.nonGraphNum = S.num;
       }
       rNum.querySelector("dd").textContent = v === "graph" ? tx("1 grafuppgift", "1 graph task") : String(S.num);
       setGraphCountMode(v === "graph", String(S.num));
     }, function (v) { return typeText[v]; }));
 
-    var countPicker = pickerRow(tx("Antal", "Count"), ["1", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
+    var countPicker = pickerRow(tx("Antal", "Count"), ["1", "2", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
       var count = Number(v);
-      if ((S.qType === "graph" && count !== 1) || (S.qType !== "graph" && count < 3)) return;
+      if ((S.qType === "graph" && count !== 1) || (S.qType !== "graph" && count < 2)) return;
       S.num = count;
       if (S.qType !== "graph") S.nonGraphNum = count;
       rNum.querySelector("dd").textContent = S.qType === "graph" ? tx("1 grafuppgift", "1 graph task") : v;
@@ -3124,7 +3124,7 @@
       var d = dna();
       S.level = d.level;
       S.qType = "mix";
-      S.num = clamp(d.num, 3, 20);
+      S.num = clamp(d.num, 2, 20);
       S.nonGraphNum = S.num;
       if (Array.from(mat).length > MATERIAL_MAX) {
         stepMaterial(tx("Träningsmaterialet är längre än gränsen. Korta ner texten innan du fortsätter.", "The practice material exceeds the limit. Shorten it before continuing."));

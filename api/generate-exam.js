@@ -1027,7 +1027,7 @@ module.exports = async function handler(req, res) {
   const selectedFocusTerms = normalizeSelectedFocusTerms(parsed.focusTerms, pastedText);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 3);
-  const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(3, numQuestionsRaw));
+  const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(2, numQuestionsRaw));
 
   if (!pastedText.trim()) return json(res, 400, { ok: false, error: "Missing pastedText" });
 
