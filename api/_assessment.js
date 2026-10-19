@@ -492,6 +492,7 @@ function getProfile(key) { return PROFILES[key] || PROFILES.generic; }
 const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
+  "source_reference_missing",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal", "math_option_type_mismatch",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
@@ -570,6 +571,9 @@ function gateExam(exam, opts) {
   for (const q of questions) {
     const issues = [
       ...generalQualityIssues(q),
+      ...(options.requireSourceReferences && String(q && q.type) !== "graph" && (!Array.isArray(q && q.source_references)
+        || !q.source_references.some(reference => typeof reference === "string" && reference.trim()))
+        ? ["source_reference_missing"] : []),
       ...(profile.allowedTypes.includes(String(q && q.type)) ? [] : ["type_not_allowed_for_subject"]),
       ...(typeof profile.extraIssues === "function" ? profile.extraIssues(q) : []),
     ];

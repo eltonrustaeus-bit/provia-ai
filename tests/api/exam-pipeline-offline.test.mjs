@@ -17,6 +17,8 @@ assert.equal(verifierModule.buildVerifierSchema(1).schema.properties.results.ite
   "verifier schema uses the same MC option maximum");
 assert.equal(solverModule.buildSolverSchema(1).schema.properties.results.items.properties.option_verdicts.maxItems, 5,
   "solver schema uses the same MC option maximum");
+assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.source_references.minItems, 1,
+  "generated questions must cite at least one source excerpt");
 const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
   id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
 }] }, {
@@ -296,7 +298,7 @@ function invoke(handler, body) {
 
 try {
   const course = "Matematik 1b";
-  const pastedText = "Vi tränar addition, subtraktion och multiplikation med heltal.";
+  const pastedText = "Grundläggande räkning: Vi tränar addition, subtraktion och multiplikation med heltal.";
   const unsupportedGraph = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 2b", pastedText: "Parabeln ges av y = x^2.",
     qType: "graph", numQuestions: 1,
@@ -394,7 +396,7 @@ try {
   quotaDenied = true;
   const quotaDeniedExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 1b",
-    pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+    pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
   });
   quotaDenied = false;
   assert.equal(quotaDeniedExam.status, 429, "a denied mock-exam quota is returned before generation");
@@ -547,6 +549,30 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
+
+  activeQuestions = questions.map((question, index) => index === 0
+    ? { ...question, source_references: ["A reference absent from the supplied material"] }
+    : question);
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  const verifierCountBeforeMissingSource = verifierInputs.length;
+  const solverCountBeforeMissingSource = solverInputs.length;
+  const missingSourceExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(missingSourceExam.status, 200, JSON.stringify(missingSourceExam.body));
+  assert.equal(missingSourceExam.body.exam.questions.length, 3,
+    "a question with no retained source excerpt is replaced by an independently reviewed repair");
+  assert.equal(verifierInputs.slice(verifierCountBeforeMissingSource)
+    .some((batch) => batch.questions.some((question) => question.id === "q-1")), false,
+  "a question without a retained source reference never reaches the verifier");
+  assert.equal(solverInputs.slice(solverCountBeforeMissingSource)
+    .some((batch) => batch.some((question) => question.id === "q-1")), false,
+  "a question without a retained source reference never reaches the solver");
+  assert.equal(missingSourceExam.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "the original source-less question is not delivered");
+  activeQuestions = questions;
+  regenerationQuestions = null;
 
   activeQuestions = [
     { ...questions[0], id: "duplicate-zero-a", question: "Vad är 2 + 3?" },
@@ -1179,7 +1205,7 @@ try {
   issuanceUnavailable = true;
   const issuanceFailure = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 1b",
-    pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+    pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
   });
   issuanceUnavailable = false;
   assert.equal(issuanceFailure.status, 500, "a failed exam issuance is never returned as a usable exam");
@@ -1235,7 +1261,7 @@ try {
   try {
     sealingFailure = await invoke(generateExam, {
       lang: "sv", level: "C", course: "Matematik 1b",
-      pastedText: "Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+      pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
     });
   } finally {
     gradeTasks.sealQuestion = sealQuestion;

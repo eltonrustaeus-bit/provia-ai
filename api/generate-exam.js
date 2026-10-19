@@ -300,7 +300,7 @@ function buildMockExamSchema(numQuestions) {
                  inkonsekvent hierarki blev tyst fel data. */
               concept_tag: { type: "string" },
               learning_objective: { type: "string" },
-              source_references: { type: "array", items: { type: "string" }, maxItems: 5 },
+              source_references: { type: "array", items: { type: "string", minLength: 1 }, minItems: 1, maxItems: 5 },
               cognitive_level: { type: "string", enum: ["minnas", "förstå", "tillämpa", "analysera", "värdera"] },
               accepted_answers: { type: "array", items: { type: "string" }, maxItems: 5 },
               estimated_answer_length: { type: "string", enum: ["none", "one_word", "one_sentence", "short_paragraph", "long_paragraph"] },
@@ -1240,7 +1240,7 @@ module.exports = async function handler(req, res) {
 
     failureStage = "quality_review";
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
-    let gate = assessment.gateExam(exam, { profile: subjectProfile });
+    let gate = assessment.gateExam(exam, { profile: subjectProfile, requireSourceReferences: true });
     if (truncated) {
       const seenIds = new Set();
       gate.questions = gate.questions.filter((question) => {
@@ -1422,7 +1422,7 @@ module.exports = async function handler(req, res) {
                 qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions: repairCount, truncated: false,
               });
               if (normalized2?.exam) {
-                const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile });
+                const candidateGate = assessment.gateExam(normalized2.exam, { profile: subjectProfile, requireSourceReferences: true });
                 const candidateQuestions = candidateGate.questions;
                 repairCandidateCount = candidateQuestions.length;
                 if (candidateQuestions.length > 0) {

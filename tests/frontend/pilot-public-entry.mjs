@@ -87,6 +87,26 @@ try {
   }
 
   {
+    const recoveryPayload = Buffer.from(JSON.stringify({ email: "synthetic@example.test" })).toString("base64url");
+    const recoveryToken = `e30.${recoveryPayload}.synthetic-signature`;
+    const { page, close } = await open(`aterstall.html#access_token=${recoveryToken}&refresh_token=synthetic-refresh&expires_in=3600&type=recovery`, "pilot");
+    await page.evaluate((authKey) => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === authKey) throw new Error("synthetic storage failure");
+        return original.call(this, key, value);
+      };
+    }, AUTH_KEY);
+    await page.route("**/auth/v1/user", route => route.fulfill({ json: { id: "synthetic-user", email: "synthetic@example.test" } }));
+    await page.locator("#rsPass").fill("synthetic-new-password");
+    await page.locator("#rsPass2").fill("synthetic-new-password");
+    await page.locator("#rsSave").click();
+    await page.waitForFunction(() => document.querySelector("#rsMsg")?.textContent?.includes("automatisk inloggning misslyckades"));
+    ok("återställning påstår inte att användaren loggats in när sessionen inte kan sparas", await page.locator("#rsLoginHint").isVisible() && await page.locator("#rsSave").isDisabled() && page.url().includes("aterstall.html"));
+    await close();
+  }
+
+  {
     const { page, close } = await open("index.html", "production");
     ok("publik startsida behåller registrering och prisväg", await page.getByRole("link", { name: "Skapa ditt första prov" }).isVisible() && await page.locator("#pricingStrip").isVisible() && await page.locator(".xg-footer a[href='pricing.html']").isVisible());
     await close();

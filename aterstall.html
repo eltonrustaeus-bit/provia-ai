@@ -78,6 +78,7 @@
       </div>
       <button class="rsBtn" id="rsSave" type="button">Spara nytt lösenord</button>
       <div class="rsMsg" id="rsMsg" role="alert" aria-live="polite"></div>
+      <p class="rsHint" id="rsLoginHint" hidden><a href="app.html" style="color:var(--a)">Gå till inloggningen</a></p>
     </div>
 
     <!-- Ingen eller utgången länk -->
@@ -171,6 +172,7 @@
          matches what supabase-js writes to this key, user object included,
          so the SDK on the next page reads it as its own session. */
       var ttl = Number(hash.get('expires_in') || 3600);
+      var sessionSaved = false;
       try {
         localStorage.setItem(SUPA_LS, JSON.stringify({
           access_token: token,
@@ -180,7 +182,15 @@
           token_type: 'bearer',
           user: updatedUser
         }));
+        sessionSaved = true;
       } catch (_) {}
+      if (!sessionSaved) {
+        msg('Lösenordet sparades, men automatisk inloggning misslyckades. Logga in med ditt nya lösenord.', 'ok');
+        $('rsLoginHint').hidden = false;
+        btn.disabled = true;
+        btn.textContent = 'Lösenord sparat';
+        return;
+      }
       msg('Klart. Loggar in dig…', 'ok');
       if (window.triggerWelcome) window.triggerWelcome(email);
       setTimeout(function () { location.href = 'app.html'; }, 600);

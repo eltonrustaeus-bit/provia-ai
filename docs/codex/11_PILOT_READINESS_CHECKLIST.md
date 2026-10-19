@@ -1,5 +1,16 @@
 # ExGen: checklista for skolpilot
 
+## Senaste lokala uppfoljning — 2026-10-19
+
+- Grundcommit for denna uppfoljning ar `d9a98f4` pa den befintliga pilotgrenen. Previewn fran den grenen ar separat fran Production; ingen `main`-merge eller produktionsdeploy ingar.
+- Provpipelinen kravde tidigare inte att varje genererad fraga hade minst en källreferens som faktiskt finns kvar i elevens material. Kallreferens ar nu obligatorisk for vanliga fragor och ingar som `minItems: 1` i generatorns schema. Fragor utan referens stoppas av den deterministiska grinden fore verifierare/losare och kan ersattas genom den befintliga begransade reparationsvagen. Grafuppgifter ar undantagna eftersom de normaliseras fran den givna tabellen/ekvationen.
+- Regressionen bekraftar att en fraga med en referens som saknas i materialet inte nar verifieraren, losaren eller elevens prov. Kallforekomst ar en strukturell kontroll; semantisk relevans och om texten verkligen stodjer fragan bygger fortsatt pa verifieraren och ar inte en full garanti.
+- Aterstallningssidan visade tidigare fortsatt automatisk inloggning aven nar webblasaren inte kunde spara Auth-sessionen. Den visar nu att losenordsbytet lyckades men inloggningen misslyckades, samt en tydlig vag till inloggningssidan.
+- Verifierat lokalt: fokuserade API-/assessment-tester passerade; `pilot-public-entry.mjs` passerade 24/24; `node --check` for andrade JavaScript-filer och `git diff --check` passerade. En redundant fullsvitskornig avbrots efter tio minuter; den raknas inte som pass for denna diff.
+- Anvandaren uppger fortsatt att stagingkontot inte gar att logga in pa. Inga nya liveanrop, auth-andringar, databasandringar eller stagingdataborttagningar gjordes. Godkand staging-callback var redan tillaten.
+
+**PILOT NOT READY.** Offline-regressionerna bevisar inte att provgenerering, P.E.R., rattning eller sparning fungerar i staging. Nasta steg ar att anvandaren loggar in med det avsedda syntetiska stagingkontot i en aktuell Preview. Nar autentisering fungerar kan ett litet, syntetiskt skolpilotflode verifieras. Produktion och `main` lamnas ororda.
+
 ## Senaste verifiering — 2026-10-19
 
 - Aktiv XelioV-mappning aterbekraftad for pilot-worktree `/private/tmp/provia-ai-pilot-feature-20261019` och ExGen-projekt `c3af48b2-20c3-4d33-a5e0-72aa001a1637`.
