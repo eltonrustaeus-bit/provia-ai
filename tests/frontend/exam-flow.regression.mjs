@@ -95,10 +95,20 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
 const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") => {
-  await page.route("**/auth/v1/user**", route => route.fulfill({
-    json: { id: uid, email: uid + "@t.se" },
-    headers: { "access-control-allow-origin": "*" },
-  }));
+  await page.route("**/auth/v1/user**", route => {
+    const corsHeaders = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+      "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+    };
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+    return route.fulfill({
+      json: { id: uid, email: uid + "@t.se" },
+      headers: corsHeaders,
+    });
+  });
   await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role }] }));
   await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang, storage });
 };
