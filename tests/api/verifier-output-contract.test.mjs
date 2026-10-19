@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { verifyQuestions, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
+const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved });
@@ -39,6 +39,12 @@ assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
 assert.equal(valid.outcome.model, "measured-review-model");
 assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
 assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upper timeout");
+const submittedReviewSchema = valid.requestBody.text.format.schema.properties.results;
+assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
+assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
+assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
+  "schema inspection without a question count remains backward compatible");
+assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
 const boundedReview = await runWithResults([result("q1", true)], [question("q1")], "", 6_500);
 assert.equal(boundedReview.requestTimeoutMs, 6_500, "retry can bound the reviewer to the remaining function budget");
 const cappedReview = await runWithResults([result("q1", true)], [question("q1")], "", 60_000);
@@ -120,6 +126,7 @@ assert.equal(transmitted.questions[0].rubric, "En poäng för x = 2.");
 assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_rubric);
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
+assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och returnera exakt ett resultat/i);
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
 assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");
