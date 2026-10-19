@@ -1,14 +1,16 @@
 # ExGen: checklista for skolpilot
 
-## Senaste lokala uppfoljning — 2026-10-19 (efter `8bdf367`)
+## Senaste uppfoljning — 2026-10-19 (commit `80eeb49`)
 
 - Provbegaran validerar nu att varje godkand fraga matchar elevens valda format (`mc`, `short`, eller en tillaten blandning). Formatfel stoppas i den deterministiska grinden bade efter forstagenerering och efter reparation; regressionen visar att fel format inte nar verifierare eller losare.
 - Vanlig P.E.R.-studiehjalp kan nu fa det aktuella inklistrade studiematerialet, begransat till 6 000 tecken och behandlat som opalitlig kalltext, inte instruktioner. Materialet filtreras bort nar kontexten markerar aktivt prov, provresultat eller aktuell provfraga.
 - Verifierat lokalt efter dessa andringar: API-/assessment-sviten passerade 5/5 testfiler; P.E.R.-kontextpaketet passerade 39/39; browserregressionen for P.E.R./prov passerade 66/66. Dessa ar lokala tester, inte provider- eller stagingbevis.
 - Oberoende kodgranskning bedomde att provskyddet failar stangt enligt de granskade kodvagarna. Kvarstaende risk: kallreferensernas forekomst ar strukturell och semantisk relevans beror fortfarande pa modellgranskning; representativa adversariala kvalitetsfall och verklig providerprestanda ar inte liveverifierade.
+- Commit `80eeb49` ar pushad till `codex/exgen-school-pilot-review-2026-10-13`. Git-kopplad Vercel Preview fran exakt SHA ar `dpl_62m3YJkHgc2zMAYwHpBuVakCLjx7`, status `READY`, target `preview`. Build-scriptet accepterade den explicita icke-produktionsruntime-konfigurationen; ingen `main`-merge eller produktionsdeploy har gjorts.
+- En forsta lokal CLI-upload utan Git-branchkontext stoppades av build-scriptets fail-closed-miljoskydd. Den ersattes av den Git-kopplade Previewn ovan; inga hemligheter kopierades eller exponerades och inga Vercel/Supabase-miljovariabler andrades.
 - Anvandaren kan inte logga in pa stagingkontot. Inga nya AI-anrop, Auth-andringar, DB-andringar eller produktionsatgarder har gjorts. Nasta steg ar att aterfa staginginloggning pa Previewn; darefter kan ett litet syntetiskt flode verifiera trefragorsgenerering, P.E.R. och sparad rattning.
 
-**PILOT NOT READY.** De nya andringarna ar annu lokala och bevisar inte att aktuell Preview kan generera, ratta eller spara ett prov live.
+**PILOT NOT READY.** Preview-bygget ar verifierat fran ratt commit, men utan staginginloggning ar liveprov for generering, P.E.R., rattning och sparning inte genomforda.
 
 ## Senaste lokala uppfoljning — 2026-10-19
 
