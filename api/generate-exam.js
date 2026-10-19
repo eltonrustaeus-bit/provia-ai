@@ -408,6 +408,7 @@ async function consumeMockExamQuota(userId, limit, periodKey, requestId) {
       count: 0,
       limit: null,
       period: limit.period,
+      periodUnit: limit.period,
       unlimited: true,
       enforced: true
     };
@@ -444,6 +445,7 @@ async function consumeMockExamQuota(userId, limit, periodKey, requestId) {
     count: Number(data?.count || 0),
     limit: data?.limit ?? limit.cap,
     period: periodKey,
+    periodUnit: limit.period,
     unlimited: data?.unlimited === true,
     enforced: true
   };
@@ -1094,7 +1096,8 @@ module.exports = async function handler(req, res) {
       error: "Quota exceeded",
       count: quota.count,
       limit: quota.limit,
-      period: quota.period
+      period: quota.period,
+      periodUnit: quota.periodUnit
     });
   }
 

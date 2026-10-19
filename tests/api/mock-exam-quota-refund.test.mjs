@@ -30,6 +30,7 @@ try {
   );
   assert.equal(reservation.ok, true);
   assert.equal(reservation.period, "2026-10", "the request's captured period remains authoritative");
+  assert.equal(reservation.periodUnit, "month", "the quota period unit is separate from its storage key");
   assert.equal(seen.url, "https://synthetic.supabase.co/rest/v1/rpc/reserve_mock_exam_quota");
   assert.equal(seen.init.headers.apikey, "sb_secret_test_only");
   assert.equal(seen.init.headers.Authorization, undefined, "a Supabase secret API key is sent only as apikey");
@@ -162,6 +163,9 @@ assert.match(source, /catch \{\s*await refundMockExamQuota\(user\.id, quotaPerio
   "an ambiguous reserve timeout is reconciled by request ID");
 assert.match(source, /reserve_mock_exam_quota/);
 assert.match(source, /commitMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\)/);
+const quotaDeniedResponse = source.slice(source.indexOf("if (!quota.ok)"), source.indexOf("const usageEvents"));
+assert.match(quotaDeniedResponse, /period: quota\.period,[\s\S]*periodUnit: quota\.periodUnit/,
+  "quota-denial response exposes both the period storage key and its display unit");
 
 assert.match(migration, /request_id uuid primary key/i);
 assert.match(migration, /create or replace function public\.reserve_mock_exam_quota/i);
