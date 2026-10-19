@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
-const gradeTasks = require("../../api/_grade-task.js");
+const assessment = require("../../api/_assessment.js");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -48,6 +48,33 @@ const questions = [
   estimated_answer_length: "none",
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
 }));
+
+const duplicateGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "zero-first", question: "Vad får man som nollställ för funktionen y = 3x - 6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[1], id: "zero-paraphrase", question: "Vad är nollstället för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[1], id: "zero-semantic-paraphrase", question: "Vid vilket x skär grafen y=3x-6 x-axeln?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[2], id: "slope-same-equation", question: "Vilken är lutningen för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Lutning" },
+  { ...questions[0], id: "zero-new-equation", question: "Vad är nollstället för funktionen y=2x+8?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+] }, { profile: "mathematics", secret: signingSecret });
+assert.deepEqual(duplicateGate.questions.map((question) => question.id), [
+  "zero-first", "slope-same-equation", "zero-new-equation",
+], "near-identical questions are removed without suppressing a different skill or equation");
+assert.deepEqual(duplicateGate.dropped, [
+  { id: "zero-paraphrase", issues: ["duplicate_question"] },
+  { id: "zero-semantic-paraphrase", issues: ["duplicate_question"] },
+]);
+
+function assertIncompleteExamNotDelivered(response, scenario) {
+  assert.equal(response.status, 502, `${scenario}: ${JSON.stringify(response.body)}`);
+  assert.equal(response.body.error, "incomplete_exam", `${scenario}: explicit incomplete-exam error`);
+  assert.equal(response.body.exam, undefined, `${scenario}: no partial exam is exposed`);
+  const requestCalls = calls.slice(lastInvokeCallStart);
+  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")
+    && call.body?.p_request_id === response.body.requestId), true, `${scenario}: reserved quota is refunded`);
+  assert.equal(requestCalls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"), false,
+    `${scenario}: incomplete exam is never issued`);
+}
+
 let activeQuestions = questions;
 let emptyGenerationResponse = false;
 let generationTextOverride = null;
@@ -62,6 +89,7 @@ let solverRejectQuestionId = null;
 let regenerationQuestions = null;
 let throwOnRepair = false;
 let issuanceUnavailable = false;
+let lastInvokeCallStart = 0;
 const failureLogs = [];
 const previousConsoleError = console.error;
 console.error = (line) => failureLogs.push(String(line));
@@ -177,6 +205,7 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 function invoke(handler, body) {
+  lastInvokeCallStart = calls.length;
   const req = Readable.from([Buffer.from(JSON.stringify(body))]);
   req.method = "POST";
   req.headers = { authorization: "Bearer synthetic-user-token", "content-type": "application/json" };
@@ -334,6 +363,26 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
+
+  activeQuestions = [
+    { ...questions[0], id: "duplicate-zero-a", question: "Vad är 2 + 3?" },
+    { ...questions[0], id: "duplicate-zero-b", question: "Vad får man som 2 + 3?" },
+    questions[2],
+  ];
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  calls.length = 0;
+  const duplicateRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(duplicateRepairedExam.status, 200, JSON.stringify(duplicateRepairedExam.body));
+  assert.equal(duplicateRepairedExam.body.exam.questions.length, 3,
+    "a near-duplicate initial question is replaced by a distinct, independently reviewed repair");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+    "an underfilled exam triggers exactly one bounded repair generation");
+  assert.equal(new Set(duplicateRepairedExam.body.exam.questions.map(assessment.questionDedupeSignature)).size, 3,
+    "the repaired exam contains three distinct question signatures");
+
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
   verifierRejectQuestionId = "q-1";
@@ -400,9 +449,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierUnavailableForRetry = false;
-  assert.equal(verifierFailedRetry.status, 200, JSON.stringify(verifierFailedRetry.body));
-  assert.deepEqual(verifierFailedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry verifier failure falls back only to the already-approved first-round subset");
+  assertIncompleteExamNotDelivered(verifierFailedRetry, "retry verifier failure");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -411,9 +458,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierThrowsForRetry = false;
-  assert.equal(verifierTimeoutRetry.status, 200, JSON.stringify(verifierTimeoutRetry.body));
-  assert.deepEqual(verifierTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry verifier timeout cannot override or erase the safe first-round fallback");
+  assertIncompleteExamNotDelivered(verifierTimeoutRetry, "retry verifier timeout");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -422,9 +467,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverUnavailableForRetry = false;
-  assert.equal(solverUnavailableRetry.status, 200, JSON.stringify(solverUnavailableRetry.body));
-  assert.deepEqual(solverUnavailableRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry solver outage withholds all regenerated MC items and preserves the approved first-round subset");
+  assertIncompleteExamNotDelivered(solverUnavailableRetry, "retry solver outage");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -433,9 +476,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverThrowsForRetry = false;
-  assert.equal(solverTimeoutRetry.status, 200, JSON.stringify(solverTimeoutRetry.body));
-  assert.deepEqual(solverTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry solver timeout withholds every unchecked MC item and retains the first-round fallback");
+  assertIncompleteExamNotDelivered(solverTimeoutRetry, "retry solver timeout");
 
   activeQuestions = questions;
   regenerationQuestions = [
@@ -448,9 +489,7 @@ try {
   const malformedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assert.equal(malformedRetry.status, 200, JSON.stringify(malformedRetry.body));
-  assert.deepEqual(malformedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "a retry batch with duplicate IDs is rejected before review and preserves only first-round approvals");
+  assertIncompleteExamNotDelivered(malformedRetry, "retry batch with duplicate IDs");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -460,9 +499,7 @@ try {
   const timedOutRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assert.equal(timedOutRetry.status, 200, JSON.stringify(timedOutRetry.body));
-  assert.deepEqual(timedOutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "repair transport failure preserves the already-approved first-round subset");
+  assertIncompleteExamNotDelivered(timedOutRetry, "repair transport failure");
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_solver_schema"), true,
     "first-round MCs are independently solved before retry starts");
 
@@ -492,23 +529,9 @@ try {
   });
   activeQuestions = questions;
   verifierRejectQuestionId = null;
-  assert.equal(shortExam.status, 200, JSON.stringify(shortExam.body));
-  assert.equal(shortExam.body.exam.questions.length, 4, "an open-response exemplar rejected by review is withheld");
-  assert.equal(shortExam.body.exam.questions.some((q) => q.id === "short-wrong-example"), false,
-    "a contradictory model answer cannot reach the learner when the reviewer rejects it");
-  assert.equal(shortExam.body.exam.questions.every((q) => !Object.hasOwn(q, "accepted_answers")), true,
-    "accepted short-answer variants never reach the learner before submission");
-  const publicShortQuestion = shortExam.body.exam.questions[0];
-  const openedShortQuestion = gradeTasks.openQuestion(
-    publicShortQuestion, publicShortQuestion.grade_task, undefined,
-    gradeTasks.hashContext(pastedText, course, userId)
-  );
-  assert.ok(openedShortQuestion.accepted_answers.length > 0,
-    "accepted variants remain available inside the server-sealed grading task");
-  const shortVerifierInput = verifierInputs.at(-1);
-  assert.equal(shortVerifierInput.source_material, pastedText);
-  assert.equal(shortVerifierInput.questions.find((q) => q.id === "short-wrong-example")?.model_answer, "x = 3");
-  assert.equal(shortExam.body.meta.verifier.rejected, 1);
+  assertIncompleteExamNotDelivered(shortExam, "one rejected short-answer question");
+  assert.equal(shortExam.body.exam, undefined,
+    "a rejected short-answer question prevents delivery of a partial exam containing model answers");
 
   calls.length = 0;
   solverUnavailable = true;
@@ -577,11 +600,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedExam.status, 200, JSON.stringify(salvagedExam.body));
-  assert.equal(salvagedExam.body.exam.questions.length, 1,
-    "a truncated response keeps valid recovered questions and drops a malformed ID");
-  assert.equal(salvagedExam.body.exam.questions[0].id, "q-1");
-  assert.equal(salvagedExam.body.meta.truncated, true);
+  assertIncompleteExamNotDelivered(salvagedExam, "truncated response with fewer than requested questions");
 
   generationTextOverride = JSON.stringify({
     title: "Avkortat syntetiskt prov", level: "C",
@@ -591,10 +610,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedDuplicate.status, 200, JSON.stringify(salvagedDuplicate.body));
-  assert.equal(salvagedDuplicate.body.exam.questions.length, 1,
-    "a structurally invalid first duplicate does not discard the later valid recovered question");
-  assert.equal(salvagedDuplicate.body.exam.questions[0].id, "q-1");
+  assertIncompleteExamNotDelivered(salvagedDuplicate, "truncated response with an invalid duplicate");
 
   generationTextOverride = JSON.stringify({
     title: "Avkortat syntetiskt prov", level: "C",
@@ -604,10 +620,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedDuplicateAfterGate.status, 200, JSON.stringify(salvagedDuplicateAfterGate.body));
-  assert.equal(salvagedDuplicateAfterGate.body.exam.questions.length, 1,
-    "a quality-gate-rejected first duplicate does not suppress a later valid recovered question");
-  assert.equal(salvagedDuplicateAfterGate.body.exam.questions[0].id, "q-1");
+  assertIncompleteExamNotDelivered(salvagedDuplicateAfterGate, "truncated response with a rejected duplicate");
   activeQuestions = questions;
 
   const graphCourse = "Matematik 2b";

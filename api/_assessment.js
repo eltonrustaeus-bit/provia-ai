@@ -489,6 +489,54 @@ const BLOCKING = new Set([
   "science_options_quantitatively_equal", "language_options_equivalent",
   "graph_spec_invalid",
 ]);
+const DUPLICATE_QUESTION_FILLER = new Set([
+  "vad", "vilken", "vilket", "vilka", "är", "får", "man", "som", "för", "att", "av", "i", "på", "med", "till",
+  "hur", "ska", "kan", "du", "the", "what", "which", "is", "are", "a", "an", "of", "to", "for", "how",
+  "find", "solve", "calculate", "determine", "explain", "show",
+]);
+
+function questionDedupeSignature(question) {
+  const tokens = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-")
+    .match(/[\p{L}\p{N}]+/gu) || [];
+  const significant = tokens
+    .filter((token) => !DUPLICATE_QUESTION_FILLER.has(token))
+    .map((token) => token.length > 6 ? token.replace(/(?:en|et)$/u, "") : token);
+  return significant.length ? significant.join(" ") : "";
+}
+
+function mathQuestionIntent(question) {
+  const text = `${question?.concept_tag || ""} ${question?.question || ""}`
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  if (/nollst(?:ä|a)ll|nollpunkt|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
+  if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) return "slope";
+  if (/y-sk(?:ä|a)rning|y-axeln|y-axel|vertical intercept/u.test(text)) return "y-intercept";
+  if (/derivata|derivative|tangentlutning/u.test(text)) return "derivative";
+  return "";
+}
+
+function mathQuestionExpression(question) {
+  const text = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const equations = text.match(/[a-z]\s*=\s*[-+]?\d*\.?\d*\s*[a-z](?:\s*[-+]\s*\d*\.?\d+)?/gu) || [];
+  return equations.map((equation) => equation.replace(/\s+/g, "")).sort().join("|");
+}
+
+function isDuplicateQuestion(left, right) {
+  const signature = questionDedupeSignature(left);
+  if (signature && signature === questionDedupeSignature(right)) return true;
+  const leftIntent = mathQuestionIntent(left);
+  const expression = mathQuestionExpression(left);
+  return Boolean(leftIntent && expression
+    && leftIntent === mathQuestionIntent(right)
+    && expression === mathQuestionExpression(right));
+}
 // Non-blocking issues are flagged (soft warnings) but the question is kept —
 // they describe a weak or suspicious question, not an unanswerable one, and
 // dropping them would shrink the exam the student asked for:
@@ -522,6 +570,10 @@ function gateExam(exam, opts) {
       dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: blocking });
       continue;
     }
+    if (kept.some((accepted) => isDuplicateQuestion(accepted, q))) {
+      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: ["duplicate_question"] });
+      continue;
+    }
     if (issues.length) flagged.push({ id: String(q && q.id != null ? q.id : ""), issues });
     // sign the (now trusted) answer key before it leaves the server
     q.akey_sig = signAnswerKey(q, secret);
@@ -544,5 +596,7 @@ module.exports = {
   signAnswerKey,
   verifyAnswerKey,
   answerKeyString,
+  questionDedupeSignature,
+  isDuplicateQuestion,
   COGNITIVE_VERBS,
 };

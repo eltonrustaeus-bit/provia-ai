@@ -1204,6 +1204,9 @@ module.exports = async function handler(req, res) {
         return true;
       });
     }
+    const duplicateQuestionIds = gate.dropped
+      .filter((item) => item.issues.includes("duplicate_question"))
+      .map((item) => item.id);
     exam.questions = gate.questions;
 
     // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
@@ -1242,7 +1245,7 @@ module.exports = async function handler(req, res) {
       verifierOutcome.callOk = v1.callOk;
       if (v1.callOk) {
         const approvedIds = new Set();
-        const rejectedIds = [];
+        const rejectedIds = [...duplicateQuestionIds];
         for (const q of exam.questions) {
           const vres = v1.perQuestion.get(String(q.id));
           verifierOutcome.checked++;
@@ -1272,17 +1275,18 @@ module.exports = async function handler(req, res) {
         // per-question stamping below — round 1 unless a regeneration round
         // actually succeeds and replaces exam.questions with round-2 output.
         let activeVerifierMap = v1.perQuestion;
-        // One bounded regeneration attempt for the whole exam if too much was
-        // rejected (mirrors the existing >30%-flagged retry threshold below) —
-        // never loop, never regenerate per-question (cost + spec §13 says no
-        // unbounded regeneration loops).
+        // One bounded whole-exam repair for an underfilled set or a high
+        // rejection rate. Never loop or regenerate per question.
         //
         // A regenerated graph batch remains excluded until the graph-specific
         // cross-round fixture is covered. Ordinary and MC batches share the
         // same server normalization, gate, verifier and (for MC) blind solver.
         const regenerationTimeoutMs = regenerationGenerationTimeout(budget.remaining());
         const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null;
-        if (rejectedIds.length > 0 && rejectedIds.length / exam.questions.length > 0.3 && canRegenerate) {
+        const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
+        const needsRepair = exam.questions.length < numQuestions
+          || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
+        if (needsRepair && canRegenerate) {
           const originalGatedQuestions = exam.questions;
           const round1ApprovedQuestions = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
           const round1Gate = gate;
@@ -1348,14 +1352,10 @@ module.exports = async function handler(req, res) {
                     }
                     const retryUniqueQuestions = [];
                     const retryIds = new Set();
-                    const retryStems = new Set();
                     for (const q of kept) {
                       const id = String(q.id);
-                      const stem = String(q.question || "").normalize("NFKC").toLowerCase()
-                        .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-                      if (retryIds.has(id) || !stem || retryStems.has(stem)) continue;
+                      if (retryIds.has(id) || retryUniqueQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
                       retryIds.add(id);
-                      retryStems.add(stem);
                       retryUniqueQuestions.push(q);
                     }
                     const completeRetry = retryUniqueQuestions.length >= numQuestions;
@@ -1363,17 +1363,12 @@ module.exports = async function handler(req, res) {
                       ? retryUniqueQuestions.slice(0, numQuestions)
                       : [...round1ApprovedQuestions];
                     const combinedIds = new Set(combinedQuestions.map(q => String(q.id)));
-                    const combinedStems = new Set(combinedQuestions.map(q => String(q.question || "")
-                      .normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()));
                     if (!completeRetry) {
                       for (const q of retryUniqueQuestions) {
                         const id = String(q.id);
-                        const stem = String(q.question || "").normalize("NFKC").toLowerCase()
-                          .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
                         if (combinedQuestions.length >= numQuestions) break;
-                        if (combinedIds.has(id) || !stem || combinedStems.has(stem)) continue;
+                        if (combinedIds.has(id) || combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) continue;
                         combinedIds.add(id);
-                        combinedStems.add(stem);
                         combinedQuestions.push(q);
                       }
                     }
@@ -1481,6 +1476,17 @@ module.exports = async function handler(req, res) {
         message: lang === "en"
           ? "The question quality check could not be completed. No exam was delivered; please try again."
           : "Kvalitetskontrollen hann inte slutföras. Inget prov lämnades ut; försök igen."
+      });
+    }
+
+    if (exam.questions.length > 0 && exam.questions.length < numQuestions) {
+      return fail(502, {
+        ok: false,
+        error: "incomplete_exam",
+        requestId: quotaRequestId,
+        message: lang === "en"
+          ? "The quality checks could not approve enough distinct questions. No exam was delivered; please try again."
+          : "Kvalitetskontrollen kunde inte godkänna tillräckligt många unika frågor. Inget prov lämnades ut; försök igen."
       });
     }
 
