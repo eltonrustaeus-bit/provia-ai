@@ -647,7 +647,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("genereringsfel visar bara en tillåten, begriplig serverfas",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes("Steg: provstart") && !text.includes("exam_issuance")));
-    const qualityMessage = "Kvalitetskontrollen kunde inte godkänna tillräckligt många unika frågor. Inget prov lämnades ut; försök igen.";
+    const qualityMessage = "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen.";
     await page.route("**/api/generate-exam", route => route.fulfill({
       status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage },
     }));

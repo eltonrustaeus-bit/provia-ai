@@ -8,6 +8,19 @@ const gradeExam = require("../../api/grade.js");
 const assessment = require("../../api/_assessment.js");
 const gradeTasks = require("../../api/_grade-task.js");
 
+const repairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3 });
+assert.deepEqual(repairPayload.input.slice(0, 2), [
+  { role: "system", content: "system prompt" },
+  { role: "user", content: "material prompt" },
+], "repair retains the original system prompt and source material");
+assert.match(repairPayload.input.at(-1).content, /exakt 3 frågor/i);
+assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
+assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 const previousFetch = globalThis.fetch;
@@ -413,6 +426,9 @@ try {
     "a near-duplicate initial question is replaced by a distinct, independently reviewed repair");
   assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
     "an underfilled exam triggers exactly one bounded repair generation");
+  const repairCall = calls.find((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema");
+  assert.match(repairCall.body.input.at(-1).content, /KVALITETSREPARATION/,
+    "the single repair generation receives explicit quality guidance");
   assert.equal(new Set(duplicateRepairedExam.body.exam.questions.map(assessment.questionDedupeSignature)).size, 3,
     "the repaired exam contains three distinct question signatures");
 

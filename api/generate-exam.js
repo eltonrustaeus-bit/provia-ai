@@ -954,6 +954,19 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
+function buildRepairPayload(payload, { lang, numQuestions }) {
+  const instruction = lang === "en"
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create a fresh, complete set of exactly ${numQuestions} questions of the already selected type and level. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa en ny, komplett uppsättning med exakt ${numQuestions} frågor av den redan valda typen och nivån. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+  return {
+    ...payload,
+    input: [
+      ...(Array.isArray(payload?.input) ? payload.input : []),
+      { role: "user", content: instruction },
+    ],
+  };
+}
+
 module.exports = async function handler(req, res) {
   const budget = makeBudget(Date.now());
 
@@ -1297,10 +1310,11 @@ module.exports = async function handler(req, res) {
           const regenStartedAt = Date.now();
           let data2 = null;
           try {
+            const repairPayload = buildRepairPayload(payload, { lang, numQuestions });
             const r2 = await fetch("https://api.openai.com/v1/responses", {
               method: "POST",
               headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
+              body: JSON.stringify(repairPayload),
               // Preserve time for independent review plus delivery finalization.
               signal: AbortSignal.timeout(regenerationTimeoutMs)
             });
@@ -1507,8 +1521,8 @@ module.exports = async function handler(req, res) {
         error: "incomplete_exam",
         requestId: quotaRequestId,
         message: lang === "en"
-          ? "The quality checks could not approve enough distinct questions. No exam was delivered; please try again."
-          : "Kvalitetskontrollen kunde inte godkänna tillräckligt många unika frågor. Inget prov lämnades ut; försök igen."
+          ? "There were not enough distinct questions that could be verified. No exam was delivered. Add relevant course material or narrow the topic, then try again."
+          : "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen."
       });
     }
 
@@ -1525,7 +1539,9 @@ module.exports = async function handler(req, res) {
     if (exam.questions.length === 0) {
       return fail(502, {
         ok: false,
-        error: "Alla frågor underkändes av kvalitetskontrollen. Försök igen.",
+        error: lang === "en"
+          ? "No questions passed the quality review. No exam was delivered. Add relevant course material or narrow the topic, then try again."
+          : "Inga frågor klarade kvalitetsgranskningen. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen.",
         gate: { profile: subjectProfile, dropped: gate.dropped },
       });
     }
@@ -1638,6 +1654,7 @@ module.exports = async function handler(req, res) {
 // itself as the handler). Exposed so tests/evals can drive the real prompt and
 // schema without an HTTP request.
 module.exports.buildExamPrompts = buildExamPrompts;
+module.exports.buildRepairPayload = buildRepairPayload;
 module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;
 module.exports.readJsonBody = readJsonBody;
 module.exports.buildMockExamSchema = buildMockExamSchema;
