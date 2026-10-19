@@ -3,7 +3,7 @@
 ## Senaste verifiering — 2026-10-19
 
 - Aktiv XelioV-mappning aterbekraftad for pilot-worktree `/private/tmp/provia-ai-pilot-feature-20261019` och ExGen-projekt `c3af48b2-20c3-4d33-a5e0-72aa001a1637`.
-- Pilotgrenens HEAD och remote branch ar bada `09cf3a1` (docs/test-only uppfoljning). Vercel Preview `dpl_GBWUNs1ecKhh9VkMykL9E4JP8egS` ar READY fran app-commiten `d90322f`, `target=null`; den ar inte Production. Preview-URL: `https://provia-4qgnxsjxr-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- Pilotgrenens HEAD och remote branch ar bada `4fe3516` (`Require complete option-quality verification`). Vercel Preview `dpl_4EGDivqzJCZGEVnvfBQewbUFrMNc` ar READY fran exakt samma commit, `target=null`; den ar inte Production. Preview-URL: `https://provia-d96upasss-eltons-projects-4adfb1a3.vercel.app/app.html`.
 - Den nya Previewn oppnas korrekt men visar inloggningsgrinden i en ny session. Inloggnings- och aterstallningsvyn laddar. Runtimefilen och `/aterstall.html` returnerar HTTP 200; återställningssidans titel är `Återställ lösenord – ExGen`.
 - Vercel deploymentens publika `js/exgen-runtime.js` verifierades utan att skriva ut nyckelvardet: `environment=pilot` och `projectRef=yhcinqejsocpmmetazpz`. Den innehaller en stabil branch-origin for appen. Branch-scope finns for Preview-variablerna, men Vercel vagrade lasa metadata via anslutningen och CLI visar alla varden krypterade; serverns krypterade `SUPABASE_URL` ar darfor inte separat verifierad.
 - Read-only kontroll i Supabase bekraftar att det godkanda stagingkontot finns, ar e-postbekraftat och har minst en tidigare lyckad inloggning. Kontot skapades med `Auto confirm user`, sa skapandet skickade inget bekraftelsemejl. Inget mejl ska forvantas fran just den atgarden; ett separat aterstallningsmejl ar annu inte verifierat mottaget.
@@ -20,14 +20,15 @@
 
 - [x] Rattningsaterforsok efter ett syntetiskt provider-timeout verifierat i samma handlerflode: forsta forsoket sparar inget delresultat och slapper claimen; samma signerade inlamning kan sedan rattas och sparas exakt en gang. Detta visar kodens kontrollerade timeout-/retrybeteende, inte orsaken till det tidigare live-502:et.
 - [x] De tre fokuserade rattningstesterna passerade 3/3 efter regressionsandringen. Tidigare fullsvitsforsok fick enstaka instabila browser-testfail, men den senaste fulla korningen passerade rent: 299 tester, 0 fail, 0 cancelled, 0 skipped (`node --test --test-concurrency=4 --test-reporter=spec $(rg --files tests -g '*.test.mjs')`, exit 0).
-- [x] Pilot-public-entry browser regression passerade 23/23 efter callbackandringen; auth-first-run och auth-modal-focus passerade ocksa. Full offline-svit kor-des pa samma andrade kod och avslutades med exit 0, 299/299.
+- [x] `decideApproval()` failar nu stangt om `option_quality_contract_ok` inte uttryckligen ar `true`. Ett positivt kortsvarsfall bevisar att `options: []` och en korrekt tom kvalitetslista fortfarande godkanns; MC med ofullstandigt kontrakt nekas.
+- [x] Verifierarens besluts- och outputkontrakt, syntetiska provpipeline inklusive reparation, samt full offline-svit passerade efter hardningen. Fullsvit: `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')`, exit 0 (299 pass).
 - [x] Det oavsiktligt skapade Vercel-projektet `provia-ai-pilot-feature-20261019` togs bort efter uttryckligt godkannande. Dashboarden visade ingen Production Deployment och inga miljovariabler; deployments-API:t visade noll deployments; efterat returnerade projekt-ID:t 404 `Project not found`.
 - [x] Avgransad kodgranskning av provgenerering och P.E.R genomford i separat worktree baserad pa mergade `main`.
 - [x] Provverifieraren granskar nu varje flervalsalternativs sprakliga begriplighet och amnesrelevans; saknad eller felaktig kvalitetsmetadata faller stangt.
 - [x] P.E.R:s grundniva ger en kort, uppgiftsanpassad ledtrad utan facit for konkreta ovningar, men svarar direkt pa enkla begreppsfragor.
 - [x] Riktade tester for verifieringskontrakt, provpipeline, P.E.R-pedagogik och grafflode har korsts.
 - [x] Full offline-svit kor om pa commit `d90322f`; `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0, 299/299.
-- [x] Vercel Preview `dpl_GBWUNs1ecKhh9VkMykL9E4JP8egS` ar READY fran exakt branch/commit `d90322f`; target ar Preview och runtime-/aterstallningssidorna svarar HTTP 200.
+- [x] Vercel Preview `dpl_4EGDivqzJCZGEVnvfBQewbUFrMNc` ar READY fran exakt branch/commit `4fe3516`; target ar Preview. Runtimefilen och aterstallningssidan svarar HTTP 200; runtime visar pilotlage och godkant stagingref.
 - [ ] Staging-schema, Auth/Storage, provideranrop, RLS/tvakonto-isolering, provskapande, rattning, P.E.R och radering maste verifieras med syntetiska konton.
 - [ ] Skolan maste godkanna elevdata, retention, lararatkomst, support/incidentflode och kriterier for pilotstart.
 
