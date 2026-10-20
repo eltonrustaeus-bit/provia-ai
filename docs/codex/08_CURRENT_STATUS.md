@@ -7,7 +7,8 @@
 - [x] Offline exam-pipeline regression, independent-verifier contract and regeneration-budget tests passed; full sequential API suite passed **174/174**; `git diff --check` passed.
 - [x] Commit `86aacb4153b49f7ba458912078c47ddec8db04a8` is on `codex/exgen-generation-quality-2026-10-20`; Vercel Preview `dpl_2qR8ZTm4YdPEKgnDvqgnQhCtDCSt` is READY and carries the branch Preview alias.
 - [x] The signed-in Preview restored its session after the initial reload. One synthetic run was attempted, but staging returned the test account's weekly quota-exhausted state before model generation; no live model result was produced.
-- [!] The repair-batch change is deployed; the first-pass prompt refinement is part of this local increment and awaits its Preview build. Neither change has established its effect on real model-backed question yield or repair latency.
+- [x] The first-pass refinement is included in commit `e33b0010e89a9a9a535a2efaf26d6bc009e80c74`; Preview `dpl_79yFTWprTFK1kcqbSMZZfLWXtUH5` is READY from that exact SHA.
+- [!] Neither change has established its effect on real model-backed question yield or repair latency.
 - [!] No model default was changed. `OPENAI_MODEL_EXAM` remains the controlled exam-only comparison path; stronger-model quality, latency and cost have not been measured against the default.
 
 **PILOT NOT READY.** Next: with separate authorization, temporarily enable one bounded synthetic test for the staging account (or wait for its quota reset); compare candidate count, repair duration, and verified question yield to the last 0/3 run. Do not change model defaults until a controlled candidate-model comparison is measured.
