@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Preview and offline verification — 2026-10-20 21:22 UTC
+
+- [x] Commit `679e6350cb7603668e4b37d844c48da665e8e3a5` is pushed to `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo` is `READY` for that exact SHA and branch at `https://provia-jgnflaa89-eltons-projects-4adfb1a3.vercel.app/app.html`; its branch alias is `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [x] Fresh local verification at the same HEAD: full sequential API suite **174/174**; frontend exam-flow browser regression **178/178**; `git diff --check` passed. The first browser run was manually interrupted and is not counted; the completed rerun passed.
+- [x] An attempted independent agent review could not start because the agent thread limit was reached. No independent agent review is claimed.
+- [!] The latest live 3-question Mathematics 2b request on the prior deployment failed closed at **0/3** after ambiguous reviewer feedback and a repair transport timeout. Commit `679e635` clarifies bounded math tasks and records repair budget/timeout telemetry, but its effect on live question yield and latency has not been measured.
+- [!] No new provider-backed request was run on this Preview. The previously approved single live test was consumed; another staging model call requires fresh, bounded approval. No quota/role change, staging cleanup, `main` merge, Production deployment, or production-data change was made in this increment.
+
+**PILOT NOT READY.** Next: obtain separate approval for one synthetic staging generation on the exact READY Preview, without changing role/quota; stop before the provider if staging denies it. Capture only sanitized telemetry and compare candidate yield, repair duration and final questions with the previous 0/3 run. Keep `main`, Production and staging data unchanged.
+
 ## Latest live generation check — 2026-10-20 21:13 UTC
 
 - [x] The user approved exactly one synthetic staging exam with temporary Premium access. The signed-in feature Preview `dpl_CYcK7LWidAyog31TXN7zkCJmq7xN` (branch `codex/exgen-generation-quality-2026-10-20`, SHA `a70092b8bbede3a9467d4f7c70d07bc7bd9814a6`) was verified before the request; no login was needed.
