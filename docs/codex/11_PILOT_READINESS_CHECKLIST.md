@@ -252,3 +252,15 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Evalen simulerar fortfarande inte produktionsreparation, endpoint-budget, kvot eller persistens. Ett granskar-/solvergenomslag i evalen ar inte bevis for live modellkvalitet.
 
 **PILOT NOT READY.** Nasta steg ar att fa stagingkontot autentiserat utan att dela losenord i chatten. Darefter verifieras exakt aktuell Preview mot staging med fa syntetiska anrop; grading-API och migration kraver en separat samordnad granskning och uttryckligt staginggodkannande. Produktion, `main` och stagingdata ar ororda.
+
+## Fortsatt lokal och stagingverifiering — 2026-10-20 10:37 UTC
+
+- [x] XelioV:s aktiva projektmappning ar omkontrollerad: ExGen-ID `c3af48b2-20c3-4d33-a5e0-72aa001a1637` pekar pa den isolerade pilot-worktreen. Aktuell kod-HEAD och remote feature-branch var bada `4be6914` fore denna lokala uppfoljning.
+- [x] Oberoende read-only QA av den lokala abandonment-migrationen fann ingen regeldefekt, men identifierade saknade effektiva ACL-assertioner och statusfall for enkel-avbryt. PGlite-testet tackar nu `service_role`/`anon`/`authenticated`-EXECUTE pa bada RPC:erna och testar saknad, pagarende rattning, utganget och redan avbrutet prov.
+- [x] Riktade regressionsfiler for grading-claims, abandonment och rattningsaterhamtning passerade 4/4. Den fulla sekventiella offline-sviten passerade 310/310 tester, exit 0. Detta ar lokal/mock-evidens; PGlite ar inte hosted PostgreSQL eller ett tvasessions-concurrencytest.
+- [x] Farsk skrivskyddad Supabase-kontroll visar att stagingens migrationsledger fortfarande slutar pa `20261016094813`; `grading_claim_id`-migrationen och abandonment-migrationen ar inte applicerade. Stagingens `claim_exam_grading` och `release_exam_grading` tar fortsatt tre argument och `persist_graded_exam_result` tio. Alla kontrollerade RPC:er har EXECUTE for `service_role`, inte for `anon` eller `authenticated`.
+- [x] Farsk stagedefinition visar fortsatt att nuvarande abandonment-funktioner kan behandla en befintlig `mock_results`-rad som fardig utan att krava `verified_at`. Den lokala migrationen andrar detta till verifierat resultat, men staging ar annu inte andrad.
+- [ ] Grading-API-kandidaten skickar `p_claim_id`, vilket inte matchar stagingens nuvarande graderings-RPC-kontrakt. Distribuera inte kandidat-API separat fran en granskat och uttryckligt godkand stagingmigration/cutover.
+- [ ] Inget nytt autentiserat Preview/stagingflode eller AI-anrop har verifierats. Staginginloggningens rotorsak ar fortfarande okand; anvandarens losenord ska hanteras endast direkt i Auth-UI, aldrig efterfragas eller lagras har.
+
+**PILOT NOT READY.** Lokal svit ar gron, men livegenerering, P.E.R., grading, sparning och aktuell deploy mot staging ar fortfarande overifierade. Ingen stagingmigration, Auth-/SMTP-andring, kontoforandring, kvotandring, dataradering, `main`-merge eller produktionsdeploy har gjorts i denna uppfoljning.
