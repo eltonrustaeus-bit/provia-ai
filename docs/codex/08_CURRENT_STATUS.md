@@ -1,5 +1,13 @@
 # 08 Current Status
 
+## Streamed repair Preview — 2026-10-21
+
+- [x] After explicit approval, pushed exactly `807a4d9`, `2adfe18`, `b974478`, and `adc5e0b` to `codex/exgen-generation-quality-2026-10-20`. Remote branch readback confirmed exact tip `adc5e0b41f3849789c683864036337e22ab6a2ac`.
+- [x] Vercel deployment `dpl_AVPF16aWsaWkgeHQwFiMzZxs5dVv` reached `READY` from that exact SHA and branch in the existing `provia-ai` project. Preview URL: `https://provia-dcf0wih06-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] This approval covered only the branch push and Preview build. No model-backed request, staging database change, role/quota change, `main` merge, or Production action was made. Runtime authentication and Supabase target have not been newly verified for this deployment.
+
+**PILOT NOT READY.** The streamed-repair code has a READY Preview but no live generation evidence. Next: obtain fresh, bounded approval for one synthetic generation request; do not change the staging account role/quota unless separately approved. If authentication or the existing staging quota blocks before a provider call, stop and report that exact blocker.
+
 ## P.E.R regression audit — 2026-10-21
 
 - [x] Ran `node --test tests/per/*.test.mjs`: **25/25** passed, covering P.E.R guidance, evidence selection, answer-leak protection, and usage-event privacy.
