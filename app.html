@@ -2169,7 +2169,7 @@ try{
     if(res.status===429&&res.data?.error==="Quota exceeded"){
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
-      setBusy(false);setStatus(msg,"bad");await refreshQuotaUi();
+      setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){

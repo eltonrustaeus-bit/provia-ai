@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Staging quota UI follow-up — 2026-10-20
+
+- [x] The latest feature Preview from commit `3e245c437bd445d6814678d38d8cf6d667786cf0` is `READY` (`dpl_CvJrdmuYaNMi5h996TzPxs5fYpHs`). The user authenticated in the existing stable feature Preview alias; its app UI showed the pilot exam generator and the account's known weekly usage `3/3`.
+- [x] One bounded request using synthetic linear-function material reached the staging quota gate and returned the expected weekly-limit message. No provider generation was attempted after the quota denial, and no account role, quota, or staging data was changed.
+- [!] The live UI also retained generated-question skeleton placeholders after HTTP 429. Source review found the quota branch did not call the existing placeholder cleanup used by other failure branches.
+- [x] `app.html` now clears those placeholders and restores the empty exam label when quota blocks generation. Added an integration regression asserting the synthetic 429 clears skeletons, preserves the reset message, and leaves grading disabled. `node tests/frontend/pilot-quota-copy.test.mjs` passed; full `node tests/frontend/exam-flow.regression.mjs` passed **178/178**; `git diff --check` passed.
+- [ ] The fix and this note are local and not yet pushed. Next: push the reviewed change to the feature branch, verify the exact new Preview deployment, then repeat only the same zero-provider quota-denial check in the authenticated Preview.
+
+**PILOT NOT READY.** Generation quality, grading persistence, and P.E.R. live flows remain unverified on the latest Preview; security and school-operation gates remain open. Do not change quota/role or merge to `main`/Production as part of the quota UI verification.
+
 ## Quota messaging follow-up — 2026-10-20
 
 - [x] The exam wizard now treats an API quota response as a distinct learner state: it says the quota is exhausted and shows the existing reset/limit message instead of presenting a generic generation failure or suggesting fewer questions.
