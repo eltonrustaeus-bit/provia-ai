@@ -119,7 +119,7 @@ globalThis.fetch = async (input, init = {}) => {
     const schemaName = request.text?.format?.name;
     if (schemaName === "exam_verifier_schema") return outputResponse({ results: providerQuestions.map((q) => ({
       id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
-      source_alignment: 1, scoring_quality: 1, language_quality: 1, option_quality: [], issues: [], required_changes: [],
+      source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [], issues: [], required_changes: [],
     })) });
     if (schemaName === "exam_solver_schema") return outputResponse({ results: providerQuestions.map((q) => ({
       id: q.id, option_verdicts: [], index: -1, confidence: 1, reason: "Syntetisk grafkontroll.",

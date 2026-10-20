@@ -162,8 +162,10 @@ let solverThrowsForRetry = false;
 let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
 let verifierRejectOptionId = null;
+let verifierLanguageMismatchId = null;
 let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
+let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
 let throwOnRepair = false;
 let issuanceUnavailable = false;
@@ -270,7 +272,7 @@ globalThis.fetch = async (input, init = {}) => {
         return {
         id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
-        language_quality: 1, option_quality: Array.isArray(q.options)
+        language_quality: 1, language_match: q.id !== verifierLanguageMismatchId, option_quality: Array.isArray(q.options)
           ? q.options.map((_, index) => !(optionRejected && index === 2))
           : [],
         issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
@@ -292,10 +294,16 @@ globalThis.fetch = async (input, init = {}) => {
       return outputResponse({ results: requestedQuestions.map((requested) => {
         const q = activeQuestions.find((question) => question.id === requested.id);
         if (!q) return { id: requested.id, option_verdicts: [], option_plausibility: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
+        const expectedIndex = solverAnswerIndexOverrides.has(q.id)
+          ? solverAnswerIndexOverrides.get(q.id)
+          : q.correct_index;
+        const solverIndex = (Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId)
+          ? (expectedIndex + 1) % q.options.length
+          : expectedIndex;
         return {
-        id: q.id, option_verdicts: q.options.map((_, i) => i === ((Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index)),
+        id: q.id, option_verdicts: q.options.map((_, i) => i === solverIndex),
         option_plausibility: q.options.map((option) => option !== "Kesäkten"),
-        index: (Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId) ? (q.correct_index + 1) % q.options.length : q.correct_index,
+        index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
       }) });
@@ -385,7 +393,7 @@ try {
 
   const biologyCourse = "Biologi 1";
   const biologyMaterial = "Fotosyntes sker i kloroplasterna. Växten använder ljusenergi, vatten och koldioxid för att bilda glukos och syre.";
-  activeQuestions = questions.map((question, index) => ({
+  const biologyQuestions = questions.map((question, index) => ({
     ...question,
     id: `biology-${index + 1}`,
     question: [
@@ -398,7 +406,7 @@ try {
       ["Vatten och koldioxid", "Glukos och syre", "Protein och kväve"],
       ["Glukos och syre", "Vatten och koldioxid", "Klorofyll och kväve"],
     ][index],
-    correct_index: index === 2 ? 0 : 1,
+    correct_index: index === 0 ? 1 : 0,
     model_answer: ["I kloroplasterna", "Vatten och koldioxid", "Glukos och syre"][index],
     topic: "Fotosyntes",
     subtopic: "Fotosyntesens reaktanter och produkter",
@@ -406,6 +414,8 @@ try {
     learning_objective: "Beskriva fotosyntesens plats, reaktanter och produkter.",
     source_references: [["kloroplasterna"], ["vatten och koldioxid"], ["glukos och syre"]][index],
   }));
+  activeQuestions = biologyQuestions;
+  solverAnswerIndexOverrides = new Map([["biology-1", 1], ["biology-2", 0], ["biology-3", 0]]);
   const biologyExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
   });
@@ -419,7 +429,105 @@ try {
   "biology question references are grounded in the submitted source material");
   assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
     "the independent reviewer receives the synthetic biology source material");
+
+  activeQuestions = biologyQuestions.slice(0, 2);
+  calls.length = 0;
+  const twoQuestionBiologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 2,
+  });
+  assert.equal(twoQuestionBiologyExam.status, 200, JSON.stringify(twoQuestionBiologyExam.body));
+  assert.equal(twoQuestionBiologyExam.body.exam.questions.length, 2,
+    "a two-question non-math exam completes with exact requested count");
+  assert.equal(twoQuestionBiologyExam.body.meta.verifier.approved, 2);
+  assert.equal(twoQuestionBiologyExam.body.meta.solver.checked, 2,
+    "both non-math items receive independent answer checks");
+
+  const malformedBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["I cellkärnan", "I kloroplasterna", "Kesäkten"], correct_index: 1, model_answer: "I kloroplasterna" }
+    : question);
+  const repairedBiology = biologyQuestions.map((question, index) => ({
+    ...question,
+    id: `biology-repair-${index + 1}`,
+    question: `En ny fråga om fotosyntes: ${question.question}`,
+  }));
+  activeQuestions = malformedBiology;
+  regenerationQuestions = repairedBiology;
+  verifierRejectOptionId = "biology-1";
+  calls.length = 0;
+  const nonsenseBiologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(nonsenseBiologyExam.status, 200, JSON.stringify(nonsenseBiologyExam.body));
+  assert.equal(nonsenseBiologyExam.body.exam.questions.length, 3);
+  assert.equal(nonsenseBiologyExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "a non-math nonsense distractor cannot reach the learner after independent verifier and solver rejection");
+  assert.ok(solverInputs.at(-2).some((question) => question.options.includes("Kesäkten")),
+    "the non-math nonsense candidate is explicitly checked by the blind solver");
+  verifierRejectOptionId = null;
+  regenerationQuestions = null;
+
+  const languageMismatchQuestions = [
+    { ...questions[0], id: "language-mismatch-1", question: "What is 2 + 3?" },
+    { ...questions[1], id: "language-valid-2" },
+    { ...questions[2], id: "language-valid-3" },
+  ];
+  const languageRepairQuestions = [
+    { ...questions[0], id: "language-repair-1", question: "Vad blir produkten av 3 och 4?", options: ["7", "12", "9"], correct_index: 1, model_answer: "12" },
+    { ...questions[1], id: "language-repair-2", question: "Hur stor är skillnaden mellan 8 och 3?", options: ["5", "11", "24"], correct_index: 0, model_answer: "5" },
+  ];
+  activeQuestions = languageMismatchQuestions;
+  regenerationQuestions = languageRepairQuestions;
+  verifierLanguageMismatchId = "language-mismatch-1";
+  solverAnswerIndexOverrides = new Map([["language-mismatch-1", 1], ["language-valid-2", 1], ["language-valid-3", 1], ["language-repair-1", 1], ["language-repair-2", 0]]);
+  calls.length = 0;
+  const languageRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(languageRepairedExam.status, 200, JSON.stringify(languageRepairedExam.body));
+  assert.equal(languageRepairedExam.body.exam.questions.length, 3);
+  assert.equal(languageRepairedExam.body.exam.questions.some((question) => question.question.includes("What is")), false,
+    "a fluent question in the wrong selected language is replaced, never shown to the learner");
+  const firstGenerationCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.stream);
+  assert.match(firstGenerationCall.body.input[0].content, /Alla elevriktade fält ska vara naturlig svenska/i,
+    "the generator is explicitly instructed to match the requested Swedish output language");
+  const firstVerifierCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_verifier_schema");
+  assert.ok(firstVerifierCall.body.text.format.schema.properties.results.items.required.includes("language_match"));
+  assert.match(firstVerifierCall.body.input[0].content, /language_match=true endast om alla elevriktade fält/i,
+    "the independent reviewer receives the same selected-language requirement");
+  verifierLanguageMismatchId = null;
+  regenerationQuestions = null;
+
+  const wrongKeyQuestion = {
+    ...questions[0], id: "wrong-key-initial", question: "Vad är 2 + 3?",
+    options: ["5", "4", "6"], correct_index: 1, model_answer: "4",
+  };
+  const correctKeyRepair = {
+    ...questions[0], id: "wrong-key-repair", question: "Vad är 4 + 2?",
+    options: ["6", "7", "8"], correct_index: 0, model_answer: "6",
+  };
+  const alternateCorrectKeyRepair = {
+    ...questions[1], id: "wrong-key-repair-alternate", question: "Vad blir summan av 5 och 4?",
+    options: ["8", "9", "10"], correct_index: 1, model_answer: "9",
+  };
+  activeQuestions = [wrongKeyQuestion, questions[1]];
+  regenerationQuestions = [correctKeyRepair, alternateCorrectKeyRepair];
+  solverAnswerIndexOverrides = new Map([
+    ["wrong-key-initial", 0], ["q-2", 1], ["wrong-key-repair", 0], ["wrong-key-repair-alternate", 1],
+  ]);
+  calls.length = 0;
+  const wrongKeyRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 2,
+  });
+  assert.equal(wrongKeyRepairedExam.status, 200, JSON.stringify(wrongKeyRepairedExam.body));
+  assert.equal(wrongKeyRepairedExam.body.exam.questions.length, 2);
+  assert.ok(wrongKeyRepairedExam.body.exam.questions.some((question) => question.id === "wrong-key-repair"),
+    "an independent solver answer that contradicts correct_index forces replacement");
+  assert.equal(wrongKeyRepairedExam.body.exam.questions.some((question) => question.id === "wrong-key-initial"), false);
+  assert.deepEqual(Object.keys(solverInputs.at(-2)[0]).sort(), ["id", "options", "question"],
+    "the solver mock is given no answer key or model answer for this integration case");
+  regenerationQuestions = null;
   activeQuestions = questions;
+  solverAnswerIndexOverrides = new Map();
 
   calls.length = 0;
   quotaDenied = true;

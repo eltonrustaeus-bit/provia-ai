@@ -19,7 +19,7 @@ function check(name, fn) { try { fn(); ok(name); } catch (e) { fail(name, e); } 
 
 const good = {
   id: "1", approved: true, factual_accuracy: 0.95, ambiguity_score: 0.05,
-  difficulty_match: 0.9, source_alignment: 0.9, scoring_quality: 0.9, language_quality: 0.95,
+  difficulty_match: 0.9, source_alignment: 0.9, scoring_quality: 0.9, language_quality: 0.95, language_match: true,
   option_quality: [], option_quality_contract_ok: true, issues: [], required_changes: [],
 };
 

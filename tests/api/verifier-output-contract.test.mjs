@@ -5,9 +5,9 @@ const require = createRequire(import.meta.url);
 const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
-const result = (id, approved) => ({ id, approved, option_quality: [] });
+const result = (id, approved) => ({ id, approved, language_match: true, option_quality: [] });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en") {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -25,7 +25,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", material, timeoutMs, targetLevel, comparisonQuestions }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -42,9 +42,21 @@ assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upp
 const submittedReviewSchema = valid.requestBody.text.format.schema.properties.results;
 assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
 assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
+assert.ok(submittedReviewSchema.items.required.includes("language_match"), "review schema requires an explicit selected-language verdict");
 assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
   "schema inspection without a question count remains backward compatible");
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
+assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
+assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
+assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+const wrongLanguageReview = await runWithResults([{
+  ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  language_match: false, issues: [], required_changes: [],
+}], [question("q1")], "", undefined, undefined, undefined, "sv");
+assert.match(wrongLanguageReview.requestBody.input[0].content, /prov(språket|sprak)|selected output language/i);
+assert.equal(decideApproval(wrongLanguageReview.outcome.perQuestion.get("q1")), false,
+  "a high-scoring fluent response is rejected when it does not match the requested Swedish output language");
 const levelBoundReview = await runWithResults([result("q1", true)], [question("q1")], "", undefined, "C");
 assert.match(levelBoundReview.requestBody.input[0].content, /selected exam level is C/i);
 assert.match(levelBoundReview.requestBody.input[0].content, /difficulty_match against this target/i);
@@ -148,13 +160,18 @@ const validOpenQuestion = { ...openQuestion, model_answer: "x = 2", rubric: "En 
 const validOpenResponse = await runWithResults([{
   id: validOpenQuestion.id, approved: true, factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
-  option_quality: [], issues: [], required_changes: [],
+  language_match: true, option_quality: [], issues: [], required_changes: [],
 }], [validOpenQuestion], "Ekvationer: 2x = 4.");
 const validOpenReview = validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id);
 assert.equal(validOpenReview.option_quality_contract_ok, true,
   "an empty option list is a complete quality review for a short-answer item");
 assert.equal(decideApproval(validOpenReview), true,
   "a valid reviewed short-answer question still passes the deterministic gate");
+assert.equal(decideApproval({ ...validOpenReview, language_match: false }), false,
+  "a fluent question in the wrong selected language fails closed despite high language-quality scores");
+const { language_match: _omittedLanguage, ...missingLanguageMatch } = validOpenReview;
+assert.equal(decideApproval(missingLanguageMatch), false,
+  "a missing selected-language verdict fails closed");
 assert.equal(decideApproval({ ...validOpenReview, required_changes: undefined }), false,
   "a missing required_changes list fails closed");
 assert.equal(decideApproval({ ...validOpenReview, required_changes: "" }), false,
