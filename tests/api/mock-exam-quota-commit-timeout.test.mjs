@@ -11,15 +11,12 @@ const savedEnv = Object.fromEntries(["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUP
 for (const [key, value] of Object.entries({
   SUPABASE_URL: "https://synthetic.supabase.co",
   SUPABASE_SECRET_KEY: "sb_secret_test_only",
-  SUPABASE_SERVICE_ROLE_KEY: "synthetic-signing-key",
   EXAM_SIGNING_SECRET: "synthetic-exam-signing-secret",
   OPENAI_API_KEY: "test-only-openai-key",
 })) process.env[key] = value;
 
-let reservationStatus = "reserved";
-let committedAttempts = 0;
-let refundRequest = null;
-let reserveRequest = null;
+const userId = "33333333-3333-4333-8333-333333333333";
+const idempotencyKey = "11111111-1111-4111-8111-111111111111";
 const generatedExam = {
   title: "Linjär funktion",
   level: "C",
@@ -39,31 +36,46 @@ const generatedExam = {
   }],
 };
 const generatedText = JSON.stringify(generatedExam);
+let completedResponse;
+let completionApplied = false;
+let loseFirstCompletionResponse = true;
+let reserveCalls = 0;
+let generationCalls = 0;
+let completionCalls = 0;
+let releaseCalls = 0;
 
 global.fetch = async (url, init = {}) => {
   const target = String(url);
-  if (target.endsWith("/auth/v1/user")) return Response.json({ id: "synthetic-student" });
+  if (target.endsWith("/auth/v1/user")) return Response.json({ id: userId });
   if (target.includes("/rest/v1/profiles") && target.includes("select=role")) return Response.json([{ role: "gratis" }]);
+  if (target.endsWith("/rest/v1/rpc/claim_mock_exam_generation")) {
+    const claim = JSON.parse(init.body);
+    assert.equal(claim.p_idempotency_key, idempotencyKey);
+    if (completionApplied) return Response.json({ status: "replay", response: completedResponse });
+    return Response.json({ status: "claimed" });
+  }
   if (target.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
-    reserveRequest = JSON.parse(init.body);
+    reserveCalls++;
     return Response.json({ ok: true, count: 1, limit: 3, period: "ignored", unlimited: false });
   }
-  if (target.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) {
-    committedAttempts++;
-    reservationStatus = "consumed";
-    throw new Error("synthetic timeout after database commit");
+  if (target.endsWith("/rest/v1/rpc/complete_mock_exam_generation")) {
+    completionCalls++;
+    const body = JSON.parse(init.body);
+    completedResponse = body.p_response;
+    completionApplied = true;
+    if (loseFirstCompletionResponse) {
+      loseFirstCompletionResponse = false;
+      throw new Error("synthetic timeout after atomic database commit");
+    }
+    return Response.json({ status: "completed", response: completedResponse });
   }
-  if (target.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) {
-    refundRequest = JSON.parse(init.body);
-    assert.equal(reservationStatus, "consumed", "the response was lost after commit applied");
-    reservationStatus = "refunded";
-    return Response.json({ refunded: true, duplicate: false });
-  }
-  if (target.includes("/rest/v1/exam_issuances")) {
-    if (init.method === "POST") return Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 });
-    if (init.method === "DELETE") return new Response(null, { status: 204 });
+  if (target.endsWith("/rest/v1/rpc/fail_mock_exam_generation")) {
+    releaseCalls++;
+    assert.equal(completionApplied, true, "the complete transaction already committed");
+    return Response.json({ status: "fenced" });
   }
   if (target.includes("api.openai.com")) {
+    generationCalls++;
     if (JSON.parse(init.body || "{}").stream) {
       const events = [
         { type: "response.output_text.delta", delta: generatedText },
@@ -77,16 +89,15 @@ global.fetch = async (url, init = {}) => {
   throw new Error(`Unexpected synthetic request: ${target}`);
 };
 
-try {
-  const errorLogs = [];
-  console.error = (line) => errorLogs.push(String(line));
+async function invoke() {
   const req = Readable.from([Buffer.from(JSON.stringify({
+    idempotencyKey,
     lang: "sv", level: "C", course: "Matematik 1b", qType: "graph", numQuestions: 1,
     pastedText: "Den räta linjen ges av y = 2x + 1.",
   }))]);
   req.method = "POST";
   req.headers = { authorization: "Bearer synthetic-token", "content-type": "application/json" };
-  const response = await new Promise(async (resolve) => {
+  return new Promise(async (resolve) => {
     const res = {
       statusCode: 200,
       setHeader() {},
@@ -94,20 +105,30 @@ try {
     };
     await handler(req, res);
   });
+}
 
-  assert.equal(response.status, 500, "a failed quota commit never delivers the generated exam");
-  assert.equal(committedAttempts, 2, "the RPC wrapper makes its bounded retry");
-  assert.equal(reservationStatus, "refunded", "the undelivered exam's consumed reservation is compensated");
-  assert.equal(refundRequest.p_user_id, "synthetic-student");
-  assert.equal(refundRequest.p_period_key, reserveRequest.p_period_key, "refund reuses the reservation period key");
-  assert.equal(refundRequest.p_request_id.length > 0, true);
+try {
+  const errorLogs = [];
+  console.error = (line) => errorLogs.push(String(line));
+  const first = await invoke();
+  assert.equal(first.status, 500, JSON.stringify(first.body));
+  assert.equal(first.body.stage, "generation_finalize");
+  assert.equal(completionApplied, true, "the atomic transaction committed before the response was lost");
+  assert.equal(releaseCalls, 1, "failure cleanup cannot undo a successful committed operation");
+
+  const generatedBeforeReplay = generationCalls;
+  const second = await invoke();
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+  assert.deepEqual(second.body, completedResponse, "retry returns the exact committed exam payload");
+  assert.equal(generationCalls, generatedBeforeReplay, "the replay performs no second model call");
+  assert.equal(reserveCalls, 1, "the replay consumes no second quota reservation");
+  assert.equal(completionCalls, 1, "the replay does not run finalization again");
   const failureEvent = errorLogs.map((line) => {
     try { return JSON.parse(line); } catch { return null; }
   }).find((event) => event?.event === "exam_generation_failed");
-  assert.equal(failureEvent?.stage, "quota_finalization");
-  assert.equal(failureEvent?.requestId, reserveRequest.p_request_id);
+  assert.equal(failureEvent?.stage, "generation_finalize");
   assert.doesNotMatch(JSON.stringify(failureEvent), /synthetic timeout|synthetic-student|test-only-openai-key/);
-  console.log("mock exam quota commit timeout: consumed reservation is compensated after undelivered exam");
+  console.log("mock exam generation lost completion response: exact replay without a second model call or quota reservation passed");
 } finally {
   global.fetch = savedFetch;
   console.error = savedConsoleError;

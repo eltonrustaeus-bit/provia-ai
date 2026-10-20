@@ -4,6 +4,7 @@
   <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
   <script src="/js/account-storage.js"></script>
+  <script src="/js/generation-request.js"></script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="js/exgen-modules.js"></script>
@@ -2138,6 +2139,14 @@ try{
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
     const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||3),focusTerms:selectedExamFocusTerms};
+    let idempotencyKey;
+    try {
+      idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(await getUserId(),payload);
+    } catch {
+      const message=LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
+    payload.idempotencyKey=idempotencyKey;
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
@@ -2173,12 +2182,34 @@ try{
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message,errorCode:"auth_verification_unavailable"};
       }
+      if(res.status===503&&res.data?.error==="generation_request_state_unavailable"){
+        const message=LANG==="sv"
+          ?"Provstarten kunde inte säkras just nu. Ditt material finns kvar; vänta en liten stund och försök igen."
+          :"Exam creation could not be safely started. Your material is still here; wait briefly and try again.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_request_state_unavailable"};
+      }
       if(res.status===401||res.data?.error==="Unauthorized"){
         const message=LANG==="sv"
           ?"Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter."
           :"The exam service could not verify your sign-in. Your material is still here. Sign out and back in; contact the pilot lead if this continues.";
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message,errorCode:"unauthorized"};
+      }
+      if(res.status===409&&res.data?.error==="GENERATION_IN_PROGRESS"){
+        const message=LANG==="sv"
+          ?"Provet skapas fortfarande. Vänta en liten stund och försök sedan igen; samma begäran fortsätter utan ett nytt kvotdrag."
+          :"The exam is still being created. Wait a moment and retry; the same request continues without a new quota reservation.";
+        setStatus(message,"warn");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_in_progress"};
+      }
+      if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
+        window.ExGenGenerationRequest.clear(idempotencyKey);
+        const message=LANG==="sv"
+          ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
+          :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_request_expired"};
       }
       if(res.data?.error==="MATERIAL_TOO_LONG"){
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
@@ -2205,11 +2236,11 @@ try{
         const stages=LANG==="sv"?{
           generation_setup:"förberedelse",model_generation:"frågegenerering",question_normalization:"bearbetning av frågor",
           quality_review:"kvalitetskontroll",grade_task_sealing:"säkring av facit",exam_manifest:"slutkontroll av prov",
-          exam_issuance:"provstart",quota_finalization:"provkvot",usage_flush:"slutförande",response_delivery:"leverans av prov"
+          exam_issuance:"provstart",quota_finalization:"provkvot",generation_finalize:"säker registrering av provet",usage_flush:"slutförande",response_delivery:"leverans av prov"
         }:{
           generation_setup:"setup",model_generation:"question generation",question_normalization:"question processing",
           quality_review:"quality review",grade_task_sealing:"answer-key security",exam_manifest:"exam validation",
-          exam_issuance:"exam start",quota_finalization:"exam quota",usage_flush:"finalization",response_delivery:"exam delivery"
+          exam_issuance:"exam start",quota_finalization:"exam quota",generation_finalize:"safe exam finalization",usage_flush:"finalization",response_delivery:"exam delivery"
         };
         const stageLabel=Object.hasOwn(stages,res.data?.stage)?stages[res.data.stage]:"";
         const stageText=stageLabel?(LANG==="sv"?`Steg: ${stageLabel}`:`Stage: ${stageLabel}`):"";
@@ -2234,6 +2265,7 @@ try{
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
+    window.ExGenGenerationRequest.clear(idempotencyKey);
     setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
 
     // Uppdatera floating bar hint med antal frågor

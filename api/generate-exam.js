@@ -12,7 +12,7 @@ const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 const examCompletion = require("./_exam-completion.cjs");
-const examIssuance = require("./_exam-issuance.cjs");
+const examGenerationOperations = require("./_exam-generation-operations.cjs");
 const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
 const materialInput = require("./_material.cjs");
@@ -1271,6 +1271,10 @@ module.exports = async function handler(req, res) {
   }
   const pastedText = material.text;
   const selectedFocusTerms = normalizeSelectedFocusTerms(parsed.focusTerms, pastedText);
+  const idempotencyKey = typeof parsed.idempotencyKey === "string" ? parsed.idempotencyKey : "";
+  if (!examGenerationOperations.UUID.test(idempotencyKey)) {
+    return json(res, 400, { ok: false, error: "GENERATION_REQUEST_ID_REQUIRED" });
+  }
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 3);
   const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(2, numQuestionsRaw));
@@ -1303,7 +1307,11 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  const attemptId = crypto.randomUUID();
   const quotaRequestId = crypto.randomUUID();
+  const requestHash = crypto.createHash("sha256").update(JSON.stringify({
+    lang, level, course, qType, numQuestions, pastedText, focusTerms: selectedFocusTerms,
+  })).digest("hex");
   function logBudgetGate(stage, requiredMs) {
     console.warn(JSON.stringify({
       event: "exam_generation_budget_gate",
@@ -1333,16 +1341,50 @@ module.exports = async function handler(req, res) {
   }
 
   const quotaPeriod = rules.currentPeriodKey(mockLimit.period);
+  let generationClaim;
+  try {
+    generationClaim = await examGenerationOperations.claimGeneration({
+      userId: user.id,
+      idempotencyKey,
+      payloadHash: requestHash,
+      attemptId,
+      quotaRequestId,
+      quotaPeriod,
+      quotaEnforced: mockLimit.cap !== Infinity,
+    });
+  } catch {
+    generationClaim = null;
+  }
+  if (!generationClaim) {
+    return json(res, 503, {
+      ok: false,
+      error: "generation_request_state_unavailable",
+      requestId: quotaRequestId,
+      message: lang === "en"
+        ? "Exam creation could not safely start. Please try again."
+        : "Provet kunde inte startas säkert. Försök igen.",
+    });
+  }
+  if (generationClaim.status === "replay") return json(res, 200, generationClaim.response);
+  if (generationClaim.status === "payload_conflict") {
+    return json(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" });
+  }
+  if (generationClaim.status === "in_progress") {
+    return json(res, 409, { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true });
+  }
+  if (generationClaim.status === "expired") {
+    return json(res, 409, { ok: false, error: "GENERATION_REQUEST_EXPIRED", retryable: false });
+  }
+
   let quota;
   let focusInstruction = "";
-  let issuedSubmissionId = null;
   try {
     [quota, focusInstruction] = await Promise.all([
       consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId),
       buildAdaptiveFocus(user.id, { numQuestions, lang }),
     ]);
   } catch {
-    await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
+    await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
     console.error(JSON.stringify({
       event: "exam_generation_failed",
       requestId: quotaRequestId,
@@ -1358,6 +1400,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (!quota.ok) {
+    await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
     return json(res, 429, {
       ok: false,
       error: "Quota exceeded",
@@ -1383,13 +1426,11 @@ module.exports = async function handler(req, res) {
   async function fail(status, payload) {
     if (!cleaned) {
       cleaned = true;
-      if (issuedSubmissionId) {
-        const removed = await examIssuance.removeUndeliveredExam(user.id, issuedSubmissionId);
-        if (!removed) console.warn(JSON.stringify({ event: "undelivered_exam_issuance_cleanup_failed" }));
-      }
-      if (quota.enforced && !quota.unlimited) {
-        const refunded = await refundMockExamQuota(user.id, quotaPeriod, quotaRequestId);
-        if (!refunded) console.warn(JSON.stringify({ event: "mock_exam_quota_refund_failed", period: quota.period }));
+      const failed = await examGenerationOperations.failGeneration({
+        userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId,
+      });
+      if (failed !== "retryable") {
+        console.warn(JSON.stringify({ event: "exam_generation_operation_release_failed", requestId: quotaRequestId }));
       }
     }
     await flushUsage();
@@ -2143,21 +2184,9 @@ module.exports = async function handler(req, res) {
     failureStage = "exam_manifest";
     clientExam.exam_manifest = examCompletion.issueExamManifest(user.id, course, pastedText, clientExam.questions);
     if (!clientExam.exam_manifest) throw new Error("Exam manifest unavailable");
-    issuedSubmissionId = examCompletion.submissionId(user.id, course, clientExam.questions);
-    failureStage = "exam_issuance";
-    if (!await examIssuance.issueExam(user.id, issuedSubmissionId)) {
-      throw new Error("Exam issuance unavailable");
-    }
-
-    if (quota.enforced && !quota.unlimited) {
-      failureStage = "quota_finalization";
-      const committed = await commitMockExamQuota(user.id, quotaPeriod, quotaRequestId);
-      if (!committed) throw new Error("Mock quota finalization unavailable");
-    }
-    failureStage = "usage_flush";
-    await flushUsage();
-    failureStage = "response_delivery";
-    return json(res, 200, {
+    const submissionId = examCompletion.submissionId(user.id, course, clientExam.questions);
+    if (!submissionId) throw new Error("Exam submission identity unavailable");
+    const responsePayload = {
       ok: true,
       exam: clientExam,
       meta: {
@@ -2181,7 +2210,23 @@ module.exports = async function handler(req, res) {
           enforced: quota.enforced
         }
       }
+    };
+    failureStage = "generation_finalize";
+    const finalized = await examGenerationOperations.completeGeneration({
+      userId: user.id,
+      idempotencyKey,
+      payloadHash: requestHash,
+      attemptId,
+      submissionId,
+      response: responsePayload,
     });
+    if (!finalized || !["completed", "replay"].includes(finalized.status) || !finalized.response) {
+      throw new Error("Exam generation finalization unavailable");
+    }
+    failureStage = "usage_flush";
+    await flushUsage();
+    failureStage = "response_delivery";
+    return json(res, 200, finalized.response);
   } catch {
     console.error(JSON.stringify({
       event: "exam_generation_failed",

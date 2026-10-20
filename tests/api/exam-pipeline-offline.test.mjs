@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { createRequire } from "node:module";
 
@@ -222,9 +223,9 @@ function assertIncompleteExamNotDelivered(response, scenario) {
   assert.equal(JSON.stringify(diagnostic).includes("Vi tränar addition, subtraktion och multiplikation med heltal."), false,
     `${scenario}: diagnostic omits submitted study material`);
   const requestCalls = calls.slice(lastInvokeCallStart);
-  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")
-    && call.body?.p_request_id === response.body.requestId), true, `${scenario}: reserved quota is refunded`);
-  assert.equal(requestCalls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"), false,
+  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
+    `${scenario}: failed operation releases its fenced claim and quota`);
+  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
     `${scenario}: incomplete exam is never issued`);
 }
 
@@ -251,6 +252,7 @@ let throwOnRepair = false;
 let issuanceUnavailable = false;
 let quotaDenied = false;
 let lastInvokeCallStart = 0;
+const generationOperations = new Map();
 const failureLogs = [];
 const previousConsoleError = console.error;
 const previousConsoleWarn = console.warn;
@@ -287,6 +289,36 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
   if (url.startsWith(`${origin}/rest/v1/user_profiles?select=mastery`)) return Response.json([]);
+  if (url.endsWith("/rest/v1/rpc/claim_mock_exam_generation")) {
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (existing?.requestHash && existing.requestHash !== body.p_request_hash) return Response.json({ status: "payload_conflict" });
+    if (existing?.state === "succeeded") return Response.json({ status: "replay", response: existing.response });
+    if (existing?.state === "running") return Response.json({ status: "in_progress" });
+    generationOperations.set(body.p_idempotency_key, {
+      state: "running", requestHash: body.p_request_hash,
+      attemptId: body.p_attempt_id, quotaRequestId: body.p_quota_request_id,
+    });
+    return Response.json({ status: "claimed", attempt_id: body.p_attempt_id, quota_request_id: body.p_quota_request_id });
+  }
+  if (url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")) {
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (existing?.state === "running" && existing.attemptId === body.p_attempt_id) existing.state = "retryable";
+    return Response.json({ status: existing?.state === "retryable" ? "retryable" : "fenced" });
+  }
+  if (url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")) {
+    if (issuanceUnavailable) return Response.json({ message: "synthetic finalization unavailable" }, { status: 503 });
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (!existing || existing.state !== "running" || existing.attemptId !== body.p_attempt_id) {
+      return Response.json({ status: "fenced" });
+    }
+    const response = body.p_response;
+    existing.state = "succeeded";
+    existing.response = response;
+    return Response.json({ status: "completed", response });
+  }
   if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
     if (quotaDenied) return Response.json({ ok: false, count: 3, limit: 3, period: "synthetic", unlimited: false });
     return Response.json({ ok: true, count: 1, limit: 3, period: "synthetic", unlimited: false });
@@ -410,7 +442,7 @@ globalThis.fetch = async (input, init = {}) => {
 
 function invoke(handler, body) {
   lastInvokeCallStart = calls.length;
-  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  const req = Readable.from([Buffer.from(JSON.stringify({ ...body, idempotencyKey: body.idempotencyKey || randomUUID() }))]);
   req.method = "POST";
   req.headers = { authorization: "Bearer synthetic-user-token", "content-type": "application/json" };
   return new Promise((resolve, reject) => {
@@ -868,11 +900,9 @@ try {
     "the quota response exposes its captured ISO week period");
   assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 0,
     "a quota denial never calls the model");
-  assert.equal(calls.filter((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST").length, 0,
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
     "a quota denial never creates a usable exam issuance");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")
-    || call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")
-    || call.url.endsWith("/rest/v1/ai_usage_events")), false,
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/ai_usage_events")), false,
   "a denied reservation triggers no commit, refund, or model-usage write");
   assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1,
     "the request checks quota exactly once");
@@ -969,8 +999,8 @@ try {
       { id: "q-3", points: 1, max_points: 1, feedback: "Rätt.", model_answer: "9", concept_tag: "Aritmetik", error_tags: [] },
     ],
   });
-  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
-    "a successfully generated exam commits its reserved quota");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")),
+    "a successfully generated exam atomically commits quota, issuance and replay result");
 
   const badOptionQuestions = questions.map((question) => question.id === "q-1"
     ? { ...question, options: ["4", "5", "Kesäkten"] }
@@ -1117,7 +1147,7 @@ try {
   assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
   assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 4,
     "one missing slot requests a bounded four-candidate pool so quality gates can reject weak candidates without underfilling");
-  assert.equal(calls.filter((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST").length, 1,
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 1,
     "only the complete three-question set is issued");
   activeQuestions = questions;
 
@@ -1469,9 +1499,9 @@ try {
   assert.match(uncheckedMultipleChoice.body.message, /Inget prov lämnades ut; försök igen/i);
   const outageUrls = calls.map((call) => call.url);
   assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "the reserved quota is returned after the independent check fails");
-  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
     "unchecked multiple-choice questions do not commit quota");
   assert.equal(outageUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an exam without an independent answer check is neither persisted nor counted toward mastery");
@@ -1506,9 +1536,9 @@ try {
     assert.equal(rejected.body.error, "GENERATION_QUESTION_IDS_INVALID");
     const urls = calls.map((call) => call.url);
     assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
       `${malformed.label} IDs refund the reserved quota`);
-    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
+    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0);
     assert.equal(urls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
     assert.equal(urls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1,
       "invalid IDs are rejected before verifier or solver calls");
@@ -1570,7 +1600,7 @@ try {
   const wrongGraphCalls = calls.slice();
   assert.equal(wrongGraphCalls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 1);
   assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "the rejected non-graph response returns the reserved quota");
 
   activeQuestions = [{
@@ -1819,8 +1849,8 @@ try {
   assert.equal(graphTimeout.status, 504, "an empty/timed-out graph generation does not produce a zero-score exam");
   const timeoutUrls = calls.map((call) => call.url);
   assert.equal(timeoutUrls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1);
-  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1);
-  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
+  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1);
+  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0);
   assert.equal(timeoutUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
 
   const mismatchCallsStart = calls.length;
@@ -1841,9 +1871,9 @@ try {
   assert.ok(JSON.stringify(mismatchCalls.find((call) => call.url === "https://api.openai.com/v1/responses").body).includes(mismatchedMaterial),
     "the new source material reaches the generator request");
   assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "a rejected generated graph refunds its reserved quota");
-  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
+  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
     "a rejected generated graph does not commit quota");
   assert.equal(mismatchUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an unsupported generated graph is not persisted and does not update mastery");
@@ -1862,16 +1892,14 @@ try {
     "unexpected generation errors provide an actionable Swedish message");
   assert.match(issuanceFailure.body.requestId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     "the safe response includes an opaque correlation id");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,
-    "an unissued exam never commits quota");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")), true,
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 1,
+    "an issuance/finalization failure reaches the atomic transaction exactly once");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
     "an unissued exam refunds its reserved quota");
-  assert.equal(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "DELETE"), true,
-    "a failed issuance cleans up any partial row");
   const issuanceEvent = failureLogs.map((line) => {
     try { return JSON.parse(line); } catch { return null; }
-  }).find((event) => event?.event === "exam_generation_failed" && event.stage === "exam_issuance");
-  assert.ok(issuanceEvent, "the privacy-safe diagnostic identifies the exam issuance stage");
+  }).find((event) => event?.event === "exam_generation_failed" && event.stage === "generation_finalize");
+  assert.ok(issuanceEvent, "the privacy-safe diagnostic identifies atomic generation finalization");
   assert.equal(issuanceEvent.requestId, issuanceFailure.body.requestId,
     "the response reference correlates with the stage-only server diagnostic");
   assert.doesNotMatch(JSON.stringify(issuanceEvent), /synthetic schema unavailable|Träna addition|synthetic-user-token/);
@@ -1890,15 +1918,14 @@ try {
     `${origin}/rest/v1/profiles?select=role&id=eq.${userId}`,
     `${origin}/rest/v1/user_profiles?select=mastery&id=eq.${userId}`,
     `${origin}/rest/v1/rpc/reserve_mock_exam_quota`,
-    `${origin}/rest/v1/rpc/commit_mock_exam_quota`,
-    `${origin}/rest/v1/rpc/refund_mock_exam_quota`,
+    `${origin}/rest/v1/rpc/claim_mock_exam_generation`,
+    `${origin}/rest/v1/rpc/fail_mock_exam_generation`,
+    `${origin}/rest/v1/rpc/complete_mock_exam_generation`,
     `${origin}/rest/v1/rpc/consume_anon_rate`,
     `${origin}/rest/v1/rpc/try_replay_mock_learning_job`,
     `${origin}/rest/v1/rpc/persist_graded_exam_result`,
     `${origin}/rest/v1/ai_usage_events`,
-    `${origin}/rest/v1/exam_issuances`,
     `${origin}/rest/v1/feature_flags?select=key%2Cenabled%2Callowed_user_ids&key=in.%28per_learner_loop_enabled%29`,
-    ...calls.filter((call) => call.url.startsWith(`${origin}/rest/v1/exam_issuances`)).map((call) => call.url),
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),
     `unexpected mock route: ${calls.map((call) => call.url).filter((url) => url !== "https://api.openai.com/v1/responses" && !allowedSupabaseRoutes.includes(url)).join(", ")}`);
@@ -1921,12 +1948,39 @@ try {
   assert.equal(sealingFailure.body.stage, "grade_task_sealing",
     "the safe response identifies the failure stage without exposing the exception");
   assert.equal(sealingFailure.body.exam, undefined, "a signing failure never delivers an ungradeable exam");
-  assert.equal(calls.some((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"), false,
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
     "a signing failure does not attempt issuance");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
     "a signing failure does not commit the exam quota");
-  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")), true,
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
     "a signing failure refunds the reserved exam quota");
+
+  calls.length = 0;
+  activeQuestions = questions;
+  const stableKey = "00000000-0000-4000-8000-000000000555";
+  const stableRequest = {
+    lang: "sv", level: "C", course: "Matematik 1b", pastedText, qType: "mc", numQuestions: 3,
+    idempotencyKey: stableKey,
+  };
+  const firstStableResponse = await invoke(generateExam, stableRequest);
+  assert.equal(firstStableResponse.status, 200, JSON.stringify(firstStableResponse.body));
+  const firstStableSubmission = firstStableResponse.body.exam.questions.map((question) => question.grade_task);
+  calls.length = 0;
+  const replayedStableResponse = await invoke(generateExam, stableRequest);
+  assert.equal(replayedStableResponse.status, 200, JSON.stringify(replayedStableResponse.body));
+  assert.deepEqual(replayedStableResponse.body, firstStableResponse.body,
+    "retry after a lost HTTP response returns the exact same exam and metadata");
+  assert.equal(JSON.stringify(replayedStableResponse.body.exam.questions.map((question) => question.grade_task)),
+    JSON.stringify(firstStableSubmission));
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "a successful same-key retry never calls the model again");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
+    "a replay never reserves quota a second time");
+  const changedStableRequest = await invoke(generateExam, { ...stableRequest, pastedText: `${pastedText}\nEn ändrad rad.` });
+  assert.equal(changedStableRequest.status, 409);
+  assert.equal(changedStableRequest.body.error, "GENERATION_REQUEST_PAYLOAD_CONFLICT");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "a reused key with changed study material is rejected before generation");
 
   console.log("offline exam pipeline: MC and supported graph flows passed; unsupported source and mismatched generated graph are rejected safely");
 } finally {

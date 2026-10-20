@@ -1,5 +1,16 @@
 # 08 Current Status
 
+## Generation idempotency implementation — 2026-10-20
+
+- [x] The generation endpoint now binds each authenticated request to a UUID idempotency key and a server-computed hash of the normalized settings and study material. A different payload cannot reuse the same key.
+- [x] A server-only request ledger provides fenced attempts, a bounded lease, exact successful-response replay, and atomic quota commit + exam issuance + cached response. The client reuses the key for the same account and exact payload without storing the study material in `sessionStorage`.
+- [x] The full API Node suite passed 171/171. Targeted frontend checks passed for durable request-key storage/privacy, auth gate, and pilot session recovery. PGlite checks covered replay, payload binding, retries, stale-attempt fencing, quota commit/refund, and service-only access; the lost-response API test confirmed exact replay without a second AI or quota call. `git diff --check` passed.
+- [!] The broader `tests/frontend/exam-flow.regression.mjs` still terminates with Playwright `Target page, context or browser has been closed`; this is not counted as a pass.
+- [!] The changes and migration are local to `codex/exgen-generation-quality-2026-10-20`; the staging migration has not been applied, and this local code has not been pushed or deployed. The user's confirmation of login is not treated as verification of this new implementation.
+- [!] Still required: review and separately approve/apply the new staging migration, deploy an approved Preview, then verify the authenticated synthetic generate/retry/grade/P.E.R. path. Two-account live RLS/IDOR and school operational approval also remain open.
+
+**PILOT NOT READY.** No production or `main` change was made. Keep the staging account/data intact.
+
 ## Local generation-quality follow-up — 2026-10-20
 
 - [x] The client-side source-word picker now excludes the generic discourse word `alltså`; the API independently filters it even when a client submits it directly. Focus-term tests pass.
@@ -7,7 +18,7 @@
 - [x] Local checks passed: `tests/api/exam-focus-terms.test.mjs`, `tests/api/exam-pipeline-offline.test.mjs`, `tests/api/verifier-output-contract.test.mjs`, and `git diff --check`.
 - [!] `tests/frontend/exam-flow.regression.mjs` did not complete on two attempts; both ended with Playwright reporting that its page/context/browser had been closed during later navigation. No browser-suite pass is claimed.
 - [!] These edits are local to the feature worktree and have not been pushed or deployed. No additional live AI request was made; the user-authenticated Preview does not yet contain these local edits.
-- [!] Generation request replay remains an open pilot risk: the client supplies no durable operation key and each retry gets a new server quota request ID. A correct fix must make quota reservation and generated-result replay share a server-enforced idempotency contract; it likely requires a reviewed schema change and separate staging approval.
+- [!] At this checkpoint, generation replay was still open. It is addressed by the later local implementation documented above, but awaits a reviewed and separately approved staging migration and Preview verification.
 
 **PILOT NOT READY.** The observed Swedish wording and generic focus-term issues have local fixes and regression coverage, but updated Preview verification, generation idempotency, security isolation, telemetry/security review and school operational approval remain outstanding.
 
