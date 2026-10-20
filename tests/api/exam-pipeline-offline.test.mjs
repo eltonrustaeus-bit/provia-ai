@@ -94,8 +94,10 @@ assert.deepEqual(repairPayload.input.slice(0, 2), [
   { role: "system", content: "system prompt" },
   { role: "user", content: "material prompt" },
 ], "repair retains the original system prompt and source material");
-assert.match(repairPayload.input.at(-1).content, /exakt 6 nya frågekandidater.*fylla 3 saknade provplatser/i);
+assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*fylla 3 saknade provplatser/i);
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
+assert.match(repairPayload.input.at(-1).content, /självständig, tydligt avgränsad uppgift.*klart svarsmål/i);
+assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*behövs för lösningen/i);
 assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
@@ -138,10 +140,10 @@ const missingSlotRepair = generateExam.buildRepairPayload({
   lang: "sv", numQuestions: 3,
   existingQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
 });
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 6,
-  "repair schema oversamples while respecting the six-candidate cap");
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 6);
-assert.match(missingSlotRepair.input.at(-1).content, /exakt 6 nya frågekandidater.*fylla 2 saknade provplatser/i);
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 3,
+  "repair requests one spare candidate beyond the two missing slots");
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 3);
+assert.match(missingSlotRepair.input.at(-1).content, /exakt 3 nya frågekandidater.*fylla 2 saknade provplatser/i);
 assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
   "existing stems are passed to repair so the model can avoid repeating them");
 
@@ -615,7 +617,7 @@ try {
     "a two-question verifier repair preserves one MC and one short answer");
   assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
     && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
-    /exakt 0 flervalskandidat\(er\) och 4 kortsvarskandidat\(er\)/i,
+    /exakt 0 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
     "quality repair targets the missing short-answer type");
 
   const rejectedMixedMc = { ...questions[0], id: "mixed-rejected-mc" };
@@ -643,7 +645,7 @@ try {
     "one repair replaces both rejected types and preserves the requested mixed balance");
   assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
     && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
-    /exakt 3 flervalskandidat\(er\) och 3 kortsvarskandidat\(er\)/i,
+    /exakt 2 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
     "quality repair requests candidates for both simultaneously missing types");
 
   activeQuestions = questions.slice(0, 3);
@@ -659,7 +661,7 @@ try {
     "a three-question structural repair enforces the requested mixed balance");
   assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
     && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
-    /exakt 0 flervalskandidat\(er\) och 6 kortsvarskandidat\(er\)/i,
+    /exakt 0 flervalskandidat\(er\) och 3 kortsvarskandidat\(er\)/i,
     "structural repair generates candidates for the missing short-answer slots");
 
   const wrongTypeRepairCandidates = Array.from({ length: 6 }, (_, index) => ({
@@ -1202,8 +1204,8 @@ try {
   const underfilledRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.stream !== true);
   assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
-  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 4,
-    "one missing slot requests a bounded four-candidate pool so quality gates can reject weak candidates without underfilling");
+  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 2,
+    "one missing slot requests one spare candidate so repair stays within its short review window");
   assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 1,
     "only the complete three-question set is issued");
   activeQuestions = questions;
@@ -1370,9 +1372,10 @@ try {
     reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2,
   },
     "safe repair telemetry records only the review rejection category");
-  assert.equal(verifierRejectedLog.repairStructuralDropped, 1);
-  assert.deepEqual(verifierRejectedLog.repairStructuralIssueCounts, { source_reference_missing: 1 },
-    "repair-gate diagnostics report allowlisted issue counts without candidate content");
+  assert.equal(verifierRejectedLog.repairStructuralDropped, 0,
+    "the bounded two-candidate repair excludes the unused third fixture candidate");
+  assert.deepEqual(verifierRejectedLog.repairStructuralIssueCounts, {},
+    "unused repair candidates are not evaluated or counted");
   assert.deepEqual({
     round1ApprovedCount: verifierRejectedLog.round1ApprovedCount,
     round1UniqueApprovedCount: verifierRejectedLog.round1UniqueApprovedCount,

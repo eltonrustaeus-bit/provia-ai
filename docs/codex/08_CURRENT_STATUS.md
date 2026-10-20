@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## Bounded quality-repair follow-up — 2026-10-20
+
+- [x] Quality repair now requests one extra candidate beyond the missing slots instead of `2 * missing slots + 2`, reducing repair output while retaining a spare for independent review. Mixed repairs reserve one extra candidate for each missing question type so the requested balance cannot be lost.
+- [x] Repair instructions now explicitly require self-contained short-answer prompts, complete mathematical givens, and scoring criteria limited to the work the question asks for.
+- [x] Offline exam-pipeline regression passed; full sequential API suite passed; `git diff --check` passed.
+- [!] This change is local and offline-verified only. It has not yet been pushed/deployed or tested with a live model on staging, so improved live completion rate and repair latency are not yet established.
+
+**PILOT NOT READY.** Next: deploy this change to the feature Preview under the existing staging scope and run one bounded synthetic generation; compare candidate count, repair duration, and verified question yield to the last 0/3 run. Do not change model defaults until a controlled candidate-model comparison is measured.
+
 ## Live generation and repair diagnostics — 2026-10-20
 
 - [x] The authenticated stable feature Preview session was already active after its brief restoration delay; no password was used or requested.

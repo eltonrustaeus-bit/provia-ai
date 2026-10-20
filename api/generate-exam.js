@@ -1100,9 +1100,16 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function repairCandidateCountFor(missingSlots) {
+function repairCandidateCountFor(missingSlots, missingTypes = null) {
   const slots = Math.max(1, Number(missingSlots) || 1);
-  return Math.min(6, slots * 2 + 2);
+  const missingTypeCount = missingTypes
+    ? Number(Number(missingTypes.mc) > 0) + Number(Number(missingTypes.short) > 0)
+    : 1;
+  // One spare candidate gives the independent reviewer room to reject a weak
+  // item without making repair output so large that it misses the function's
+  // verification/finalization window. Mixed repairs retain one spare per
+  // missing type so the response cannot accidentally omit a requested format.
+  return Math.min(6, slots + Math.max(1, missingTypeCount));
 }
 
 function mixedTypeTargets(numQuestions) {
@@ -1156,7 +1163,7 @@ function mixedRepairCandidateTypes(candidateCount, missingTypes) {
 function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType, missingTypes = null }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
-  const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots)));
+  const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots, missingTypes)));
   const existingStems = existing.map((question) => ({
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
@@ -1216,8 +1223,8 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
       : `För detta blandade prov ska du skapa exakt ${repairTypes.mc} flervalskandidat(er) och ${repairTypes.short} kortsvarskandidat(er), så att de saknade platserna av respektive typ kan fyllas. Returnera inte en annan typfördelning.`)
     : "";
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant frågan uttryckligen ber eleven göra. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1598,10 +1605,10 @@ module.exports = async function handler(req, res) {
       let repairResponse = null;
       try {
         const repairSlots = numQuestions - exam.questions.length;
-        const repairCount = repairCandidateCountFor(repairSlots);
         const missingTypes = ["mix", "mixed"].includes(qType)
           ? selectMixedQuestions(exam.questions, mixedTypeTargets(numQuestions)).missing
           : null;
+        const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
         const repairPayload = buildRepairPayload(payload, {
           lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
         });
@@ -1822,10 +1829,10 @@ module.exports = async function handler(req, res) {
           let data2 = null;
           try {
             const repairSlots = Math.max(1, numQuestions - round1ApprovedQuestions.length);
-            const repairCount = repairCandidateCountFor(repairSlots);
             const missingTypes = ["mix", "mixed"].includes(qType)
               ? selectMixedQuestions(round1ApprovedQuestions, mixedTypeTargets(numQuestions)).missing
               : null;
+            const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
               reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType, missingTypes,
