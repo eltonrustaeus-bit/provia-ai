@@ -5,10 +5,10 @@
 - [x] The exam wizard now treats an API quota response as a distinct learner state: it says the quota is exhausted and shows the existing reset/limit message instead of presenting a generic generation failure or suggesting fewer questions.
 - [x] Browser coverage drives the real wizard-to-`runGenerate()` bridge with a synthetic HTTP 429 and verifies the dedicated heading, reset guidance, and absence of the misleading retry hint.
 - [x] Focused generation/verifier/solver checks passed. The complete `tests/frontend/exam-flow.regression.mjs` passed **178/178** on the final rerun; an earlier run had one transient Supabase mock fetch failure. `EXAM_FLOW_LANGUAGE_ONLY=1` also passed 58/58; syntax and diff checks passed.
-- [!] Current code/deployment readback: branch `codex/exgen-generation-quality-2026-10-20` has latest pushed docs commit `2c7d7ec`; its Vercel Preview is READY from that exact SHA. The quota-message code is local only until the next feature-branch commit/deployment.
-- [!] In the last authenticated live check, exam generation and P.E.R. were both stopped by exhausted staging quotas before useful model-backed responses. No quota/role, staging, `main`, or Production changes were made in this increment; no new live generation result is claimed.
+- [x] Commit `4fc2122` was pushed only to `codex/exgen-generation-quality-2026-10-20`; Vercel Preview `dpl_ApBoVAqpGLqFhVnzGyHuZ5xqqvw7` is READY from that exact SHA at `https://provia-q6w46eyau-eltons-projects-4adfb1a3.vercel.app/app.html`. The existing stable branch Preview alias points to this deployment; `main` and Production were not changed.
+- [!] After reloading the stable alias, the app showed the sign-in gate. The prior browser session is no longer active, so no model-backed generation/P.E.R./grading check was run against this deployment. Earlier authenticated live checks were stopped by exhausted staging quotas. No quota/role or staging data was changed in this increment.
 
-**PILOT NOT READY.** Next: publish this small quota-UX fix to the feature Preview, then resume bounded synthetic generation/P.E.R. verification only when the staging test entitlement is available; preserve all staging data and keep `main`/Production unchanged.
+**PILOT NOT READY.** Next: reauthenticate once on the stable feature Preview, verify its staging runtime, then run the bounded synthetic generation/P.E.R./grading checks if the approved staging test entitlement allows them. Preserve all staging data and keep `main`/Production unchanged.
 
 ## Generation reliability follow-up — 2026-10-20
 
