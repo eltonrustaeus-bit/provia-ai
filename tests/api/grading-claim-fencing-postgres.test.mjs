@@ -4,8 +4,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 
 const migrationPaths = [
-  new URL("../../supabase/migrations/20261019130000_fence_stale_exam_grading_claims.sql", import.meta.url),
-  new URL("../../supabase/migrations/20261020091748_fix_unverified_exam_abandonment_state.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261020170419_fence_stale_exam_grading_claims.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261020170431_fix_unverified_exam_abandonment_state.sql", import.meta.url),
 ];
 
 test("grading migrations execute and fence stale claims in isolated PostgreSQL", async () => {

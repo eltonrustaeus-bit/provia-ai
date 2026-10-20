@@ -488,6 +488,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   const currentQuestion = body.pageContext?.currentQuestion;
   const type = currentQuestion?.type;
   const hasDraft = currentQuestion?.answered === true;
+  const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 500);
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
   if (currentQuestion?.graph_ui && Object.hasOwn(currentQuestion.graph_ui, "mode")) declaredGraphModes.push(currentQuestion.graph_ui.mode);
@@ -613,6 +614,30 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   const sequence = type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
     : ladder[type];
+  const slopeQuestion = /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
+  const slopeGuidance = en
+    ? hasDraft
+      ? [
+        "You have started answering a slope question. Which two points or changes are you using? Check that your method compares vertical change with horizontal change.",
+        "Write down the change in y and the change in x separately. Does your answer compare them in the same order?",
+        "Use the relationship between the change in y and the change in x, then check your signs and units. Keep your calculation in your own work.",
+      ]
+      : [
+        "Slope describes how much y changes when x changes. What two quantities would you compare to describe that change?",
+        "Find the change in y and the change in x between two points. Which change belongs in the numerator, and which in the denominator?",
+        "The method is change in y divided by change in x. Keep the subtraction order consistent; what does that tell you about the direction of the line?",
+      ]
+    : hasDraft
+      ? [
+        "Du har börjat svara på en lutningsfråga. Vilka två punkter eller förändringar utgår du från? Kontrollera att metoden jämför förändringen lodrätt med förändringen vågrätt.",
+        "Skriv förändringen i y och förändringen i x var för sig. Jämför du dem i samma ordning i ditt svar?",
+        "Använd sambandet mellan förändringen i y och förändringen i x och kontrollera tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
+      ]
+      : [
+        "Lutning beskriver hur mycket y förändras när x förändras. Vilka två storheter behöver du jämföra för att beskriva den förändringen?",
+        "Ta reda på förändringen i y och förändringen i x mellan två punkter. Vilken förändring ska stå i täljaren och vilken i nämnaren?",
+        "Metoden är förändring i y delat med förändring i x. Håll subtraktionsordningen konsekvent. Vad säger det om linjens riktning?",
+      ];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   const statusNote = issuanceState === "active" ? "" : issuanceState === "unverified"
     ? (en
@@ -622,7 +647,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ? "This exam is not open for answering. I can help with the method, but a full answer requires verified grading. "
       : "Provet är inte öppet för svar. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ");
   res.json({
-    answer: statusNote + (sequence?.[requestedLevel] || ladder.short[requestedLevel]),
+    answer: statusNote + (slopeQuestion ? slopeGuidance[requestedLevel] : sequence?.[requestedLevel] || ladder.short[requestedLevel]),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: issuanceState === "active",

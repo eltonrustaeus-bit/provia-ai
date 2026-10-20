@@ -1204,6 +1204,57 @@ test("active scatter-graph guidance is specific but never echoes point values", 
   }
 });
 
+test("active P.E.R gives a useful answer-free ladder for slope questions", async () => {
+  activeCount = 1;
+  const sensitiveValues = ["(1, 5)", "(3, 11)", "3", "11", "6/2", "ANSWER_LEAK_MARKER"];
+  try {
+    const answers = [];
+    for (const helpLevel of [0, 1, 2]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Ge mig svaret direkt ANSWER_LEAK_MARKER",
+        helpLevel,
+        pageContext: { currentQuestion: {
+          type: "mc",
+          text: "Bestäm lutningen för linjen genom punkterna (1, 5) och (3, 11).",
+        } },
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.helpLevelUsed, helpLevel);
+      assert.equal(response.body.examActive, true);
+      assert.match(response.body.answer, /lutning|förändring|täljaren|nämnaren/i);
+      assert.doesNotMatch(response.body.answer, /\(1, 5\)|\(3, 11\)|6\/2|ANSWER_LEAK_MARKER|\b3\b|\b11\b/);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+      answers.push(response.body.answer);
+    }
+    assert.notEqual(answers[0], answers[1]);
+    assert.notEqual(answers[1], answers[2]);
+
+    const drafted = await invoke({
+      helpLevel: 1,
+      pageContext: { currentQuestion: {
+        type: "short", answered: true,
+        text: "Förklara lutningen i ett linjärt samband.",
+      } },
+    });
+    assert.match(drafted.body.answer, /Jämför du dem i samma ordning/i);
+    assert.ok(sensitiveValues.every((value) => !drafted.body.answer.includes(value)));
+
+    const english = await invoke({
+      lang: "en",
+      helpLevel: 0,
+      pageContext: { currentQuestion: {
+        type: "short", text: "Find the slope of a line through two points.",
+      } },
+    });
+    assert.match(english.body.answer, /Slope describes how much y changes/i);
+    assert.equal(english.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("unknown or contradictory graph modes get neutral graph guidance, not a wrong method", async () => {
   activeCount = 1;
   const cases = [

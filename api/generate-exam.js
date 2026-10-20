@@ -1104,7 +1104,43 @@ function repairCandidateCountFor(missingSlots) {
   return Math.min(6, slots * 2 + 2);
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType }) {
+function mixedTypeTargets(numQuestions) {
+  const count = Math.max(0, Number(numQuestions) || 0);
+  return { mc: Math.floor(count / 2), short: Math.ceil(count / 2) };
+}
+
+function selectMixedQuestions(questions, targets) {
+  const selected = [];
+  const counts = { mc: 0, short: 0 };
+  for (const question of Array.isArray(questions) ? questions : []) {
+    const type = question?.type;
+    if ((type !== "mc" && type !== "short") || counts[type] >= (targets?.[type] || 0)) continue;
+    selected.push(question);
+    counts[type]++;
+  }
+  return {
+    questions: selected,
+    missing: {
+      mc: Math.max(0, (targets?.mc || 0) - counts.mc),
+      short: Math.max(0, (targets?.short || 0) - counts.short),
+    },
+  };
+}
+
+function mixedRepairCandidateTypes(candidateCount, missingTypes) {
+  const count = Math.max(1, Math.min(6, Number(candidateCount) || 1));
+  const missingMc = Math.max(0, Number(missingTypes?.mc) || 0);
+  const missingShort = Math.max(0, Number(missingTypes?.short) || 0);
+  const missingTotal = missingMc + missingShort;
+  if (!missingTotal) return { mc: Math.floor(count / 2), short: Math.ceil(count / 2) };
+  if (!missingMc) return { mc: 0, short: count };
+  if (!missingShort) return { mc: count, short: 0 };
+  const mc = Math.max(missingMc, Math.min(count - missingShort,
+    Math.round(count * missingMc / missingTotal)));
+  return { mc, short: count - mc };
+}
+
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType, missingTypes = null }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots)));
@@ -1160,10 +1196,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."
           : "",
       ].filter(Boolean).join(" ");
+  const repairTypes = mixedRepairCandidateTypes(repairCount, missingTypes);
   const mixedTypeGuidance = ["mix", "mixed"].includes(qType)
     ? (lang === "en"
-      ? `For this mixed exam, include exactly ${repairCount - Math.ceil(repairCount / 2)} multiple-choice candidate(s) and ${Math.ceil(repairCount / 2)} short-answer candidate(s). For an odd candidate count, the extra candidate must be short-answer. Do not return all candidates as multiple choice.`
-      : `För detta blandade prov ska du skapa exakt ${repairCount - Math.ceil(repairCount / 2)} flervalskandidat(er) och ${Math.ceil(repairCount / 2)} kortsvarskandidat(er). Vid udda antal ska den extra kandidaten vara kortsvar. Gör inte alla kandidater till flervalsfrågor.`)
+      ? `For this mixed exam, include exactly ${repairTypes.mc} multiple-choice candidate(s) and ${repairTypes.short} short-answer candidate(s), to fill the remaining type-specific slots. Do not return a different type mix.`
+      : `För detta blandade prov ska du skapa exakt ${repairTypes.mc} flervalskandidat(er) och ${repairTypes.short} kortsvarskandidat(er), så att de saknade platserna av respektive typ kan fyllas. Returnera inte en annan typfördelning.`)
     : "";
   const instruction = lang === "en"
     ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
@@ -1446,6 +1483,16 @@ module.exports = async function handler(req, res) {
     let duplicateQuestionIds = gate.dropped
       .filter((item) => item.issues.includes("duplicate_question"))
       .map((item) => item.id);
+    if (["mix", "mixed"].includes(qType)) {
+      const balanced = selectMixedQuestions(gate.questions, mixedTypeTargets(numQuestions));
+      const selectedIds = new Set(balanced.questions.map((question) => String(question.id)));
+      for (const question of gate.questions) {
+        if (!selectedIds.has(String(question.id))) {
+          gate.dropped.push({ id: question.id, issues: ["mixed_type_overflow"] });
+        }
+      }
+      gate.questions = balanced.questions;
+    }
     exam.questions = gate.questions;
 
     let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
@@ -1496,8 +1543,11 @@ module.exports = async function handler(req, res) {
       try {
         const repairSlots = numQuestions - exam.questions.length;
         const repairCount = repairCandidateCountFor(repairSlots);
+        const missingTypes = ["mix", "mixed"].includes(qType)
+          ? selectMixedQuestions(exam.questions, mixedTypeTargets(numQuestions)).missing
+          : null;
         const repairPayload = buildRepairPayload(payload, {
-          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType,
+          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
         });
         const response = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -1532,8 +1582,12 @@ module.exports = async function handler(req, res) {
             repairCandidateCount = repairGate.questions.length;
             const kept = [...exam.questions];
             const keptIds = new Set(kept.map((question) => String(question.id)));
+            const mixedTargets = ["mix", "mixed"].includes(qType) ? mixedTypeTargets(numQuestions) : null;
+            const typeCounts = { mc: 0, short: 0 };
+            for (const question of kept) if (question.type === "mc" || question.type === "short") typeCounts[question.type]++;
             for (const question of repairGate.questions) {
               const id = String(question.id);
+              if (mixedTargets && (question.type !== "mc" && question.type !== "short" || typeCounts[question.type] >= mixedTargets[question.type])) continue;
               if (keptIds.has(id) || kept.some((accepted) => assessment.isDuplicateQuestion(accepted, question))) {
                 repairDuplicateCount++;
                 continue;
@@ -1541,6 +1595,7 @@ module.exports = async function handler(req, res) {
               if (kept.length >= numQuestions) break;
               keptIds.add(id);
               kept.push(question);
+              if (mixedTargets) typeCounts[question.type]++;
             }
             repairCrossRoundDuplicateCount = repairDuplicateCount;
             combinedQuestionCount = kept.length;
@@ -1710,9 +1765,12 @@ module.exports = async function handler(req, res) {
           try {
             const repairSlots = Math.max(1, numQuestions - round1ApprovedQuestions.length);
             const repairCount = repairCandidateCountFor(repairSlots);
+            const missingTypes = ["mix", "mixed"].includes(qType)
+              ? selectMixedQuestions(round1ApprovedQuestions, mixedTypeTargets(numQuestions)).missing
+              : null;
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
-              reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType,
+              reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType, missingTypes,
             });
             repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {
@@ -1812,13 +1870,19 @@ module.exports = async function handler(req, res) {
                       retryUniqueQuestions.push(q);
                     }
                     repairUniqueApprovedCount = retryUniqueQuestions.length;
-                    const completeRetry = round1ApprovedQuestions.length === 0 && retryUniqueQuestions.length >= numQuestions;
+                    const missingTypes = ["mix", "mixed"].includes(qType)
+                      ? selectMixedQuestions(round1ApprovedQuestions, mixedTypeTargets(numQuestions)).missing
+                      : null;
+                    const repairQuestions = missingTypes
+                      ? selectMixedQuestions(retryUniqueQuestions, missingTypes).questions
+                      : retryUniqueQuestions;
+                    const completeRetry = round1ApprovedQuestions.length === 0 && repairQuestions.length >= numQuestions;
                     const combinedQuestions = completeRetry
-                      ? retryUniqueQuestions.slice(0, numQuestions)
+                      ? repairQuestions.slice(0, numQuestions)
                       : [...round1ApprovedQuestions];
                     const combinedIds = new Set(combinedQuestions.map(q => String(q.id)));
                     if (!completeRetry) {
-                      for (const q of retryUniqueQuestions) {
+                      for (const q of repairQuestions) {
                         const id = String(q.id);
                         if (combinedQuestions.length >= numQuestions) break;
                         if (combinedIds.has(id) || combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
@@ -2148,6 +2212,9 @@ module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;
 module.exports.readJsonBody = readJsonBody;
 module.exports.buildMockExamSchema = buildMockExamSchema;
 module.exports.normalizeGeneratedExam = normalizeGeneratedExam;
+module.exports.mixedTypeTargets = mixedTypeTargets;
+module.exports.selectMixedQuestions = selectMixedQuestions;
+module.exports.mixedRepairCandidateTypes = mixedRepairCandidateTypes;
 module.exports.looksLikeMath = looksLikeMath;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested

@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 
 const [migration, rollbackNote, rollbackSql, issuanceApi, gradeApi, migrationFiles] = await Promise.all([
-  readFile(new URL("../../supabase/migrations/20261019130000_fence_stale_exam_grading_claims.sql", import.meta.url), "utf8"),
-  readFile(new URL("../../docs/codex/rollback/20261019130000_fence_stale_exam_grading_claims.md", import.meta.url), "utf8"),
-  readFile(new URL("../../supabase/migrations/20261019130000_fence_stale_exam_grading_claims_ROLLBACK.sql", import.meta.url), "utf8"),
+  readFile(new URL("../../supabase/migrations/20261020170419_fence_stale_exam_grading_claims.sql", import.meta.url), "utf8"),
+  readFile(new URL("../../docs/codex/rollback/20261020170419_fence_stale_exam_grading_claims.md", import.meta.url), "utf8"),
+  readFile(new URL("../../supabase/migrations/20261020170419_fence_stale_exam_grading_claims_ROLLBACK.sql", import.meta.url), "utf8"),
   readFile(new URL("../../api/_exam-issuance.cjs", import.meta.url), "utf8"),
   readFile(new URL("../../api/grade.js", import.meta.url), "utf8"),
   readdir(new URL("../../supabase/migrations/", import.meta.url)),
@@ -51,7 +51,7 @@ assert.match(gradeApi, /claimed = \{ id: submissionId, fingerprint, claimId \}/)
 assert.match(rollbackNote, /no executable rollback/i);
 assert.match(rollbackSql, /raise exception 'Rollback blocked:/i,
   "the paired rollback is present but deliberately cannot change the schema");
-assert.ok(migrationFiles.includes("20261019130000_fence_stale_exam_grading_claims_ROLLBACK.sql"),
+assert.ok(migrationFiles.includes("20261020170419_fence_stale_exam_grading_claims_ROLLBACK.sql"),
   "the migration checker requires a paired fail-closed rollback guard");
 
 console.log("grading claim fencing contract: stale takeover, verified completion, and owner fencing covered");

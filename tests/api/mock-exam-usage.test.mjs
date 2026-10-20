@@ -3,7 +3,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { measuredTokens, measuredEmbeddingTokens, usageEvent, logMockExamUsage } = require("../../api/_ai-usage.cjs");
+const { measuredTokens, measuredEmbeddingTokens, usageEvent, logMockExamUsage, safeFailureDetails } = require("../../api/_ai-usage.cjs");
 
 const sample = {
   userId: "00000000-0000-4000-8000-000000000001",
@@ -95,12 +95,45 @@ test("telemetry failure is fail-open and cannot fabricate a zero-cost row", asyn
       fetchImpl: async () => { throw new Error("synthetic metrics outage"); },
     });
     assert.equal(result, false);
-    assert.deepEqual(warnings, ['{"event":"ai_usage_event_write_failed","count":1}']);
+    assert.deepEqual(JSON.parse(warnings[0]), {
+      event: "ai_usage_event_write_failed", count: 1, features: ["mock_exam"], steps: ["generate"], category: "network_or_fetch",
+      errorClass: "Error", networkCode: null, timedOut: false,
+    });
+    assert.doesNotMatch(warnings[0], /synthetic metrics outage|PRIVATE_STUDY_MATERIAL|PRIVATE_STUDENT_ANSWER/);
     assert.equal(await logMockExamUsage({ ...sample, usage: null }, { env, fetchImpl: () => { throw Error("unexpected"); } }), false);
     assert.equal(warnings.length, 1);
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test("telemetry diagnostics retain only HTTP status and a bounded database code", async () => {
+  const env = { SUPABASE_URL: "https://synthetic.supabase.invalid", SUPABASE_SECRET_KEY: "sb_secret_synthetic" };
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(message);
+  try {
+    await logMockExamUsage(sample, {
+      env,
+      fetchImpl: async () => Response.json({ code: "42501", message: "PRIVATE_DATABASE_DETAIL" }, { status: 403 }),
+    });
+    assert.deepEqual(JSON.parse(warnings[0]), {
+      event: "ai_usage_event_write_failed", count: 1, features: ["mock_exam"], steps: ["generate"],
+      category: "http_error", httpStatus: 403, databaseCode: "42501",
+    });
+    assert.doesNotMatch(warnings[0], /PRIVATE_DATABASE_DETAIL|sb_secret_synthetic|PRIVATE_STUDY_MATERIAL/);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("telemetry diagnostic error classes and network codes are allowlisted", () => {
+  assert.deepEqual(safeFailureDetails(Object.assign(new Error("private"), { cause: { code: "ETIMEDOUT" } })), {
+    category: "timeout", errorClass: "Error", networkCode: "ETIMEDOUT", timedOut: true,
+  });
+  assert.deepEqual(safeFailureDetails(Object.assign(new Error("private"), { name: "PrivateError", code: "PRIVATE_CODE" })), {
+    category: "network_or_fetch", errorClass: "UnknownError", networkCode: null, timedOut: false,
+  });
 });
 
 test("pilot telemetry fails open when its branch-scoped staging URL is missing", async () => {

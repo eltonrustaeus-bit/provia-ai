@@ -94,6 +94,15 @@ const mixedRepairEnglish = generateExam.buildRepairPayload({
 }, { lang: "en", numQuestions: 3, candidateCount: 3, qType: "mixed" });
 assert.match(mixedRepairEnglish.input.at(-1).content, /exactly 1 multiple-choice candidate\(s\) and 2 short-answer candidate\(s\)/i,
   "an odd mixed repair allocates its extra candidate to short answer in English too");
+assert.deepEqual(generateExam.mixedTypeTargets(2), { mc: 1, short: 1 });
+assert.deepEqual(generateExam.mixedTypeTargets(3), { mc: 1, short: 2 },
+  "odd mixed exams give the extra slot to a gradable short-answer question");
+assert.deepEqual(generateExam.mixedRepairCandidateTypes(4, { mc: 0, short: 1 }), { mc: 0, short: 4 },
+  "repair oversamples the missing type instead of wasting candidates on the already-full type");
+assert.deepEqual(generateExam.selectMixedQuestions([
+  { id: "mc-1", type: "mc" }, { id: "mc-2", type: "mc" },
+  { id: "short-1", type: "short" }, { id: "short-2", type: "short" },
+], generateExam.mixedTypeTargets(3)).questions.map((question) => question.type), ["mc", "short", "short"]);
 assert.deepEqual(generateExam.safeAuthFailureDetails(Object.assign(
   new TypeError("private-token-sentinel"),
   { cause: Object.assign(new Error("private-message-sentinel"), { code: "ECONNRESET" }) },
@@ -512,6 +521,53 @@ try {
     "both questions still pass independent review");
   assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
     "both questions still pass the solver check");
+
+  const mixedShortCandidates = Array.from({ length: 6 }, (_, index) => {
+    const answer = String(6 + index);
+    return {
+      id: `mixed-short-${index + 1}`, type: "short", points: 1,
+      question: `Beräkna ${answer} - 1.`, options: [], correct_index: -1,
+      rubric: `En poäng för ${answer - 1}.`, model_answer: String(Number(answer) - 1),
+      topic: "Aritmetik", subtopic: "Subtraktion", concept_tag: "Aritmetik",
+      learning_objective: "Beräkna en enkel differens.", source_references: ["Grundläggande räkning"],
+      cognitive_level: "tillämpa", accepted_answers: [String(Number(answer) - 1)], estimated_answer_length: "short",
+      scoring_rubric: { parts: [{ description: "Rätt differens", points: 1 }], full_score_requirements: "Rätt differens", partial_credit_notes: "" },
+    };
+  });
+
+  activeQuestions = [questions[0], { ...mixedShortCandidates[0], id: "mixed-rejected-short" }];
+  verifierRejectQuestionId = "mixed-rejected-short";
+  regenerationQuestionBatches = [mixedShortCandidates.slice(1, 5)];
+  calls.length = 0;
+  const repairedTwoQuestionMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  verifierRejectQuestionId = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedTwoQuestionMix.status, 200, JSON.stringify(repairedTwoQuestionMix.body));
+  assert.deepEqual(repairedTwoQuestionMix.body.exam.questions.map((question) => question.type).sort(), ["mc", "short"],
+    "a two-question verifier repair preserves one MC and one short answer");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 0 flervalskandidat\(er\) och 4 kortsvarskandidat\(er\)/i,
+    "quality repair targets the missing short-answer type");
+
+  activeQuestions = questions.slice(0, 3);
+  regenerationQuestionBatches = [mixedShortCandidates];
+  calls.length = 0;
+  const repairedThreeQuestionMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 3,
+  });
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedThreeQuestionMix.status, 200, JSON.stringify(repairedThreeQuestionMix.body));
+  assert.deepEqual(repairedThreeQuestionMix.body.exam.questions.map((question) => question.type).sort(), ["mc", "short", "short"],
+    "a three-question structural repair enforces the requested mixed balance");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 0 flervalskandidat\(er\) och 6 kortsvarskandidat\(er\)/i,
+    "structural repair generates candidates for the missing short-answer slots");
 
   const fourQuestionSet = [
     ...questions,

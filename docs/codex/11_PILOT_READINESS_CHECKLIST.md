@@ -1,6 +1,19 @@
 # ExGen: checklista for skolpilot
 
-## Ny read-only kontroll — 2026-10-20 17:00 UTC
+## Latest staging verification and local follow-up — 2026-10-20
+
+- [x] Both approved grading-state migrations are applied only to staging; hosted schema and RPC permissions match the fenced grading contract. Migration versions are `20261020170419` and `20261020170431`.
+- [x] A synthetic authenticated 3-question Mathematics 2b flow completed on Preview: generation succeeded, in-exam P.E.R. withheld answer-bearing help, submission graded 6/6, and the verified result/account history were saved. Post-grade P.E.R. explained the verified response.
+- [!] The UI selected a mixed exam, but all 3 delivered questions were MC. Local server-side handling now targets 1 MC + 1 short answer for 2 questions and 1 MC + 2 short answers for 3; structural and verifier-driven repairs target the missing type. Integrated 2- and 3-question regressions pass locally, but this change is not deployed.
+- [!] The deployed logger warned that a four-event AI-usage batch failed. Staging schema metadata matches local event columns/constraints and an aggregate found no matching rows in the exact interval; the cause is not known. Local code now records allowlisted status/error categories without logging response bodies, credentials or study content; this change needs Preview verification.
+- [x] The verified result remains bound to its grading claim/fingerprint for recovery. The claim RPC checks verified completion before pending-claim state; a retained claim timestamp is not alone a stale/in-progress grading failure.
+- [x] Focused pilot/API/PostgreSQL/P.E.R. suite passed 66/66, migration checker found 39 migrations/36 rollback files, routing fixtures passed and `git diff --check` passed. The full sequential suite had one `pilot-session-recovery` navigation timeout; the same file passed alone (1/1), so the full suite is not green-certified.
+- [ ] The deployed Preview is still older commit `303b3c6`; local changes are not pushed or live-verified.
+- [ ] Two-account authenticated RLS/IDOR and school operational approvals remain open. Keep the synthetic staging account/data; do not delete without separate approval. `main`, Production, Vercel alias and staging data remain unchanged.
+
+**PILOT NOT READY.** Generation, active exam answer protection, grading/save and post-grade P.E.R. have live staging evidence. Mixed question distribution, telemetry diagnosis, two-account isolation and school operational approvals remain unverified.
+
+## Historisk kontroll före stagingmigrering — 2026-10-20 17:00 UTC
 
 - [x] Preview-aliasen pekar pa READY-deployment fran branchens aktuella HEAD `303b3c6`; ingen `main`-merge eller Production-andring.
 - [x] RLS ar aktiverat pa alla `public`-tabeller. Granskade elevtabeller har agarkontroller i policies; katalogkontroll ersatter inte autentiserat tva-konto-IDOR-test.
