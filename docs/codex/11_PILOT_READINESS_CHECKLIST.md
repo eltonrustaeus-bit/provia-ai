@@ -1,12 +1,14 @@
 # ExGen: checklista for skolpilot
 
-## Aktuell statuskontroll — 2026-10-20 16:49 UTC
+## Aktuell statuskontroll — 2026-10-20 16:55 UTC
 
-- Auth-fixens applikationscommit `15a95880d49a9f54430e47ef2b508317c5c00c7f` ar pushad till feature branch `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_5Acwdz11rmNnqnMtFi3EbMkzESYZ` ar `READY` fran exakt SHA; stabil Preview-alias pekar pa deploymenten. Ingen `main`-merge, Production-deploy eller databasandring har gjorts.
+- Auth-fixens applikationscommit `15a95880d49a9f54430e47ef2b508317c5c00c7f` och statusdokumentationens commit `691cd290a4b8fc50ec4347d33abe5cfca8764f73` ar pushade till feature branch `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_7adHe5wkw7rf5VEpDa5HV97PMLaD` ar `READY` fran exakt dokumentations-SHA; appkoden innehaller `15a9588`. Stabil Preview-alias pekar pa deploymenten. Ingen `main`-merge, Production-deploy eller databasandring har gjorts.
 - Foregaende liveprov pa `dpl_83i2yFcRadJDSN3DVecMyVF8irz4` stoppades vid `auth_user_lookup` med `TimeoutError` efter 5 sekunder. Ny kod gor en begransad andra Auth-begaran (8 s per forsok), returnerar 503 vid Auth-otillganglighet i stallet for felaktig 401 och behaller 401 for ogiltig elevtoken. Liveeffekten ar annu inte verifierad.
 - Offline: 196 Node-tester i 95 API-/assessment-/P.E.R.-testfiler passerade; fokuserad auth/pipeline/Supabase-key-svit passerade 10/10; `git diff --check` passerade. Inget av detta bevisar att liveleverantorer fungerar.
+- Kompletterande UI/browser-verifiering: 10 prov-/P.E.R.-/eval-filer genomforda, Node rapporterade 13/13 subtester; P.E.R.-provkontext 66/66, hjalptrappa 28/28, felannonsering 12/12 och mobil-P.E.R. pa 320/375/390/430 px passerade.
 - Vercel-metadata visar stagingvariabler krypterade och avgransade till den aktuella feature-branchen. Inga vardena visades.
 - Ny Preview-flik visar inloggningsgrinden. Supabase Auth-loggaggregering 16:37-16:40 UTC visar 13 lyckade `GET /user` med `referer=http://localhost:3000`; ingen Preview-begaran syns i resultatet. Rotorsaken till Vercels timeout ar darfor fortfarande okand. Ingen ny livegenerering eller P.E.R./rattning/sparning har verifierats.
+- Preview-loggen for `/api/abandon-exam` visade Node `DEP0169`-deprecation fran ett beroende vid en utloggad forfragan; rutten avvisar utloggade anrop med 401 enligt design. Det ar inte en verifierad applikationskrasch.
 
 **PILOT NOT READY.** Nasta steg: logga in i den stabila staging-Previewn och kor ett fa-syntetiskt-endast flode for provgenerering, P.E.R., rattning och sparning. Radera inte stagingkontot eller dess data. Ror inte Production eller `main`.
 
