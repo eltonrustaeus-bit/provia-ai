@@ -10,6 +10,14 @@
 
 **PILOT NOT READY.** Offline tests and the Preview build are verified, but generator quality and the full generation -> grading -> persistence -> P.E.R. live flow remain unverified on this deployment. Next: the user signs in directly to the exact Preview URL and confirms “inloggad”; then run only the already-approved synthetic 3-question test at the current staging role/quota. Stop if auth or quota blocks before a model call.
 
+## Staging target and Preview secret-scope recheck — 2026-10-21
+
+- [x] Supabase read-only project metadata identifies `yhcinqejsocpmmetazpz` as `exgen-pilot-staging`, region `eu-west-1`, status `ACTIVE_HEALTHY`. The migration ledger includes the grading-fencing, verified-abandonment, and mock-generation-idempotency migrations. No SQL or data was changed.
+- [x] The Vercel MCP returned 403 for environment metadata; the documented CLI read-only fallback succeeded against the explicitly verified `provia-ai` project and exact feature branch. It confirmed `EXGEN_PILOT_APP_ORIGIN`, `EXGEN_PILOT_PUBLISHABLE_KEY`, `EXGEN_PILOT_SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `OPENAI_API_KEY`, `EXAM_SIGNING_SECRET`, `EXGEN_PILOT_MODE`, and `SUPABASE_URL` are encrypted and Preview-scoped to `codex/exgen-generation-quality-2026-10-20`. No values were decrypted or read.
+- [!] These configuration checks do not prove that the browser has a valid Supabase session or that an AI request succeeds. The exact deployment remains at the login gate.
+
+**PILOT NOT READY.** The staging target and Preview secret scope are verified, but authenticated runtime behavior remains unverified. Next: user sign-in to the exact Preview, then the already-approved single synthetic generation request; make no role/quota changes.
+
 ## Grading recovery regression audit — 2026-10-21
 
 - [x] Focused grading/API recovery and frontend timeout suite passed **15/15**. Coverage includes injected upstream HTTP 502, retry recovery, concurrent claim fencing, lost HTTP response replay, conflicting answers, result persistence, and no result/mastery writes when provider transport times out.
