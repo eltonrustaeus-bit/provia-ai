@@ -165,6 +165,7 @@ let verifierRejectOptionId = null;
 let verifierLanguageMismatchId = null;
 let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
+let solverRejectNonsenseOption = true;
 let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
 let throwOnRepair = false;
@@ -302,7 +303,7 @@ globalThis.fetch = async (input, init = {}) => {
           : expectedIndex;
         return {
         id: q.id, option_verdicts: q.options.map((_, i) => i === solverIndex),
-        option_plausibility: q.options.map((option) => option !== "Kesäkten"),
+        option_plausibility: q.options.map((option) => !(solverRejectNonsenseOption && option === "Kesäkten")),
         index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
@@ -459,7 +460,9 @@ try {
   activeQuestions = malformedBiology;
   regenerationQuestions = repairedBiology;
   verifierRejectOptionId = "biology-1";
+  solverRejectNonsenseOption = false;
   const verifierInputCountBeforeBiologyRepair = verifierInputs.length;
+  const solverInputCountBeforeVerifierRejection = solverInputs.length;
   calls.length = 0;
   const nonsenseBiologyExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
@@ -474,7 +477,8 @@ try {
   assert.ok(flaggedNonsenseReview.questions.find((question) => question.options.includes("Kesäkten"))
     .review_hints.includes("single_word_option_outlier_review"),
   "the independent verifier receives the format warning as a review hint");
-  assert.equal(solverInputs.some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), true,
+  assert.equal(solverInputs.slice(solverInputCountBeforeVerifierRejection)
+    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), true,
     "a format warning does not suppress the independent solver's judgment");
   const repairedOutlierReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
     .flatMap((review) => review.questions)
@@ -483,8 +487,27 @@ try {
     "the verifier also receives the warning on the regeneration review path");
   assert.ok(nonsenseBiologyExam.body.exam.questions.some((question) =>
     question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
-  "a valid flagged technical-term answer survives the full pipeline when the independent checks approve it");
+  "the verifier's option-quality rejection triggers bounded replacement even when the solver marks every option plausible");
   verifierRejectOptionId = null;
+  solverRejectNonsenseOption = true;
+  regenerationQuestions = null;
+
+  activeQuestions = malformedBiology;
+  regenerationQuestions = repairedBiology;
+  const solverInputCountBeforeSolverRejection = solverInputs.length;
+  calls.length = 0;
+  const solverRejectedNonsenseExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(solverRejectedNonsenseExam.status, 200, JSON.stringify(solverRejectedNonsenseExam.body));
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.length, 3);
+  assert.equal(solverInputs.slice(solverInputCountBeforeSolverRejection)
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), true,
+  "the blind solver receives the malformed biology candidate");
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "the solver's option-plausibility rejection triggers bounded replacement when the verifier does not flag the item");
+  assert.ok(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
+    "the solver-rejected item is replaced by an independently checked candidate");
   regenerationQuestions = null;
 
   const languageMismatchQuestions = [

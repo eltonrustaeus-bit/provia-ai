@@ -133,5 +133,34 @@ check("systemprompten tillåter ett kort direkt begreppssvar",
 check("systemprompten inte kräver en motfråga för varje faktasvar",
   /Undvik motfrågor som ersätter ett enkelt faktasvar/i.test(levelZeroPrompt));
 
+console.log("\n— KURSKONTEXT VÄGLEDER MATTEPEDAGOGIKEN —");
+const vagMattefråga = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Matematik 1b" },
+});
+const vagHistoriefråga = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Historia 1b" },
+});
+check("vag fråga i matematikkurs får mattearbetsgång",
+  /ARBETSGÅNG VID PROBLEMLÖSNING/.test(vagMattefråga));
+check("vag fråga i historiekurs får inte mattearbetsgång",
+  !/ARBETSGÅNG VID PROBLEMLÖSNING/.test(vagHistoriefråga));
+
+const graphPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig tolka den?",
+  pageContext: {
+    course: "Matematik 1b",
+    currentQuestion: { type: "graph", graphMode: "line", text: "Beskriv sambandet i grafen." },
+  },
+});
+const textOnlyGraphPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Matematik 1b", currentQuestion: { text: "Beskriv sambandet." } },
+});
+check("linjegraf får stöd om lutning och skärning", /förändringen i y.*förändringen i x.*skärningen med y-axeln/i.test(graphPrompt));
+check("grafstödet säger åt P.E.R att inte hitta på osynliga data", /får inte själva bilden.*Hitta aldrig på koordinater/i.test(graphPrompt));
+check("vanlig textfråga får inte grafinstruktioner", !/Grafhandledning/.test(textOnlyGraphPrompt));
+
 console.log(failures ? `\n${failures} FEL\n` : "\nAllt grönt\n");
 process.exit(failures ? 1 : 0);
