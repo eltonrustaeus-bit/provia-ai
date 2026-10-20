@@ -238,3 +238,17 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Anvandaren behover gora ett nytt forsok i den aktuella Previewn och rapportera endast exakt feltext och ungefarlig tid. Dela inte e-post, losenord, aterstallningslank eller token i chatten.
 
 **PILOT NOT READY.** Callbacken ar verifierat tillagd, men den paverkar aterstallningsredirect och bevisar inte att inloggningen fungerar. Inget nytt autentiserat stagingflode har annu kunnat koras.
+
+## Eval- och specialistgranskning — 2026-10-20
+
+- [x] Exam-quality-evalen failar nu stangt nar verifieraren misslyckas; en aktiv blind solver som misslyckas stoppar MC-fragor, medan verifierade kortsvarsfragor inte felaktigt blockeras av MC-solvern. Rapporten skiljer granskaravslag fran totalt tillbakahallna fragor och markerar leverans som forstagangsgranskning utan reparationsrunda.
+- [x] Evalen rapporterar granskarens sprakavvikelser och alternativproblem samt solverns plausibilitetsavslag och deterministiska dubblettbortfall. Dessa ar signaler, inte garanti for modellupptackt.
+- [x] Full offline-svit passerade 175 `*.test.mjs`-filer med `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')`, exit 0. Riktad svit passerade 6/6; gratis `check-detection.mjs`, syntax och `git diff --check` passerade. Inga provideranrop gjordes.
+- [x] Commit `d50259d28fd9b692b14f7e4478bb0db4ce28ed4a` ar pushad till befintlig pilotbranch. Vercel Preview `dpl_4E78s8gH66oiB9Ex4NUzjjNptGfd` ar `READY` fran exakt SHA; endast test-/evalkod och README andrades, inte appens auth eller API.
+- [x] Oberoende P.E.R.-granskning fann stark lokal serverstyrd provgrind och god fokuserad offline-tackning. Aktiva prov far avsiktligt generiska, icke-generativa ledtradar; detta ar en pedagogisk kvalitetsbegransning, inte en identifierad facitlacka.
+- [x] Oberoende gradinggranskning fann att lokala API-/migrationskandidater maste bytas samordnat: API skickar `p_claim_id`, medan senast dokumenterad staging-RPC har aldre signatur. PGlite-testerna verifierar inte tvasessions PostgreSQL-concurrency; abandon-bulkfunktionen saknar motsvarande runtime-test.
+- [ ] Ingen ny autentiserad staging-session eller live AI-/prov-/P.E.R.-/grading-/persistenskornig har gjorts. Senaste Auth-loggar saknar det nya loginforsoket; rotorsaken ar fortsatt okand.
+- [ ] Abandonment-migration, grading-cutover, hosted grants/migration-ledger och skolans operativa elevdatagodkannanden ar kvarstaende releasegrindar. Ror inte migration eller API-kandidater i en separat deploy.
+- [ ] Evalen simulerar fortfarande inte produktionsreparation, endpoint-budget, kvot eller persistens. Ett granskar-/solvergenomslag i evalen ar inte bevis for live modellkvalitet.
+
+**PILOT NOT READY.** Nasta steg ar att fa stagingkontot autentiserat utan att dela losenord i chatten. Darefter verifieras exakt aktuell Preview mot staging med fa syntetiska anrop; grading-API och migration kraver en separat samordnad granskning och uttryckligt staginggodkannande. Produktion, `main` och stagingdata ar ororda.
