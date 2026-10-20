@@ -213,6 +213,7 @@ let solverRejectQuestionId = null;
 let solverRejectNonsenseOption = true;
 let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
+let regenerationQuestionBatches = null;
 let throwOnRepair = false;
 let issuanceUnavailable = false;
 let quotaDenied = false;
@@ -287,9 +288,10 @@ globalThis.fetch = async (input, init = {}) => {
     const schemaName = body.text?.format?.name;
     if (schemaName === "mock_exam_schema") {
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
-      if (!regenerationQuestions) throw new Error("unexpected synthetic repair request");
-      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || regenerationQuestions.length;
-      const repaired = regenerationQuestions.slice(0, repairCount);
+      const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
+      if (!batch) throw new Error("unexpected synthetic repair request");
+      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || batch.length;
+      const repaired = batch.slice(0, repairCount);
       activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
       return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
     }
@@ -823,6 +825,44 @@ try {
     "the verifier only sees the complete, structurally valid candidate set");
   activeQuestions = questions;
   regenerationQuestions = null;
+
+  const structuralCandidates = questions.map((question, index) => ({
+    ...question,
+    id: `structural-${index + 1}`,
+    question: `Strukturell kandidat ${index + 1}: ${question.question}`,
+    source_references: ["addition, subtraktion och multiplikation"],
+  }));
+  const qualityCandidates = [
+    { ...questions[0], id: "quality-1", question: "Hur mycket är 10 - 5?", options: ["4", "5", "6"], correct_index: 1, model_answer: "5", source_references: ["addition, subtraktion och multiplikation"] },
+    { ...questions[1], id: "quality-2", question: "Vad är 2 · 4?", options: ["6", "8", "10"], correct_index: 1, model_answer: "8", source_references: ["addition, subtraktion och multiplikation"] },
+  ];
+  activeQuestions = questions.map((question) => ({
+    ...question,
+    source_references: ["Not found in the supplied material"],
+  }));
+  regenerationQuestionBatches = [structuralCandidates, qualityCandidates];
+  verifierRejectQuestionId = "structural-1";
+  calls.length = 0;
+  const structuralThenQualityRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(structuralThenQualityRepair.status, 200, JSON.stringify(structuralThenQualityRepair.body));
+  assert.equal(structuralThenQualityRepair.body.exam.questions.length, 3,
+    "a verifier-driven repair remains available after a structural repair fills the initial batch");
+  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "structural-1"), false,
+    "a structurally repaired but verifier-rejected question is never delivered");
+  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
+    "the bounded verifier-driven repair supplies a newly reviewed question");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 2,
+    "at most one structural repair and one verifier-driven repair run for a request");
+  const twoStageRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(twoStageRepairLog.structuralRepairAttempted, true);
+  assert.equal(twoStageRepairLog.qualityRepairAttempted, true);
+  assert.equal(twoStageRepairLog.finalQuestionCount, 3);
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
 
   const structuralOutlierQuestions = repairedQuestions.map((question, index) => index === 0
     ? {

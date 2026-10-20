@@ -1390,6 +1390,8 @@ module.exports = async function handler(req, res) {
     let solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
     let verifierSkipped = false;
     let repairAttempted = false;
+    let structuralRepairAttempted = false;
+    let qualityRepairAttempted = false;
     let repairFailureStage = null;
     let repairCandidateCount = 0;
     let repairResponseStatus = null;
@@ -1407,13 +1409,14 @@ module.exports = async function handler(req, res) {
     let repairCrossRoundDuplicateCount = 0;
     let combinedQuestionCount = 0;
 
-    // Fill structural gaps before model review so even a fully rejected first
-    // batch can recover once, while preserving time for independent checks.
+    // Fill structural gaps before review, then keep the separate bounded
+    // verifier-driven repair available if review still rejects a question.
     const structuralRepairTimeout = qType === "graph"
       ? null
       : regenerationGenerationTimeout(budget.remaining());
     if (exam.questions.length < numQuestions && structuralRepairTimeout !== null) {
       repairAttempted = true;
+      structuralRepairAttempted = true;
       repairFailureStage = "structural_repair_generation";
       const repairStartedAt = Date.now();
       let repairResponse = null;
@@ -1609,8 +1612,9 @@ module.exports = async function handler(req, res) {
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
         const needsRepair = approvedIds.size < numQuestions
           || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
-        if (needsRepair && canRegenerate && !repairAttempted) {
+        if (needsRepair && canRegenerate && !qualityRepairAttempted) {
           repairAttempted = true;
+          qualityRepairAttempted = true;
           const originalGatedQuestions = exam.questions;
           const round1ApprovedCandidates = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
           round1ApprovedCount = round1ApprovedCandidates.length;
@@ -1908,6 +1912,8 @@ module.exports = async function handler(req, res) {
         verifierCallOk: verifierOutcome.callOk,
         initialVerifierFailureCodes,
         repairAttempted,
+        structuralRepairAttempted,
+        qualityRepairAttempted,
         repairFailureStage,
         repairCandidateCount,
         repairResponseStatus,
@@ -1957,6 +1963,8 @@ module.exports = async function handler(req, res) {
       solverChecked: solverOutcome.checked,
       solverRejected: solverOutcome.rejected,
       solverReasons: solverOutcome.reasons,
+      structuralRepairAttempted,
+      qualityRepairAttempted,
       structurallyDropped: gate.dropped.length,
       structurallyFlagged: gate.flagged.length,
       verifierChecked: verifierOutcome.checked,
