@@ -1402,6 +1402,8 @@ module.exports = async function handler(req, res) {
       profile: subjectProfile,
       requireSourceReferences: true,
       reviewSingleWordOptionOutliers: lang === "sv",
+      requireSourceSupportedOptionOutliers: lang === "sv",
+      sourceMaterial: pastedText,
       requestedQuestionType: qType,
     });
     if (truncated) {
@@ -1493,6 +1495,8 @@ module.exports = async function handler(req, res) {
               profile: subjectProfile,
               requireSourceReferences: true,
               reviewSingleWordOptionOutliers: lang === "sv",
+              requireSourceSupportedOptionOutliers: lang === "sv",
+              sourceMaterial: pastedText,
               requestedQuestionType: qType,
             });
             recordRepairGateRejections(repairGate);
@@ -1708,6 +1712,8 @@ module.exports = async function handler(req, res) {
                   profile: subjectProfile,
                   requireSourceReferences: true,
                   reviewSingleWordOptionOutliers: lang === "sv",
+                  requireSourceSupportedOptionOutliers: lang === "sv",
+                  sourceMaterial: pastedText,
                   requestedQuestionType: qType,
                 });
                 recordRepairGateRejections(candidateGate);

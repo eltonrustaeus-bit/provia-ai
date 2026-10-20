@@ -559,3 +559,14 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Rättning/sparning, P.E.R. under aktivt prov, sessionåterhämtning över sidbyte, RLS/IDOR, hosted PostgreSQL-gradering, rollback och skolans operativa godkännanden är fortsatt öppna pilotgrindar. Stagingkontot och dess testdata lämnades orörda.
 
 **PILOT NOT READY.** Den senaste Previewn autentiserade och körde hela provflödet, men den levererade inte tre verifierade frågor. En lokal bounded-oversampling-fix täcks av grön full offline-svit; den måste först deployas och liveverifieras innan den kan räknas som åtgärdad.
+
+## Lokal deterministisk spärr för misstänkta svarsalternativ — 2026-10-20 16:31 UTC
+
+- [x] Den tidigare spärren gjorde ett ensamt längre ord bland frasalternativ till en granskningshint. Livefyndet `Kesäkten` visar att modellgranskare kan godkänna ett sådant nonsensord. Svenska genererade flervalsprov stoppar nu deterministiskt just denna formatavvikelse när ett fristående distraktorord inte har exakt eller tydligt böjningsstöd i det inskickade materialet. Kandidaten stoppas före både verifierare och blind lösare; bounded-repair och befintliga kvalitetsgrindar är oförändrade.
+- [x] Källförankrade ensamma fackord kan fortfarande gå vidare till oberoende granskning. Ett ensamt korrekt svar som kan vara ett egennamn blockeras inte av denna källstödsregel. Engelska prov och språkprov där enstaka ord är avsiktliga glosor använder inte denna svenska formatregel.
+- [x] Regression täcker `Kesäkten`, källförankrad böjning (`Kloroplast`/`kloroplasterna`), verifierar-/solvergränsen samt befintliga ämnes- och mattekontrakt. Hela API- och assessment-sviten passerade sekventiellt: 171/171. `node --check` för ändrade JS-filer och `git diff --check` passerade.
+- [ ] Regeln är en avgränsad källstödsheuristik, inte en svensk stavningsordlista. Ett giltigt fristående egennamn eller fackord som inte förekommer i elevens material kan nekas och göra att reparationen behöver ersätta frågan.
+- [ ] Ändringarna är lokala på `codex/exgen-generation-quality-2026-10-20`; commits `136b9d8` och `7ce13b2` är inte pushade eller Preview-verifierade. Separat pushgodkännande krävs för dessa commits. Ingen staging-/produktionsdata, miljövariabel, `main` eller alias har ändrats.
+- [ ] Oberoende specialistagent kunde inte startas eftersom agentkapaciteten var full. Granskning och sammanslagning gjordes av huvudagenten; den separata agent-QA:n är kvar.
+
+**PILOT NOT READY.** Den kända formen av osourcat ensamt nonsensord stoppas nu deterministiskt i lokal kod, men den nya regeln och bounded-oversampling-fixen behöver Preview och ett fåtal syntetiska stagingprov innan liveeffekt kan bekräftas. Rättning/sparning, P.E.R. under aktivt prov, RLS/IDOR, hosted PostgreSQL-gradering och skolans operativa godkännanden kvarstår.

@@ -589,24 +589,21 @@ try {
   assert.equal(nonsenseBiologyExam.status, 200, JSON.stringify(nonsenseBiologyExam.body));
   assert.equal(nonsenseBiologyExam.body.exam.questions.length, 3);
   assert.equal(nonsenseBiologyExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
-    "the independent reviewer rejects the nonsensical outlier and a bounded regeneration replaces it");
-  const flaggedNonsenseReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
-    .find((review) => review.questions.some((question) => question.options.includes("Kesäkten")));
-  assert.ok(flaggedNonsenseReview, "the independent verifier sees the suspicious but not automatically rejected option");
-  assert.ok(flaggedNonsenseReview.questions.find((question) => question.options.includes("Kesäkten"))
-    .review_hints.includes("single_word_option_outlier_review"),
-  "the independent verifier receives the format warning as a review hint");
+    "the deterministic source-support gate and bounded repair keep the nonsense out of the delivered exam");
+  assert.equal(verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
+    .some((review) => review.questions.some((question) => question.options.includes("Kesäkten"))), false,
+  "an unsupported single-word outlier is withheld before the independent verifier");
   assert.equal(solverInputs.slice(solverInputCountBeforeVerifierRejection)
-    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), true,
-    "a format warning does not suppress the independent solver's judgment");
+    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
+  "an unsupported single-word outlier is withheld before the blind solver too");
   const repairedOutlierReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
     .flatMap((review) => review.questions)
     .find((question) => question.id === "biology-repair-1");
   assert.ok(repairedOutlierReview?.review_hints.includes("single_word_option_outlier_review"),
-    "the verifier also receives the warning on the regeneration review path");
+    "a source-supported standalone technical option remains eligible and receives independent review");
   assert.ok(nonsenseBiologyExam.body.exam.questions.some((question) =>
     question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
-  "the verifier's option-quality rejection triggers bounded replacement even when the solver marks every option plausible");
+  "a source-supported repair candidate can replace the deterministically dropped outlier");
   verifierRejectOptionId = null;
   solverRejectNonsenseOption = true;
   regenerationQuestions = null;
@@ -621,8 +618,8 @@ try {
   assert.equal(solverRejectedNonsenseExam.status, 200, JSON.stringify(solverRejectedNonsenseExam.body));
   assert.equal(solverRejectedNonsenseExam.body.exam.questions.length, 3);
   assert.equal(solverInputs.slice(solverInputCountBeforeSolverRejection)
-    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), true,
-  "the blind solver receives the malformed biology candidate");
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), false,
+  "an unsupported outlier does not reach the blind solver in the subsequent request either");
   assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
     "the solver's option-plausibility rejection triggers bounded replacement when the verifier does not flag the item");
   assert.ok(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
@@ -924,7 +921,7 @@ try {
   regenerationQuestions = structuralOutlierQuestions;
   const verifierCountBeforeStructuralOutlier = verifierInputs.length;
   const structuralOutlierExam = await invoke(generateExam, {
-    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    lang: "sv", level: "C", course, pastedText: `${pastedText} Pythagoras`, qType: "mc", numQuestions: 3,
   });
   assert.equal(structuralOutlierExam.status, 200, JSON.stringify(structuralOutlierExam.body));
   const structuralOutlierReview = verifierInputs.slice(verifierCountBeforeStructuralOutlier)

@@ -69,6 +69,51 @@ check("Swedish exam flags a lone word among phrase options for review without dr
     && result.flagged[0].issues.includes("single_word_option_outlier_review");
 })());
 
+check("Swedish generated exam drops an unsupported lone-word outlier before model review", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I kloroplasterna", "Kesäkten"],
+    correct_index: 1,
+  });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    requireSourceSupportedOptionOutliers: true,
+    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+  });
+  return result.questions.length === 0
+    && result.dropped[0].issues.includes("unsupported_single_word_option_outlier");
+})());
+
+check("source-grounded inflected technical outlier remains eligible for independent review", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I cellmembranet", "Kloroplast"],
+    correct_index: 2,
+  });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    requireSourceSupportedOptionOutliers: true,
+    sourceMaterial: "Fotosyntesen sker i kloroplasterna.",
+  });
+  return result.questions.length === 1
+    && result.flagged[0].issues.includes("single_word_option_outlier_review");
+})());
+
+check("an unsupported single-word correct answer remains eligible for model review", (() => {
+  const q = mc({
+    question: "Vilken stad är Sveriges huvudstad?",
+    options: ["Stockholm", "En stad i norra Sverige", "En mindre kustort"],
+    correct_index: 0,
+  });
+  const result = gate(q, "social_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    requireSourceSupportedOptionOutliers: true,
+    sourceMaterial: "Sverige är en nordisk stat.",
+  });
+  return result.questions.length === 1
+    && result.flagged[0].issues.includes("single_word_option_outlier_review");
+})());
+
 check("Swedish exam keeps an ungrounded proper-name answer and flags it for review", (() => {
   const q = mc({
     question: "Vilken stad är Sveriges huvudstad?",

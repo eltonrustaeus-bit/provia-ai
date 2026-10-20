@@ -211,7 +211,8 @@ function optionFormatIssues(q, options) {
 
   const words = (value) => String(value || "").match(/[\p{L}\p{M}\p{N}]+/gu) || [];
   const lexicalSingleOptions = optionsList
-    .map((value) => ({
+    .map((value, index) => ({
+      index,
       value: String(value || "").normalize("NFKC").trim()
         .replace(/^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, ""),
     }))
@@ -219,8 +220,20 @@ function optionFormatIssues(q, options) {
   const phraseOptions = optionsList.filter((value) => words(value).length >= 2);
   if (lexicalSingleOptions.length !== 1 || phraseOptions.length !== optionsList.length - 1) return [];
 
-  // A single-word outlier is a review signal, not proof of an invalid option:
-  // proper names and valid technical terms may not occur in the source text.
+  if (options?.requireSourceSupportedOptionOutliers === true &&
+      lexicalSingleOptions[0].index !== q.correct_index) {
+    const outlier = lexicalSingleOptions[0].value.toLocaleLowerCase("sv-SE");
+    const sourceTokens = new Set(
+      (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
+    );
+    const sourceSupported = [...sourceTokens].some((token) => token === outlier || (
+      Math.min(token.length, outlier.length) >= 7 &&
+      (token.startsWith(outlier) || outlier.startsWith(token))
+    ));
+    if (!sourceSupported) return ["unsupported_single_word_option_outlier"];
+  }
+
+  // A single-word outlier is a review signal, not proof of an invalid option.
   return ["single_word_option_outlier_review"];
 }
 
@@ -517,6 +530,7 @@ const BLOCKING = new Set([
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal", "math_option_type_mismatch",
+  "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
   "graph_spec_invalid",
