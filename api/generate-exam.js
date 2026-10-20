@@ -1557,6 +1557,8 @@ module.exports = async function handler(req, res) {
     let qualityRepairAttempted = false;
     let repairFailureStage = null;
     let repairCandidateCount = 0;
+    let repairHttpStatus = null;
+    let repairTransportError = null;
     let repairResponseStatus = null;
     let repairParseStatus = null;
     let repairNormalizationIssue = null;
@@ -1609,19 +1611,18 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify(repairPayload),
           signal: AbortSignal.timeout(structuralRepairTimeout),
         });
+        repairHttpStatus = response.status;
         const raw = await response.text();
         try { repairResponse = JSON.parse(raw); } catch { repairResponse = null; }
+        repairResponseStatus = typeof repairResponse?.status === "string" ? repairResponse.status : "unknown";
         if (response.ok && repairResponse) {
           repairFailureStage = "structural_repair_normalization";
-          const outputText = (Array.isArray(repairResponse.output)
-            ? repairResponse.output.flatMap((item) => Array.isArray(item.content) ? item.content : [])
-              .find((item) => item.type === "output_text")?.text
-            : null) || repairResponse.output_text || null;
-          let repairExam = null;
-          try { repairExam = outputText ? JSON.parse(outputText) : null; } catch { repairExam = null; }
-          const normalized = repairExam && normalizeGeneratedExam(repairExam, {
+          const parsedRepair = parseExamResponse(repairResponse);
+          repairParseStatus = parsedRepair.parseStatus;
+          repairOutputQuestionCount = Array.isArray(parsedRepair.exam?.questions) ? parsedRepair.exam.questions.length : 0;
+          const normalized = parsedRepair.exam && normalizeGeneratedExam(parsedRepair.exam, {
             qType, graphMode, pointTable, isMath, pastedText, lang,
-            numQuestions: repairCount, truncated: false,
+            numQuestions: repairCount, truncated: parsedRepair.truncated || repairResponse.status === "incomplete",
           });
           if (normalized?.exam) {
             const repairGate = assessment.gateExam(normalized.exam, {
@@ -1670,8 +1671,11 @@ module.exports = async function handler(req, res) {
         } else {
           repairFailureStage = "structural_repair_generation";
         }
-      } catch {
+      } catch (error) {
         repairFailureStage = "structural_repair_generation";
+        repairTransportError = ["TimeoutError", "AbortError"].includes(error?.name)
+          ? "timeout"
+          : error?.name === "TypeError" ? "network" : "other";
       } finally {
         recordUsage("repair", repairResponse?.model || model, repairResponse?.usage, Date.now() - repairStartedAt);
       }
@@ -1834,6 +1838,7 @@ module.exports = async function handler(req, res) {
               // Preserve time for independent review plus delivery finalization.
               signal: AbortSignal.timeout(regenerationTimeoutMs)
             });
+            repairHttpStatus = r2.status;
             repairFailureStage = "generation_response";
             const raw2 = await r2.text();
             try { data2 = JSON.parse(raw2); } catch { data2 = null; }
@@ -2113,6 +2118,8 @@ module.exports = async function handler(req, res) {
         qualityRepairAttempted,
         repairFailureStage,
         repairCandidateCount,
+        repairHttpStatus,
+        repairTransportError,
         repairResponseStatus,
         repairParseStatus,
         repairNormalizationIssue,
@@ -2169,6 +2176,8 @@ module.exports = async function handler(req, res) {
         qualityRepairAttempted,
         repairFailureStage,
         repairCandidateCount,
+        repairHttpStatus,
+        repairTransportError,
         repairResponseStatus,
         repairParseStatus,
         repairNormalizationIssue,
@@ -2211,6 +2220,14 @@ module.exports = async function handler(req, res) {
       solverReasons: solverOutcome.reasons,
       structuralRepairAttempted,
       qualityRepairAttempted,
+      repairFailureStage,
+      repairCandidateCount,
+      repairHttpStatus,
+      repairTransportError,
+      repairResponseStatus,
+      repairParseStatus,
+      repairNormalizationIssue,
+      repairOutputQuestionCount,
       structurallyDropped: gate.dropped.length,
       structurallyFlagged: gate.flagged.length,
       verifierChecked: verifierOutcome.checked,

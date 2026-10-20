@@ -1,14 +1,17 @@
 # 08 Current Status
 
-## Staging quota UI follow-up — 2026-10-20
+## Live generation and repair diagnostics — 2026-10-20
 
-- [x] The latest feature Preview from commit `3e245c437bd445d6814678d38d8cf6d667786cf0` is `READY` (`dpl_CvJrdmuYaNMi5h996TzPxs5fYpHs`). The user authenticated in the existing stable feature Preview alias; its app UI showed the pilot exam generator and the account's known weekly usage `3/3`.
-- [x] One bounded request using synthetic linear-function material reached the staging quota gate and returned the expected weekly-limit message. No provider generation was attempted after the quota denial, and no account role, quota, or staging data was changed.
-- [!] The live UI also retained generated-question skeleton placeholders after HTTP 429. Source review found the quota branch did not call the existing placeholder cleanup used by other failure branches.
-- [x] `app.html` now clears those placeholders and restores the empty exam label when quota blocks generation. Added an integration regression asserting the synthetic 429 clears skeletons, preserves the reset message, and leaves grading disabled. `node tests/frontend/pilot-quota-copy.test.mjs` passed; full `node tests/frontend/exam-flow.regression.mjs` passed **178/178**; `git diff --check` passed.
-- [ ] The fix and this note are local and not yet pushed. Next: push the reviewed change to the feature branch, verify the exact new Preview deployment, then repeat only the same zero-provider quota-denial check in the authenticated Preview.
+- [x] The authenticated stable feature Preview session was already active after its brief restoration delay; no password was used or requested.
+- [x] The quota-denial UI fix is live on deployment `dpl_D5f6AT7BHNJ2HVk7yyYNU3EF22HR` from commit `7feb6ac9cff9c0907cd936165d4fb08df96ca30f`. One synthetic 429 request verified the exhausted-quota message and that no question skeleton remains. The fix also has a frontend integration regression.
+- [!] A separate synthetic 3-question Mathematics 2b generation reached the model pipeline but failed closed with **0/3** questions delivered. Safe telemetry showed two candidates rejected for missing source references and the remaining reviewed candidate rejected for option quality. Repair was attempted but its structural-repair response diagnostics were absent, so timeout/network/HTTP/parse cause is not yet known. No generated content was delivered.
+- [x] Local code now uses the shared tolerant Responses JSON parser for structural repair and records bounded, content-free repair HTTP status, response/parse status, output count, normalization category and coarse transport-error class. The raw provider error/body and study material are not logged.
+- [x] `node tests/api/exam-pipeline-offline.test.mjs` passed; `node --test tests/api/*.test.mjs` passed **174/174**; `git diff --check` passed.
+- [!] `node tests/frontend/exam-flow.regression.mjs` did not complete in this run: it remained in a Playwright wait and was interrupted, producing a browser-closed error. No pass is claimed. Prior UI behavior was independently verified on Preview.
+- [ ] Current diagnostic change is local and not yet deployed. Next: review and push to the existing feature branch, inspect the new safe repair fields on one bounded synthetic staging generation, then fix the measured generation-quality failure rather than changing models without a controlled comparison.
+- [!] The staging test account's role is temporarily `premium` to support the approved limited tests; restore it to `gratis` after the bounded checks. This is staging-only.
 
-**PILOT NOT READY.** Generation quality, grading persistence, and P.E.R. live flows remain unverified on the latest Preview; security and school-operation gates remain open. Do not change quota/role or merge to `main`/Production as part of the quota UI verification.
+**PILOT NOT READY.** The latest live generation failed quality checks; grading/P.E.R. and broader security and school-operation gates remain separate. No `main`, Production or production database action was made.
 
 ## Quota messaging follow-up — 2026-10-20
 

@@ -1091,6 +1091,32 @@ try {
     "repaired candidates receive one independent review batch");
   assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet)[0].questions.length, 3,
     "the verifier only sees the complete, structurally valid candidate set");
+  const structuralRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(structuralRepairLog.repairHttpStatus, 200,
+    "structural repair telemetry captures only the provider HTTP status");
+  assert.equal(structuralRepairLog.repairResponseStatus, "unknown");
+  assert.equal(structuralRepairLog.repairParseStatus, "complete_json");
+  assert.equal(structuralRepairLog.repairOutputQuestionCount, 3);
+  assert.equal(structuralRepairLog.repairTransportError, null);
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = questions.map((question) => ({
+    ...question,
+    source_references: ["Not found in the supplied material"],
+  }));
+  throwOnRepair = true;
+  const structuralRepairTransportFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(structuralRepairTransportFailure, "structural repair transport failure");
+  const structuralRepairFailureLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(structuralRepairFailureLog.repairTransportError, "other",
+    "transport diagnostics use a bounded error category, never the raw error");
+  assert.equal(structuralRepairFailureLog.repairHttpStatus, null);
+  assert.equal(JSON.stringify(structuralRepairFailureLog).includes("synthetic repair transport timeout"), false,
+    "repair diagnostics never expose raw provider errors");
+  throwOnRepair = false;
   activeQuestions = questions;
   regenerationQuestions = null;
 
