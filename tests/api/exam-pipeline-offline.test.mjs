@@ -1052,6 +1052,13 @@ try {
   assert.deepEqual(optionQualityLog.initialVerifierFailureCodes, {
     option_quality_failed: 3,
   }, "option plausibility failures have their own content-free diagnostic category");
+  const optionQualityRepairCall = calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").at(-1);
+  assert.match(optionQualityRepairCall.body.input.at(-1).content,
+    /Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt/i,
+    "option-quality rejection gives the bounded repair a specific distractor-quality correction");
+  assert.doesNotMatch(optionQualityRepairCall.body.input.at(-1).content,
+    /The reviewer found/,
+    "Swedish repair prompts keep their targeted feedback in Swedish");
   assert.deepEqual(optionQualityLog.repairVerifierFailureCodes, {
     option_quality_failed: 4,
   }, `repair option plausibility failures are distinguished from other review failures: ${JSON.stringify(optionQualityLog)}`);

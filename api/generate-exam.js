@@ -1024,7 +1024,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount }) {
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [] }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || missingSlots + 1));
@@ -1032,9 +1032,57 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
   }));
+  const failures = new Set(Array.isArray(reviewFailureCodes) ? reviewFailureCodes : []);
+  const reviewGuidance = lang === "en"
+    ? [
+        failures.has("option_quality_failed")
+          ? "The reviewer found weak or implausible answer options: prefer exactly three options total, and use only clear established subject concepts in the same category; for each distractor, check that it is a real, relevant misconception and not nonsense or an unrelated filler. Do not pad the options."
+          : "",
+        failures.has("high_ambiguity")
+          ? "The reviewer found ambiguity: ask for one bounded fact or outcome that has exactly one defensible answer in the supplied material."
+          : "",
+        failures.has("low_source_alignment")
+          ? "The reviewer found weak source support: test only facts explicitly supported by the supplied material and quote the exact supporting words."
+          : "",
+        failures.has("low_factual_accuracy")
+          ? "The reviewer found a factual or answer-key problem: independently re-check each answer and ensure the marked answer and explanation agree."
+          : "",
+        failures.has("low_scoring_quality")
+          ? "The reviewer found a scoring problem: make the question, model answer, points, and rubric agree exactly; do not require unstated work."
+          : "",
+        failures.has("low_language_quality") || failures.has("language_mismatch")
+          ? "The reviewer found a language problem: write every learner-facing field in natural Swedish, except established technical terms and exact source quotations."
+          : "",
+        failures.has("difficulty_mismatch")
+          ? "The reviewer found a level mismatch: match the requested level and avoid hidden or advanced requirements."
+          : "",
+      ].filter(Boolean).join(" ")
+    : [
+        failures.has("option_quality_failed")
+          ? "Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt och använd tydliga, etablerade ämnesbegrepp i samma kategori; kontrollera att varje distraktor är en verklig, relevant missuppfattning och inte nonsens eller utfyllnad. Bygg inte ut alternativen."
+          : "",
+        failures.has("high_ambiguity")
+          ? "Granskningen hittade tvetydighet: fråga efter en avgränsad uppgift eller slutsats med exakt ett försvarbart svar i underlaget."
+          : "",
+        failures.has("low_source_alignment")
+          ? "Granskningen hittade svagt källstöd: pröva bara fakta som uttryckligen stöds av materialet och citera de exakta stödorden."
+          : "",
+        failures.has("low_factual_accuracy")
+          ? "Granskningen hittade fakta- eller facitproblem: kontrollera varje svar självständigt och se till att markerat svar och förklaring stämmer överens."
+          : "",
+        failures.has("low_scoring_quality")
+          ? "Granskningen hittade bedömningsproblem: låt frågan, exempelsvaret, poängen och matrisen stämma exakt; kräv inget som inte uttryckligen efterfrågas."
+          : "",
+        failures.has("low_language_quality") || failures.has("language_mismatch")
+          ? "Granskningen hittade språkproblem: skriv alla elevriktade fält på naturlig svenska, förutom etablerade facktermer och exakta källcitat."
+          : "",
+        failures.has("difficulty_mismatch")
+          ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."
+          : "",
+      ].filter(Boolean).join(" ");
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1550,6 +1598,7 @@ module.exports = async function handler(req, res) {
             const repairCount = Math.min(6, repairSlots + 1);
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
+              reviewFailureCodes: Object.keys(initialVerifierFailureCodes),
             });
             repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {
