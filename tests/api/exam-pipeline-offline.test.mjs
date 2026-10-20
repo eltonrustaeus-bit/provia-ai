@@ -45,14 +45,14 @@ const missingSlotRepair = generateExam.buildRepairPayload({
   text: { format: { name: "mock_exam_schema" } },
 }, {
   lang: "sv", numQuestions: 3,
-  verifiedQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
+  existingQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
 });
 assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 3,
   "repair schema requests one extra candidate for two missing exam slots");
 assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 3);
 assert.match(missingSlotRepair.input.at(-1).content, /exakt 3 nya frågekandidater.*fylla 2 saknade provplatser/i);
 assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
-  "already verified stems are passed to repair so the model can avoid repeating them");
+  "existing stems are passed to repair so the model can avoid repeating them");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -241,8 +241,9 @@ globalThis.fetch = async (input, init = {}) => {
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       if (!regenerationQuestions) throw new Error("unexpected synthetic repair request");
       const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || regenerationQuestions.length;
-      activeQuestions = regenerationQuestions.slice(0, repairCount);
-      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: activeQuestions });
+      const repaired = regenerationQuestions.slice(0, repairCount);
+      activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
+      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
     }
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
@@ -556,6 +557,7 @@ try {
   verifierRejectOptionId = null;
   activeQuestions = questions;
   regenerationQuestions = null;
+
   assert.equal(nonsenseOptionExam.status, 200, JSON.stringify(nonsenseOptionExam.body));
   assert.equal(nonsenseOptionExam.body.exam.questions.length, 3,
     "a bounded repair can replace a batch after the deterministic gate flags a malformed option");
@@ -577,6 +579,25 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
+
+  activeQuestions = questions.map((question) => ({
+    ...question,
+    source_references: ["Not found in the supplied material"],
+  }));
+  regenerationQuestions = repairedQuestions;
+  const verifierCountBeforeEmptyStructuralSet = verifierInputs.length;
+  const emptyStructuralSetExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(emptyStructuralSetExam.status, 200, JSON.stringify(emptyStructuralSetExam.body));
+  assert.equal(emptyStructuralSetExam.body.exam.questions.length, 3,
+    "one bounded structural repair can recover when the first gate rejects every question");
+  assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet).length, 1,
+    "repaired candidates receive one independent review batch");
+  assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet)[0].questions.length, 3,
+    "the verifier only sees the complete, structurally valid candidate set");
+  activeQuestions = questions;
+  regenerationQuestions = null;
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;

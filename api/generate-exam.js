@@ -987,17 +987,17 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, verifiedQuestions = [], candidateCount }) {
-  const verified = Array.isArray(verifiedQuestions) ? verifiedQuestions : [];
-  const missingSlots = Math.max(1, numQuestions - verified.length);
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount }) {
+  const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
+  const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || missingSlots + 1));
-  const verifiedStems = verified.map((question) => ({
+  const existingStems = existing.map((question) => ({
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
   }));
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Do not repeat these already verified questions: ${JSON.stringify(verifiedStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Upprepa inte de här redan verifierade frågorna: ${JSON.stringify(verifiedStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; use a short exact quote or heading in source_references. Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och ange ett kort, exakt citat eller en rubrik i source_references. Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1265,18 +1265,13 @@ module.exports = async function handler(req, res) {
         return true;
       });
     }
-    const duplicateQuestionIds = gate.dropped
+    let duplicateQuestionIds = gate.dropped
       .filter((item) => item.issues.includes("duplicate_question"))
       .map((item) => item.id);
     exam.questions = gate.questions;
 
-    // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
-    const verifier = require("./_verifier");
-    const solver = require("./_solver");
     let verifierOutcome = { checked: 0, approved: 0, rejected: 0, callOk: false };
     let solverOutcome = { checked: 0, rejected: 0, callOk: false, model: null, reasons: {} };
-    // The deterministic graph contract can stand without model review; other
-    // question types must not be delivered unless the reviewer completes.
     let verifierSkipped = false;
     let repairAttempted = false;
     let repairFailureStage = null;
@@ -1291,6 +1286,97 @@ module.exports = async function handler(req, res) {
     let repairDuplicateCount = 0;
     let repairCrossRoundDuplicateCount = 0;
     let combinedQuestionCount = 0;
+
+    // Fill structural gaps before model review so even a fully rejected first
+    // batch can recover once, while preserving time for independent checks.
+    const structuralRepairTimeout = qType === "graph"
+      ? null
+      : regenerationGenerationTimeout(budget.remaining());
+    if (exam.questions.length < numQuestions && structuralRepairTimeout !== null) {
+      repairAttempted = true;
+      repairFailureStage = "structural_repair_generation";
+      const repairStartedAt = Date.now();
+      let repairResponse = null;
+      try {
+        const repairSlots = numQuestions - exam.questions.length;
+        const repairCount = Math.min(6, repairSlots + 1);
+        const repairPayload = buildRepairPayload(payload, {
+          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount,
+        });
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(repairPayload),
+          signal: AbortSignal.timeout(structuralRepairTimeout),
+        });
+        const raw = await response.text();
+        try { repairResponse = JSON.parse(raw); } catch { repairResponse = null; }
+        if (response.ok && repairResponse) {
+          repairFailureStage = "structural_repair_normalization";
+          const outputText = (Array.isArray(repairResponse.output)
+            ? repairResponse.output.flatMap((item) => Array.isArray(item.content) ? item.content : [])
+              .find((item) => item.type === "output_text")?.text
+            : null) || repairResponse.output_text || null;
+          let repairExam = null;
+          try { repairExam = outputText ? JSON.parse(outputText) : null; } catch { repairExam = null; }
+          const normalized = repairExam && normalizeGeneratedExam(repairExam, {
+            qType, graphMode, pointTable, isMath, pastedText, lang,
+            numQuestions: repairCount, truncated: false,
+          });
+          if (normalized?.exam) {
+            const repairGate = assessment.gateExam(normalized.exam, {
+              profile: subjectProfile,
+              requireSourceReferences: true,
+              requestedQuestionType: qType,
+            });
+            repairCandidateCount = repairGate.questions.length;
+            const kept = [...exam.questions];
+            const keptIds = new Set(kept.map((question) => String(question.id)));
+            for (const question of repairGate.questions) {
+              const id = String(question.id);
+              if (keptIds.has(id) || kept.some((accepted) => assessment.isDuplicateQuestion(accepted, question))) {
+                repairDuplicateCount++;
+                continue;
+              }
+              if (kept.length >= numQuestions) break;
+              keptIds.add(id);
+              kept.push(question);
+            }
+            repairCrossRoundDuplicateCount = repairDuplicateCount;
+            combinedQuestionCount = kept.length;
+            exam = { ...exam, questions: kept };
+            duplicateQuestionIds = [
+              ...duplicateQuestionIds,
+              ...repairGate.dropped.filter((item) => item.issues.includes("duplicate_question")).map((item) => item.id),
+            ];
+            gate = {
+              ...gate,
+              dropped: [...gate.dropped, ...repairGate.dropped],
+              flagged: [...gate.flagged, ...repairGate.flagged],
+            };
+            repairFailureStage = kept.length >= numQuestions ? null : "insufficient_structural_repair";
+          } else {
+            repairFailureStage = "structural_repair_normalization";
+          }
+        } else {
+          repairFailureStage = "structural_repair_generation";
+        }
+      } catch {
+        repairFailureStage = "structural_repair_generation";
+      } finally {
+        recordUsage("repair", repairResponse?.model || model, repairResponse?.usage, Date.now() - repairStartedAt);
+      }
+    }
+
+    // ── VERIFIER PASS (separate role — checks, never fixes) ───────────────
+    const verifier = require("./_verifier");
+    const solver = require("./_solver");
+    // The deterministic graph contract can stand without model review; other
+    // question types must not be delivered unless the reviewer completes.
+    repairVerifierCallOk = null;
+    repairVerifierChecked = 0;
+    repairVerifierApproved = 0;
+    repairVerifierFailure = null;
     const initialVerifierFailureCodes = {};
     const repairVerifierFailureCodes = {};
     const collectVerifierFailureCodes = (vres) => {
@@ -1395,7 +1481,7 @@ module.exports = async function handler(req, res) {
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
         const needsRepair = exam.questions.length < numQuestions
           || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
-        if (needsRepair && canRegenerate) {
+        if (needsRepair && canRegenerate && !repairAttempted) {
           repairAttempted = true;
           const originalGatedQuestions = exam.questions;
           const round1ApprovedCandidates = originalGatedQuestions.filter(q => approvedIds.has(String(q.id)));
@@ -1417,7 +1503,7 @@ module.exports = async function handler(req, res) {
             const repairSlots = Math.max(1, numQuestions - round1ApprovedQuestions.length);
             const repairCount = Math.min(6, repairSlots + 1);
             const repairPayload = buildRepairPayload(payload, {
-              lang, numQuestions, verifiedQuestions: round1ApprovedQuestions, candidateCount: repairCount,
+              lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
             });
             repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {

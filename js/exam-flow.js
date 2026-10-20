@@ -1551,7 +1551,7 @@
       }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
-        var retryHint = r && r.error === "incomplete_exam"
+        var retryHint = r && r.errorCode === "incomplete_exam"
           ? tx("Lägg till mer relevant material eller avgränsa området tydligare.", "Add more relevant study material or narrow the topic.")
           : tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions.");
         say(tx("Det gick inte den här gången.", "That did not work this time."), retryHint);
