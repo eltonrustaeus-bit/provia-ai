@@ -452,3 +452,28 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Stagingkontot är fortfarande inte autentiserat. Chattexponerat lösenord får inte återanvändas; ange ett nytt lösenord direkt i stagingens Supabase Dashboard. Inga liveanrop, stagingändringar eller produktionsåtgärder har gjorts.
 
 **PILOT NOT READY.** Felmeddelandena är tydligare och lokalt testade. Historiskt runtimefel, autentiserad staging-E2E och grading-databascutover återstår.
+
+## Preview och lokala regressioner — 2026-10-20 (commit `a951cb7`)
+
+- [x] Aktuell branch i isolerad worktree är `codex/exgen-generation-quality-2026-10-20`; HEAD och godkänd feature-remote pekar på `a951cb7` (`fix(exams): align verifier target difficulty`). Orelaterade lokala grading-/migrationsändringar är lämnade orörda och ingår inte i commiten.
+- [x] Vercel Preview `https://provia-f0p2ydn11-eltons-projects-4adfb1a3.vercel.app` nådde `READY` från exakt SHA `a951cb742afb9385ac6434c96188a3e4457654cd`. Autentiserad, redigerad runtimekontroll bekräftade `environment=pilot`, stagingref `yhcinqejsocpmmetazpz` och appOrigin på stabil branch-alias. Nyckelvärden lästes inte ut eller dokumenterades.
+- [x] Riktade provgenererings-/verifierar-/solver-tester passerade 7/7 testfiler. Separata tester för completion-proof, rättning, recovery, P.E.R.-provskydd och klientåterhämtning passerade 70/70 kontroller. Dessa är lokala/mokade tester, inte live-modell- eller databasbevis.
+- [x] Hela aktuella offline-sviten passerade: `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')`, 176 testfiler, exit 0; `git diff --check` passerade. Körningen omfattade den orena worktreen, inklusive ocommittade grading-/migrationskandidater. Det bevisar inte att de kandidaterna finns i Previewn eller fungerar mot hosted PostgreSQL.
+- [x] P.E.R:s eval-gold-set klarade sin kostnadsfria strukturkontroll: 25 fall och obligatoriska svåra/negativa kategorier finns. Ingen modell-eval kördes; datasetvalideringen mäter inte svarskvalitet.
+- [x] Fokuserad lokal verifiering av den ocommittade grading-kandidaten passerade 3/3 filer: PGlite-migrations-/claim-fencing, grading recovery/concurrency och verifierad exam-abandonment. PGlite ersätter inte två oberoende hosted PostgreSQL-sessioner eller PostgREST-dispatch; kandidatens API/SQL är inte i Preview.
+- [x] Den nya Preview-adressen öppnades och visade inloggningsformuläret. Auth-sessionen från äldre Preview-origin följde inte med. Användaren ombads logga in själv; lösenord efterfrågades inte och ska inte skickas i chatten.
+- [x] Branch-alias `https://provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app/app.html` verifierades också som `environment=pilot` mot samma stagingref och är samma `appOrigin` som deploymenten anger. Den saknar också en återanvändbar webbläsarsession; den lämnades öppen vid inloggningsrutan för stabil fortsättning mellan branch-Preview-byggnader.
+- [ ] Senaste verifierade livegenerering är fortfarande från den äldre Previewn `0d6c0e0`: ett syntetiskt trefrågeprov godkände endast 1 av 4 reparationskandidater och avvisades säkert. Diagnostiken visade modellbaserade kvalitetsavslag samt en solverflagga för flera korrekta alternativ. Prompt-/svårighetsändringen i `a951cb7` har ännu inte liveverifierats.
+- [ ] Ingen ny livegenerering, P.E.R.-körning, rättning eller persistens har gjorts på `a951cb7`. Efter inloggning återstår ett begränsat syntetiskt prov; därefter P.E.R. utanför och under aktivt prov, verifierad rättning och kontroll av sparat resultat.
+- [ ] De separata lokala grading-/SQL-kandidaterna är fortsatt ocommittade och oapplicerade. Ingen migration, `main`-merge, produktionsdeploy eller stagingdataborttagning har gjorts.
+
+**PILOT NOT READY.** Aktuell kod är deployad till staging-Preview och offline-regressionerna passerar, men den nya generationen och hela autentiserade skolpilotflödet saknar livebevis. Nästa steg är användarens inloggning i den exakta Previewn ovan; dela inte lösenordet i chatten.
+
+## Fortsatt offlineverifiering och Preview-session — 2026-10-20
+
+- [x] Öppnade på nytt den verifierade branch-aliasen `https://provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app/app.html`. Den visade först pilotens auth-gate och därefter inloggningsformuläret efter att Logga in valdes. Ingen inloggad session finns verifierad på denna origin just nu; en inloggad äldre Preview-origin är inte tillräckligt bevis.
+- [x] Färsk riktad offlinekörning passerade 12 testfiler och 61 tester: generatorprompt, regenereringsbudget, verifierarkontrakt, solver, P.E.R. under prov, grading-claim fencing, recovery/concurrency och oavslutat prov. Dessa kördes lokalt med mockar/PGlite; de bevisar inte live-modellkvalitet eller hosted Postgres/PostgREST.
+- [x] Försökte få en oberoende kodgranskning via tillgänglig agentfunktion; kapaciteten var full, så ingen agentgranskning genomfördes.
+- [ ] Ingen syntetisk livegenerering eller P.E.R.-/rättning-/persistenskörning gjordes. Fortsätt först när användaren själv loggat in på branch-aliasen och startsidan visas.
+
+**PILOT NOT READY.** Den riktade offlinekedjan passerar, men ny livekvalitet och autentiserad end-to-end-verifiering återstår. Ingen credential hanterades, ingen stagingdata ändrades och ingen produktionsåtgärd gjordes.
