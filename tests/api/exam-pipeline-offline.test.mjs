@@ -37,6 +37,29 @@ const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: 
 assert.equal(sixOptionNormalization.failure?.payload.error, "MC options invalid",
   "server normalization rejects more than five options even if a provider bypasses its schema");
 
+const completeRepairJson = JSON.stringify({ title: "Biologi", level: "C", questions: [{ id: "q1" }] });
+const completeRepairResponse = generateExam.parseExamResponse({
+  output: [{ type: "message", content: [{ type: "output_text", text: completeRepairJson }] }],
+});
+assert.equal(completeRepairResponse.parseStatus, "complete_json");
+assert.equal(completeRepairResponse.exam.questions.length, 1);
+const interruptedRepairResponse = generateExam.parseExamResponse({
+  status: "incomplete",
+  output: [{ type: "message", content: [{
+    type: "output_text",
+    text: '{"title":"Biologi","level":"C","questions":[{"id":"q1"},{"id":"q2","question":"',
+  }] }],
+});
+assert.equal(interruptedRepairResponse.parseStatus, "salvaged_json");
+assert.equal(interruptedRepairResponse.truncated, true);
+assert.equal(interruptedRepairResponse.exam.questions.length, 1,
+  "a complete candidate before a truncated tail remains available for independent quality gates");
+assert.equal(generateExam.parseExamResponse({ output: [] }).parseStatus, "missing_output_text");
+assert.equal(generateExam.safeNormalizationFailure({
+  failure: { payload: { error: "MC options invalid", question: { question: "private source text" } } },
+}), "mc_options_invalid",
+"repair diagnostics classify failures without retaining candidate or source text");
+
 const repairPayload = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],

@@ -759,6 +759,32 @@ function salvageExamJson(text) {
   }
 }
 
+function parseExamResponse(response) {
+  const outputText = (Array.isArray(response?.output)
+    ? response.output.flatMap((item) => Array.isArray(item.content) ? item.content : [])
+      .find((item) => item.type === "output_text" && typeof item.text === "string")?.text
+    : null) || (typeof response?.output_text === "string" ? response.output_text : null);
+  if (!outputText) return { exam: null, truncated: false, parseStatus: "missing_output_text" };
+  const parsed = salvageExamJson(outputText);
+  return {
+    ...parsed,
+    parseStatus: parsed.exam ? (parsed.truncated ? "salvaged_json" : "complete_json") : "invalid_json",
+  };
+}
+
+function safeNormalizationFailure(normalized) {
+  const error = normalized?.failure?.payload?.error;
+  const known = new Map([
+    ["GENERATION_QUESTION_COUNT_INVALID", "question_count_invalid"],
+    ["GENERATION_QUESTION_IDS_INVALID", "question_ids_invalid"],
+    ["MC options invalid", "mc_options_invalid"],
+    ["MC correct_index invalid", "mc_correct_index_invalid"],
+    ["GRAPH_GENERATION_REJECTED", "graph_generation_rejected"],
+    ["Missing scoring_rubric on short question", "short_scoring_rubric_missing"],
+  ]);
+  return known.get(error) || (normalized?.exam ? null : "no_usable_questions");
+}
+
 // Streams a generation and stops at `budgetMs`, keeping whatever has arrived.
 // Returns the accumulated text plus whether the stream was cut short; parsing
 // and salvage are left to salvageExamJson so this stays a transport concern.
@@ -1362,6 +1388,10 @@ module.exports = async function handler(req, res) {
     let repairAttempted = false;
     let repairFailureStage = null;
     let repairCandidateCount = 0;
+    let repairResponseStatus = null;
+    let repairParseStatus = null;
+    let repairNormalizationIssue = null;
+    let repairOutputQuestionCount = 0;
     let repairVerifierCallOk = null;
     let repairVerifierChecked = 0;
     let repairVerifierApproved = 0;
@@ -1613,11 +1643,15 @@ module.exports = async function handler(req, res) {
             try { data2 = JSON.parse(raw2); } catch { data2 = null; }
             if (r2.ok && data2) {
               repairFailureStage = "repair_normalization";
-              const out2 = (Array.isArray(data2.output) && data2.output.flatMap(o => Array.isArray(o.content) ? o.content : []).find(c => c.type === "output_text") || {}).text || null;
-              let exam2; try { exam2 = out2 ? JSON.parse(out2) : null; } catch { exam2 = null; }
-              const normalized2 = exam2 && normalizeGeneratedExam(exam2, {
-                qType, graphMode, pointTable, isMath, pastedText, lang, numQuestions: repairCount, truncated: false,
+              repairResponseStatus = typeof data2.status === "string" ? data2.status : "unknown";
+              const parsedRepair = parseExamResponse(data2);
+              repairParseStatus = parsedRepair.parseStatus;
+              repairOutputQuestionCount = Array.isArray(parsedRepair.exam?.questions) ? parsedRepair.exam.questions.length : 0;
+              const normalized2 = parsedRepair.exam && normalizeGeneratedExam(parsedRepair.exam, {
+                qType, graphMode, pointTable, isMath, pastedText, lang,
+                numQuestions: repairCount, truncated: parsedRepair.truncated || data2.status === "incomplete",
               });
+              repairNormalizationIssue = safeNormalizationFailure(normalized2);
               if (normalized2?.exam) {
                 const candidateGate = assessment.gateExam(normalized2.exam, {
                   profile: subjectProfile,
@@ -1872,6 +1906,10 @@ module.exports = async function handler(req, res) {
         repairAttempted,
         repairFailureStage,
         repairCandidateCount,
+        repairResponseStatus,
+        repairParseStatus,
+        repairNormalizationIssue,
+        repairOutputQuestionCount,
         repairVerifierCallOk,
         repairVerifierChecked,
         repairVerifierApproved,
@@ -2010,6 +2048,8 @@ module.exports = async function handler(req, res) {
 // schema without an HTTP request.
 module.exports.buildExamPrompts = buildExamPrompts;
 module.exports.buildRepairPayload = buildRepairPayload;
+module.exports.parseExamResponse = parseExamResponse; // pure — structured-output parsing/salvage
+module.exports.safeNormalizationFailure = safeNormalizationFailure; // bounded diagnostic classification
 module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;
 module.exports.readJsonBody = readJsonBody;
 module.exports.buildMockExamSchema = buildMockExamSchema;
