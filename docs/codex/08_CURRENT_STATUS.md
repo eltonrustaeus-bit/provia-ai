@@ -3,8 +3,10 @@
 ## Local verification follow-up — 2026-10-20
 
 - [x] Added an integrated mixed-exam regression where both the MC question and short answer fail independent review in the same pass. The repair prompt must request candidates for both missing types, and the returned exam must retain the requested one-MC/one-short distribution.
-- [x] The focused exam pipeline test passed, then the full sequential API suite passed 169/169. These are offline/mocked tests; they do not verify live model output or Preview behavior.
-- [!] This regression and the prior local P.E.R. request-path tests remain local-only on the feature branch. No push, Vercel deployment, alias movement, `main` merge, Production operation, or staging-data change was made.
+- [x] Generic multiple-choice options are now compared after Unicode compatibility normalization, whitespace/case normalization, and removal of terminal sentence punctuation. Math-profile options retain their existing syntax-sensitive comparison and numeric-equivalence check. A regression covers `Stockholm` versus full-width lowercase `stockholm.`.
+- [x] Assessment checks and the full sequential API suite passed; API result: 169/169. These are offline/mocked tests and do not verify live model output or Preview behavior. A full offline suite was started but its final exit status was not captured; it is not claimed green.
+- [!] Independent P.E.R. audit found that selected responses, especially mathematics, can reach the learner and session history before optional self-review completes. A later serious correction is displayed, but the initially stored history may not include it. This remains a pedagogical risk; no stream/timeout change was made.
+- [!] These regressions and prior local P.E.R. request-path tests remain local-only on the feature branch. No push, Vercel deployment, alias movement, `main` merge, Production operation, or staging-data change was made.
 - [!] Password changes must be entered and submitted by the user. The Supabase staging users page and the latest Preview login are the next manual handoff; after the user signs in, run only the previously approved bounded synthetic staging checks.
 
 **PILOT NOT READY.** Authenticated Preview verification, telemetry diagnosis, two-account RLS/IDOR runtime checks, and school operational approval remain outstanding.

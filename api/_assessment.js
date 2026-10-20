@@ -237,6 +237,16 @@ function optionFormatIssues(q, options) {
   return ["single_word_option_outlier_review"];
 }
 
+function normalizeGenericOption(value) {
+  return String(value == null ? "" : value)
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/u, "")
+    .trim()
+    .toLocaleLowerCase("sv-SE");
+}
+
 function generalQualityIssues(q, options) {
   const issues = [];
   if (!q || typeof q !== "object") return ["not_an_object"];
@@ -251,7 +261,9 @@ function generalQualityIssues(q, options) {
     const opts = Array.isArray(q.options) ? q.options : [];
     if (opts.length < 2) issues.push("too_few_options");
     if (opts.some(o => !String(o == null ? "" : o).trim())) issues.push("empty_option");
-    const norm = opts.map(o => String(o).trim().toLowerCase());
+    const norm = options?.profile === "mathematics"
+      ? opts.map(o => String(o).trim().toLowerCase())
+      : opts.map(normalizeGenericOption);
     if (new Set(norm).size !== norm.length) issues.push("duplicate_options");
     const ci = q.correct_index;
     if (!Number.isInteger(ci) || ci < 0 || ci >= opts.length) issues.push("answer_key_out_of_range");
