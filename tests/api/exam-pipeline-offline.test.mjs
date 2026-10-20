@@ -450,9 +450,16 @@ try {
     id: `biology-repair-${index + 1}`,
     question: `En ny fråga om fotosyntes: ${question.question}`,
   }));
+  repairedBiology[0] = {
+    ...repairedBiology[0],
+    options: ["I cellkärnan", "Kloroplasterna", "I cellmembranet"],
+    correct_index: 1,
+    model_answer: "Kloroplasterna",
+  };
   activeQuestions = malformedBiology;
   regenerationQuestions = repairedBiology;
   verifierRejectOptionId = "biology-1";
+  const verifierInputCountBeforeBiologyRepair = verifierInputs.length;
   calls.length = 0;
   const nonsenseBiologyExam = await invoke(generateExam, {
     lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
@@ -460,11 +467,23 @@ try {
   assert.equal(nonsenseBiologyExam.status, 200, JSON.stringify(nonsenseBiologyExam.body));
   assert.equal(nonsenseBiologyExam.body.exam.questions.length, 3);
   assert.equal(nonsenseBiologyExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
-    "a non-math unsupported single-word outlier is removed by the deterministic gate and repaired");
-  assert.equal(verifierInputs.some((review) => review.questions.some((question) => question.options.includes("Kesäkten"))), false,
-    "the unsupported outlier is rejected before model review, even if model reviewers could miss it");
-  assert.equal(solverInputs.some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
-    "the unsupported outlier never reaches the blind solver");
+    "the independent reviewer rejects the nonsensical outlier and a bounded regeneration replaces it");
+  const flaggedNonsenseReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
+    .find((review) => review.questions.some((question) => question.options.includes("Kesäkten")));
+  assert.ok(flaggedNonsenseReview, "the independent verifier sees the suspicious but not automatically rejected option");
+  assert.ok(flaggedNonsenseReview.questions.find((question) => question.options.includes("Kesäkten"))
+    .review_hints.includes("single_word_option_outlier_review"),
+  "the independent verifier receives the format warning as a review hint");
+  assert.equal(solverInputs.some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), true,
+    "a format warning does not suppress the independent solver's judgment");
+  const repairedOutlierReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
+    .flatMap((review) => review.questions)
+    .find((question) => question.id === "biology-repair-1");
+  assert.ok(repairedOutlierReview?.review_hints.includes("single_word_option_outlier_review"),
+    "the verifier also receives the warning on the regeneration review path");
+  assert.ok(nonsenseBiologyExam.body.exam.questions.some((question) =>
+    question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
+  "a valid flagged technical-term answer survives the full pipeline when the independent checks approve it");
   verifierRejectOptionId = null;
   regenerationQuestions = null;
 
@@ -673,10 +692,10 @@ try {
     "a bounded repair can replace a batch after the deterministic gate flags a malformed option");
   assert.equal(verifierInputs.slice(verifierInputCountBeforeMalformedOption)
     .some((batch) => batch.questions.some((question) => question.options.includes("Kesäkten"))), false,
-  "the deterministic gate withholds the malformed distractor before verifier review");
+  "the mathematics structural gate rejects a nonnumeric option before model review");
   assert.equal(solverInputs.slice(solverInputCountBeforeMalformedOption)
     .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
-  "the deterministic gate withholds the malformed distractor before solver review");
+  "the mathematics structural gate keeps the nonnumeric option away from the solver");
   assert.equal(nonsenseOptionExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
     "an MC item with a nonsense distractor is withheld from the learner-facing exam");
 
@@ -706,6 +725,33 @@ try {
     "repaired candidates receive one independent review batch");
   assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet)[0].questions.length, 3,
     "the verifier only sees the complete, structurally valid candidate set");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  const structuralOutlierQuestions = repairedQuestions.map((question, index) => index === 0
+    ? {
+      ...question,
+      question: "Vilken sats beskriver sambandet mellan sidorna i en rätvinklig triangel?",
+      options: ["En regel för cirkelarea", "Pythagoras", "En metod för volym"],
+      correct_index: 1,
+      model_answer: "Pythagoras",
+    }
+    : question);
+  activeQuestions = questions.map((question) => ({
+    ...question,
+    source_references: ["Not found in the supplied material"],
+  }));
+  regenerationQuestions = structuralOutlierQuestions;
+  const verifierCountBeforeStructuralOutlier = verifierInputs.length;
+  const structuralOutlierExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(structuralOutlierExam.status, 200, JSON.stringify(structuralOutlierExam.body));
+  const structuralOutlierReview = verifierInputs.slice(verifierCountBeforeStructuralOutlier)
+    .flatMap((review) => review.questions)
+    .find((question) => question.id === "retry-1");
+  assert.ok(structuralOutlierReview?.review_hints.includes("single_word_option_outlier_review"),
+    "the verifier receives the warning for a single-word distractor found by structural repair");
   activeQuestions = questions;
   regenerationQuestions = null;
 

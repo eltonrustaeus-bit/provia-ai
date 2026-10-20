@@ -56,42 +56,65 @@ check("science KEEPS prose options (not quantities, never coerced)", (() => {
   return kept(q, "natural_sciences");
 })());
 
-check("Swedish exam drops an unsupported lone word among phrase options", (() => {
+check("Swedish exam flags a lone word among phrase options for review without dropping it", (() => {
   const q = mc({
     question: "Var sker fotosyntesen i växtcellen?",
     options: ["I cellkärnan", "I kloroplasterna", "Zerpläkten"],
     correct_index: 1,
   });
   const result = gate(q, "natural_sciences", {
-    requireGroundedOptionStyle: true,
-    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+    reviewSingleWordOptionOutliers: true,
   });
-  return result.questions.length === 0
-    && result.dropped[0].issues.includes("unsupported_option_format_outlier");
+  return result.questions.length === 1
+    && result.flagged[0].issues.includes("single_word_option_outlier_review");
 })());
 
-check("Swedish exam keeps a lone technical term grounded in the material", (() => {
+check("Swedish exam keeps an ungrounded proper-name answer and flags it for review", (() => {
+  const q = mc({
+    question: "Vilken stad är Sveriges huvudstad?",
+    options: ["Stockholm", "En stad i norra Sverige", "En mindre kustort"],
+    correct_index: 0,
+  });
+  const result = gate(q, "social_sciences", {
+    reviewSingleWordOptionOutliers: true,
+  });
+  return result.questions.length === 1
+    && result.flagged[0].issues.includes("single_word_option_outlier_review");
+})());
+
+check("Swedish exam keeps a lone source-grounded technical term while flagging its format", (() => {
   const q = mc({
     question: "Var sker fotosyntesen i växtcellen?",
     options: ["I cellkärnan", "I cellmembranet", "Kloroplasterna"],
     correct_index: 2,
   });
-  return gate(q, "natural_sciences", {
-    requireGroundedOptionStyle: true,
-    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
-  }).questions.length === 1;
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+  });
+  return result.questions.length === 1
+    && result.flagged[0]?.issues.includes("single_word_option_outlier_review");
 })());
 
-check("Swedish exam recognizes an inflected source term", (() => {
+check("Swedish exam flags punctuation-wrapped outlier consistently", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I kloroplasterna", '"Zerpläkten!"'],
+    correct_index: 1,
+  });
+  const result = gate(q, "natural_sciences", { reviewSingleWordOptionOutliers: true });
+  return result.questions.length === 1
+    && result.flagged[0].issues.includes("single_word_option_outlier_review");
+})());
+
+check("Swedish exam keeps an inflected standalone term for verifier review", (() => {
   const q = mc({
     question: "Var sker fotosyntesen i växtcellen?",
     options: ["I cellkärnan", "I cellmembranet", "Kloroplast"],
     correct_index: 2,
   });
-  return gate(q, "natural_sciences", {
-    requireGroundedOptionStyle: true,
-    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
-  }).questions.length === 1;
+  const result = gate(q, "natural_sciences", { reviewSingleWordOptionOutliers: true });
+  return result.questions.length === 1
+    && result.flagged[0]?.issues.includes("single_word_option_outlier_review");
 })());
 
 check("language exams keep standalone vocabulary options", (() => {
@@ -100,8 +123,7 @@ check("language exams keep standalone vocabulary options", (() => {
     correct_index: 0,
   });
   return gate(q, "languages", {
-    requireGroundedOptionStyle: true,
-    sourceMaterial: "",
+    reviewSingleWordOptionOutliers: true,
   }).questions.length === 1;
 })());
 

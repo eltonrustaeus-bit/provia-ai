@@ -7,7 +7,7 @@ const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApprova
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, language_match: true, option_quality: [] });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en") {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -25,7 +25,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -49,6 +49,17 @@ assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
+const outlierHintReview = await runWithResults(
+  [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], issues: [], required_changes: [] }],
+  [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
+  "", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review"] },
+);
+const outlierHintPayload = JSON.parse(outlierHintReview.requestBody.input.find((item) => item.role === "user").content);
+assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_option_outlier_review"],
+  "internal style warnings reach the independent reviewer without becoming a verdict");
+assert.equal(decideApproval(outlierHintReview.outcome.perQuestion.get("q1")), true,
+  "the heuristic warning alone does not reject a valid single-word answer");
 const wrongLanguageReview = await runWithResults([{
   ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,

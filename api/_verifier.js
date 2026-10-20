@@ -194,6 +194,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
       "eller en svårighetsgrad som inte matchar cognitive_level. " +
       "För option_quality ska du bedöma VARJE alternativ i samma ordning: true endast om alternativet är begripligt, språkligt rimligt och relevant som svar eller distraktor i ämnet; false för nonsensord, trasig text, oförklarad språkblandning eller uppenbart irrelevant alternativ. " +
+      "review_hints kan innehålla en intern formatvarning. Behandla den som en signal att granska extra noggrant, aldrig som en slutsats: avvisa inte enbart på grund av flaggan och godkänn giltiga namn och facktermer. " +
       "Godkänn legitima facktermer, namn, korta metodnamn, tal, formler, kod och andra ämnesspecifika uttryck när de är giltiga. Antalet boolean-värden måste motsvara antalet svarsalternativ; kortsvar utan alternativ får en tom lista. " +
       "Sätt language_match=true endast om alla elevriktade fält är på det valda provspråket (svenska), bortsett från egennamn, formler, etablerade facktermer och exakta källcitat. Ett grammatiskt korrekt fält på fel språk är ändå en språkavvikelse; sätt language_match=false. " +
       "required_changes ska vara tomt endast om frågan kan visas för en elev precis som den är."
@@ -208,6 +209,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match cognitive_level. " +
       "For option_quality, assess EVERY option in order: true only when it is intelligible, linguistically plausible, and relevant as an answer or distractor in the subject; false for nonsense words, broken text, unexplained language mixing, or clearly irrelevant choices. " +
+      "review_hints may contain an internal format warning. Treat it as a cue for closer inspection, never as a conclusion: do not reject solely because of the flag, and accept valid names and technical terms. " +
       "Keep valid technical terms, names, concise method names, numbers, formulas, code, and other valid subject-specific expressions. The boolean count must match the option count; short-answer items with no options use an empty list. " +
       "Set language_match=true only when every learner-facing field is in the selected output language (English), except proper names, formulas, established technical terms, and exact source quotations. A grammatically fluent field in another language is still a mismatch; set language_match=false. " +
       "required_changes must be empty only if the question can be shown to a student exactly as-is.";
@@ -232,8 +234,20 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
+function reviewHintsFor(reviewHintsById, questionId) {
+  const id = String(questionId ?? "");
+  const hints = reviewHintsById instanceof Map
+    ? reviewHintsById.get(id)
+    : Object.prototype.hasOwnProperty.call(reviewHintsById || {}, id)
+      ? reviewHintsById[id]
+      : [];
+  return Array.isArray(hints)
+    ? hints.filter((hint) => hint === "single_word_option_outlier_review")
+    : [];
+}
+
 async function verifyQuestions(questions, opts) {
-  const { apiKey, model, subjectProfile, lang, material, timeoutMs, targetLevel, comparisonQuestions } = opts || {};
+  const { apiKey, model, subjectProfile, lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById } = opts || {};
   const requestTimeoutMs = Math.max(1_000, Math.min(30_000, Number(timeoutMs) || 30_000));
   const sourceQuestions = Array.isArray(questions) ? questions : [];
   const items = sourceQuestions.map(q => ({
@@ -248,6 +262,7 @@ async function verifyQuestions(questions, opts) {
     rubric: q.rubric,
     scoring_rubric: q.scoring_rubric,
     source_references: q.source_references,
+    review_hints: reviewHintsFor(reviewHintsById, q?.id),
   }));
   const reviewInput = {
     source_material: materialInput.truncateMaterial(material, SOURCE_MATERIAL_CHAR_CAP),

@@ -1257,8 +1257,7 @@ module.exports = async function handler(req, res) {
     let gate = assessment.gateExam(exam, {
       profile: subjectProfile,
       requireSourceReferences: true,
-      requireGroundedOptionStyle: lang === "sv",
-      sourceMaterial: pastedText,
+      reviewSingleWordOptionOutliers: lang === "sv",
       requestedQuestionType: qType,
     });
     if (truncated) {
@@ -1331,8 +1330,7 @@ module.exports = async function handler(req, res) {
             const repairGate = assessment.gateExam(normalized.exam, {
               profile: subjectProfile,
               requireSourceReferences: true,
-              requireGroundedOptionStyle: lang === "sv",
-              sourceMaterial: pastedText,
+              reviewSingleWordOptionOutliers: lang === "sv",
               requestedQuestionType: qType,
             });
             repairCandidateCount = repairGate.questions.length;
@@ -1419,7 +1417,12 @@ module.exports = async function handler(req, res) {
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
       const [v1, s1] = await Promise.all([
-        verifier.verifyQuestions(exam.questions, { apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level }),
+        verifier.verifyQuestions(exam.questions, {
+          apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
+          reviewHintsById: new Map(gate.flagged
+            .filter((item) => item.issues.includes("single_word_option_outlier_review"))
+            .map((item) => [item.id, ["single_word_option_outlier_review"]])),
+        }),
         solver.solveQuestions(exam.questions, {
           apiKey, model, subjectProfile, lang, pastedText,
           material: pastedText,
@@ -1535,8 +1538,7 @@ module.exports = async function handler(req, res) {
                 const candidateGate = assessment.gateExam(normalized2.exam, {
                   profile: subjectProfile,
                   requireSourceReferences: true,
-                  requireGroundedOptionStyle: lang === "sv",
-                  sourceMaterial: pastedText,
+                  reviewSingleWordOptionOutliers: lang === "sv",
                   requestedQuestionType: qType,
                 });
                 const candidateQuestions = candidateGate.questions;
@@ -1546,6 +1548,9 @@ module.exports = async function handler(req, res) {
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
+                      reviewHintsById: new Map(candidateGate.flagged
+                        .filter((item) => item.issues.includes("single_word_option_outlier_review"))
+                        .map((item) => [item.id, ["single_word_option_outlier_review"]])),
                       comparisonQuestions: round1ApprovedQuestions,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),
