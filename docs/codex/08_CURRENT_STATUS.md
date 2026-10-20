@@ -1,5 +1,16 @@
 # 08 Current Status
 
+## ExGen school pilot — verified status 2026-10-20 16:49 UTC
+
+- Auth-fix application commit `15a95880d49a9f54430e47ef2b508317c5c00c7f` is pushed to feature branch `codex/exgen-generation-quality-2026-10-20`.
+- Vercel deployment `dpl_5Acwdz11rmNnqnMtFi3EbMkzESYZ` is `READY` from that exact SHA on the feature branch. The stable Preview alias `provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app` resolves to this deployment. No `main` merge, Production deployment or database change was made.
+- The preceding live generation attempt on deployment `dpl_83i2yFcRadJDSN3DVecMyVF8irz4` logged `exam_auth_rejected`, stage `auth_user_lookup`, `TimeoutError`, after the old 5-second timeout. The new code performs one bounded retry (8 seconds per request), distinguishes invalid user token (401) from Auth service unavailability (503), and shows an appropriate retry message in the UI. This is not yet live-verified.
+- Offline verification passed: 196 Node tests across 95 API, assessment and P.E.R. test files; focused auth/pipeline/Supabase-key tests passed 10/10; `git diff --check` passed. These are code/mock tests, not live provider evidence.
+- Vercel metadata shows encrypted staging-scoped variables on the feature branch, including pilot URL, server secret, OpenAI key, exam signing secret and pilot flag. Values were not read or exposed.
+- The new Preview tab currently shows the sign-in gate. In the exact 2026-10-20 16:37-16:40 UTC staging Auth log window, 13 successful `GET /user` requests had `referer=http://localhost:3000`; no request from the Preview was present in the returned aggregate. This does not establish why the Vercel request timed out. The underlying cause is unknown, and no live generation, grading, persistence or P.E.R. test was possible after the latest deployment.
+
+**PILOT NOT READY.** Next: authenticate in the stable staging Preview, then run the bounded synthetic generation -> grade/save -> P.E.R. checks. Preserve staging account/data; do not touch Production or `main`.
+
 ## Implementerat och verifierat i kod
 
 - Statiskt HTML/JS-frontend med ExGen-skal, landing, app, pricing, konto och lärarsida.

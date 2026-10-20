@@ -1,6 +1,16 @@
 # ExGen: checklista for skolpilot
 
-## Aktuell statuskontroll — 2026-10-19
+## Aktuell statuskontroll — 2026-10-20 16:49 UTC
+
+- Auth-fixens applikationscommit `15a95880d49a9f54430e47ef2b508317c5c00c7f` ar pushad till feature branch `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_5Acwdz11rmNnqnMtFi3EbMkzESYZ` ar `READY` fran exakt SHA; stabil Preview-alias pekar pa deploymenten. Ingen `main`-merge, Production-deploy eller databasandring har gjorts.
+- Foregaende liveprov pa `dpl_83i2yFcRadJDSN3DVecMyVF8irz4` stoppades vid `auth_user_lookup` med `TimeoutError` efter 5 sekunder. Ny kod gor en begransad andra Auth-begaran (8 s per forsok), returnerar 503 vid Auth-otillganglighet i stallet for felaktig 401 och behaller 401 for ogiltig elevtoken. Liveeffekten ar annu inte verifierad.
+- Offline: 196 Node-tester i 95 API-/assessment-/P.E.R.-testfiler passerade; fokuserad auth/pipeline/Supabase-key-svit passerade 10/10; `git diff --check` passerade. Inget av detta bevisar att liveleverantorer fungerar.
+- Vercel-metadata visar stagingvariabler krypterade och avgransade till den aktuella feature-branchen. Inga vardena visades.
+- Ny Preview-flik visar inloggningsgrinden. Supabase Auth-loggaggregering 16:37-16:40 UTC visar 13 lyckade `GET /user` med `referer=http://localhost:3000`; ingen Preview-begaran syns i resultatet. Rotorsaken till Vercels timeout ar darfor fortfarande okand. Ingen ny livegenerering eller P.E.R./rattning/sparning har verifierats.
+
+**PILOT NOT READY.** Nasta steg: logga in i den stabila staging-Previewn och kor ett fa-syntetiskt-endast flode for provgenerering, P.E.R., rattning och sparning. Radera inte stagingkontot eller dess data. Ror inte Production eller `main`.
+
+## Foregaende kontroll — 2026-10-19 (historisk)
 
 - Bekraftad Preview `dpl_AsBzCd1TMVVTCwSLj74Y8sMqrFmG` ar READY fran kodcommit `3d42396` pa pilotbranchen. Den publika runtime-konfigurationen hamtades autentiserat fran just deploymenten och verifierades utan att visa nyckelvardet: pilotlage, stagingref `yhcinqejsocpmmetazpz` och appOrigin `provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app`. Supabase-projektet `exgen-pilot-staging` ar `ACTIVE_HEALTHY`.
 - Vercel slar for narvarande upp den stabila `appOrigin`-adressen till en aldre deployment pa SHA `e3bd7d9`, inte senaste kod-Previewn `3d42396`. Webblasarens lokala Auth-session delas inte mellan origin-adresser. Vid aterstallning kan lankens sida darfor se annorlunda ut; efter losenordsbyte ska anvandaren manuellt logga in igen pa den exakta aktuella Previewn `https://provia-qa62r9tex-eltons-projects-4adfb1a3.vercel.app/app.html`.
