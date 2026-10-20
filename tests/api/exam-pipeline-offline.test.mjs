@@ -75,7 +75,7 @@ assert.deepEqual(repairPayload.input.slice(0, 2), [
   { role: "system", content: "system prompt" },
   { role: "user", content: "material prompt" },
 ], "repair retains the original system prompt and source material");
-assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*fylla 3 saknade provplatser/i);
+assert.match(repairPayload.input.at(-1).content, /exakt 6 nya frågekandidater.*fylla 3 saknade provplatser/i);
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
 assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
@@ -110,10 +110,10 @@ const missingSlotRepair = generateExam.buildRepairPayload({
   lang: "sv", numQuestions: 3,
   existingQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
 });
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 3,
-  "repair schema requests one extra candidate for two missing exam slots");
-assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 3);
-assert.match(missingSlotRepair.input.at(-1).content, /exakt 3 nya frågekandidater.*fylla 2 saknade provplatser/i);
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 6,
+  "repair schema oversamples while respecting the six-candidate cap");
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 6);
+assert.match(missingSlotRepair.input.at(-1).content, /exakt 6 nya frågekandidater.*fylla 2 saknade provplatser/i);
 assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
   "existing stems are passed to repair so the model can avoid repeating them");
 
@@ -952,8 +952,8 @@ try {
   const underfilledRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.stream !== true);
   assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
-  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 2,
-    "one missing slot requests two repair candidates to retain one if quality checks reject the other");
+  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 4,
+    "one missing slot requests a bounded four-candidate pool so quality gates can reject weak candidates without underfilling");
   assert.equal(calls.filter((call) => call.url.includes("/rest/v1/exam_issuances") && call.method === "POST").length, 1,
     "only the complete three-question set is issued");
   activeQuestions = questions;
@@ -1096,7 +1096,7 @@ try {
   const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
   activeQuestions = questions;
   regenerationQuestions = unsafeRetryQuestions;
-  solverRejectQuestionId = ["retry-fallback-1", "retry-fallback-2"];
+  solverRejectQuestionId = ["retry-fallback-1", "retry-fallback-2", "retry-fallback-3"];
   calls.length = 0;
   const solverRejectedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
@@ -1104,7 +1104,10 @@ try {
   assertIncompleteExamNotDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
 
   activeQuestions = questions;
-  regenerationQuestions = repairedQuestions;
+  regenerationQuestions = [
+    ...repairedQuestions.slice(0, 2),
+    { ...repairedQuestions[2], source_references: [] },
+  ];
   solverRejectQuestionId = null;
   verifierRejectQuestionId = ["q-1", "retry-1", "retry-2"];
   const verifierRejectedRepair = await invoke(generateExam, {
@@ -1116,6 +1119,9 @@ try {
     reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2,
   },
     "safe repair telemetry records only the review rejection category");
+  assert.equal(verifierRejectedLog.repairStructuralDropped, 1);
+  assert.deepEqual(verifierRejectedLog.repairStructuralIssueCounts, { source_reference_missing: 1 },
+    "repair-gate diagnostics report allowlisted issue counts without candidate content");
   assert.deepEqual({
     round1ApprovedCount: verifierRejectedLog.round1ApprovedCount,
     round1UniqueApprovedCount: verifierRejectedLog.round1UniqueApprovedCount,

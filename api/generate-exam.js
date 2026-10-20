@@ -1075,10 +1075,15 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
+function repairCandidateCountFor(missingSlots) {
+  const slots = Math.max(1, Number(missingSlots) || 1);
+  return Math.min(6, slots * 2 + 2);
+}
+
 function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
-  const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || missingSlots + 1));
+  const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots)));
   const existingStems = existing.map((question) => ({
     concept: question?.concept_tag || question?.topic || "",
     question: question?.question || "",
@@ -1424,6 +1429,17 @@ module.exports = async function handler(req, res) {
     let repairParseStatus = null;
     let repairNormalizationIssue = null;
     let repairOutputQuestionCount = 0;
+    let repairStructuralDropped = 0;
+    const repairStructuralIssueCounts = {};
+    const recordRepairGateRejections = (candidateGate) => {
+      repairStructuralDropped += candidateGate.dropped.length;
+      for (const item of candidateGate.dropped) {
+        for (const issue of item.issues || []) {
+          if (!/^[a-z][a-z0-9_]{0,63}$/.test(issue)) continue;
+          repairStructuralIssueCounts[issue] = (repairStructuralIssueCounts[issue] || 0) + 1;
+        }
+      }
+    };
     let repairVerifierCallOk = null;
     let repairVerifierChecked = 0;
     let repairVerifierApproved = 0;
@@ -1448,7 +1464,7 @@ module.exports = async function handler(req, res) {
       let repairResponse = null;
       try {
         const repairSlots = numQuestions - exam.questions.length;
-        const repairCount = Math.min(6, repairSlots + 1);
+        const repairCount = repairCandidateCountFor(repairSlots);
         const repairPayload = buildRepairPayload(payload, {
           lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType,
         });
@@ -1479,6 +1495,7 @@ module.exports = async function handler(req, res) {
               reviewSingleWordOptionOutliers: lang === "sv",
               requestedQuestionType: qType,
             });
+            recordRepairGateRejections(repairGate);
             repairCandidateCount = repairGate.questions.length;
             const kept = [...exam.questions];
             const keptIds = new Set(kept.map((question) => String(question.id)));
@@ -1659,7 +1676,7 @@ module.exports = async function handler(req, res) {
           let data2 = null;
           try {
             const repairSlots = Math.max(1, numQuestions - round1ApprovedQuestions.length);
-            const repairCount = Math.min(6, repairSlots + 1);
+            const repairCount = repairCandidateCountFor(repairSlots);
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
               reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType,
@@ -1693,6 +1710,7 @@ module.exports = async function handler(req, res) {
                   reviewSingleWordOptionOutliers: lang === "sv",
                   requestedQuestionType: qType,
                 });
+                recordRepairGateRejections(candidateGate);
                 const candidateQuestions = candidateGate.questions;
                 repairCandidateCount = candidateQuestions.length;
                 if (candidateQuestions.length > 0) {
@@ -1946,6 +1964,8 @@ module.exports = async function handler(req, res) {
         repairParseStatus,
         repairNormalizationIssue,
         repairOutputQuestionCount,
+        repairStructuralDropped,
+        repairStructuralIssueCounts,
         repairVerifierCallOk,
         repairVerifierChecked,
         repairVerifierApproved,
