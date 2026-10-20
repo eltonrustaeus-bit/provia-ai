@@ -417,3 +417,14 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Rättnings-API-/migrationskandidaterna är fortfarande ocommittade och oapplicerade; skicka dem inte separat. Före staging-cutover behövs en uttrycklig stagingsekvens, godkänd ändring, tvåsessions-/PostgREST-bevis och verifierad framåtriktad återhämtningsplan.
 
 **PILOT NOT READY.** P.E.R-/generatorförbättringarna är deployade till Preview, men liveflöden återstår. Rättningskandidaten kan inte driftsättas mot nuvarande stagingkontrakt separat från migrationen.
+
+## Färsk stagingkatalog och lokal tillgänglighet — 2026-10-20
+
+- [x] XelioV:s aktiva projektmappning verifierad igen för denna worktree: ExGen `c3af48b2-20c3-4d33-a5e0-72aa001a1637`. Branch-remote och isolerad checkout står på `583afe9`; inga andra/orena worktrees ändrades.
+- [x] Supabase staging `exgen-pilot-staging` är `ACTIVE_HEALTHY`, PostgreSQL 17.11. Skrivskyddad katalogläsning bekräftade att `exam_issuances` har den äldre paritetskontrollen för `grading_started_at`/`answer_fingerprint`, saknar `grading_claim_id`, och att `mock_results` har unik indexering på `(user_id, submission_id)`. Claim/release är fortsatt 3-arguments RPC och persist är 10 argument. Funktionerna är `SECURITY INVOKER` med tom `search_path`; inga rader eller Auth-identiteter lästes.
+- [x] Officiell Supabase/PostgREST-feldokumentation beskriver `PGRST202` vid inaktuell/okänd RPC-signatur och `PGRST203` för vissa tvetydiga överlagrade RPC-anrop. Det förstärker behovet av att efter varje godkänd stagingmigration verifiera faktisk PostgREST-dispatch, inte bara SQL-funktionsmetadata: https://supabase.com/docs/guides/api/rest/postgrest-error-codes.
+- [x] Färsk `npm run a11y-audit` passerade utan axe- eller konsolfel på index, pricing, app, konto, förbättring, lärare, admin och integritetspolicy; mobilkontrollen vid 390 px hade ingen horisontell overflow. Detta är automatiserad DOM-audit, inte manuell skärmläsar- eller helappstestning.
+- [ ] Supabase create-user-formuläret är fortfarande öppet med tomt lösenordsfält och förvalt “Auto confirm user?”; kontot är inte skapat. Användaren behöver själv ange ett nytt unikt lösenord direkt i Supabase och därefter verifiera inloggning i aktuell Preview. Chattexponerat lösenord ska inte återanvändas.
+- [ ] Ingen stagingmigration eller live-AI-/rättningskörning genomfördes. Den lokala claim-fencing-kandidaten kräver en samordnad stagingcutover och verklig PostgREST- samt tvåsessions-PostgreSQL-verifiering. `main`, Production, stagingrader, roller och kvoter lämnades orörda.
+
+**PILOT NOT READY.** Den färska katalogen bekräftar att migrationens basobjekt finns, men det nya claim-token-kontraktet, Auth-sessionen och syntetisk live E2E är ännu inte verifierade.
