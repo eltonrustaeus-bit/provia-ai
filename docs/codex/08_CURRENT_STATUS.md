@@ -8,9 +8,10 @@
 - [x] The pipeline now reserves pre-review structural repair for the zero-valid-candidate case. A partial batch is reviewed first; the existing single verifier-driven repair can then fill structural gaps and replace rejected questions.
 - [x] The staging profile was temporarily Premium for the one approved request and immediately restored to `gratis`; its recorded count/period was not modified. No second model request was made.
 - [x] Focused generation-pipeline and budget tests passed; full sequential API suite passed **174/174**; P.E.R. pedagogy regression and exam answer-gate tests also passed.
-- [!] This repair-flow change is not yet deployed or live-verified. No further staging generation is authorized by the one-request approval.
+- [x] Commit `1778d97` is pushed to the feature branch; Preview `dpl_37J7CEM4Pd9sRzNJJw56QTXzMLhB` is `READY` from that exact SHA, and the stable branch alias points to it. The existing signed-in session restored after the page's brief auth-state check.
+- [!] The new repair flow has **not** been live-tested. The single approved request was consumed on the preceding deployment; no retry was sent.
 
-**PILOT NOT READY.** Next: commit and deploy the offline-verified change to the existing feature Preview. Verify deployment identity and preserve staging at gratis; request separate approval before another model-backed staging run.
+**PILOT NOT READY.** Next: request separate approval for another bounded staging generation to verify the single-repair fix. Preserve the staging account at `gratis`, and keep `main` and Production unchanged.
 
 ## P.E.R. help-level consistency — 2026-10-20
 
