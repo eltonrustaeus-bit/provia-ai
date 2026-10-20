@@ -1257,6 +1257,8 @@ module.exports = async function handler(req, res) {
     let gate = assessment.gateExam(exam, {
       profile: subjectProfile,
       requireSourceReferences: true,
+      requireGroundedOptionStyle: lang === "sv",
+      sourceMaterial: pastedText,
       requestedQuestionType: qType,
     });
     if (truncated) {
@@ -1329,6 +1331,8 @@ module.exports = async function handler(req, res) {
             const repairGate = assessment.gateExam(normalized.exam, {
               profile: subjectProfile,
               requireSourceReferences: true,
+              requireGroundedOptionStyle: lang === "sv",
+              sourceMaterial: pastedText,
               requestedQuestionType: qType,
             });
             repairCandidateCount = repairGate.questions.length;
@@ -1531,6 +1535,8 @@ module.exports = async function handler(req, res) {
                 const candidateGate = assessment.gateExam(normalized2.exam, {
                   profile: subjectProfile,
                   requireSourceReferences: true,
+                  requireGroundedOptionStyle: lang === "sv",
+                  sourceMaterial: pastedText,
                   requestedQuestionType: qType,
                 });
                 const candidateQuestions = candidateGate.questions;

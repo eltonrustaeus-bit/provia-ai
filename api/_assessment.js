@@ -202,7 +202,37 @@ function detectSubjectProfile(course, pastedText) {
 
 // ── General (subject-agnostic) quality checks ───────────────────────────────
 // Returns an array of issue codes; empty array = passes the general gate.
-function generalQualityIssues(q) {
+function optionFormatIssues(q, options) {
+  if (q?.type !== "mc" || options?.requireGroundedOptionStyle !== true
+      || options?.profile === "languages") return [];
+
+  const optionsList = Array.isArray(q.options) ? q.options : [];
+  if (optionsList.length < 3) return [];
+
+  const words = (value) => String(value || "").match(/[\p{L}\p{M}\p{N}]+/gu) || [];
+  const lexicalSingleOptions = optionsList
+    .map((value) => ({ value: String(value || "").trim(), tokens: words(value) }))
+    .filter((item) => item.tokens.length === 1 && /^[\p{L}][\p{L}\p{M}'’-]{4,}$/u.test(item.value));
+  const phraseOptions = optionsList.filter((value) => words(value).length >= 2);
+  if (lexicalSingleOptions.length !== 1 || phraseOptions.length !== optionsList.length - 1) return [];
+
+  const candidate = lexicalSingleOptions[0].tokens[0].normalize("NFKC").toLocaleLowerCase("sv-SE");
+  const evidence = `${String(q.question || "")} ${String(options.sourceMaterial || "")}`
+    .normalize("NFKC")
+    .toLocaleLowerCase("sv-SE");
+  const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const exactMatch = new RegExp(`(^|[^\\p{L}\\p{M}])${escaped}($|[^\\p{L}\\p{M}])`, "u").test(evidence);
+  const stem = (word) => word.replace(/(?:erna|orna|arna|ande|else|ning|het|en|et|er|or|ar|na|s)$/u, "");
+  const candidateStem = stem(candidate);
+  const groundedStem = words(evidence).some((word) => {
+    const normalized = word.normalize("NFKC").toLocaleLowerCase("sv-SE");
+    return normalized === candidate || stem(normalized) === candidateStem;
+  });
+  const supported = exactMatch || (candidateStem.length >= 5 && groundedStem);
+  return supported ? [] : ["unsupported_option_format_outlier"];
+}
+
+function generalQualityIssues(q, options) {
   const issues = [];
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
@@ -269,6 +299,7 @@ function generalQualityIssues(q) {
       }
     }
   }
+  issues.push(...optionFormatIssues(q, options));
   return issues;
 }
 
@@ -493,6 +524,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
+  "unsupported_option_format_outlier",
   "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal", "math_option_type_mismatch",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
@@ -574,7 +606,7 @@ function gateExam(exam, opts) {
       ? !["mc", "short"].includes(String(q && q.type))
       : (requestedType && String(q && q.type) !== requestedType);
     const issues = [
-      ...generalQualityIssues(q),
+      ...generalQualityIssues(q, options),
       ...(requestedTypeMismatch ? ["requested_type_mismatch"] : []),
       ...(options.requireSourceReferences && String(q && q.type) !== "graph" && (!Array.isArray(q && q.source_references)
         || !q.source_references.some(reference => typeof reference === "string" && reference.trim()))

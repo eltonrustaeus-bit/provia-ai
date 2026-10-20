@@ -460,9 +460,11 @@ try {
   assert.equal(nonsenseBiologyExam.status, 200, JSON.stringify(nonsenseBiologyExam.body));
   assert.equal(nonsenseBiologyExam.body.exam.questions.length, 3);
   assert.equal(nonsenseBiologyExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
-    "a non-math nonsense distractor cannot reach the learner after independent verifier and solver rejection");
-  assert.ok(solverInputs.at(-2).some((question) => question.options.includes("Kesäkten")),
-    "the non-math nonsense candidate is explicitly checked by the blind solver");
+    "a non-math unsupported single-word outlier is removed by the deterministic gate and repaired");
+  assert.equal(verifierInputs.some((review) => review.questions.some((question) => question.options.includes("Kesäkten"))), false,
+    "the unsupported outlier is rejected before model review, even if model reviewers could miss it");
+  assert.equal(solverInputs.some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
+    "the unsupported outlier never reaches the blind solver");
   verifierRejectOptionId = null;
   regenerationQuestions = null;
 

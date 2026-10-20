@@ -31,7 +31,7 @@ const mc = (over) => ({
   id: "q", type: "mc", question: "Fråga?", options: ["a", "b", "c"],
   correct_index: 0, points: 1, cognitive_level: "minnas", ...over,
 });
-const gate = (q, profile) => A.gateExam({ questions: [q] }, { profile });
+const gate = (q, profile, options = {}) => A.gateExam({ questions: [q] }, { profile, ...options });
 const issuesOf = (q, profile) => {
   const g = gate(q, profile);
   const rec = g.dropped[0] || g.flagged[0];
@@ -54,6 +54,55 @@ check("science KEEPS same value with different units (5 J vs 5 N)", (() => {
 check("science KEEPS prose options (not quantities, never coerced)", (() => {
   const q = mc({ options: ["Cellandning", "Fotosyntes", "Diffusion"], correct_index: 1 });
   return kept(q, "natural_sciences");
+})());
+
+check("Swedish exam drops an unsupported lone word among phrase options", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I kloroplasterna", "Zerpläkten"],
+    correct_index: 1,
+  });
+  const result = gate(q, "natural_sciences", {
+    requireGroundedOptionStyle: true,
+    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+  });
+  return result.questions.length === 0
+    && result.dropped[0].issues.includes("unsupported_option_format_outlier");
+})());
+
+check("Swedish exam keeps a lone technical term grounded in the material", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I cellmembranet", "Kloroplasterna"],
+    correct_index: 2,
+  });
+  return gate(q, "natural_sciences", {
+    requireGroundedOptionStyle: true,
+    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+  }).questions.length === 1;
+})());
+
+check("Swedish exam recognizes an inflected source term", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["I cellkärnan", "I cellmembranet", "Kloroplast"],
+    correct_index: 2,
+  });
+  return gate(q, "natural_sciences", {
+    requireGroundedOptionStyle: true,
+    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+  }).questions.length === 1;
+})());
+
+check("language exams keep standalone vocabulary options", (() => {
+  const q = mc({
+    options: ["the nucleus", "the chloroplast", "Kesäkten"],
+    correct_index: 0,
+  });
+  return gate(q, "languages", {
+    requireGroundedOptionStyle: true,
+    sourceMaterial: "",
+  }).questions.length === 1;
 })());
 
 check("science treats m/s^2 and m/s2 as the same unit", (() => {
