@@ -46,7 +46,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       res.write('data: {"done":true,"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat."}],"helpCap":2}\n\n');
       const timer = setTimeout(() => {
         if (res.destroyed) return;
-        res.write('data: {"granskning":{"rättelse":"En kort precisering."}}\n\n');
+        res.write('data: {"granskning":{"rättelse":"En kort precisering."},"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat.\\n\\nP.E.R-kontroll: En kort precisering."}]}\n\n');
         res.end();
       }, 800);
       res.on("close", () => clearTimeout(timer));
@@ -416,6 +416,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       "the saved primary answer renders before the optional review correction arrives");
     await reviewPage.locator(".per-rattelse").waitFor();
     assert.equal(await reviewPage.locator(".per-rattelse").innerText(), "JAG KONTROLLERADE MITT SVAR\nEn kort precisering.");
+    assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll: En kort precisering/);
 
     const tokenSwitchPage = await openPilotPage(makeSession("account-a"));
     await tokenSwitchPage.locator("#perBubble").click();

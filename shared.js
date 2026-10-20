@@ -1561,6 +1561,7 @@ function finalizeMsg(div, text) {
                   _perRättelse = ev.granskning.rättelse;
                   if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
                 }
+                if (ev.granskning && ev.history) perSaveHist(ev.history);
                 // Taket kommer alltid härifrån, aldrig ur en egen uträkning.
                 if (typeof ev.helpCap === 'number') _perHelpCap = ev.helpCap;
               } catch (_) {}

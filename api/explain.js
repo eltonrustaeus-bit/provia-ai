@@ -1313,7 +1313,25 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         isMath: !!curriculumContext,
         läroplan: curriculumContext,
       });
-      if (granskning) res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
+      if (granskning) {
+        let correctedHistory;
+        let correctedHistorySaved = false;
+        if (granskning.rättelse) {
+          correctedHistory = newHistory.slice();
+          const lastAssistant = correctedHistory.findLastIndex((message) => message.role === "assistant");
+          if (lastAssistant >= 0) {
+            correctedHistory[lastAssistant] = {
+              ...correctedHistory[lastAssistant],
+              content: `${correctedHistory[lastAssistant].content}\n\nP.E.R-kontroll: ${granskning.rättelse}`,
+            };
+            correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+          }
+        }
+        res.write(`data: ${JSON.stringify({
+          granskning,
+          ...(correctedHistorySaved ? { history: correctedHistory } : {}),
+        })}\n\n`);
+      }
 
       await usageWrite;
       return res.end();

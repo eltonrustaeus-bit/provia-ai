@@ -21,6 +21,8 @@ let activeCount = 0;
 let staleMemory = false;
 let failStreamingAfterDelta = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
+let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+let reviewAnswer = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   const body = typeof init.body === "string" ? JSON.parse(init.body) : null;
@@ -56,15 +58,17 @@ globalThis.fetch = async (input, init = {}) => {
       });
       return new Response(bodyStream, { status: 200 });
     }
-    const delta = { choices: [{ delta: { content: "Börja med att hitta ett begrepp i ditt material." } }] };
+    const delta = { choices: [{ delta: { content: streamAnswer } }] };
     const usage = { model: "measured-stream-model", choices: [], usage: { prompt_tokens: 90, completion_tokens: 21 } };
     return new Response(`data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n`, { status: 200 });
   }
   if (url === "https://api.openai.com/v1/responses") {
+    const requestText = JSON.stringify(body?.input || []);
+    const isReview = requestText.includes("SVARET SOM SKA GRANSKAS");
     return Response.json({
       model: "measured-json-model",
       usage: { input_tokens: 45, output_tokens: 13 },
-      output: [{ content: [{ type: "output_text", text: providerAnswer }] }],
+      output: [{ content: [{ type: "output_text", text: isReview && reviewAnswer ? reviewAnswer : providerAnswer }] }],
     });
   }
   throw new Error(`Unexpected synthetic route: ${url}`);
@@ -124,6 +128,33 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.equal(usageWrite.body[0].input_tokens, 90);
   assert.equal(usageWrite.body[0].output_tokens, 21);
   assert.doesNotMatch(JSON.stringify(usageWrite.body), /Hur börjar jag|Börja med att hitta/);
+});
+
+test("a serious P.E.R correction is persisted with the assistant answer and returned to the client", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({
+    allvar: "allvarlig",
+    fynd: [{ typ: "räknefel", citat: "x = 5", varför: "Insättning visar att värdet inte stämmer." }],
+    rättelse: "Kontrollera insättningen: rätt värde är x = 4.",
+  });
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    const events = res.chunks
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+    const correctionEvent = events.find((event) => event.granskning?.rättelse);
+    assert.ok(correctionEvent);
+    assert.match(correctionEvent.history.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+
+    const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
+    assert.equal(historyWrites.length, 2);
+    assert.doesNotMatch(historyWrites[0].body.p_messages.at(-1).content, /P\.E\.R-kontroll/);
+    assert.match(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+  } finally {
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+    reviewAnswer = null;
+  }
 });
 
 test("streaming P.E.R ends safely when the provider stream fails after a partial answer", async () => {
