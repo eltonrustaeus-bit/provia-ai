@@ -1,5 +1,16 @@
 # 08 Current Status
 
+## Approved second synthetic generation test — 2026-10-20 21:38 UTC
+
+- [x] Ran exactly one additional synthetic staging request on READY deployment `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo` (branch `codex/exgen-generation-quality-2026-10-20`, SHA `679e6350cb7603668e4b37d844c48da665e8e3a5`). Vercel's env-list API returned 403; the explicit CLI fallback verified the needed pilot variables remain encrypted and Preview-scoped to this branch. No values were read.
+- [x] Replaced the short source with a clearer synthetic Mathematics 2b source containing two fully worked quadratic examples and explicit rules. The authenticated UI remained set to A-level, three short-answer questions. No real learner material was used.
+- [x] The request reached generation and failed closed: **0/3** approved, no exam issued; elapsed time 36.2 s and initial generation 12.7 s. Content-free telemetry shows all 3 initial candidates were structurally rejected for `source_reference_missing`. Structural repair returned 4 candidates, all passed structural checks; the reviewer checked 3 and rejected all 3 with `required_changes` / `low_scoring_quality`.
+- [x] No quality repair followed: telemetry says `qualityRepairAttempted=false` and `qualityRepairGenerationTimeoutMs=null` with about 20.8 s left. The configured repair gate requires 32 s (8 s generation + 10 s review + 14 s finalization), so it correctly withheld a second repair rather than risk an unreviewed result. This is a bounded-budget tradeoff, not evidence of a provider outage.
+- [x] The synthetic account was verified Gratis before the run, changed temporarily to Premium only for this approved attempt, and immediately restored to Gratis. Post-run profile read showed `mock_quota_count=3`, period `2026-W43`, role `gratis`; Premium's code path bypasses the quota RPC. Production and `main` were untouched.
+- [!] The richer material did not fix candidate quality. The evidence points to two generation-pipeline weaknesses: exact source excerpts are not consistently emitted/retained, and the initial math candidates failed the independent scoring-quality review. Runtime logs deliberately contain no generated question or source text, so the precise reviewer objections are unknown. Do not weaken the review gate or conclude a stronger model is the fix from this run alone.
+
+**PILOT NOT READY.** Next: improve and test the generator's exact source-reference behavior and short-answer rubric/scoring alignment using synthetic fixtures; add a regression for the structural-repair path leaving insufficient time for a quality repair. Then seek a separate bounded approval before another model-backed staging request.
+
 ## Approved staging generation after temporary entitlement — 2026-10-20 21:33 UTC
 
 - [x] The user approved exactly one synthetic 3-question Mathematics 2b attempt using temporary Premium on the existing staging account. Before changing the role, a read-only query found exactly one matching profile and confirmed it was `gratis`; the role was changed only in staging project `yhcinqejsocpmmetazpz`.
