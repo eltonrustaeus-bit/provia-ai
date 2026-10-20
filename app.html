@@ -2166,6 +2166,13 @@ try{
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);
       clearGenerationPlaceholder();
+      if(res.status===503&&res.data?.error==="AUTH_VERIFICATION_UNAVAILABLE"){
+        const message=LANG==="sv"
+          ?"Provtjänsten kunde inte nå inloggningen just nu. Ditt material finns kvar; försök igen om en liten stund."
+          :"The exam service could not reach sign-in just now. Your material is still here; please try again shortly.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"auth_verification_unavailable"};
+      }
       if(res.status===401||res.data?.error==="Unauthorized"){
         const message=LANG==="sv"
           ?"Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter."

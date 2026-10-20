@@ -265,7 +265,13 @@ globalThis.fetch = async (input, init = {}) => {
   calls.push({ url, method, body: init.body ? JSON.parse(init.body) : null, headers: Object.fromEntries(new Headers(init.headers).entries()) });
 
   if (url === `${origin}/auth/v1/user`) {
-    if (authFetchFailure) throw authFetchFailure;
+    if (Array.isArray(authFetchFailure)) {
+      const next = authFetchFailure.shift();
+      if (next instanceof Response) return next;
+      if (next) throw next;
+    } else if (authFetchFailure) {
+      throw authFetchFailure;
+    }
     return Response.json({ id: userId });
   }
   if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
@@ -416,17 +422,41 @@ try {
   authFetchFailure = Object.assign(new TypeError("private-token-sentinel"), {
     cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),
   });
+  const authLookupCountBefore = calls.filter((call) => call.url === `${origin}/auth/v1/user`).length;
   const authLookupFailure = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   authFetchFailure = null;
-  assert.equal(authLookupFailure.status, 401, "an auth lookup transport failure remains unauthorized");
+  assert.equal(authLookupFailure.status, 503, "an auth lookup transport failure is reported as temporary service unavailability");
+  assert.deepEqual(authLookupFailure.body, { ok: false, error: "AUTH_VERIFICATION_UNAVAILABLE" });
+  assert.equal(calls.filter((call) => call.url === `${origin}/auth/v1/user`).length - authLookupCountBefore, 2,
+    "a retryable auth transport failure receives exactly one bounded retry");
   const authLookupLog = JSON.parse(authLogs.at(-1));
   assert.deepEqual(authLookupLog, {
     event: "exam_auth_rejected", stage: "auth_user_lookup", errorClass: "TypeError",
-    networkCode: "ETIMEDOUT", timedOut: true,
+    attempts: 2, networkCode: "ETIMEDOUT", timedOut: true,
   }, "auth transport diagnostics identify timeout class without exposing exception text");
   assert.doesNotMatch(JSON.stringify(authLookupLog), /private-token-sentinel|private-message-sentinel|synthetic-user-token/);
+
+  authFetchFailure = [Object.assign(new TypeError("private-token-sentinel"), {
+    cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),
+  })];
+  const retryBefore = calls.filter((call) => call.url === `${origin}/auth/v1/user`).length;
+  const retriedAuth = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText: "", qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(retriedAuth.status, 400, "a transient auth timeout can recover before material validation without reaching generation");
+  assert.equal(calls.filter((call) => call.url === `${origin}/auth/v1/user`).length - retryBefore, 2);
+  assert.equal(calls.slice(lastInvokeCallStart).some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "auth retry regression does not spend an AI call");
+
+  authFetchFailure = [new Response("unauthorized", { status: 401 })];
+  const invalidAuth = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(invalidAuth.status, 401, "a rejected user token remains an authentication error, not an outage");
 
   const unsupportedGraph = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 2b", pastedText: "Parabeln ges av y = x^2.",

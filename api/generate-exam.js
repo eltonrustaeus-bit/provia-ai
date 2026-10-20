@@ -394,47 +394,69 @@ async function readJsonBody(req) {
 
 async function requireAuth(req) {
   const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
-  const logFailure = (stage, status, error) => {
+  const logFailure = (stage, status, error, attempts) => {
     console.warn(JSON.stringify({
       event: "exam_auth_rejected",
       stage,
       ...(Number.isInteger(status) ? { status } : {}),
+      ...(Number.isInteger(attempts) ? { attempts } : {}),
       ...(error ? safeAuthFailureDetails(error) : {}),
     }));
   };
   if (!token) {
     logFailure("missing_bearer_token");
-    return null;
+    return { ok: false, unavailable: false };
   }
   let stage = "supabase_target";
   try {
     const supabaseUrl = getSupabaseUrl();
     const headers = getSupabaseAdminHeaders();
+    if (!headers.apikey) {
+      logFailure("auth_server_key_missing");
+      return { ok: false, unavailable: true };
+    }
     stage = "auth_user_lookup";
-    const r = await fetch(
-      supabaseUrl + "/auth/v1/user",
-      {
-        headers: {
-          ...headers,
-          "Authorization": "Bearer " + token,
-        },
-        signal: AbortSignal.timeout(5000)
+    for (let attempt = 1; attempt <= AUTH_USER_LOOKUP_ATTEMPTS; attempt += 1) {
+      let r;
+      try {
+        r = await fetch(
+          supabaseUrl + "/auth/v1/user",
+          {
+            headers: {
+              ...headers,
+              "Authorization": "Bearer " + token,
+            },
+            signal: AbortSignal.timeout(AUTH_USER_LOOKUP_TIMEOUT_MS)
+          }
+        );
+      } catch (error) {
+        const details = safeAuthFailureDetails(error);
+        const retryable = details.timedOut || SAFE_AUTH_NETWORK_CODES.has(error?.cause?.code || error?.code);
+        if (retryable && attempt < AUTH_USER_LOOKUP_ATTEMPTS) continue;
+        logFailure("auth_user_lookup", undefined, error, attempt);
+        return { ok: false, unavailable: true };
       }
-    );
-    if (!r.ok) {
-      logFailure("auth_user_http", r.status);
-      return null;
+      if (!r.ok) {
+        logFailure("auth_user_http", r.status, undefined, attempt);
+        return { ok: false, unavailable: r.status !== 401 };
+      }
+      try {
+        stage = "auth_user_response";
+        const data = await r.json();
+        if (!data?.id) {
+          logFailure("auth_user_missing_id", undefined, undefined, attempt);
+          return { ok: false, unavailable: true };
+        }
+        return { ok: true, user: data };
+      } catch (error) {
+        logFailure("auth_user_response", undefined, error, attempt);
+        return { ok: false, unavailable: true };
+      }
     }
-    stage = "auth_user_response";
-    const data = await r.json();
-    if (!data?.id) {
-      logFailure("auth_user_missing_id");
-      return null;
-    }
-    return data;
+    return { ok: false, unavailable: true };
   } catch (error) {
     logFailure(stage, undefined, error);
-    return null;
+    return { ok: false, unavailable: true };
   }
 }
 
@@ -442,6 +464,8 @@ const SAFE_AUTH_NETWORK_CODES = new Set([
   "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETUNREACH", "ENOTFOUND",
   "EAI_AGAIN", "ETIMEDOUT",
 ]);
+const AUTH_USER_LOOKUP_TIMEOUT_MS = 8000;
+const AUTH_USER_LOOKUP_ATTEMPTS = 2;
 
 function safeAuthFailureDetails(error) {
   const name = ["AbortError", "TimeoutError", "TypeError"].includes(error?.name)
@@ -1162,8 +1186,13 @@ module.exports = async function handler(req, res) {
     return json(res, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
   }
 
-  const user = await requireAuth(req);
-  if (!user) return json(res, 401, { ok: false, error: "Unauthorized" });
+  const auth = await requireAuth(req);
+  if (!auth.ok) {
+    return auth.unavailable
+      ? json(res, 503, { ok: false, error: "AUTH_VERIFICATION_UNAVAILABLE" })
+      : json(res, 401, { ok: false, error: "Unauthorized" });
+  }
+  const user = auth.user;
 
   if (!process.env.EXAM_SIGNING_SECRET) {
     return json(res, 503, { ok: false, error: "EXAM_SIGNING_NOT_CONFIGURED" });
