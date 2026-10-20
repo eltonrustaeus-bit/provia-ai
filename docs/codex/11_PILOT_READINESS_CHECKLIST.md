@@ -156,3 +156,15 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Detta ar lokal kod-/mockevidens, inte en ny Preview eller live AI-korning. Inloggning till staging ar fortfarande blockerad; graderingsmigreringen ar oprovad mot riktig PostgreSQL.
 
 **PILOT NOT READY.**
+
+## Uppfoljning — 2026-10-20 (P.E.R-felaterhamtning och staginginloggning)
+
+- [x] Aktuell branch-Preview ar fortfarande READY fran commit `a702495` pa `codex/exgen-school-pilot-review-2026-10-13`; deployment-ID `dpl_AZkSTsNMWt1h5uGTSjvk58rMwwnp`. Ny lokal P.E.R-kod ar annu inte deployad.
+- [x] Supabase `exgen-pilot-staging` ar `ACTIVE_HEALTHY`. Den godkanda Previewns `/aterstall.html`-callback finns redan i Redirect URLs; ingen dubblett lades till och ingen Auth-installning andrades.
+- [x] Auth > Emails > SMTP visar `Enable custom SMTP` av. Supabases standard-SMTP ar begransad till teamadresser; ingen aterstallning skickades i denna uppfoljning. Anvandaren uppger fortsatt att inloggning inte fungerar och att testkontots uppgifter inte kan anvandas.
+- [x] P.E.R JSON-fallbacken aterstaller nu fragan och annonserar ett tydligt retry-fel nar HTTP 200 innehaller trasig JSON eller saknat/tomt svar. Ett trasigt JSON-fel pa 502 behaller samtidigt serverfelvagen. Inget automatiskt omskick sker. Regressionerna finns i `tests/frontend/pilot-session-recovery.test.mjs`.
+- [x] P.E.R/provskyddets riktade svit passerade 60/60. Full isolerad offline-svit `node --test tests/**/*.test.mjs` passerade 304/304. `git diff --check` ar ren.
+- [ ] `node --test` utan filter tar aven med `scripts/test-emails.js` och `.mjs`; bada faller i denna miljo pa saknad `RESEND_API_KEY` respektive en gammal textmarkor i `api/signup.js`. De ar inte del av de 304 testfilerna men behover en separat testkommandograns eller uppdatering.
+- [ ] Staginginloggning och ett syntetiskt liveflode (tre fragor, P.E.R utanfor/under prov, rattning och sparning) aterstar. Stagingdata och konto ska inte raderas utan separat uttryckligt godkannande.
+
+**PILOT NOT READY.** Offlinebeteende ar verifierat men den nya P.E.R-fixen ar inte deployad; liveinloggning, modellkvalitet, provgenerering/rattning i staging och skolans operativa godkannanden aterstar.

@@ -1581,7 +1581,10 @@ function finalizeMsg(div, text) {
         } else {
           /* ── JSON fallback ── */
           var data = {};
-          try { data = await Promise.race([r.json(), requestDeadline]); }
+          try {
+            var parsed = await Promise.race([r.json(), requestDeadline]);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
+          }
           catch (err) { if (requestTimedOut) throw err; }
           if (!requestStillOwned()) return;
           stopThinking();
@@ -1624,11 +1627,25 @@ function finalizeMsg(div, text) {
               }
               announceFailure(typing.textContent);
             } else {
-              if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
-              finalizeMsg(typing, data.answer || 'Inget svar.');
-              if (data.history) perSaveHist(data.history);
-              if (isLandingMode) addAnswerCTA(typing);
-              stepsAfterAnswer(data.answer, isLandingMode);
+              var answer = data && typeof data.answer === 'string' ? data.answer.trim() : '';
+              if (!answer) {
+                restoreFailedQuestion();
+                typing.className = 'per-msg teacher';
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'P.E.R returned no usable answer. Your question is still here; press Send to try again.'
+                  : 'P.E.R fick inget användbart svar. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
+                announceFailure(typing.textContent);
+              } else {
+                if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
+                finalizeMsg(typing, data.answer);
+                if (data.history) perSaveHist(data.history);
+                if (isLandingMode) addAnswerCTA(typing);
+                stepsAfterAnswer(data.answer, isLandingMode);
+              }
             }
           }
         }

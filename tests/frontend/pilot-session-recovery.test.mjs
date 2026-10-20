@@ -322,6 +322,35 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await serverErrorPage.locator("#perInput").inputValue(), QUESTION,
       "HTTP failure restores the question for a deliberate retry");
 
+    const malformedJsonPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: "{" }));
+    await malformedJsonPage.locator("#perBubble").click();
+    await malformedJsonPage.locator("#perInput").fill(QUESTION);
+    await malformedJsonPage.locator("#perSendBtn").click();
+    await malformedJsonPage.locator("#perMessages").getByText("P.E.R fick inget användbart svar.").waitFor();
+    assert.equal(await malformedJsonPage.locator("#perInput").inputValue(), QUESTION,
+      "malformed JSON with HTTP 200 restores the question for a deliberate retry");
+    assert.match(await malformedJsonPage.locator("#perAnnouncement").textContent(), /Frågan finns kvar/,
+      "malformed JSON is announced to assistive technology");
+
+    const malformedServerJsonPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 502, headers: { "content-type": "application/json" }, body: "{" }));
+    await malformedServerJsonPage.locator("#perBubble").click();
+    await malformedServerJsonPage.locator("#perInput").fill(QUESTION);
+    await malformedServerJsonPage.locator("#perSendBtn").click();
+    await malformedServerJsonPage.locator("#perMessages").getByText("Fel — försök igen.").waitFor();
+    assert.equal(await malformedServerJsonPage.locator("#perInput").inputValue(), QUESTION,
+      "malformed JSON on an HTTP failure keeps the normal server-error recovery path");
+
+    const emptyAnswerPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 200, json: { answer: "   " } }));
+    await emptyAnswerPage.locator("#perBubble").click();
+    await emptyAnswerPage.locator("#perInput").fill(QUESTION);
+    await emptyAnswerPage.locator("#perSendBtn").click();
+    await emptyAnswerPage.locator("#perMessages").getByText("P.E.R fick inget användbart svar.").waitFor();
+    assert.equal(await emptyAnswerPage.locator("#perInput").inputValue(), QUESTION,
+      "an empty answer is not presented as success and restores the question");
+
     const incompleteStreamPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       route => route.fulfill({
         status: 200,
