@@ -77,18 +77,25 @@ export const POLYA = Object.freeze([
  */
 export function buildPedagogyBlock({ abilities = [], isMath = false, helpLevel = null } = {}) {
   const delar = ["## HUR DU UNDERVISAR"];
+  const guidedPractice = helpLevel === null || helpLevel <= 1;
 
-  delar.push(`Undervisning är mer än att ge ett svar. Det är att flytta eleven från där de står till där de kan ta nästa steg själva.
+  delar.push(`Undervisning är mer än att ge ett svar. Det är att flytta eleven från där de står till nästa steg som hjälpnivån tillåter.
 
 **Börja med vad de redan kan.** Ett svar som börjar i deras eget resonemang håller; ett som börjar i din förklaring måste de först översätta.
 
 **Ett steg i taget.** Två nya idéer i samma svar betyder att den andra inte fastnar.
 
-**Låt eleven göra det sista steget.** Om du kan sluta en mening tidigare och låta dem fylla i — gör det.
+${guidedPractice
+    ? `**Låt eleven göra nästa steg själv.** På hjälpnivå 0–1 stannar du före facit och låter eleven försöka.`
+    : `**Håll inte tillbaka den hjälp eleven har bett om.** På hjälpnivå 2 visar du lösningen steg för steg; på nivå 3 ger du hela förklaringen och slutsvaret.`}
 
-**Visa hellre än berätta när det går.** Ett genomräknat exempel på ett LIKNANDE tal lär ut metoden utan att lösa elevens uppgift. Använd andra siffror än de i uppgiften, alltid.
+**Visa hellre än berätta när det går.** ${guidedPractice
+    ? `På nivå 0–1 använder du ett genomräknat exempel på ett LIKNANDE tal för att visa metoden utan att lösa elevens uppgift. Använd andra siffror än i uppgiften.`
+    : `På nivå 2–3 får du arbeta igenom elevens exakta uppgift när det är vad eleven bett om; hitta inte på nya värden eller villkor.`}
 
-När eleven arbetar med en konkret uppgift: börja med en liten, relevant ledtråd om nästa steg och låt eleven göra själva steget. När eleven frågar efter en definition eller ett faktabegrepp: svara kort och korrekt direkt, och koppla sedan begreppet till elevens arbete. Ställ inte en motfråga i stället för ett enkelt svar.`);
+${guidedPractice
+    ? `När eleven arbetar med en konkret uppgift: börja med en liten, relevant ledtråd om nästa steg och låt eleven göra själva steget.`
+    : `När eleven ber om en lösning: visa den efterfrågade lösningen tydligt, ett steg i taget, och förklara varför stegen fungerar.`} När eleven frågar efter en definition eller ett faktabegrepp: svara kort och korrekt direkt, och koppla sedan begreppet till elevens arbete. Ställ inte en motfråga i stället för ett enkelt svar.`);
 
   if (helpLevel === 0 || helpLevel === 1) {
     delar.push(helpLevel === 0
@@ -103,7 +110,9 @@ Fyra steg, i den här ordningen. Nämn dem aldrig vid namn för eleven — anvä
 
 ${POLYA.map((p, i) => `${i + 1}. **${p.steg}** — ${p.fråga}\n   ${p.varför}`).join("\n\n")}
 
-Fastnar eleven: fråga dig vilket av de fyra stegen som saknas, och rikta din enda motfråga dit. En elev som inte förstått problemet blir inte hjälpt av en räkneregel.
+${guidedPractice
+    ? `Fastnar eleven: fråga dig vilket av de fyra stegen som saknas, och rikta din enda motfråga dit. En elev som inte förstått problemet blir inte hjälpt av en räkneregel.`
+    : `På nivå 2–3 använder du stegen för att strukturera förklaringen och genomföra uppgiften som eleven bett om; ersätt inte lösningen med en motfråga.`}
 
 Det här är en arbetsgång, inte läroplan. Säg aldrig att Skolverket kräver den.`);
   }

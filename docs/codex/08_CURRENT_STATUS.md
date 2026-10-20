@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## P.E.R. help-level consistency — 2026-10-20
+
+- [x] P.E.R.'s pedagogy prompt now follows the selected help level: guided practice at levels 0-1, requested step-by-step work at level 2, and a full explanation with answer at level 3. The generic instruction no longer overrides levels 2-3.
+- [x] Added regression coverage for levels 0, 2 and 3, exact task values, and the guided-practice answer boundary.
+- [x] `node tests/per/per-pedagogy.test.mjs` passed; `node --test tests/api/per-exam-review-handler.test.mjs tests/api/grade-to-explain-completion-proof.integration.test.mjs` passed **55/55**; full sequential API suite passed **174/174**.
+- [!] User confirmed the Preview session is already signed in; no further login is needed. The P.E.R. prompt change is still local and has not been deployed or live-tested.
+
+**PILOT NOT READY.** Next: commit the reviewed local change, update the branch Preview, and verify normal study help at levels 0-3 without changing the active-exam answer gate. Live generation still needs a permitted staging test entitlement.
+
 ## Bounded quality-repair follow-up — 2026-10-20
 
 - [x] Quality repair now requests one extra candidate beyond the missing slots instead of `2 * missing slots + 2`, reducing repair output while retaining a spare for independent review. Mixed repairs reserve one extra candidate for each missing question type so the requested balance cannot be lost.
