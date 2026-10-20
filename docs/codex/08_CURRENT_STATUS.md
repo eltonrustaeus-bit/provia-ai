@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## Matteprov: poängmatris i linje med frågan — 2026-10-21
+
+- [x] Granskning av liveutfallet och den verkliga produktionsprompten hittade en motsägelse: kortsvarsinstruktionen säger att matrisen bara får bedöma uttryckligen efterfrågat arbete, medan matteprompten generellt krävde att varje uppgift delar poäng mellan metod och slutsvar. Det kunde skapa poängmatriser med metodkrav som frågetexten inte ställde.
+- [x] Svensk och engelsk matteprompt kräver nu metodpoäng endast när frågan uttryckligen ber eleven visa eller förklara metoden. Frågor som bara begär slutsvar poängsätter bara slutsvaret. Modellsvar får fortfarande innehålla en full lösning, men utökar inte elevens poängkrav.
+- [x] Regression täcker båda språken och kontrollerar att uppgiftskrav, matris och fullständigt modellsvar inte motsäger varandra. `node tests/api/exam-pipeline-offline.test.mjs`, hela sekventiella API-sviten, `node --check api/generate-exam.js` och `git diff --check` passerade.
+- [!] Detta är en kod- och offlineförbättring. Den är inte pushad eller liveverifierad. Den senaste syntetiska livegenereringen misslyckades fortfarande vid kvalitetsgrinden; dess Premium-testfönster är förbrukat och kontot återställdes till Gratis. Ingen ytterligare modellbegäran, kvot-/rolländring eller Supabase-ändring gjordes.
+
+**PILOT NOT READY.** Nästa steg är att granska patchen och, efter separat godkännande, skapa en Preview och använda ett nytt avgränsat syntetiskt test för att verifiera om scoring-avvisningarna minskar utan att verifieringsgrinden försvagas. P.E.R.-provskydd, rättning/sparning, tvåkontos-RLS/IDOR och skolans operativa godkännanden återstår också.
+
 ## Approved live generation attempt stopped at quota — 2026-10-21
 
 - [x] The user authenticated in the exact READY staging Preview. One approved attempt used only synthetic Matematik 2b notes, the existing `gratis` role/quota, level A and three short-answer questions.

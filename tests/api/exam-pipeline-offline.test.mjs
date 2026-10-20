@@ -93,6 +93,12 @@ assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom fler
   "A-level mathematics uses bounded multi-step work rather than open-ended wording");
 assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
   "each mathematical short answer has one checkable answer target");
+assert.match(mathPrompt.systemPrompt, /frågan uttryckligen be eleven visa eller förklara lösningsmetoden om metodpoäng ska ges/i,
+  "method points require the question to explicitly request working");
+assert.match(mathPrompt.systemPrompt, /Om frågan bara ber om ett slutsvar ska matrisen bara bedöma slutsvaret/i,
+  "final-answer-only tasks cannot silently score method");
+assert.match(mathPrompt.systemPrompt, /Model_answer ska ändå.*får inte i sig utöka vad eleven måste göra för poäng/i,
+  "a complete worked model answer does not expand the scoring contract");
 const englishPrompt = generateExam.buildExamPrompts({
   lang: "en", level: "C", course: "Mathematics 2b", qType: "short", numQuestions: 2,
   pastedText: "A fixed fee is 50 SEK and each hour costs 30 SEK.", isMath: true,
@@ -101,6 +107,10 @@ assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear a
   "English short-answer generation follows the same bounded-task rule");
 assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
   "English scoring criteria cannot silently require unrequested work");
+assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
+  "English math prompts align method points with requested student work");
+assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
+  "English final-answer-only tasks cannot silently score method");
 const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
   id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
 }] }, {

@@ -966,8 +966,8 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "logaritmer, exponentialfunktioner, vektorer, komplexa tal eller diskret matematik. " +
     "Svårighetsgrad, uppgiftstyper och bedömning ska följa Skolverkets centrala innehåll och " +
     "kunskapskrav för den aktuella kursen. " +
-    "Rubric ska dela upp poäng på metod + slutsvar (t.ex. 'Metod 2p, svar 1p'). " +
-    "Model_answer ska innehålla full lösning med tydliga steg och ett markerat slutsvar. " +
+    "För kortsvar ska frågan uttryckligen be eleven visa eller förklara lösningsmetoden om metodpoäng ska ges; då delar rubric upp poängen mellan efterfrågad metod och slutsvar. Om frågan bara ber om ett slutsvar ska matrisen bara bedöma slutsvaret. " +
+    "Model_answer ska ändå innehålla en korrekt full lösning med tydliga steg och ett markerat slutsvar, men den får inte i sig utöka vad eleven måste göra för poäng. " +
     "Flervalsalternativ ska vara plausibla felalternativ (typiska räknefel) och endast ett korrekt. " +
     "För kortsvar ska varje uppgift ha ETT kontrollerbart slutsvarsmål. På A-nivå skapar du utmaning genom flera tydliga matematiska steg med givna värden — inte genom öppna uppmaningar som 'analysera' eller 'resonera' utan avgränsning. Skriv ut alla villkor och exakt vad eleven ska bestämma, till exempel ett visst nollställe, en symmetrilinje eller ett extremvärde. Varje uppgift ska gå att lösa fristående med materialet och frågetexten. " +
     /* Notationen. Utan den skrevs bråk som 3/4 och integraler i löpande text,
@@ -1036,8 +1036,8 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "exponential functions, vectors, complex numbers or discrete mathematics. " +
     "Difficulty, task types and assessment must follow the Swedish National Agency for " +
     "Education's core content and knowledge requirements for the course in question. " +
-    "Rubric must split points into method + final answer (e.g. 'Method 2p, answer 1p'). " +
-    "Model_answer must include a complete step-by-step solution and a clearly marked final answer. " +
+    "For short-answer tasks, the question must explicitly ask students to show or explain their method if method points are awarded; then the rubric splits points between the requested method and final answer. If the question asks only for a final answer, the rubric scores only that answer. " +
+    "Model_answer must still include a correct complete step-by-step solution and a clearly marked final answer, but it must not expand what the student is required to do for credit. " +
     "MC options must be plausible distractors (typical calculation mistakes) with exactly one correct. " +
     "For short-answer tasks, give each item ONE checkable final-answer target. At A level, make the work challenging through several explicit mathematical steps using supplied values, not through open-ended 'analyze' or 'discuss' wording. State every condition and exactly what the student must find, such as a specified root, axis of symmetry, or extremum. Each task must be independently solvable from the material and question text.";
 
