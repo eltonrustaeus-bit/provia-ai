@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Approved staging attempt stopped at quota — 2026-10-20 21:26 UTC
+
+- [x] The user approved exactly one synthetic 3-question Mathematics 2b short-answer attempt on the READY Preview `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo`, using the existing synthetic quadratic-function source. Deployment SHA and branch were rechecked first; encrypted pilot variables are scoped to the exact feature branch. No variable values were read.
+- [x] The authenticated Preview returned the learner-facing state **“Provkvoten är slut”** and said the test version's weekly allowance was used. No role or quota setting was changed and no additional attempt was made.
+- [x] Source inspection confirms `generate-exam.js` handles `!quota.ok` with HTTP 429 and returns before `pickModel()` and `streamGeneration()`. Therefore this attempt did not reach a model call. The Vercel runtime-log query returned no records in its requested five-minute window, so no runtime event corroboration was available.
+- [!] The prompt and repair-telemetry changes remain unverified against live model output; the last allowed live generation still yielded **0/3** before this commit. We cannot test generation quality again until the staging quota resets or the user separately authorizes an entitlement change.
+- [x] The fresh API suite (174/174), frontend exam-flow regression (178/178), P.E.R pedagogy, active-exam gate (55/55), P.E.R browser context (66/66), and help ladder (28/28) remain green at code commit `679e635`; status-only commits do not alter deployed app code.
+
+**PILOT NOT READY.** Next: wait for the staging weekly quota reset or get separate explicit approval for a narrowly scoped test entitlement. Do not alter staging role/quota or make another model call under the exhausted-quota approval. After a permitted generation, compare final verified yield and repair timing with the previous 0/3 result.
+
 ## Preview and offline verification — 2026-10-20 21:22 UTC
 
 - [x] Commit `679e6350cb7603668e4b37d844c48da665e8e3a5` is pushed to `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo` is `READY` for that exact SHA and branch at `https://provia-jgnflaa89-eltons-projects-4adfb1a3.vercel.app/app.html`; its branch alias is `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
