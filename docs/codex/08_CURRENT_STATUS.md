@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Quota messaging follow-up — 2026-10-20
+
+- [x] The exam wizard now treats an API quota response as a distinct learner state: it says the quota is exhausted and shows the existing reset/limit message instead of presenting a generic generation failure or suggesting fewer questions.
+- [x] Browser coverage drives the real wizard-to-`runGenerate()` bridge with a synthetic HTTP 429 and verifies the dedicated heading, reset guidance, and absence of the misleading retry hint.
+- [x] Focused generation/verifier/solver checks passed. The complete `tests/frontend/exam-flow.regression.mjs` passed **178/178** on the final rerun; an earlier run had one transient Supabase mock fetch failure. `EXAM_FLOW_LANGUAGE_ONLY=1` also passed 58/58; syntax and diff checks passed.
+- [!] Current code/deployment readback: branch `codex/exgen-generation-quality-2026-10-20` has latest pushed docs commit `2c7d7ec`; its Vercel Preview is READY from that exact SHA. The quota-message code is local only until the next feature-branch commit/deployment.
+- [!] In the last authenticated live check, exam generation and P.E.R. were both stopped by exhausted staging quotas before useful model-backed responses. No quota/role, staging, `main`, or Production changes were made in this increment; no new live generation result is claimed.
+
+**PILOT NOT READY.** Next: publish this small quota-UX fix to the feature Preview, then resume bounded synthetic generation/P.E.R. verification only when the staging test entitlement is available; preserve all staging data and keep `main`/Production unchanged.
+
 ## Generation reliability follow-up — 2026-10-20
 
 - [x] The endpoint now delivers a shortened exam only when at least 60% of the requested questions (minimum 2) have passed every existing quality gate. Mixed exams must retain both MC and short-answer types. Rejected or unchecked questions are never included; smaller sets still fail closed and release the reserved quota.

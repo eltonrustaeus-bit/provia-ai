@@ -1549,6 +1549,12 @@
         err.textContent = tx("Kontot ändrades medan provet skapades. Logga in igen för att fortsätta.", "The account changed while the exam was being created. Sign in again to continue.");
         return;
       }
+      if (r && r.quota) {
+        var quotaMessage = r.error || tx("Provkvoten är slut just nu.", "Your exam quota has been reached.");
+        err.textContent = "";
+        say(tx("Provkvoten är slut.", "Exam quota reached."), quotaMessage);
+        return;
+      }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
         var retryHint = r && r.errorCode === "incomplete_exam"

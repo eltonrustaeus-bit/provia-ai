@@ -672,6 +672,17 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("ofullständigt prov visar kvalitetsfelet i stället för en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+    await page.route("**/api/generate-exam", route => route.fulfill({
+      status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")
+      ?.textContent === "Provkvoten är slut.", null, { timeout: 5000 });
+    const quotaNotice = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
+    const quotaError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
+      /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
+      JSON.stringify({ quotaNotice, quotaError }));
     await page.route("**/api/generate-exam", route => route.abort("failed"));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Anslutningen bröts/.test(
