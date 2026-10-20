@@ -80,6 +80,28 @@ assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från mater
 assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+const mixedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: 4, qType: "mix" });
+assert.match(mixedRepairPayload.input.at(-1).content, /exakt 2 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
+  "a four-candidate mixed repair explicitly requests two candidates of each type");
+const mixedRepairEnglish = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "en", numQuestions: 3, candidateCount: 3, qType: "mixed" });
+assert.match(mixedRepairEnglish.input.at(-1).content, /exactly 1 multiple-choice candidate\(s\) and 2 short-answer candidate\(s\)/i,
+  "an odd mixed repair allocates its extra candidate to short answer in English too");
+assert.deepEqual(generateExam.safeAuthFailureDetails(Object.assign(
+  new TypeError("private-token-sentinel"),
+  { cause: Object.assign(new Error("private-message-sentinel"), { code: "ECONNRESET" }) },
+)), { errorClass: "TypeError", networkCode: "ECONNRESET", timedOut: false },
+"auth diagnostics retain only an allowlisted error class and network code");
+assert.deepEqual(generateExam.safeAuthFailureDetails(Object.assign(new Error("private-token-sentinel"), { code: "ETIMEDOUT" })),
+  { errorClass: "Error", networkCode: "ETIMEDOUT", timedOut: true },
+  "auth timeouts are distinguishable without logging the original error");
 const missingSlotRepair = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
@@ -220,10 +242,13 @@ let quotaDenied = false;
 let lastInvokeCallStart = 0;
 const failureLogs = [];
 const previousConsoleError = console.error;
+const previousConsoleWarn = console.warn;
 const qualityLogs = [];
+const authLogs = [];
 const previousConsoleLog = console.log;
 console.error = (line) => failureLogs.push(String(line));
 console.log = (line) => qualityLogs.push(String(line));
+console.warn = (line) => authLogs.push(String(line));
 
 function outputResponse(value) {
   return Response.json({
@@ -233,12 +258,16 @@ function outputResponse(value) {
   });
 }
 
+let authFetchFailure = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
   const method = init.method || "GET";
   calls.push({ url, method, body: init.body ? JSON.parse(init.body) : null, headers: Object.fromEntries(new Headers(init.headers).entries()) });
 
-  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (url === `${origin}/auth/v1/user`) {
+    if (authFetchFailure) throw authFetchFailure;
+    return Response.json({ id: userId });
+  }
   if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
   if (url.startsWith(`${origin}/rest/v1/user_profiles?select=mastery`)) return Response.json([]);
   if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
@@ -384,6 +413,21 @@ function invoke(handler, body) {
 try {
   const course = "Matematik 1b";
   const pastedText = "Grundläggande räkning: Vi tränar addition, subtraktion och multiplikation med heltal.";
+  authFetchFailure = Object.assign(new TypeError("private-token-sentinel"), {
+    cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),
+  });
+  const authLookupFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(authLookupFailure.status, 401, "an auth lookup transport failure remains unauthorized");
+  const authLookupLog = JSON.parse(authLogs.at(-1));
+  assert.deepEqual(authLookupLog, {
+    event: "exam_auth_rejected", stage: "auth_user_lookup", errorClass: "TypeError",
+    networkCode: "ETIMEDOUT", timedOut: true,
+  }, "auth transport diagnostics identify timeout class without exposing exception text");
+  assert.doesNotMatch(JSON.stringify(authLookupLog), /private-token-sentinel|private-message-sentinel|synthetic-user-token/);
+
   const unsupportedGraph = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 2b", pastedText: "Parabeln ges av y = x^2.",
     qType: "graph", numQuestions: 1,
@@ -1719,6 +1763,7 @@ try {
 } finally {
   globalThis.fetch = previousFetch;
   console.error = previousConsoleError;
+  console.warn = previousConsoleWarn;
   console.log = previousConsoleLog;
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];

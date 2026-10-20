@@ -394,11 +394,12 @@ async function readJsonBody(req) {
 
 async function requireAuth(req) {
   const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
-  const logFailure = (stage, status) => {
+  const logFailure = (stage, status, error) => {
     console.warn(JSON.stringify({
       event: "exam_auth_rejected",
       stage,
       ...(Number.isInteger(status) ? { status } : {}),
+      ...(error ? safeAuthFailureDetails(error) : {}),
     }));
   };
   if (!token) {
@@ -431,10 +432,30 @@ async function requireAuth(req) {
       return null;
     }
     return data;
-  } catch {
-    logFailure(stage);
+  } catch (error) {
+    logFailure(stage, undefined, error);
     return null;
   }
+}
+
+const SAFE_AUTH_NETWORK_CODES = new Set([
+  "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETUNREACH", "ENOTFOUND",
+  "EAI_AGAIN", "ETIMEDOUT",
+]);
+
+function safeAuthFailureDetails(error) {
+  const name = ["AbortError", "TimeoutError", "TypeError"].includes(error?.name)
+    ? error.name
+    : "Error";
+  const rawCode = error?.cause?.code || error?.code;
+  const networkCode = typeof rawCode === "string" && SAFE_AUTH_NETWORK_CODES.has(rawCode)
+    ? rawCode
+    : null;
+  return {
+    errorClass: name,
+    ...(networkCode ? { networkCode } : {}),
+    timedOut: name === "TimeoutError" || networkCode === "ETIMEDOUT",
+  };
 }
 
 async function loadCentralRules() {
@@ -1054,7 +1075,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [] }) {
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || missingSlots + 1));
@@ -1110,9 +1131,14 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."
           : "",
       ].filter(Boolean).join(" ");
+  const mixedTypeGuidance = ["mix", "mixed"].includes(qType)
+    ? (lang === "en"
+      ? `For this mixed exam, include exactly ${repairCount - Math.ceil(repairCount / 2)} multiple-choice candidate(s) and ${Math.ceil(repairCount / 2)} short-answer candidate(s). For an odd candidate count, the extra candidate must be short-answer. Do not return all candidates as multiple choice.`
+      : `För detta blandade prov ska du skapa exakt ${repairCount - Math.ceil(repairCount / 2)} flervalskandidat(er) och ${Math.ceil(repairCount / 2)} kortsvarskandidat(er). Vid udda antal ska den extra kandidaten vara kortsvar. Gör inte alla kandidater till flervalsfrågor.`)
+    : "";
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1424,7 +1450,7 @@ module.exports = async function handler(req, res) {
         const repairSlots = numQuestions - exam.questions.length;
         const repairCount = Math.min(6, repairSlots + 1);
         const repairPayload = buildRepairPayload(payload, {
-          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount,
+          lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType,
         });
         const response = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -1636,7 +1662,7 @@ module.exports = async function handler(req, res) {
             const repairCount = Math.min(6, repairSlots + 1);
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
-              reviewFailureCodes: Object.keys(initialVerifierFailureCodes),
+              reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType,
             });
             repairFailureStage = "repair_generation";
             const r2 = await fetch("https://api.openai.com/v1/responses", {
@@ -2060,6 +2086,7 @@ module.exports = async function handler(req, res) {
 // schema without an HTTP request.
 module.exports.buildExamPrompts = buildExamPrompts;
 module.exports.buildRepairPayload = buildRepairPayload;
+module.exports.safeAuthFailureDetails = safeAuthFailureDetails;
 module.exports.parseExamResponse = parseExamResponse; // pure — structured-output parsing/salvage
 module.exports.safeNormalizationFailure = safeNormalizationFailure; // bounded diagnostic classification
 module.exports.normalizeSelectedFocusTerms = normalizeSelectedFocusTerms;

@@ -523,3 +523,27 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Ingen Preview-push/deploy, Supabase-migration, `main`-merge, Production-åtgärd, kontokvot-/rolländring eller stagingdata-radering utfördes. Skolans godkännanden för elevdata, retention, läraråtkomst, support och incidentflöde kvarstår.
 
 **PILOT NOT READY.** En konkret rotorsak bakom den aktuella trefrågeavvisningen är nu rättad lokalt och täckt offline. Livebekräftelse kräver Preview från den ändrade grenen; stagingref, grading-502, AI-användningsloggning och skolans operativa grindar återstår.
+
+## Fortsatt liveverifiering — ny kvalitetsreparation och P.E.R. — 2026-10-20 15:50 UTC
+
+- [x] Efter uttryckligt godkännande flyttades den stabila Preview-aliasen till deployment `dpl_6KtS422CdUHwWBzC3DCTYz5hPRG9`, READY från commit `8e8abe695a6ac285d88ad427b7061dc61c5dc628` på `codex/exgen-generation-quality-2026-10-20`. Aliasen är fortsatt Preview; `exgen.se` och Production ändrades inte. Runtimekonfigurationen via aliasen visade pilotläge, stagingref `yhcinqejsocpmmetazpz` och samma origin som `appOrigin`.
+- [x] Ett syntetiskt Biologi 1-prov med blandade frågor startades. Kvalitetsreparationen kördes efter den första granskningen, men endast två av tre slutfrågor klarade oberoende verifiering och solverkontroll. Loggen visar 7 verifierade frågor, 2 godkända, 5 avvisade, varav två reparationskandidater avvisades på alternativkvalitet och en solvermarkerades för flera korrekta alternativ. API:t lämnade inte ut något delprov. Detta är en faktisk återstående kapacitets-/kvalitetsbrist, inte ett lyckat provflöde.
+- [x] Ett separat syntetiskt P.E.R.-meddelande utanför aktivt prov fick svar i staging. Svaret gav en biologispecifik ledtråd om syrets roll och ställde en vägledande följdfråga utan att börja med facit.
+- [x] Ett andra syntetiskt provförsök stoppades före generering: Vercel loggade `exam_auth_rejected` vid `auth_user_lookup` utan HTTP-status. Koden loggar detta när Supabase Auth-fetch kastar i stället för att returnera ett HTTP-fel; transport-/timeoutorsak är sannolik men inte bevisad. Staging-unified-logs-frågan i exakt tidsfönster visade endast `pgbouncer_logs`, så rotorsaken är inte fastställd.
+- [x] Hela offline-sviten `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0. Ingen kod ändrades i denna uppföljning.
+- [ ] Kvalitetsreparationen har fortfarande inte visat att ett liveprov med begärt antal frågor kan färdigställas. Förbättra kandidatkvalitet utan att försvaga verifierare/solver; täck realistiskt blandat och kortsvarsflöde med regressionsfall innan ny begränsad livekörning.
+- [ ] Auth-fetch-felet behöver bättre säker, aggregerad diagnostik och en reproducerbar stagingkontroll. Logga aldrig token, nyckel, e-post eller rått användarmaterial. Inga ytterligare liveanrop gjordes efter auth-avvisningen.
+- [ ] Rättning, P.E.R. under aktivt prov/facitskydd, sparat resultat, RLS/tvakonto-isolering, hosted PostgreSQL-gradering, rollback och skolans operativa godkännanden är fortfarande overifierade.
+
+**PILOT NOT READY.** Preview-aliasen och staging-runtimekonfigurationen är verifierade. P.E.R. svarade på ett syntetiskt fristående meddelande, men liveprovskapandet föll en gång på kvalitetsgrinden och nästa försök fastnade på Auth-fetch. Full offline-svit är grön; autentiserad end-to-end, rättning/sparning och skolans säkerhets-/driftgodkännanden återstår.
+
+## Lokal förbättring efter livefynd — 2026-10-20
+
+- [x] Källkontroll av `js/exam-flow.js` bekräftade att klienten skickar `qType: "mix"`. Kvalitetsreparationen gav tidigare inget exakt antal per frågetyp; live-loggen visade fyra flervalskandidater och noll kortsvarskandidater. Reparationsprompten anger nu en exakt, balanserad kandidatfördelning för `mix` (udda antal får en extra kortsvarskandidat). Ingen kvalitetsgrind har försvagats.
+- [x] Auth-fetch-undantag loggar nu endast en allowlistad felklass, ett allowlistat nätverkskodfält och timeoutindikator. Rått felmeddelande, stack, token och användarinnehåll loggas inte. Auth-svaret fortsätter fail-closed som 401.
+- [x] Regressionsfall täcker den verkliga klienttypen `mix`, svensk och engelsk kandidatfördelning, timeout-/nätverksklassificering samt att privata sentinel-strängar inte når loggen.
+- [x] Riktade tester: provpipeline, regenereringsbudget, verifierarkontrakt och assessment-core passerade; `node --check` för generator och testfil samt `git diff --check` passerade. Hela offline-sviten `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0.
+- [ ] Ändringen är lokal och ännu inte deployad eller liveverifierad. Push/ny Preview kräver separat åtgärdsgodkännande; efter ny READY-kontroll ska högst ett syntetiskt blandat prov användas för att se om reparationen ger både MC och kortsvar och klarar oförändrade verifierar-/solvergrindar.
+- [ ] Auth-diagnostiken är endast en säker felklassificering. Den fastställer inte orsaken till det tidigare stagingfelet förrän en ny kontrollerad körning visar till exempel timeout eller allowlistad nätverkskod.
+
+**PILOT NOT READY.** De två lokala regressionerna är täckta och hela offline-sviten är grön. Liveprov, Auth-transportdiagnos, rättning/sparning, provskydd och skolans operativa godkännanden återstår.
