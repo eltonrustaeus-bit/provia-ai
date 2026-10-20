@@ -1134,39 +1134,33 @@ try {
   activeQuestions = questions;
   regenerationQuestions = null;
 
-  const structuralCandidates = questions.map((question, index) => ({
-    ...question,
-    id: `structural-${index + 1}`,
-    question: `Strukturell kandidat ${index + 1}: ${question.question}`,
-    source_references: ["addition, subtraktion och multiplikation"],
-  }));
   const qualityCandidates = [
     { ...questions[0], id: "quality-1", question: "Hur mycket är 10 - 5?", options: ["4", "5", "6"], correct_index: 1, model_answer: "5", source_references: ["addition, subtraktion och multiplikation"] },
     { ...questions[1], id: "quality-2", question: "Vad är 2 · 4?", options: ["6", "8", "10"], correct_index: 1, model_answer: "8", source_references: ["addition, subtraktion och multiplikation"] },
+    { ...questions[2], id: "quality-3", question: "Beräkna 12 ÷ 3.", options: ["3", "4", "5"], correct_index: 1, model_answer: "4", source_references: ["addition, subtraktion och multiplikation"] },
   ];
-  activeQuestions = questions.map((question) => ({
-    ...question,
-    source_references: ["Not found in the supplied material"],
-  }));
-  regenerationQuestionBatches = [structuralCandidates, qualityCandidates];
-  verifierRejectQuestionId = "structural-1";
+  activeQuestions = questions.map((question, index) => index === 1
+    ? { ...question, source_references: ["Not found in the supplied material"] }
+    : question);
+  regenerationQuestionBatches = [qualityCandidates];
+  verifierRejectQuestionId = "q-1";
   calls.length = 0;
   const structuralThenQualityRepair = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(structuralThenQualityRepair.status, 200, JSON.stringify(structuralThenQualityRepair.body));
   assert.equal(structuralThenQualityRepair.body.exam.questions.length, 3,
-    "a verifier-driven repair remains available after a structural repair fills the initial batch");
-  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "structural-1"), false,
-    "a structurally repaired but verifier-rejected question is never delivered");
+    "one verifier-driven repair fills a structural gap and replaces a rejected question");
+  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "a verifier-rejected first-round question is never delivered");
   assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
-    "the bounded verifier-driven repair supplies a newly reviewed question");
-  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 2,
-    "at most one structural repair and one verifier-driven repair run for a request");
-  const twoStageRepairLog = JSON.parse(qualityLogs.at(-1));
-  assert.equal(twoStageRepairLog.structuralRepairAttempted, true);
-  assert.equal(twoStageRepairLog.qualityRepairAttempted, true);
-  assert.equal(twoStageRepairLog.finalQuestionCount, 3);
+    "the bounded repair supplies a newly reviewed question");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+    "a partial first batch uses one repair generation, not a structural plus quality pair");
+  const partialBatchRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(partialBatchRepairLog.structuralRepairAttempted, false);
+  assert.equal(partialBatchRepairLog.qualityRepairAttempted, true);
+  assert.equal(partialBatchRepairLog.finalQuestionCount, 3);
   verifierRejectQuestionId = null;
   regenerationQuestions = null;
   regenerationQuestionBatches = null;

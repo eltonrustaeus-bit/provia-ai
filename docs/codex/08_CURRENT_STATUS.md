@@ -1,5 +1,17 @@
 # 08 Current Status
 
+## Single-pass repair after partial generation — 2026-10-20
+
+- [x] One explicitly approved synthetic staging request on Preview commit `b401b6b` requested three short-answer Mathematics 2b questions. It failed closed with **1/3** approved; no incomplete exam was delivered.
+- [x] Content-free runtime diagnostics showed one initial structural drop (`source_reference_missing`) and two verifier rejections (`low_scoring_quality`). A structural repair returned two candidates, but the later quality repair did not run.
+- [x] Root cause: the partial batch triggered a structural repair before first review, spending generation time before the verifier-driven repair could run inside the 60-second function budget.
+- [x] The pipeline now reserves pre-review structural repair for the zero-valid-candidate case. A partial batch is reviewed first; the existing single verifier-driven repair can then fill structural gaps and replace rejected questions.
+- [x] The staging profile was temporarily Premium for the one approved request and immediately restored to `gratis`; its recorded count/period was not modified. No second model request was made.
+- [x] Focused generation-pipeline and budget tests passed; full sequential API suite passed **174/174**; P.E.R. pedagogy regression and exam answer-gate tests also passed.
+- [!] This repair-flow change is not yet deployed or live-verified. No further staging generation is authorized by the one-request approval.
+
+**PILOT NOT READY.** Next: commit and deploy the offline-verified change to the existing feature Preview. Verify deployment identity and preserve staging at gratis; request separate approval before another model-backed staging run.
+
 ## P.E.R. help-level consistency — 2026-10-20
 
 - [x] P.E.R.'s pedagogy prompt now follows the selected help level: guided practice at levels 0-1, requested step-by-step work at level 2, and a full explanation with answer at level 3. The generic instruction no longer overrides levels 2-3.

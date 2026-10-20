@@ -1592,12 +1592,14 @@ module.exports = async function handler(req, res) {
     let repairCrossRoundDuplicateCount = 0;
     let combinedQuestionCount = 0;
 
-    // Fill structural gaps before review, then keep the separate bounded
-    // verifier-driven repair available if review still rejects a question.
+    // If the structural gate rejects the whole first batch, seed review with
+    // one bounded repair. For a partial batch, defer replacement until after
+    // review so one verifier-driven repair can fill structural gaps and replace
+    // weak questions without spending the function budget on two generations.
     const structuralRepairTimeout = qType === "graph"
       ? null
       : regenerationGenerationTimeout(budget.remaining());
-    if (exam.questions.length < numQuestions && structuralRepairTimeout !== null) {
+    if (exam.questions.length === 0 && structuralRepairTimeout !== null) {
       repairAttempted = true;
       structuralRepairAttempted = true;
       repairFailureStage = "structural_repair_generation";
