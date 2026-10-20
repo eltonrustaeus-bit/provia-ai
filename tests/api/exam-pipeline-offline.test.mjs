@@ -553,6 +553,34 @@ try {
     /exakt 0 flervalskandidat\(er\) och 4 kortsvarskandidat\(er\)/i,
     "quality repair targets the missing short-answer type");
 
+  const rejectedMixedMc = { ...questions[0], id: "mixed-rejected-mc" };
+  const rejectedMixedShort = { ...mixedShortCandidates[0], id: "mixed-rejected-short-both" };
+  const mixedRepairCandidates = [
+    { ...questions[0], id: "mixed-repair-mc-1", question: "Vilket tal är summan av 2 och 3?" },
+    { ...questions[0], id: "mixed-repair-mc-2", question: "Vilket tal är summan av 3 och 4?", model_answer: "7" },
+    { ...questions[0], id: "mixed-repair-mc-3", question: "Vilket tal är summan av 4 och 5?", model_answer: "9" },
+    { ...mixedShortCandidates[1], id: "mixed-repair-short-1" },
+    { ...mixedShortCandidates[2], id: "mixed-repair-short-2" },
+    { ...mixedShortCandidates[3], id: "mixed-repair-short-3" },
+  ];
+  activeQuestions = [rejectedMixedMc, rejectedMixedShort];
+  verifierRejectQuestionId = [rejectedMixedMc.id, rejectedMixedShort.id];
+  regenerationQuestionBatches = [mixedRepairCandidates];
+  calls.length = 0;
+  const repairedBothTypes = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  verifierRejectQuestionId = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedBothTypes.status, 200, JSON.stringify(repairedBothTypes.body));
+  assert.deepEqual(repairedBothTypes.body.exam.questions.map((question) => question.type).sort(), ["mc", "short"],
+    "one repair replaces both rejected types and preserves the requested mixed balance");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 3 flervalskandidat\(er\) och 3 kortsvarskandidat\(er\)/i,
+    "quality repair requests candidates for both simultaneously missing types");
+
   activeQuestions = questions.slice(0, 3);
   regenerationQuestionBatches = [mixedShortCandidates];
   calls.length = 0;

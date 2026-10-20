@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## Local verification follow-up — 2026-10-20
+
+- [x] Added an integrated mixed-exam regression where both the MC question and short answer fail independent review in the same pass. The repair prompt must request candidates for both missing types, and the returned exam must retain the requested one-MC/one-short distribution.
+- [x] The focused exam pipeline test passed, then the full sequential API suite passed 169/169. These are offline/mocked tests; they do not verify live model output or Preview behavior.
+- [!] This regression and the prior local P.E.R. request-path tests remain local-only on the feature branch. No push, Vercel deployment, alias movement, `main` merge, Production operation, or staging-data change was made.
+- [!] Password changes must be entered and submitted by the user. The Supabase staging users page and the latest Preview login are the next manual handoff; after the user signs in, run only the previously approved bounded synthetic staging checks.
+
+**PILOT NOT READY.** Authenticated Preview verification, telemetry diagnosis, two-account RLS/IDOR runtime checks, and school operational approval remain outstanding.
+
 ## Latest staging verification and local follow-up — 2026-10-20
 
 - [x] After explicit approval, applied both grading-state migrations only to Supabase staging `yhcinqejsocpmmetazpz`; hosted ledger records `20261020170419` and `20261020170431`. Schema/RPC ACL checks and isolated PostgreSQL migration tests passed.
