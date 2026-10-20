@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## Bounded streamed quality repair — 2026-10-21
+
+- [x] The verifier-driven quality-repair request now uses the existing bounded Responses stream reader, matching the initial generation path. A timeout can retain complete question objects emitted before a partial JSON tail; those candidates still pass normalization, source checks, independent verifier, and the existing fail-closed delivery gate.
+- [x] Added offline coverage for an actual abort-signal timeout preserving streamed bytes, JSON salvage of a complete candidate before an incomplete tail, and a full synthetic repair where the salvaged candidate is independently accepted. Telemetry marks a salvaged/truncated repair response as incomplete. No extra repair attempt or quality-threshold relaxation was added.
+- [x] Verification: `node tests/api/exam-pipeline-offline.test.mjs` passed; full API suite **176/176**; `node --check api/generate-exam.js` and `git diff --check` passed.
+- [!] This is offline evidence only. The latest live run on commit `7f2a067` timed out before repair candidates were returned; it does not prove partial candidate text reached the server, nor does this change prove that a live repair will produce or pass review.
+
+**PILOT NOT READY.** Next: continue offline analysis of the reviewer rejection pattern and inspect model-call timing/stream behavior under controlled fixtures. A new staging model call and Preview deployment require fresh explicit approval; do not weaken the quality gate.
+
 ## Verifier repair feedback — 2026-10-21
 
 - [x] Pushed only approved commit `7f2a067df4585f9a8820bec9fc36feac802356eb` to `codex/exgen-generation-quality-2026-10-20`. Preview `dpl_rpqu8moGNyjqm4ZgXGidqaDyA5Cr` is `READY` from that exact SHA and branch. Required Preview variables remain encrypted and scoped to the branch; no values were read.

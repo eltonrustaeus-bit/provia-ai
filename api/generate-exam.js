@@ -893,7 +893,13 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
     if (e && (e.name === "AbortError" || controller.signal.aborted)) {
       return { ok: true, text, cutShort: true, usage, model: providerModel, latencyMs: Date.now() - t0 };
     }
-    return { ok: false, status: 0, details: String(e), latencyMs: Date.now() - t0 };
+    return {
+      ok: false,
+      status: 0,
+      details: String(e),
+      failureKind: e?.name === "TypeError" ? "network" : "other",
+      latencyMs: Date.now() - t0,
+    };
   }
 
   clearTimeout(timer);
@@ -1862,21 +1868,32 @@ module.exports = async function handler(req, res) {
               reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType, missingTypes,
             });
             repairFailureStage = "repair_generation";
-            const r2 = await fetch("https://api.openai.com/v1/responses", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify(repairPayload),
-              // Preserve time for independent review plus delivery finalization.
-              signal: AbortSignal.timeout(regenerationTimeoutMs)
+            const repairStream = await streamGeneration({
+              apiKey,
+              payload: repairPayload,
+              // Keep the same bounded review/finalization reserve while allowing
+              // complete candidates to be salvaged if the provider runs long.
+              budgetMs: regenerationTimeoutMs,
             });
-            repairHttpStatus = r2.status;
-            repairFailureStage = "generation_response";
-            const raw2 = await r2.text();
-            try { data2 = JSON.parse(raw2); } catch { data2 = null; }
-            if (r2.ok && data2) {
+            repairHttpStatus = Number.isInteger(repairStream.status) && repairStream.status > 0
+              ? repairStream.status
+              : null;
+            if (!repairStream.ok) {
+              repairFailureStage = "repair_generation";
+              if (repairStream.status === 0) repairTransportError = repairStream.failureKind || "other";
+            } else {
+              if (repairStream.cutShort) repairTransportError = "timeout";
+              data2 = {
+                status: repairStream.cutShort ? "incomplete" : "completed",
+                model: repairStream.model || model,
+                usage: repairStream.usage,
+                output_text: repairStream.text,
+              };
               repairFailureStage = "repair_normalization";
-              repairResponseStatus = typeof data2.status === "string" ? data2.status : "unknown";
               const parsedRepair = parseExamResponse(data2);
+              repairResponseStatus = repairStream.cutShort || parsedRepair.truncated
+                ? "incomplete"
+                : (typeof data2.status === "string" ? data2.status : "unknown");
               repairParseStatus = parsedRepair.parseStatus;
               repairOutputQuestionCount = Array.isArray(parsedRepair.exam?.questions) ? parsedRepair.exam.questions.length : 0;
               const normalized2 = parsedRepair.exam && normalizeGeneratedExam(parsedRepair.exam, {

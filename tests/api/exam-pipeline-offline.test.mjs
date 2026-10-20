@@ -11,6 +11,33 @@ const verifierModule = require("../../api/_verifier.js");
 const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
 
+const originalStreamFetch = globalThis.fetch;
+const streamedPartialQuestion = '{"title":"Syntetiskt","level":"C","questions":[{"id":"partial-1","question":"2 + 2?"},';
+globalThis.fetch = async (_url, { signal }) => new Response(new ReadableStream({
+  start(controller) {
+    const event = { type: "response.output_text.delta", delta: streamedPartialQuestion };
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
+    signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+  },
+}));
+let interruptedRepairStream;
+try {
+  interruptedRepairStream = await generateExam.streamGeneration({ apiKey: "synthetic", payload: {}, budgetMs: 25 });
+} finally {
+  globalThis.fetch = originalStreamFetch;
+}
+assert.equal(interruptedRepairStream.ok, true);
+assert.equal(interruptedRepairStream.cutShort, true,
+  "a provider stream timeout is recognized as an expected bounded interruption");
+assert.match(interruptedRepairStream.text, /partial-1/,
+  "the response stream retains complete candidate bytes received before timeout");
+const parsedInterruptedRepair = generateExam.parseExamResponse({
+  status: "incomplete", output_text: interruptedRepairStream.text,
+});
+assert.equal(parsedInterruptedRepair.parseStatus, "salvaged_json");
+assert.equal(parsedInterruptedRepair.exam.questions.length, 1,
+  "the parser can recover a complete question before the interrupted JSON tail");
+
 assert.equal(assessment.MAX_MC_OPTIONS, 5);
 assert.equal(generateExam.pickModel({ isMath: false, env: {} }), "gpt-4o-mini",
   "the exam model stays on the current inexpensive default until a candidate is deliberately selected");
@@ -350,6 +377,7 @@ let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
 let regenerationQuestionBatches = null;
 let throwOnRepair = false;
+let truncateQualityRepairStream = false;
 let simulatedNow = null;
 let issuanceUnavailable = false;
 let quotaDenied = false;
@@ -456,6 +484,31 @@ globalThis.fetch = async (input, init = {}) => {
 
   if (url === "https://api.openai.com/v1/responses") {
     const body = JSON.parse(init.body || "{}");
+    const schemaName = body.text?.format?.name;
+    const isQualityRepair = typeof body.input?.at?.(-1)?.content === "string"
+      && body.input.at(-1).content.includes("KVALITETSREPARATION");
+    if (body.stream && schemaName === "mock_exam_schema" && isQualityRepair) {
+      if (simulatedNow !== null) simulatedNow += 20_000;
+      if (throwOnRepair) throw new Error("synthetic repair transport timeout");
+      const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
+      if (!batch) throw new Error("unexpected synthetic quality-repair request");
+      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || batch.length;
+      const repaired = batch.slice(0, repairCount);
+      activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
+      const fullText = JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
+      const outputText = truncateQualityRepairStream && repaired.length > 1
+        ? JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired.slice(0, 1) })
+          .slice(0, -2) + "," + JSON.stringify(repaired[1]).slice(0, -1)
+        : fullText;
+      const events = [{ type: "response.output_text.delta", delta: outputText }];
+      if (!truncateQualityRepairStream) {
+        events.push({ type: "response.completed", response: {
+          model: "measured-generator-model",
+          usage: { input_tokens: 120, output_tokens: 40 },
+        } });
+      }
+      return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`);
+    }
     if (body.stream) {
       if (simulatedNow !== null) simulatedNow += 10_000;
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
@@ -466,7 +519,6 @@ globalThis.fetch = async (input, init = {}) => {
       } };
       return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
-    const schemaName = body.text?.format?.name;
     if (schemaName === "mock_exam_schema") {
       if (simulatedNow !== null) simulatedNow += 20_000;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
@@ -1270,8 +1322,9 @@ try {
     "a verifier-rejected first-round question is never delivered");
   assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
     "the bounded repair supplies a newly reviewed question");
-  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
-    "a partial first batch uses one repair generation, not a structural plus quality pair");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "a partial first batch uses one streamed repair generation, not a structural plus quality pair");
   const partialBatchRepairLog = JSON.parse(qualityLogs.at(-1));
   assert.equal(partialBatchRepairLog.structuralRepairAttempted, false);
   assert.equal(partialBatchRepairLog.qualityRepairAttempted, true);
@@ -1280,6 +1333,37 @@ try {
   assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairGenerationTimeoutMs),
     "quality repair logs its actual provider timeout budget");
   assert.equal(partialBatchRepairLog.finalQuestionCount, 3);
+
+  activeQuestions = questions;
+  regenerationQuestionBatches = [qualityCandidates];
+  verifierRejectQuestionId = "q-1";
+  truncateQualityRepairStream = true;
+  calls.length = 0;
+  let salvagedQualityRepair;
+  try {
+    salvagedQualityRepair = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    truncateQualityRepairStream = false;
+    verifierRejectQuestionId = null;
+  }
+  assert.equal(salvagedQualityRepair.status, 200, JSON.stringify(salvagedQualityRepair.body));
+  assert.equal(salvagedQualityRepair.body.exam.questions.length, 3,
+    "a complete repair candidate can be salvaged from a truncated streamed response");
+  assert.equal(salvagedQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
+    "the salvaged candidate still fills only a slot after independent verification");
+  const salvagedQualityRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(salvagedQualityRepairLog.repairParseStatus, "salvaged_json");
+  assert.equal(salvagedQualityRepairLog.repairResponseStatus, "incomplete");
+  assert.equal(salvagedQualityRepairLog.repairOutputQuestionCount, 1);
+  assert.equal(salvagedQualityRepairLog.finalQuestionCount, 3);
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "salvage does not add a second repair attempt");
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+
   verifierRejectQuestionId = null;
   regenerationQuestions = null;
   regenerationQuestionBatches = null;
@@ -1324,7 +1408,8 @@ try {
   assert.deepEqual(underfilledExam.body.exam.questions.map((question) => question.id), ["q-1", "q-2", "retry-1"],
     "two valid initial questions are reviewed and one bounded repair fills the third slot");
   const underfilledRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
-    && call.body?.stream !== true);
+    && call.body?.stream === true
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
   assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
   assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 2,
     "one missing slot requests one spare candidate so repair stays within its short review window");
@@ -1419,9 +1504,11 @@ try {
   assert.equal(duplicateRepairedExam.status, 200, JSON.stringify(duplicateRepairedExam.body));
   assert.equal(duplicateRepairedExam.body.exam.questions.length, 3,
     "a near-duplicate initial question is replaced by a distinct, independently reviewed repair");
-  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "an underfilled exam triggers exactly one bounded repair generation");
-  const repairCall = calls.find((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema");
+  const repairCall = calls.find((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
   assert.match(repairCall.body.input.at(-1).content, /KVALITETSREPARATION/,
     "the single repair generation receives explicit quality guidance");
   assert.equal(new Set(duplicateRepairedExam.body.exam.questions.map(assessment.questionDedupeSignature)).size, 3,
@@ -1461,7 +1548,8 @@ try {
     "the retry verifier receives the generated repair candidate");
   assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question }) => ({ id, type, question })),
     "the retry verifier gets already approved question wording only as comparison context");
-  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "at most one bounded missing-slot repair is requested");
   verifierRejectComparisonDuplicate = false;
 
@@ -1545,7 +1633,8 @@ try {
   assert.deepEqual(optionQualityLog.initialVerifierFailureCodes, {
     option_quality_failed: 3,
   }, "option plausibility failures have their own content-free diagnostic category");
-  const optionQualityRepairCall = calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").at(-1);
+  const optionQualityRepairCall = calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).at(-1);
   assert.match(optionQualityRepairCall.body.input.at(-1).content,
     /Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt/i,
     "option-quality rejection gives the bounded repair a specific distractor-quality correction");
