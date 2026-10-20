@@ -641,8 +641,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const requestId = "12345678-1234-4234-8234-123456789abc";
+    const technicalFailureMessage = "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.";
     await page.route("**/api/generate-exam", route => route.fulfill({
-      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance" },
+      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance", message: technicalFailureMessage },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Steg: provstart/.test(
@@ -657,6 +658,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("genereringsfel visar bara en tillåten, begriplig serverfas",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes("Steg: provstart") && !text.includes("exam_issuance")));
+    ok("genereringsfel visar en användbar förklaring i stället för ett generiskt återförsök",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
     const qualityMessage = "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen.";
     await page.route("**/api/generate-exam", route => route.fulfill({
       status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage },

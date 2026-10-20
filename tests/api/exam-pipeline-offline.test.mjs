@@ -110,11 +110,15 @@ const overfilledNormalization = generateExam.normalizeGeneratedExam({ questions:
 assert.equal(overfilledNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
 assert.equal(overfilledNormalization.failure?.payload.exam, undefined,
   "a question-count error never includes raw generated questions or answers");
+assert.match(overfilledNormalization.failure?.payload.message || "", /fel antal frågor.*tydligare material eller färre frågor/i,
+  "an overfilled draft gives a specific, actionable message rather than a generic completion error");
 assert.equal(JSON.stringify(overfilledNormalization.failure?.payload).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false);
 const emptyNormalization = generateExam.normalizeGeneratedExam({ questions: [] }, {
   qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
 });
 assert.equal(emptyNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
+assert.match(emptyNormalization.failure?.payload.message || "", /inga användbara frågor.*Lägg till relevant studiematerial eller prova med färre frågor/i,
+  "an empty draft explains that no usable questions were produced and what to try next");
 assert.equal(emptyNormalization.failure?.payload.exam, undefined,
   "an empty model response also returns no raw exam object");
 
@@ -1553,6 +1557,8 @@ try {
   issuanceUnavailable = false;
   assert.equal(issuanceFailure.status, 500, "a failed exam issuance is never returned as a usable exam");
   assert.equal(issuanceFailure.body.error, "exam_generation_failed");
+  assert.equal(issuanceFailure.body.message, "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.",
+    "unexpected generation errors provide an actionable Swedish message");
   assert.match(issuanceFailure.body.requestId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     "the safe response includes an opaque correlation id");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")), false,

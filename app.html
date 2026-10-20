@@ -2187,7 +2187,7 @@ try{
       if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
         const message=res.data.error==="mock_quota_unavailable"
           ? (LANG==="sv"?"Provkvoten kunde inte kontrolleras. Försök igen senare.":"The exam quota could not be checked. Please try again later.")
-          : (LANG==="sv"?"Provet kunde inte färdigställas. Försök igen.":"The exam could not be completed. Please try again.");
+          : (res.data?.message||(LANG==="sv"?"Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.":"A technical issue stopped exam creation. No exam was delivered. Please try again in a moment."));
         const stages=LANG==="sv"?{
           generation_setup:"förberedelse",model_generation:"frågegenerering",question_normalization:"bearbetning av frågor",
           quality_review:"kvalitetskontroll",grade_task_sealing:"säkring av facit",exam_manifest:"slutkontroll av prov",

@@ -103,7 +103,9 @@ function normalizeGeneratedExam(exam, {
       error: "GENERATION_QUESTION_COUNT_INVALID",
       requested: numQuestions,
       received: Array.isArray(exam?.questions) ? exam.questions.length : null,
-      message: lang === "en" ? "The exam could not be completed. Please try again." : "Provet kunde inte färdigställas. Försök igen.",
+      message: lang === "en"
+        ? "The generated draft did not contain usable questions. No exam was delivered. Add relevant study material or try fewer questions."
+        : "Provutkastet innehöll inga användbara frågor. Inget prov lämnades ut. Lägg till relevant studiematerial eller prova med färre frågor.",
     } } };
   }
   if (truncated) {
@@ -112,14 +114,18 @@ function normalizeGeneratedExam(exam, {
     return { failure: { status: 500, payload: {
       ok: false,
       error: "GENERATION_QUESTION_IDS_INVALID",
-      message: "Provet kunde inte färdigställas. Försök igen.",
+      message: lang === "en"
+        ? "The generated questions could not be validated safely. No exam was delivered; please try again."
+        : "Frågorna kunde inte valideras säkert. Inget prov lämnades ut; försök igen.",
     } } };
   }
   if (exam.questions.length === 0) {
     return { failure: { status: 500, payload: {
       ok: false,
       error: "GENERATION_QUESTION_IDS_INVALID",
-      message: "Provet kunde inte färdigställas. Försök igen.",
+      message: lang === "en"
+        ? "The generated questions could not be validated safely. No exam was delivered; please try again."
+        : "Frågorna kunde inte valideras säkert. Inget prov lämnades ut; försök igen.",
     } } };
   }
   if (!truncated && exam.questions.length > numQuestions) {
@@ -128,7 +134,9 @@ function normalizeGeneratedExam(exam, {
       error: "GENERATION_QUESTION_COUNT_INVALID",
       requested: numQuestions,
       received: exam.questions.length,
-      message: lang === "en" ? "The exam could not be completed. Please try again." : "Provet kunde inte färdigställas. Försök igen.",
+      message: lang === "en"
+        ? "The generated draft had an unexpected number of questions. No exam was delivered; please try again with clearer material or fewer questions."
+        : "Provutkastet hade fel antal frågor. Inget prov lämnades ut; försök igen med tydligare material eller färre frågor.",
     } } };
   }
 
@@ -1914,7 +1922,9 @@ module.exports = async function handler(req, res) {
       error: "exam_generation_failed",
       requestId: quotaRequestId,
       stage: failureStage,
-      message: "Provet kunde inte färdigställas. Försök igen."
+      message: lang === "en"
+        ? "A technical issue stopped exam creation. No exam was delivered. Please try again in a moment."
+        : "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund."
     });
   }
 };

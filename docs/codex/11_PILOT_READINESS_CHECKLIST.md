@@ -441,3 +441,14 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Rättnings-API-/SQL-kandidaterna är fortsatt lokala och ocommittade: stagingens RPC-kontrakt är äldre, PGlite ersätter inte två sessionsbaserade PostgreSQL- och PostgREST-tester, och en samordnad staging-cutover kräver separat godkännande.
 
 **PILOT NOT READY.** Reparationsgränsfallet är lokalt fixat och testat. Stagingautentisering, livegenerering/P.E.R./rättning/sparning och säker verifiering av databas-cutovern återstår.
+
+## Tydligare genereringsfel — 2026-10-20
+
+- [x] Lokalisering visar att aktiv P.E.R-ledd provvy redan bevarar API:ts detaljerade `incomplete_exam`-meddelande. Den tidigare generiska texten kan komma från en annan stoppväg; utan färska runtime-loggar är den historiska felorsaken inte fastställd.
+- [x] Tomma, felräknade eller osäkra provutkast returnerar nu ett konkret svenskt/engelskt fel i stället för den generiska completion-texten. Den breda API-felvägen säger också att ett tekniskt fel stoppade försöket, och klienten använder serverns lokaliserade meddelande i stället för att hårdkoda en generisk text. Korrelation-ID och tillåten fas visas fortsatt utan rå intern kod.
+- [x] Full offline-svit passerade med exit 0 före denna feltextändring. Efter ändringen passerade de tre berörda testfilerna: API-pipeline, browserflöde med 175 kontroller och antal-frågor-regression. `node --check` och `git diff --check` verifieras före commit.
+- [ ] Den exakta historiska felorsaken är ännu inte verifierad mot nya Preview-loggar; ändringen förbättrar felvägen men är inte ett bevis på att provgenereringens ursprungliga runtimefel är löst.
+- [ ] Den browserflik som senast var aktiv visar deployment `dpl_BoJxsyD8NhEtr5RpowYSSWSh6gMN`, commit `e7d8f43`, inte aktuellaste ExGen-previewn. Senaste verifierade Preview före denna kodändring var `d836350`; öppna och testa endast den nya deploymenten efter dess READY-status.
+- [ ] Stagingkontot är fortfarande inte autentiserat. Chattexponerat lösenord får inte återanvändas; ange ett nytt lösenord direkt i stagingens Supabase Dashboard. Inga liveanrop, stagingändringar eller produktionsåtgärder har gjorts.
+
+**PILOT NOT READY.** Felmeddelandena är tydligare och lokalt testade. Historiskt runtimefel, autentiserad staging-E2E och grading-databascutover återstår.
