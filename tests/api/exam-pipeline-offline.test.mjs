@@ -58,6 +58,14 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
+const mathPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
+  pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
+});
+assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom flera tydliga matematiska steg.*inte genom öppna uppmaningar/i,
+  "A-level mathematics uses bounded multi-step work rather than open-ended wording");
+assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
+  "each mathematical short answer has one checkable answer target");
 const englishPrompt = generateExam.buildExamPrompts({
   lang: "en", level: "C", course: "Mathematics 2b", qType: "short", numQuestions: 2,
   pastedText: "A fixed fee is 50 SEK and each hour costs 30 SEK.", isMath: true,
@@ -1160,6 +1168,10 @@ try {
   const partialBatchRepairLog = JSON.parse(qualityLogs.at(-1));
   assert.equal(partialBatchRepairLog.structuralRepairAttempted, false);
   assert.equal(partialBatchRepairLog.qualityRepairAttempted, true);
+  assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairBudgetRemainingMs),
+    "quality repair logs the remaining bounded request budget without study content");
+  assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairGenerationTimeoutMs),
+    "quality repair logs its actual provider timeout budget");
   assert.equal(partialBatchRepairLog.finalQuestionCount, 3);
   verifierRejectQuestionId = null;
   regenerationQuestions = null;

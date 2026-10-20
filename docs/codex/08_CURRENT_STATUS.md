@@ -1,5 +1,17 @@
 # 08 Current Status
 
+## Latest live generation check — 2026-10-20 21:13 UTC
+
+- [x] The user approved exactly one synthetic staging exam with temporary Premium access. The signed-in feature Preview `dpl_CYcK7LWidAyog31TXN7zkCJmq7xN` (branch `codex/exgen-generation-quality-2026-10-20`, SHA `a70092b8bbede3a9467d4f7c70d07bc7bd9814a6`) was verified before the request; no login was needed.
+- [x] Generated a 3-question short-answer Mathematics 2b exam from synthetic quadratic-function notes. The request reached the live model pipeline but failed closed: **0/3** questions passed review, so no exam was issued.
+- [x] Privacy-minimized Vercel telemetry shows all three initial items were rejected for reviewer rejection, required changes, and high ambiguity. The bounded repair request timed out before returning HTTP headers (`repairTransportError=timeout`); the first generation took 16.9 s and the full request reached 33.0 s. This confirms both weak first-pass question clarity and an unhelpful repair outcome, but the exact repair timeout allowance was not logged.
+- [x] The staging test profile was restored immediately to `gratis`; `mock_quota_count=3` and `mock_quota_period=2026-W43` remain unchanged. No production, `main`, or student data was touched.
+- [x] Local follow-up now makes A-level math short answers explicitly bounded multi-step tasks with one checkable answer target. Repair telemetry now records only the remaining milliseconds and provider timeout allowance, without question or study-material content.
+- [x] Focused offline tests for the exam pipeline and regeneration budget pass **2/2**; `git diff --check` passes.
+- [!] The prompt and telemetry changes are local only and have not been pushed, deployed, or live-tested. A second provider-backed request needs separate authorization; no further live generation was sent.
+
+**PILOT NOT READY.** Next: finish the offline suite, review the local diff, then get a bounded approval before deploying and performing one more staging-only generation check. Keep the staging profile free and Production/`main` unchanged.
+
 ## Single-pass repair after partial generation — 2026-10-20
 
 - [x] One explicitly approved synthetic staging request on Preview commit `b401b6b` requested three short-answer Mathematics 2b questions. It failed closed with **1/3** approved; no incomplete exam was delivered.

@@ -958,6 +958,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "Rubric ska dela upp poäng på metod + slutsvar (t.ex. 'Metod 2p, svar 1p'). " +
     "Model_answer ska innehålla full lösning med tydliga steg och ett markerat slutsvar. " +
     "Flervalsalternativ ska vara plausibla felalternativ (typiska räknefel) och endast ett korrekt. " +
+    "För kortsvar ska varje uppgift ha ETT kontrollerbart slutsvarsmål. På A-nivå skapar du utmaning genom flera tydliga matematiska steg med givna värden — inte genom öppna uppmaningar som 'analysera' eller 'resonera' utan avgränsning. Skriv ut alla villkor och exakt vad eleven ska bestämma, till exempel ett visst nollställe, en symmetrilinje eller ett extremvärde. Varje uppgift ska gå att lösa fristående med materialet och frågetexten. " +
     /* Notationen. Utan den skrevs bråk som 3/4 och integraler i löpande text,
        vilket är oläsligt så fort uttrycket blir större än en rad. Klienten
        renderar $...$ med KaTeX (js/math-render.js) i både provet och rättningen,
@@ -1026,7 +1027,8 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "Education's core content and knowledge requirements for the course in question. " +
     "Rubric must split points into method + final answer (e.g. 'Method 2p, answer 1p'). " +
     "Model_answer must include a complete step-by-step solution and a clearly marked final answer. " +
-    "MC options must be plausible distractors (typical calculation mistakes) with exactly one correct.";
+    "MC options must be plausible distractors (typical calculation mistakes) with exactly one correct. " +
+    "For short-answer tasks, give each item ONE checkable final-answer target. At A level, make the work challenging through several explicit mathematical steps using supplied values, not through open-ended 'analyze' or 'discuss' wording. State every condition and exactly what the student must find, such as a specified root, axis of symmetry, or extremum. Each task must be independently solvable from the material and question text.";
 
   const systemPrompt =
     lang === "sv"
@@ -1563,6 +1565,8 @@ module.exports = async function handler(req, res) {
     let structuralRepairAttempted = false;
     let qualityRepairAttempted = false;
     let repairFailureStage = null;
+    let qualityRepairBudgetRemainingMs = null;
+    let qualityRepairGenerationTimeoutMs = null;
     let repairCandidateCount = 0;
     let repairHttpStatus = null;
     let repairTransportError = null;
@@ -1805,7 +1809,9 @@ module.exports = async function handler(req, res) {
         // A regenerated graph batch remains excluded until the graph-specific
         // cross-round fixture is covered. Ordinary and MC batches share the
         // same server normalization, gate, verifier and (for MC) blind solver.
-        const regenerationTimeoutMs = regenerationGenerationTimeout(budget.remaining());
+        qualityRepairBudgetRemainingMs = Math.max(0, Math.floor(budget.remaining()));
+        const regenerationTimeoutMs = regenerationGenerationTimeout(qualityRepairBudgetRemainingMs);
+        qualityRepairGenerationTimeoutMs = regenerationTimeoutMs;
         const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null;
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
         const needsRepair = approvedIds.size < numQuestions
@@ -2128,6 +2134,8 @@ module.exports = async function handler(req, res) {
         repairAttempted,
         structuralRepairAttempted,
         qualityRepairAttempted,
+        qualityRepairBudgetRemainingMs,
+        qualityRepairGenerationTimeoutMs,
         repairFailureStage,
         repairCandidateCount,
         repairHttpStatus,
@@ -2186,6 +2194,8 @@ module.exports = async function handler(req, res) {
         repairAttempted,
         structuralRepairAttempted,
         qualityRepairAttempted,
+        qualityRepairBudgetRemainingMs,
+        qualityRepairGenerationTimeoutMs,
         repairFailureStage,
         repairCandidateCount,
         repairHttpStatus,
@@ -2232,6 +2242,8 @@ module.exports = async function handler(req, res) {
       solverReasons: solverOutcome.reasons,
       structuralRepairAttempted,
       qualityRepairAttempted,
+      qualityRepairBudgetRemainingMs,
+      qualityRepairGenerationTimeoutMs,
       repairFailureStage,
       repairCandidateCount,
       repairHttpStatus,
