@@ -3,7 +3,8 @@
   "outputDirectory": ".",
   "git": {
     "deploymentEnabled": {
-      "codex/exgen-school-pilot-review-2026-10-13": true
+      "codex/exgen-school-pilot-review-2026-10-13": true,
+      "codex/exgen-generation-quality-2026-10-20": true
     }
   },
   "functions": {
