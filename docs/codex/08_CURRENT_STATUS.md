@@ -3,11 +3,12 @@
 ## Bounded quality-repair follow-up — 2026-10-20
 
 - [x] Quality repair now requests one extra candidate beyond the missing slots instead of `2 * missing slots + 2`, reducing repair output while retaining a spare for independent review. Mixed repairs reserve one extra candidate for each missing question type so the requested balance cannot be lost.
-- [x] Repair instructions now explicitly require self-contained short-answer prompts, complete mathematical givens, and scoring criteria limited to the work the question asks for.
-- [x] Offline exam-pipeline regression passed; full sequential API suite passed; `git diff --check` passed.
+- [x] Both first-pass generation and repair prompts now require bounded short-answer tasks, complete mathematical givens, and scoring criteria limited to the work the question asks for (Swedish and English).
+- [x] Offline exam-pipeline regression, independent-verifier contract and regeneration-budget tests passed; full sequential API suite passed **174/174**; `git diff --check` passed.
 - [x] Commit `86aacb4153b49f7ba458912078c47ddec8db04a8` is on `codex/exgen-generation-quality-2026-10-20`; Vercel Preview `dpl_2qR8ZTm4YdPEKgnDvqgnQhCtDCSt` is READY and carries the branch Preview alias.
 - [x] The signed-in Preview restored its session after the initial reload. One synthetic run was attempted, but staging returned the test account's weekly quota-exhausted state before model generation; no live model result was produced.
-- [!] The code is deployed and offline-verified, but its effect on real model-backed question yield and repair latency is not yet established.
+- [!] The repair-batch change is deployed; the first-pass prompt refinement is part of this local increment and awaits its Preview build. Neither change has established its effect on real model-backed question yield or repair latency.
+- [!] No model default was changed. `OPENAI_MODEL_EXAM` remains the controlled exam-only comparison path; stronger-model quality, latency and cost have not been measured against the default.
 
 **PILOT NOT READY.** Next: with separate authorization, temporarily enable one bounded synthetic test for the staging account (or wait for its quota reset); compare candidate count, repair duration, and verified question yield to the last 0/3 run. Do not change model defaults until a controlled candidate-model comparison is measured.
 

@@ -54,6 +54,18 @@ assert.match(biologyPrompt.systemPrompt, /frågetyp-valet är blandat.*välj sho
   "mixed exams prefer a gradable short answer when the source cannot support plausible distractors");
 assert.match(biologyPrompt.systemPrompt, /cognitive_level beskriver vilket tänkande.*INTE samma skala som E\/C\/A/i,
   "the generator does not conflate cognitive action labels with exam level");
+assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad uppgift med ett klart svarsmål/i,
+  "first-pass short answers have one clear and bounded answer target");
+assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
+  "the short-answer rubric cannot silently score unrequested work");
+const englishPrompt = generateExam.buildExamPrompts({
+  lang: "en", level: "C", course: "Mathematics 2b", qType: "short", numQuestions: 2,
+  pastedText: "A fixed fee is 50 SEK and each hour costs 30 SEK.", isMath: true,
+});
+assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear answer target/i,
+  "English short-answer generation follows the same bounded-task rule");
+assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
+  "English scoring criteria cannot silently require unrequested work");
 const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
   id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
 }] }, {
