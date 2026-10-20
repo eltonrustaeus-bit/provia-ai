@@ -1,5 +1,15 @@
 # 08 Current Status
 
+## Full offline regression and Preview recheck — 2026-10-21
+
+- [x] The complete repository test run passed **324/324** (`node --test 'tests/**/*.test.mjs' 'tests/**/*.test.js'`); duration was 91.6 s. No failures, cancellations, skips, or todos.
+- [x] Read-only GitHub/Vercel verification confirms feature branch `codex/exgen-generation-quality-2026-10-20` remains at `adc5e0b41f3849789c683864036337e22ab6a2ac`; deployment `dpl_AVPF16aWsaWkgeHQwFiMzZxs5dVv` is `READY` from that exact branch and SHA.
+- [x] Reopened the exact Preview in the browser. It still displays the invited-pilot login gate, so this is not an authenticated runtime test.
+- [!] The user approved exactly one synthetic 3-question generation using the existing staging role/quota. No model-backed request has been made in this check because the Preview session is logged out. No credentials were requested or used; no quota, role, staging data, `main`, Production, or deployment settings were changed.
+- [!] The current local branch includes two status-only commits (`526e46c`, `1c72e42`) beyond the deployed remote SHA; they do not change app code. This status update is local and has not been pushed.
+
+**PILOT NOT READY.** Offline tests and the Preview build are verified, but generator quality and the full generation -> grading -> persistence -> P.E.R. live flow remain unverified on this deployment. Next: the user signs in directly to the exact Preview URL and confirms “inloggad”; then run only the already-approved synthetic 3-question test at the current staging role/quota. Stop if auth or quota blocks before a model call.
+
 ## Grading recovery regression audit — 2026-10-21
 
 - [x] Focused grading/API recovery and frontend timeout suite passed **15/15**. Coverage includes injected upstream HTTP 502, retry recovery, concurrent claim fencing, lost HTTP response replay, conflicting answers, result persistence, and no result/mastery writes when provider transport times out.
