@@ -1513,6 +1513,11 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assertVerifiedPartialExamDelivered(timedOutRetry, "repair transport failure");
+  const timedOutRetryLog = JSON.parse(qualityLogs.at(-2));
+  assert.equal(timedOutRetryLog.repairTransportError, "other",
+    "quality-repair transport failures are classified without recording the raw error");
+  assert.equal(timedOutRetryLog.repairHttpStatus, null);
+  assert.equal(JSON.stringify(timedOutRetryLog).includes("synthetic repair transport timeout"), false);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_solver_schema"), true,
     "first-round MCs are independently solved before retry starts");
 

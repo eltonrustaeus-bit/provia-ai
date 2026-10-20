@@ -1999,7 +1999,10 @@ module.exports = async function handler(req, res) {
                 }
               }
             }
-          } catch {
+          } catch (error) {
+            repairTransportError = ["TimeoutError", "AbortError"].includes(error?.name)
+              ? "timeout"
+              : error?.name === "TypeError" ? "network" : "other";
             // A bounded repair is optional. Preserve the already-reviewed
             // round-1 subset if generation or either independent check fails.
           } finally {
