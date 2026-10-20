@@ -208,3 +208,14 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Inloggning, livegenerering, P.E.R under/utanfor aktivt prov, sparad rattning, migreringsbeteende och skolans operativa godkannanden aterstar.
 
 **PILOT NOT READY.** Nasta steg ar att aterfa stagingautentisering utan att dela losenord eller aterstallningslank. Daretter kor ett litet syntetiskt stagingflode och verifiera aktuella Preview-/stagingkopplingar. Hall anvandarens separata graderingskandidater utanfor push tills de har en separat granskad verifieringsvag. Produktion, `main` och stagingdata lamnas ororda.
+
+## Farsk kontroll — 2026-10-20 09:52 UTC
+
+- [x] Vercel deployment `dpl_9FhFLbTgfJN2EHARF1pXQkbVf3Cz` ar `READY`, Preview-target, fran exakt commit `856d8ec2eeb9bd75733361ffeb1f7bfbb9a9ee74` pa pilotbranchen. Dess deployment-URL ar `https://provia-bjihuzexm-eltons-projects-4adfb1a3.vercel.app`.
+- [x] Med Vercels autentiserade Preview-fetch returnerade `js/exgen-runtime.js` HTTP 200 och visade `environment=pilot`, stagingref `yhcinqejsocpmmetazpz` och stabil gren-origin. Vardet for publicerbar nyckel skrevs inte ut eller dokumenterades.
+- [x] Skrivskyddad Auth-loggaggregering for senaste 24 timmarna visade tre `invalid_credentials`-svar, fem lyckade password-token-svar och senare tokenfornyelser, alla senast 2026-10-19 19:50 UTC. Inga nya `/token`- eller `/recover`-forsok syntes efter den tiden. Loggarna saknar har anvandarattribut; de identifierar inte vilket konto eller vilken Preview som anvandes och faststaller inte rotorsaken.
+- [x] Stagingens aktuella Preview-callback ar redan allowlistad. Ingen Auth-/SMTP-installning eller stagingdata andrades. Exakt autentiserat skolpilotflode ar fortsatt otestat.
+- [x] Lokal `.vercel/project.json` pekade pa ett separat tomt Vercel-projekt och har lokalt rattats till verifierade `provia-ai`-projektet. En `vercel curl` under den felaktiga lankningen rapporterade att den skapade en protection-bypass-token for tomma projektet `provia-ai-pilot-feature-20261019` (`prj_vWo9J6XgP2qJRQ5btgf2WR9C5Xs7`). Vercel lasningskontroll visar att projektet saknar deployment och domaner; env-metadata kunde inte lasas (403). Tokenvardet visades inte eller lades i repo. Projektinstallningen har inte andrats ytterligare.
+- [ ] Agaren behover granska och vid behov aterkalla den projektbundna bypass-tokenen for `prj_vWo9J6XgP2qJRQ5btgf2WR9C5Xs7`, eller uttryckligen godkanna radering av just det tomma projektet. Tidigare raderingsgodkannande avsag ett annat projekt-ID och anvands inte har.
+
+**PILOT NOT READY.** Senaste Previewn ar verifierad mot staging, men ingen ny Auth-begaran registrerades efter 2026-10-19 19:50 UTC och anvandarens inloggningsrotorsak ar okand. Fortsatt inte med liveprov forran testkontot loggar in. Ror inte det separat identifierade tomma Vercel-projektet igen utan specifikt agargodkannande.
