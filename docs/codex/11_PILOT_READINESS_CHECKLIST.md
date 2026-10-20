@@ -268,8 +268,152 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 ## Granskningsfix for utgangna graderingsclaims — 2026-10-20 10:42 UTC
 
 - [x] Oberoende QA flaggade utgangna claims. Kallkontroll bekraftade att `claim_exam_grading` redan stoppar utgangna issuances fore stale takeover; den verkliga luckan var att persist kunde godta en fortfarande aktiv claim efter issuance-deadline.
-- [x] Den lokala fencing-migrationen avvisar nu persist nar `expires_at <= now()`. PGlite-regressionen visar att stale utgangen claim inte kan tas over, att varken stale eller tidigare aktiv claim kan spara efter deadline, och att ingen `mock_results`-rad skapas.
-- [x] Riktade migration-/recoverytester passerade 4/4 efter fixen. Full sekventiell offline-svit passerade 310/310 tester, exit 0, efter fixen; detta verifierar lokal/mock-logik men inte hosted PostgreSQL eller liveflode.
+- [x] Den lokala fencing-migrationen avvisar nu claim och persist nar issuance-deadline har passerat enligt aktuell klocktid. PGlite-regressionen visar att stale utgangen claim inte kan tas over, att varken stale eller tidigare aktiv claim kan spara efter deadline, och att ingen `mock_results`-rad skapas.
+- [x] Riktade migration-/recoverytester passerade 4/4 efter expiry-fixen; full sekventiell offline-svit passerade 310/310 innan de senare fail-closed legacy overloads tillkom. Nuvarande kontrakt och ACL verifieras separat av den senare fokuserade sviten; inget av detta bevisar hosted PostgreSQL eller liveflode.
 - [ ] Fixen finns endast lokalt i den orenade worktreen och ar inte pushad eller applicerad. Den kravda grading-API/RPC-cutovern ar fortsatt stoppad av stagingens aldre RPC-signaturer och separat godkannande for stagingmigration.
 
 **PILOT NOT READY.** Ingen API- eller databas-cutover har gjorts. Oberoende QA bekräftar utgangssparren, men stagingmigration/cutover kraver separat tydligt godkannande; autentiserat liveflode och skolans operativa godkannanden aterstar ocksa.
+
+## Lokal tidsgrans-QA — 2026-10-20
+
+- [x] Efter den oberoende granskningen behaller migrationen gamla RPC-signaturer som fail-closed stubbar och lagger till tokenbaserade overloads. Migration-forst ger aldre Preview-kod ett avsiktligt stopp fram till ny koddeploy; ny kod forst far saknat RPC och failar ocksa stangt. Det ar en tydligt avgransad staging-cutover, inte nollavbrott. Ingen cutover har gjorts.
+- [x] Ytterligare granskning av tidsgranslogiken visade att PostgreSQL `now()` ar transaktionsstarttid. De lokala fencing- och abandonment-migrationerna anvander nu `clock_timestamp()` for deadline-/stale-kontroller efter radlaset.
+- [x] PGlite-testet provar att en grading-persistens och en abandonment som anropas efter att issuance-fristen passerat mitt i en langre transaktion returnerar `expired` utan att skriva resultat eller avbrott.
+- [x] Fokuserad API-/migration-/gradering-svit passerade 18/18 efter andringen. PGlite bevisar inte konkurrens mellan separata PostgreSQL-sessioner, hosted Supabase eller Preview/live-AI-flode.
+- [x] Oberoende QA fann inga SQL-/ACL-defekter i fail-closed legacy overloads. Cutovern ger tillfalligt gradingstopp for aldre Preview-kod; en redan startad gammal claim kan behova aldra ut fore ny kod kan ta over. Den lokala SQL-testen verifierar inte PostgREST:s JSON-overloadval eller schema-cache refresh.
+- [ ] Lokala API- och migrationsandringar ar fortfarande ocommittade/odeployerade och stagingkontot ar inte autentiserat i den aktuella Previewn. Ingen stagingmigration har applicerats. Verifiera riktiga tva-sessions PostgreSQL-konflikter fore separat cutover-godkannande.
+
+**PILOT NOT READY.** Nasta steg for livevagen ar att anvandaren loggar in med stagingkontot i aktuell Preview och delar endast feltext/tid om det misslyckas. Grading-cutover forblir separat och kraver uttryckligt godkannande efter PostgreSQL-verifiering.
+
+## Skrivskyddad Auth-kontroll — 2026-10-20 11:02 UTC
+
+- [x] Supabase bekräftar att `exgen-pilot-staging` (`yhcinqejsocpmmetazpz`) är `ACTIVE_HEALTHY`. En boolesk Auth-kontroll visar att det tidigare angivna stagingkontots e-post finns. En separat boolesk join visar att profilen är bekräftad, inte raderad eller avstängd och godkänd. Inga e-postadresser, UUID:er eller lösenord skrevs ut ur Auth-tabellen.
+- [x] Auth-loggar för 10:02-11:02 UTC visar ett `POST /token` med `grant_type=password` och `400 invalid_credentials`. Frågan returnerade endast path, grant type, HTTP-status och felkod; inga identitetsfält lästes. Begäran nådde alltså staging Auth, men inloggningsuppgifterna som användes accepterades inte. Rotorsaken är sannolikt lösenordsmismatch; Auths generiska felkod avslöjar inte lösenord eller exakt orsak.
+- [ ] Användaren behöver sätta ett känt nytt lösenord direkt i Supabase Dashboard för det bekräftade syntetiska kontot och försöka logga in på aktuell Preview igen. Lösenordet ska inte skickas till Codex. Ingen reset, SMTP-ändring, profil-/kvotändring eller ny Auth-användare gjordes i denna kontroll.
+
+**PILOT NOT READY.** Auth-endpointen och kontot är verifierade; autentiserad app-session saknas fortfarande. Efter lyckad inloggning fortsätter den begränsade syntetiska prov-/P.E.R.-/rättnings-/sparningsverifieringen.
+
+## Lokal helsvit och oberoende granskning — 2026-10-20
+
+- [x] Aktiv XelioV-mappning verifierad via CLI: ExGen-projekt `c3af48b2-20c3-4d33-a5e0-72aa001a1637` pekar på exakt denna isolerade worktree. HEAD är `5a0242e`; arbetsgrenen är detached och innehåller befintliga lokala ändringar. Dessa har bevarats.
+- [x] Aktuell Vercel Preview-listning bekräftar READY-deployment från `5a0242e` på den befintliga pilotgrenen. Deploymenten innehåller inte de lokala rättnings-/migrationskandidaterna. Ingen push eller deploy gjordes.
+- [x] Riktad API-/migrations-/graderingssvit passerade 18/18; hela offline-sviten passerade med exit 0 och omfattade 175 `*.test.mjs`-filer. `git diff --check` passerade. Resultaten styrker lokal/mokad kod, inte hosted PostgreSQL, riktig modellkvalitet eller live Preview.
+- [x] Oberoende P.E.R-granskning fann inget konkret fel i svarsspärren. Föreslagna fall för förfalskad provstatus, avbrutna/utgångna prov och obekräftade gamla resultat kontrollerades mot den befintliga P.E.R-handler-sviten och täcks redan av regressionsfall; inga duplicerade tester lades till.
+- [x] Oberoende generatorgranskning bekräftade en begränsad pipeline med verifiering, blind lösning och högst en reparation. Exakta/normaliserade dubbletter testas, men semantiska upprepningar förlitar sig fortfarande på modellgranskning. Verifierare och lösare faller som standard tillbaka på generatorns modell; om Preview har separata modellöverskrivningar är inte verifierat.
+- [ ] Ingen autentiserad staging-/Preview-session finns ännu; därför återstår syntetisk liveprovning av provgenerering, P.E.R. och rättning/sparning. Auth-kontrollen visar endast `invalid_credentials`, inte den exakta orsaken. Användaren behöver sätta/återställa lösenordet direkt i stagingens Supabase Dashboard; dela inte lösenordet här.
+- [ ] Rättnings-API och två lokala SQL-migrationer är fortfarande ocommittade och oapplicerade. PGlite ersätter inte två oberoende PostgreSQL-sessioner eller hosted Supabase-migrationstest. Applicera inte migration eller skicka API-kandidaten separat.
+
+**PILOT NOT READY.** Helsviten är grön lokalt, men aktuell Preview kör inte de lokala graderingskandidaterna och inget liveflöde har verifierats. Produktion, `main`, stagingdata, roller och kvoter lämnades orörda.
+
+## Ny kontroll av liveblocker — 2026-10-20 11:10 UTC
+
+- [x] Skrivskyddad Auth-loggfråga för 11:02-11:10 UTC hittade inga `/token`- eller `/recover`-anrop. Ingen ny staginginloggning eller återställning har därför observerats i perioden.
+- [x] Försök att hämta historiska Vercel Preview-runtime-loggar för de senaste sju dagarna avvisades eftersom Hobby-planens runtime-loggretention är kortare. Detta är ett retentionfel, inte bevis på att loggar eller fel saknades. Orsaken till det rapporterade 502-felet kan inte fastställas retrospektivt från dessa loggar.
+- [x] Lokal rättningskod har en kontrollerad 502-väg: providerfel avbryter utan partiell resultatpersistens och släpper den aktuella claimen. Syntetiska regressioner täcker att samma försök kan göras om. Detta bevisar inte orsaken eller återhämtningen för det historiska livefelet.
+- [ ] Vid nästa autentiserade stagingförsök, fånga Preview-runtime/request-loggar omedelbart runt ett syntetiskt rättningsfel. Dela endast tidsstämpel och användarvisad feltext.
+
+**PILOT NOT READY.** Liveflödet är fortfarande blockerat av saknad staginginloggning; den historiska 502-orsaken är okänd. Ingen Auth-, stagingdata-, migrerings-, Production- eller `main`-ändring gjordes.
+
+## Gränssnitt och färsk stagingkontraktskontroll — 2026-10-20 11:11 UTC
+
+- [x] Supabase stagingens migrationsledger lästes på nytt: senaste version `20261016094813` (`preserve_latest_exam_issuance`). De tre graderings-RPC:erna har fortfarande äldre kontrakt: `claim_exam_grading` och `release_exam_grading` har tre argument och `persist_graded_exam_result` har tio. De lokala API-/SQL-kandidaterna med `p_claim_id` matchar alltså inte den aktuella databasen ännu. Endast skrivskyddade katalogfrågor kördes.
+- [x] `npm run a11y-audit` passerade: noll axe-överträdelse och noll konsolfel på de granskade sidorna; integritetspolicyn hade ingen horisontell overflow vid 390 px. Detta är lokal DOM/a11y-evidens, inte manuell tangentbords-/skärmläsartestning eller helappsmobilverifiering.
+- [x] Riktade frontendregressioner passerade 4/4 filer: `per-mobile`, `per-error-announcements`, `per-exam-context` och `graph-keyboard-isolation`. De täcker bland annat P.E.R:s trygga fel/återförsök, in-/utgång ur provläge och visning vid 320/375/390/430 px; tangentbordstestet håller grafpiltangenter inom aktiv fråga.
+- [ ] Ingen stagingmigration eller deploy genomfördes. Före cutover krävs riktig PostgreSQL-verifiering av overloads, ACL, transaktionskonkurrens och HTTP-/PostgREST-dispatch samt separat uttryckligt godkännande.
+
+**PILOT NOT READY.** Lokala API-regressioner och sidtillgänglighet är gröna, men stagingens graderingskontrakt är ännu inkompatibelt med den lokala claim-fencing-kandidaten; användarautentisering och liveproven saknas fortfarande.
+
+## Lokal frontendregression och stagingkontohandoff — 2026-10-20 11:22 UTC
+
+- [x] Den riktade frontendsviten passerade efter omkörning: 5/5 testfiler, inklusive `exam-flow.regression.mjs` med 174/174 kontroller och `pilot-session-recovery.test.mjs`. Den första körningen rapporterade ett enstaka `Failed to fetch` från Supabase-klienten i startspråkstestet; det isolerade språkflödet passerade 58/58 och hela sviten passerade vid upprepad körning.
+- [x] Oberoende read-only granskning bedömer testfelet som sannolik Playwright-/mockflakighet, inte bekräftat produktionsfel. Testet saknar ännu requestfailed- och routeträffsdiagnostik, så rotorsaken är inte bevisad. Inga kodfiler ändrades.
+- [x] Efteråt passerade hela offline-sviten med exit 0: 175 filer `tests/**/*.test.mjs` med `node --test --test-concurrency=4 --test-reporter=dot`. Ändrade API-filer passerade `node --check`; `git diff --check` passerade. Detta är lokal/mokad evidens och ersätter inte tvåsessions-PostgreSQL, verifierade Preview-hemligheter eller syntetiska liveflöden.
+- [ ] Supabase Auth-sidan visar det valda syntetiska kontot med en annan e-postadress än den användaren vill använda. Den synliga kontovyn erbjuder att skicka återställningsmejl men inte att sätta lösenord direkt. Ingen e-post, lösenord, konto, profil, roll eller kvot ändrades. Webbläsarens credential-policy kräver att användaren själv anger och skickar ett nytt lösenord; lösenord som skrivits i chatten ska inte återanvändas.
+- [ ] Användaren behöver välja om avsikten är att ersätta befintligt syntetiskt konto eller skapa ett separat stagingkonto. Därefter måste användaren själv sätta ett nytt unikt lösenord via den säkra stagingvägen och verifiera inloggning i aktuell Preview.
+- [x] Färsk Auth-sökning efter den användarangivna e-postadressen gav ingen match bland stagingkontona. Ny användarform är förberedd med e-postfältet ifyllt, lösenordsfältet tomt och standardvalet "Auto confirm user?" markerat. Kontot skapades inte; användaren måste själv ange ett nytt lösenord och välja om e-postbekräftelse ska hoppas över innan skapandet.
+
+**PILOT NOT READY.** Frontendens riktade regressioner är gröna efter en icke-reproducerad flakighet, men stagingautentisering är inte återställd och inget liveprov har körts.
+
+## Lokal kvalitetsgrind — 2026-10-20 11:43 UTC
+
+- [x] En deterministisk komplettering stoppar nu svenska flervalsfrågor utanför språkprofilen när exakt ett långt enordsalternativ sticker ut bland frasalternativ och ordet saknas både i frågan och elevens studiematerial. Regeln kör före verifierare/lösare i första generering och båda begränsade reparationsvägar.
+- [x] Regressionen visar att ett nytt syntetiskt felord stoppas före modellkontrollerna, att ett tekniskt ord som finns i materialet (även i singular mot pluralform) passerar och att språkprovets enordsalternativ inte påverkas.
+- [x] Riktade assessment-/pipeline-tester, syntaxkontroller och `git diff --check` passerade. Full offline-svit passerade 310 tester, 0 fel, exit 0 (`node --test --test-concurrency=4 --test-reporter=spec ...`).
+- [ ] Detta är en format-/källförankringsheuristik, inte generell stavnings- eller semantikkontroll. Den fångar inte nonsens om alla alternativ har samma format och kan stoppa ett giltigt men ej källbelagt enordsbegrepp när det ensamt bryter formatet. Liveproviderkvalitet är inte verifierad.
+- [ ] Den nya staging-Auth-användaren är inte skapad. Användaren måste själv ange ett nytt unikt lösenord i Supabase Dashboard; lösenordet som skrevs i chatten ska inte återanvändas. Inget konto, ingen data eller konfiguration ändrades.
+- [ ] Lokala grading-API-/SQL-kandidater är fortsatt ocommittade och oapplicerade. PGlite-resultat ersätter inte tvåsessions-PostgreSQL eller hosted Supabase. De pushades inte med kvalitetsgrindscommiten; ingen `main`-merge, stagingmigration eller produktionsändring gjordes.
+
+**PILOT NOT READY.** Den lokala kvalitetsgrinden och 310 offline-tester är verifierade, men staginginloggning, syntetiskt liveflöde och hosted grading/databasbeteende återstår.
+
+## Preview efter kvalitetsgrind — 2026-10-20
+
+- [x] Commit `7ed1033ac84fcd7fad3e3c15e5dca81f9f7bf3dc` pushades till den befintliga pilotgrenen efter att remote head verifierats som dess föregående commit `5a0242e`.
+- [x] Vercel Preview `dpl_57vLxsHFy5WBFHJhtHtrRhPCkGiH` är `READY` från exakt `7ed1033`. Runtimefilen från deploymenten returnerade pilotkonfiguration och stagingref `yhcinqejsocpmmetazpz`; nyckelfältet verifierades inte eller sparades.
+- [ ] Deploymenten har inte autentiserats i browsern. Det syntetiska stagingkontot är ännu inte skapat, så inga liveanrop för prov, P.E.R., rättning eller sparning har gjorts.
+
+Preview: `https://provia-7um7wegdu-eltons-projects-4adfb1a3.vercel.app/app.html`.
+
+**PILOT NOT READY.** Den nya kvalitetsgrinden är deployad endast till Preview. Stagingautentisering och syntetiskt end-to-end-flöde återstår; `main` och Production är orörda.
+
+## Uppföljning av alternativgrind — 2026-10-20
+
+- [x] Den tidigare hårda regeln som kunde ta bort ett ensamt enordsalternativ om det saknades i källtexten är ersatt. Formatavvikelsen är nu endast en granskningssignal; frågan går vidare till oberoende verifierare och lösare.
+- [x] Verifieraren får en intern `review_hints`-signal i första granskning, strukturell reparation och regenerering. Prompten säger uttryckligen att signalen inte är en slutsats och inte ensam får fälla giltiga namn eller facktermer.
+- [x] Tester visar att nonsensalternativet `Kesäkten` kan avvisas av den oberoende kvalitetskontrollen, medan det giltiga tekniska svaret `Kloroplasterna` kan överleva när kontrollerna godkänner frågan. Punctuation-wrapped outlier och en från källan saknad egennamnsfråga testas också.
+- [x] Oberoende granskning fann inga missade hint-vägar i initial-, strukturell reparations- eller regenereringsflödet. En kvarvarande begränsning är att modellen fortfarande avgör om ett giltigt enordsalternativ ska godkännas; offline-fixturer bevisar inte live-modellens bedömning.
+- [x] Slutlig offline-svit passerade alla 175 `*.test.mjs`-filer, exit 0. Ändrade API-filer passerade `node --check`; `git diff --check` passerade.
+- [x] Commit `0a93efe5003e23faaf50f31f83d2df90def1cb01` är pushad till den befintliga pilotgrenen efter att remote head verifierats som `7ed1033`.
+- [x] Vercel-deployment `dpl_AGsSGxESdPaqwbnFxNtFJrFCA4kK` är `READY` från exakt SHA `0a93efe`. `/app.html` och `/js/exgen-runtime.js` returnerade 200; runtimefilen innehåller stagingref `yhcinqejsocpmmetazpz`. Inga nyckelvärden lästes eller dokumenterades.
+- [ ] Ingen autentiserad staging-session eller live-AI-körning gjordes i denna uppföljning.
+- [ ] Stagingkontot är inte skapat/autentiserat. Inloggning, syntetisk livegenerering, P.E.R., rättning och resultatsparning återstår. Använd inte lösenord som skrivits i chatten; användaren behöver ange ett nytt lösenord direkt i Supabase Dashboard.
+- [ ] Lokala grading-API-/SQL-kandidater har inte inkluderats, migrerats eller verifierats mot hosted Supabase. `main`, Production och stagingdata är orörda.
+
+Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`.
+
+**PILOT NOT READY.** Korrigerad kvalitetsgrind är pushad och byggd i aktuell branch-deployment, men inte livevaliderad mot AI. Autentiserad staging-E2E väntar fortfarande på att användaren säkert skapar/loggar in på ett syntetiskt konto.
+
+## Lokal grading-cutover-kandidat — 2026-10-20
+
+- [x] Claim-ID-stödet bär nu samma servergenererade ägartoken genom claim, release och persist; stale takeover ska avvisa den gamla ägaren. Testerna täcker 502-/providerfel, retry, idempotens, abandonment och syntetisk SQL-persistens.
+- [x] Riktade API-/PGlite-/migrations-/provider-tester passerade 5/5 filer. Efter tillägg av de två avsiktligt spärrade `_ROLLBACK.sql`-filerna passerade migrationstesterna 3/3 och `node scripts/check-migration-files.mjs` rapporterade 39 migrationer och 36 rollbackfiler.
+- [x] Båda rollbackfilerna avbryter med exception i stället för att återställa en osäker äldre funktion. Förklaringar finns under `docs/codex/rollback/`.
+- [ ] Lokal miljö saknar `postgres`, `psql`, `pg_ctl` och Docker. PGlite kör PL/pgSQL mot isolerat schema men är inte två oberoende PostgreSQL-sessioner och bevisar inte faktisk samtidighet, PostgREST-overloadval/schema-cache eller hosted Supabase-beteende.
+- [ ] Cutover mellan befintliga 3-arguments RPC och nya claim-ID-RPC är inte bakåtkompatibel i någondera ordningen: API före migration failar mot saknad overload; migration före API stoppar den gamla Previewn från att gradera. Planera en samordnad staging-cutover efter separat godkännande.
+- [ ] Kandidat-API och migrationer är fortfarande ocommittade/oapplicerade; ingen hosted stagingmigration, `main`-merge eller Production-ändring har gjorts. Aktuell Preview använder inte dessa gradingändringar.
+
+**PILOT NOT READY.** Offlinekontrakten är mer täckta, men tvåsessions-PostgreSQL/PostgREST och staging-cutover saknas. Autentiserat staging-E2E med prov, P.E.R. och sparad rättning återstår också.
+
+## Grafhandledning, fail-closed-regressioner och färsk stagingkontrakt — 2026-10-20
+
+- [x] P.E.R.-kontexten bevarar nu endast stödda frågetyper och grafmodus. Linje- och punktdiagram får olika metodstöd; konflikt eller okänt modus får neutral vägledning. Prompten säger uttryckligen att modellen inte ser själva grafbilden och inte får hitta på koordinater.
+- [x] Fråga, alternativ, svar och provfrågor avgränsas som klientdata och HTML-liknande sluttaggar escapats innan systemprompten byggs. Sammanfattningskontexten får samma datagräns. Detta minskar injektionsrisken men garanterar inte modellens tolkning av fientlig text.
+- [x] Ny testning visar att verifierarens `option_quality=false` ensam kan avvisa och ersätta en biologifråga, och att lösarens `option_plausibility=false` ensam kan göra samma sak; giltig teknisk term kan fortsatt accepteras. Detta testar mockade modellbeslut, inte live-detektion av nonsens.
+- [x] Hela lokala/offline-sviten passerade 175 `*.test.mjs`-filer, exit 0. Därefter passerade den tillagda riktade regressionen för motstridiga grafmodus i vanlig P.E.R.-chatt. Riktade P.E.R-/provskyddstester, migrationstestare, syntax och diffkontroll passerade.
+- [x] Färsk Supabase-läsning: staging `exgen-pilot-staging` är `ACTIVE_HEALTHY`, men dess tre grading-RPC:er har fortfarande gamla signaturer utan claim-token. Vercel-listningen visar senaste pilot-Preview `READY` från branch-HEAD `0a93efe`; den innehåller inte lokala grading-/P.E.R.-kandidater.
+- [ ] Ingen verifierad kontoautentisering eller syntetisk livegenerering, P.E.R., rättning och persistens. Användaren känner inte till staginglösenordet; ett lösenord som skrevs i chatten får inte återanvändas. Sätt ett nytt unikt lösenord direkt i stagingdashboarden.
+- [ ] Grading-API-/SQL-kandidaten är fortfarande ocommittad och oapplicerad. Cutover mellan Preview-API och RPC-kontrakt kräver en samordnad stagingsekvens, tvåsessions-PostgreSQL/PostgREST-verifiering och separat uttryckligt godkännande.
+
+**PILOT NOT READY.** Lokala graf-/P.E.R.-förbättringar och fail-closed-kedjor är testade, men ändringarna är inte deployade. Aktuell Preview använder ännu inte dem; liveproviderkvalitet, staginglogin, gradingcutover och sparning är fortfarande otestade.
+
+## P.E.R.-kurskontext och oberoende granskning — 2026-10-20
+
+- [x] Oberoende P.E.R.-granskning hittade att kursfältet inte aktiverade mattepedagogiken vid vag elevfråga. `_per-core.js` använder nu även `pageContext.course`; regressionstester bekräftar Matematik 1b får arbetsgång och Historia 1b inte.
+- [x] Alla 175 `*.test.mjs`-filer passerade med exit 0. Den kostnadsfria ämnesroutningsevalen passerade, migrationstestaren rapporterade 39 migrationer/36 rollbackfiler, och `git diff --check` passerade.
+- [x] Oberoende granskning körde 54 riktade P.E.R.-provskydds-/streaming- och pedagogiktester utan fel. Den bekräftar lokal testtäckning, inte live-modellsvar.
+- [ ] P.E.R. saknar ännu separat eval för faktiska handledningssvar (matte/graf, materialförankring, otillräckligt underlag och naturlig svenska). Detta är en testlucka, inte en verifierad svarsbugg.
+- [ ] Staginginloggning är fortfarande blockerad. Användaren känner inte till kontots aktuella lösenord; lösenord som skrivits i chatten ska inte återanvändas. Sätt ett nytt unikt lösenord direkt i stagingens Supabase Dashboard.
+- [ ] Lokala grading-/SQL-kandidater inklusive den verifierade-avbrytning-fixen är ocommittade och oapplicerade. Ingen tvåsessions-PostgreSQL/PostgREST- eller hosted migrationsverifiering har gjorts.
+
+**PILOT NOT READY.** Mattepedagogikens kursdetektion är lokalt förbättrad och offline-testad, men ändringen är inte deployad. Liveinloggning, riktad P.E.R.-chat-eval, stagingcutover och syntetiska end-to-end-prov återstår.
+
+## Preview-uppdatering och rättningsgranskning — 2026-10-20
+
+- [x] Commit `cf1b158574aa73c34a743e69ab73a026d92b6d0b` pushad till `codex/exgen-school-pilot-review-2026-10-13`; Vercel Preview `dpl_7oDsx2zdmWfJj4XQCjSdSR71MwbS` nådde `READY` från exakt denna SHA. Preview: `https://provia-29s5kgh0b-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [x] P.E.R använder även kurskontext för mattestöd, ger metodspecifik handledning för linje- och punktdiagram och uttryckligen avstår från att hitta på osynliga grafdata. Klientens frågetyp/grafmodus allowlistas; okända eller motstridiga modus ger neutral vägledning. Otestade/fientliga datagränser escaped innan studentkontext förs in i systemprompten.
+- [x] Full lokal offline-svit passerade 175 `*.test.mjs`-filer, exit 0. Riktad rättningssvit passerade 8/8 filer; aktivt provskydd, efterprovsgranskning och front-end provkontext passerade 60/60 tester. Syntax- och diffkontroller passerade. Endast lokala/mokade tester, inte live-modellbevis.
+- [x] Oberoende backendgranskning fann ingen reproducerad API-logikbugg. Oberoende migrationsgranskning bekräftade att API och schema måste skiftas samordnat: annars svarar rättning fail-closed tills nya RPC:er finns. Fencing är ännu inte verifierad med två oberoende PostgreSQL-sessioner; PGlite-testet är sekventiellt. Rollbackskripten är avsiktliga stoppvakter, inte schemaåterställningar.
+- [x] Färsk skrivskyddad stagingfråga bekräftade att de befintliga claim/release-RPC:erna fortfarande har tre argument och persist-RPC:n tio; lokal kandidat kräver `p_claim_id`. Ingen stagingmigration eller Auth-ändring gjordes.
+- [ ] Ingen autentiserad Preview-session eller syntetisk livegenerering, P.E.R., rättning och persistens har verifierats. Användaren behöver sätta ett nytt lösenord direkt i stagingens Supabase Dashboard och logga in i Preview. Lösenordet som skrevs i chatten ska inte återanvändas.
+- [ ] Rättnings-API-/migrationskandidaterna är fortfarande ocommittade och oapplicerade; skicka dem inte separat. Före staging-cutover behövs en uttrycklig stagingsekvens, godkänd ändring, tvåsessions-/PostgREST-bevis och verifierad framåtriktad återhämtningsplan.
+
+**PILOT NOT READY.** P.E.R-/generatorförbättringarna är deployade till Preview, men liveflöden återstår. Rättningskandidaten kan inte driftsättas mot nuvarande stagingkontrakt separat från migrationen.
