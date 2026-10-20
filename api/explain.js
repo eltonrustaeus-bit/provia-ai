@@ -1234,6 +1234,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       let fullText = '';
       let streamUsage = null;
       let streamModel = null;
+      let streamFinished = false;
+      let streamTruncated = false;
       const streamStartedAt = Date.now();
       try {
         const stream = await callAIStream(msgs, { timeout: 55_000, includeUsage: true });
@@ -1249,13 +1251,19 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             const raw = line.slice(6).trim();
-            if (raw === '[DONE]') continue;
+            if (raw === '[DONE]') {
+              streamFinished = true;
+              continue;
+            }
             try {
               const ev = JSON.parse(raw);
               if (ev.usage) {
                 streamUsage = ev.usage;
                 streamModel = ev.model || null;
               }
+              const finishReason = ev.choices?.[0]?.finish_reason;
+              if (finishReason === 'stop') streamFinished = true;
+              else if (finishReason) streamTruncated = true;
               const delta = ev.choices?.[0]?.delta?.content;
               if (delta) { fullText += delta; res.write(`data: ${JSON.stringify({ delta })}\n\n`); }
             } catch (_) {}
@@ -1263,6 +1271,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         }
       } catch {
         res.write(`data: ${JSON.stringify({ error: 'P.E.R är tillfälligt otillgänglig. Försök igen senare.' })}\n\n`);
+        return res.end();
+      }
+
+      if (!streamFinished || streamTruncated) {
+        res.write(`data: ${JSON.stringify({ error: 'Svaret avbröts innan det blev klart. Frågan finns kvar; försök igen.' })}\n\n`);
         return res.end();
       }
 

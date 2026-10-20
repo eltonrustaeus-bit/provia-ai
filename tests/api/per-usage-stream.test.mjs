@@ -20,6 +20,9 @@ const requests = [];
 let activeCount = 0;
 let staleMemory = false;
 let failStreamingAfterDelta = false;
+let cleanEofAfterDelta = false;
+let truncatedStream = false;
+let stopReasonWithoutDone = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
 let reviewAnswer = null;
@@ -46,6 +49,16 @@ globalThis.fetch = async (input, init = {}) => {
       : Response.json([]);
   }
   if (url === "https://api.openai.com/v1/chat/completions") {
+    if (cleanEofAfterDelta) {
+      const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
+      const bodyStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(partial));
+          controller.close();
+        },
+      });
+      return new Response(bodyStream, { status: 200 });
+    }
     if (failStreamingAfterDelta) {
       const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
       const bodyStream = new ReadableStream({
@@ -59,8 +72,14 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(bodyStream, { status: 200 });
     }
     const delta = { choices: [{ delta: { content: streamAnswer } }] };
+    const terminal = truncatedStream
+      ? { choices: [{ delta: {}, finish_reason: "length" }] }
+      : stopReasonWithoutDone
+        ? { choices: [{ delta: {}, finish_reason: "stop" }] }
+        : null;
     const usage = { model: "measured-stream-model", choices: [], usage: { prompt_tokens: 90, completion_tokens: 21 } };
-    return new Response(`data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(usage)}\n\ndata: [DONE]\n\n`, { status: 200 });
+    const done = stopReasonWithoutDone ? "" : "data: [DONE]\n\n";
+    return new Response(`data: ${JSON.stringify(delta)}\n\n${terminal ? `data: ${JSON.stringify(terminal)}\n\n` : ""}data: ${JSON.stringify(usage)}\n\n${done}`, { status: 200 });
   }
   if (url === "https://api.openai.com/v1/responses") {
     const requestText = JSON.stringify(body?.input || []);
@@ -173,6 +192,58 @@ test("streaming P.E.R ends safely when the provider stream fails after a partial
   assert.match(payload, /Börja med en ledtråd/);
   assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
   assert.doesNotMatch(payload, /synthetic provider stream reset/);
+});
+
+test("streaming P.E.R does not commit a partial answer after clean EOF without a terminal event", async () => {
+  requests.length = 0;
+  cleanEofAfterDelta = true;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    cleanEofAfterDelta = false;
+  }
+
+  const payload = res.chunks.join("");
+  assert.equal(res.ended, true);
+  assert.match(payload, /Börja med en ledtråd/);
+  assert.match(payload, /Svaret avbröts innan det blev klart/);
+  assert.doesNotMatch(payload, /"done":true/);
+  assert.equal(requests.some((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch") && request.body?.p_messages?.at(-1)?.role === "assistant"), false);
+});
+
+test("streaming P.E.R rejects provider output explicitly truncated by its token limit", async () => {
+  requests.length = 0;
+  truncatedStream = true;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    truncatedStream = false;
+  }
+
+  const payload = res.chunks.join("");
+  assert.equal(res.ended, true);
+  assert.match(payload, /Svaret avbröts innan det blev klart/);
+  assert.doesNotMatch(payload, /"done":true/);
+  assert.equal(requests.some((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch") && request.body?.p_messages?.at(-1)?.role === "assistant"), false);
+});
+
+test("streaming P.E.R accepts an explicit stop finish reason without a DONE sentinel", async () => {
+  requests.length = 0;
+  stopReasonWithoutDone = true;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    stopReasonWithoutDone = false;
+  }
+
+  const payload = res.chunks.join("");
+  assert.equal(res.ended, true);
+  assert.match(payload, /"done":true/);
+  assert.doesNotMatch(payload, /Svaret avbröts innan det blev klart/);
+  assert.ok(requests.some((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch") && request.body?.p_messages?.at(-1)?.role === "assistant"));
 });
 
 test("JSON P.E.R records Responses usage and preserves the answer", async () => {

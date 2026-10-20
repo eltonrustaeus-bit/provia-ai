@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 
 const db = new PGlite();
-const migration = await readFile(new URL("../../supabase/migrations/20261020210000_mock_exam_generation_idempotency.sql", import.meta.url), "utf8");
+const migration = await readFile(new URL("../../supabase/migrations/20261020190719_mock_exam_generation_idempotency.sql", import.meta.url), "utf8");
 const userId = "00000000-0000-4000-8000-000000000001";
 const key = "00000000-0000-4000-8000-000000000101";
 const attempt1 = "00000000-0000-4000-8000-000000000201";
