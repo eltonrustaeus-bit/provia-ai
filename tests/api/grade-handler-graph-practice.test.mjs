@@ -359,7 +359,9 @@ try {
   const saved = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(saved, "the official graph submission writes its result through the persistence path");
   const savedPayload = JSON.parse(saved.body);
-  const { p_learning_payload: learningPayload, ...resultPayload } = savedPayload;
+  const { p_learning_payload: learningPayload, p_claim_id: claimId, ...resultPayload } = savedPayload;
+  assert.match(claimId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "the result write is fenced by the UUID claim owned by this grading request");
   assert.deepEqual({ ...resultPayload, p_submission_id: undefined }, {
     p_user_id: userId,
     p_submission_id: undefined,

@@ -139,33 +139,35 @@ async function releasePerAnswerLease(userId, leaseId) {
   }
 }
 
-async function claimExamGrading(userId, submissionId, fingerprint) {
-  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
+async function claimExamGrading(userId, submissionId, fingerprint, claimId) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "") ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(claimId || "")) return null;
   const response = await request("rpc/claim_exam_grading", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint }),
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint, p_claim_id: claimId }),
   });
   if (!response?.ok) return null;
   try {
     const state = await response.json();
-    return ["claimed", "pending", "stale", "completed", "conflict", "missing", "abandoned", "expired"].includes(state) ? state : null;
+    return ["claimed", "pending", "completed", "conflict", "missing", "abandoned", "expired", "invalid"].includes(state) ? state : null;
   } catch {
     return null;
   }
 }
 
-async function releaseExamGrading(userId, submissionId, fingerprint) {
-  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "")) return null;
+async function releaseExamGrading(userId, submissionId, fingerprint, claimId) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(submissionId || "") || !/^[a-f0-9]{64}$/.test(fingerprint || "") ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(claimId || "")) return null;
   const response = await request("rpc/release_exam_grading", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint }),
+    body: JSON.stringify({ p_user_id: userId, p_submission_id: submissionId, p_answer_fingerprint: fingerprint, p_claim_id: claimId }),
   });
   if (!response?.ok) return null;
   try {
     const state = await response.json();
-    return ["released", "completed", "missing", "conflict"].includes(state) ? state : null;
+    return ["released", "completed", "missing", "conflict", "fenced"].includes(state) ? state : null;
   } catch {
     return null;
   }
@@ -194,7 +196,8 @@ async function recoverExamResult(userId, submissionId, fingerprint) {
 
 async function persistExamResult(payload) {
   if (!payload?.user_id || !/^[a-f0-9]{32}$/.test(payload.submission_id || "") ||
-      !/^[a-f0-9]{64}$/.test(payload.answer_fingerprint || "")) return "error";
+      !/^[a-f0-9]{64}$/.test(payload.answer_fingerprint || "") ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.claim_id || "")) return "error";
   const response = await request("rpc/persist_graded_exam_result", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -202,6 +205,7 @@ async function persistExamResult(payload) {
       p_user_id: payload.user_id,
       p_submission_id: payload.submission_id,
       p_answer_fingerprint: payload.answer_fingerprint,
+      p_claim_id: payload.claim_id,
       p_course: payload.course,
       p_percent: payload.percent,
       p_num_questions: payload.num_questions,
@@ -214,7 +218,7 @@ async function persistExamResult(payload) {
   if (!response?.ok) return "error";
   try {
     const outcome = await response.json();
-    return ["saved", "duplicate", "missing", "abandoned", "expired", "unclaimed", "invalid"].includes(outcome) ? outcome : "error";
+    return ["saved", "duplicate", "missing", "abandoned", "expired", "unclaimed", "invalid", "fenced"].includes(outcome) ? outcome : "error";
   } catch {
     return "error";
   }

@@ -194,7 +194,7 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
-function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload) {
+function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, learningPayload) {
   const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
   const conceptTags = [...new Set(
     per.map(q => q.concept_tag).filter(c => c && c !== "Okänt" && c !== "Unknown")
@@ -203,7 +203,7 @@ function buildMockPayload(userId, course, per, total, maxTotal, attemptId, finge
     per.flatMap(q => q.error_tags || []).filter(Boolean)
   )].slice(0, 20);
   return {
-    user_id: userId, submission_id: attemptId, answer_fingerprint: fingerprint,
+    user_id: userId, submission_id: attemptId, answer_fingerprint: fingerprint, claim_id: claimId,
     course: (course || "").slice(0, 100), percent: pct, num_questions: per.length,
     concept_tags: conceptTags, error_tags: errorTags,
     result_payload: { total_points: total, max_points: maxTotal, per_question: per },
@@ -306,13 +306,13 @@ async function saveMockResult(payload) {
   return examIssuance.persistExamResult(payload);
 }
 
-async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, fingerprint, level, attemptRows }) {
+async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, level, attemptRows }) {
   const state = await examIssuance.examState(userId, attemptId);
   if (!state) return "state_error";
   if (state !== "grading") return state === "completed" ? "duplicate" : "inactive";
   const learnerLoopEnabled = await snapshotLearnerLoopFlag(userId);
   const learningPayload = await buildLearningPayload(level, course, attemptRows, learnerLoopEnabled);
-  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload));
+  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, learningPayload));
   if (saved === "duplicate") return "duplicate";
   if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
@@ -479,9 +479,10 @@ module.exports = async function handler(req, res) {
     let claimed = null;
     async function fail(status, payload) {
       if (claimed) {
-        const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint);
+        const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint, claimed.claimId);
         claimed = null;
         if (released === "completed") return json(res, 503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
+        if (released === "fenced") return json(res, 409, { ok: false, error: "EXAM_GRADING_SUPERSEDED" });
         if (released !== "released") return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
       }
       return json(res, status, payload);
@@ -491,11 +492,12 @@ module.exports = async function handler(req, res) {
       const submissionId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const fingerprint = examCompletion.answerFingerprint(user.id, course, submittedQuestions, answerMap);
       if (!submissionId || !fingerprint) return json(res, 400, { ok: false, error: "EXAM_ANSWERS_INVALID" });
-      const claim = await examIssuance.claimExamGrading(user.id, submissionId, fingerprint);
+      const claimId = randomUUID();
+      const claim = await examIssuance.claimExamGrading(user.id, submissionId, fingerprint, claimId);
       if (!claim) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
       if (claim === "pending") return json(res, 409, { ok: false, error: "EXAM_GRADING_IN_PROGRESS" });
-      if (claim === "stale") return json(res, 409, { ok: false, error: "EXAM_GRADING_INTERRUPTED" });
       if (claim === "conflict") return json(res, 409, { ok: false, error: "EXAM_ANSWERS_CONFLICT" });
+      if (claim === "invalid") return json(res, 400, { ok: false, error: "EXAM_ANSWERS_INVALID" });
       if (claim === "completed") {
         const lease = await acquirePostExamReviewLease(user.id);
         if (lease.outcome !== "acquired") {
@@ -530,7 +532,7 @@ module.exports = async function handler(req, res) {
         }
       }
       if (claim !== "claimed") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
-      claimed = { id: submissionId, fingerprint };
+      claimed = { id: submissionId, fingerprint, claimId };
     }
 
     let postExamLeaseId = null;
@@ -744,7 +746,7 @@ module.exports = async function handler(req, res) {
       const attemptRows = withAttemptAnswers(per, answerMap, questions);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, claimId: claimed.claimId, level, attemptRows,
       });
       if (persistence === "duplicate") {
         return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
@@ -979,7 +981,7 @@ module.exports = async function handler(req, res) {
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, claimId: claimed.claimId, level, attemptRows,
       });
       if (persistence === "duplicate") {
         return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
