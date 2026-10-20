@@ -1,5 +1,22 @@
 # 08 Current Status
 
+## Approved live generation attempt stopped at quota — 2026-10-21
+
+- [x] The user authenticated in the exact READY staging Preview. One approved attempt used only synthetic Matematik 2b notes, the existing `gratis` role/quota, level A and three short-answer questions.
+- [x] The UI returned **“Provkvoten är slut”** before any exam was delivered. No second request was made and no account role/quota was changed.
+- [x] Source inspection confirms the handler returns HTTP 429 from the quota check (`api/generate-exam.js`) before `pickModel()` and `streamGeneration()`. This attempt did not call OpenAI; it provides no evidence about current live question quality.
+- [!] Whether the rejected attempt changed any quota counter was not independently queried. No quota or account mutation was made by the operator.
+
+**PILOT NOT READY.** The approved live generation was blocked before the model call by the exhausted weekly quota. Next: wait for the normal quota reset or obtain separate approval for one explicitly bounded staging entitlement change, then repeat a synthetic generation. Do not alter role/quota without that approval.
+
+## Staging security advisor snapshot — 2026-10-21
+
+- [x] The read-only Supabase Security Advisor returned 30 `RLS enabled, no policy` informational findings, two mutable-search-path warnings (`match_knowledge_chunks`, `sync_report_count`), one `pg_trgm`-in-public warning, four client-executable `SECURITY DEFINER` findings, and leaked-password protection disabled. No database/Auth setting was changed.
+- [!] RLS-enabled tables without policies are not evidence of public row access; they commonly represent server-only tables. Advisor function warnings also need source/ACL review, especially trigger-returning functions. No exploitability conclusion or two-user runtime IDOR result is established by this snapshot.
+- [ ] Before widening a school pilot, review and remediate applicable function/extension warnings, decide whether leaked-password protection should be enabled for staging, and complete authenticated two-account RLS/IDOR tests. Any Auth or database setting/migration change needs separate approval.
+
+**PILOT NOT READY.** Security Advisor findings are documented as review items, not silently modified. Runtime access isolation and school-level data-handling approval remain unverified.
+
 ## Full offline regression and Preview recheck — 2026-10-21
 
 - [x] The complete repository test run passed **324/324** (`node --test 'tests/**/*.test.mjs' 'tests/**/*.test.js'`); duration was 91.6 s. No failures, cancellations, skips, or todos.
