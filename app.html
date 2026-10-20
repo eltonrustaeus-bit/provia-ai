@@ -2166,6 +2166,13 @@ try{
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);
       clearGenerationPlaceholder();
+      if(res.status===401||res.data?.error==="Unauthorized"){
+        const message=LANG==="sv"
+          ?"Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter."
+          :"The exam service could not verify your sign-in. Your material is still here. Sign out and back in; contact the pilot lead if this continues.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"unauthorized"};
+      }
       if(res.data?.error==="MATERIAL_TOO_LONG"){
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};

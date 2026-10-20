@@ -678,6 +678,19 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("nätverksfel skiljs från serverfel och eleven kan försöka igen",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
+    const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
+    await page.route("**/api/generate-exam", route => route.fulfill({
+      status: 401, json: { ok: false, error: "Unauthorized" },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(message => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes(message), authMessage, { timeout: 5000 });
+    const authError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    ok("authfel blir begripligt och döljer rå Unauthorized-text",
+      authError.includes(authMessage) && !authError.includes("Unauthorized"));
+    ok("authfel behåller elevens material för återhämtning",
+      await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
+        .then(value => value.includes("Linjär funktion y = 2x + 1")));
   } catch (e) {
     ok("genereringsfel annonseras för hjälpmedel", false, e.message);
   } finally {

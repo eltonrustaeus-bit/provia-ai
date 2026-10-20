@@ -394,22 +394,47 @@ async function readJsonBody(req) {
 
 async function requireAuth(req) {
   const token = (req.headers["authorization"] || "").replace(/^Bearer\s+/i, "");
-  if (!token) return null;
+  const logFailure = (stage, status) => {
+    console.warn(JSON.stringify({
+      event: "exam_auth_rejected",
+      stage,
+      ...(Number.isInteger(status) ? { status } : {}),
+    }));
+  };
+  if (!token) {
+    logFailure("missing_bearer_token");
+    return null;
+  }
+  let stage = "supabase_target";
   try {
+    const supabaseUrl = getSupabaseUrl();
+    const headers = getSupabaseAdminHeaders();
+    stage = "auth_user_lookup";
     const r = await fetch(
-      getSupabaseUrl() + "/auth/v1/user",
+      supabaseUrl + "/auth/v1/user",
       {
         headers: {
-          ...getSupabaseAdminHeaders(),
+          ...headers,
           "Authorization": "Bearer " + token,
         },
         signal: AbortSignal.timeout(5000)
       }
     );
-    if (!r.ok) return null;
+    if (!r.ok) {
+      logFailure("auth_user_http", r.status);
+      return null;
+    }
+    stage = "auth_user_response";
     const data = await r.json();
-    return data?.id ? data : null;
-  } catch { return null; }
+    if (!data?.id) {
+      logFailure("auth_user_missing_id");
+      return null;
+    }
+    return data;
+  } catch {
+    logFailure(stage);
+    return null;
+  }
 }
 
 async function loadCentralRules() {
