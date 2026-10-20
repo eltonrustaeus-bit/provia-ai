@@ -762,6 +762,34 @@ try {
     "the solver-rejected item is replaced by an independently checked candidate");
   regenerationQuestions = null;
 
+  const allWordNonsenseBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["Kloroplast", "Cellkärna", "Kesäkten"], correct_index: 0, model_answer: "Kloroplast" }
+    : question);
+  const verifierInputCountBeforeAllWordNonsense = verifierInputs.length;
+  const solverInputCountBeforeAllWordNonsense = solverInputs.length;
+  activeQuestions = allWordNonsenseBiology;
+  regenerationQuestions = repairedBiology;
+  verifierRejectOptionId = "biology-1";
+  solverRejectNonsenseOption = true;
+  const allWordNonsenseExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(allWordNonsenseExam.status, 200, JSON.stringify(allWordNonsenseExam.body));
+  assert.equal(allWordNonsenseExam.body.exam.questions.length, 3);
+  assert.equal(allWordNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "an all-single-word nonsense distractor is rejected by independent review and solving before delivery");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordNonsense)
+    .some((review) => review.questions.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
+  "all-single-word options reach the independent reviewer when the structural pattern cannot prove an error");
+  assert.ok(solverInputs.slice(solverInputCountBeforeAllWordNonsense)
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
+  "the malformed option is also checked by the blind solver");
+  assert.ok(allWordNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
+    "the doubly rejected item is replaced with an independently reviewed candidate");
+  verifierRejectOptionId = null;
+  solverRejectNonsenseOption = false;
+  regenerationQuestions = null;
+
   const languageMismatchQuestions = [
     { ...questions[0], id: "language-mismatch-1", question: "What is 2 + 3?" },
     { ...questions[1], id: "language-valid-2" },

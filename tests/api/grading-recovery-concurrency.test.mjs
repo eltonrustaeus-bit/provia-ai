@@ -53,6 +53,7 @@ let staleClaim = false;
 let verifiedResult = false;
 let activeClaimId = null;
 let failNextProvider = false;
+let failNextProviderBodyRead = false;
 let losePersistResponseOnce = false;
 let missingClaimRpc = false;
 const claimRequests = [];
@@ -143,6 +144,13 @@ globalThis.fetch = async (input, init = {}) => {
         status: 502,
         headers: { "Content-Type": "application/json" },
       });
+    }
+    if (failNextProviderBodyRead) {
+      failNextProviderBodyRead = false;
+      const bodyStream = new ReadableStream({
+        start(controller) { controller.error(new Error("Synthetic response body interruption")); },
+      });
+      return new Response(bodyStream, { status: 200 });
     }
     await providerGate;
     return Response.json({ output_text: JSON.stringify({ total_points: 1, max_points: 2,
@@ -270,6 +278,50 @@ try {
   assert.equal(providerCalls, providerCallsBeforeRetry + 2, "one failed provider call and one successful retry are made");
   assert.equal(quotaCalls, quotaCallsBeforeRetry + 2, "each explicit grading attempt is rate-limited");
   assert.equal(saveCalls, saveCallsBeforeRetry + 1, "the successful retry persists exactly one result");
+
+  state = "active";
+  fingerprint = null;
+  activeClaimId = null;
+  result = null;
+  verifiedResult = false;
+  releasedClaims = [];
+  resetProviderGate();
+  const providerCallsBeforeBodyRead = providerCalls;
+  const saveCallsBeforeBodyRead = saveCalls;
+  failNextProviderBodyRead = true;
+  const diagnostics = [];
+  const originalWarn = console.warn;
+  console.warn = (entry) => diagnostics.push(String(entry));
+  let interruptedBody;
+  try {
+    interruptedBody = await invoke(body);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(interruptedBody.status, 502);
+  assert.equal(interruptedBody.body.error, "grading_provider_unavailable");
+  assert.ok(interruptedBody.body.requestId, "retry-safe provider failures expose an opaque request ID");
+  const diagnostic = JSON.parse(diagnostics.at(-1));
+  assert.deepEqual(diagnostic, {
+    event: "exam_grade_provider_failure",
+    requestId: interruptedBody.body.requestId,
+    stage: "response_body",
+    category: "read_error",
+  }, "provider logs classify the failure without logging provider or student content");
+  assert.equal(diagnostics.some((entry) => /Vad är ett fritt val|Eleverna röstar|demokrati/.test(entry)), false,
+    "diagnostic logs never include exam questions, answers, or study context");
+  assert.equal(state, "active", "an interrupted provider body releases the exact claim");
+  assert.equal(saveCalls, saveCallsBeforeBodyRead, "an incomplete provider body cannot persist a result");
+  assert.equal(releasedClaims.length, 1, "the interrupted response releases its claim once");
+
+  const retryAfterBodyReadPromise = invoke(body);
+  await waitForProviderCalls(providerCallsBeforeBodyRead + 2);
+  finishProvider();
+  const retryAfterBodyRead = await retryAfterBodyReadPromise;
+  assert.equal(retryAfterBodyRead.status, 200, "the same signed submission can recover after a body-read failure");
+  assert.equal(state, "completed");
+  assert.equal(providerCalls, providerCallsBeforeBodyRead + 2, "one failed body and one successful retry reach the provider");
+  assert.equal(saveCalls, saveCallsBeforeBodyRead + 1, "the retry writes exactly one verified result");
 
   state = "active";
   fingerprint = null;

@@ -488,6 +488,14 @@ module.exports = async function handler(req, res) {
       return json(res, status, payload);
     }
 
+    function failProvider(stage, category, error, message, upstreamStatus) {
+      const requestId = randomUUID();
+      const diagnostic = { event: "exam_grade_provider_failure", requestId, stage, category };
+      if (Number.isInteger(upstreamStatus)) diagnostic.upstreamStatus = upstreamStatus;
+      console.warn(JSON.stringify(diagnostic));
+      return fail(502, { ok: false, error, requestId, message });
+    }
+
     if (!practiceCompletion) {
       const submissionId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const fingerprint = examCompletion.answerFingerprint(user.id, course, submittedQuestions, answerMap);
@@ -899,15 +907,26 @@ module.exports = async function handler(req, res) {
           signal: AbortSignal.timeout(45_000)
         });
       } catch {
-        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return failProvider("request", "transport_error", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
       }
 
-      const raw = await r.text();
+      let raw;
+      try {
+        raw = await r.text();
+      } catch {
+        return failProvider("response_body", "read_error", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
+      }
+      if (!r.ok) return failProvider("response", "upstream_http_error", "grading_provider_unavailable",
+        lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.", r.status);
+
       let data;
       try {
         data = JSON.parse(raw);
       } catch {
-        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return failProvider("response_body", "invalid_json", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
       }
       await logMockExamUsage({
         userId: user.id,
@@ -917,22 +936,23 @@ module.exports = async function handler(req, res) {
         usage: data?.usage,
         latencyMs: Date.now() - gradingStartedAt,
       });
-      if (!r.ok) return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
-
       const outputText = extractOutputText(data);
       if (!outputText) {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return failProvider("response_output", "missing_text", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
       }
 
       let graded;
       try {
         graded = JSON.parse(outputText);
       } catch {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return failProvider("response_output", "invalid_json", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
       }
 
       if (!validateNonMcGradeOutput(graded, nonMcPack)) {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again." });
+        return failProvider("response_output", "contract_failed", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again.");
       }
 
       const byId = new Map();
