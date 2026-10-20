@@ -662,16 +662,16 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("genereringsfel visar en användbar förklaring i stället för ett generiskt återförsök",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
-    const qualityMessage = "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen.";
+    const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
     await page.route("**/api/generate-exam", route => route.fulfill({
-      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage },
+      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: 1, requested: 3 },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction((message) => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
       ?.textContent?.includes(message), qualityMessage, { timeout: 5000 });
     ok("ofullständigt prov visar kvalitetsfelet i stället för en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(qualityMessage) && !text.includes("Error (HTTP 502)")));
+        text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
     await page.route("**/api/generate-exam", route => route.abort("failed"));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Anslutningen bröts/.test(

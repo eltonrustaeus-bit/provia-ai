@@ -2225,9 +2225,17 @@ try{
         return {ok:false,error:message};
       }
       if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
-        setStatus(res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.","bad");
+        const message=res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.";
+        const hasSafeCounts=res.data?.error==="incomplete_exam"
+          && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
+          && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
+        const countNote=hasSafeCounts
+          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor klarade kontrollen.`:` ${res.data.received} of ${res.data.requested} questions passed review.`)
+          : "";
+        const fullMessage=message+countNote;
+        setStatus(fullMessage,"bad");
         hideDebug();
-        return {ok:false,error:res.data.message||res.data.error,errorCode:res.data.error};
+        return {ok:false,error:fullMessage,errorCode:res.data.error};
       }
       if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
         const message=res.data.error==="mock_quota_unavailable"

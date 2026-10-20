@@ -12,6 +12,22 @@ const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
 
 assert.equal(assessment.MAX_MC_OPTIONS, 5);
+assert.equal(generateExam.pickModel({ isMath: false, env: {} }), "gpt-4o-mini",
+  "the exam model stays on the current inexpensive default until a candidate is deliberately selected");
+assert.equal(generateExam.pickModel({ isMath: false, env: { OPENAI_MODEL: "gpt-4.1-mini" } }), "gpt-4.1-mini",
+  "the existing general model override remains supported");
+assert.equal(generateExam.pickModel({ isMath: false, env: { OPENAI_MODEL: "gpt-4o-mini", OPENAI_MODEL_EXAM: "gpt-5-mini" } }), "gpt-5-mini",
+  "exam generation can be evaluated on a dedicated model without changing P.E.R or other AI features");
+assert.equal(generateExam.pickModel({ isMath: true, env: { OPENAI_MODEL_EXAM: "gpt-5-mini", OPENAI_MATH_MODEL: "gpt-4.1-mini" } }), "gpt-4.1-mini",
+  "the explicit math model remains the most specific override");
+assert.equal(generateExam.minimumDeliverableQuestionCount(3), 2);
+assert.equal(generateExam.minimumDeliverableQuestionCount(10), 6);
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "mc" }, { type: "short" }], { requested: 3, qType: "mix" }), true,
+  "a partial mixed exam still contains both requested formats");
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }, { type: "short" }], { requested: 3, qType: "mix" }), false,
+  "a mixed exam cannot become a single-format partial exam");
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }], { requested: 3, qType: "short" }), false,
+  "a single verified question is too small to become a partial exam");
 assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.options.maxItems, 5,
   "generator schema uses the shared maximum of five MC options");
 assert.equal(verifierModule.buildVerifierSchema(1).schema.properties.results.items.properties.option_quality.maxItems, 5,
@@ -216,6 +232,8 @@ function assertIncompleteExamNotDelivered(response, scenario) {
   assert.equal(response.status, 502, `${scenario}: ${JSON.stringify(response.body)}`);
   assert.equal(response.body.error, "incomplete_exam", `${scenario}: explicit incomplete-exam error`);
   assert.equal(response.body.exam, undefined, `${scenario}: no partial exam is exposed`);
+  assert.equal(typeof response.body.received, "number", `${scenario}: failed responses expose only a safe count`);
+  assert.ok(response.body.received < response.body.requested, `${scenario}: the reported safe count is below the requested threshold`);
   const diagnostic = JSON.parse(qualityLogs.at(-1));
   assert.equal(diagnostic.event, "exam_quality_rejected", `${scenario}: safe diagnostic event is emitted`);
   assert.equal(diagnostic.requestId, response.body.requestId, `${scenario}: event correlates to the client request`);
@@ -227,6 +245,19 @@ function assertIncompleteExamNotDelivered(response, scenario) {
     `${scenario}: failed operation releases its fenced claim and quota`);
   assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
     `${scenario}: incomplete exam is never issued`);
+}
+
+function assertVerifiedPartialExamDelivered(response, scenario, expectedCount = 2) {
+  assert.equal(response.status, 200, `${scenario}: ${JSON.stringify(response.body)}`);
+  assert.equal(response.body.ok, true, `${scenario}: a usable verified exam is delivered`);
+  assert.equal(response.body.exam.questions.length, expectedCount, `${scenario}: only retained questions are delivered`);
+  assert.equal(response.body.meta.partial, true, `${scenario}: shortened delivery is explicit`);
+  assert.equal(response.body.exam.questions.every((question) => question.grade_task && question.model_answer === undefined), true,
+    `${scenario}: delivered questions have sealed grading data and no exposed answer key`);
+  assert.equal(JSON.parse(qualityLogs.at(-2)).event, "exam_quality_partial_delivery",
+    `${scenario}: privacy-safe partial-delivery telemetry precedes the normal quality event`);
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), true,
+    `${scenario}: accepted questions are issued through the standard completion path`);
 }
 
 let activeQuestions = questions;
@@ -1163,7 +1194,7 @@ try {
   });
   generationTextOverride = null;
   throwOnRepair = false;
-  assertIncompleteExamNotDelivered(failedUnderfilledRepair, "underfilled response whose bounded repair fails");
+  assertVerifiedPartialExamDelivered(failedUnderfilledRepair, "underfilled response whose bounded repair fails");
   assert.equal(JSON.stringify(failedUnderfilledRepair.body).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false,
     "failed repair never returns the model answer or raw generated exam");
   activeQuestions = questions;
@@ -1294,7 +1325,7 @@ try {
   const solverRejectedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assertIncompleteExamNotDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
+  assertVerifiedPartialExamDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
 
   activeQuestions = questions;
   regenerationQuestions = [
@@ -1306,8 +1337,9 @@ try {
   const verifierRejectedRepair = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assertIncompleteExamNotDelivered(verifierRejectedRepair, "verifier rejects the sole missing-slot repair");
-  const verifierRejectedLog = JSON.parse(qualityLogs.at(-1));
+  assertVerifiedPartialExamDelivered(verifierRejectedRepair, "verifier rejects the sole missing-slot repair");
+  const verifierRejectedLog = qualityLogs.map((line) => JSON.parse(line))
+    .findLast((entry) => entry.event === "exam_quality_partial_delivery");
   assert.deepEqual(verifierRejectedLog.repairVerifierFailureCodes, {
     reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2,
   },
@@ -1398,7 +1430,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierUnavailableForRetry = false;
-  assertIncompleteExamNotDelivered(verifierFailedRetry, "retry verifier failure");
+  assertVerifiedPartialExamDelivered(verifierFailedRetry, "retry verifier failure");
 
   activeQuestions = questions;
   verifierUnavailableInitially = true;
@@ -1426,7 +1458,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierThrowsForRetry = false;
-  assertIncompleteExamNotDelivered(verifierTimeoutRetry, "retry verifier timeout");
+  assertVerifiedPartialExamDelivered(verifierTimeoutRetry, "retry verifier timeout");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -1435,7 +1467,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverUnavailableForRetry = false;
-  assertIncompleteExamNotDelivered(solverUnavailableRetry, "retry solver outage");
+  assertVerifiedPartialExamDelivered(solverUnavailableRetry, "retry solver outage");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -1444,7 +1476,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverThrowsForRetry = false;
-  assertIncompleteExamNotDelivered(solverTimeoutRetry, "retry solver timeout");
+  assertVerifiedPartialExamDelivered(solverTimeoutRetry, "retry solver timeout");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -1454,7 +1486,7 @@ try {
   const timedOutRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assertIncompleteExamNotDelivered(timedOutRetry, "repair transport failure");
+  assertVerifiedPartialExamDelivered(timedOutRetry, "repair transport failure");
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_solver_schema"), true,
     "first-round MCs are independently solved before retry starts");
 
@@ -1484,9 +1516,17 @@ try {
   });
   activeQuestions = questions;
   verifierRejectQuestionId = null;
-  assertIncompleteExamNotDelivered(shortExam, "one rejected short-answer question");
-  assert.equal(shortExam.body.exam, undefined,
-    "a rejected short-answer question prevents delivery of a partial exam containing model answers");
+  assert.equal(shortExam.status, 200, JSON.stringify(shortExam.body));
+  assert.equal(shortExam.body.exam.questions.length, 4,
+    "a sufficiently large set of independently approved questions remains usable when one candidate is rejected");
+  assert.equal(shortExam.body.meta.partial, true, "the response explicitly marks a shortened verified exam");
+  assert.equal(shortExam.body.meta.requested, 5, "the requested question count remains visible for the UI notice");
+  assert.equal(shortExam.body.exam.questions.some((question) => question.id === "short-wrong-example"), false,
+    "a rejected question is never included in a partial exam");
+  assert.equal(JSON.parse(qualityLogs.at(-2)).event, "exam_quality_partial_delivery",
+    "shortened delivery is observable without recording study content");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), true,
+    "a verified partial exam is issued through the normal atomic completion path");
 
   calls.length = 0;
   solverUnavailable = true;

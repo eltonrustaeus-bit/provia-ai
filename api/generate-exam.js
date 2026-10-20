@@ -264,11 +264,11 @@ function looksLikeMath(course, pastedText) {
   return assessment.detectSubjectProfile(course, pastedText) === "mathematics";
 }
 
-function pickModel({ isMath }) {
-  const base = process.env.OPENAI_MODEL || "gpt-4o-mini";
+function pickModel({ isMath, env = process.env }) {
+  const base = env.OPENAI_MODEL_EXAM || env.OPENAI_MODEL || "gpt-4o-mini";
   // OPENAI_MATH_MODEL is the canonical name for school math generation.
   // OPENAI_MODEL_MATH is kept as a fallback in case it was ever set in an env this repo can't see.
-  const math = process.env.OPENAI_MATH_MODEL || process.env.OPENAI_MODEL_MATH || base;
+  const math = env.OPENAI_MATH_MODEL || env.OPENAI_MODEL_MATH || base;
   return isMath ? math : base;
 }
 
@@ -1108,6 +1108,18 @@ function repairCandidateCountFor(missingSlots) {
 function mixedTypeTargets(numQuestions) {
   const count = Math.max(0, Number(numQuestions) || 0);
   return { mc: Math.floor(count / 2), short: Math.ceil(count / 2) };
+}
+
+function minimumDeliverableQuestionCount(requested) {
+  const count = Math.max(0, Number(requested) || 0);
+  return Math.min(count, Math.max(2, Math.ceil(count * 0.6)));
+}
+
+function canDeliverVerifiedQuestions(questions, { requested, qType }) {
+  if (!Array.isArray(questions) || questions.length < minimumDeliverableQuestionCount(requested)) return false;
+  if (!['mix', 'mixed'].includes(qType)) return true;
+  const types = new Set(questions.map((question) => question?.type));
+  return types.has('mc') && types.has('short');
 }
 
 function selectMixedQuestions(questions, targets) {
@@ -2071,7 +2083,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (exam.questions.length < numQuestions) {
+    if (!canDeliverVerifiedQuestions(exam.questions, { requested: numQuestions, qType })) {
       const structuralIssueCounts = {};
       for (const item of gate.dropped) {
         for (const issue of item.issues || []) {
@@ -2128,10 +2140,57 @@ module.exports = async function handler(req, res) {
         ok: false,
         error: "incomplete_exam",
         requestId: quotaRequestId,
+        requested: numQuestions,
+        received: exam.questions.length,
         message: lang === "en"
-          ? "There were not enough distinct questions that could be verified. No exam was delivered. Add relevant course material or narrow the topic, then try again."
-          : "Det gick inte att verifiera tillräckligt många unika frågor. Inget prov lämnades ut. Lägg till relevant kursmaterial eller avgränsa området och försök igen."
+          ? "Too few questions passed the quality checks to form a useful exam. No exam was delivered. Add relevant study material or narrow the topic, then try again."
+          : "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen."
       });
+    }
+
+    const partialExam = exam.questions.length < numQuestions;
+    if (partialExam) {
+      console.log(JSON.stringify({
+        event: "exam_quality_partial_delivery",
+        requestId: quotaRequestId,
+        subjectProfile,
+        numRequested: numQuestions,
+        finalQuestionCount: exam.questions.length,
+        truncated,
+        elapsedMs: budget.elapsed(),
+        generationMs: gen.latencyMs,
+        verifierChecked: verifierOutcome.checked,
+        verifierApproved: verifierOutcome.approved,
+        verifierRejected: verifierOutcome.rejected,
+        verifierCallOk: verifierOutcome.callOk,
+        initialVerifierFailureCodes,
+        repairAttempted,
+        structuralRepairAttempted,
+        qualityRepairAttempted,
+        repairFailureStage,
+        repairCandidateCount,
+        repairResponseStatus,
+        repairParseStatus,
+        repairNormalizationIssue,
+        repairOutputQuestionCount,
+        repairStructuralDropped,
+        repairStructuralIssueCounts,
+        repairVerifierCallOk,
+        repairVerifierChecked,
+        repairVerifierApproved,
+        repairVerifierFailure,
+        repairVerifierFailureCodes,
+        round1ApprovedCount,
+        round1UniqueApprovedCount,
+        repairUniqueApprovedCount,
+        repairDuplicateCount,
+        repairCrossRoundDuplicateCount,
+        combinedQuestionCount,
+        solverChecked: solverOutcome.checked,
+        solverRejected: solverOutcome.rejected,
+        solverCallOk: solverOutcome.callOk,
+        solverReasons: solverOutcome.reasons,
+      }));
     }
 
     // ── OBSERVABILITY (structured, no question/answer content logged) ─────
@@ -2192,6 +2251,7 @@ module.exports = async function handler(req, res) {
       meta: {
         isMath,
         subjectProfile,
+        partial: partialExam,
         truncated,
         verifierSkipped,
         requested: numQuestions,
@@ -2261,7 +2321,10 @@ module.exports.normalizeGeneratedExam = normalizeGeneratedExam;
 module.exports.mixedTypeTargets = mixedTypeTargets;
 module.exports.selectMixedQuestions = selectMixedQuestions;
 module.exports.mixedRepairCandidateTypes = mixedRepairCandidateTypes;
+module.exports.minimumDeliverableQuestionCount = minimumDeliverableQuestionCount;
+module.exports.canDeliverVerifiedQuestions = canDeliverVerifiedQuestions;
 module.exports.looksLikeMath = looksLikeMath;
+module.exports.pickModel = pickModel;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested

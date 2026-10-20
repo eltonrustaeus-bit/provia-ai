@@ -18,5 +18,9 @@ assert.match(app, /errorCode:res\.data\.error/,
   "the engine preserves the server error code separately from the localized message");
 assert.match(flow, /r\.errorCode === "incomplete_exam"[\s\S]*?Lägg till mer relevant material eller avgränsa området tydligare\.[\s\S]*?: tx\("Försök igen, gärna med färre frågor\./,
   "quality rejections ask for better source material, while other failures may still suggest fewer questions");
+assert.match(app, /Number\.isInteger\(res\.data\.received\)[\s\S]*?res\.data\.received\} av \$\{res\.data\.requested\} frågor klarade kontrollen/,
+  "when no safe partial exam can be delivered, the student sees how many questions passed review");
+assert.match(flow, /S\.questionCountNote = got < S\.num[\s\S]*?Du bad om .*?frågor\./,
+  "a safely shortened delivered exam visibly explains the requested and delivered counts");
 
-console.log("exam-question-count-minimum: 5 assertions passed");
+console.log("exam-question-count-minimum: 7 assertions passed");
