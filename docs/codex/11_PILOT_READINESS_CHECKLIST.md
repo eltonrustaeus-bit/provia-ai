@@ -480,3 +480,29 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Ingen syntetisk livegenerering eller P.E.R.-/rättning-/persistenskörning gjordes. Fortsätt först när användaren själv loggat in på branch-aliasen och startsidan visas.
 
 **PILOT NOT READY.** Den riktade offlinekedjan passerar, men ny livekvalitet och autentiserad end-to-end-verifiering återstår. Ingen credential hanterades, ingen stagingdata ändrades och ingen produktionsåtgärd gjordes.
+
+## Fortsatt verifiering — aktuell Preview och lokala kvalitetsgrindar — 2026-10-20
+
+- [x] XelioV:s aktiva projektmappning verifierades: ExGen `c3af48b2-20c3-4d33-a5e0-72aa001a1637` pekar på pilot-worktreen `/private/tmp/provia-ai-pilot-feature-20261019`. Worktree HEAD är `461169b`; lokala grading-/migrationsändringar är kvar orörda.
+- [x] Färsk Vercel-läsning visar Preview `dpl_4NLCLi7TPskwd83azswNm4YvnjsF` som `READY` på `codex/exgen-school-pilot-review-2026-10-13`, commit `9bbf4b8f767e36f2cb7b07d4b7b0e61f7a93d0f6`. Vercel CLI bekräftade att pilotvariablerna är branch-scope:ade, men värdena är krypterade. MCP-läsning av env-metadata nekades med 403; därför är exakt runtime-destination inte bevisad av denna kontroll.
+- [x] Exakt aktuell deployment öppnades i webbläsaren och visar `SKOLPILOT · LOGGA IN`. Ingen inloggad session har verifierats. Inloggning behöver göras av användaren; lösenord ska inte skickas i chatten.
+- [x] Lokal browserregression passerade 177 kontroller, 0 fel (`node tests/frontend/exam-flow.regression.mjs`). Exam-quality delivery-test passerade 4/4 och gratis ämnesroutningseval passerade alla fixture- och motexempel.
+- [ ] Generell nonsensdetektion är fortfarande inte deterministiskt garanterad: ordformatsavvikelsen skickas som granskningssignal och verifieraren/lösaren avgör. Offline-fixturer testar mockade `false`-bedömningar; de visar inte att live-modellen kommer känna igen ett nytt felord i biologifrågor.
+- [ ] Inget autentiserat liveprov, P.E.R-samtal, rättning eller resultatsparning har körts på deploymenten. Stagingkopplingen ska bekräftas genom den syntetiska staginginloggningen innan liveanrop.
+- [ ] Ocommittade grading-/SQL-kandidater ingår inte i deploymenten och är inte pushade eller applicerade. Ingen stagingdata, kvot, roll, `main` eller Production ändrades.
+
+**PILOT NOT READY.** Lokala regressioner är gröna och rätt Preview är öppen, men autentiserad staging-E2E och livekvalitet återstår. Separat specialistagent kunde inte startas eftersom agentkapaciteten var full.
+
+## Fortsatt verifiering — syntetiskt Preview-flöde — 2026-10-20
+
+- [x] XelioV:s aktiva ExGen-mappning verifierades på nytt och pekar på detta worktree. En specialistagentgranskning kunde inte startas eftersom agentkapaciteten var full; ingen agentinsats påstås.
+- [x] Vercel läs-API bekräftade att branch-aliasen `provia-ai-git-codex-exgen-schoo-1725d7-eltons-projects-4adfb1a3.vercel.app` pekar på `dpl_4NLCLi7TPskwd83azswNm4YvnjsF`, `READY`, branch `codex/exgen-school-pilot-review-2026-10-13`, SHA `9bbf4b8f767e36f2cb7b07d4b7b0e61f7a93d0f6`. Den aktuella runtimefilens Supabase-projektref kunde inte läsas i denna kontroll; behandla därför inte refen som nyverifierad.
+- [x] Med den redan inloggade Preview-sessionen genererades ett syntetiskt trefrågeprov i Matematik 2b om linjära funktioner. Alla tre frågor var relevanta och begripliga; de granskade flervalsalternativen innehöll inget uppenbart nonsens.
+- [x] P.E.R svarade under aktivt prov på en ledtrådsfråga och en direkt begäran om facit utan att avslöja svaret. Facitknappen var inaktiverad tills inlämning. Ledtråden var dock generisk och inte tillräckligt anpassad till uppgiften.
+- [x] Provets syntetiska svar rättades först med HTTP 502; UI:t behöll svaren. Ett manuellt engångsåterförsök gav 7/7. Efter navigering visade kontosidan ett poängsatt prov, vilket stödjer att resultatet sparades. Ingen andra provgenerering gjordes.
+- [ ] Vercel-loggar för deploymenten visade ingen `/api/grade`-stacktrace eller rotorsak; endast varningar för `/api/abandon-exam` syntes. 502-problemet är alltså reproducerat, men inte förklarat eller löst.
+- [ ] Efter sidbyte från resultatsidan till kontosidan och tillbaka visade `app.html` inloggningsgrinden, trots att kontosidan visade kontohistoriken. Det exakta Auth-/sessionsfelet är inte fastställt; appens sidnavigering kräver fortsatt undersökning.
+- [ ] Liveprovningen styrker inte att aktuell runtime pekar på exakt stagingref eftersom runtimekonfigurationen inte kunde hämtas direkt. Inget har pushats, deployats, applicerats i databas, ändrats i produktion eller raderats.
+- [x] Riktade lokala tester för rättningsfencing/abandonment passerade 5/5. Hela sviten `node --test --test-concurrency=4 --test-reporter=dot $(rg --files tests -g '*.test.mjs')` avslutades med exit 0 över 176 testfiler. `git diff --check`, `node --check api/grade.js` och `node --check api/_exam-issuance.cjs` passerade. Detta är lokala/PGlite-tester, inte hosted PostgreSQL- eller runtimebevis.
+
+**PILOT NOT READY.** Ett syntetiskt prov kunde genereras, P.E.R höll facitskyddet och rättningen lyckades på återförsök. Kvar är 502-rotorsak, Auth-persistens över sidbyte, färsk verifiering av exakt stagingref, separat granskning/applicering av lokala SQL-kandidater samt skolans operativa godkännanden.
