@@ -1,5 +1,17 @@
 # ExGen: checklista for skolpilot
 
+## Ny read-only kontroll — 2026-10-20 17:00 UTC
+
+- [x] Preview-aliasen pekar pa READY-deployment fran branchens aktuella HEAD `303b3c6`; ingen `main`-merge eller Production-andring.
+- [x] RLS ar aktiverat pa alla `public`-tabeller. Granskade elevtabeller har agarkontroller i policies; katalogkontroll ersatter inte autentiserat tva-konto-IDOR-test.
+- [!] Staging saknar `exam_issuances.grading_claim_id` och de RPC-overloads som aktuell grading-API skickar claim-token till. Den aktuella stagingdatabasen ar darfor inte kompatibel med Previewns graderingsflode.
+- [x] Fencing-/avbrottsmigreringarna passerade isolerade PostgreSQL/PGlite-regressioner 4/4.
+- [!] Klientroller har breda tabellgrant, inklusive `TRUNCATE` pa flera tabeller. RLS skyddar inte `TRUNCATE`; praktisk atkomst via Data API ar inte testad och grants har inte andrats.
+- [!] Supabase Security Advisor flaggar `sync_report_count` som klientkallbar `SECURITY DEFINER` med muterbar `search_path`; den ar kopplad som trigger men hardning av dess oqualificerade tabellnamn aterstar. `match_knowledge_chunks` har ocksa muterbar `search_path` (SECURITY INVOKER). Ingen Auth-/DB-installning har andrats.
+- [ ] Exakt stagingmigration och hosted verifiering invantar separat godkannande. Ingen databasandring gjordes.
+
+**PILOT NOT READY:** applicera godkanda stagingmigrationer och verifiera autentiserad provgenerering, rattning/sparning, P.E.R. samt tva-konto-IDOR innan elevpilot.
+
 ## Aktuell statuskontroll — 2026-10-20 16:55 UTC
 
 - Auth-fixens applikationscommit `15a95880d49a9f54430e47ef2b508317c5c00c7f` och statusdokumentationens commit `691cd290a4b8fc50ec4347d33abe5cfca8764f73` ar pushade till feature branch `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_7adHe5wkw7rf5VEpDa5HV97PMLaD` ar `READY` fran exakt dokumentations-SHA; appkoden innehaller `15a9588`. Stabil Preview-alias pekar pa deploymenten. Ingen `main`-merge, Production-deploy eller databasandring har gjorts.
