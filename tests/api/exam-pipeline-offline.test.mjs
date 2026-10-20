@@ -378,6 +378,7 @@ let regenerationQuestions = null;
 let regenerationQuestionBatches = null;
 let throwOnRepair = false;
 let truncateQualityRepairStream = false;
+let truncateQualityRepairAfter = 1;
 let simulatedNow = null;
 let issuanceUnavailable = false;
 let quotaDenied = false;
@@ -497,8 +498,10 @@ globalThis.fetch = async (input, init = {}) => {
       activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
       const fullText = JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
       const outputText = truncateQualityRepairStream && repaired.length > 1
-        ? JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired.slice(0, 1) })
-          .slice(0, -2) + "," + JSON.stringify(repaired[1]).slice(0, -1)
+        ? JSON.stringify({
+            title: "Omgenererat syntetiskt prov", level: "C",
+            questions: repaired.slice(0, Math.min(truncateQualityRepairAfter, repaired.length - 1)),
+          }).slice(0, -2) + "," + JSON.stringify(repaired[Math.min(truncateQualityRepairAfter, repaired.length - 1)]).slice(0, -1)
         : fullText;
       const events = [{ type: "response.output_text.delta", delta: outputText }];
       if (!truncateQualityRepairStream) {
@@ -1346,6 +1349,7 @@ try {
     });
   } finally {
     truncateQualityRepairStream = false;
+    truncateQualityRepairAfter = 1;
     verifierRejectQuestionId = null;
   }
   assert.equal(salvagedQualityRepair.status, 200, JSON.stringify(salvagedQualityRepair.body));
@@ -1361,6 +1365,36 @@ try {
   assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "salvage does not add a second repair attempt");
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+
+  activeQuestions = questions;
+  regenerationQuestionBatches = [qualityCandidates];
+  verifierRejectQuestionId = ["q-1", "q-2", "q-3"];
+  truncateQualityRepairStream = true;
+  truncateQualityRepairAfter = 2;
+  calls.length = 0;
+  let salvagedPartialExam;
+  try {
+    salvagedPartialExam = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    truncateQualityRepairStream = false;
+    truncateQualityRepairAfter = 1;
+    verifierRejectQuestionId = null;
+  }
+  assert.equal(salvagedPartialExam.status, 200, JSON.stringify(salvagedPartialExam.body));
+  assert.equal(salvagedPartialExam.body.exam.questions.length, 2,
+    "two salvaged and independently approved repair candidates can satisfy the existing 2-of-3 partial-exam floor");
+  assert.equal(salvagedPartialExam.body.meta.partial, true,
+    "a salvaged underfilled repair is clearly labeled partial rather than presented as a complete exam");
+  assert.equal(salvagedPartialExam.body.exam.questions.every((question) => question.id.startsWith("quality-")), true,
+    "all rejected first-round candidates remain excluded from partial delivery");
+  const salvagedPartialLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(salvagedPartialLog.repairParseStatus, "salvaged_json");
+  assert.equal(salvagedPartialLog.repairOutputQuestionCount, 2);
+  assert.equal(salvagedPartialLog.finalQuestionCount, 2);
   regenerationQuestionBatches = null;
   activeQuestions = questions;
 
