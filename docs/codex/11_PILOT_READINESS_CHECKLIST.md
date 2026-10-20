@@ -428,3 +428,16 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Ingen stagingmigration eller live-AI-/rättningskörning genomfördes. Den lokala claim-fencing-kandidaten kräver en samordnad stagingcutover och verklig PostgREST- samt tvåsessions-PostgreSQL-verifiering. `main`, Production, stagingrader, roller och kvoter lämnades orörda.
 
 **PILOT NOT READY.** Den färska katalogen bekräftar att migrationens basobjekt finns, men det nya claim-token-kontraktet, Auth-sessionen och syntetisk live E2E är ännu inte verifierade.
+
+## Reparation efter verifieringsavslag — 2026-10-20
+
+- [x] Oberoende granskning hittade ett fyrfrågegränsfall: en underkänd fråga (25 % av fyra) låg under den tidigare reparationströskeln, eftersom triggern räknade genererade frågor i stället för godkända frågor. Provet föll då igenom som ofullständigt trots att en begränsad ersättningsrunda kunde köras.
+- [x] Reparation triggas nu när antalet modellgodkända frågor understiger begärt antal. En regression begär fyra frågor, underkänner en och verifierar att ersättningsfrågan granskas, att exakt fyra frågor levereras och att den underkända frågan inte återkommer.
+- [x] Det nya testet och hela offline-sviten passerade: `node --test --test-concurrency=4 --test-reporter=dot $(rg --files -g '*.test.mjs')`, 175 testfiler, exit 0. JavaScript-syntax och `git diff --check` passerade. Detta är mockad/offline-evidens, inte live-modellkvalitet.
+- [ ] Oberoende granskning bekräftar att nonsensalternativ kan fortfarande passera om både modellbaserad verifierare och lösare felbedömer dem; de kan som standard använda samma modell. Generell nonsensdetektion är därför inte deterministiskt garanterad och måste verifieras mot liveprovider/material.
+- [ ] Reparationen är fortfarande ett enda tidsbegränsat försök med högst sex kandidater. Större luckor i långa prov kan därför ge ett tydligt ofullständighetsfel i stället för ett komplett prov; detta ska inte kringgås genom att leverera frågor som inte godkänts.
+- [ ] Fresh branchkontroll visar att HEAD och remote är `161b6b0`; Vercel Preview `dpl_6hWtDERiuLDkrnLiAZ115fr28fmS` är `READY` från exakt den SHA. Koden för denna regressionsfix är ännu inte pushad i denna kontroll.
+- [ ] Ingen autentiserad staging-session eller syntetiskt liveprov har verifierats. Staginglösenord ska sättas direkt i Supabase Dashboard och får inte återanvändas efter att ha delats i chatten.
+- [ ] Rättnings-API-/SQL-kandidaterna är fortsatt lokala och ocommittade: stagingens RPC-kontrakt är äldre, PGlite ersätter inte två sessionsbaserade PostgreSQL- och PostgREST-tester, och en samordnad staging-cutover kräver separat godkännande.
+
+**PILOT NOT READY.** Reparationsgränsfallet är lokalt fixat och testat. Stagingautentisering, livegenerering/P.E.R./rättning/sparning och säker verifiering av databas-cutovern återstår.

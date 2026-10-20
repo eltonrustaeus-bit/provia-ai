@@ -392,6 +392,34 @@ try {
   assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
     "both questions still pass the solver check");
 
+  const fourQuestionSet = [
+    ...questions,
+    {
+      ...questions[0], id: "q-4", question: "Vad blir 8 + 1?", options: ["8", "9", "10"],
+      correct_index: 1, model_answer: "9",
+    },
+  ];
+  activeQuestions = fourQuestionSet;
+  regenerationQuestions = [
+    { ...fourQuestionSet[3], id: "q-4-repair", question: "Vad blir 6 + 3?", options: ["8", "9", "10"] },
+    { ...fourQuestionSet[3], id: "q-4-repair-extra", question: "Vad blir 7 + 2?", options: ["8", "9", "10"] },
+  ];
+  verifierRejectQuestionId = "q-4";
+  calls.length = 0;
+  const fourQuestionRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 4,
+  });
+  assert.equal(fourQuestionRepair.status, 200, JSON.stringify(fourQuestionRepair.body));
+  assert.equal(fourQuestionRepair.body.exam.questions.length, 4,
+    "one rejected question in a four-question request triggers repair even when the rejection rate is only 25 percent");
+  assert.ok(fourQuestionRepair.body.exam.questions.some((question) => question.id === "q-4-repair"),
+    "the repair replaces the rejected question with a verified candidate");
+  assert.equal(fourQuestionRepair.body.exam.questions.some((question) => question.id === "q-4"), false,
+    "a rejected initial question is never restored to fill the requested count");
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  activeQuestions = questions;
+
   const biologyCourse = "Biologi 1";
   const biologyMaterial = "Fotosyntes sker i kloroplasterna. Växten använder ljusenergi, vatten och koldioxid för att bilda glukos och syre.";
   const biologyQuestions = questions.map((question, index) => ({

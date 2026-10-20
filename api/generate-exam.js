@@ -1490,7 +1490,7 @@ module.exports = async function handler(req, res) {
         const regenerationTimeoutMs = regenerationGenerationTimeout(budget.remaining());
         const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null;
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
-        const needsRepair = exam.questions.length < numQuestions
+        const needsRepair = approvedIds.size < numQuestions
           || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
         if (needsRepair && canRegenerate && !repairAttempted) {
           repairAttempted = true;
