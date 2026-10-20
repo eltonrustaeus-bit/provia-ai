@@ -1181,14 +1181,14 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("option_quality_failed")
           ? "The reviewer found weak or implausible answer options: prefer exactly three options total, and use only clear established subject concepts in the same category; for each distractor, check that it is a real, relevant misconception and not nonsense or an unrelated filler. Do not pad the options."
           : "",
-        failures.has("high_ambiguity")
+        failures.has("high_ambiguity") || failures.has("question_clarity")
           ? "The reviewer found ambiguity: ask for one bounded fact or outcome that has exactly one defensible answer in the supplied material."
           : "",
-        failures.has("low_source_alignment")
+        failures.has("low_source_alignment") || failures.has("source_support")
           ? "The reviewer found weak source support: test only facts explicitly supported by the supplied material and quote the exact supporting words."
           : "",
-        failures.has("low_factual_accuracy")
-          ? "The reviewer found a factual or answer-key problem: independently re-check each answer and ensure the marked answer and explanation agree."
+        failures.has("low_factual_accuracy") || failures.has("answer_alignment")
+          ? "The reviewer found a factual or answer-alignment problem: solve each task independently, check that the result answers exactly what was asked, and make the model answer, explanation, and any answer key agree."
           : "",
         failures.has("low_scoring_quality")
           && !failures.has("scoring_alignment")
@@ -1197,10 +1197,10 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("scoring_alignment")
           ? "The reviewer found a question/rubric scoring mismatch. For a short-answer math task, award method points only when the question explicitly asks the student to show or explain the method; otherwise score only its stated final-answer target. Ensure the rubric parts sum exactly to points and the full-score rule matches the requested work. Re-solve the task and check the answer independently."
           : "",
-        failures.has("low_language_quality") || failures.has("language_mismatch")
+        failures.has("low_language_quality") || failures.has("language_mismatch") || failures.has("language_quality")
           ? "The reviewer found a language problem: write every learner-facing field in natural Swedish, except established technical terms and exact source quotations."
           : "",
-        failures.has("difficulty_mismatch")
+        failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "The reviewer found a level mismatch: match the requested level and avoid hidden or advanced requirements."
           : "",
       ].filter(Boolean).join(" ")
@@ -1208,14 +1208,14 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("option_quality_failed")
           ? "Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt och använd tydliga, etablerade ämnesbegrepp i samma kategori; kontrollera att varje distraktor är en verklig, relevant missuppfattning och inte nonsens eller utfyllnad. Bygg inte ut alternativen."
           : "",
-        failures.has("high_ambiguity")
+        failures.has("high_ambiguity") || failures.has("question_clarity")
           ? "Granskningen hittade tvetydighet: fråga efter en avgränsad uppgift eller slutsats med exakt ett försvarbart svar i underlaget."
           : "",
-        failures.has("low_source_alignment")
+        failures.has("low_source_alignment") || failures.has("source_support")
           ? "Granskningen hittade svagt källstöd: pröva bara fakta som uttryckligen stöds av materialet och citera de exakta stödorden."
           : "",
-        failures.has("low_factual_accuracy")
-          ? "Granskningen hittade fakta- eller facitproblem: kontrollera varje svar självständigt och se till att markerat svar och förklaring stämmer överens."
+        failures.has("low_factual_accuracy") || failures.has("answer_alignment")
+          ? "Granskningen hittade fakta- eller svarsförankringsproblem: lös varje uppgift självständigt, kontrollera att resultatet faktiskt besvarar frågan och låt exempelsvar, förklaring och eventuellt facit stämma överens."
           : "",
         failures.has("low_scoring_quality")
           && !failures.has("scoring_alignment")
@@ -1224,10 +1224,10 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("scoring_alignment")
           ? "Granskningen hittade en avvikelse mellan frågan och poängmatrisen. I en matematisk kortsvarsuppgift får metodpoäng bara ges när frågan uttryckligen ber eleven visa eller förklara metoden; annars bedöms endast det angivna slutsvaret. Se till att delmomentens poäng summerar exakt till points och att full_score_requirements bara omfattar efterfrågat arbete. Lös uppgiften själv och kontrollera svaret på nytt."
           : "",
-        failures.has("low_language_quality") || failures.has("language_mismatch")
+        failures.has("low_language_quality") || failures.has("language_mismatch") || failures.has("language_quality")
           ? "Granskningen hittade språkproblem: skriv alla elevriktade fält på naturlig svenska, förutom etablerade facktermer och exakta källcitat."
           : "",
-        failures.has("difficulty_mismatch")
+        failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."
           : "",
       ].filter(Boolean).join(" ");

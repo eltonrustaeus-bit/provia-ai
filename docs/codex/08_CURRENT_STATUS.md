@@ -1,5 +1,16 @@
 # 08 Current Status
 
+## Preview verifier feedback and targeted repair follow-up — 2026-10-21
+
+- [x] Pushed the explicitly approved fast-forward chain to `codex/exgen-generation-quality-2026-10-20`; branch now contains `96255dc`. Vercel Preview `dpl_FuVh4f2rkHNQvjysNWiB925r8Jfj` reached `READY` from that exact SHA. The branch-specific Preview variables remain encrypted and scoped to this branch; no values were read.
+- [x] Ran exactly one previously approved synthetic A-level Mathematics 2b test with three short-answer questions on the READY Preview. The material used two worked quadratic examples and contained no learner data. The authenticated request reached generation and returned **1/3 approved**; the API issued no exam. Runtime telemetry reports 3 initial candidates checked, 1 approved, 2 rejected for `low_factual_accuracy`, `low_source_alignment` and `low_scoring_quality`; one also had `answer_alignment`, and one had `reviewer_other`. The bounded quality repair generated 3 candidates, but all 3 were rejected; there were no duplicates. The attempt completed in 32.7 seconds. No source/question/answer text was logged by the diagnostic event.
+- [x] Temporarily changed only the existing staging test profile from `gratis` to `premium` for that approved attempt, then immediately restored `gratis`. The post-run readback showed quota count 3 and period `2026-W43`; no other profile, quota, staging row, database schema, `main` or Production was changed.
+- [x] The live evidence exposed a repair-prompt gap: verifier categories `answer_alignment`, `source_support`, `question_clarity`, `language_quality` and `difficulty_match` were safely emitted but not individually consumed by the repair prompt. Local code now maps these categories to targeted Swedish/English instructions; regression tests cover each mapping. This does not prove a future model repair will pass.
+- [x] Offline checks after the local follow-up: full API suite **176/176**; focused source-reference suite **6/6**; exam-pipeline regression and `node --check` passed; `git diff --check` passed.
+- [!] The targeted follow-up is committed locally but has not been pushed or live-tested. No second model-backed staging request has been made. Specialist-agent review was unavailable because the agent-thread limit was reached.
+
+**PILOT NOT READY.** The authenticated live generation attempt still failed to produce a usable three-question exam. Next: obtain explicit approval to push the local repair-feedback commit and to make one further bounded synthetic staging request. Do not change the model or weaken the quality gate without evidence and approval. Keep `main`, Production and staging test data unchanged.
+
 ## Local source-reference recovery and scoring diagnostics — 2026-10-21
 
 - [x] Added a conservative source-excerpt fallback for non-graph questions when the model's supplied citation is absent or paraphrased. It derives only a literal excerpt from the student's submitted material after multiple meaningful terms overlap with question/answer context; weak or unrelated matches return no citation. The independent reviewer, solver and existing quality gate still decide whether a question is accepted.

@@ -133,6 +133,42 @@ assert.match(mathScoringRepair.input.at(-1).content, /metodpoäng bara ges när 
   "a classified math scoring failure produces precise repair guidance");
 assert.match(mathScoringRepair.input.at(-1).content, /delmomentens poäng summerar exakt till points/i,
   "the targeted scoring repair requires parts to sum exactly to the total");
+const categorizedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 2,
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match"],
+});
+assert.match(categorizedRepair.input.at(-1).content, /lös varje uppgift självständigt.*faktiskt besvarar frågan/i,
+  "reviewer answer-alignment findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /uttryckligen stöds av materialet/i,
+  "reviewer source-support findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /exakt ett försvarbart svar/i,
+  "reviewer clarity findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /naturlig svenska/i,
+  "reviewer language findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /följ den valda nivån/i,
+  "reviewer difficulty findings translate to explicit repair guidance");
+const categorizedRepairEnglish = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "en", numQuestions: 2,
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match"],
+});
+assert.match(categorizedRepairEnglish.input.at(-1).content, /solve each task independently.*answers exactly what was asked/i,
+  "English reviewer answer-alignment findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /explicitly supported by the supplied material/i,
+  "English reviewer source-support findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /exactly one defensible answer/i,
+  "English reviewer clarity findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /natural Swedish/i,
+  "English repair prompt still enforces Swedish learner-facing language");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /match the requested level/i,
+  "English reviewer difficulty findings receive targeted repair guidance");
 const mixedRepairPayload = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
