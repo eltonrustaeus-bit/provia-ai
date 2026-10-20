@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## P.E.R regression audit — 2026-10-21
+
+- [x] Ran `node --test tests/per/*.test.mjs`: **25/25** passed, covering P.E.R guidance, evidence selection, answer-leak protection, and usage-event privacy.
+- [x] Ran `node --test tests/frontend/per-*.test.mjs tests/frontend/pilot-session-recovery.test.mjs`: **15/15** passed on the clean rerun, including active-exam answer gating, preserving an unsent question through reauthentication, accessible error announcements, widget suppression, and focus/layout behavior.
+- [!] One earlier parallel frontend run reported a failure in `per-felbank-collision.test.mjs`; that test passed in isolation and the full focused suite passed on rerun. Treat as a transient timing flake, not proof that the behavior is failure-free in live browsers.
+- [!] These are offline regressions only; they do not constitute authenticated staging verification or school-pilot acceptance.
+
+**PILOT NOT READY.** P.E.R's offline regression suite is green. The latest live exam-generation attempt still failed closed at 0/3, and the local streamed-repair fix has not been deployed or live-verified. The two local commits remain unpushed; obtain fresh approval before Preview deployment or another provider-backed staging request.
+
 ## Bounded streamed quality repair — 2026-10-21
 
 - [x] The verifier-driven quality-repair request now uses the existing bounded Responses stream reader, matching the initial generation path. A timeout can retain complete question objects emitted before a partial JSON tail; those candidates still pass normalization, source checks, independent verifier, and the existing fail-closed delivery gate.
