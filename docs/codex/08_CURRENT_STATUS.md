@@ -1,5 +1,13 @@
 # 08 Current Status
 
+## Grading recovery regression audit — 2026-10-21
+
+- [x] Focused grading/API recovery and frontend timeout suite passed **15/15**. Coverage includes injected upstream HTTP 502, retry recovery, concurrent claim fencing, lost HTTP response replay, conflicting answers, result persistence, and no result/mastery writes when provider transport times out.
+- [x] The handler releases a retry-safe grading claim after an upstream failure; the same submission/answer fingerprint can then be retried, while completed requests replay the saved result and do not grade or persist twice.
+- [!] This verifies offline handler behavior only. The cause of the historical live 502 is still unknown because no matching live runtime event has been freshly retrieved for that request.
+
+**PILOT NOT READY.** Grading recovery has focused offline evidence, but the new streamed-repair Preview has not had a generation request. Continue with the separately approved one-request staging check when its approval arrives; keep the test account role/quota unchanged.
+
 ## Streamed repair Preview — 2026-10-21
 
 - [x] After explicit approval, pushed exactly `807a4d9`, `2adfe18`, `b974478`, and `adc5e0b` to `codex/exgen-generation-quality-2026-10-20`. Remote branch readback confirmed exact tip `adc5e0b41f3849789c683864036337e22ab6a2ac`.
