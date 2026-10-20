@@ -121,6 +121,18 @@ assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*beh�
 assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+const mathScoringRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "math system" }, { role: "user", content: "synthetic math material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3, reviewFailureCodes: ["low_scoring_quality", "scoring_alignment"],
+  qType: "short", candidateCount: 4,
+});
+assert.match(mathScoringRepair.input.at(-1).content, /metodpoäng bara ges när frågan uttryckligen ber eleven visa eller förklara metoden/i,
+  "a classified math scoring failure produces precise repair guidance");
+assert.match(mathScoringRepair.input.at(-1).content, /delmomentens poäng summerar exakt till points/i,
+  "the targeted scoring repair requires parts to sum exactly to the total");
 const mixedRepairPayload = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
@@ -302,6 +314,7 @@ let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
 let regenerationQuestionBatches = null;
 let throwOnRepair = false;
+let simulatedNow = null;
 let issuanceUnavailable = false;
 let quotaDenied = false;
 let lastInvokeCallStart = 0;
@@ -408,6 +421,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url === "https://api.openai.com/v1/responses") {
     const body = JSON.parse(init.body || "{}");
     if (body.stream) {
+      if (simulatedNow !== null) simulatedNow += 10_000;
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
       const event = { type: "response.output_text.delta", delta: generationTextOverride || JSON.stringify({ title: "Syntetiskt prov", level: "C", questions: activeQuestions }) };
       const completed = { type: "response.completed", response: {
@@ -418,6 +432,7 @@ globalThis.fetch = async (input, init = {}) => {
     }
     const schemaName = body.text?.format?.name;
     if (schemaName === "mock_exam_schema") {
+      if (simulatedNow !== null) simulatedNow += 20_000;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
       if (!batch) throw new Error("unexpected synthetic repair request");
@@ -773,6 +788,24 @@ try {
   assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
     "the independent reviewer receives the synthetic biology source material");
 
+  activeQuestions = biologyQuestions.map((question) => question.id === "biology-2"
+    ? { ...question, source_references: ["Parafras som inte finns ordagrant i materialet"] }
+    : question);
+  const sourceExcerptRecoveryVerifierStart = verifierInputs.length;
+  const sourceExcerptRecoveryExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(sourceExcerptRecoveryExam.status, 200, JSON.stringify(sourceExcerptRecoveryExam.body));
+  assert.equal(sourceExcerptRecoveryExam.body.exam.questions.length, 3,
+    "a source-supported question is not dropped solely because the model supplied only a paraphrased citation");
+  const recoveredSourceQuestion = sourceExcerptRecoveryExam.body.exam.questions.find((question) => question.id === "biology-2");
+  assert.ok(recoveredSourceQuestion?.source_references.length > 0);
+  assert.ok(recoveredSourceQuestion.source_references.every((reference) => biologyMaterial.includes(reference)),
+    "fallback citations remain literal excerpts from the submitted material");
+  assert.ok(verifierInputs.slice(sourceExcerptRecoveryVerifierStart)
+    .some((review) => review.questions.some((question) => question.id === "biology-2")),
+  "the recovered candidate still must pass independent review");
+
   activeQuestions = biologyQuestions.slice(0, 2);
   calls.length = 0;
   const twoQuestionBiologyExam = await invoke(generateExam, {
@@ -1096,11 +1129,20 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
-
-  activeQuestions = questions.map((question) => ({
+  const unsupportedQuestions = questions.map((question) => ({
     ...question,
+    question: "Vilket tal följer efter 80?",
+    options: ["80", "81", "82"],
+    correct_index: 1,
+    model_answer: "81",
+    topic: "Talserie",
+    subtopic: "Efterföljare",
+    concept_tag: "Efterföljare",
+    learning_objective: "Ange nästa tal i en talserie.",
     source_references: ["Not found in the supplied material"],
   }));
+
+  activeQuestions = unsupportedQuestions;
   regenerationQuestions = repairedQuestions;
   const verifierCountBeforeEmptyStructuralSet = verifierInputs.length;
   const emptyStructuralSetExam = await invoke(generateExam, {
@@ -1123,10 +1165,7 @@ try {
   activeQuestions = questions;
   regenerationQuestions = null;
 
-  activeQuestions = questions.map((question) => ({
-    ...question,
-    source_references: ["Not found in the supplied material"],
-  }));
+  activeQuestions = unsupportedQuestions;
   throwOnRepair = true;
   const structuralRepairTransportFailure = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
@@ -1139,6 +1178,38 @@ try {
   assert.equal(JSON.stringify(structuralRepairFailureLog).includes("synthetic repair transport timeout"), false,
     "repair diagnostics never expose raw provider errors");
   throwOnRepair = false;
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = repairedQuestions.map((question) => question.id);
+  const originalDateNow = Date.now;
+  simulatedNow = originalDateNow();
+  Date.now = () => simulatedNow;
+  calls.length = 0;
+  let exhaustedRepairBudget;
+  try {
+    exhaustedRepairBudget = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    Date.now = originalDateNow;
+    simulatedNow = null;
+  }
+  assertIncompleteExamNotDelivered(exhaustedRepairBudget, "structural repair leaves insufficient quality-repair time");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+    "the request does not start a second generation after the structural repair consumes the quality-repair window");
+  const exhaustedRepairBudgetLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(exhaustedRepairBudgetLog.structuralRepairAttempted, true);
+  assert.equal(exhaustedRepairBudgetLog.qualityRepairAttempted, false,
+    "quality repair is not started when its protected generation/review/finalization budget is unavailable");
+  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 32_000,
+    "the synthetic latency leaves less than the required bounded repair window");
+  assert.equal(exhaustedRepairBudgetLog.qualityRepairGenerationTimeoutMs, null);
+  assert.equal(exhaustedRepairBudgetLog.finalQuestionCount, 0,
+    "unreviewed or rejected candidates are never issued as a fallback");
+  verifierRejectQuestionId = null;
   activeQuestions = questions;
   regenerationQuestions = null;
 
@@ -1187,10 +1258,7 @@ try {
       model_answer: "Pythagoras",
     }
     : question);
-  activeQuestions = questions.map((question) => ({
-    ...question,
-    source_references: ["Not found in the supplied material"],
-  }));
+  activeQuestions = unsupportedQuestions;
   regenerationQuestions = structuralOutlierQuestions;
   const verifierCountBeforeStructuralOutlier = verifierInputs.length;
   const structuralOutlierExam = await invoke(generateExam, {
@@ -1245,9 +1313,7 @@ try {
     "failed repair never returns the model answer or raw generated exam");
   activeQuestions = questions;
 
-  activeQuestions = questions.map((question, index) => index === 0
-    ? { ...question, source_references: ["A reference absent from the supplied material"] }
-    : question);
+  activeQuestions = unsupportedQuestions;
   regenerationQuestions = repairedQuestions;
   verifierRejectQuestionId = null;
   const verifierCountBeforeMissingSource = verifierInputs.length;
@@ -1387,7 +1453,7 @@ try {
   const verifierRejectedLog = qualityLogs.map((line) => JSON.parse(line))
     .findLast((entry) => entry.event === "exam_quality_partial_delivery");
   assert.deepEqual(verifierRejectedLog.repairVerifierFailureCodes, {
-    reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2,
+    reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2, answer_alignment: 2,
   },
     "safe repair telemetry records only the review rejection category");
   assert.equal(verifierRejectedLog.repairStructuralDropped, 0,
@@ -1422,7 +1488,7 @@ try {
   const noApprovedLog = JSON.parse(qualityLogs.at(-1));
   assert.equal(noApprovedLog.finalQuestionCount, 0);
   assert.deepEqual(noApprovedLog.initialVerifierFailureCodes, {
-    reviewer_rejected: 3, required_changes: 3, low_factual_accuracy: 3,
+    reviewer_rejected: 3, required_changes: 3, low_factual_accuracy: 3, answer_alignment: 3,
   }, "zero-question rejection records safe aggregate reviewer categories");
   assert.equal(Object.hasOwn(noApprovedLog, "questions"), false);
   assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,

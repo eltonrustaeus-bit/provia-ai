@@ -69,8 +69,10 @@ try {
       body: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     } });
     await submitFromWizard(page);
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent.includes("på måndag"));
-    assert.match(await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent(), /veckans prov/);
+    const quotaStatus = page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub");
+    await quotaStatus.waitFor({ state: "visible" });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-sub")?.textContent.includes("på måndag"));
+    assert.match(await quotaStatus.textContent(), /veckans prov/);
     assert.equal(requests(), 1, "server denial is returned after the authoritative request");
     await page.close();
   }

@@ -64,6 +64,49 @@ const DEFAULT_THRESHOLDS = {
   minLanguageQuality: 0.6,
 };
 
+const REVIEW_FAILURE_CATEGORIES = [
+  "scoring_alignment",
+  "answer_alignment",
+  "source_support",
+  "question_clarity",
+  "language_quality",
+  "difficulty_match",
+  "reviewer_other",
+];
+
+// Convert free-form reviewer notes into bounded labels before they reach logs
+// or repair prompts. Never persist the note itself: it can quote generated or
+// user-provided text.
+function classifyReviewFindings(requiredChanges) {
+  const text = (Array.isArray(requiredChanges) ? requiredChanges : [])
+    .filter((item) => typeof item === "string")
+    .join(" ")
+    .normalize("NFKC")
+    .toLowerCase();
+  if (!text) return [];
+
+  const categories = [];
+  if (/(rubric|scoring|points?|poäng|poang|bedömn|bedom|delpoäng|delpoang|full score|partial credit)/iu.test(text)) {
+    categories.push("scoring_alignment");
+  }
+  if (/(answer|facit|lösning|losning|correct|incorrect|svar|beräkning|berakning)/iu.test(text)) {
+    categories.push("answer_alignment");
+  }
+  if (/(source|käll|kall|underlag|material|stöd|stod|evidence|ground)/iu.test(text)) {
+    categories.push("source_support");
+  }
+  if (/(ambig|tvetyd|avgräns|avgrans|specific|unclear|otydlig|ospecifik)/iu.test(text)) {
+    categories.push("question_clarity");
+  }
+  if (/(language|språk|grammat|stavning|nonsens|idiomat|formulering)/iu.test(text)) {
+    categories.push("language_quality");
+  }
+  if (/(difficulty|svårighets|svarighets|nivå|niva|level|cognitive)/iu.test(text)) {
+    categories.push("difficulty_match");
+  }
+  return categories.length ? categories : ["reviewer_other"];
+}
+
 const materialInput = require("./_material.cjs");
 const SOURCE_MATERIAL_CHAR_CAP = 12000;
 const REVIEW_PAYLOAD_CHAR_CAP = 60000;
@@ -333,7 +376,14 @@ async function verifyQuestions(questions, opts) {
       const optionQualityContractOk = Array.isArray(res.option_quality) &&
         res.option_quality.length === expectedOptions &&
         res.option_quality.every((quality) => typeof quality === "boolean");
-      perQuestion.set(res.id, { ...res, option_quality_contract_ok: optionQualityContractOk });
+      const failureCategories = res.approved === true && Array.isArray(res.required_changes) && res.required_changes.length === 0
+        ? []
+        : classifyReviewFindings(res.required_changes);
+      perQuestion.set(res.id, {
+        ...res,
+        option_quality_contract_ok: optionQualityContractOk,
+        failure_categories: failureCategories,
+      });
     }
     if (perQuestion.size !== expectedIds.size) { failed.failureReason = "missing_result"; return failed; }
     return { perQuestion, callOk: true, model: failed.model, usage: failed.usage, latencyMs: failed.latencyMs };
@@ -351,4 +401,6 @@ module.exports = {
   verifyQuestions,
   SUBJECT_HINTS,
   DEFAULT_THRESHOLDS,
+  REVIEW_FAILURE_CATEGORIES,
+  classifyReviewFindings,
 };

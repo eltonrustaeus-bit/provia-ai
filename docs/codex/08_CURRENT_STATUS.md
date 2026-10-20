@@ -1,5 +1,17 @@
 # 08 Current Status
 
+## Local source-reference recovery and scoring diagnostics — 2026-10-21
+
+- [x] Added a conservative source-excerpt fallback for non-graph questions when the model's supplied citation is absent or paraphrased. It derives only a literal excerpt from the student's submitted material after multiple meaningful terms overlap with question/answer context; weak or unrelated matches return no citation. The independent reviewer, solver and existing quality gate still decide whether a question is accepted.
+- [x] Added bounded verifier failure categories so scoring, answer alignment, source support, clarity, language and difficulty issues can guide repair without storing free-form reviewer notes or generated/student content in telemetry.
+- [x] Added Swedish and English repair guidance for short-answer scoring alignment: method points must be explicitly requested, rubric parts must sum to the stated points, and the solution must be checked again.
+- [x] Added a deterministic elapsed-budget regression for the two-repair path: when structural repair leaves less than the protected generation/review/finalization window, quality repair is not started and no unreviewed/rejected question is issued.
+- [x] Fixed two browser-suite fixtures: the quota test now waits on the visible quota status row, and the graph-flow mock now implements the server's idempotency claim/completion/failure RPC contract. Both previously failing tests pass in isolation and in the full run.
+- [x] Offline verification: focused source/pipeline/verifier tests **8/8**; pilot candidate builder **10/10**; complete API/P.E.R. suite **201/201**; all discovered repository tests **324/324**. `node --check` for all changed JavaScript files and `git diff --check` passed.
+- [!] These are local/offline improvements only. They do not overturn the live **0/3** generation outcome or prove that the requested number of questions will be generated. The user approved one more synthetic staging run with temporary Premium, but the open signed-in Preview is an older deployment and does not contain these local changes. No new provider call, push, deployment, role/quota change, database change, `main` merge or Production operation was made in this update.
+
+**PILOT NOT READY.** Next: get explicit approval to publish the exact reviewed local commit to the existing feature branch and create a staging-only Preview. Then use the already approved one-shot synthetic test on that exact READY deployment, temporarily set only the staging test account to Premium, and restore it immediately after the attempt. Keep `main`, Production and unrelated staging data unchanged.
+
 ## Approved second synthetic generation test — 2026-10-20 21:38 UTC
 
 - [x] Ran exactly one additional synthetic staging request on READY deployment `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo` (branch `codex/exgen-generation-quality-2026-10-20`, SHA `679e6350cb7603668e4b37d844c48da665e8e3a5`). Vercel's env-list API returned 403; the explicit CLI fallback verified the needed pilot variables remain encrypted and Preview-scoped to this branch. No values were read.
@@ -10,6 +22,16 @@
 - [!] The richer material did not fix candidate quality. The evidence points to two generation-pipeline weaknesses: exact source excerpts are not consistently emitted/retained, and the initial math candidates failed the independent scoring-quality review. Runtime logs deliberately contain no generated question or source text, so the precise reviewer objections are unknown. Do not weaken the review gate or conclude a stronger model is the fix from this run alone.
 
 **PILOT NOT READY.** Next: improve and test the generator's exact source-reference behavior and short-answer rubric/scoring alignment using synthetic fixtures; add a regression for the structural-repair path leaving insufficient time for a quality repair. Then seek a separate bounded approval before another model-backed staging request.
+
+## Local verifier diagnosis and targeted scoring repair — 2026-10-20
+
+- [x] The verifier now maps free-form `required_changes` to a fixed allowlist of diagnostic categories. Raw reviewer notes remain out of logs and repair telemetry; the quality gate is unchanged.
+- [x] When a rejection is categorized as a question/rubric scoring mismatch, the bounded repair prompt now requires method points to be explicitly requested, rubric parts to sum to the question's points, and the answer to be independently re-solved. This is a targeted repair instruction, not a claim that the model will necessarily comply.
+- [x] Added offline regression coverage for safe categorization, multi-category findings, verifier output, and targeted math scoring repair. A false-positive clarity classification was caught and narrowed during testing.
+- [x] Focused pipeline/verifier tests passed **2/2**. Full API and P.E.R. suites passed **199/199**. `node --check` on both changed API files and `git diff --check` passed.
+- [!] The live **0/3** outcome is not repaired or overturned by this local change. Exact source-reference generation remains unaddressed; this improvement has not been deployed or live-tested, and the previously approved staging request is consumed. No provider call, push, deployment, role/quota change, database change, `main` merge or Production operation was made here.
+
+**PILOT NOT READY.** Next: add synthetic fixtures that reproduce missing source references and verify the generator/structural-repair contract, then exercise the repair-budget edge case offline. Request separate approval before any further model-backed staging request or push/deploy.
 
 ## Approved staging generation after temporary entitlement — 2026-10-20 21:33 UTC
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval } = require("../../api/_verifier.js");
+const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApproval, classifyReviewFindings } = require("../../api/_verifier.js");
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, language_match: true, option_quality: [] });
@@ -39,6 +39,10 @@ assert.equal(valid.outcome.perQuestion.get("q1").approved, true);
 assert.equal(valid.outcome.model, "measured-review-model");
 assert.deepEqual(valid.outcome.usage, { input_tokens: 31, output_tokens: 7 });
 assert.equal(valid.requestTimeoutMs, 30_000, "the reviewer keeps its default upper timeout");
+assert.deepEqual(classifyReviewFindings(["Poängmatrisen ger metodpoäng som frågan inte efterfrågar."]), ["scoring_alignment"],
+  "reviewer notes are reduced to a fixed scoring category without retaining their wording");
+assert.deepEqual(classifyReviewFindings(["Underlaget stöder inte det angivna facit."]), ["answer_alignment", "source_support"],
+  "multiple relevant review categories can be retained without raw notes");
 const submittedReviewSchema = valid.requestBody.text.format.schema.properties.results;
 assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
 assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
@@ -198,6 +202,8 @@ const needsRevision = {
   issues: ["Exempelsvaret löser inte ekvationen."], required_changes: ["Byt exempelsvaret till x = 2."],
 };
 const openResponse = await runWithResults([needsRevision], [openQuestion], "Ekvationer: 2x = 4.");
+assert.deepEqual(openResponse.outcome.perQuestion.get("open-1").failure_categories, ["answer_alignment"],
+  "the review outcome exposes only bounded diagnostic categories for rejected content");
 const transmitted = JSON.parse(openResponse.requestBody.input.find((item) => item.role === "user").content);
 assert.equal(transmitted.source_material, "Ekvationer: 2x = 4.");
 assert.equal(transmitted.questions[0].model_answer, "x = 3", "the reviewer receives the generated exemplar it must independently check");

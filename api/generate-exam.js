@@ -10,7 +10,7 @@ const crypto = require("crypto");
 const assessment = require("./_assessment");
 const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
-const { filterSourceReferences } = require("./_source-references.cjs");
+const { filterSourceReferences, deriveSourceExcerpt } = require("./_source-references.cjs");
 const examCompletion = require("./_exam-completion.cjs");
 const examGenerationOperations = require("./_exam-generation-operations.cjs");
 const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
@@ -230,6 +230,11 @@ function normalizeGeneratedExam(exam, {
     }
     if (q.type !== "graph") q.graph_spec = null;
     q.source_references = filterSourceReferences(pastedText, q.source_references);
+    if (q.type !== "graph" && q.source_references.length === 0) {
+      q.source_references = deriveSourceExcerpt(pastedText, [
+        q.question, q.model_answer, q.topic, q.subtopic, q.concept_tag, q.learning_objective,
+      ]);
+    }
     keptQuestions.push(q);
   }
   if (keptQuestions.length === 0) {
@@ -1186,7 +1191,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           ? "The reviewer found a factual or answer-key problem: independently re-check each answer and ensure the marked answer and explanation agree."
           : "",
         failures.has("low_scoring_quality")
+          && !failures.has("scoring_alignment")
           ? "The reviewer found a scoring problem: make the question, model answer, points, and rubric agree exactly; do not require unstated work."
+          : "",
+        failures.has("scoring_alignment")
+          ? "The reviewer found a question/rubric scoring mismatch. For a short-answer math task, award method points only when the question explicitly asks the student to show or explain the method; otherwise score only its stated final-answer target. Ensure the rubric parts sum exactly to points and the full-score rule matches the requested work. Re-solve the task and check the answer independently."
           : "",
         failures.has("low_language_quality") || failures.has("language_mismatch")
           ? "The reviewer found a language problem: write every learner-facing field in natural Swedish, except established technical terms and exact source quotations."
@@ -1209,7 +1218,11 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           ? "Granskningen hittade fakta- eller facitproblem: kontrollera varje svar självständigt och se till att markerat svar och förklaring stämmer överens."
           : "",
         failures.has("low_scoring_quality")
+          && !failures.has("scoring_alignment")
           ? "Granskningen hittade bedömningsproblem: låt frågan, exempelsvaret, poängen och matrisen stämma exakt; kräv inget som inte uttryckligen efterfrågas."
+          : "",
+        failures.has("scoring_alignment")
+          ? "Granskningen hittade en avvikelse mellan frågan och poängmatrisen. I en matematisk kortsvarsuppgift får metodpoäng bara ges när frågan uttryckligen ber eleven visa eller förklara metoden; annars bedöms endast det angivna slutsvaret. Se till att delmomentens poäng summerar exakt till points och att full_score_requirements bara omfattar efterfrågat arbete. Lös uppgiften själv och kontrollera svaret på nytt."
           : "",
         failures.has("low_language_quality") || failures.has("language_mismatch")
           ? "Granskningen hittade språkproblem: skriv alla elevriktade fält på naturlig svenska, förutom etablerade facktermer och exakta källcitat."
@@ -1721,6 +1734,9 @@ module.exports = async function handler(req, res) {
       if (vres?.option_quality_contract_ok === false) codes.push("option_quality_contract_failed");
       if (Array.isArray(vres?.option_quality) && vres.option_quality.some((quality) => quality !== true)) {
         codes.push("option_quality_failed");
+      }
+      for (const category of Array.isArray(vres?.failure_categories) ? vres.failure_categories : []) {
+        if (verifier.REVIEW_FAILURE_CATEGORIES.includes(category)) codes.push(category);
       }
       if (codes.length === 0) codes.push("review_thresholds");
       return codes;
