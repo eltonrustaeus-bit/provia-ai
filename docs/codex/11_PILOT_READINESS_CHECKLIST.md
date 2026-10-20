@@ -219,3 +219,22 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Agaren behover granska och vid behov aterkalla den projektbundna bypass-tokenen for `prj_vWo9J6XgP2qJRQ5btgf2WR9C5Xs7`, eller uttryckligen godkanna radering av just det tomma projektet. Tidigare raderingsgodkannande avsag ett annat projekt-ID och anvands inte har.
 
 **PILOT NOT READY.** Senaste Previewn ar verifierad mot staging, men ingen ny Auth-begaran registrerades efter 2026-10-19 19:50 UTC och anvandarens inloggningsrotorsak ar okand. Fortsatt inte med liveprov forran testkontot loggar in. Ror inte det separat identifierade tomma Vercel-projektet igen utan specifikt agargodkannande.
+
+## Lokal gradingverifiering — 2026-10-20 10:01 UTC
+
+- [x] Exakt pinnad PGlite `0.5.10` ar tillagd som devDependency for reproducerbart lokalt SQL-beteendetest.
+- [x] `tests/api/grading-claim-fencing-postgres.test.mjs` exekverar fencing- och abandonment-migrationerna mot en syntetisk PostgreSQL-databas. Den visar stale takeover, att gammal agare inte kan frigora eller spara, att ny agare kan spara/verifiera och aterhamta resultat, att obekraftad legacyrad inte hindrar avbrott samt att RPC-behorigheter ar service-only. Tre riktade migrationstester passerade.
+- [x] Den falska `_ROLLBACK.sql`-filen har flyttats ut ur migrationskatalogen till en uttrycklig Markdown-notering. Regressionen kontrollerar att den inte langre kan tolkas som en migration med kolliderande versionsprefix.
+- [ ] PGlite ar en isolerad PostgreSQL/WASM-instans, inte hosted Supabase eller tva oberoende samtidiga PostgreSQL-sessioner. Transaktionskonkurrens, hosted migration ledger och riktiga grants maste fortsatt verifieras separat.
+- [ ] Nyskapade API-kandidaten skickar `p_claim_id`, medan stagingens aktuella `claim_exam_grading`, `release_exam_grading` och `persist_graded_exam_result` fortfarande har aldre 3/3/10-argumentsignaturer. Darfor ar API och migrering inte deploybara var for sig; stagingmigrering kraver separat uttryckligt godkannande och samordnad Preview-cutover.
+
+**PILOT NOT READY.** Lokal SQL-beteendeverifiering ar starkare men livegrading, verklig concurrency och autentiserat skolflode ar fortfarande obekraftade. Ingen stagingmigration har applicerats.
+
+## Auth-uppfoljning — 2026-10-20 10:07 UTC
+
+- [x] Vercel-listan bekraftade aktuell Preview `dpl_BoJxsyD8NhEtr5RpowYSSWSh6gMN`, `READY`, fran exakt commit `e7d8f43481a7d57b81b57263ed388adc49ca6923` pa pilotbranchen.
+- [x] Efter uttryckligt godkannande lades endast denna Previews aterstallningscallback till i stagingens Supabase Auth Redirect URLs: `https://provia-dxi9c0gvk-eltons-projects-4adfb1a3.vercel.app/aterstall.html`. Dashboarden bekraftade `Successfully added 1 URL`; listan visar nu tre adresser. Site URL ar fortsatt `http://localhost:3000`; SMTP och produktion andrades inte.
+- [x] Senaste Previewns inloggningsformular laddar. Anvandaren uppger att inloggningen inte fungerar. Auth-loggarna 2026-10-20 09:00-10:08 UTC visar ingen `/token`- eller `/recover`-begaran, bara Auth-konfigurationens omladdning; rotorsaken ar darfor inte faststalld.
+- [ ] Anvandaren behover gora ett nytt forsok i den aktuella Previewn och rapportera endast exakt feltext och ungefarlig tid. Dela inte e-post, losenord, aterstallningslank eller token i chatten.
+
+**PILOT NOT READY.** Callbacken ar verifierat tillagd, men den paverkar aterstallningsredirect och bevisar inte att inloggningen fungerar. Inget nytt autentiserat stagingflode har annu kunnat koras.
