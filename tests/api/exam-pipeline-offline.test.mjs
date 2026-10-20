@@ -19,6 +19,16 @@ assert.equal(solverModule.buildSolverSchema(1).schema.properties.results.items.p
   "solver schema uses the same MC option maximum");
 assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.source_references.minItems, 1,
   "generated questions must cite at least one source excerpt");
+const biologyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
+  pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
+});
+assert.match(biologyPrompt.systemPrompt, /ORDAGRANT utdrag kopierat direkt från materialet, inte en parafras/i,
+  "the generator must use exact source excerpts that survive the server's literal-reference check");
+assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp/i,
+  "multiple-choice distractors must stay plausible and in the same subject category");
+assert.match(biologyPrompt.systemPrompt, /Hitta inte på nonsensord, trasig svenska/i,
+  "the generator explicitly avoids nonsense and broken Swedish options");
 const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
   id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
 }] }, {
@@ -38,6 +48,8 @@ assert.deepEqual(repairPayload.input.slice(0, 2), [
 ], "repair retains the original system prompt and source material");
 assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*fylla 3 saknade provplatser/i);
 assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
+assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
+assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
 const missingSlotRepair = generateExam.buildRepairPayload({
   model: "synthetic-model",
