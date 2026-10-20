@@ -264,3 +264,12 @@ Data deletion gate: see `docs/codex/12_DATA_DELETION_GAP.md`.
 - [ ] Inget nytt autentiserat Preview/stagingflode eller AI-anrop har verifierats. Staginginloggningens rotorsak ar fortfarande okand; anvandarens losenord ska hanteras endast direkt i Auth-UI, aldrig efterfragas eller lagras har.
 
 **PILOT NOT READY.** Lokal svit ar gron, men livegenerering, P.E.R., grading, sparning och aktuell deploy mot staging ar fortfarande overifierade. Ingen stagingmigration, Auth-/SMTP-andring, kontoforandring, kvotandring, dataradering, `main`-merge eller produktionsdeploy har gjorts i denna uppfoljning.
+
+## Granskningsfix for utgangna graderingsclaims — 2026-10-20 10:42 UTC
+
+- [x] Oberoende QA flaggade utgangna claims. Kallkontroll bekraftade att `claim_exam_grading` redan stoppar utgangna issuances fore stale takeover; den verkliga luckan var att persist kunde godta en fortfarande aktiv claim efter issuance-deadline.
+- [x] Den lokala fencing-migrationen avvisar nu persist nar `expires_at <= now()`. PGlite-regressionen visar att stale utgangen claim inte kan tas over, att varken stale eller tidigare aktiv claim kan spara efter deadline, och att ingen `mock_results`-rad skapas.
+- [x] Riktade migration-/recoverytester passerade 4/4 efter fixen. Full sekventiell offline-svit passerade 310/310 tester, exit 0, efter fixen; detta verifierar lokal/mock-logik men inte hosted PostgreSQL eller liveflode.
+- [ ] Fixen finns endast lokalt i den orenade worktreen och ar inte pushad eller applicerad. Den kravda grading-API/RPC-cutovern ar fortsatt stoppad av stagingens aldre RPC-signaturer och separat godkannande for stagingmigration.
+
+**PILOT NOT READY.** Ingen API- eller databas-cutover har gjorts. Oberoende QA bekräftar utgangssparren, men stagingmigration/cutover kraver separat tydligt godkannande; autentiserat liveflode och skolans operativa godkannanden aterstar ocksa.
