@@ -1,14 +1,26 @@
 # 08 Current Status
 
-## Approved staging attempt stopped at quota — 2026-10-20 21:26 UTC
+## Approved staging generation after temporary entitlement — 2026-10-20 21:33 UTC
+
+- [x] The user approved exactly one synthetic 3-question Mathematics 2b attempt using temporary Premium on the existing staging account. Before changing the role, a read-only query found exactly one matching profile and confirmed it was `gratis`; the role was changed only in staging project `yhcinqejsocpmmetazpz`.
+- [x] Rechecked the READY Preview `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo` and its alias. Vercel environment-variable metadata confirmed the pilot URL, publishable key, Supabase server key, OpenAI key, signing secret and pilot flag are Preview-scoped to `codex/exgen-generation-quality-2026-10-20`; encrypted values were not read.
+- [x] The request reached `POST /api/generate-exam` at 2026-10-20 21:32:55 UTC. The UI failed closed with **1/3** questions passing and no exam issued.
+- [x] Sanitized runtime telemetry explains the rejection path: initial generation took 12.3 s; the reviewer checked 3 questions, approved 1 and rejected 2 with `low_factual_accuracy` / `required_changes`. One bounded quality repair returned 3 candidates; one was structurally dropped for `source_reference_missing`, and both reviewed candidates were rejected with `required_changes`. Final verified question count: 1. Total elapsed time: 36.3 s. No question text or study material was logged or retrieved.
+- [x] The staging profile was immediately restored from `premium` to `gratis`; a fresh query confirmed exactly one matching profile and role `gratis`. No quota counter/period, other account, production, `main`, or student data was changed.
+- [!] The run exposes a real reliability issue: for this synthetic material and request, one bounded repair still failed to reach the requested count. The failure categories do not expose enough content to determine whether the issue was source grounding, question formulation, or reviewer calibration. Do not weaken the quality gate without inspecting safe synthetic question evidence and adding targeted tests.
+- [x] Fresh offline verification at code commit `679e635`: API suite **174/174**; exam-flow browser regression **178/178**; P.E.R. completion-proof/review **55/55**; P.E.R. browser context **66/66**; P.E.R. help ladder **28/28**; pedagogy test passed; `git diff --check` passed.
+
+**PILOT NOT READY.** The one newly approved live attempt is consumed. Next: investigate why the initial and repair candidates were rejected using only sanitized synthetic evidence, implement a targeted correction with regression coverage, then seek a separate bounded approval before another provider-backed staging test. Keep the account Gratis and do not touch `main` or Production.
+
+## Previous staging attempt stopped at quota — 2026-10-20 21:26 UTC
 
 - [x] The user approved exactly one synthetic 3-question Mathematics 2b short-answer attempt on the READY Preview `dpl_FQy7czAN2fnnX2swogy1af6R4Zoo`, using the existing synthetic quadratic-function source. Deployment SHA and branch were rechecked first; encrypted pilot variables are scoped to the exact feature branch. No variable values were read.
 - [x] The authenticated Preview returned the learner-facing state **“Provkvoten är slut”** and said the test version's weekly allowance was used. No role or quota setting was changed and no additional attempt was made.
 - [x] Source inspection confirms `generate-exam.js` handles `!quota.ok` with HTTP 429 and returns before `pickModel()` and `streamGeneration()`. Therefore this attempt did not reach a model call. The Vercel runtime-log query returned no records in its requested five-minute window, so no runtime event corroboration was available.
-- [!] The prompt and repair-telemetry changes remain unverified against live model output; the last allowed live generation still yielded **0/3** before this commit. We cannot test generation quality again until the staging quota resets or the user separately authorizes an entitlement change.
+- [!] At that time, the prompt and repair-telemetry changes remained unverified against live model output; the last allowed live generation still yielded **0/3** before this commit. The later 21:32 attempt is documented above.
 - [x] The fresh API suite (174/174), frontend exam-flow regression (178/178), P.E.R pedagogy, active-exam gate (55/55), P.E.R browser context (66/66), and help ladder (28/28) remain green at code commit `679e635`; status-only commits do not alter deployed app code.
 
-**PILOT NOT READY.** Next: wait for the staging weekly quota reset or get separate explicit approval for a narrowly scoped test entitlement. Do not alter staging role/quota or make another model call under the exhausted-quota approval. After a permitted generation, compare final verified yield and repair timing with the previous 0/3 result.
+**PILOT NOT READY.** This quota-denial checkpoint is historical; the single separately approved Premium-assisted attempt is documented above. Do not change staging role/quota or make another model call without fresh bounded approval.
 
 ## Preview and offline verification — 2026-10-20 21:22 UTC
 
