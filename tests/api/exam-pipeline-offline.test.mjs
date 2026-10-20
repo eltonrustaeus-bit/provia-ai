@@ -29,6 +29,8 @@ assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begri
   "multiple-choice distractors must stay plausible and in the same subject category");
 assert.match(biologyPrompt.systemPrompt, /Hitta inte på nonsensord, trasig svenska/i,
   "the generator explicitly avoids nonsense and broken Swedish options");
+assert.match(biologyPrompt.systemPrompt, /idiomatisk och grammatiskt korrekt svenska.*böjningar.*'linjens ekvation', aldrig 'linjären'/i,
+  "learner-facing Swedish must use natural technical-term inflections");
 assert.match(biologyPrompt.systemPrompt, /options ska ha exakt 3 alternativ/i,
   "the generator limits multiple choice to the correct answer and two focused distractors");
 assert.match(biologyPrompt.systemPrompt, /frågetyp-valet är blandat.*välj short/i,
@@ -812,7 +814,7 @@ try {
   assert.equal(languageRepairedExam.body.exam.questions.some((question) => question.question.includes("What is")), false,
     "a fluent question in the wrong selected language is replaced, never shown to the learner");
   const firstGenerationCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.stream);
-  assert.match(firstGenerationCall.body.input[0].content, /Alla elevriktade fält ska vara naturlig svenska/i,
+  assert.match(firstGenerationCall.body.input[0].content, /Alla elevriktade fält ska vara naturlig, idiomatisk och grammatiskt korrekt svenska/i,
     "the generator is explicitly instructed to match the requested Swedish output language");
   const firstVerifierCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_verifier_schema");
   assert.ok(firstVerifierCall.body.text.format.schema.properties.results.items.required.includes("language_match"));

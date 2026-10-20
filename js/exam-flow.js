@@ -1236,7 +1236,7 @@
 
   var STOP = ("och att det en som för med den de var på är av till om inte har " +
     "ett kan man vid han hon jag vi ni du sig men så där när eller alla också " +
-    "detta denna dessa vilket vilken samt under efter före mellan genom mycket " +
+    "detta denna dessa vilket vilken samt under efter före mellan genom mycket alltså " +
     "andra vara blir blev hade skulle kunna finns bland utan över").split(" ");
 
   /* Lokal ordheuristik för elevens val före provet. Ingen AI eller nätverksbegäran:

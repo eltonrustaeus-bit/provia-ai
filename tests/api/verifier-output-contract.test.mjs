@@ -49,6 +49,8 @@ assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+assert.match(buildVerifierPrompt("sv"), /frågestammen för idiomatisk, grammatiskt korrekt svenska.*'linjens ekvation', inte 'linjären'/i,
+  "the independent reviewer explicitly checks Swedish inflection in question stems");
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], issues: [], required_changes: [] }],
