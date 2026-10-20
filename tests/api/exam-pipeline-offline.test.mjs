@@ -569,6 +569,28 @@ try {
     /exakt 0 flervalskandidat\(er\) och 6 kortsvarskandidat\(er\)/i,
     "structural repair generates candidates for the missing short-answer slots");
 
+  const wrongTypeRepairCandidates = Array.from({ length: 6 }, (_, index) => ({
+    ...questions[index % questions.length],
+    id: `wrong-type-mix-${index + 1}`,
+    question: `Räkna ${index + 2} + ${index + 3}.`,
+    model_answer: String(index * 2 + 5),
+    options: [String(index * 2 + 4), String(index * 2 + 5), String(index * 2 + 6)],
+    correct_index: 1,
+    source_references: ["Grundläggande räkning"],
+  }));
+  activeQuestions = questions.slice(0, 2);
+  regenerationQuestionBatches = [wrongTypeRepairCandidates.slice(0, 4), wrongTypeRepairCandidates];
+  calls.length = 0;
+  const wrongTypeMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(wrongTypeMix.status, 502, JSON.stringify(wrongTypeMix.body));
+  assert.equal(wrongTypeMix.body.error, "incomplete_exam");
+  assert.equal(wrongTypeMix.body.exam, undefined,
+    "repairs that ignore the missing type never deliver an unbalanced mixed exam");
+
   const fourQuestionSet = [
     ...questions,
     {
