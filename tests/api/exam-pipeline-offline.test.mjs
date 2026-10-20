@@ -29,6 +29,12 @@ assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begri
   "multiple-choice distractors must stay plausible and in the same subject category");
 assert.match(biologyPrompt.systemPrompt, /Hitta inte på nonsensord, trasig svenska/i,
   "the generator explicitly avoids nonsense and broken Swedish options");
+assert.match(biologyPrompt.systemPrompt, /options ska ha exakt 3 alternativ/i,
+  "the generator limits multiple choice to the correct answer and two focused distractors");
+assert.match(biologyPrompt.systemPrompt, /frågetyp-valet är blandat.*välj short/i,
+  "mixed exams prefer a gradable short answer when the source cannot support plausible distractors");
+assert.match(biologyPrompt.systemPrompt, /cognitive_level beskriver vilket tänkande.*INTE samma skala som E\/C\/A/i,
+  "the generator does not conflate cognitive action labels with exam level");
 const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
   id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
 }] }, {

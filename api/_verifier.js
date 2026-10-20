@@ -177,8 +177,8 @@ function requestedLevelHint(lang, level) {
       };
   if (!levels[level]) return "";
   return lang === "sv"
-    ? ` Användarens valda provnivå är ${level}. Bedöm varje frågas difficulty_match mot denna nivå, inte bara mot modellens egen cognitive_level-etikett. ${levels[level]} Frågan får inte smyga in krav som inte efterfrågas eller poängsätts.`
-    : ` The user's selected exam level is ${level}. Assess each question's difficulty_match against this target, not only against the model's own cognitive_level label. ${levels[level]} The question must not hide requirements that are not asked for or scored.`;
+    ? ` Användarens valda provnivå är ${level}. Bedöm frågans faktiska krav mot E/C/A-nivån. cognitive_level beskriver typen av tänkande, inte E/C/A-skalan; likställ inte exempelvis 'analysera' med A. ${levels[level]} Frågan får inte smyga in krav som inte efterfrågas eller poängsätts.`
+    : ` The user's selected exam level is ${level}. Judge the task's actual demand against this E/C/A target. cognitive_level describes the kind of thinking, not the E/C/A scale; do not treat a label such as 'analyze' as proof of A-level difficulty. ${levels[level]} Do not add hidden requirements or unsupported facts.`;
 }
 
 function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
@@ -192,7 +192,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Avvisa en kandidat som upprepar eller nära parafraserar samma lärandemål; comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
       "Sätt approved=false om NÅGOT av följande gäller: faktafel, mer än ett rimligt svar, en hittad-på term/kategori/paragraf, " +
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
-      "eller en svårighetsgrad som inte matchar cognitive_level. " +
+      "eller en svårighetsgrad som inte matchar den valda E/C/A-nivån och uppgiftens faktiska krav. cognitive_level är en separat beskrivning av tänkandet och får inte ensam avgöra nivån. " +
       "För option_quality ska du bedöma VARJE alternativ i samma ordning: true endast om alternativet är begripligt, språkligt rimligt och relevant som svar eller distraktor i ämnet; false för nonsensord, trasig text, oförklarad språkblandning eller uppenbart irrelevant alternativ. " +
       "review_hints kan innehålla en intern formatvarning. Behandla den som en signal att granska extra noggrant, aldrig som en slutsats: avvisa inte enbart på grund av flaggan och godkänn giltiga namn och facktermer. " +
       "Godkänn legitima facktermer, namn, korta metodnamn, tal, formler, kod och andra ämnesspecifika uttryck när de är giltiga. Antalet boolean-värden måste motsvara antalet svarsalternativ; kortsvar utan alternativ får en tom lista. " +
@@ -207,7 +207,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Reject a candidate that repeats or near-paraphrases the same learning objective; comparison_questions are context only and must not receive results. " +
       "Set approved=false if ANY of the following apply: factual errors, more than one reasonable answer, a fabricated " +
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
-      "match the question's scope, or a difficulty that doesn't match cognitive_level. " +
+      "match the question's scope, or a difficulty that doesn't match the selected E/C/A target and actual task demand. cognitive_level describes the type of thinking separately and must not determine the target level by itself. " +
       "For option_quality, assess EVERY option in order: true only when it is intelligible, linguistically plausible, and relevant as an answer or distractor in the subject; false for nonsense words, broken text, unexplained language mixing, or clearly irrelevant choices. " +
       "review_hints may contain an internal format warning. Treat it as a cue for closer inspection, never as a conclusion: do not reject solely because of the flag, and accept valid names and technical terms. " +
       "Keep valid technical terms, names, concise method names, numbers, formulas, code, and other valid subject-specific expressions. The boolean count must match the option count; short-answer items with no options use an empty list. " +

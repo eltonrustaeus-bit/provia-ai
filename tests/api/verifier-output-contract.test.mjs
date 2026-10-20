@@ -70,9 +70,12 @@ assert.equal(decideApproval(wrongLanguageReview.outcome.perQuestion.get("q1")), 
   "a high-scoring fluent response is rejected when it does not match the requested Swedish output language");
 const levelBoundReview = await runWithResults([result("q1", true)], [question("q1")], "", undefined, "C");
 assert.match(levelBoundReview.requestBody.input[0].content, /selected exam level is C/i);
-assert.match(levelBoundReview.requestBody.input[0].content, /difficulty_match against this target/i);
+assert.match(levelBoundReview.requestBody.input[0].content, /actual demand against this E\/C\/A target/i);
 assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /valda provnivå är C/i);
 assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /två relevanta led/i);
+assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /cognitive_level är en separat beskrivning.*får inte ensam avgöra/i);
+assert.doesNotMatch(buildVerifierPrompt("sv"), /svårighetsgrad som inte matchar cognitive_level/i,
+  "verifier no longer compares exam difficulty to the unrelated cognitive action label");
 assert.match(buildVerifierPrompt("sv"), /comparison_questions.*(?:context only|jämförelseunderlag)/i);
 const comparisonContext = await runWithResults(
   [result("retry-1", true)],
