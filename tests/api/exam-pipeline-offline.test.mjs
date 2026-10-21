@@ -166,6 +166,24 @@ assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*beh�
 assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
 assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
 assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+const categorizedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  reviewFailureCounts: {
+    low_source_alignment: 2,
+    low_scoring_quality: 1,
+    private_reviewer_note: "PRIVAT_GRANSKARTEXT_SENTINEL",
+    arbitrary_untrusted_code: 99,
+  },
+});
+const categorizedRepairInstruction = categorizedRepairPayload.input.at(-1).content;
+assert.match(categorizedRepairInstruction, /"low_source_alignment":2/);
+assert.match(categorizedRepairInstruction, /"low_scoring_quality":1/);
+assert.doesNotMatch(categorizedRepairInstruction, /PRIVAT_GRANSKARTEXT_SENTINEL|arbitrary_untrusted_code/,
+  "repair feedback includes only allowlisted numeric categories, never free-form reviewer content");
 const mathScoringRepair = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "math system" }, { role: "user", content: "synthetic math material" }],
@@ -1692,6 +1710,11 @@ try {
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
   assert.equal(noApprovedRepairCall.body.text.format.schema.properties.questions.minItems, 6,
     "a complete first-pass rejection expands only the bounded repair batch");
+  const noApprovedRepairInstruction = noApprovedRepairCall.body.input.at(-1).content;
+  assert.match(noApprovedRepairInstruction, /"low_factual_accuracy":3/);
+  assert.match(noApprovedRepairInstruction, /"answer_alignment":3/);
+  assert.ok(questions.every((question) => !noApprovedRepairInstruction.includes(question.question)),
+    "the all-rejected 0/3 path passes only safe review categories, not rejected question text");
   assert.equal(Object.hasOwn(noApprovedLog, "questions"), false);
   assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
     "zero-question diagnostics never include generated question text");

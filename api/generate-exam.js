@@ -1180,7 +1180,14 @@ function mixedRepairCandidateTypes(candidateCount, missingTypes) {
   return { mc, short: count - mc };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], qType, missingTypes = null }) {
+const SAFE_REPAIR_FAILURE_CODES = new Set([
+  "low_factual_accuracy", "high_ambiguity", "difficulty_mismatch", "low_source_alignment",
+  "low_scoring_quality", "low_language_quality", "language_mismatch", "option_quality_failed",
+  "option_quality_contract_failed", "answer_alignment", "source_support", "scoring_alignment",
+  "question_clarity", "language_quality", "difficulty_match", "reviewer_other",
+]);
+
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, qType, missingTypes = null }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots, missingTypes)));
@@ -1189,6 +1196,17 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
     question: question?.question || "",
   }));
   const failures = new Set(Array.isArray(reviewFailureCodes) ? reviewFailureCodes : []);
+  const safeReviewFailureCounts = Object.fromEntries(Object.entries(
+    reviewFailureCounts && typeof reviewFailureCounts === "object" && !Array.isArray(reviewFailureCounts)
+      ? reviewFailureCounts
+      : {},
+  ).filter(([code, count]) => SAFE_REPAIR_FAILURE_CODES.has(code)
+    && Number.isInteger(count) && count > 0)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([code, count]) => [code, Math.min(20, count)]));
+  const reviewFailureSummary = lang === "en"
+    ? `Bounded review failure counts for the previous candidates (fixed categories only; not answer keys): ${JSON.stringify(safeReviewFailureCounts)}.`
+    : `Summerat granskningsutfall för föregående kandidater (endast fasta kategorier, inga facit): ${JSON.stringify(safeReviewFailureCounts)}.`;
   const reviewGuidance = lang === "en"
     ? [
         failures.has("option_quality_failed")
@@ -1251,8 +1269,8 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
       : `För detta blandade prov ska du skapa exakt ${repairTypes.mc} flervalskandidat(er) och ${repairTypes.short} kortsvarskandidat(er), så att de saknade platserna av respektive typ kan fyllas. Returnera inte en annan typfördelning.`)
     : "";
   const instruction = lang === "en"
-    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
-    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant frågan uttryckligen ber eleven göra. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+    ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} ${reviewFailureSummary} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
+    : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant frågan uttryckligen ber eleven göra. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} ${reviewFailureSummary} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
@@ -1876,7 +1894,8 @@ module.exports = async function handler(req, res) {
             );
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
-              reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType, missingTypes,
+              reviewFailureCodes: Object.keys(initialVerifierFailureCodes),
+              reviewFailureCounts: initialVerifierFailureCodes, qType, missingTypes,
             });
             repairFailureStage = "repair_generation";
             const repairStream = await streamGeneration({
