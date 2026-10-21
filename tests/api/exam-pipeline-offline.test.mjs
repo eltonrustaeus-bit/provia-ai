@@ -414,6 +414,7 @@ function assertVerifiedPartialExamDelivered(response, scenario, expectedCount = 
 
 let activeQuestions = questions;
 let emptyGenerationResponse = false;
+let providerHttpFailure = false;
 let generationTextOverride = null;
 let gradingState = "active";
 let solverUnavailable = false;
@@ -568,6 +569,10 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`);
     }
     if (body.stream) {
+      if (providerHttpFailure) {
+        providerHttpFailure = false;
+        return new Response(JSON.stringify({ error: { message: "synthetic-provider-body-sentinel" } }), { status: 429 });
+      }
       if (simulatedNow !== null) simulatedNow += 10_000;
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
       const event = { type: "response.output_text.delta", delta: generationTextOverride || JSON.stringify({ title: "Syntetiskt prov", level: "C", questions: activeQuestions }) };
@@ -694,6 +699,28 @@ try {
     attempts: 2, networkCode: "ETIMEDOUT", timedOut: true,
   }, "auth transport diagnostics identify timeout class without exposing exception text");
   assert.doesNotMatch(JSON.stringify(authLookupLog), /private-token-sentinel|private-message-sentinel|synthetic-user-token/);
+
+  providerHttpFailure = true;
+  calls.length = 0;
+  const providerFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(providerFailure.status, 502);
+  assert.equal(providerFailure.body.error, "exam_generation_failed");
+  assert.equal(providerFailure.body.stage, "model_generation");
+  assert.ok(providerFailure.body.requestId);
+  assert.match(providerFailure.body.message, /Inget prov lämnades ut/);
+  assert.doesNotMatch(JSON.stringify(providerFailure.body), /synthetic-provider-body-sentinel|details|OpenAI error/,
+    "provider response bodies are not returned to the browser");
+  const providerFailureLog = JSON.parse(authLogs.at(-1));
+  assert.deepEqual(providerFailureLog, {
+    event: "exam_generation_provider_failure",
+    requestId: providerFailure.body.requestId,
+    stage: "model_generation",
+    category: "upstream_http_error",
+    upstreamStatus: 429,
+  });
+  assert.doesNotMatch(JSON.stringify(providerFailureLog), /synthetic-provider-body-sentinel|synthetic-provider-key/);
 
   authFetchFailure = [Object.assign(new TypeError("private-token-sentinel"), {
     cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),

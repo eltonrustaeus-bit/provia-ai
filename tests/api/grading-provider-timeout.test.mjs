@@ -54,6 +54,13 @@ function invoke(body) {
 }
 
 try {
+  assert.equal(grade.gradingProviderTimeoutMs(10_000, 10_000), 30_000,
+    "grading uses only the remaining provider budget after reserving persistence time");
+  assert.equal(grade.gradingProviderTimeoutMs(10_000, 40_000), 0,
+    "grading declines to start a provider call when only the persistence reserve remains");
+  assert.equal(grade.gradingProviderTimeoutMs(10_000, 10_000), 30_000,
+    "the end-to-end budget leaves no more than thirty seconds for the provider");
+
   const course = "Matematik 1b";
   const material = "En rät linje har riktningskoefficient 2.";
   const question = {

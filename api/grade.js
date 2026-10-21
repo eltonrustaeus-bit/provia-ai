@@ -281,6 +281,17 @@ async function buildLearningPayload(level, course, attemptRows, learnerLoopEnabl
 
 // Feature-flag evaluation uses one cached server-side Supabase client.
 let _sb = null;
+const GRADE_HANDLER_BUDGET_MS = 60_000;
+const GRADE_PERSISTENCE_RESERVE_MS = 30_000;
+const GRADE_PROVIDER_MAX_MS = 45_000;
+const GRADE_PROVIDER_MIN_MS = 4_000;
+const GRADE_FLAG_LOOKUP_TIMEOUT_MS = 1_000;
+
+function gradingProviderTimeoutMs(requestStartedAt, now = Date.now()) {
+  const available = GRADE_HANDLER_BUDGET_MS - (now - requestStartedAt) - GRADE_PERSISTENCE_RESERVE_MS;
+  return Math.min(GRADE_PROVIDER_MAX_MS, available);
+}
+
 async function supabaseClient() {
   if (_sb) return _sb;
   if (!getSupabaseUrl() || !getSupabaseServerKey()) return null;
@@ -293,7 +304,8 @@ async function snapshotLearnerLoopFlag(userId) {
     const sb = await supabaseClient();
     if (!sb) return false;
     const { flagsEnabled } = await perFlags();
-    return Boolean(await flagsEnabled(sb, ["per_learner_loop_enabled"], userId));
+    return Boolean(await flagsEnabled(sb, ["per_learner_loop_enabled"], userId,
+      AbortSignal.timeout(GRADE_FLAG_LOOKUP_TIMEOUT_MS)));
   } catch { return false; }
 }
 
@@ -344,6 +356,7 @@ async function requireAuth(req) {
 }
 
 module.exports = async function handler(req, res) {
+  const requestStartedAt = Date.now();
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "Use POST" });
@@ -898,13 +911,18 @@ module.exports = async function handler(req, res) {
       };
 
       let r;
+      const providerTimeoutMs = gradingProviderTimeoutMs(requestStartedAt);
+      if (providerTimeoutMs < GRADE_PROVIDER_MIN_MS) {
+        return failProvider("provider_budget", "insufficient_time_for_safe_persistence", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras säkert inom tidsgränsen. Försök igen." : "Grading could not safely finish within the time limit. Please try again.");
+      }
       const gradingStartedAt = Date.now();
       try {
         r = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(45_000)
+          signal: AbortSignal.timeout(providerTimeoutMs)
         });
       } catch {
         return failProvider("request", "transport_error", "grading_provider_unavailable",
@@ -1022,7 +1040,13 @@ module.exports = async function handler(req, res) {
           per_question: per
         }
       });
-    } catch {
+    } catch (error) {
+      console.warn(JSON.stringify({
+        event: "exam_grade_internal_failure",
+        category: ["TypeError", "ReferenceError", "SyntaxError", "RangeError", "AbortError"].includes(error?.name)
+          ? error.name.toLowerCase()
+          : "internal_error",
+      }));
       return fail(500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
     } finally {
       if (postExamLeaseId) await examIssuance.releasePerAnswerLease(user.id, postExamLeaseId);
@@ -1034,3 +1058,4 @@ module.exports.clampAwardedPoints = clampAwardedPoints;
 module.exports.normalizeGradeFeedback = normalizeGradeFeedback;
 module.exports.validateNonMcGradeOutput = validateNonMcGradeOutput;
 module.exports.normalizeChoice = normalizeChoice;
+module.exports.gradingProviderTimeoutMs = gradingProviderTimeoutMs;

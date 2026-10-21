@@ -1,5 +1,14 @@
 # 08 Current Status
 
+## Provider error safety and grading deadline reserve — 2026-10-21
+
+- [x] Exam-generation failures no longer return an upstream OpenAI response body or raw provider details to the browser. The client receives a localized retry-safe message, request ID and stage; server telemetry records only a bounded category and upstream HTTP status.
+- [x] Grading now computes its provider timeout from the 60-second route budget and reserves 30 seconds for validation, result persistence, recovery bookkeeping and cleanup. It refuses to start model work when fewer than four provider seconds remain. The optional learner-loop feature-flag lookup is bounded to one second and remains fail-closed.
+- [x] Regression coverage includes a synthetic provider body sentinel, safe failure telemetry, and provider-budget boundary cases. The three focused grading/generation tests passed. Syntax checks and `git diff --check` passed; the complete sequential suite passed **324/324 test files**.
+- [!] These changes are local and have not been pushed or deployed. The accessible Preview tab currently shows the sign-in gate, despite the user's report of being logged in, so no live generation or grading attempt was made. No new provider call, role/quota change, Supabase mutation, `main` merge or Production action was made.
+
+**PILOT NOT READY.** Next: confirm the authenticated session in the exact staging Preview, then request/confirm approval to push these new code changes and create a Preview before any bounded synthetic live request. Keep production and `main` untouched.
+
 ## Non-blocking review hint for all-word distractors — 2026-10-21
 
 - [x] Swedish multiple-choice exams now add `mixed_source_support_single_word_options_review` when every option is a standalone word and only some options match terms in the supplied source. The signal is passed to both first-pass and repair verification.

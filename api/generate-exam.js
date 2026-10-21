@@ -856,9 +856,9 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
       signal: controller.signal,
     });
     if (!r.ok) {
-      const body = await r.text().catch(() => "");
+      await r.text().catch(() => "");
       clearTimeout(timer);
-      return { ok: false, status: r.status, details: body.slice(0, 500), latencyMs: Date.now() - t0 };
+      return { ok: false, status: r.status, latencyMs: Date.now() - t0 };
     }
 
     const decoder = new TextDecoder();
@@ -1581,7 +1581,22 @@ module.exports = async function handler(req, res) {
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget });
     recordUsage("generate", gen.model || model, gen.usage, gen.latencyMs);
     if (!gen.ok) {
-      return fail(502, { ok: false, error: "OpenAI error", status: gen.status, details: gen.details });
+      console.warn(JSON.stringify({
+        event: "exam_generation_provider_failure",
+        requestId: quotaRequestId,
+        stage: failureStage,
+        category: gen.status ? "upstream_http_error" : (gen.failureKind || "transport_error"),
+        ...(Number.isInteger(gen.status) && gen.status > 0 ? { upstreamStatus: gen.status } : {}),
+      }));
+      return fail(502, {
+        ok: false,
+        error: "exam_generation_failed",
+        requestId: quotaRequestId,
+        stage: failureStage,
+        message: lang === "en"
+          ? "A technical issue stopped exam generation. No exam was issued. Please try again shortly."
+          : "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.",
+      });
     }
 
     failureStage = "question_normalization";

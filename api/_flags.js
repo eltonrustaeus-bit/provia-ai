@@ -15,11 +15,13 @@
  * @param keys      alla flaggor som måste vara på samtidigt
  * @param userId    null = anonym; en ifylld allowed_user_ids stänger då grinden
  */
-export async function flagsEnabled(supabase, keys, userId = null) {
-  const { data, error } = await supabase
+export async function flagsEnabled(supabase, keys, userId = null, signal = undefined) {
+  let query = supabase
     .from("feature_flags")
     .select("key, enabled, allowed_user_ids")
     .in("key", keys);
+  if (signal) query = query.abortSignal(signal);
+  const { data, error } = await query;
   if (error || !data) return false;
   return keys.every((k) => {
     const row = data.find((r) => r.key === k);
