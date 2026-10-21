@@ -856,7 +856,7 @@ sv:{
   noExam:"Ingen provdata ännu.",noGrade:"Ingen rättning ännu.",
   needMat:"Klistra in material först.",
   genWorking:"Skapar mockprov…",gradeWorking:"Rättar prov…",
-  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",gradeDone:"Rättning klar. Sparad till förbättring.",
+  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kvalitetskontrollen godkände {received} av {requested} begärda frågor. Ett kortare, kontrollerat prov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
   wrongCode:"Fel kod.",ocrNoFile:"Välj en bild först.",
   ocrWorking:"OCR pågår…",ocrDone:"OCR klart. Texten lades in i materialet.",
   writeAnswer:"Skriv ditt svar här…",fullScore:"Modellsvar (full poäng)",
@@ -903,7 +903,7 @@ en:{
   noExam:"No exam data yet.",noGrade:"No grading yet.",
   needMat:"Paste material first.",
   genWorking:"Generating mock exam…",gradeWorking:"Grading…",
-  genDone:"Exam ready! Answer the questions below and press Grade exam.",gradeDone:"Grading done. Saved to Improve page.",
+  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Quality review approved {received} of {requested} requested questions. A shorter, checked exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
   wrongCode:"Wrong code.",ocrNoFile:"Choose an image first.",
   ocrWorking:"Running OCR…",ocrDone:"OCR done. Text was added to the material.",
   writeAnswer:"Write your answer here…",fullScore:"Full-score model answer",
@@ -2274,15 +2274,23 @@ try{
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
     window.ExGenGenerationRequest.clear(idempotencyKey);
-    setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
+    const generationMeta=res.data.meta||{};
+    const questionCount=res.data.exam?.questions?.length||0;
+    const requestedCount=generationMeta.requested;
+    const partialExam=generationMeta.partial===true&&Number.isInteger(requestedCount)&&requestedCount>questionCount;
+    const completionMessage=partialExam
+      ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
+      :t.genDone;
+    setBusy(false);setStatus(completionMessage,"ok");showToast(completionMessage,"ok");setWizardStep(2);
+    if(partialExam){const guide=$("examGuide");if(guide)guide.textContent=completionMessage;}
 
     // Uppdatera floating bar hint med antal frågor
     const fh=$("floatingGradeHint");
     if(fh){
-      const qCount=res.data.exam?.questions?.length||0;
-      fh.innerHTML=LANG==="sv"
-        ?`Besvara alla <strong>${qCount} frågor</strong> och tryck rätta.`
-        :`Answer all <strong>${qCount} questions</strong> then grade.`;
+      const qCount=questionCount;
+      fh.textContent=partialExam
+        ?(LANG==="sv"?`Besvara de ${qCount} godkända frågorna och tryck Rätta.`:`Answer the ${qCount} approved questions and press Grade.`)
+        :(LANG==="sv"?`Besvara alla ${qCount} frågor och tryck Rätta.`:`Answer all ${qCount} questions then grade.`);
     }
     return {ok:true,exam:currentExam,meta:res.data.meta||null};
   }
