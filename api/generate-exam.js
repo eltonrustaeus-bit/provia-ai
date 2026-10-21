@@ -1125,6 +1125,13 @@ function repairCandidateCountFor(missingSlots, missingTypes = null) {
   return Math.min(6, slots + Math.max(1, missingTypeCount));
 }
 
+function qualityRepairCandidateCountFor(missingSlots, missingTypes, approvedCount) {
+  const slots = Math.max(1, Number(missingSlots) || 1);
+  const standardCount = repairCandidateCountFor(slots, missingTypes);
+  if (Number(approvedCount) > 0) return standardCount;
+  return Math.min(6, Math.max(standardCount, slots * 2));
+}
+
 function mixedTypeTargets(numQuestions) {
   const count = Math.max(0, Number(numQuestions) || 0);
   return { mc: Math.floor(count / 2), short: Math.ceil(count / 2) };
@@ -1864,7 +1871,9 @@ module.exports = async function handler(req, res) {
             const missingTypes = ["mix", "mixed"].includes(qType)
               ? selectMixedQuestions(round1ApprovedQuestions, mixedTypeTargets(numQuestions)).missing
               : null;
-            const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
+            const repairCount = qualityRepairCandidateCountFor(
+              repairSlots, missingTypes, round1ApprovedQuestions.length,
+            );
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
               reviewFailureCodes: Object.keys(initialVerifierFailureCodes), qType, missingTypes,
@@ -2408,6 +2417,7 @@ module.exports.makeBudget = makeBudget;             // pure — unit-tested
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
 module.exports.minimumExamPreflightBudgetMs = minimumExamPreflightBudgetMs; // pure — unit-tested
 module.exports.minimumExamGenerationReviewBudgetMs = minimumExamGenerationReviewBudgetMs; // pure — unit-tested
+module.exports.qualityRepairCandidateCountFor = qualityRepairCandidateCountFor; // pure — unit-tested
 module.exports.streamGeneration = streamGeneration; // transport — exercised by the eval
 module.exports.refundMockExamQuota = refundMockExamQuota;
 module.exports.commitMockExamQuota = commitMockExamQuota;

@@ -49,6 +49,14 @@ assert.equal(generateExam.pickModel({ isMath: true, env: { OPENAI_MODEL_EXAM: "g
   "the explicit math model remains the most specific override");
 assert.equal(generateExam.minimumDeliverableQuestionCount(3), 2);
 assert.equal(generateExam.minimumDeliverableQuestionCount(10), 6);
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, null, 0), 6,
+  "a 0/3 first-pass result requests the bounded maximum of six repair candidates");
+assert.equal(generateExam.qualityRepairCandidateCountFor(2, null, 1), 3,
+  "a partially approved exam retains the ordinary one-spare repair count");
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, { mc: 2, short: 1 }, 0), 6,
+  "zero-approved mixed repairs remain balanced within the six-candidate cap");
+assert.equal(generateExam.qualityRepairCandidateCountFor(20, null, 0), 6,
+  "repair candidate output remains capped at six for large exams");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "mc" }, { type: "short" }], { requested: 3, qType: "mix" }), true,
   "a partial mixed exam still contains both requested formats");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }, { type: "short" }], { requested: 3, qType: "mix" }), false,
@@ -1680,6 +1688,10 @@ try {
   assert.deepEqual(noApprovedLog.initialVerifierFailureCodes, {
     reviewer_rejected: 3, required_changes: 3, low_factual_accuracy: 3, answer_alignment: 3,
   }, "zero-question rejection records safe aggregate reviewer categories");
+  const noApprovedRepairCall = calls.findLast((call) => call.body?.stream
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  assert.equal(noApprovedRepairCall.body.text.format.schema.properties.questions.minItems, 6,
+    "a complete first-pass rejection expands only the bounded repair batch");
   assert.equal(Object.hasOwn(noApprovedLog, "questions"), false);
   assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
     "zero-question diagnostics never include generated question text");
