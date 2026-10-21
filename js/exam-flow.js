@@ -757,7 +757,15 @@
           back.disabled = true;
           resumeStatus.hidden = false;
           resumeStatus.textContent = tx("Kontrollerar att provet fortfarande är aktivt…", "Checking that the exam is still active…");
-          var issuanceState = await window.ExGenEngine.examState(draft.exam.exam_manifest);
+          var issuance = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
+            course: draft.course || "",
+            pastedText: draft.material || "",
+            questions: draft.exam.questions,
+          });
+          var issuanceState = issuance && issuance.state;
+          if (issuance && /^[a-f0-9]{32}$/.test(issuance.submissionId || "")) {
+            draft.exam.submission_id = issuance.submissionId;
+          }
           if (issuanceState !== "active") {
             back.disabled = false;
             if (issuanceState === null) {
@@ -995,6 +1003,9 @@
   // ── Steg 1: ämne ─────────────────────────────────────────────────────────
 
   function stepSubject() {
+    // This is a neutral study/setup screen, not the prior result or question.
+    if (window.clearPerContext) window.clearPerContext();
+    else if (window.PER && window.PER.describe) window.PER.describe(null);
     UI.languageRerender = stepSubject;
     var d = dna();
     var b = mount("subject");
@@ -1891,7 +1902,7 @@
         answered: answered,
         remaining: qs.length - answered,
         elapsed: (UI.time && UI.time.dataset.elapsed) || "",
-        submissionId: (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
+        submissionId: S.exam.submission_id || (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
         /* Visningsfas för P.E.R. Servern litar inte på den som rättningsbevis. */
         phase: "exam"
       }

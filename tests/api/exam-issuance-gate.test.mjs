@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
@@ -157,6 +158,28 @@ test("abandon requires the signed full exam and rejects a completed exam", async
   } finally {
     state = "active";
   }
+});
+
+test("legacy v1 exam status is resolved from its signed full context without mutation", async () => {
+  const context = tasks.hashContext(pastedText, course, userId);
+  const signature = createHmac("sha256", process.env.EXAM_SIGNING_SECRET)
+    .update(`exgen-exam-manifest:v1:${context}:1:${submissionId}`)
+    .digest("base64url");
+  const legacyManifest = `v1.1.${signature}`;
+  calls.length = 0;
+  const resolved = await invokeAbandon({ ...body, exam_manifest: legacyManifest, resolve_status: true });
+  assert.equal(resolved.statusCode, 200);
+  assert.deepEqual(resolved.body, { ok: true, exam_state: "active", submission_id: submissionId });
+  assert.ok(calls.some((call) => call.url.endsWith("/rpc/exam_issuance_state") &&
+    JSON.parse(call.body).p_submission_id === submissionId));
+  assert.equal(calls.some((call) => call.url.endsWith("/rpc/abandon_exam_issuance")), false,
+    "resolving a legacy exam's state never abandons it");
+
+  calls.length = 0;
+  const forged = await invokeAbandon({ ...body, exam_manifest: "v1.1.forged", resolve_status: true });
+  assert.equal(forged.statusCode, 400);
+  assert.equal(calls.some((call) => call.url.endsWith("/rpc/exam_issuance_state")), false,
+    "an invalid legacy manifest cannot probe issuance state");
 });
 
 test("fresh-browser recovery counts and abandons undelivered active exams", async () => {

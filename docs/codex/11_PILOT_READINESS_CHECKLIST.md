@@ -654,3 +654,24 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Tvåkonto-RLS/IDOR, rollback, skolans datahantering/samtycke, läraråtkomst, support och incidentflöde återstår innan rekommendation om skolpilot.
 
 **PILOT NOT READY.** Livegenerering med exakt tre frågor passerade en gång. Fortsätt endast med godkända syntetiska stagingtester och behåll `main`, Production och stagingrensning oförändrade.
+
+## Liveverifiering: generering, rättning och P.E.R. — 2026-10-21
+
+- [x] Ett syntetiskt Matematik 2b-prov genererade och visade samtliga 3 begärda frågor i staging-Preview. Loggen redovisar 3/3 slutfrågor och 3 verifierargodkännanden; genereringen tog 35,7 sekunder och kvalitetsreparationen time-outade.
+- [x] Inlämning/rättning visade en resultatvy med 5/7 poäng och återkoppling per fråga. Beständig databassparning verifierades inte separat. Testet använde endast syntetiska svar.
+- [ ] P.E.R. under prov gav ingen facitåtkomst, men kunde inte verifiera status. Källgranskning fann ett konkret formatfel: servern utfärdade v1-manifest utan synligt submission-ID, medan klienten bara läste ID från v2. Nya v2-manifest och fortsatt verifiering av gamla v1-manifest är implementerade lokalt; stagingens status-RPC finns med väntad invoker-säkerhet. Exakt live-request saknas i loggarna, så detta måste bekräftas i ny Preview.
+- [x] Riktade prov-/P.E.R.-regressioner: 52/52 passerade. Detta ersätter inte den tidigare fullsviten som inte passerade i en körning på grund av två frontend-timeouts.
+- [x] Nya manifest bär nu backendens signerade submission-ID; klientregressionen använder samma serverfunktion för ID-beräkning och verifierar den faktiska `/api/explain`-payloaden. Äldre v1 fortsätter verifieras.
+- [x] `js/exam-flow.js` rensar gammal P.E.R.-kontext när användaren går till nytt ämne efter resultatet; browser-testet verifierar UI-övergång och skickad kontext.
+- [ ] Fixarna är inte Preview-deployade/liveverifierade. Nästa steg: använd endast den befintliga feature-Previewprocessen efter exakt pushgodkännande; verifiera active/unfinished exam answer-free och vanlig/efter-rättnings P.E.R. utan fler AI-anrop än uttryckligen godkänt.
+
+**PILOT NOT READY.** Generering och rättning har nu ett livepass, men P.E.R:s normala hjälpflöde är inte fungerande/verifierat i detta Preview-test. Behåll stagingtestdata, `main` och Production oförändrade.
+
+## Lokal fortsättning: legacy-återhämtning och replay — 2026-10-21
+
+- [x] Idempotent replay utfärdar ett aktuellt v2-manifest från det sparade provet; frågemängd, grade-task och metadata förblir oförändrade. Ogiltig cachepayload ger fail-closed svar.
+- [x] Ett äldre, signerat v1-utkast kan efter omladdning be om status via hela signerade provkontexten. Servern autentiserar, verifierar manifestet, härleder submission-ID och endast läser provstatus; ett förfalskat v1-manifest stoppas före statusfrågan.
+- [x] Browser-regression simulerar omladdning av ett v1-prov och bekräftar att serververifierat ID når P.E.R. API issuance/completion-regressioner passerade 19/19; P.E.R.-browser passerade 69/69; offline generation pipeline, syntax och diffkontroll passerade.
+- [ ] Allt ovan är lokalt och ej Preview-verifierat. Inga nya live AI-anrop gjordes. Tidigare stagingbevis är begränsade till ett syntetiskt 3-frågeprov, rättning/resultatvisning och P.E.R:s facitskyddade men status-blockerade svar.
+
+**PILOT NOT READY.** Före skolpilot krävs push/deploy till verifierad feature-Preview, autentiserad syntetisk stagingbekräftelse av P.E.R.-status och sparad rättning, samt återstående RLS/IDOR- och skolans drift-/integritetsgrindar. Ingen main-merge eller produktionsdeploy är godkänd här.

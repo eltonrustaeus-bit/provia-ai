@@ -545,3 +545,23 @@
 - [ ] Stagingadvisories innehåller även befintliga säkerhets-/prestandafynd. Den nya reservationstabellen syns i RLS-no-policy-linten; direkt tabellåtkomst är samtidigt borttagen för `anon`/`authenticated` och RLS är aktiv. Övriga project-wide fynd har inte ändrats eller åtgärdats i denna ändring.
 
 **PILOT NOT READY.** En aktuell Preview och stagingmigration är verifierade och ett syntetiskt 3-frågeprov genererades. Rättning/sparning, P.E.R.-beteende, RLS/IDOR med två konton och skolans operativa godkännanden återstår.
+
+## Uppföljning av liveprov, rättning och P.E.R. — 2026-10-21
+
+- [x] I samma staging-Preview och med syntetiskt Matematik 2b-material färdigställdes provet med exakt 3 frågor. Vercel-loggen visar `finalQuestionCount: 3`, 3 av 3 granskade frågor godkända och en reparations-timeout; hela provet levererades ändå efter 35,7 sekunder. Det verifierar ett lyckat försök, inte stabil svarstid eller allmän kvalitet.
+- [x] Det syntetiska provet lämnades in och gav ett synligt rättat resultat: 5/7 poäng, inklusive full poäng på kostnadsresonemang och beräkning samt delpoäng på lutningsförklaringen. Resultatsidan visade frågespecifik återkoppling och nästa träningsområde.
+- [ ] P.E.R. under aktivt prov gav endast en säker statusvägledning: den kunde inte verifiera provstatus och gav varken facit eller vanlig modellsvarshjälp. Källgranskningen bekräftade ett kontraktsfel: API:t utfärdade `v1.<antal-frågor>.<signatur>`, medan klienten bara extraherade ID ur `v2.<submissionId>.<signatur>`. Därför hoppades exakt-issuance-kontrollen över och klienten använde den bredare statusvägen. Stagingens `exam_issuance_state(uuid,text)` finns och har `SECURITY INVOKER` plus tom `search_path`. Vercels Hobby-retention gav ingen P.E.R.-requestlogg, så kontraktsfelet är bekräftat i koden men dess andel i varje observerat livefel är inte fullt bevisad.
+- [x] Riktade offlineprov `tests/api/per-exam-review-handler.test.mjs` och `tests/frontend/per-exam-context.test.mjs` passerade tillsammans: 52/52. Den tidigare fulla sviten är fortsatt inte grön som helhet eftersom två timeoutande frontend-filer endast passerade isolerat.
+- [x] Gratisrollen lämnades oförändrad under rättning och P.E.R.-kontrollerna. Ingen kvotändring, radering, produktionsåtgärd eller elevdata användes.
+
+### Lokala P.E.R.-status- och kontextfixar — ej Preview-verifierade
+
+- [x] Nya provmanifest är nu `v2.<submissionId>.<signatur>`; signaturen binder det synliga ID:t till användare, kurs, material och frågemängd. Verifieraren accepterar även äldre v1-manifest så redan utfärdade prov kan rättas och avbrytas.
+- [x] `stepSubject()` rensar dessutom resultat-/frågekontext före vanlig studiehjälp. Browser-regressionen använder serverns `submissionId()` och kontrollerar att exakt ID skickas till `/api/explain`.
+- [x] Riktad verifiering: completion/issuance/grade-review/recovery API 23/23; exam-pipeline offline passerade; P.E.R.-kontext 68/68; verifierare/solver-kontrakt 3/3; syntax och `git diff --check` passerade.
+- [x] Cachead idempotent provåterspelning får nu ett nytt v2-manifest utan att frågor, grade-task eller metadata ändras. Ogiltig replay-payload failar stängt i stället för att returnera gammalt manifest.
+- [x] Giltiga äldre v1-utkast kan nu statuskontrolleras efter omladdning: klienten skickar hela signerade provkontexten, servern verifierar den, härleder kontoägt ID och gör enbart en statusläsning. Browser-testet verifierar att återupptaget äldre prov för vidare exakt ID till P.E.R.
+- [x] Uppdaterad riktad verifiering efter återhämtningsfixen: issuance/completion API 19/19 och P.E.R.-browser 69/69; offline generation pipeline passerade, syntaxkontroll och `git diff --check` passerade.
+- [ ] Ändringen är lokal och inte pushad eller deployad. Inget nytt live P.E.R.-anrop har körts; det kräver separat godkännande efter Preview från exakt commit. Aktiva och oavslutade prov ska fortsatt verifieras fail-closed.
+
+**PILOT NOT READY.** En generering med tre frågor samt rättning/resultatvisning verifierades live. P.E.R:s live-statusgrind hindrar fortfarande normal hjälp i appens provflöde; dessutom återstår fullsvitsstabilitet, RLS/IDOR-tvåkonto, och skolans operativa godkännanden.

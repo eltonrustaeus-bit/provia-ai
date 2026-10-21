@@ -54,6 +54,13 @@ function json(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+function refreshReplayManifest(response, userId, course, pastedText) {
+  if (!response?.ok || !response.exam || !Array.isArray(response.exam.questions)) return null;
+  const examManifest = examCompletion.issueExamManifest(userId, course, pastedText, response.exam.questions);
+  if (!examManifest) return null;
+  return { ...response, exam: { ...response.exam, exam_manifest: examManifest } };
+}
+
 function safeString(x, maxLen = 200000) {
   const s = typeof x === "string" ? x : "";
   return s.length > maxLen ? s.slice(0, maxLen) : s;
@@ -1471,7 +1478,11 @@ module.exports = async function handler(req, res) {
         : "Provet kunde inte startas säkert. Försök igen.",
     });
   }
-  if (generationClaim.status === "replay") return json(res, 200, generationClaim.response);
+  if (generationClaim.status === "replay") {
+    const replayResponse = refreshReplayManifest(generationClaim.response, user.id, course, pastedText);
+    if (!replayResponse) return json(res, 503, { ok: false, error: "exam_replay_unavailable" });
+    return json(res, 200, replayResponse);
+  }
   if (generationClaim.status === "payload_conflict") {
     return json(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" });
   }
@@ -2453,7 +2464,9 @@ module.exports = async function handler(req, res) {
     failureStage = "usage_flush";
     await flushUsage();
     failureStage = "response_delivery";
-    return json(res, 200, finalized.response);
+    const finalResponse = refreshReplayManifest(finalized.response, user.id, course, pastedText);
+    if (!finalResponse) throw new Error("Finalized exam manifest unavailable");
+    return json(res, 200, finalResponse);
   } catch {
     console.error(JSON.stringify({
       event: "exam_generation_failed",

@@ -44,6 +44,12 @@ export default async function handler(req, res) {
   }
 
   const submissionId = examCompletion.submissionId(user.id, course, questions);
+  if (body.resolve_status === true) {
+    const state = await examIssuance.examState(user.id, submissionId);
+    return state === null
+      ? res.status(503).json({ ok: false, error: "EXAM_STATE_UNAVAILABLE" })
+      : res.json({ ok: true, exam_state: state, submission_id: submissionId });
+  }
   const state = await examIssuance.abandonExam(user.id, submissionId);
   if (state === null) return res.status(503).json({ ok: false, error: "EXAM_STATE_UNAVAILABLE" });
   if (state === "abandoned") return res.json({ ok: true, abandoned: true });

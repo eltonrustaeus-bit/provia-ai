@@ -1,4 +1,5 @@
 import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
+import { createRequire } from "node:module";
 // Bevisar att P.E.R får rätt fråga — det som saknades när eleven skrev
 // "hjälp mig med frågan" och fick svar om en annan.
 //
@@ -8,22 +9,26 @@ import { ROOT, serve, mockApis, seed, report } from "./_harness.mjs";
 // Användning:  node tests/frontend/per-exam-context.test.mjs
 
 const { chromium } = await import(ROOT + "/node_modules/playwright/index.mjs");
+const require = createRequire(import.meta.url);
+const examCompletion = require("../../api/_exam-completion.cjs");
 const srv = await serve(ROOT, { indexFile: "app.html" });
 
+const QUESTIONS = Array.from({ length: 4 }, (_, n) => ({
+  id: "q" + (n + 1), type: n >= 2 ? "graph" : "mc", points: n >= 2 ? 3 : 2,
+  question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen"
+    : n === 3 ? "Fråga nummer 4 med okänt grafmetadata"
+      : "Fråga nummer " + (n + 1) + " om cellandning",
+  options: n >= 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n >= 2 ? -1 : 1,
+  ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } }
+    : n === 3 ? { graph_ui: { mode: "future", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
+  topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
+  model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
+  scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
+}));
+const EXAM_SUBMISSION_ID = examCompletion.submissionId("u1", "Biologi 1", QUESTIONS);
 const EXAM = {
-  title: "Prov", level: "C", exam_manifest: `v2.${"a".repeat(32)}.synthetic`,
-  questions: Array.from({ length: 4 }, (_, n) => ({
-    id: "q" + (n + 1), type: n >= 2 ? "graph" : "mc", points: n >= 2 ? 3 : 2,
-    question: n === 2 ? "Fråga nummer 3: placera tre mätpunkter från tabellen"
-      : n === 3 ? "Fråga nummer 4 med okänt grafmetadata"
-        : "Fråga nummer " + (n + 1) + " om cellandning",
-    options: n >= 2 ? [] : ["Alfa", "Beta", "Gamma", "Delta"], correct_index: n >= 2 ? -1 : 1,
-    ...(n === 2 ? { graph_ui: { mode: "scatter", point_count: 3, x_label: "Tid", y_label: "Halt" } }
-      : n === 3 ? { graph_ui: { mode: "future", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
-    topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
-    model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
-    scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
-  }))
+  title: "Prov", level: "C", exam_manifest: `v2.${EXAM_SUBMISSION_ID}.synthetic`,
+  questions: QUESTIONS,
 };
 
 let lastExplain = null;
@@ -31,6 +36,7 @@ let examStateUnavailable = false;
 let activeExamCount = 0;
 let historyAllowed = true;
 const activeExamCountCalls = [];
+const legacyStatusCalls = [];
 const SAVED_PER_HISTORY = [
   { role: "user", content: "Explain my old practice result." },
   { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42." },
@@ -53,9 +59,15 @@ await mockApis(page, {
     ["**/api/abandon-exam**", r => {
       activeExamCountCalls.push({ method: r.request().method(), url: r.request().url() });
       const url = new URL(r.request().url());
-      r.fulfill({ json: url.searchParams.has("submission_id")
-        ? { ok: true, exam_state: "active" }
-        : { ok: true, active_count: activeExamCount } });
+      if (r.request().method() === "POST") {
+        const body = JSON.parse(r.request().postData() || "{}");
+        legacyStatusCalls.push(body);
+        r.fulfill({ json: { ok: true, exam_state: "active", submission_id: EXAM_SUBMISSION_ID } });
+      } else {
+        r.fulfill({ json: url.searchParams.has("submission_id")
+          ? { ok: true, exam_state: "active" }
+          : { ok: true, active_count: activeExamCount } });
+      }
     }],
     ["**/api/explain", r => {
       if (r.request().method() === "GET") {
@@ -105,6 +117,13 @@ ok("P.E.R hides cached full solutions after an exam opens", !historyDuringExam.v
 ok("hiding exam history preserves the original local transcript", JSON.stringify(historyDuringExam.stored) === JSON.stringify(SAVED_PER_HISTORY), JSON.stringify(historyDuringExam.stored));
 ok("active exam history mask persists for same-browser navigation", historyDuringExam.mask === "1");
 
+await page.evaluate(() => {
+  const key = "exgen_flow_draft_u1";
+  const draft = JSON.parse(localStorage.getItem(key));
+  draft.exam.exam_manifest = "v1.4.synthetic";
+  delete draft.exam.submission_id;
+  localStorage.setItem(key, JSON.stringify(draft));
+});
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
 await page.evaluate(() => window.PER.setExamHistoryMasked(false));
@@ -117,6 +136,12 @@ ok("reload keeps historical solutions hidden until the active exam is verified",
 await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.ghost");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 ok("verified exam resume keeps the old solution hidden", await page.locator("#perMessages").innerText().then(text => !text.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER")));
+ok("legacy resume sends the signed full exam context for server-side status resolution",
+  legacyStatusCalls.length === 1 && legacyStatusCalls[0].resolve_status === true
+    && legacyStatusCalls[0].exam_manifest === "v1.4.synthetic"
+    && legacyStatusCalls[0].questions?.length === QUESTIONS.length
+    && legacyStatusCalls[0].course === "Biologi 1",
+  JSON.stringify(legacyStatusCalls[0] || null));
 
 // ── T1: manifestet finns direkt, utan att hjälpknappen tryckts ────────────
 const t1 = await page.evaluate(() => window.__perTestCtx());
@@ -126,7 +151,7 @@ ok("T1b targets finns för alla frågor", t1.targets?.length === 4 && t1.targets
 // Saknas den tolkas provet som pågående med taket 2 — vilket ser rimligt ut och
 // därför aldrig märks. Den måste finnas, och den måste vara "exam" här.
 ok("T1c phase är exam under provet", t1.examState?.phase === "exam", JSON.stringify(t1.examState));
-ok("T1c1 aktivt provs id finns i det serverbundna sammanhanget", t1.examState?.submissionId === "a".repeat(32), JSON.stringify(t1.examState));
+ok("T1c1 det serververifierade ID:t för ett äldre prov finns i provkontexten", t1.examState?.submissionId === EXAM_SUBMISSION_ID, JSON.stringify(t1.examState));
 ok("T1d answered är falskt innan eleven rört frågan", t1.currentQuestion?.answered === false,
    String(t1.currentQuestion?.answered));
 
@@ -172,7 +197,7 @@ ok("T4e provstatus i kroppen", typeof lastExplain?.pageContext?.examState?.answe
 // och bara här.
 ok("T4f phase följer med ut på nätverket", lastExplain?.pageContext?.examState?.phase === "exam",
    JSON.stringify(lastExplain?.pageContext?.examState));
-ok("T4g provets submission-id följer med till servern", lastExplain?.pageContext?.examState?.submissionId === "a".repeat(32),
+ok("T4g provets servergenererade submission-id följer med till API:t", lastExplain?.pageContext?.examState?.submissionId === EXAM_SUBMISSION_ID,
    JSON.stringify(lastExplain?.pageContext?.examState));
 
 // Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
@@ -397,6 +422,24 @@ ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
      { id: "q1", answer: "B" }, { id: "q2", answer: "" }, { id: "q3", answer: "" }, { id: "q4", answer: "" }
    ]), JSON.stringify(lastExplain?.examProof?.answers));
 await page.evaluate(() => document.getElementById("langBtn")?.click());
+
+// Starting a new topic after a verified result must leave the exam context.
+// Otherwise ordinary study help is still treated as an exam-page request.
+await page.getByRole("button", { name: "Nytt ämne", exact: true }).click();
+await page.waitForSelector("#xf .xf-screen[data-screen='subject'].on", { timeout: 5000 });
+const newTopicContext = await page.evaluate(() => window.__perTestCtx());
+ok("Nytt ämne rensar föregående provkontext", newTopicContext.page === "app"
+  && !newTopicContext.currentQuestion && !newTopicContext.examState && !newTopicContext.targets,
+  JSON.stringify(newTopicContext));
+if (!(await page.locator("#perPanel").isVisible())) await page.click("#perBubble");
+await page.waitForTimeout(200);
+await page.locator("#perInput").waitFor({ state: "visible", timeout: 3000 });
+await page.fill("#perInput", "Hjälp mig förstå lutningen i en linjär funktion.");
+await page.click("#perSendBtn");
+await page.waitForTimeout(200);
+ok("vanlig P.E.R-fråga skickas utan gammal provstatus", lastExplain?.pageContext?.page === "app"
+  && !lastExplain.pageContext.currentQuestion && !lastExplain.pageContext.examState,
+  JSON.stringify(lastExplain?.pageContext));
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid

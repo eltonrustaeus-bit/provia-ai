@@ -2620,20 +2620,41 @@ try{
       } catch { return null; }
       finally { clearTimeout(timer); }
     },
-    async examState(examManifest) {
+    async examState(examManifest, examContext) {
       const submissionId = submissionIdFromProof(examManifest);
       const token = await getAccessToken();
-      if (!submissionId || !token) return null;
+      if (!token) return null;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 10000);
       try {
-        const query = new URLSearchParams({ submission_id: submissionId });
-        const response = await fetch(`/api/abandon-exam?${query}`, {
-          headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
-        });
+        let response;
+        if (submissionId) {
+          const query = new URLSearchParams({ submission_id: submissionId });
+          response = await fetch(`/api/abandon-exam?${query}`, {
+            headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+          });
+        } else if (typeof examManifest === "string" && examContext && Array.isArray(examContext.questions)) {
+          response = await fetch("/api/abandon-exam", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              resolve_status: true,
+              course: examContext.course,
+              pastedText: examContext.pastedText,
+              questions: examContext.questions,
+              exam_manifest: examManifest,
+            }),
+            signal: ctrl.signal,
+          });
+        } else {
+          return null;
+        }
         const data = await response.json();
-        return response.ok && data?.ok && ["active", "grading", "completed", "abandoned", "expired", "missing"].includes(data.exam_state)
-          ? data.exam_state : null;
+        if (!response.ok || !data?.ok || !["active", "grading", "completed", "abandoned", "expired", "missing"].includes(data.exam_state)) return null;
+        return {
+          state: data.exam_state,
+          submissionId: submissionId || (typeof data.submission_id === "string" ? data.submission_id : ""),
+        };
       } catch { return null; }
       finally { clearTimeout(timer); }
     },

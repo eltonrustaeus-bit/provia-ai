@@ -10,6 +10,7 @@ const assessment = require("../../api/_assessment.js");
 const verifierModule = require("../../api/_verifier.js");
 const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
+const examCompletion = require("../../api/_exam-completion.cjs");
 
 const originalStreamFetch = globalThis.fetch;
 const streamedPartialQuestion = '{"title":"Syntetiskt","level":"C","questions":[{"id":"partial-1","question":"2 + 2?"},';
@@ -1212,7 +1213,11 @@ try {
     "a source-supported learner selection reaches the real generation handler's prompt");
   assert.doesNotMatch(generationUserPrompt, /påhittat/,
     "a client term absent from the source is removed before model input");
-  assert.match(generated.body.exam.exam_manifest, /^v1\.3\./);
+  const generatedSubmissionId = examCompletion.submissionId(userId, course, generated.body.exam.questions);
+  assert.match(generated.body.exam.exam_manifest, new RegExp(`^v2\\.${generatedSubmissionId}\\.[A-Za-z0-9_-]{43}$`));
+  assert.equal(examCompletion.verifyExamManifest(
+    generated.body.exam.exam_manifest, userId, course, pastedText, generated.body.exam.questions,
+  ), true, "the API response contains a manifest the server can verify for this exact issued set");
   for (const question of generated.body.exam.questions) {
     assert.ok(question.grade_task, "each delivered question has opaque signed grading material");
     for (const hidden of ["correct_index", "model_answer", "rubric", "scoring_rubric", "akey_sig", "confidence_score", "detected_issues"]) {
@@ -2447,11 +2452,19 @@ try {
   const firstStableResponse = await invoke(generateExam, stableRequest);
   assert.equal(firstStableResponse.status, 200, JSON.stringify(firstStableResponse.body));
   const firstStableSubmission = firstStableResponse.body.exam.questions.map((question) => question.grade_task);
+  generationOperations.get(stableKey).response.exam.exam_manifest = "v1.3.legacy-cached-manifest";
   calls.length = 0;
   const replayedStableResponse = await invoke(generateExam, stableRequest);
   assert.equal(replayedStableResponse.status, 200, JSON.stringify(replayedStableResponse.body));
-  assert.deepEqual(replayedStableResponse.body, firstStableResponse.body,
-    "retry after a lost HTTP response returns the exact same exam and metadata");
+  assert.deepEqual(replayedStableResponse.body.exam.questions, firstStableResponse.body.exam.questions,
+    "retry after a lost HTTP response returns the exact same questions and grading tasks");
+  assert.deepEqual(replayedStableResponse.body.meta, firstStableResponse.body.meta,
+    "replay preserves generation metadata");
+  assert.match(replayedStableResponse.body.exam.exam_manifest, /^v2\.[a-f0-9]{32}\./,
+    "replay refreshes a cached legacy manifest to the current version");
+  assert.equal(replayedStableResponse.body.exam.exam_manifest.split(".")[1],
+    examCompletion.submissionId(userId, stableRequest.course, replayedStableResponse.body.exam.questions),
+    "the refreshed replay manifest exposes the same exact submission ID as the persisted question set");
   assert.equal(JSON.stringify(replayedStableResponse.body.exam.questions.map((question) => question.grade_task)),
     JSON.stringify(firstStableSubmission));
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,

@@ -39,19 +39,32 @@ function issueExamManifest(userId, course, material, questions) {
   if (!secret || !id) return null;
   const context = gradeTasks.hashContext(material, course, userId);
   const signature = crypto.createHmac("sha256", secret)
-    .update(`exgen-exam-manifest:v1:${context}:${questions.length}:${id}`)
+    .update(`exgen-exam-manifest:v2:${context}:${questions.length}:${id}`)
     .digest("base64url");
-  return `v1.${questions.length}.${signature}`;
+  return `v2.${id}.${signature}`;
 }
 
 function verifyExamManifest(manifest, userId, course, material, questions) {
   if (typeof manifest !== "string" || manifest.length > 80 || !supportedMaterial(material)) return false;
-  const expected = issueExamManifest(userId, course, material, questions);
-  if (!expected) return false;
-  const givenBytes = Buffer.from(manifest);
-  const expectedBytes = Buffer.from(expected);
-  return givenBytes.length === expectedBytes.length &&
-    crypto.timingSafeEqual(givenBytes, expectedBytes);
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) return false;
+  const secret = getExamSigningSecret();
+  const id = submissionId(userId, course, questions);
+  if (!secret || !id) return false;
+  const context = gradeTasks.hashContext(material, course, userId);
+  const signatureFor = (version) => crypto.createHmac("sha256", secret)
+    .update(`exgen-exam-manifest:${version}:${context}:${questions.length}:${id}`)
+    .digest("base64url");
+  const matches = (expected) => {
+    const givenBytes = Buffer.from(manifest);
+    const expectedBytes = Buffer.from(expected);
+    return givenBytes.length === expectedBytes.length &&
+      crypto.timingSafeEqual(givenBytes, expectedBytes);
+  };
+
+  // v1 kept the ID inside the MAC; v2 exposes that same account-bound ID so
+  // the client can address the exact server-side issuance during an exam.
+  return matches(`v2.${id}.${signatureFor("v2")}`) ||
+    matches(`v1.${questions.length}.${signatureFor("v1")}`);
 }
 
 function completionSignature(userId, id, secret) {
