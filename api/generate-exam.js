@@ -68,7 +68,17 @@ function safeString(x, maxLen = 200000) {
 
 function normalizeSelectedFocusTerms(value, pastedText) {
   if (!Array.isArray(value) || value.length > 6) return [];
-  const genericTerms = new Set(["alltså"]);
+  const genericTerms = new Set([
+    "alltså",
+    "anteckningar",
+    "övningsmaterial",
+    "presentation",
+    "sammanfattning",
+    "testunderlag",
+    "worksheet",
+    "studyguide",
+    "summary",
+  ]);
   const sourceWords = new Set(String(pastedText || "").toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || []);
   const accepted = new Set();
   for (const raw of value) {
