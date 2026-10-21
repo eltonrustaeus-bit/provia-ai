@@ -1,6 +1,21 @@
 # 08 Current Status
 
+## Latest pilot checkpoint — 2026-10-21
+
+This is the current checkpoint. Older entries below are chronological snapshots; where they conflict with this section, this section is newer.
+
+- [x] Exact feature Preview rechecked read-only: deployment `dpl_GgVkpUSjof5xUdoAkJLnqx6fT8cf` is `READY` from commit `1c06b914baf136ec3715502b8dc040527e4576ec` on `codex/exgen-generation-quality-2026-10-20`. It includes the earlier P.E.R. quota-reservation code; `main` and Production are untouched.
+- [x] Authenticated synthetic staging UI was rechecked. It reports the Gratis account at its three-exam weekly limit and P.E.R. quota exhausted. The approved short P.E.R. request returned only the quota message; no model answer was observed. Vercel's deployment-scoped 30-minute runtime query showed `/api/abandon-exam` only, with no `/api/explain` record. No role, quota, account, database, or Production change was made.
+- [x] Read-only aggregate SQL confirmed the latest synthetic account exam row has 3 questions, saved answers, a saved result, and a matching verified `mock_results` row. Its timestamp (12:32 UTC) is after prior READY deployment `dpl_DjHaHgpC1Fu5e3W2rBJVeD2bPQ73` (`5fccaff`) and before the current deployment was created (13:12 UTC). No question, answer, score payload, row ID, or account ID was read. `api/grade.js` and migrations are unchanged from `5fccaff` through current `1c06b91`; the newer generation/issuance/recovery code still lacks a fresh complete live run.
+- [x] Targeted offline regressions on the current code passed **58/58**, including generation/repair and malformed-distractor checks, solver/verifier contracts, P.E.R. active-exam and post-grade gates, quota reservation/refund migration, and server-authoritative quota handling. The same code had previously passed the full API suite **181/181**; this turn did not rerun the full suite.
+- [!] Live model-backed P.E.R. is not verified on this deployment because the staging quota blocked the request before a model response. Do not change the account role/quota to get around this without fresh, action-specific approval.
+- [!] Pilot still needs a live generation on the current deployment, active-exam P.E.R. hint, and a current-deployment check of result recovery after save/reload. One prior staging generation/grade is now confirmed persisted, but it was on `5fccaff`, not current `1c06b91`. Hosted two-JWT RLS/IDOR and school privacy/operational approval remain open. The local documentation-only commit `ccdccdf` and these updates are not pushed.
+
+**PILOT NOT READY.** Next safe step: wait for ordinary staging quota availability, then run only the bounded synthetic cases that remain and capture the actual model response and saved-result evidence. Keep Production and `main` untouched.
+
 ## Local P.E.R. quota failure-settlement — 2026-10-21
+
+> Historical snapshot: the later `5fccaff` commit is an ancestor of the current READY Preview at `1c06b91`; the local-only/deployment statements in this snapshot are superseded by the latest checkpoint above.
 
 - [x] Replaced the API's direct `consume_per_chat_quota` increment with a request-ID-bound reservation flow for P.E.R. routes. Successful model responses commit the reservation; provider/stream failures refund it. Explain-cache hits are checked before quota reservation.
 - [x] Added a local forward migration with a service-role-only reservation ledger, profile-row locking, period-aware counters, idempotent commit/refund, two-minute stale-reservation cleanup, RLS, and restricted grants.

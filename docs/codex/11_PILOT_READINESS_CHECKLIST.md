@@ -1,6 +1,21 @@
 # ExGen: checklista for skolpilot
 
+## Latest pilot checkpoint — 2026-10-21
+
+This is the current checkpoint. Older entries below are chronological snapshots; where they conflict with this section, this section is newer.
+
+- [x] Exact feature Preview `dpl_GgVkpUSjof5xUdoAkJLnqx6fT8cf` is `READY` from `1c06b914baf136ec3715502b8dc040527e4576ec` on `codex/exgen-generation-quality-2026-10-20`. It includes `5fccaff`, the P.E.R. quota-reservation change. `main` and Production remain untouched.
+- [x] The authenticated synthetic staging UI is reachable and reports three known exams this week plus exhausted P.E.R. quota. A short synthetic P.E.R. request produced only the quota message; no model response was observed. The deployment-scoped 30-minute Vercel log query contained `/api/abandon-exam` only and no `/api/explain` record.
+- [x] Read-only aggregate SQL confirms the latest synthetic account exam has 3 questions, saved answers, a saved result, and a matching verified `mock_results` row. It was created at 12:32 UTC, after the preceding READY Preview `dpl_DjHaHgpC1Fu5e3W2rBJVeD2bPQ73` (`5fccaff`) and before current Preview `1c06b91` was created. `api/grade.js` and migrations are unchanged across that range, but exact-current-Preview recovery after reload is not live-verified. No question/answer content, score payload, identifiers, or student rows beyond these aggregate indicators were read.
+- [x] Current-code focused regressions passed 58/58. The full API suite previously passed 181/181 on the same code; it was not rerun in this checkpoint. `git diff --check` passed.
+- [!] Do not change the staging account role or quota to bypass exhaustion without a new, exact approval. No role, quota, account, database, Production or `main` change occurred in this checkpoint.
+- [ ] Live generation and active-exam P.E.R. hint on the exact current deployment, post-grade recovery after reload, hosted two-JWT RLS/IDOR, and school privacy/operational approval remain outstanding. One prior synthetic grade is now verified saved on the preceding deployment; do not treat it as a fresh end-to-end pass on `1c06b91`.
+
+**PILOT NOT READY.** Next safe live step is to wait for normal staging quota availability, then run the remaining bounded synthetic checks and preserve the actual model/result evidence.
+
 ## Local quota-failure fix — 2026-10-21
+
+> Historical snapshot: the local fix was subsequently included in the Preview through `5fccaff`; use the latest checkpoint above for current deployment and quota status.
 
 - [x] The API now reserves P.E.R quota against a server-generated request ID, commits it on a successful response, and refunds it on provider/stream failure. Explain-cache hits no longer consume a new quota unit.
 - [x] A service-role-only RLS migration adds the reservation ledger and guarded reserve/commit/refund RPCs. The migration ran successfully in disposable PGlite; its quota/idempotency/stale-cleanup/privilege checks passed. This is not a hosted staging migration run.
