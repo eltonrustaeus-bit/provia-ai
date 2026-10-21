@@ -533,3 +533,15 @@
 4. Kör kontrollerad testbaslinje utan betalda AI-anrop.
 5. Bygg en skolpilot-checklista: 1-5 klasser, lärarroll, elevjoin, samtycke/GDPR, export/reporting, support.
 6. Därefter: förbättra kärnflödet mockprov -> rättning -> felbank -> P.E.R-rekommendation, eftersom det är ExGens huvudloop.
+
+## Liveuppdatering — kvotreservation och trefrågeprov — 2026-10-21
+
+- [x] Commit `5fccaff6bfedfbbb4831f8a293e40d71fa44f8a3` är pushad till `codex/exgen-generation-quality-2026-10-20`. Vercel Preview `dpl_DjHaHgpC1Fu5e3W2rBJVeD2bPQ73` är `READY` från exakt denna SHA; projektets publika runtime visar pilotläge och stagingref `yhcinqejsocpmmetazpz`. Ingen merge till `main` eller Production-deploy har gjorts.
+- [x] Efter uttryckligt godkännande tillämpades endast `per_chat_quota_reservations` i Supabase-staging. Migreringen registrerades som `20261021122219`. Read-only kontroll bekräftar RLS på reservationstabellen, ingen tabell-SELECT för `anon`/`authenticated`, samt att reserve/commit/refund/reap-RPC:erna endast kan köras av `service_role`.
+- [x] Staginginloggning lyckades i den nya Previewn. Ett godkänt syntetiskt Matematik 2b-prov med 3 kortsvarsfrågor genererades på nivå A. Alla tre visades i UI: kostnadsstruktur med fasta/rörliga kostnader, totalkostnad vid 15 biljetter, samt kostnadsfunktionens lutning och tolkning. Detta bekräftar endast att ett prov med begärt antal frågor kunde genereras i just detta försök; det bevisar inte allmän kvalitet eller stabilitet.
+- [x] Testkontots roll ändrades tillfälligt från Gratis till Premium för det godkända genereringsförsöket och återställdes direkt till Gratis. Ingen kvot ändrades. Det genererade syntetiska provet ligger kvar i staging; det har inte rättats eller raderats.
+- [x] Den kompletta seriala Node-sviten avslutades, men rapporterade två timeoutfel i webbläsartesterna `tests/frontend/solution-photo.test.mjs` och `tests/frontend/stale-session.test.mjs`. Båda passerade när de kördes isolerat. Därför räknas fullsviten inte som helt grön. Den fokuserade kvot/P.E.R.-sviten hade passerat 71/71 före denna stagingkörning.
+- [ ] Live-rättning och verifierad resultatsparning är ännu inte testade. Live-P.E.R. utanför och under ett aktivt prov är ännu inte testat. Stagingkonto och provdata ska bevaras tills separat godkänd städning.
+- [ ] Stagingadvisories innehåller även befintliga säkerhets-/prestandafynd. Den nya reservationstabellen syns i RLS-no-policy-linten; direkt tabellåtkomst är samtidigt borttagen för `anon`/`authenticated` och RLS är aktiv. Övriga project-wide fynd har inte ändrats eller åtgärdats i denna ändring.
+
+**PILOT NOT READY.** En aktuell Preview och stagingmigration är verifierade och ett syntetiskt 3-frågeprov genererades. Rättning/sparning, P.E.R.-beteende, RLS/IDOR med två konton och skolans operativa godkännanden återstår.

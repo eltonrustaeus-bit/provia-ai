@@ -642,3 +642,15 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Oberoende specialistagent kunde inte startas eftersom agentkapaciteten var full. Granskning och sammanslagning gjordes av huvudagenten; den separata agent-QA:n är kvar.
 
 **PILOT NOT READY.** Den kända formen av osourcat ensamt nonsensord stoppas nu deterministiskt i lokal kod, men den nya regeln och bounded-oversampling-fixen behöver Preview och ett fåtal syntetiska stagingprov innan liveeffekt kan bekräftas. Rättning/sparning, P.E.R. under aktivt prov, RLS/IDOR, hosted PostgreSQL-gradering och skolans operativa godkännanden kvarstår.
+
+## Staginguppdatering — 2026-10-21
+
+- [x] `5fccaff` finns i feature-Preview `dpl_DjHaHgpC1Fu5e3W2rBJVeD2bPQ73` (`READY`, exakt SHA verifierad); pilotruntime pekar på `exgen-pilot-staging`.
+- [x] `per_chat_quota_reservations` är tillämpad i staging och registrerad där. RLS och service-role-only tabell-/RPC-åtkomst är verifierade med katalogfrågor.
+- [x] Ett syntetiskt Matematik 2b-prov med 3 kortsvarsfrågor genererades och alla tre frågor visades. Ett enda sådant lyckat prov är inte tillräckligt bevis för pilotberedskap.
+- [x] Testkontot återställdes till Gratis direkt efter provgenereringen. Ingen kvot ändrades och ingen data raderades.
+- [ ] Full offline-svit har två browser timeout-fel; samma två testfiler passerade separat. Undersök resurs-/tidskänsligheten; full suite är inte verifierad grön.
+- [ ] Rättning och sparad resultatrad, P.E.R. utanför aktivt prov, P.E.R. under aktivt prov, avbrutet prov/facitskydd och återhämtning efter session-/nätverksfel återstår live.
+- [ ] Tvåkonto-RLS/IDOR, rollback, skolans datahantering/samtycke, läraråtkomst, support och incidentflöde återstår innan rekommendation om skolpilot.
+
+**PILOT NOT READY.** Livegenerering med exakt tre frågor passerade en gång. Fortsätt endast med godkända syntetiska stagingtester och behåll `main`, Production och stagingrensning oförändrade.
