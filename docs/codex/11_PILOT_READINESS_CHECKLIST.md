@@ -693,6 +693,7 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 
 - [x] Nytt PGlite-test exekverar den faktiska `20261012103942_lock_user_exams_to_owner.sql`-migrationen med två användare och `authenticated`-rollen.
 - [x] Konto A kan endast läsa egna historikrader och infoga egna; ett försök att skriva konto B:s ägar-ID stoppas av RLS. Browserrollen nekas även UPDATE och DELETE, och den avslutande tabelläsningen bekräftar att inget otillåtet skrivförsök sparats.
-- [ ] Detta är isolerad PostgreSQL-testning, inte en livekontroll av aktuella Supabase staging-grants/policies eller två separata autentiserade konton.
+- [x] Read-only Supabase-stagingkontroll bekräftade att `user_exams` har RLS och ägarpolicyer aktiva samt att `authenticated` saknar UPDATE/DELETE-grants. `mock_results`, `exam_issuances` och `per_chat_quota_reservations` har RLS aktiv och inga `anon`/`authenticated`-tabellgrants.
+- [ ] Två separata autentiserade stagingkonton har ännu inte testats genom Data API; katalogmetadata bekräftar policykonfiguration men inte det fullständiga session-till-radflödet. Inga elevrader hämtades.
 
 **PILOT NOT READY.** Den lokala ägarpolicy-regressionen är nu exekverad. Hosted Supabase RLS/IDOR-kontroll och skolans data-/driftgodkännanden återstår.

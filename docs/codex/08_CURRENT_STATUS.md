@@ -573,6 +573,7 @@
 - [x] `tests/api/user-exams-rls-postgres.test.mjs` kör den riktiga `lock_user_exams_to_owner`-migreringen i isolerad PostgreSQL via PGlite med två användar-ID:n och rollen `authenticated`.
 - [x] Testet bekräftar att konto A endast läser egna provrader, kan infoga en egen rad, inte kan infoga med konto B:s ägar-ID och saknar direkt UPDATE/DELETE. Slutlig tabellkontroll bekräftar att det nekade försöket inte sparades.
 - [x] Samma ändringars närliggande regressionskontroller passerade: RLS/pilot-scope/route-boundary 13/13; resultatpersistens/completion-proof plus PostgreSQL grading fencing 5/5.
-- [ ] Detta är lokal SQL-runtime-evidens, inte liveverifiering av Supabase-stagingens policies, grants eller tvåkontosdataåtkomst. Inga stagingrader eller konton lästes eller ändrades.
+- [x] Read-only katalogkontroll i aktuellt Supabase staging bekräftade `user_exams` med RLS aktiv, ägarbegränsade SELECT/INSERT-policyer och ingen authenticated UPDATE/DELETE-grant. `mock_results`, `exam_issuances` och `per_chat_quota_reservations` har RLS aktiv och saknar browser-rollernas tabellgrants. Migreringshistoriken innehåller de väntade ägar-/exam-skyddsmigreringarna.
+- [ ] Varken PGlite-testet eller katalogkontrollen bevisar två separata autentiserade JWT-sessioners faktiska radåtkomst via staging Data API. Inga stagingrader eller konton lästes eller ändrades.
 
 **PILOT NOT READY.** En central ägarpolicy har nu ett exekverat tvåkontotest lokalt. Hosted staging-RLS/IDOR och skolans operativa godkännanden är fortfarande öppna.
