@@ -148,13 +148,14 @@ check("all-word options with uniformly supported terms do not receive the mixed-
   return !result.flagged.some((item) => item.issues.includes("mixed_source_support_single_word_options_review"));
 })());
 
-check("all-word options with no source support are not rejected or marked as mixed", (() => {
+check("all-word options with no source support reach review without being rejected", (() => {
   const q = mc({ options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0 });
   const result = gate(q, "natural_sciences", {
     reviewSingleWordOptionOutliers: true,
     sourceMaterial: "Fotosyntes omvandlar ljusenergi.",
   });
   return result.questions.length === 1
+    && result.flagged[0]?.issues.includes("all_single_word_options_unmatched_source_review")
     && !result.flagged.some((item) => item.issues.includes("mixed_source_support_single_word_options_review"));
 })());
 

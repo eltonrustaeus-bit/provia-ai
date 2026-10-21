@@ -56,13 +56,14 @@ assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språ
 assert.match(buildVerifierPrompt("sv"), /frågestammen för idiomatisk, grammatiskt korrekt svenska.*'linjens ekvation', inte 'linjären'/i,
   "the independent reviewer explicitly checks Swedish inflection in question stems");
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
+assert.match(buildVerifierPrompt("sv"), /inga enordsalternativ matchar källtexten.*avvisa inte enbart/i);
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
-  "", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review"] },
+  "", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"] },
 );
 const outlierHintPayload = JSON.parse(outlierHintReview.requestBody.input.find((item) => item.role === "user").content);
-assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_option_outlier_review"],
+assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"],
   "internal style warnings reach the independent reviewer without becoming a verdict");
 assert.equal(decideApproval(outlierHintReview.outcome.perQuestion.get("q1")), true,
   "the heuristic warning alone does not reject a valid single-word answer");

@@ -240,8 +240,9 @@ function optionFormatIssues(q, options) {
 
   if (lexicalSingleOptions.length === optionsList.length && optionsList.length >= 3) {
     const supportedCount = lexicalSingleOptions.filter((item) => isSourceSupported(item.value)).length;
-    if (sourceTokens.size > 0 && supportedCount > 0 && supportedCount < lexicalSingleOptions.length) {
-      return ["mixed_source_support_single_word_options_review"];
+    if (sourceTokens.size > 0) {
+      if (supportedCount === 0) return ["all_single_word_options_unmatched_source_review"];
+      if (supportedCount < lexicalSingleOptions.length) return ["mixed_source_support_single_word_options_review"];
     }
   }
 

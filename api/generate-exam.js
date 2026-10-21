@@ -1831,7 +1831,9 @@ module.exports = async function handler(req, res) {
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
           reviewHintsById: gate.flagged
             .flatMap((item) => item.issues
-              .filter((issue) => issue === "single_word_option_outlier_review" || issue === "mixed_source_support_single_word_options_review")
+              .filter((issue) => issue === "single_word_option_outlier_review"
+                || issue === "mixed_source_support_single_word_options_review"
+                || issue === "all_single_word_options_unmatched_source_review")
               .map((issue) => [item.id, issue]))
             .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
         }),
@@ -1992,7 +1994,9 @@ module.exports = async function handler(req, res) {
                       apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
                       reviewHintsById: candidateGate.flagged
                         .flatMap((item) => item.issues
-                          .filter((issue) => issue === "single_word_option_outlier_review" || issue === "mixed_source_support_single_word_options_review")
+                          .filter((issue) => issue === "single_word_option_outlier_review"
+                            || issue === "mixed_source_support_single_word_options_review"
+                            || issue === "all_single_word_options_unmatched_source_review")
                           .map((issue) => [item.id, issue]))
                         .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
                       comparisonQuestions: round1ApprovedQuestions,

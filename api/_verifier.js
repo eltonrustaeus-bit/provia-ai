@@ -238,7 +238,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "eller en svårighetsgrad som inte matchar den valda E/C/A-nivån och uppgiftens faktiska krav. cognitive_level är en separat beskrivning av tänkandet och får inte ensam avgöra nivån. " +
       "För option_quality ska du bedöma VARJE alternativ i samma ordning: true endast om alternativet är begripligt, språkligt rimligt och relevant som svar eller distraktor i ämnet; false för nonsensord, trasig text, oförklarad språkblandning eller uppenbart irrelevant alternativ. " +
       "Granska också själva frågestammen för idiomatisk, grammatiskt korrekt svenska, särskilt böjning, bestämd form och prepositioner; avvisa en fråga som innehåller en påhittad böjningsform av en fackterm (skriv exempelvis 'linjens ekvation', inte 'linjären'). " +
-      "review_hints kan innehålla en intern formatvarning eller granskningssignal, bland annat om blandat källstöd för enordsalternativ. Behandla den som en signal att granska extra noggrant, aldrig som en slutsats: avvisa inte enbart på grund av flaggan; kontrollera varje alternativ och godkänn giltiga namn och facktermer även när de inte står i källtexten. " +
+      "review_hints kan innehålla en intern formatvarning eller granskningssignal, till exempel blandat källstöd eller att inga enordsalternativ matchar källtexten. Behandla den som en signal att granska extra noggrant, aldrig som en slutsats: avvisa inte enbart på grund av flaggan eller källfrånvaro; kontrollera varje alternativ och godkänn giltiga synonymer, namn och facktermer även när de inte står ordagrant i källtexten. " +
       "Godkänn legitima facktermer, namn, korta metodnamn, tal, formler, kod och andra ämnesspecifika uttryck när de är giltiga. Antalet boolean-värden måste motsvara antalet svarsalternativ; kortsvar utan alternativ får en tom lista. " +
       "Sätt language_match=true endast om alla elevriktade fält är på det valda provspråket (svenska), bortsett från egennamn, formler, etablerade facktermer och exakta källcitat. Ett grammatiskt korrekt fält på fel språk är ändå en språkavvikelse; sätt language_match=false. " +
       "required_changes ska vara tomt endast om frågan kan visas för en elev precis som den är."
@@ -253,7 +253,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match the selected E/C/A target and actual task demand. cognitive_level describes the type of thinking separately and must not determine the target level by itself. " +
       "For option_quality, assess EVERY option in order: true only when it is intelligible, linguistically plausible, and relevant as an answer or distractor in the subject; false for nonsense words, broken text, unexplained language mixing, or clearly irrelevant choices. " +
-      "review_hints may contain an internal review signal, including mixed source support among single-word options. Treat it as a cue for closer inspection, never as a conclusion: check every option and do not reject solely because of the flag or because a valid name or technical term is absent from the source. " +
+      "review_hints may contain an internal review signal, such as mixed source support or no single-word options matching the source. Treat it as a cue for closer inspection, never as a conclusion: check every option and do not reject solely because of the flag or source absence; retain valid synonyms, names, and technical terms even when not stated verbatim in the source. " +
       "Keep valid technical terms, names, concise method names, numbers, formulas, code, and other valid subject-specific expressions. The boolean count must match the option count; short-answer items with no options use an empty list. " +
       "Set language_match=true only when every learner-facing field is in the selected output language (English), except proper names, formulas, established technical terms, and exact source quotations. A grammatically fluent field in another language is still a mismatch; set language_match=false. " +
       "required_changes must be empty only if the question can be shown to a student exactly as-is.";
@@ -286,7 +286,9 @@ function reviewHintsFor(reviewHintsById, questionId) {
       ? reviewHintsById[id]
       : [];
   return Array.isArray(hints)
-    ? hints.filter((hint) => hint === "single_word_option_outlier_review" || hint === "mixed_source_support_single_word_options_review")
+    ? hints.filter((hint) => hint === "single_word_option_outlier_review"
+      || hint === "mixed_source_support_single_word_options_review"
+      || hint === "all_single_word_options_unmatched_source_review")
     : [];
 }
 
