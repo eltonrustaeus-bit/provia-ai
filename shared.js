@@ -2204,7 +2204,12 @@ function finalizeMsg(div, text) {
           _micListening = active;
           if (micBtn) micBtn.classList.toggle('listening', active);
           if (perAvEl) perAvEl.classList.toggle('per-listening', active);
-          if (perInpEl) perInpEl.placeholder = active ? 'Lyssnar…' : 'Fråga P.E.R…';
+          if (perInpEl) {
+            var english = perWidgetUsesEnglish();
+            perInpEl.placeholder = active
+              ? (english ? 'Listening…' : 'Lyssnar…')
+              : (english ? 'Ask P.E.R…' : 'Fråga P.E.R…');
+          }
         }
 
         function createRecognition() {
