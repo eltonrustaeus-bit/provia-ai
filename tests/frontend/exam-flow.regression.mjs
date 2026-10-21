@@ -54,6 +54,12 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
   const errs = [];
   page.on("pageerror", e => errs.push("PAGEERROR " + e.message));
   page.on("console", m => { if (m.type() === "error" && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
+  page.on("requestfailed", request => {
+    const url = new URL(request.url());
+    if (url.hostname === "exgen-test-project.invalid" && url.pathname.startsWith("/auth/v1/")) {
+      errs.push(`AUTH_REQUEST_FAILED ${url.pathname} ${request.failure()?.errorText || "unknown"}`);
+    }
+  });
   // Baslagret från _harness.mjs; provgenereringen och rättningen ligger i
   // `extra` som registreras sist och därmed vinner.
   await mockApis(page, { extra: [
