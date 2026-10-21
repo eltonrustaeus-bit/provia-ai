@@ -39,6 +39,7 @@ const EXAM = {
 };
 
 let lastGradePayload = null;
+let gradeCallCount = 0;
 let lastGeneratePayload = null;
 let lastAbandonPayload = null;
 let activeExamCountResponse = 0;
@@ -82,6 +83,7 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async r => {
+    gradeCallCount++;
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
     if (gradeDelayMs > 0) await new Promise(resolve => setTimeout(resolve, gradeDelayMs));
@@ -1014,6 +1016,59 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T1d inga konsolfel", errs.length === 0, errs.join(" | "));
   await page.screenshot({ path: SHOT + "/t1-result.png" });
   await ctx.close();
+}
+
+// A successful grade survives a reload and is recovered only through the
+// server's verified/idempotent replay path, preserving P.E.R review proof.
+{
+  const { ctx, page } = await mk();
+  const originalGradeTasks = EXAM.questions.map(q => q.grade_task);
+  try {
+    EXAM.questions.forEach((q, index) => { q.grade_task = { task_id: `recovery-${index}`, rubric: "synthetic" }; });
+    await signIn(page, "result-recovery-user");
+    await toExam(page);
+    const initialGradeCalls = gradeCallCount;
+    await page.click(".xf-mc-opt >> nth=0");
+    await page.fill(".xf-answer", "syntetiskt svar");
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    await page.waitForTimeout(300);
+    await page.click(".xf-mc-opt >> nth=2");
+    await page.waitForTimeout(900);
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const callsAfterFirstGrade = gradeCallCount;
+    const savedPhase = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find(name => name.startsWith("exgen_flow_draft_"));
+      return key ? JSON.parse(localStorage.getItem(key))?.phase : null;
+    });
+    ok("T1r lyckad rättning behåller signerad återhämtningskopia", savedPhase === "result-recovery", String(savedPhase));
+
+    examIssuanceStateResponse = "completed";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    const restore = page.getByRole("button", { name: "Återställ resultatet" });
+    ok("T1r resultatutkast får en tydlig återställningsåtgärd", await restore.count() === 1);
+    await restore.click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    ok("T1r verifierat resultat återställs efter omladdning", await page.locator(".xf-item-own").count() === 3);
+    ok("T1r första inlämningen gör ett enda rättningsanrop", callsAfterFirstGrade === initialGradeCalls + 1,
+      `grade calls=${callsAfterFirstGrade - initialGradeCalls}`);
+    ok("T1r återhämtning använder exakt en idempotent rättningsåterspelning",
+      gradeCallCount === callsAfterFirstGrade + 1, `replay calls=${gradeCallCount - callsAfterFirstGrade}`);
+    ok("T1r P.E.R:s facitgranskning finns efter återhämtning", await page.locator(".xf-review-action").count() > 0);
+  } finally {
+    EXAM.questions.forEach((q, index) => { q.grade_task = originalGradeTasks[index]; });
+    examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
+}
+
+if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
+  await browser.close();
+  await srv.close();
+  fail.forEach(f => console.log("  FEL  " + f));
+  console.log(`\n${pass.length} godkända, ${fail.length} fel`);
+  process.exit(fail.length ? 1 : 0);
 }
 
 // ── T1e: objektliknande modell-id bevaras genom signerad rättning ──────────

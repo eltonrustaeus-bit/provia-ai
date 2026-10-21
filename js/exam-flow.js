@@ -496,6 +496,7 @@
     material: "",
     focusTerms: null,
     exam: null,
+    draftPhase: "active",
     answers: questionState(),   // qid -> svar
     helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
     draftOwnerId: "",
@@ -741,7 +742,11 @@
         var legacyNote = el("p", "xf-sub", tx("Det här provet skapades med en äldre version och kan inte rättas säkert. Ditt material finns kvar; skapa ett nytt prov för att fortsätta.", "This exam was created with an older version and cannot be graded safely. Your material is still here; create a new exam to continue."));
         act.appendChild(legacyNote);
       }
-      var back = el("button", "xf-btn ghost", legacyDraft ? tx("Skapa nytt prov av materialet", "Create a new exam from this material") : tx("Fortsätt provet du började", "Continue your exam"));
+      var back = el("button", "xf-btn ghost", legacyDraft
+        ? tx("Skapa nytt prov av materialet", "Create a new exam from this material")
+        : draft.phase === "result-recovery"
+          ? tx("Återställ resultatet", "Restore the result")
+          : tx("Fortsätt provet du började", "Continue your exam"));
       back.type = "button";
       var resumeStatus = el("p", "xf-sub");
       resumeStatus.hidden = true;
@@ -763,13 +768,48 @@
               resumeStatus.textContent = tx("Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.", "The exam is being graded. Wait until grading is complete before continuing.");
               return;
             }
+            if (issuanceState === "completed") {
+              back.disabled = true;
+              S.draftOwnerId = String(draft.uid || uid());
+              S.course = draft.course || "";
+              S.level = draft.level || "C";
+              S.qType = draft.qType || "mix";
+              S.num = draft.num || draft.exam.questions.length;
+              S.nonGraphNum = clamp(Number(draft.nonGraphNum) || S.num, 2, 20);
+              S.material = draft.material || "";
+              S.startedAt = Number(draft.startedAt) || Date.now();
+              S.exam = draft.exam;
+              S.answers = questionState(draft.answers);
+              S.helped = questionState(draft.helped);
+              S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
+              S.draftPhase = "result-recovery";
+              window.ExGenEngine.setInputs({ course: S.course, level: S.level, qType: S.qType, num: S.num, material: S.material });
+              window.ExGenEngine.adoptExam(S.exam);
+              saveDraft();
+              resumeStatus.textContent = tx("Provet är inlämnat. Hämtar det verifierade resultatet…", "The exam was submitted. Recovering the verified result…");
+              var answers = S.exam.questions.map(function (q, n) {
+                var id = qid(q, n);
+                return { id: id, answer: isAnswerComplete(q, S.answers[id]) ? String(S.answers[id] || "").trim() : "" };
+              });
+              try {
+                var recovered = await window.ExGenEngine.grade(answers);
+                if (!recovered || !recovered.ok || !recovered.result || uid() !== S.draftOwnerId) {
+                  resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
+                  back.disabled = false;
+                  return;
+                }
+                stopMachine().then(function () { stepResult(recovered.result, recovered.persistence, recovered.examProof, answers); });
+              } catch (_) {
+                resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
+                back.disabled = false;
+              }
+              return;
+            }
             clearDraft();
             S.material = draft.material || "";
             releasePerHistoryIfNoActiveExams();
             back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
-            resumeStatus.textContent = issuanceState === "completed"
-              ? tx("Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt.", "This exam has already been submitted. Your material is still here if you want to create a new one.")
-              : tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar tas bort, men materialet finns kvar. Skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your saved answers are removed, but your material is still here. Create a new exam to continue.");
+            resumeStatus.textContent = tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar tas bort, men materialet finns kvar. Skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your saved answers are removed, but the material remains. Create a new exam to continue.");
             back.dataset.expired = "true";
             return;
           }
@@ -783,6 +823,7 @@
         S.material = draft.material || "";
         if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
+        S.draftPhase = draft.phase === "result-recovery" ? "result-recovery" : "active";
         S.answers = questionState(draft.answers);
         S.helped = questionState(draft.helped);
         S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
@@ -1565,6 +1606,7 @@
       }
       S.draftOwnerId = requestOwnerId;
       S.exam = normalizeIds(r.exam);
+      S.draftPhase = "active";
       var got = S.exam.questions.length;
       S.questionCountNote = got < S.num
         ? tx("Du bad om " + S.num + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
@@ -2408,8 +2450,10 @@
         backToExam((r && r.error) || "Rättningen gick inte igenom. Dina svar är kvar — prova att lämna in igen.");
         return;
       }
-      // Rättningen är i hamn: utkastet får försvinna först nu.
-      clearDraft();
+      // Behåll det signerade provet och svaren tills resultatskärmen har
+      // visats. Om fliken laddas om kan servern spela upp verifierat resultat.
+      S.draftPhase = "result-recovery";
+      saveDraft();
       stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof, answers); });
     }).catch(function (e) {
       /* Utan den här grenen blir ett oväntat avslag från motorn en mörk skärm
@@ -2774,6 +2818,7 @@
     fresh.type = "button";
     fresh.addEventListener("click", function () {
       S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";
+      S.draftPhase = "active";
       S.submitting = false;
       // Eleven har uttryckligen övergett provet. Låg utkastet kvar erbjöds det
       // tillbaka vid nästa sidladdning som "Fortsätt provet du började".
@@ -2798,6 +2843,7 @@
     var draft = {
       ts: Date.now(),
       uid: ownerId,
+      phase: S.draftPhase === "result-recovery" ? "result-recovery" : "active",
       startedAt: S.startedAt,
       course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
       material: S.material, exam: S.exam,

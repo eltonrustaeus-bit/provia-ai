@@ -476,18 +476,19 @@ ok("T10b examState bär bara phase result (kortsvar, direkt inlämning)",
    t10state.phase === "result" && Object.keys(t10state).join(",") === "phase", JSON.stringify(t10ctx.examState));
 ok("T10c perSees ljuger inte uppåt efter att debounce-fönstret passerat", t10sees === "ser: den här sidan", t10sees);
 
-// ── T11: closeExam() rensar draftTimer, inte bara publishTimer (Fynd 1) ───
+// ── T11: closeExam() rensar draftTimer utan att skriva över resultatrecovery ─
 // Samma inlämning som T10 ovan råkar också vara det exakta fönstret för den
 // här buggen: fråga 3 fylls i och "Lämna in" trycks OMEDELBART, så
 // saveDraftSoon() hinner schemalägga en 800ms-timer precis innan closeExam()
-// körs. lsDel(draftKey()) tar bort utkastet så fort den mockade rättningen
-// svarar (nästan direkt) — men maskinytan håller resultatskärmen borta i
-// minst MACHINE_MIN_MS (1400ms, redan passerat här). Rensades inte
-// draftTimer i closeExam() hann den brinna i det fönstret och skriva
-// tillbaka utkastet (S.exam nollställs först vid "Nytt ämne") — eleven
-// erbjuds då "Fortsätt provet du började" för ett prov som redan är rättat.
+// körs. Efter verifierad rättning ska recovery-utkastet finnas kvar, men den
+// fördröjda skrivningen får aldrig ersätta det med ett aktivt provutkast.
 const t11draft = await page2.evaluate(() => localStorage.getItem("exgen_flow_draft_u1"));
-ok("T11 utkastet återuppstår inte efter inlämning", t11draft === null, String(t11draft));
+let t11parsed = null;
+try { t11parsed = JSON.parse(t11draft || "null"); } catch (_) {}
+ok("T11 rättat prov återställs endast som result recovery", t11parsed?.phase === "result-recovery"
+  && t11parsed.exam?.exam_manifest === "synthetic-short-manifest"
+  && t11parsed.answers?.s1 === "syre" && t11parsed.answers?.s2 === "vatten"
+  && t11parsed.answers?.s3 === "syre", String(t11draft));
 
 // ── T12: bara de två kända phase-värdena släpps igenom ────────────────────
 // Whitelisten är hela poängen. Servern har ett tak per läge, och ett okänt

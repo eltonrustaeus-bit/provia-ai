@@ -1,5 +1,16 @@
 # 08 Current Status
 
+## Result recovery after reload — 2026-10-21
+
+- [x] A successful exam grade now retains the user-bound signed exam snapshot, answers, and P.E.R-used flags as a short-lived local recovery draft. If the server confirms the issuance is completed after reload, the student can explicitly restore the result through the existing exact-answer, idempotent server replay; the UI still requires a verified result/proof before showing the result or P.E.R answer-review actions.
+- [x] Starting a new topic still clears the recovery draft. Failed or unverifiable recovery keeps the saved answers and offers retry; it does not show local/unverified answer keys.
+- [x] Added a browser regression for grade -> reload -> one recovery replay -> restored submitted answers and P.E.R review actions. The latest `EXAM_FLOW_ONLY_RESULT_RECOVERY=1 node tests/frontend/exam-flow.regression.mjs` run passed **120 checks, 0 failures**; an earlier repeat was flaky at 119/1 and should be watched. `node tests/frontend/per-exam-context.test.mjs` passed **66/66**. The broader selected P.E.R, exam-pipeline, assessment, completion-proof, grade-to-review, and P.E.R review-handler matrix passed **112/112 Node tests**. `node --check` on changed JavaScript and `git diff --check` passed.
+- [x] The complete `node tests/frontend/exam-flow.regression.mjs` browser regression passed **184 checks, 0 failures** on the latest run. One earlier focused-only repetition was flaky at 119/1; its subsequent rerun passed 120/120, so retain this as a watch item rather than treating the flake as resolved.
+- [!] The authenticated READY branch Preview still reports exhausted exam quota; the synthetic P.E.R check also returned “P.E.R-kvoten är slut.” Both handlers reject at their quota gates before model generation (`api/generate-exam.js` before `pickModel`, `api/explain.js` before the chat model call). No successful provider-backed response was observed. No account, role, quota, Supabase, `main`, or Production change was made.
+- [!] The explicitly approved range of eight commits through `b46bd55` is pushed and its Vercel Preview is READY at `https://provia-3eyj9tgac-eltons-projects-4adfb1a3.vercel.app`. Later local generation-quality commits and the current result-recovery changes are not in that Preview. No further push/deploy was authorized.
+
+**PILOT NOT READY.** Next: once ordinary staging quotas are available, run the bounded synthetic generation and P.E.R checks, then verify grading persistence on the READY Preview. Review the later local generation-quality and result-recovery changes; obtain explicit approval for the exact additional commit range before pushing/deploying. Do not widen quota or clean staging data without separate approval.
+
 ## Shortened exam notice clarity — 2026-10-21
 
 - [x] A delivered exam with fewer questions than requested already had an inline, mobile-layout-tested notice. Its wording now explicitly says that the included questions passed quality review, in Swedish and English; singular/plural English grammar is covered by the browser test.
