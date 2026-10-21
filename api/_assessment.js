@@ -218,6 +218,24 @@ function optionFormatIssues(q, options) {
     }))
     .filter((item) => /^[\p{L}][\p{L}\p{M}'’\-]{4,}$/u.test(item.value));
   const phraseOptions = optionsList.filter((value) => words(value).length >= 2);
+
+  if (lexicalSingleOptions.length === optionsList.length && optionsList.length >= 3) {
+    const sourceTokens = new Set(
+      (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
+    );
+    const isSourceSupported = (value) => {
+      const option = value.toLocaleLowerCase("sv-SE");
+      return [...sourceTokens].some((token) => token === option || (
+        Math.min(token.length, option.length) >= 7 &&
+        (token.startsWith(option) || option.startsWith(token))
+      ));
+    };
+    const supportedCount = lexicalSingleOptions.filter((item) => isSourceSupported(item.value)).length;
+    if (sourceTokens.size > 0 && supportedCount > 0 && supportedCount < lexicalSingleOptions.length) {
+      return ["mixed_source_support_single_word_options_review"];
+    }
+  }
+
   if (lexicalSingleOptions.length !== 1 || phraseOptions.length !== optionsList.length - 1) return [];
 
   if (options?.requireSourceSupportedOptionOutliers === true &&

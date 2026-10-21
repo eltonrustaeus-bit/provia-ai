@@ -1002,6 +1002,10 @@ try {
   assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordNonsense)
     .some((review) => review.questions.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
   "all-single-word options reach the independent reviewer when the structural pattern cannot prove an error");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordNonsense)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.review_hints.includes("mixed_source_support_single_word_options_review"))),
+  "mixed source support is passed as a non-blocking review hint for all-single-word options");
   assert.ok(solverInputs.slice(solverInputCountBeforeAllWordNonsense)
     .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
   "the malformed option is also checked by the blind solver");

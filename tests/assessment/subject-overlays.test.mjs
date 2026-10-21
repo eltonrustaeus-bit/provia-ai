@@ -99,6 +99,35 @@ check("source-grounded inflected technical outlier remains eligible for independ
     && result.flagged[0].issues.includes("single_word_option_outlier_review");
 })());
 
+check("all-word options with mixed source support receive a non-blocking review signal", (() => {
+  const q = mc({ options: ["Kloroplast", "Cellkärna", "Kesäkten"], correct_index: 0 });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    sourceMaterial: "Fotosyntes sker i kloroplasterna.",
+  });
+  return result.questions.length === 1
+    && result.flagged[0]?.issues.includes("mixed_source_support_single_word_options_review");
+})());
+
+check("all-word options with uniformly supported terms do not receive the mixed-support signal", (() => {
+  const q = mc({ options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0 });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    sourceMaterial: "Kloroplast, cellkärna och cellmembran är delar av växtcellen.",
+  });
+  return !result.flagged.some((item) => item.issues.includes("mixed_source_support_single_word_options_review"));
+})());
+
+check("all-word options with no source support are not rejected or marked as mixed", (() => {
+  const q = mc({ options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0 });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    sourceMaterial: "Fotosyntes omvandlar ljusenergi.",
+  });
+  return result.questions.length === 1
+    && !result.flagged.some((item) => item.issues.includes("mixed_source_support_single_word_options_review"));
+})());
+
 check("an unsupported single-word correct answer remains eligible for model review", (() => {
   const q = mc({
     question: "Vilken stad är Sveriges huvudstad?",

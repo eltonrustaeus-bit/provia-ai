@@ -1763,9 +1763,11 @@ module.exports = async function handler(req, res) {
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
-          reviewHintsById: new Map(gate.flagged
-            .filter((item) => item.issues.includes("single_word_option_outlier_review"))
-            .map((item) => [item.id, ["single_word_option_outlier_review"]])),
+          reviewHintsById: gate.flagged
+            .flatMap((item) => item.issues
+              .filter((issue) => issue === "single_word_option_outlier_review" || issue === "mixed_source_support_single_word_options_review")
+              .map((issue) => [item.id, issue]))
+            .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
         }),
         solver.solveQuestions(exam.questions, {
           apiKey, model, subjectProfile, lang, pastedText,
@@ -1918,9 +1920,11 @@ module.exports = async function handler(req, res) {
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
-                      reviewHintsById: new Map(candidateGate.flagged
-                        .filter((item) => item.issues.includes("single_word_option_outlier_review"))
-                        .map((item) => [item.id, ["single_word_option_outlier_review"]])),
+                      reviewHintsById: candidateGate.flagged
+                        .flatMap((item) => item.issues
+                          .filter((issue) => issue === "single_word_option_outlier_review" || issue === "mixed_source_support_single_word_options_review")
+                          .map((issue) => [item.id, issue]))
+                        .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
                       comparisonQuestions: round1ApprovedQuestions,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),
