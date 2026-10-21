@@ -567,3 +567,12 @@
 - [ ] Inget nytt live P.E.R.-anrop har körts efter deployen; livebekräftelse av fixen återstår och kräver separat godkännande. Aktiva och oavslutade prov ska fortsatt verifieras fail-closed.
 
 **PILOT NOT READY.** En generering med tre frågor samt rättning/resultatvisning verifierades live. P.E.R:s live-statusgrind hindrar fortfarande normal hjälp i appens provflöde; dessutom återstår fullsvitsstabilitet, RLS/IDOR-tvåkonto, och skolans operativa godkännanden.
+
+## Exekverad RLS-regression — 2026-10-21
+
+- [x] `tests/api/user-exams-rls-postgres.test.mjs` kör den riktiga `lock_user_exams_to_owner`-migreringen i isolerad PostgreSQL via PGlite med två användar-ID:n och rollen `authenticated`.
+- [x] Testet bekräftar att konto A endast läser egna provrader, kan infoga en egen rad, inte kan infoga med konto B:s ägar-ID och saknar direkt UPDATE/DELETE. Slutlig tabellkontroll bekräftar att det nekade försöket inte sparades.
+- [x] Samma ändringars närliggande regressionskontroller passerade: RLS/pilot-scope/route-boundary 13/13; resultatpersistens/completion-proof plus PostgreSQL grading fencing 5/5.
+- [ ] Detta är lokal SQL-runtime-evidens, inte liveverifiering av Supabase-stagingens policies, grants eller tvåkontosdataåtkomst. Inga stagingrader eller konton lästes eller ändrades.
+
+**PILOT NOT READY.** En central ägarpolicy har nu ett exekverat tvåkontotest lokalt. Hosted staging-RLS/IDOR och skolans operativa godkännanden är fortfarande öppna.

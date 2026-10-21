@@ -688,3 +688,11 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [x] Feature-Preview `https://provia-m7ws1q3sa-eltons-projects-4adfb1a3.vercel.app/app.html` blev READY från exakt `c82914eb36da3a0c06339b8d8f4a171ffa735abd`, branch `codex/exgen-generation-quality-2026-10-20`, deployment `dpl_8QyRVKihvp5oFmXk8cW1rDYE1HLe`, `target=null`.
 - [ ] Ingen ny live AI-/stagingbegäran kördes efter deployen. Tidigare godkända anrop är förbrukade; behöver ny separat avgränsad testbekräftelse för P.E.R.-status efter fixen.
 - [ ] Lokala XelioV-handoff/statusuppgifter ska synkas först efter att den dokumenterande committen är separat pushgodkänd. `main` och Production är orörda.
+
+## Lokal tvåkontos-RLS-verifiering — 2026-10-21
+
+- [x] Nytt PGlite-test exekverar den faktiska `20261012103942_lock_user_exams_to_owner.sql`-migrationen med två användare och `authenticated`-rollen.
+- [x] Konto A kan endast läsa egna historikrader och infoga egna; ett försök att skriva konto B:s ägar-ID stoppas av RLS. Browserrollen nekas även UPDATE och DELETE, och den avslutande tabelläsningen bekräftar att inget otillåtet skrivförsök sparats.
+- [ ] Detta är isolerad PostgreSQL-testning, inte en livekontroll av aktuella Supabase staging-grants/policies eller två separata autentiserade konton.
+
+**PILOT NOT READY.** Den lokala ägarpolicy-regressionen är nu exekverad. Hosted Supabase RLS/IDOR-kontroll och skolans data-/driftgodkännanden återstår.
