@@ -4,8 +4,8 @@
 
 - [x] Swedish multiple-choice exams now add `mixed_source_support_single_word_options_review` when every option is a standalone word and only some options match terms in the supplied source. The signal is passed to both first-pass and repair verification.
 - [x] The verifier is explicitly told to inspect each option, not reject on the signal or source absence alone, and retain valid names/technical terms. The rule does not drop questions, alter solver checks, delivery thresholds, or quota behavior.
-- [x] Regression tests cover mixed, uniformly supported, and uniformly unsupported all-word options; the pipeline test confirms the hint reaches the verifier. Subject overlays and offline exam pipeline passed, and the complete sequential test suite passed.
-- [!] This is a review-quality signal, not a deterministic nonsense detector. The latest live attempt was blocked by the staging account's exhausted Gratis quota before any OpenAI call, so model-backed yield remains unverified. No account/role/quota, Supabase, Preview, `main`, or Production change was made.
+- [x] Regression tests cover mixed, uniformly supported, and uniformly unsupported all-word options. The pipeline tests confirm the hint reaches the verifier and that a valid mixed-support technical-options question can still be delivered. Subject overlays and offline exam pipeline passed, and the complete sequential test suite passed.
+- [!] This is a review-quality signal, not a deterministic nonsense detector. The signed-in staging Preview still shows the exhausted Gratis quota; the single authorized UI attempt remained at that quota gate, so no model-backed yield was measured. No account/role/quota, Supabase, Preview, `main`, or Production change was made.
 
 **PILOT NOT READY.** Next: after normal quota reset or separately approved temporary test access, compare generated/reviewed question yield with this signal enabled. Continue the remaining live generation, grading/P.E.R., two-account RLS/IDOR, and school-operation checks.
 

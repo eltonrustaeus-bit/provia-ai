@@ -1015,6 +1015,24 @@ try {
   solverRejectNonsenseOption = false;
   regenerationQuestions = null;
 
+  const allWordValidBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0, model_answer: "Kloroplast" }
+    : question);
+  const verifierInputCountBeforeAllWordValid = verifierInputs.length;
+  activeQuestions = allWordValidBiology;
+  solverAnswerIndexOverrides = new Map();
+  const allWordValidExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(allWordValidExam.status, 200, JSON.stringify(allWordValidExam.body));
+  assert.ok(allWordValidExam.body.exam.questions.some((question) => question.id === "biology-1"
+    && question.options.includes("Cellkärna")),
+  "the mixed-source-support signal does not prevent the verifier from approving valid technical options");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordValid)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.review_hints.includes("mixed_source_support_single_word_options_review"))),
+  "valid all-word options receive the same non-blocking hint as the malformed case");
+
   const languageMismatchQuestions = [
     { ...questions[0], id: "language-mismatch-1", question: "What is 2 + 3?" },
     { ...questions[1], id: "language-valid-2" },
