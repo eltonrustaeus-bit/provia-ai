@@ -391,6 +391,38 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await completeStreamPage.locator("#perMessages").getByText("Steg för steg.").waitFor();
     assert.equal(await completeStreamPage.locator("#perInput").inputValue(), "",
       "a complete stream keeps the normal success behavior");
+    assert.equal(await completeStreamPage.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")), null,
+      "a completed answer clears its recovery draft");
+
+    let releaseHeldExplain;
+    let heldExplainRoute;
+    const heldExplain = new Promise(resolve => { releaseHeldExplain = resolve; });
+    const requestCountBeforeReload = explainPosts;
+    const reloadDuringRequestPage = await openPilotPage(makeSession("account-a"), "account-a", null, route => {
+      if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, history: [] } });
+      heldExplainRoute = route;
+      return heldExplain.then(() => heldExplainRoute.abort().catch(() => {}));
+    });
+    await reloadDuringRequestPage.locator("#perBubble").click();
+    await reloadDuringRequestPage.locator("#perInput").fill(QUESTION);
+    const reloadExplainRequest = reloadDuringRequestPage.waitForRequest(request =>
+      request.url().includes("/api/explain") && request.method() === "POST");
+    await reloadDuringRequestPage.locator("#perSendBtn").click();
+    await reloadExplainRequest;
+    assert.equal(await reloadDuringRequestPage.evaluate(() => {
+      const pending = JSON.parse(sessionStorage.getItem("exgen_pilot_pending_per_question") || "null");
+      return pending?.question || null;
+    }), QUESTION, "the in-flight question is persisted before a provider response arrives");
+    await reloadDuringRequestPage.reload({ waitUntil: "domcontentloaded" });
+    await reloadDuringRequestPage.locator("#perMessages").getByText("Din fråga är återställd. Tryck Skicka när du vill fortsätta.").waitFor();
+    assert.equal(await reloadDuringRequestPage.locator("#perInput").inputValue(), QUESTION,
+      "reloading during an in-flight request restores the question for a deliberate retry");
+    assert.equal(await reloadDuringRequestPage.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")), null,
+      "restoration consumes the transient recovery record");
+    releaseHeldExplain();
+    await reloadDuringRequestPage.waitForTimeout(50);
+    assert.equal(explainPosts, requestCountBeforeReload + 1,
+      "restoring after reload never automatically resends the question");
 
     const timeoutPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       () => new Promise(() => {}));

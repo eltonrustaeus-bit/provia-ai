@@ -99,6 +99,21 @@ check("source-grounded inflected technical outlier remains eligible for independ
     && result.flagged[0].issues.includes("single_word_option_outlier_review");
 })());
 
+check("a truncated source prefix is not accepted as an inflected subject term", (() => {
+  const q = mc({
+    question: "Var sker fotosyntesen i växtcellen?",
+    options: ["Kloropla", "I cellkärnan", "I cellmembranet"],
+    correct_index: 1,
+  });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    requireSourceSupportedOptionOutliers: true,
+    sourceMaterial: "Fotosyntesen sker i kloroplasterna.",
+  });
+  return result.questions.length === 0
+    && result.dropped[0]?.issues.includes("unsupported_single_word_option_outlier");
+})());
+
 check("all-word options with mixed source support receive a non-blocking review signal", (() => {
   const q = mc({ options: ["Kloroplast", "Cellkärna", "Kesäkten"], correct_index: 0 });
   const result = gate(q, "natural_sciences", {

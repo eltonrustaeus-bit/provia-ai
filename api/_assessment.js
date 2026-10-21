@@ -218,18 +218,27 @@ function optionFormatIssues(q, options) {
     }))
     .filter((item) => /^[\p{L}][\p{L}\p{M}'’\-]{4,}$/u.test(item.value));
   const phraseOptions = optionsList.filter((value) => words(value).length >= 2);
+  const sourceTokens = new Set(
+    (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
+  );
+  const swedishInflectionForms = (value) => {
+    const suffixes = ["erna", "arna", "orna", "ande", "ende", "heten", "heter", "en", "et", "ar", "er", "or", "na", "n", "t", "s"];
+    const forms = new Set([value]);
+    for (const suffix of suffixes) {
+      if (value.endsWith(suffix) && value.length - suffix.length >= 5) forms.add(value.slice(0, -suffix.length));
+    }
+    return forms;
+  };
+  const isSourceSupported = (value) => {
+    const option = value.toLocaleLowerCase("sv-SE");
+    const optionForms = swedishInflectionForms(option);
+    return [...sourceTokens].some((token) => {
+      const sourceForms = swedishInflectionForms(token);
+      return [...optionForms].some((form) => sourceForms.has(form));
+    });
+  };
 
   if (lexicalSingleOptions.length === optionsList.length && optionsList.length >= 3) {
-    const sourceTokens = new Set(
-      (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
-    );
-    const isSourceSupported = (value) => {
-      const option = value.toLocaleLowerCase("sv-SE");
-      return [...sourceTokens].some((token) => token === option || (
-        Math.min(token.length, option.length) >= 7 &&
-        (token.startsWith(option) || option.startsWith(token))
-      ));
-    };
     const supportedCount = lexicalSingleOptions.filter((item) => isSourceSupported(item.value)).length;
     if (sourceTokens.size > 0 && supportedCount > 0 && supportedCount < lexicalSingleOptions.length) {
       return ["mixed_source_support_single_word_options_review"];
@@ -240,15 +249,7 @@ function optionFormatIssues(q, options) {
 
   if (options?.requireSourceSupportedOptionOutliers === true &&
       lexicalSingleOptions[0].index !== q.correct_index) {
-    const outlier = lexicalSingleOptions[0].value.toLocaleLowerCase("sv-SE");
-    const sourceTokens = new Set(
-      (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
-    );
-    const sourceSupported = [...sourceTokens].some((token) => token === outlier || (
-      Math.min(token.length, outlier.length) >= 7 &&
-      (token.startsWith(outlier) || outlier.startsWith(token))
-    ));
-    if (!sourceSupported) return ["unsupported_single_word_option_outlier"];
+    if (!isSourceSupported(lexicalSingleOptions[0].value)) return ["unsupported_single_word_option_outlier"];
   }
 
   // A single-word outlier is a review signal, not proof of an invalid option.

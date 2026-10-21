@@ -174,6 +174,18 @@
     } catch (_) { return false; }
   }
 
+  function clearPilotPendingQuestionForAccount(accountId) {
+    if (EXGEN_RUNTIME.environment !== 'pilot' || !accountId) return;
+    try {
+      var raw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      if (pending.accountId === accountId) sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
+
   function abortPerRequestForAccountId(nextAccountId) {
     var active = _perActiveRequest;
     if (!active || (active.accountId || null) === (nextAccountId || null)) return;
@@ -1358,6 +1370,15 @@ function finalizeMsg(div, text) {
         if (input) input.value = q;
         return true;
       }
+      function clearPendingQuestion() {
+        if (EXGEN_RUNTIME.environment !== 'pilot') return;
+        try {
+          var pending = JSON.parse(sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY) || 'null');
+          if (pending && pending.question === q && (pending.accountId || null) === (requestAccountId || null)) {
+            sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+          }
+        } catch (_) {}
+      }
       function announceFailure(message) {
         var status = document.getElementById('perAnnouncement');
         if (status) status.textContent = message;
@@ -1368,9 +1389,7 @@ function finalizeMsg(div, text) {
         addMsg('Frågan är för lång för P.E.R. Korta ned den till högst 2 000 tecken.', 'teacher');
         return;
       }
-      if (EXGEN_RUNTIME.environment === 'pilot') {
-        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-      }
+      if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
       var announcement = document.getElementById('perAnnouncement');
       if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
@@ -1419,6 +1438,7 @@ function finalizeMsg(div, text) {
       function requestStillOwned() {
         if (requestState.cancelled) return false;
         if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
+        clearPilotPendingQuestionForAccount(requestAccountId);
         abortPerRequestForAccountId(currentPilotAccountId());
         return false;
       }
@@ -1541,6 +1561,7 @@ function finalizeMsg(div, text) {
                   streamComplete = true;
                   if (!answerCommitted && answerText.trim()) {
                     answerCommitted = true;
+                    clearPendingQuestion();
                     clearTimeout(requestTimeout);
                     reviewTimeout = setTimeout(function () {
                       if (requestController) requestController.abort();
@@ -1641,6 +1662,7 @@ function finalizeMsg(div, text) {
                   : 'P.E.R fick inget användbart svar. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
                 announceFailure(typing.textContent);
               } else {
+                clearPendingQuestion();
                 if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
                 finalizeMsg(typing, data.answer);
                 if (data.history) perSaveHist(data.history);

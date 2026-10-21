@@ -184,6 +184,25 @@ assert.match(categorizedRepairInstruction, /"low_source_alignment":2/);
 assert.match(categorizedRepairInstruction, /"low_scoring_quality":1/);
 assert.doesNotMatch(categorizedRepairInstruction, /PRIVAT_GRANSKARTEXT_SENTINEL|arbitrary_untrusted_code/,
   "repair feedback includes only allowlisted numeric categories, never free-form reviewer content");
+const solverCategorizedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  solverFailureCounts: {
+    solver_implausible_option: 2,
+    solver_disagrees_on_key: 1,
+    solver_unavailable: 4,
+    private_solver_note: "PRIVAT_LOSARTEXT_SENTINEL",
+  },
+});
+const solverCategorizedInstruction = solverCategorizedRepairPayload.input.at(-1).content;
+assert.match(solverCategorizedInstruction, /"solver_implausible_option":2/);
+assert.match(solverCategorizedInstruction, /"solver_disagrees_on_key":1/);
+assert.match(solverCategorizedInstruction, /Den blinda lösaren hittade ett orimligt alternativ/);
+assert.doesNotMatch(solverCategorizedInstruction, /solver_unavailable|PRIVAT_LOSARTEXT_SENTINEL|private_solver_note/,
+  "repair feedback includes only allowlisted content categories, never infrastructure or free-form solver data");
 const mathScoringRepair = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "math system" }, { role: "user", content: "synthetic math material" }],
@@ -1719,6 +1738,58 @@ try {
   assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
     "zero-question diagnostics never include generated question text");
   verifierRejectQuestionId = null;
+
+  const solverOnlyRejectedFirstPass = biologyQuestions.map((question, index) => ({
+    ...question,
+    id: `solver-only-${index + 1}`,
+    question: `REJECTED_STEM_SENTINEL_${index + 1}`,
+    options: ["Kloroplast", "Cellkärna", "Kesäkten"],
+    correct_index: 0,
+    model_answer: "REJECTED_ANSWER_KEY_SENTINEL",
+  }));
+  const solverOnlyRepairCandidates = [
+    ...repairedBiology.slice(0, 3).map((question, index) => ({
+      ...question,
+      id: `solver-repair-${index + 1}`,
+      question: `Återhämtad biologifråga ${index + 1}: ${question.question}`,
+    })),
+    ...repairedBiology.slice(0, 3).map((question, index) => ({
+      ...question,
+      id: `solver-repair-${index + 4}`,
+      question: `Underkänd biologikandidat ${index + 1}: ${question.question}`,
+      options: ["Kloroplast", "Cellkärna", "Kesäkten"],
+      correct_index: 0,
+      model_answer: "Kloroplast",
+    })),
+  ];
+  activeQuestions = solverOnlyRejectedFirstPass;
+  regenerationQuestions = solverOnlyRepairCandidates;
+  verifierRejectOptionId = ["solver-repair-4", "solver-repair-5", "solver-repair-6"];
+  solverRejectNonsenseOption = true;
+  calls.length = 0;
+  const solverOnlyRecovery = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(solverOnlyRecovery.status, 200, JSON.stringify(solverOnlyRecovery.body));
+  assert.equal(solverOnlyRecovery.body.exam.questions.length, 3,
+    "a 0/3 exam recovers to three verified biology questions when the initial solver alone rejects all candidates");
+  assert.ok(solverOnlyRecovery.body.exam.questions.every((question) => question.id.startsWith("solver-repair-")
+    && Number(question.id.slice("solver-repair-".length)) <= 3),
+  "only the three independently accepted repair candidates are delivered");
+  const solverOnlyRepairCall = calls.findLast((call) => call.body?.stream
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  const solverOnlyRepairInstruction = solverOnlyRepairCall.body.input.at(-1).content;
+  assert.equal(solverOnlyRepairCall.body.text.format.schema.properties.questions.minItems, 6);
+  assert.match(solverOnlyRepairInstruction, /"solver_implausible_option":3/,
+    "solver-only failures provide the repair with a safe aggregate category");
+  assert.match(solverOnlyRepairInstruction, /byt ut varje distraktor mot ett naturligt, etablerat ämnesbegrepp/i,
+    "solver-only implausible options receive specific Swedish repair guidance");
+  assert.doesNotMatch(solverOnlyRepairInstruction, /REJECTED_STEM_SENTINEL|REJECTED_ANSWER_KEY_SENTINEL|Kloroplast.*Kesäkten/,
+    "repair receives no rejected stem or answer key");
+  verifierRejectOptionId = null;
+  solverRejectNonsenseOption = true;
+  regenerationQuestions = null;
+  activeQuestions = questions;
 
   activeQuestions = questions;
   regenerationQuestions = [
