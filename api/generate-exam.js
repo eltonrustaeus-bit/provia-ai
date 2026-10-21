@@ -79,7 +79,8 @@ function normalizeSelectedFocusTerms(value, pastedText) {
     "studyguide",
     "summary",
   ]);
-  const sourceWords = new Set(String(pastedText || "").toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || []);
+  const sourceText = String(pastedText || "").toLowerCase().replace(/\bstudy\s+guide\b/g, " ");
+  const sourceWords = new Set(sourceText.match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || []);
   const accepted = new Set();
   for (const raw of value) {
     if (typeof raw !== "string") continue;

@@ -1296,7 +1296,8 @@
      återkommande och särpräglade ord väljs ur texten och eleven kan prioritera
      dem. Det är förslag, inte semantisk begreppsigenkänning. */
   function terms(text) {
-    var words = String(text).toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || [];
+    var words = String(text).toLowerCase().replace(/\bstudy\s+guide\b/g, " ")
+      .match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || [];
     var freq = {};
     words.forEach(function (w) {
       if (w.length > 48 || STOP.indexOf(w) !== -1) return;

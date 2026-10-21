@@ -354,7 +354,7 @@ async function toMaterial(page) {
   try {
     await signIn(page, "focus-scope-user");
     await toMaterial(page);
-    const material = "Fotosyntesen sker alltså i växtens kloroplaster. Klorofyll fångar ljusenergi och koldioxid tas upp genom klyvöppningarna. Vatten transporteras från rötterna och används när växten bygger druvsocker. Syre bildas alltså som en restprodukt under processen. Övningsmaterial och testunderlag.";
+    const material = "Fotosyntesen sker alltså i växtens kloroplaster. Klorofyll fångar ljusenergi och koldioxid tas upp genom klyvöppningarna. Vatten transporteras från rötterna och används när växten bygger druvsocker. Syre bildas alltså som en restprodukt under processen. Övningsmaterial och testunderlag. Study guide.";
     await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", material);
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
@@ -373,6 +373,8 @@ async function toMaterial(page) {
       && !focusValues.includes("alltså")
       && !focusValues.includes("övningsmaterial")
       && !focusValues.includes("testunderlag")
+      && !focusValues.includes("study")
+      && !focusValues.includes("guide")
       && await page.locator(".xf-focus legend").textContent() === "Prioritera ord"
       && await page.locator(".xf-focus").getAttribute("aria-describedby") === "xf-focus-help"
       && /ingen fullständig kurskarta/.test(await page.locator(".xf-focus-help").textContent() || ""));
