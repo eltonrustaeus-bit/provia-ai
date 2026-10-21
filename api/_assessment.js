@@ -281,6 +281,15 @@ function generalQualityIssues(q, options) {
     const opts = Array.isArray(q.options) ? q.options : [];
     if (opts.length < 2) issues.push("too_few_options");
     if (opts.some(o => !String(o == null ? "" : o).trim())) issues.push("empty_option");
+    if (opts.some((option) => {
+      const text = String(option == null ? "" : option);
+      return [...text].some((char) => {
+        const code = char.codePointAt(0);
+        return code === 0xfffd
+          || (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d)
+          || (code >= 0x7f && code <= 0x9f);
+      });
+    })) issues.push("corrupted_option_text");
     const norm = options?.profile === "mathematics"
       ? opts.map(o => String(o).trim().toLowerCase())
       : opts.map(normalizeGenericOption);
@@ -561,7 +570,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
-  "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal", "math_option_type_mismatch",
+  "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",

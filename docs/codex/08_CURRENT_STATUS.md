@@ -1,5 +1,24 @@
 # 08 Current Status
 
+## Shortened exam notice clarity — 2026-10-21
+
+- [x] A delivered exam with fewer questions than requested already had an inline, mobile-layout-tested notice. Its wording now explicitly says that the included questions passed quality review, in Swedish and English; singular/plural English grammar is covered by the browser test.
+- [x] `node tests/frontend/exam-result-language-and-note.test.mjs` passed, `node tests/frontend/exam-question-count-minimum.test.mjs` passed (7 assertions), and `git diff --check` passed.
+- [!] `node tests/frontend/exam-flow.regression.mjs` reported 177 checks passing and one failure: a browser-side `TypeError: Failed to fetch` from the external Supabase JS auth initialization in the English-first-load fixture. No app assertion failed before that network error. Treat the suite as not fully green; retry in an environment that can stub/block that auth request deterministically.
+- [x] After the additional quality-gate change below, the full sequential `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js')` run exited 0 across 178 test files. The separate `exam-flow.regression.mjs` failure above remains an independent unresolved browser/network flake.
+- [!] Both changes are local-only, not committed, pushed, or deployed. Vercel confirms the accessible READY deployment is still exactly `63533b6`; the browser tab at that deployment displayed the invited-pilot sign-in gate, so no live staging generation was made. The user reports being signed in; the accessible tab did not confirm it.
+
+**PILOT NOT READY.** The wording improvement is covered offline. Next: verify the exact authenticated Preview tab and run only the already-approved single synthetic request if the current staging quota permits; stop on auth/quota failure. No production, `main`, role/quota, or database changes.
+
+## Objective corrupted option guard — 2026-10-21
+
+- [x] The deterministic assessment gate now blocks multiple-choice options containing Unicode replacement characters or C0/C1 control characters, reported as `corrupted_option_text`. It allows ordinary spaces, tabs, line breaks and carriage returns; it does not try to decide whether unfamiliar vocabulary is a real word.
+- [x] Regression cases cover a damaged non-math science distractor, C0 and C1 controls, ordinary whitespace, and valid technical terms absent from the source. This preserves model review for semantic/plausibility questions rather than adding a brittle dictionary heuristic.
+- [x] `node --check api/_assessment.js`, `node tests/assessment/subject-overlays.test.mjs`, `node tests/api/exam-pipeline-offline.test.mjs`, `node tests/api/solver-contract.test.mjs`, `node tests/api/verifier-output-contract.test.mjs`, `git diff --check`, and the full sequential 178-file test run passed.
+- [!] This is deterministic protection against corrupted text only. It does not prove that verifier and solver will identify semantic nonsense when both models incorrectly approve it; no model-backed live generation was run.
+
+**PILOT NOT READY.** Continue with a safely bounded semantic regression fixture and live staging verification only after the exact Preview session is demonstrably authenticated. No `main`, Production, staging role/quota, or database changes.
+
 ## Provider error safety and grading deadline reserve — 2026-10-21
 
 - [x] Exam-generation failures no longer return an upstream OpenAI response body or raw provider details to the browser. The client receives a localized retry-safe message, request ID and stage; server telemetry records only a bounded category and upstream HTTP status.

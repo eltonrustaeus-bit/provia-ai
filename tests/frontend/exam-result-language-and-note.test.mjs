@@ -81,7 +81,7 @@ try {
   await page.waitForSelector(".xf-exam.on .xf-question-quality-note");
 
   assert.equal(generatedRequest?.numQuestions, 3, "the fast default exam size reaches generation");
-  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 3 questions.*1 question is ready/i);
+  assert.match(await page.locator(".xf-question-quality-note").innerText(), /requested 3 questions.*1 question passed quality review and is included/i);
   const noteLayout = await page.locator(".xf-question-quality-note").evaluate((note) => {
     const noteRect = note.getBoundingClientRect();
     const questionRect = document.querySelector(".xf-exam.on .xf-q-text").getBoundingClientRect();

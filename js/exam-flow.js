@@ -1567,8 +1567,8 @@
       S.exam = normalizeIds(r.exam);
       var got = S.exam.questions.length;
       S.questionCountNote = got < S.num
-        ? tx("Du bad om " + S.num + " frågor. Det blev " + got + " " + (got === 1 ? "fråga" : "frågor") + " den här gången.",
-            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question is" : "questions are") + " ready this time.")
+        ? tx("Du bad om " + S.num + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
+            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question passed quality review and is included" : "questions passed quality review and are included") + " in this exam.")
         : "";
       S.answers = questionState();
       S.helped = questionState();

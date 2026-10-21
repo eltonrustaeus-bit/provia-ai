@@ -20,7 +20,7 @@ assert.match(flow, /r\.errorCode === "incomplete_exam"[\s\S]*?Lägg till mer rel
   "quality rejections ask for better source material, while other failures may still suggest fewer questions");
 assert.match(app, /Number\.isInteger\(res\.data\.received\)[\s\S]*?res\.data\.received\} av \$\{res\.data\.requested\} frågor klarade kontrollen/,
   "when no safe partial exam can be delivered, the student sees how many questions passed review");
-assert.match(flow, /S\.questionCountNote = got < S\.num[\s\S]*?Du bad om .*?frågor\./,
-  "a safely shortened delivered exam visibly explains the requested and delivered counts");
+assert.match(flow, /S\.questionCountNote = got < S\.num[\s\S]*?frågor klarade[\s\S]*?kvalitetskontrollen[\s\S]*?questions passed[\s\S]*?quality review/i,
+  "a safely shortened delivered exam explains that only questions passing quality review are included");
 
 console.log("exam-question-count-minimum: 7 assertions passed");

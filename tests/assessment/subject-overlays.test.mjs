@@ -56,6 +56,30 @@ check("science KEEPS prose options (not quantities, never coerced)", (() => {
   return kept(q, "natural_sciences");
 })());
 
+check("all subjects block an objectively corrupted MC option", (() => {
+  const damagedOptions = ["Cellkärna", "Kloroplast", "Fotosyntes�"];
+  const result = gate(mc({ options: damagedOptions, correct_index: 1 }), "natural_sciences");
+  return result.questions.length === 0
+    && result.dropped[0]?.issues.includes("corrupted_option_text");
+})());
+
+check("the corruption guard keeps valid technical terms absent from the source", (() => {
+  const q = mc({ options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0 });
+  const result = gate(q, "natural_sciences", { sourceMaterial: "Fotosyntes omvandlar ljusenergi." });
+  return result.questions.length === 1
+    && !result.dropped.length
+    && !result.questions[0].options.some((option) => option.includes("�"));
+})());
+
+check("control characters are blocked but ordinary option whitespace is allowed", (() => {
+  const corrupted = gate(mc({ options: ["Kloroplast", "Cellkärna", "Cell\u0001membran"] }), "generic");
+  const c1 = gate(mc({ options: ["Kloroplast", "Cellkärna", "Cell\u0085membran"] }), "generic");
+  const spaced = gate(mc({ options: ["Kloroplast", "Cell kärna", "Cellmembran"] }), "generic");
+  return corrupted.dropped[0]?.issues.includes("corrupted_option_text")
+    && c1.dropped[0]?.issues.includes("corrupted_option_text")
+    && spaced.questions.length === 1;
+})());
+
 check("Swedish exam flags a lone word among phrase options for review without dropping it", (() => {
   const q = mc({
     question: "Var sker fotosyntesen i växtcellen?",
