@@ -115,11 +115,13 @@ globalThis.fetch = async (input, init = {}) => {
       }
       : null);
   }
-  if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) {
+  if (url.includes("/rest/v1/rpc/reserve_per_chat_quota")) {
     if (quotaMode === "unavailable") return Response.json({ error: "synthetic unavailable" }, { status: 503 });
     if (quotaMode === "denied") return Response.json({ ok: false, count: 2 });
     return Response.json({ ok: true, count: 1 });
   }
+  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
+  if (url.includes("/rest/v1/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
   if (url.includes("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url === "https://api.openai.com/v1/responses" && providerUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
@@ -158,12 +160,12 @@ test("an ungraded or altered question is rejected before quota and model calls",
   calls.length = 0;
   const denied = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } });
   assert.equal(denied.statusCode, 403);
-  assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+  assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
 
   calls.length = 0;
   const alteredSource = await invoke({ examReview: true, examProof: { ...proof, material: "different study source" } });
   assert.equal(alteredSource.statusCode, 403);
-  assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+  assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
 
   const alteredSourceEn = await invoke({ examReview: true, examProof: { ...proof, material: "different study source" }, lang: "en" });
   assert.equal(alteredSourceEn.statusCode, 403);
@@ -173,7 +175,7 @@ test("an ungraded or altered question is rejected before quota and model calls",
   const missingAnswers = await invoke({ examReview: true, examProof: { ...proof, answers: [] } });
   assert.equal(missingAnswers.statusCode, 403);
   assert.ok(calls.every(({ url }) => !url.includes("/rest/v1/mock_results") &&
-    !url.includes("recover_graded_exam_result") && !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+    !url.includes("recover_graded_exam_result") && !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
 });
 
 test("deleting the saved result revokes an otherwise valid completion proof", async () => {
@@ -183,7 +185,7 @@ test("deleting the saved result revokes an otherwise valid completion proof", as
     const denied = await invoke({ examReview: true, examProof: proof });
     assert.equal(denied.statusCode, 403);
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results")));
-    assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+    assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
   } finally {
     resultPresent = true;
   }
@@ -199,7 +201,7 @@ test("an unverified legacy result cannot unlock post-exam answers", async () => 
     assert.equal(denied.statusCode, 403);
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results")));
     assert.ok(calls.every(({ url }) => !url.includes("recover_graded_exam_result") &&
-      !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+      !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
   } finally {
     savedVerifiedAt.set(submissionId, verifiedAt);
   }
@@ -381,7 +383,7 @@ test("review-result service failure fails closed before quota and AI", async () 
     assert.equal(response.statusCode, 503);
     assert.equal(response.body.error, "The saved grading could not be loaded right now.");
     assert.ok(calls.some(({ url }) => url.includes("recover_graded_exam_result")));
-    assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+    assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
   } finally {
     reviewResultUnavailable = false;
   }
@@ -448,7 +450,7 @@ test("a saved score with a max that differs from the signed question fails close
   calls.length = 0;
   const response = await invoke({ examReview: true, examProof: mismatched });
   assert.equal(response.statusCode, 503);
-  assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+  assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
 });
 
 test("invalid saved points and totals fail closed before quota and AI", async () => {
@@ -471,7 +473,7 @@ test("invalid saved points and totals fail closed before quota and AI", async ()
     calls.length = 0;
     const response = await invoke({ examReview: true, examProof: resultProof });
     assert.equal(response.statusCode, 503);
-    assert.ok(calls.every(({ url }) => !url.includes("consume_per_chat_quota") && !url.includes("openai.com")));
+    assert.ok(calls.every(({ url }) => !url.includes("reserve_per_chat_quota") && !url.includes("openai.com")));
   }
 });
 
@@ -592,7 +594,7 @@ test("direct chat calls during an exam get method guidance before quota, cache o
         assert.equal(response.body.answer, expected[usedLevel], `${type}:${requestedLevel}`);
         assert.ok(!response.body.answer.includes(marker), String(type));
         assert.equal(response.headers["Cache-Control"], "no-store");
-        assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+        assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")));
       }
     }
   } finally {
@@ -625,7 +627,7 @@ test("active-exam help uses the English hint ladder without forwarding question 
   assert.equal(response.body.helpLevelUsed, 1);
   assert.equal(response.body.answer, "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.");
   assert.doesNotMatch(response.body.answer, /ENGLISH_(?:PROMPT|QUESTION|ANSWER)_MARKER|777/);
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 });
 
 test("unverified, abandoned, expired and completed exams keep useful answer-free guidance", async () => {
@@ -659,7 +661,7 @@ test("unverified, abandoned, expired and completed exams keep useful answer-free
       assert.doesNotMatch(response.body.answer, new RegExp(marker), state);
       assert.equal(response.headers["Cache-Control"], "no-store", state);
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-        !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")), state);
+        !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")), state);
     }
   } finally {
     issuanceState = "active";
@@ -687,7 +689,7 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
     assert.equal(unverified.body.helpCap, 2);
     assert.match(unverified.body.answer, /cannot verify this exam's status|kan inte verifiera provets status/i);
     assert.doesNotMatch(unverified.body.answer, new RegExp(marker));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 
     calls.length = 0;
     issuanceState = "expired";
@@ -703,7 +705,7 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
     assert.equal(unrelated.body.examState, "expired");
     assert.match(unrelated.body.answer, /fullständigt svar kräver verifierad rättning/i);
     assert.doesNotMatch(unrelated.body.answer, new RegExp(marker));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
   } finally {
     if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = priorPilotMode;
@@ -724,7 +726,7 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
     assert.equal(ended.body.helpCap, 2);
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
     issuanceState = "abandoned";
@@ -733,7 +735,7 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     assert.equal(abandoned.body.examState, "abandoned");
     assert.match(abandoned.body.answer, /fullständigt svar kräver verifierad rättning/i);
     assert.equal(abandoned.body.helpCap, 2);
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
     const abandonedReview = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } }, "POST", "application/json");
@@ -742,7 +744,7 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
     assert.equal(abandonedReview.body.helpCap, 0);
     assert.match(abandonedReview.body.answer, /rättningen har verifierats/i);
     assert.ok(calls.every(({ url }) => !url.includes("recover_graded_exam_result") && !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota")), JSON.stringify(calls));
+      !url.includes("reserve_per_chat_quota")), JSON.stringify(calls));
 
     calls.length = 0;
     const conflictingReview = await invoke({ examReview: true, examProof: proof, tipsMode: true, question: "Q", feedback: "F", model_answer: "A" }, "POST", "application/json");
@@ -789,7 +791,7 @@ test("an older verified exam cannot bypass a newer unverified or purged issuance
       assert.equal(ordinary.body.examState, state, state);
       assert.equal(ordinary.body.helpCap, state === "grading" ? 0 : 2, state);
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-        !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")), state);
+        !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")), state);
 
       calls.length = 0;
       const review = await invoke({ examReview: true, examProof: proof });
@@ -801,7 +803,7 @@ test("an older verified exam cannot bypass a newer unverified or purged issuance
         ? /håller på att rättas|being graded/i
         : /without giving the answer|utan att visa facit|utan att ge svaret/i, state);
       assert.ok(calls.every(({ url }) => (state === "missing" || !url.includes("/rest/v1/mock_results")) &&
-        !url.includes("recover_graded_exam_result") && !url.includes("consume_per_chat_quota") &&
+        !url.includes("recover_graded_exam_result") && !url.includes("reserve_per_chat_quota") &&
         !url.includes("openai.com") && !url.includes("acquire_per_answer_lease")), state);
     }
 
@@ -813,7 +815,7 @@ test("an older verified exam cannot bypass a newer unverified or purged issuance
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results?") && url.includes("verified_at=not.is.null")));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+      !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
     const deletedLatestReview = await invoke({ examReview: true, examProof: proof });
@@ -821,7 +823,7 @@ test("an older verified exam cannot bypass a newer unverified or purged issuance
     assert.equal(deletedLatestReview.body.examState, "missing");
     assert.equal(deletedLatestReview.body.helpCap, 0);
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota") && !url.includes("recover_graded_exam_result")));
+      !url.includes("reserve_per_chat_quota") && !url.includes("recover_graded_exam_result")));
   } finally {
     activeCount = previous.activeCount;
     issuanceState = previous.issuanceState;
@@ -846,7 +848,7 @@ test("a newly abandoned issuance between status read and answer lease stays answ
     assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
     assert.ok(calls.some(({ url }) => url.includes("release_per_answer_lease")));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota")));
+      !url.includes("reserve_per_chat_quota")));
   } finally {
     activeCount = previous.activeCount;
     issuanceState = previous.issuanceState;
@@ -962,7 +964,7 @@ test("draft self-check guidance stays fixed, localized and answer-free for every
           assert.doesNotMatch(response.body.answer, new RegExp(marker));
           assert.equal(response.headers["Cache-Control"], "no-store");
           assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-            !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+            !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")));
         }
       }
     }
@@ -995,7 +997,7 @@ test("draft self-check guidance stays fixed, localized and answer-free for every
     assert.equal(forgedReview.body.helpCap, 0);
     assert.equal(forgedReview.headers["Cache-Control"], "no-store");
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota") && !url.includes("recover_graded_exam_result")));
+      !url.includes("reserve_per_chat_quota") && !url.includes("recover_graded_exam_result")));
   } finally {
     activeCount = 0;
   }
@@ -1073,7 +1075,7 @@ test("verified completed exams route each answer type's signed answer to post-gr
       assert.ok(provider.body.includes(entry.marker), `${entry.id}: signed answer reaches the explanation prompt`);
       assert.ok(provider.body.includes(reviewAnswer), `${entry.id}: fingerprint-matched student answer reaches the prompt`);
       assert.ok(provider.body.includes(reviewFeedback), `${entry.id}: persisted grader feedback reaches the prompt`);
-      assert.ok(calls.some(({ url }) => url.includes("consume_per_chat_quota")), `${entry.id}: post-grade help uses quota`);
+      assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")), `${entry.id}: post-grade help uses quota`);
     } finally {
       providerAnswer = defaultProviderAnswer;
       savedSubmissionIds.delete(submissionId);
@@ -1113,7 +1115,7 @@ test("post-grade review treats a blank response as unanswered while explaining t
     assert.equal(reviewPayload.student_answer, "");
     assert.equal(reviewPayload.awarded_points, 0);
     assert.match(reviewPayload.model_answer, /Lutningen beskriver ändringen i y/);
-    assert.ok(calls.some(({ url }) => url.includes("consume_per_chat_quota")));
+    assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")));
   } finally {
     providerAnswer = defaultProviderAnswer;
     const submissionId = completion.submissionId(userId, course, [signedQuestion]);
@@ -1181,7 +1183,7 @@ test("post-grade explanation rejects a signed exam without its matching saved re
   assert.match(response.body.error, /sparade provresultatet/i);
   const unsavedSubmissionId = completion.submissionId(userId, course, [signedQuestion]);
   assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results") && url.includes(unsavedSubmissionId)));
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 });
 
 test("active scatter-graph guidance is specific but never echoes point values", async () => {
@@ -1198,7 +1200,7 @@ test("active scatter-graph guidance is specific but never echoes point values", 
     assert.match(response.body.answer, /rubriker och enheter/i);
     assert.doesNotMatch(response.body.answer, /\(0, 4\)|\(1, 3\)|\(2, 1\)|0, 4|1, 3|2, 1/);
     assert.equal(response.body.helpLevelUsed, 1);
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
   } finally {
     activeCount = 0;
   }
@@ -1224,7 +1226,7 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
       assert.equal(response.body.examActive, true);
       assert.match(response.body.answer, /lutning|förändring|täljaren|nämnaren/i);
       assert.doesNotMatch(response.body.answer, /\(1, 5\)|\(3, 11\)|6\/2|ANSWER_LEAK_MARKER|\b3\b|\b11\b/);
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
       answers.push(response.body.answer);
     }
     assert.notEqual(answers[0], answers[1]);
@@ -1277,7 +1279,7 @@ test("unknown or contradictory graph modes get neutral graph guidance, not a wro
         "Välj en del av grafen, till exempel en axel, punkt eller linje. Vad visar den i relation till frågan?");
       assert.doesNotMatch(response.body.answer, /lutning|skärning med y-axeln|GRAPH_VALUE_MARKER|8127/i);
       assert.equal(response.body.helpCap, 2);
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
     }
 
     calls.length = 0;
@@ -1312,7 +1314,7 @@ test("a stale exam view cannot unlock answers after issuance expiry, even if the
       assert.match(response.body.answer, /Jämför alternativen ett i taget/i);
       assert.doesNotMatch(response.body.answer, /lutningen|Lutning|fullpoäng/i);
       assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/exam_issuance_state")));
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")));
     }
 
     calls.length = 0;
@@ -1353,7 +1355,7 @@ test("an exam-marked request without a valid issuance identity cannot reach the 
       assert.match(response.body.answer, /kan inte verifiera provets status/i);
       assert.doesNotMatch(response.body.answer, /ANSWER_LEAK_MARKER|lutningen/i);
       assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/active_exam_count")));
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")));
     }
   } finally {
     activeCount = 0;
@@ -1402,7 +1404,7 @@ test("an active issuance is checked by its exact server identity even if the cli
   assert.equal(response.body.examActive, true);
   assert.match(response.body.answer, /Vilken idé från ditt material kan hjälpa dig att tänka vidare/i);
   assert.ok(calls.some(({ url, body }) => url.includes("/rest/v1/rpc/exam_issuance_state") && body.includes(submissionId)));
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 });
 
 test("verified inactive exam metadata allows ordinary help but does not bypass another active exam", async () => {
@@ -1500,7 +1502,7 @@ test("non-active issuance states keep answers gated and ended exams pedagogicall
       assert.equal(response.body.helpLevelUsed, state === "grading" ? 0 : 2, state);
       assert.equal(response.body.helpCap, state === "grading" ? 0 : 2, state);
       assert.ok(calls.some(({ url }) => url.includes("/rest/v1/rpc/exam_issuance_state")), state);
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")), state);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")), state);
     }
   } finally {
     issuanceState = "active";
@@ -1532,7 +1534,7 @@ test("a stale in-exam P.E.R view follows authoritative server state", async () =
   assert.equal(active.body.helpLevelUsed, 2);
   assert.match(active.body.answer, /Vilken del av frågan har du ännu inte besvarat/i);
   assert.doesNotMatch(active.body.answer, /ACTIVE_(?:ANSWER|QUESTION)_MARKER/);
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 
   activeCount = null;
   calls.length = 0;
@@ -1542,7 +1544,7 @@ test("a stale in-exam P.E.R view follows authoritative server state", async () =
   });
   assert.equal(unknown.statusCode, 503);
   assert.equal(unknown.body.error, "EXAM_STATE_UNAVAILABLE");
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
   activeCount = 0;
 });
 
@@ -1570,7 +1572,7 @@ test("all answer-producing P.E.R modes stay behind the active-exam hint gate", a
       assert.equal(response.body.examActive, true);
       assert.equal(response.body.helpLevelUsed, 0);
       assert.doesNotMatch(response.body.answer, /ANSWER_MARKER|DEFINITION_ANSWER_MARKER/);
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota") && !url.includes("per_sessions")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("per_sessions")));
     }
   } finally {
     activeCount = 0;
@@ -1597,7 +1599,7 @@ test("unknown exam state denies each answer-bearing route before model work", as
       const response = await invoke(body);
       assert.equal(response.statusCode, 503);
       assert.equal(response.body.error, "EXAM_STATE_UNAVAILABLE");
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
     }
   } finally {
     activeCount = 0;
@@ -1749,7 +1751,7 @@ test("atomic lease catches an exam issued after the initial status read", async 
     assert.match(response.body.answer, /begrepp/);
     assert.ok(calls.some(({ url }) => url.includes("active_exam_count")));
     assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
   } finally {
     answerLeaseState = "acquired";
   }
@@ -1778,7 +1780,7 @@ test("an exam issued during post-grade review is caught by the atomic answer lea
     assert.equal(response.body.reviewDeferred, true);
     assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
-      !url.includes("consume_per_chat_quota")));
+      !url.includes("reserve_per_chat_quota")));
   } finally {
     answerLeaseState = "acquired";
   }
@@ -1817,7 +1819,7 @@ test("unknown lease outcome fails closed before response generation", async () =
     });
     assert.equal(response.statusCode, 503);
     assert.equal(response.body.error, "EXAM_STATE_UNAVAILABLE");
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
     assert.ok(calls.some(({ url }) => url.includes("release_per_answer_lease")));
   } finally {
     answerLeaseState = "acquired";

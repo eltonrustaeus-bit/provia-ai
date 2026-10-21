@@ -10,7 +10,7 @@ assert.match(route, /Opålitligt innehåll:[\s\S]*?kurs, fråga, feedback och mo
   "student-controlled tip inputs are data, not instructions");
 assert.match(route, /role: "system", content: systemPrompt[\s\S]*?role: "user", content: userContent/,
   "student-controlled tip inputs remain separate from system rules");
-assert.match(route, /catch \(e\) \{\s*return res\.status\(500\)\.json\(\{ error: "Kunde inte skapa tips just nu\./,
-  "tip failures return a generic client message");
+assert.match(route, /catch \(e\) \{\s*await settlePerChatQuota\(user\.id, quota, false\);\s*return res\.status\(500\)\.json\(\{ error: "Kunde inte skapa tips just nu\./,
+  "tip failures refund quota and return a generic client message");
 assert.doesNotMatch(route, /error: String\(e\)/, "raw exception details are not returned");
 console.log("tips prompt security: untrusted-input boundary and generic errors passed");

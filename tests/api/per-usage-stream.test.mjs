@@ -23,6 +23,7 @@ let failStreamingAfterDelta = false;
 let cleanEofAfterDelta = false;
 let truncatedStream = false;
 let stopReasonWithoutDone = false;
+let failResponses = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
 let reviewAnswer = null;
@@ -37,7 +38,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
-  if (url.includes("/rest/v1/rpc/consume_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.includes("/rest/v1/rpc/reserve_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
+  if (url.includes("/rest/v1/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url.includes("/rest/v1/per_long_memory") && url.includes("updated_at")) {
     const updatedAt = staleMemory ? new Date(Date.now() - 2 * 86_400_000).toISOString() : new Date().toISOString();
@@ -82,6 +85,7 @@ globalThis.fetch = async (input, init = {}) => {
     return new Response(`data: ${JSON.stringify(delta)}\n\n${terminal ? `data: ${JSON.stringify(terminal)}\n\n` : ""}data: ${JSON.stringify(usage)}\n\n${done}`, { status: 200 });
   }
   if (url === "https://api.openai.com/v1/responses") {
+    if (failResponses) return Response.json({ error: "synthetic provider failure" }, { status: 503 });
     const requestText = JSON.stringify(body?.input || []);
     const isReview = requestText.includes("SVARET SOM SKA GRANSKAS");
     return Response.json({
@@ -140,6 +144,9 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.doesNotMatch(res.chunks.join(""), /prompt_tokens|measured-stream-model/);
   const provider = requests.find((request) => request.url.endsWith("/chat/completions"));
   assert.deepEqual(provider.body.stream_options, { include_usage: true });
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")),
+    "a completed streamed answer commits the reservation");
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
   const usageWrite = requests.find((request) => request.url.endsWith("/rest/v1/ai_usage_events"));
   assert.ok(usageWrite);
   assert.equal(usageWrite.body[0].feature, "per_chat");
@@ -147,6 +154,36 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.equal(usageWrite.body[0].input_tokens, 90);
   assert.equal(usageWrite.body[0].output_tokens, 21);
   assert.doesNotMatch(JSON.stringify(usageWrite.body), /Hur börjar jag|Börja med att hitta/);
+});
+
+test("tips mode commits successful quota and refunds provider failures", async () => {
+  const priorPilotMode = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  requests.length = 0;
+  try {
+    const success = await invoke("application/json", {
+      tipsMode: true,
+      question: "Vad beskriver lutningen?",
+      feedback: "Förklara sambandet tydligare.",
+    });
+    assert.equal(success.statusCode, 200);
+    assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+
+    requests.length = 0;
+    failResponses = true;
+    const failed = await invoke("application/json", {
+      tipsMode: true,
+      question: "Vad beskriver lutningen?",
+      feedback: "Förklara sambandet tydligare.",
+    });
+    assert.equal(failed.statusCode, 500);
+    assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+    assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  } finally {
+    failResponses = false;
+    if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = priorPilotMode;
+  }
 });
 
 test("a serious P.E.R correction is persisted with the assistant answer and returned to the client", async () => {
@@ -192,6 +229,9 @@ test("streaming P.E.R ends safely when the provider stream fails after a partial
   assert.match(payload, /Börja med en ledtråd/);
   assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
   assert.doesNotMatch(payload, /synthetic provider stream reset/);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")),
+    "a failed provider stream refunds its reservation");
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
 });
 
 test("streaming P.E.R does not commit a partial answer after clean EOF without a terminal event", async () => {

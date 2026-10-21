@@ -62,7 +62,9 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json(savedResults.get(key)?.result || null);
   }
   if (url.endsWith("/rpc/try_replay_mock_learning_job")) return Response.json("processed");
-  if (url.endsWith("/rpc/consume_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.endsWith("/rpc/reserve_per_chat_quota")) return Response.json({ ok: true, count: 1 });
+  if (url.endsWith("/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
+  if (url.endsWith("/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
   if (url.endsWith("/rpc/acquire_per_answer_lease")) {
     return Response.json(leaseExamBecameActive ? "exam_active" : "acquired");
   }

@@ -1,6 +1,41 @@
 # ExGen: checklista for skolpilot
 
+## Local quota-failure fix — 2026-10-21
+
+- [x] The API now reserves P.E.R quota against a server-generated request ID, commits it on a successful response, and refunds it on provider/stream failure. Explain-cache hits no longer consume a new quota unit.
+- [x] A service-role-only RLS migration adds the reservation ledger and guarded reserve/commit/refund RPCs. The migration ran successfully in disposable PGlite; its quota/idempotency/stale-cleanup/privilege checks passed. This is not a hosted staging migration run.
+- [x] The first full serial run found one stale static assertion in `tips-prompt-security.test.mjs`; after updating it to require refund plus the unchanged generic error, the focused eight-file API/P.E.R./quota suite passed **71/71**. The full suite was not rerun afterward; JavaScript syntax and whitespace checks passed.
+- [!] The fix is local only. It is absent from the `04e542a` Preview, has not been pushed, and its migration has not been applied to staging. Hosted schema drift and hosted RLS/RPC permissions still need review before deployment.
+- [!] The exact `04e542a` Preview remains at the invited-account sign-in gate. The previously approved one-time synthetic Premium test is unused. No staging role/quota/data or production state changed.
+
+**PILOT NOT READY.** Next: review the migration against the current hosted schema, get separate staging-migration approval, create a READY Preview from this code, sign in there, and run only the already approved single synthetic generation. Restore Gratis immediately after that test.
+
+## Current verification — 2026-10-21
+
+- [x] The approved eight-commit range through `04e542a` is pushed to `codex/exgen-generation-quality-2026-10-20`; remote readback matched local HEAD `04e542aa1fb1452fd4433d2d4c730bf1f82a67a2`.
+- [x] Vercel Preview `dpl_4wYECkQiFV83ch1xHnfkJG6k2AXR` is `READY` from that exact SHA and branch: `https://provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [x] Exact-HEAD offline checks recorded in the status source: exam-flow **184/184**, P.E.R./exam-context **66/66**, selected exam/P.E.R./assessment matrix **112/112**.
+- [x] Fresh full sequential offline run on `04e542a`: all **178 discovered test files** exited successfully.
+- [!] Staging exam and P.E.R. requests were stopped by exhausted quota before model execution. There is no verified provider-backed result for this deployment; offline tests do not prove live model quality.
+- [!] Confirmed staging P.E.R. quota issue: read-only SQL shows `consume_per_chat_quota` increments `profiles.per_quota_count` under a row lock and has no request/idempotency key; provider-error branches in `api/explain.js` do not refund. A provider failure can consume a learner's allowance. The forward migration source is missing from the repository. Before a pilot, recover/reconcile that source and review an idempotent reservation/refund design; no staging DDL is authorized by this finding.
+- [ ] Still required: bounded live synthetic generation and P.E.R.; grading and persisted-result verification; two-account RLS/IDOR validation; school approval for learner, privacy, consent, support and operating procedures.
+
+**PILOT NOT READY.** A later, separate approval permits only a temporary Premium role for the single synthetic generation documented below; it has not been used because sign-in is blocked. No quota adjustment, database/data write, `main` merge, or Production action is authorized. Recheck deployment and staging state before the approved request.
+
+## Latest bounded staging attempt — 2026-10-21
+
+- [x] Reverified exact deployment `dpl_4wYECkQiFV83ch1xHnfkJG6k2AXR` as `READY`, on `codex/exgen-generation-quality-2026-10-20` at SHA `04e542aa1fb1452fd4433d2d4c730bf1f82a67a2`. Deployment-specific URL: `https://provia-igzpkctdv-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [x] The exact URL presents the invited-account sign-in gate. No session was available, so no generation request was made.
+- [x] Read-only staging checks before/after confirm the single matching synthetic profile remains `gratis`, quota count `5`. No role/quota/data write and no provider call occurred.
+- [x] User explicitly approved one synthetic three-question generation with staging Premium temporarily enabled and restored to Gratis immediately afterward. The approval is unused; only sign-in is outstanding.
+- [x] Five focused offline source-reference, generation-pipeline, verifier, assessment, and solver test files passed (exit 0); these are not live model evidence.
+- [x] Additional offline P.E.R. review, completion-proof, error/stream, quota-contract, and pedagogy/help-ladder tests passed. They do not prove live provider behavior or resolve the documented quota-refund risk on provider failure.
+
+**PILOT NOT READY.** Next: sign in to the exact Preview above; then perform the already approved single synthetic generation and immediately restore Gratis. No second generation, role/limit adjustment, database write, `main` merge, or Production action is included.
+
 ## Latest staging verification and local follow-up — 2026-10-20
+
+> Historical checkpoint; deployment and local/remote status below are superseded by the current verification above.
 
 - [x] Both approved grading-state migrations are applied only to staging; hosted schema and RPC permissions match the fenced grading contract. Migration versions are `20261020170419` and `20261020170431`.
 - [x] A synthetic authenticated 3-question Mathematics 2b flow completed on Preview: generation succeeded, in-exam P.E.R. withheld answer-bearing help, submission graded 6/6, and the verified result/account history were saved. Post-grade P.E.R. explained the verified response.
