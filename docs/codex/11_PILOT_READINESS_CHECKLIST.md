@@ -667,12 +667,19 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 
 **PILOT NOT READY.** Generering och rättning har nu ett livepass, men P.E.R:s normala hjälpflöde är inte fungerande/verifierat i detta Preview-test. Behåll stagingtestdata, `main` och Production oförändrade.
 
-## Lokal fortsättning: legacy-återhämtning och replay — 2026-10-21
+## Legacy-återhämtning och replay — 2026-10-21
 
 - [x] Idempotent replay utfärdar ett aktuellt v2-manifest från det sparade provet; frågemängd, grade-task och metadata förblir oförändrade. Ogiltig cachepayload ger fail-closed svar.
 - [x] Ett äldre, signerat v1-utkast kan efter omladdning be om status via hela signerade provkontexten. Servern autentiserar, verifierar manifestet, härleder submission-ID och endast läser provstatus; ett förfalskat v1-manifest stoppas före statusfrågan.
 - [x] Browser-regression simulerar omladdning av ett v1-prov och bekräftar att serververifierat ID når P.E.R. API issuance/completion-regressioner passerade 19/19; P.E.R.-browser passerade 69/69; offline generation pipeline, syntax och diffkontroll passerade.
-- [ ] Allt ovan är lokalt och ej Preview-verifierat. Inga nya live AI-anrop gjordes. Tidigare stagingbevis är begränsade till ett syntetiskt 3-frågeprov, rättning/resultatvisning och P.E.R:s facitskyddade men status-blockerade svar.
+- [ ] Fixarna är deployade till feature-Previewn nedan men inte liveverifierade med AI efter fixen. Tidigare stagingbevis är begränsade till ett syntetiskt 3-frågeprov, rättning/resultatvisning och P.E.R:s facitskyddade men status-blockerade svar.
+
+### Bred offline-regression efter fix
+
+- [x] API-sviten: 180/180 testfiler/fall passerade (`node --test tests/api/*.test.mjs`).
+- [x] Browser: exam 9/9 filer (exam-flow 184 godkända, 0 fel; viewport inkluderad), P.E.R. 16/16, grading 2/2 och pilot-session recovery 1/1.
+- [x] Offline generation pipeline, legacy replay, P.E.R. legacy resume, syntax och `git diff --check` passerade.
+- [ ] Detta bekräftar inte den nya Previewns stagingkoppling, live P.E.R.-status, beständig resultatpersistens, tvåkontos RLS/IDOR eller skolans operativa godkännanden.
 
 **PILOT NOT READY.** Före skolpilot krävs push/deploy till verifierad feature-Preview, autentiserad syntetisk stagingbekräftelse av P.E.R.-status och sparad rättning, samt återstående RLS/IDOR- och skolans drift-/integritetsgrindar. Ingen main-merge eller produktionsdeploy är godkänd här.
 
