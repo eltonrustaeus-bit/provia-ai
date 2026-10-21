@@ -4,6 +4,8 @@
 
 This is the current checkpoint. Older entries below are chronological snapshots; where they conflict with this section, this section is newer.
 
+Read-only staging quota snapshot, 2026-10-21: profile role `gratis`, exam quota count `3`, and P.E.R. quota count `5`, both in `2026-W43`. This confirms the exhausted quota has not reset. No role, quota, or account data was changed; no email or profile ID is recorded.
+
 - [x] Current feature Preview `dpl_EeUdRtWVXviNd6JsZYzfCzMb4pX1` is `READY` from SHA `2fffb5fdf0181838b2e27a097177bb9fec3f5fa2` on `codex/exgen-generation-quality-2026-10-20`; its stable alias is `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`. Commits `6e77bdd`, `786bf73`, and `2fffb5f` are pushed. `main` and Production remain untouched.
 - [x] Vercel CLI fallback confirmed branch-scoped Preview metadata for the pilot runtime/config variables on that exact branch. Values remained encrypted; metadata presence is not runtime proof of the server-side Supabase URL.
 - [x] Startup-race cleanup is included in the current Preview: it removes a redundant early quota/Auth lookup, leaving the existing final refresh after engine registration. The delayed-Auth test and full browser exam-flow regression pass locally.
