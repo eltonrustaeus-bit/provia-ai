@@ -114,6 +114,21 @@ check("a truncated source prefix is not accepted as an inflected subject term", 
     && result.dropped[0]?.issues.includes("unsupported_single_word_option_outlier");
 })());
 
+check("Swedish -or plural supports the corresponding -a singular term", (() => {
+  const q = mc({
+    question: "Var finns ribosomerna?",
+    options: ["Cellkärna", "I cytoplasman", "I cellmembranet"],
+    correct_index: 1,
+  });
+  const result = gate(q, "natural_sciences", {
+    reviewSingleWordOptionOutliers: true,
+    requireSourceSupportedOptionOutliers: true,
+    sourceMaterial: "Cellkärnor innehåller arvsmassa. Ribosomer finns i cytoplasman.",
+  });
+  return result.questions.length === 1
+    && result.flagged[0]?.issues.includes("single_word_option_outlier_review");
+})());
+
 check("all-word options with mixed source support receive a non-blocking review signal", (() => {
   const q = mc({ options: ["Kloroplast", "Cellkärna", "Kesäkten"], correct_index: 0 });
   const result = gate(q, "natural_sciences", {

@@ -222,7 +222,7 @@ function optionFormatIssues(q, options) {
     (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
   );
   const swedishInflectionForms = (value) => {
-    const suffixes = ["erna", "arna", "orna", "ande", "ende", "heten", "heter", "en", "et", "ar", "er", "or", "na", "n", "t", "s"];
+    const suffixes = ["erna", "arna", "orna", "ande", "ende", "heten", "heter", "en", "et", "ar", "er", "or", "na", "n", "t", "s", "a"];
     const forms = new Set([value]);
     for (const suffix of suffixes) {
       if (value.endsWith(suffix) && value.length - suffix.length >= 5) forms.add(value.slice(0, -suffix.length));
