@@ -2038,7 +2038,9 @@ try{
   }
   initReveal();
   hidePageLoader();
-  await refreshQuotaUi();
+  // The exam-flow boot waits only briefly for ExGenEngine. Do not hold its
+  // registration behind a network-backed quota refresh during page startup.
+  refreshQuotaUi().catch(()=>{});
   setStatus("");
 
   // Handle return from Stripe Checkout
