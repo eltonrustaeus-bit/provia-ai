@@ -675,3 +675,9 @@ Preview: `https://provia-ovwytlyid-eltons-projects-4adfb1a3.vercel.app/app.html`
 - [ ] Allt ovan är lokalt och ej Preview-verifierat. Inga nya live AI-anrop gjordes. Tidigare stagingbevis är begränsade till ett syntetiskt 3-frågeprov, rättning/resultatvisning och P.E.R:s facitskyddade men status-blockerade svar.
 
 **PILOT NOT READY.** Före skolpilot krävs push/deploy till verifierad feature-Preview, autentiserad syntetisk stagingbekräftelse av P.E.R.-status och sparad rättning, samt återstående RLS/IDOR- och skolans drift-/integritetsgrindar. Ingen main-merge eller produktionsdeploy är godkänd här.
+
+### Previewstatus efter lokal fix
+
+- [x] Feature-Preview `https://provia-m7ws1q3sa-eltons-projects-4adfb1a3.vercel.app/app.html` blev READY från exakt `c82914eb36da3a0c06339b8d8f4a171ffa735abd`, branch `codex/exgen-generation-quality-2026-10-20`, deployment `dpl_8QyRVKihvp5oFmXk8cW1rDYE1HLe`, `target=null`.
+- [ ] Ingen ny live AI-/stagingbegäran kördes efter deployen. Tidigare godkända anrop är förbrukade; behöver ny separat avgränsad testbekräftelse för P.E.R.-status efter fixen.
+- [ ] Lokala XelioV-handoff/statusuppgifter ska synkas först efter att den dokumenterande committen är separat pushgodkänd. `main` och Production är orörda.
