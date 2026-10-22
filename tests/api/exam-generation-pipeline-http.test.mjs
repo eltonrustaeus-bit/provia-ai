@@ -67,7 +67,7 @@ globalThis.fetch = async (input, init = {}) => {
   throw new Error(`Unexpected network request ${url.pathname}`);
 };
 
-const { default: advanceHandler } = await import("../../api/exam-generation-advance.js");
+const { default: advanceHandler } = await import("../../api/_exam-generation-advance.js");
 
 function responseRecorder() {
   return {
@@ -151,7 +151,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   try {
     const callAdvance=async(operationId)=>{
       const res=responseRecorder();
-      await advanceHandler({method:"POST",headers:{authorization:"Bearer synthetic-test-token"},body:{operationId},url:"/api/exam-generation-advance"},res);
+      await advanceHandler({method:"POST",headers:{authorization:"Bearer synthetic-test-token"},body:{operationId},url:"/api/generate-exam?pipeline=advance"},res);
       return res;
     };
     const ownedJob=await seedJob(0,3);

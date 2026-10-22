@@ -21,7 +21,7 @@ try {
       ["**/auth/v1/user**", async (route) => {
         await route.fulfill({ json: { id: "english-result-user", email: "student@example.invalid" } });
       }],
-      ["**/api/exam-generation", async (route) => {
+      ["**/api/generate-exam?pipeline=start", async (route) => {
         generatedRequest = route.request().postDataJSON();
         await route.fulfill({ json: {
           ok: true,

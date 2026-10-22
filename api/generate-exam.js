@@ -1346,6 +1346,15 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
 }
 
 module.exports = async function handler(req, res, internalContext = null) {
+  if (!internalContext) {
+    const pipelineMode = new URL(req.url || "/api/generate-exam", "https://exgen.invalid").searchParams.get("pipeline");
+    if (["start", "advance", "status"].includes(pipelineMode)) {
+      const pipelineHandler = pipelineMode === "advance"
+        ? (await import("./_exam-generation-advance.js")).default
+        : (await import("./_exam-generation-start.js")).default;
+      return pipelineHandler(req, res);
+    }
+  }
   const budget = makeBudget(Date.now());
   const internalBatch = internalContext?.kind === "verified_batch" &&
     examGenerationOperations.UUID.test(internalContext.userId || "");

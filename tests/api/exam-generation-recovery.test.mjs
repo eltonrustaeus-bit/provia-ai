@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createRequire } from "node:module";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const operationId = "55555555-5555-4555-8555-555555555555";
@@ -25,10 +26,8 @@ delete process.env.VERCEL_TARGET_ENV;
 let mockFetch = async () => { throw new Error("Unexpected network request"); };
 globalThis.fetch = (...args) => mockFetch(...args);
 
-const [{ default: statusHandler }, { default: advanceHandler }] = await Promise.all([
-  import("../../api/exam-generation.js"),
-  import("../../api/exam-generation-advance.js"),
-]);
+const require = createRequire(import.meta.url);
+const generationHandler = require("../../api/generate-exam.js");
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -77,14 +76,14 @@ test("terminal generation failure survives a lost advance response and does not 
 
   const auth = { authorization: "Bearer synthetic-test-token" };
   const advanceResponse = responseRecorder();
-  await advanceHandler({ method: "POST", headers: auth, body: { operationId }, url: "/api/exam-generation-advance" }, advanceResponse);
+  await generationHandler({ method: "POST", headers: auth, body: { operationId }, url: "/api/generate-exam?pipeline=advance" }, advanceResponse);
   assert.equal(advanceResponse.statusCode, 502);
   assert.equal(advanceResponse.body.error, "incomplete_exam");
   assert.equal(advanceResponse.body.requested, 12);
   assert.equal(advanceResponse.body.received, 7);
 
   const statusResponse = responseRecorder();
-  await statusHandler({ method: "GET", headers: auth, url: `/api/exam-generation?operationId=${operationId}` }, statusResponse);
+  await generationHandler({ method: "GET", headers: auth, url: `/api/generate-exam?pipeline=status&operationId=${operationId}` }, statusResponse);
   assert.equal(statusResponse.statusCode, 502);
   assert.equal(statusResponse.body.error, "incomplete_exam");
   assert.equal(statusResponse.body.received, 7);

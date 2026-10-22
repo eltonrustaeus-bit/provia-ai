@@ -22,7 +22,7 @@ test("client reports a resumable job instead of a generic timeout or network fai
       LANG: "sv",
       Date: { now: () => [0, 0, 14 * 60 * 1000][Math.min(clockCalls++, 2)] },
       setStatus: (label) => statuses.push(label),
-      postJson: async (path) => path === "/api/exam-generation"
+      postJson: async (path) => path === "/api/generate-exam?pipeline=start"
         ? { status: 202, data: { ok: true, operationId: "operation-budget", requested: 12, approved: 7 } }
         : { status: 202, data: { ok: true, state: "retrying", requested: 12, approved: 7 } },
       getJson: async () => { throw new Error("status check not expected"); },
@@ -42,7 +42,7 @@ test("client reports a resumable job instead of a generic timeout or network fai
       LANG: "sv",
       Date: { now: () => 0 },
       setStatus: () => {},
-      postJson: async (path) => path === "/api/exam-generation"
+      postJson: async (path) => path === "/api/generate-exam?pipeline=start"
         ? { status: 202, data: { ok: true, operationId: "operation-network", requested: 6, approved: 2 } }
         : (advances++, { status: 0, networkError: true, timedOut: false }),
       getJson: async () => ({ status: 0, networkError: true, timedOut: false }),

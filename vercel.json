@@ -20,12 +20,6 @@
     "api/generate-exam.js": {
       "maxDuration": 60
     },
-    "api/exam-generation-advance.js": {
-      "maxDuration": 60
-    },
-    "api/exam-generation.js": {
-      "maxDuration": 15
-    },
     "api/teacher-report.js": {
       "maxDuration": 60
     },

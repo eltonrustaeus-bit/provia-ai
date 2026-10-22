@@ -2150,7 +2150,7 @@ try{
   // gamla wizarden bryr sig inte om returvärdet.
   async function runResumableGeneration(payload){
     const startedAt=Date.now();
-    const started=await postJson("/api/exam-generation",payload,{timeoutMs:12000});
+    const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
     if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
     if(started.status!==202||!started.data?.operationId)return started;
     const operationId=started.data.operationId;
@@ -2165,7 +2165,7 @@ try{
     };
     updateProgress(started.data);
     while(Date.now()-startedAt<14*60*1000){
-      const step=await postJson("/api/exam-generation-advance",{operationId},{timeoutMs:62000});
+      const step=await postJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000});
       if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
       if(step.status===202&&step.data?.ok){
         consecutiveNetworkFailures=0;
@@ -2175,7 +2175,7 @@ try{
       }
       if(step.status===0||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
-        const current=await getJson(`/api/exam-generation?operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
+        const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;
         if(current.status===200&&current.data?.ok){updateProgress(current.data);consecutiveNetworkFailures=0;continue;}
