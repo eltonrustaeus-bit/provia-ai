@@ -1,5 +1,362 @@
 # 08 Current Status
 
+## Integrerad dubblettreparation och rollbackskydd — 2026-10-23
+
+- [x] Semantisk dubblettkontroll fångar även svenska förklaringsparafraser
+  efter böjningsnormalisering. Regressionen stoppar "Beskriv ... innebär"
+  kontra "Redogör ... betyder" men behåller relaterade frågor med olika
+  svarsmål, inklusive hastighet kontra energiproduktion i samma cellandning.
+- [x] Oberoende kvalitetsgranskning hittade att semantiska stoppord kunde få
+  "bärförmåga och hur påverkas den" att slå ut en fråga om påverkande faktorer.
+  Svensk verb-/småordsnormalisering och regressioner skiljer nu dessa åt utan
+  att släppa igenom rena förklaringsparafraser. Normaliseringen är avgränsad
+  till den semantiska grinden; den äldre exakta signaturen och betydelsebärande
+  "eller/or"-token ändras inte. Semantisk matchning kräver även samma ordnade
+  sekvens av konjunktioner/disjunktioner, samma parentesgruppering och samma
+  ordnade betydelsebärande token när logiska operatorer finns. Redundanta
+  parenteser normaliseras bara där grupperingen är ekvivalent; operatorer utan
+  operand på båda sidor stängs ute från semantisk dubblettmatchning. Motexempel
+  med ändrad operatorordning, gruppering, operandplacering och trasiga uttryck
+  testas.
+- [x] Granskarfeedback med vanliga varianter som "samma begrepp", "same skill"
+  och "overlaps with an existing question" mappas till den fasta
+  reparationskategorin `repeated_learning_objective`.
+- [x] En syntetisk HTTP-regression tvingar fram verifieraravslag för
+  `repeated_learning_objective`, bekräftar att endast den fasta kategorin
+  sparas i privat checkpoint och att nästa reparationsprompt kräver ett annat
+  lärandemål. Den levererar exakt 12/12 verifierade frågor via verklig intern
+  generator och autentiserad HTTP/PGlite, med en issuance och en
+  kvotförbrukning; avvisad fråga utfärdas inte. Slutcheckpointens 12 `verified`
+  poster måste matcha utfärdade ID:n exakt.
+- [x] Framåtmigrationen lägger till kategorin i checkpointens fasta allowlist.
+  Rollback återställer äldre allowlist men vägrar medan jobb är `queued` eller
+  `running`; operativ ordning är att rulla tillbaka apprevisionen som skickar
+  kategorin, stoppa ny generering, dränera kön och hålla trafiken stoppad tills
+  SQL-rollbacken är klar. Guard är en punktkontroll, inte ett trafiklås; ingen
+  hosted migration utfördes.
+- [x] Den riktade fyrfiliga API-/HTTP-/PGlite-sviten passerade 25/25. Därefter
+  avslutades den fulla seriella offline-sviten över 193 testfiler med exitkod 0
+  på den slutliga lokala diffen (katalogen för explicita liveprov exkluderad).
+  `node --check` för bedömningsmodulen och dess offline-test samt
+  `git diff --check` passerade.
+- [x] Oberoende säkerhets-/kvotgranskning fann inga blockerare i diffen.
+  Den noterade att rollbackens aktiva-jobbkontroll inte synkroniserar trafik;
+  operativt stopp och dränering måste ske före rollback. Granskaren verifierade
+  inga hostade ACL/RLS-förhållanden. En separat granskning av logiknormalisering
+  hittade ett ogiltigt uttryck som kunde jämföras med en giltig fråga; det är nu
+  täckt av regression och uteslutet från semantisk matchning.
+- [x] Read-only Vercel-kontroll: senaste READY Previewn på feature-branchen är
+  deployment `dpl_2GdDg83hDTZVsLMdvf46QJEkUNJs`, commit
+  `3b7dcfb12c1a989e050880b3935b8153ea80ba55`, samma som lokal HEAD före lokala
+  ändringar. Previewn öppnades synligt i sidebrowserflik 75 och visar
+  inloggningsgrinden. Lokala dirty ändringar ingår inte. Den tidigare
+  obesvarade syntetiska provfliken lämnades orörd.
+- [x] Read-only Supabase-kontroll bekräftade stagingprojektet
+  `exgen-pilot-staging` som `ACTIVE_HEALTHY`; senast applicerade migration är
+  `20261022172446_checkpoint_exam_repair_feedback`. Den lokala nya
+  `repeated_learning_objective`-migrationen saknas i staging.
+- [!] Read-only stagingkontroll 2026-10-23 bekräftar projektet
+  `exgen-pilot-staging` som `ACTIVE_HEALTHY`; den nya lokala
+  `repeated_learning_objective`-migrationen saknas fortfarande. Budgettabellen
+  visar tak `$5.000000`, spenderat `$0.581394`, reserverat `$0.225728` och
+  beräknat saldo `$4.192878`, men `updated_at` är 2026-10-22 21:50 UTC. Detta är
+  en gammal intern bokföring, inte ett aktuellt tillstånd eller en
+  leverantörsfaktura; ingen betald förfrågan får utgå från den.
+- [x] Efter den senaste regressionsfixen passerade den riktade fyrfiliga
+  API-/HTTP-/PGlite-sviten 25/25. En utökad körning av 12 relevanta testfiler,
+  en kostnadsfri ämnesroutningskontroll och fyra eval-delivery-tester avslutades
+  utan fel. Den bredare seriella offline-sviten passerade i samtliga 193
+  testfiler.
+  `node --check` för bedömningsmodulen och offline-testet samt
+  `git diff --check` passerade efter dokumentuppdateringen.
+- [!] Ingen push, deploy, stagingmigration, produktions-/main-ändring eller ny
+  modellförfrågan gjordes.
+
+**PILOT NOT READY.** Lokala flöden och kontrakt är testade, men den här
+revisionen har inte körts mot en versionssynkad stagingmiljö eller verifierats
+med verklig modellutmatning. Enstaka framgångar räcker inte för stabil
+12-frågeyield.
+
+## Lokal dubblett- och språkgrind för provfrågor — 2026-10-22 22:05 UTC
+
+- [x] `api/_assessment.js` kompletterar exakt signatur och befintlig
+  matematikintent med en försiktig semantisk jämförelse. Den kräver gemensamma
+  innehållsord, samma frågeintent och Jaccard-likhet; samma begreppstagg får en
+  lägre minsta ordgräns. Offline-motexempel stoppar nära parafraser om
+  bärförmåga och biologisk mångfald men behåller två olika frågor om syres
+  effekt på cellandningens hastighet respektive energiproduktion.
+- [x] `api/_verifier.js` skickar en max-100-teckens `concept_tag` endast som
+  jämförelsekontekst till tidigare godkända frågor; överskridna taggar failar
+  stängt. Granskarprompten betonar upprepade lärandemål och avslag på tydliga
+  grammatikfel, inklusive regressionsfrasen `den viktigt`. Godkännandetrösklar,
+  verifiering, blind lösare, källstöd och utfärdandeflöde ändrades inte.
+- [x] `api/generate-exam.js` tillåter en fast, integritetsbevarande
+  `repeated_learning_objective`-reparationskategori. Reparationen måste byta
+  lärandemål och får inte bara formulera om kandidaten.
+- [x] Oberoende API-/återhämtningsgranskning hittade att SQL-checkpointens
+  allowlist saknade kategorin. En framåtriktad migration lägger till enbart
+  denna fasta kategori; rollbacken återställer tidigare allowlist och vägrar
+  köras medan aktiva jobb fortfarande innehåller kategorin. PGlite accepterar
+  och lagrar feedbacken, avvisar den efter rollback, testar rollbackskyddet och
+  bekräftar att `anon`/`authenticated` fortfarande inte får köra funktionen.
+- [x] Oberoende granskning identifierade en falsk-positiv risk när delad
+  ordmängd dividerades med den mindre frågan. Jaccard-måttet och ett syskonfråge-
+  regressionstest hanterar det fallet; granskaren bekräftade att motexemplet
+  behålls och bärförmågeparafrasen fortfarande stoppas.
+- [x] Fokuserad offline-svit för pipeline unit/HTTP/PGlite, recovery, budget,
+  idempotens, verifierare, 3/6/12 UI/progress/delprov och pilot-readiness
+  avslutades med exitkod 0 efter SQL-fixen och rollbackskyddet. PGlite-testfilen
+  passerade 21/21; syntaxkontroller och `git diff --check` passerade.
+- [!] Ändringarna är lokala ovanpå `3b7dcfb`; ingen push, deploy, staging-
+  migration eller ny modellförfrågan gjordes. Den öppna sidebrowsern visar den
+  tidigare deployade Previewn och dess obesvarade syntetiska 12-frågeprov.
+  Förra stagingens budgetbokning är historisk och duger inte som nytt budget- eller
+  liveverifieringsbesked.
+
+**PILOT NOT READY.** Lokal dubblett- och språkgrind är starkare, men upprepade
+stagingkörningar på exakt denna kodrevision och verifiering mot verklig
+modellutmatning återstår.
+
+## Live staging-verifiering efter recovery-release — 2026-10-22 21:50 UTC
+
+- [x] Den branch-scopade Previewn för commit
+  `3b7dcfb12c1a989e050880b3935b8153ea80ba55` körde ett enda godkänt,
+  syntetiskt Biologi 1-prov på C-nivå. Begäran var 12 kortsvarsfrågor.
+- [x] Previewn utfärdade provvyn med exakt 12 frågeknappar. Den öppna vyn står
+  kvar på fråga 2 av 12; samtliga 12 är obesvarade. Ingen rättning, inlämning,
+  avbrytning eller ytterligare generering gjordes. En visad fråga handlar om
+  ekosystemets bärförmåga. Detta är inte en fullständig manuell innehållsreview
+  av alla frågor.
+- [x] Läsning av stagingens interna budgetbokföring kl. 21:50 UTC: tak
+  `$5.000000`, spenderat `$0.581394`, reserverat `$0.225728`, återstående
+  `$4.192878`. Före testet var spenderat `$0.528050`; förändringen är
+  appens interna bokföring, inte en verifierad leverantörsfaktura.
+- [!] Detta är en lyckad liveleverans för en syntetisk begäran, inte belägg för
+  stabil yield över upprepade körningar eller en full kvalitetsgranskning av
+  frågorna. Produktionssystem, `main`, staging-schema, konton och kvoter ändrades
+  inte i denna verifiering.
+
+**PILOT NOT READY.** Exakt 12/12 levererades i detta enda stagingprov. Behåll
+provet öppet för användarens inspektion; upprepad yield och granskning av
+frågekvalitet återstår.
+
+## Staging release: request identity and recovery — 2026-10-22 21:44 UTC
+
+- [x] Committed the scoped app/recovery change as `3b7dcfb12c1a989e050880b3935b8153ea80ba55` and pushed only to `codex/exgen-generation-quality-2026-10-20`.
+- [x] Vercel Preview deployment `dpl_2GdDg83hDTZVsLMdvf46QJEkUNJs` is READY for that exact SHA. Its branch alias remains the open side-browser URL. Branch-only staging environment-variable metadata was verified without reading values.
+- [x] Focused API/PGlite/browser identity tests passed (23 tests); the browser exam-flow regression passed 192/192 on the diagnostic rerun. Syntax checks and `git diff --check` passed before commit.
+- [x] The refreshed Preview returned to the signed-in app start screen in the sidebrowser. No exam was generated during this verification.
+- [!] This release hardens verified-session binding, idempotency-key durability and safe retry/cleanup; it does not change generator quality gates or prove improved 12-question yield. No Supabase migration, production/main change, or paid model call was made.
+- [!] Separate XelioV playbook/learning files and unrelated local changes remain uncommitted and outside this app release. `supabase/.temp/cli-latest` remains untouched.
+
+**PILOT NOT READY.** The deployed client recovery changes are visible in Preview, but hosted generation and repeatable 12-question acceptance remain unverified.
+
+## Recovery hardening and final offline test pass — 2026-10-22 21:33 UTC
+
+- [x] Malformed durable request metadata now fails closed when its valid
+  fingerprint matches the pending request but its idempotency UUID or expiry
+  is invalid. This check runs before legacy-session migration can rewrite the
+  record. The regression asserts that no replacement key is written and the
+  damaged record remains available for safe resolution.
+- [x] Supabase identity is bound to one captured session token: the token is
+  verified once against Auth, its verified user ID binds the request
+  fingerprint, and the same token is used for graph, start, advance and status
+  requests. Missing or mismatched identity stops before generation.
+- [x] Mixed retry partial rules now cover 3, 6 and 12 requested questions,
+  including the approved-count floor, one below it, and missing-format cases.
+  The mixed deadline HTTP cases verify terminal payload/checkpoint scrubbing,
+  exact response replay, one issuance/refund and unchanged quota on replay.
+- [x] The real two-tab browser test now waits until both tabs have requested the
+  Web Lock before asserting that creation and cleanup remain blocked behind the
+  lock holder. Synthetic auth fixtures for partial delivery, graph navigation
+  and quota denial now return the same verified user as their seeded session.
+- [x] Final affected API/PGlite/browser-identity tests passed 23/23 after the
+  last coverage additions. `node --check` for modified JS/test files and
+  `git diff --check` passed. The serial repository suite exited 0 across 193
+  test files before the last two test-only coverage additions; the added cases
+  themselves are included in the 23/23 final affected-file run. The standalone
+  Playwright exam-flow regression passed 192/192.
+- [x] The independent security reviewer confirmed the malformed-key P2 is
+  closed. The test/recovery reviewer found no blocker in the updated lock
+  handshake and mixed retry work; their suggested boundary cases are now
+  covered by the focused passing run.
+- [!] No code was pushed or deployed, no Supabase migration or staging mutation
+  was made, and no live model call was made. The open side-browser Preview still
+  shows the pilot login gate; the local dirty changes are not in that Preview.
+  The last staging budget read is historical and must be refreshed before any
+  new live request.
+
+**PILOT NOT READY.** Offline coverage is stronger, but a revision-synced,
+authenticated staging run is still needed to verify current 12-question yield.
+
+## Preview, staging readout and offline verification — 2026-10-22 21:02 UTC
+
+- [x] Read-only Vercel listing confirms the latest READY Preview on the feature
+  branch is deployment `dpl_9JzibJsjf78pTXNfcUy1wAtSqc26`, created 19:29 UTC,
+  at commit `1ff86e1e7fb9309871a6949a0ffca5b718ef056b`. This matches local HEAD.
+- [!] The current dirty worktree changes are not part of that deployment.
+  In particular, the open browser URL that previously showed `b3c147` is older;
+  a separate side-browser tab now shows the latest READY Preview. This Preview
+  is behind the local unstaged request-recovery changes and cannot verify them.
+- [x] Browser request identity also fails closed if shared `localStorage`
+  becomes unavailable between capability detection and storage selection; it
+  never falls back to tab-scoped storage in a browser. The UI explains the
+  required capability, and a regression exercises the intermittent failure.
+- [x] The latest focused local command covered generation pipeline unit/HTTP,
+  PGlite/issuance, recovery/progress, browser-backed request identity, and
+  mixed-format deadline partials: 58/58 tests passed. The full Playwright
+  exam-flow regression passed 192/192, including a browser without Web Locks
+  stopping before the generation API or quota reservation. No live provider
+  call was made in this check.
+- [x] Read-only staging inspection found no active queued/running/retryable
+  generation job. In the four newest synthetic 12-question jobs, one completed
+  12/12, two stopped at 2/12 with `STAGE_RETRY_LIMIT`, and one ended with
+  `OPERATION_DEADLINE` before any model-usage event. These jobs predate telemetry
+  commit `af37cfa`; their nullable `verification_passed` values therefore do
+  not diagnose individual candidate rejection or the current Preview behavior.
+- [x] The staging spend ledger reports a $5.00 cap, $0.528050 spent and
+  $0.225728 reserved at its last update (2026-10-22 17:59:47 UTC). This is the
+  application ledger, not a provider invoice or proof of current provider
+  balance. No live AI request or staging mutation was made in this check.
+- [!] The visible current Preview still shows the login gate, so there is no
+  authenticated session for a revision-synced live generation check. No schema,
+  account, role, quota, spend-ledger or exam-row state was changed. No active
+  queued/running/retryable generation job was present in the read-only check.
+  Refresh budget and job state immediately before any separately approved live
+  request.
+- [x] The broad serial command `node --test --test-concurrency=1
+  --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js')`
+  completed with exit code 0 across 192 test files before the latest focused
+  edits. After those edits, auth-snapshot/progress/idempotency tests passed
+  14/14; the HTTP pipeline test file passed 2/2; and the full browser exam-flow
+  regression passed 192/192. The preceding focused generation suite passed
+  58/58 and supplemental issuance/quota tests passed 12/12.
+- [x] Follow-up coverage now checks mixed-format deadline partial floors for
+  3, 6 and 12 questions, including missing-format and one-below-floor failures.
+  Request cleanup also verifies read-back after deleting the final key, with a
+  regression for storage implementations that silently ignore `removeItem`.
+- [x] Generation now captures one Supabase session token, verifies the user
+  against that exact token, and binds both owner fingerprint and all start,
+  advance, status and graph requests to the same snapshot. A verified-user
+  mismatch or missing session stops before a generation request. Tests cover
+  snapshot/token wiring and reuse through status recovery.
+- [x] Migration of legacy session-scoped request keys now fails closed when the
+  old storage cannot be read or parsed, instead of treating an unreadable
+  pending key as absent and creating a second quota claim. Synthetic regressions
+  verify no durable key is written in either failure case.
+- [x] Independent read-only security review confirmed both P2 findings are
+  closed by the local changes and their tests. The independent test/recovery
+  review confirmed the new mixed 3/6/12 cases match the server's 60% partial
+  floor and require both formats. No remaining blocker was found in these
+  reviewed scopes; this does not verify hosted Supabase or live-model behavior.
+
+**PILOT NOT READY.** Before claiming
+repeatable live yield, run a synthetic test against a revision-synced Preview
+after confirming the active exam is safely resolved and the current staging
+budget remains within the approved cap.
+
+## Keep resumable generation identity across tab closure — 2026-10-22
+
+- [x] `js/generation-request.js` now keeps only a request fingerprint, UUID
+  idempotency key and expiry in browser storage; it does not store study text
+  or the account ID. With Web Locks, same-origin tabs serialize the lookup and
+  creation. If Web Locks or accessible shared local storage is unavailable,
+  browser generation fails closed before starting a job; tab-scoped keys cannot
+  prevent another tab from charging quota twice.
+- [x] Legacy same-tab request metadata is merged into existing durable records.
+  The registry is bounded at five; a sixth request fails closed instead of
+  evicting a key that may still identify an active server job. Malformed UUIDs
+  are ignored and unreadable storage blocks generation rather than reusing stale
+  in-memory state.
+- [x] Creation and cleanup both use the same Web Lock when shared local storage
+  is enabled. The app waits for cleanup; if durable cleanup fails after a
+  successful exam, the student is warned that identical settings may replay the
+  prior result. Cleanup failures are no longer silently reported as success.
+- [x] If migration finds distinct keys for the same account-bound request
+  fingerprint, both keys are preserved and generation fails closed with a clear
+  support message instead of silently selecting one possibly active job.
+- [x] `app.html` now tells a returning student that resumption requires the
+  exact same material and exam settings. It only supports closing the tab when
+  Web Locks plus local storage are available; otherwise it tells the student
+  to keep/reload the same tab. Server replay of the same key avoids another
+  quota reservation.
+- [x] Offline verification: request identity and migration tests cover reload,
+  concurrent key creation, locked cleanup, account-bound fingerprints, bounded
+  storage, malformed/corrupt state, legacy migration collisions and the
+  no-Web-Locks and intermittent-localStorage fail-closed behavior. A two-tab Playwright test exercises actual
+  same-origin Web Locks, concurrent create/cleanup and reload persistence. The
+  focused generation/API/PGlite/recovery suite including the browser
+  request-identity test passed 58/58; browser exam-flow regression passed
+  192/192; syntax and `git diff --check` passed.
+- [!] The source text is intentionally not recovered from browser storage.
+  After closing a supported tab, the student must paste identical material and
+  use the same settings to reconnect. Browsers without Web Locks cannot start a
+  generation until browser capabilities are restored. These are offline tests; no
+  live provider request, staging deployment or hosted recovery was run.
+
+**PILOT NOT READY.** Repeatable hosted 12-question yield and live resume still
+need a separately approved, revision-synced staging test after the open exam is
+safely completed or cleared by its owner.
+
+## Accumulate bounded repair feedback across retries — 2026-10-22
+
+- [x] `api/_exam-generation-pipeline.cjs` now merges the prior job feedback
+  with the latest batch before checkpointing. Only existing allowlisted review
+  and solver categories survive normalization; counts cap at 20 and duplicate
+  count at 3, matching the private RPC constraints. Candidate acceptance,
+  independent verification, solver checks, source support and deduplication
+  are unchanged.
+- [x] Unit coverage verifies cross-attempt category accumulation, ignored raw
+  fields/categories and saturation at the SQL bounds. HTTP/PGlite recovery
+  coverage seeds an earlier `answer_alignment` signal, observes a later
+  `low_source_alignment` signal, and verifies the next repair prompt retains
+  both. The focused nine-file suite passed 72/72; the HTTP suite passed 2/2;
+  `node --check api/_exam-generation-pipeline.cjs` and `git diff --check` passed.
+- [x] Independent generation and security reviewers found no blocker in the
+  local diff. The security review confirms the merge stays bounded and behind
+  the existing fenced private checkpoint.
+- [!] This is offline evidence only. No source/material text is added to
+  feedback, but no new staging model run has shown improved yield. The active
+  staging exam remains untouched; no push, deploy, migration, provider call,
+  production change or `main` change was made.
+
+**PILOT NOT READY.** After the open staging exam is safely completed or cleared
+by its owner, rerun a synthetic 12-question test on the exact Preview and
+inspect the persisted diagnostics and accepted-count progression.
+
+## Read-only staging yield diagnosis — 2026-10-22 19:06 UTC
+
+- [x] Rechecked the exact READY branch Preview: deployment
+  `dpl_GiBqY9VJCDwVt8sVdYf5wVQo7axb`, SHA `6e0fbe2c6eb28cda2adbd34225fa924ca7365a55`,
+  created 18:58 UTC. It is the same generation code as `af37cfa` plus docs.
+- [x] Read only sanitized job columns and aggregates from staging
+  `yhcinqejsocpmmetazpz`. In four recent 12-question jobs, one succeeded at
+  12/12 after five generation events (mean 20.1s, max 23.4s) and eleven
+  comparison-review events (mean 4.3s, max 6.3s). Two failed at 2/12 with
+  `STAGE_RETRY_LIMIT`: their generation means were 18.6s/22.2s and comparison
+  review means 5.1s/6.7s. One failed at 0/12 with `OPERATION_DEADLINE` before
+  any model event.
+- [!] The older jobs have no persisted `verification_passed` outcome flags.
+  Their aggregates do not expose candidate-level reject reasons, so they
+  confirm underfilled/retry and preflight-deadline paths, not the exact cause
+  for each rejected candidate. The new telemetry still needs a run on the
+  deployed revision to test hosted persistence and explain new outcomes.
+- [!] Vercel runtime-log lookup for the 17:26 UTC failure was rejected because
+  the project plan retains runtime logs for one hour; no historical per-batch
+  console diagnosis can be recovered from that interval. Persisted, sanitized
+  outcome metrics and a fresh post-deploy run are the available route forward.
+- [x] The currently open browser session corresponds to a 12-question exam
+  with all answers unanswered; it was not submitted, abandoned, or modified.
+  The staging budget was reread at 19:06 UTC: cap `$5.000000`, spent
+  `$0.528050`, reserved `$0.225728`, remaining `$4.246222`; its ledger row's
+  last update remains 17:59 UTC. Recheck immediately before another provider
+  request.
+
+**PILOT NOT READY.** Preserve the active exam. Once its owner finishes or
+leaves it, run another synthetic 12-question job on the current Preview and
+compare accepted counts, generation/review latency, persisted outcome flags,
+and retry stage against this baseline.
+
 ## Staging quality-diagnostic package deployed — 2026-10-22
 
 - [x] The approved generation diagnostic package is on feature branch

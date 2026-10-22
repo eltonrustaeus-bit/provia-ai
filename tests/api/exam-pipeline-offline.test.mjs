@@ -297,7 +297,7 @@ const categorizedRepair = generateExam.buildRepairPayload({
   text: { format: { name: "mock_exam_schema" } },
 }, {
   lang: "sv", numQuestions: 2,
-  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match", "reviewer_other"],
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "repeated_learning_objective", "difficulty_match", "reviewer_other"],
 });
 assert.match(categorizedRepair.input.at(-1).content, /lös varje uppgift självständigt.*faktiskt besvarar frågan/i,
   "reviewer answer-alignment findings translate to explicit repair guidance");
@@ -307,6 +307,8 @@ assert.match(categorizedRepair.input.at(-1).content, /exakt ett försvarbart sva
   "reviewer clarity findings translate to explicit repair guidance");
 assert.match(categorizedRepair.input.at(-1).content, /naturlig svenska/i,
   "reviewer language findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /verkligt annat begrepp eller en annan uppgiftstanke.*byt inte bara formulering/i,
+  "duplicate reviewer findings require a genuinely different learning objective, not a rewording");
 assert.match(categorizedRepair.input.at(-1).content, /följ den valda nivån/i,
   "reviewer difficulty findings translate to explicit repair guidance");
 assert.match(categorizedRepair.input.at(-1).content, /Ersätt kandidaten med en annan uppgift som stöds direkt av materialet/i,
@@ -459,6 +461,132 @@ assert.deepEqual(duplicateGate.dropped, [
   { id: "zero-paraphrase", issues: ["duplicate_question"] },
   { id: "zero-semantic-paraphrase", issues: ["duplicate_question"] },
 ]);
+
+const semanticDuplicateGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "capacity-definition", question: "Vad är ekosystemets bärförmåga och hur påverkas den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-paraphrase", question: "Vad är bärförmåga och vilka faktorer kan påverka den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-explanation", question: "Beskriv vad bärförmåga i ett ekosystem innebär.", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-explanation-paraphrase", question: "Redogör för vad ett ekosystems bärförmåga betyder.", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[2], id: "biodiversity-importance", question: "Varför är biologisk mångfald viktig för ekosystemets stabilitet?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+  { ...questions[0], id: "biodiversity-paraphrase", question: "Varför är biologisk mångfald viktig för ekosystemens stabilitet?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+  { ...questions[0], id: "photosynthesis-relationship", question: "Hur hänger fotosyntes och cellandning ihop i ett ekosystem?", topic: "Ekologi", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "photosynthesis-difference", question: "Vad är skillnaden mellan fotosyntes och cellandning?", topic: "Ekologi", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "respiration-rate", question: "Hur påverkar syre cellandningens hastighet?", topic: "Ekologi", concept_tag: "Cellandning" },
+  { ...questions[0], id: "respiration-energy", question: "Hur påverkar syre cellandningens energiproduktion?", topic: "Ekologi", concept_tag: "Cellandning" },
+  { ...questions[0], id: "biodiversity-measurement", question: "Hur mäts den biologiska mångfalden i ett område?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(semanticDuplicateGate.questions.map((question) => question.id), [
+  "capacity-definition", "capacity-paraphrase", "capacity-explanation", "biodiversity-importance", "photosynthesis-relationship",
+  "photosynthesis-difference", "respiration-rate", "respiration-energy", "biodiversity-measurement",
+], "semantic dedupe removes close paraphrases but preserves related questions with distinct answer targets");
+assert.deepEqual(semanticDuplicateGate.dropped, [
+  { id: "capacity-explanation-paraphrase", issues: ["duplicate_question"] },
+  { id: "biodiversity-paraphrase", issues: ["duplicate_question"] },
+]);
+
+const respirationSiblingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "respiration-rate-context", question: "Hur påverkar syre cellandningens hastighet i en muskelcell?", topic: "Cellandning", concept_tag: "Cellandning" },
+  { ...questions[0], id: "respiration-energy-context", question: "Hur påverkar syre cellandningens energiproduktion i en muskelcell?", topic: "Cellandning", concept_tag: "Cellandning" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(respirationSiblingGate.questions.map((question) => question.id), [
+  "respiration-rate-context", "respiration-energy-context",
+], "a shared concept and context cannot collapse questions with distinct learning outcomes");
+
+const logicalConnectorGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "cell-processes-and", question: "Jämför cellandning och fotosyntes.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "cell-processes-or", question: "Jämför cellandning eller fotosyntes.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalConnectorGate.questions.map((question) => question.id), [
+  "cell-processes-and", "cell-processes-or",
+], "semantic normalization preserves logical connectors that change the task meaning");
+
+const contextualLogicalConnectorGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "context-cell-processes-and", question: "Jämför fotosyntes och cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "context-cell-processes-or", question: "Jämför fotosyntes eller cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(contextualLogicalConnectorGate.questions.map((question) => question.id), [
+  "context-cell-processes-and", "context-cell-processes-or",
+], "logical connector changes remain distinct even when additional shared context raises similarity");
+
+for (const [language, first, reversed] of [
+  ["sv", "Jämför cellandning och fotosyntes.", "Jämför fotosyntes och cellandning."],
+  ["en", "Compare cellular respiration and photosynthesis.", "Compare photosynthesis and cellular respiration."],
+]) {
+  const comparisonGate = assessment.gateExam({ questions: [
+    { ...questions[0], id: `${language}-comparison`, question: first, topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+    { ...questions[0], id: `${language}-comparison-reversed`, question: reversed, topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  ] }, { profile: "generic", secret: signingSecret });
+  assert.deepEqual(comparisonGate.questions.map((question) => question.id), [`${language}-comparison`],
+    `${language}: reversing two simple comparison operands does not create a distinct question`);
+}
+
+const scopedComparisonGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "comparison-context-first", question: "Jämför cellandning och fotosyntes i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "comparison-context-reversed", question: "Jämför fotosyntes och cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(scopedComparisonGate.questions.map((question) => question.id), [
+  "comparison-context-first", "comparison-context-reversed",
+], "comparison operand normalization does not guess across contextual clauses");
+
+const logicalScopeGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "light-and-dark-or", question: "Jämför om fotosyntes och cellandning sker i ljus eller mörker.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "light-or-dark-and", question: "Jämför om fotosyntes eller cellandning sker i ljus och mörker.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalScopeGate.questions.map((question) => question.id), [
+  "light-and-dark-or", "light-or-dark-and",
+], "different logical scope remains distinct when connector counts match but order differs");
+
+const logicalGroupingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "and-or-grouping", question: "Vilka fall gäller när A och (B eller C) gäller?", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "or-and-grouping", question: "Vilka fall gäller när (A och B) eller C gäller?", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalGroupingGate.questions.map((question) => question.id), [
+  "and-or-grouping", "or-and-grouping",
+], "exact-signature matching preserves Boolean grouping when parentheses change scope");
+
+const malformedLogicalGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "valid-and", question: "Describe whether ruleA and ruleB applies.", topic: "Logic", concept_tag: "Logic" },
+  { ...questions[0], id: "malformed-and", question: "Describe whether (ruleA and) ruleB applies.", topic: "Logic", concept_tag: "Logic" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(malformedLogicalGate.questions.map((question) => question.id), [
+  "valid-and", "malformed-and",
+], "malformed Boolean fragments cannot collapse a valid question during semantic dedupe");
+
+const logicalOperandGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "ordered-operands", question: "Förklara om regelA och (regelB eller regelC) gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "same-operands-paraphrase", question: "Beskriv om regelA och (regelB eller regelC) gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "reassigned-operands", question: "Förklara om regelC och (regelB eller regelA) gäller.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalOperandGate.questions.map((question) => question.id), [
+  "ordered-operands", "reassigned-operands",
+], "Boolean dedupe keeps operand positions while removing an equivalent paraphrase");
+assert.deepEqual(logicalOperandGate.dropped, [
+  { id: "same-operands-paraphrase", issues: ["duplicate_question"] },
+]);
+
+for (const [language, original, redundant] of [
+  ["sv", "Förklara om regelA och (regelB eller regelC) gäller.", "Förklara om regelA och ((regelB eller regelC)) gäller."],
+  ["en", "Explain whether ruleA and (ruleB or ruleC) applies.", "Explain whether ruleA and ((ruleB or ruleC)) applies."],
+  ["sv-atom", "Förklara om regelA och (regelB) eller regelC gäller.", "Förklara om regelA och regelB eller regelC gäller."],
+  ["en-atom", "Explain whether ruleA and (ruleB) or ruleC applies.", "Explain whether ruleA and ruleB or ruleC applies."],
+  ["sv-whole", "Förklara om (regelA och regelB) gäller.", "Förklara om regelA och regelB gäller."],
+  ["en-whole", "Explain whether (ruleA and ruleB) applies.", "Explain whether ruleA and ruleB applies."],
+  ["sv-precedence", "Förklara om (regelA och regelB) eller regelC gäller.", "Förklara om regelA och regelB eller regelC gäller."],
+  ["en-precedence", "Explain whether (ruleA and ruleB) or ruleC applies.", "Explain whether ruleA and ruleB or ruleC applies."],
+]) {
+  const redundantGroupingGate = assessment.gateExam({ questions: [
+    { ...questions[0], id: `${language}-grouping`, question: original, topic: "Logik", concept_tag: "Logik" },
+    { ...questions[0], id: `${language}-redundant-grouping`, question: redundant, topic: "Logik", concept_tag: "Logik" },
+  ] }, { profile: "generic", secret: signingSecret });
+  assert.deepEqual(redundantGroupingGate.questions.map((question) => question.id), [`${language}-grouping`],
+    `${language}: redundant nested parentheses do not hide a semantic duplicate`);
+}
+const mathGroupingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "math-grouped", question: "Förklara om (regelA + regelB) och regelC gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "math-ungrouped", question: "Förklara om regelA + regelB och regelC gäller.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(mathGroupingGate.questions.map((question) => question.id), ["math-grouped", "math-ungrouped"],
+  "mathematical grouping is not normalized as redundant Boolean parentheses");
 
 function assertIncompleteExamNotDelivered(response, scenario) {
   assert.equal(response.status, 502, `${scenario}: ${JSON.stringify(response.body)}`);
@@ -1961,8 +2089,8 @@ try {
   }
   assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), duplicateAwareRepair.map(({ id }) => id),
     "the retry verifier receives the generated repair candidate");
-  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question }) => ({ id, type, question })),
-    "the retry verifier gets already approved question wording only as comparison context");
+  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag }) => ({ id, type, question, concept_tag })),
+    "the retry verifier gets already approved question wording and concept tags only as comparison context");
   assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "at most one bounded missing-slot repair is requested");

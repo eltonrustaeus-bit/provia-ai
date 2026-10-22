@@ -218,13 +218,45 @@ vercel dev          # runs at http://localhost:3000
 ## Core Development Rules
 
 1. **Read file before editing** — never edit blind
-2. **Commit before every new feature** — `git add -A && git commit -m "chore: pre-feature snapshot"`
+2. **Preserve the worktree** — inspect `git status` before edits; never stage or commit with `git add -A` by default. Commit only when requested or explicitly authorized, and stage exact files.
 3. **Match CJS/ESM of the file you're editing** — see module format table above
 4. **No speculative features** — only what's asked, nothing extra
 5. **No design token changes** without asking first
 6. **Test Supabase RLS** after any schema change
 7. **No `innerHTML` with user data** — XSS risk
 8. **Secrets via env only** — never hardcode keys
+
+## Reusable Agent and Learning Workflow
+
+At the start of each substantive task, read `docs/codex/08_CURRENT_STATUS.md`
+and `docs/codex/15_AGENT_PLAYBOOK.md`, then inspect the exact source files and
+current Git diff. Load task-relevant reviewed lessons with
+`npm run xeliov:context -- --task "<short task description>"`; read the full
+`docs/codex/16_LEARNING_LEDGER.md` for a broad project audit. The project root
+is mapped to XelioV; use its injected project context and leave a structured
+handoff at the end of the task.
+
+The context command prints relevant role cards and reviewed ledger entries for
+the current checkout. Use it as an index, not a substitute for reading current
+status, source, diff, or applicable rules. It prints to stdout and is not
+stored. Do not include secrets, credentials, student data, or private customer
+details in the task argument.
+
+- Reuse the role cards in `docs/codex/15_AGENT_PLAYBOOK.md`; agent instances
+  themselves are not persistent. Select only the smallest relevant roles.
+- Keep one designated writer for each mutable code area. Reviewers are
+  read-only unless a separate, disjoint implementation task is explicitly
+  assigned.
+- Record only concise, source-backed outcomes in `docs/codex/16_LEARNING_LEDGER.md`.
+  Mark evidence as offline, staging, or production; do not promote assumptions,
+  raw private reasoning, credentials, user data, or unverified agent claims.
+- At task end, update `docs/codex/08_CURRENT_STATUS.md` with the verified state,
+  tests and blockers when the task materially changes project status. Add to the
+  learning ledger only if the finding is reusable; do not turn every task or
+  agent response into a permanent rule.
+- A learning becomes a durable rule only after evidence is checked and a human
+  approves it. Preserve rejected hypotheses and known limitations when they
+  prevent the same investigation from being repeated.
 
 ---
 

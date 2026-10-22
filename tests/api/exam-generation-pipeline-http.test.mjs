@@ -34,6 +34,8 @@ let mockActualProviderResponses = false;
 let reuseActualProviderIds = false;
 let rejectNextActualVerifierQuestion = false;
 let rejectActualVerifierIndex = 0;
+let nextActualVerifierFailureCode = "low_source_alignment";
+let exhaustInlineRepairBudget = false;
 let abortRepairAfterRejection = false;
 let abortNextActualStream = false;
 let failNextActualGenerationStreams = 0;
@@ -141,8 +143,17 @@ globalThis.fetch = async (input, init = {}) => {
         actualVerifierQuestionCounts.push(review.questions.length);
         const rejectedQuestion = rejectNextActualVerifierQuestion ? review.questions[rejectActualVerifierIndex] : null;
         const rejectedId = rejectedQuestion?.id || null;
+        const failureCode = rejectedId ? nextActualVerifierFailureCode : null;
+        const failureNote = failureCode === "repeated_learning_objective"
+          ? "Frågan upprepar samma lärandemål som en redan godkänd fråga; välj en annan uppgift."
+          : "Förankra frågan tydligare i materialet.";
         if (rejectedId) rejectedActualStems.push(rejectedQuestion.question);
         rejectNextActualVerifierQuestion = false;
+        if (rejectedId) nextActualVerifierFailureCode = "low_source_alignment";
+        if (rejectedId && exhaustInlineRepairBudget) {
+          fakeNow += 35_000;
+          exhaustInlineRepairBudget = false;
+        }
         if (rejectedId && abortRepairAfterRejection) abortNextActualStream = true;
         return responseBody({ results: review.questions.map((question) => ({
           id: question.id, approved: question.id !== rejectedId,
@@ -150,8 +161,8 @@ globalThis.fetch = async (input, init = {}) => {
           source_alignment: question.id === rejectedId ? 0.5 : 1,
           scoring_quality: 1, language_quality: 1,
           language_match: true, option_quality: question.options.map(() => true),
-          issues: question.id === rejectedId ? ["low_source_alignment"] : [],
-          required_changes: question.id === rejectedId ? ["Förankra frågan tydligare i materialet."] : [],
+          issues: question.id === rejectedId ? [failureCode] : [],
+          required_changes: question.id === rejectedId ? [failureNote] : [],
         })) });
       }
       if (stage === "exam_solver_schema") {
@@ -339,6 +350,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   const ownerClaimMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140100_owner_scoped_pipeline_claim.sql", import.meta.url), "utf8");
   const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
   const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
+  const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth; create table auth.users(id uuid primary key);
@@ -354,6 +366,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   await db.exec(ownerClaimMigration);
   await db.exec(preflightReleaseMigration);
   await db.exec(feedbackMigration);
+  await db.exec(repeatedObjectiveFeedbackMigration);
   const seedJob = async (ordinal, requested, stage = "generate", qType = "mc") => {
     const jobId = testUuid(100 + ordinal);
     const idempotencyKey = testUuid(200 + ordinal);
@@ -829,6 +842,114 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     assert.ok(repairTelemetry.length > 0 && repairTelemetry.every((event) =>
       event.requestId === `exam-pipeline:${actualRepairPipelineId}`),
     "success and repair batch telemetry use the same content-free job ID as setup and model usage events");
+
+    const objectiveQuotaBefore = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    const objectiveRepairStart = await callStart({
+      ...startPayload, numQuestions: 12, idempotencyKey: testUuid(11_997),
+    });
+    assert.equal(objectiveRepairStart.statusCode, 202, JSON.stringify(objectiveRepairStart.body));
+    const objectiveRepairJob = (await db.query(
+      "select id,quota_request_id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+      [testUuid(11_997)],
+    )).rows[0];
+    const objectiveIssuancesBefore = (await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n;
+    mockedProviderStages.length = 0;
+    mockedGenerationInstructions.length = 0;
+    mockedPipelineCheckpoints.length = 0;
+    rejectedActualStems.length = 0;
+    generated = 0;
+    mockActualProviderResponses = true;
+    useActualGeneratorForPipeline = true;
+    reuseActualProviderIds = true;
+    rejectNextActualVerifierQuestion = true;
+    rejectActualVerifierIndex = 0;
+    nextActualVerifierFailureCode = "repeated_learning_objective";
+    exhaustInlineRepairBudget = true;
+    const objectiveClockBefore = Date.now;
+    fakeNow = objectiveClockBefore();
+    Date.now = () => fakeNow;
+    let objectiveRepairResult = null;
+    try {
+      const firstObjectiveBatch = await callAdvance(objectiveRepairJob.id);
+      assert.equal(firstObjectiveBatch.statusCode, 202, JSON.stringify(firstObjectiveBatch.body));
+      assert.equal(firstObjectiveBatch.body.approved, 2,
+        "the verifier-rejected repeated objective is excluded from the first checkpoint");
+      const storedObjectiveFeedback = (await db.query(
+        "select payload->'repairFeedback' as feedback from public.mock_exam_generation_pipeline_jobs where id=$1",
+        [objectiveRepairJob.id],
+      )).rows[0].feedback;
+      assert.equal(storedObjectiveFeedback.reviewFailureCounts.repeated_learning_objective, 1,
+        "the fixed verifier category survives the private HTTP checkpoint");
+      assert.equal(storedObjectiveFeedback.solverFailureCounts && Object.hasOwn(storedObjectiveFeedback, "rawText"), false,
+        "the persisted repair signal stays bounded and contains no reviewer prose");
+
+      for (let attempt = 0; attempt < 6 && !objectiveRepairResult; attempt++) {
+        const response = await callAdvance(objectiveRepairJob.id);
+        if (response.statusCode === 200) objectiveRepairResult = response;
+        else assert.equal(response.statusCode, 202, JSON.stringify(response.body));
+      }
+    } finally {
+      Date.now = objectiveClockBefore;
+      useActualGeneratorForPipeline = false;
+      mockActualProviderResponses = false;
+      rejectNextActualVerifierQuestion = false;
+      rejectActualVerifierIndex = 0;
+      nextActualVerifierFailureCode = "low_source_alignment";
+      exhaustInlineRepairBudget = false;
+      reuseActualProviderIds = false;
+    }
+    assert.ok(objectiveRepairResult, "the repeated-objective repair completes through authenticated HTTP issuance");
+    assert.equal(objectiveRepairResult.body.exam.questions.length, 12);
+    assert.equal(objectiveRepairResult.body.meta.requested, 12);
+    assert.equal(objectiveRepairResult.body.meta.partial, false);
+    const objectiveAccepted = mockedPipelineCheckpoints.at(-1);
+    assert.equal(objectiveAccepted.length, 12);
+    assert.ok(objectiveAccepted.every((question) => question.validation_status === "verified"),
+      "all 12 questions in the final checkpoint passed structural and independent quality gates");
+    assert.deepEqual(objectiveRepairResult.body.exam.questions.map((question) => question.id).sort(),
+      objectiveAccepted.map((question) => question.id).sort(),
+    "the issued 12-question exam contains exactly the independently verified checkpointed questions");
+    assert.equal(objectiveRepairResult.body.exam.questions.some((question) => rejectedActualStems.includes(question.question)), false,
+      "the rejected repeated-objective question is never delivered");
+    assert.ok(mockedGenerationInstructions.some((prompt) =>
+      prompt.includes("KVALITETSREPARATION") && /upprepat lärandemål.*verkligt annat begrepp/i.test(prompt)),
+    "the next HTTP repair request receives the actionable repeated-objective instruction");
+    assert.equal((await db.query(
+      "select status from public.mock_exam_quota_reservations where request_id=$1", [objectiveRepairJob.quota_request_id],
+    )).rows[0].status, "consumed");
+    assert.equal((await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count, objectiveQuotaBefore + 1,
+    "the repaired exam consumes exactly one quota reservation");
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, objectiveIssuancesBefore + 1,
+    "the repaired full exam is issued exactly once");
+    const objectiveQuotaCountAfterCompletion = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    const objectiveProviderCallsBeforeReplay = mockedProviderStages.length;
+    const objectiveFinalizationsBeforeReplay = finalizationInvocations;
+    const objectiveReplay = await callAdvance(objectiveRepairJob.id);
+    assert.equal(objectiveReplay.statusCode, 200);
+    assert.deepEqual(objectiveReplay.body, objectiveRepairResult.body,
+      "repeated-objective repair replays the same completed exam");
+    assert.equal(mockedProviderStages.length, objectiveProviderCallsBeforeReplay,
+      "replay does not make additional model calls");
+    assert.equal(finalizationInvocations, objectiveFinalizationsBeforeReplay,
+      "replay does not finalize a second exam");
+    assert.equal((await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count, objectiveQuotaCountAfterCompletion,
+    "replay does not consume quota a second time");
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, objectiveIssuancesBefore + 1,
+    "replay does not create a second issuance");
 
     const repairTimeoutQuotaBefore = (await db.query(
       "select mock_quota_count from public.profiles where id=$1", [userId],
@@ -1621,8 +1742,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,26,
-      "full runs, real-generator and repair paths, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,27,
+      "full runs, repeated-objective repair, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],

@@ -1278,6 +1278,7 @@ const SAFE_REPAIR_FAILURE_CODES = new Set([
   "low_factual_accuracy", "high_ambiguity", "difficulty_mismatch", "low_source_alignment",
   "low_scoring_quality", "low_language_quality", "language_mismatch", "option_quality_failed",
   "option_quality_contract_failed", "answer_alignment", "source_support", "scoring_alignment",
+  "repeated_learning_objective",
   "question_clarity", "language_quality", "difficulty_match", "reviewer_other",
 ]);
 const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
@@ -1382,6 +1383,9 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("low_language_quality") || failures.has("language_mismatch") || failures.has("language_quality")
           ? "The reviewer found a language problem: write every learner-facing field in natural Swedish, except established technical terms and exact source quotations."
           : "",
+        failures.has("repeated_learning_objective")
+          ? "The reviewer found a repeated learning objective: replace the candidate with a genuinely different concept or task intent from the retained questions; changing only wording, examples, or question format is not enough."
+          : "",
         failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "The reviewer found a level mismatch: match the requested level and avoid hidden or advanced requirements."
           : "",
@@ -1423,6 +1427,9 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
           : "",
         failures.has("low_language_quality") || failures.has("language_mismatch") || failures.has("language_quality")
           ? "Granskningen hittade språkproblem: skriv alla elevriktade fält på naturlig svenska, förutom etablerade facktermer och exakta källcitat."
+          : "",
+        failures.has("repeated_learning_objective")
+          ? "Granskningen hittade ett upprepat lärandemål: ersätt kandidaten med ett verkligt annat begrepp eller en annan uppgiftstanke än de frågor som redan behållits; byt inte bara formulering, exempel eller frågeformat."
           : "",
         failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."

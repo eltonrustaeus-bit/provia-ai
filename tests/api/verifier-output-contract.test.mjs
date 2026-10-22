@@ -43,6 +43,16 @@ assert.deepEqual(classifyReviewFindings(["Poängmatrisen ger metodpoäng som fr�
   "reviewer notes are reduced to a fixed scoring category without retaining their wording");
 assert.deepEqual(classifyReviewFindings(["Underlaget stöder inte det angivna facit."]), ["answer_alignment", "source_support"],
   "multiple relevant review categories can be retained without raw notes");
+assert.deepEqual(classifyReviewFindings(["Frågan upprepar samma lärandemål som en godkänd fråga."]), ["repeated_learning_objective"],
+  "duplicate reviewer findings become a fixed repair category without retaining their wording");
+for (const note of [
+  "Frågan prövar samma begrepp som en godkänd fråga.",
+  "This question assesses the same skill as another item.",
+  "The prompt overlaps with an existing question.",
+]) {
+  assert.deepEqual(classifyReviewFindings([note]), ["repeated_learning_objective"],
+    `common duplicate feedback maps to the targeted repair category: ${note}`);
+}
 const submittedReviewSchema = valid.requestBody.text.format.schema.properties.results;
 assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
 assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
@@ -55,6 +65,8 @@ assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elev
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
 assert.match(buildVerifierPrompt("sv"), /frågestammen för idiomatisk, grammatiskt korrekt svenska.*'linjens ekvation', inte 'linjären'/i,
   "the independent reviewer explicitly checks Swedish inflection in question stems");
+assert.match(buildVerifierPrompt("sv"), /avvisa tydliga grammatikfel.*'den viktigt'.*ge inte högt language_quality/i,
+  "the independent reviewer must reject obvious Swedish agreement errors rather than merely score them");
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
 assert.match(buildVerifierPrompt("sv"), /inga enordsalternativ matchar källtexten.*avvisa inte enbart/i);
 const outlierHintReview = await runWithResults(
@@ -75,6 +87,13 @@ const wrongLanguageReview = await runWithResults([{
 assert.match(wrongLanguageReview.requestBody.input[0].content, /prov(språket|sprak)|selected output language/i);
 assert.equal(decideApproval(wrongLanguageReview.outcome.perQuestion.get("q1")), false,
   "a high-scoring fluent response is rejected when it does not match the requested Swedish output language");
+const grammarDefectReview = await runWithResults([{
+  ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 0.5,
+  language_match: true, issues: ["language_quality"], required_changes: ["Ändra 'den viktigt' till grammatiskt korrekt svenska."],
+}], [{ id: "q1", type: "short_answer", question: "Förklara varför biologisk mångfald är den viktigt." }], "", undefined, undefined, undefined, "sv");
+assert.equal(decideApproval(grammarDefectReview.outcome.perQuestion.get("q1")), false,
+  "an obvious learner-facing grammar defect cannot pass independent review");
 const levelBoundReview = await runWithResults([result("q1", true)], [question("q1")], "", undefined, "C");
 assert.match(levelBoundReview.requestBody.input[0].content, /selected exam level is C/i);
 assert.match(levelBoundReview.requestBody.input[0].content, /actual demand against this E\/C\/A target/i);
@@ -90,11 +109,12 @@ const comparisonContext = await runWithResults(
   "",
   undefined,
   undefined,
-  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", correct_index: 2, model_answer: "Facit ska inte delas." }],
+  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", correct_index: 2, model_answer: "Facit ska inte delas." }],
 );
 const comparisonPayload = JSON.parse(comparisonContext.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(comparisonPayload.comparison_questions, [{
   id: "approved-1", type: "mc", question: "Vilken process frigör energi?",
+  concept_tag: "Cellandning",
 }], "repair review receives only approved question identity and wording, not answer keys or rubric");
 assert.deepEqual(comparisonPayload.questions.map(({ id }) => id), ["retry-1"],
   "comparison-only questions do not change the required review result IDs");
@@ -109,6 +129,12 @@ const oversizedComparison = await runWithResults(
 assert.equal(oversizedComparison.outcome.callOk, false, "oversized comparison context fails closed");
 assert.equal(oversizedComparison.outcome.failureReason, "invalid_review_input");
 assert.equal(oversizedComparison.fetchCalls, 0, "oversized comparison context makes no provider call");
+const oversizedConceptTag = await runWithResults(
+  [result("retry-1", true)], [question("retry-1")], "", undefined, undefined,
+  [{ id: "approved-1", question: "Question", concept_tag: "x".repeat(101) }],
+);
+assert.equal(oversizedConceptTag.outcome.failureReason, "invalid_review_input",
+  "comparison concept tags remain bounded before reaching the reviewer");
 const boundedReview = await runWithResults([result("q1", true)], [question("q1")], "", 6_500);
 assert.equal(boundedReview.requestTimeoutMs, 6_500, "retry can bound the reviewer to the remaining function budget");
 const cappedReview = await runWithResults([result("q1", true)], [question("q1")], "", 60_000);

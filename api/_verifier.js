@@ -70,6 +70,7 @@ const REVIEW_FAILURE_CATEGORIES = [
   "source_support",
   "question_clarity",
   "language_quality",
+  "repeated_learning_objective",
   "difficulty_match",
   "reviewer_other",
 ];
@@ -101,6 +102,9 @@ function classifyReviewFindings(requiredChanges) {
   if (/(language|språk|grammat|stavning|nonsens|idiomat|formulering)/iu.test(text)) {
     categories.push("language_quality");
   }
+  if (/(duplicat|repeat|repeated|near.?paraphras|same\s+(?:learning\s+)?(?:objective|concept|skill)|overlap(?:s|ping)?\s+with\s+(?:an?\s+)?(?:existing|another|previous)|upprep|parafras|samma\s+(?:lärandemål|begrepp|färdighet)|överlapp(?:ar|ning)?)/iu.test(text)) {
+    categories.push("repeated_learning_objective");
+  }
   if (/(difficulty|svårighets|svarighets|nivå|niva|level|cognitive)/iu.test(text)) {
     categories.push("difficulty_match");
   }
@@ -130,6 +134,8 @@ function reviewInputWithinLimits(input) {
   for (const question of comparisons) {
     if (!question || typeof question.id !== "string" || !question.id.trim() ||
         typeof question.question !== "string" || question.question.length > 3000) return false;
+    if (question.concept_tag !== undefined &&
+        (typeof question.concept_tag !== "string" || question.concept_tag.length > 100)) return false;
     size += JSON.stringify(question).length;
     if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
   }
@@ -238,7 +244,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
       "eller en svårighetsgrad som inte matchar den valda E/C/A-nivån och uppgiftens faktiska krav. cognitive_level är en separat beskrivning av tänkandet och får inte ensam avgöra nivån. " +
       "För option_quality ska du bedöma VARJE alternativ i samma ordning: true endast om alternativet är begripligt, språkligt rimligt och relevant som svar eller distraktor i ämnet; false för nonsensord, trasig text, oförklarad språkblandning eller uppenbart irrelevant alternativ. " +
-      "Granska också själva frågestammen för idiomatisk, grammatiskt korrekt svenska, särskilt böjning, bestämd form och prepositioner; avvisa en fråga som innehåller en påhittad böjningsform av en fackterm (skriv exempelvis 'linjens ekvation', inte 'linjären'). " +
+      "Granska också själva frågestammen för idiomatisk, grammatiskt korrekt svenska, särskilt böjning, bestämd form, kongruens, stavning och prepositioner; avvisa tydliga grammatikfel (exempelvis 'den viktigt') med approved=false och en konkret required_change, och ge inte högt language_quality åt sådana formuleringar. Avvisa också en fråga som innehåller en påhittad böjningsform av en fackterm (skriv exempelvis 'linjens ekvation', inte 'linjären'). " +
       "review_hints kan innehålla en intern formatvarning eller granskningssignal, till exempel blandat källstöd eller att inga enordsalternativ matchar källtexten. Behandla den som en signal att granska extra noggrant, aldrig som en slutsats: avvisa inte enbart på grund av flaggan eller källfrånvaro; kontrollera varje alternativ och godkänn giltiga synonymer, namn och facktermer även när de inte står ordagrant i källtexten. " +
       "Godkänn legitima facktermer, namn, korta metodnamn, tal, formler, kod och andra ämnesspecifika uttryck när de är giltiga. Antalet boolean-värden måste motsvara antalet svarsalternativ; kortsvar utan alternativ får en tom lista. " +
       "Sätt language_match=true endast om alla elevriktade fält är på det valda provspråket (svenska), bortsett från egennamn, formler, etablerade facktermer och exakta källcitat. Ett grammatiskt korrekt fält på fel språk är ändå en språkavvikelse; sätt language_match=false. " +
@@ -254,6 +260,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match the selected E/C/A target and actual task demand. cognitive_level describes the type of thinking separately and must not determine the target level by itself. " +
       "For option_quality, assess EVERY option in order: true only when it is intelligible, linguistically plausible, and relevant as an answer or distractor in the subject; false for nonsense words, broken text, unexplained language mixing, or clearly irrelevant choices. " +
+      "Also inspect every question stem for idiomatic, grammatically correct English, including agreement, inflection, spelling, and prepositions. Reject obvious grammar defects with approved=false and a concrete required_change; do not assign a high language_quality score to such wording. " +
       "review_hints may contain an internal review signal, such as mixed source support or no single-word options matching the source. Treat it as a cue for closer inspection, never as a conclusion: check every option and do not reject solely because of the flag or source absence; retain valid synonyms, names, and technical terms even when not stated verbatim in the source. " +
       "Keep valid technical terms, names, concise method names, numbers, formulas, code, and other valid subject-specific expressions. The boolean count must match the option count; short-answer items with no options use an empty list. " +
       "Set language_match=true only when every learner-facing field is in the selected output language (English), except proper names, formulas, established technical terms, and exact source quotations. A grammatically fluent field in another language is still a mismatch; set language_match=false. " +
@@ -320,6 +327,7 @@ async function verifyQuestions(questions, opts) {
       id: q && typeof q.id === "string" ? q.id : "",
       type: q?.type,
       question: q?.question,
+      ...(typeof q?.concept_tag === "string" ? { concept_tag: q.concept_tag } : {}),
     }));
   }
   const reviewPayload = JSON.stringify(reviewInput);

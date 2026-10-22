@@ -9,6 +9,8 @@ const retentionMigration = fs.readFileSync(new URL("../../supabase/migrations/20
 const retentionRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140200_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
 const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
+const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
+const repeatedObjectiveFeedbackRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback_ROLLBACK.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
@@ -42,6 +44,7 @@ async function makeDb() {
   await db.exec(retentionMigration);
   await db.exec(preflightReleaseMigration);
   await db.exec(feedbackMigration);
+  await db.exec(repeatedObjectiveFeedbackMigration);
   return db;
 }
 
@@ -97,7 +100,7 @@ async function addJob(db, options = {}) {
 
 test("private repair feedback shares checkpoint/retry fencing, bounds and terminal cleanup", async () => {
   const db = await makeDb();
-  const feedback = { reviewFailureCounts: { answer_alignment: 2 }, solverFailureCounts: {}, duplicateCount: 1 };
+  const feedback = { reviewFailureCounts: { answer_alignment: 2, repeated_learning_objective: 1 }, solverFailureCounts: {}, duplicateCount: 1 };
   const accepted = [{ id: "server-q1", type: "mc", question: "Synthetic approved task", validation_status: "verified" }];
   const checkpoint = async (lease, expected, questions, value = feedback, next = "repair") =>
     (await db.query("select public.checkpoint_mock_exam_generation_pipeline_batch($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb) as r",
@@ -168,6 +171,58 @@ test("private repair feedback shares checkpoint/retry fencing, bounds and termin
     assert.deepEqual(terminal.accepted_questions, []);
     assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [u1])).rows[0].mock_quota_count, 0);
   } finally { await db.close(); }
+});
+
+test("repeated-learning-objective checkpoint feedback migration preserves grants and rollback", async () => {
+  const db = await makeDb();
+  const feedback = { reviewFailureCounts: { repeated_learning_objective: 1 }, solverFailureCounts: {}, duplicateCount: 0 };
+  const checkpoint = async () => (await db.query(
+    "select public.checkpoint_mock_exam_generation_pipeline_batch($1,$2,'generate','repair','[]'::jsonb,0,$3::jsonb) as r",
+    [jobId, token, JSON.stringify(feedback)],
+  )).rows[0].r;
+  try {
+    assert.equal((await checkpoint()).status, "fenced",
+      "the new allowlisted category passes feedback validation before job fencing");
+    await db.exec("set role service_role");
+    assert.equal((await checkpoint()).status, "fenced",
+      "service_role can execute the checkpoint function");
+    await db.exec("reset role");
+    await db.exec(repeatedObjectiveFeedbackRollback);
+    assert.equal((await checkpoint()).status, "invalid_checkpoint",
+      "rollback restores the prior fixed-category allowlist");
+    for (const role of ["anon", "authenticated"]) {
+      await db.exec(`set role ${role}`);
+      await assert.rejects(() => checkpoint(), /permission denied/,
+        `${role} cannot execute the replaced security-definer checkpoint`);
+      await db.exec("reset role");
+    }
+  } finally { await db.close(); }
+});
+
+test("repeated-learning-objective rollback refuses while any active job remains", async () => {
+  for (const state of ["queued", "running"]) {
+    const db = await makeDb();
+    const feedback = { reviewFailureCounts: { repeated_learning_objective: 1 }, solverFailureCounts: {}, duplicateCount: 0 };
+    const checkpoint = async (checkpointJobId) => (await db.query(
+      "select public.checkpoint_mock_exam_generation_pipeline_batch($1,$2,'generate','repair','[]'::jsonb,0,$3::jsonb) as r",
+      [checkpointJobId, token, JSON.stringify(feedback)],
+    )).rows[0].r;
+    try {
+      await addParent(db);
+      await addJob(db, {
+        state,
+        stage: state === "running" ? "generate" : "repair",
+        leaseToken: state === "running" ? token : null,
+        payload: { pastedText: "synthetic source without repair feedback" },
+      });
+      await assert.rejects(
+        db.exec(repeatedObjectiveFeedbackRollback),
+        /Rollback refused while active pipeline jobs remain/,
+      );
+      assert.equal((await checkpoint("77777777-7777-4777-8777-777777777777")).status, "fenced",
+        "the failed rollback leaves the category allowlist installed");
+    } finally { await db.close(); }
+  }
 });
 
 test("retention cron rollback removes only the schedule created by this migration", async () => {

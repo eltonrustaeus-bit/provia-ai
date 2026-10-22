@@ -581,6 +581,25 @@ const DUPLICATE_QUESTION_FILLER = new Set([
   "hur", "ska", "kan", "du", "the", "what", "which", "is", "are", "a", "an", "of", "to", "for", "how",
   "find", "solve", "calculate", "determine", "explain", "show",
 ]);
+const SEMANTIC_DUPLICATE_FILLER = new Set([
+  ...DUPLICATE_QUESTION_FILLER,
+  "den", "det", "de", "en", "ett", "dessa", "dess", "och", "samt", "and",
+  "beskriv", "förklara", "definiera", "menas", "avses", "innebär", "varför", "viktig", "betydelse",
+  "betyder", "betyd", "innebä", "redogör", "redogöra", "redogö", "resonera", "exempel", "faktor", "faktorer", "påverka", "roll", "funktion", "skillnad", "jämför", "jämfö",
+  "describe", "explain", "define", "meaning", "why", "important", "importance", "example", "factor",
+  "role", "function", "difference", "compare", "affect", "affected", "outline", "discuss",
+]);
+const SEMANTIC_SHORT_TOKENS = new Set(["or", "no", "if", "vs", "x", "y", "z", "n", "m", "b", "c", "i", "j"]);
+const QUESTION_INTENT_PATTERNS = [
+  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
+  ["definition", /\b(?:vad\s+(?:menas|avses|innebär|är)|definiera|what\s+is|define|meaning)\b/u],
+  ["importance", /\b(?:varför|viktig|viktigt|betydelse|why|important|importance)\b/u],
+  ["effect", /\b(?:påverka\w*|faktor\w*|orsak\w*|affect\w*|factor\w*|cause\w*)\b/u],
+  ["relationship", /\b(?:samband|relater\w*|relation\w*|koppl\w*|relationship|connect\w*|relate\w*)\b/u],
+  ["difference", /\b(?:skillnad\w*|jämför\w*|difference\w*|compare\w*|contrast\w*)\b/u],
+  ["role", /\b(?:roll|bidrar|bidra|role|contribut\w*)\b/u],
+  ["process", /\b(?:process|processen|processer|processes|steg|steps)\b/u],
+];
 
 function questionDedupeSignature(question) {
   const tokens = String(question?.question || "")
@@ -592,6 +611,171 @@ function questionDedupeSignature(question) {
     .filter((token) => !DUPLICATE_QUESTION_FILLER.has(token))
     .map((token) => token.length > 6 ? token.replace(/(?:en|et)$/u, "") : token);
   return significant.length ? significant.join(" ") : "";
+}
+
+function semanticQuestionTokenSequence(question) {
+  const tokens = String(question?.question || "")
+    .normalize("NFKC")
+    .replace(/[−–—]/g, "-")
+    .match(/[\p{L}\p{N}]+/gu) || [];
+  return tokens.map((sourceToken) => {
+    const token = sourceToken.toLowerCase();
+    const isUppercaseVariable = /^[A-ZÅÄÖ]$/u.test(sourceToken);
+    const verbStem = token.replace(/(?:ar|as)$/u, "a");
+    return {
+      token: verbStem.length > 5
+        ? verbStem.replace(/(?:ens|ets|erna|arna|orna|en|et|ar|er|or|s|t|r)$/u, "")
+        : verbStem,
+      isUppercaseVariable,
+    };
+  }).filter(({ token, isUppercaseVariable }) =>
+    (isUppercaseVariable || token.length > 2 || SEMANTIC_SHORT_TOKENS.has(token)) &&
+    (isUppercaseVariable || !SEMANTIC_DUPLICATE_FILLER.has(token)))
+    .map(({ token }) => token);
+}
+
+function commutativeComparisonSignature(question) {
+  const match = String(question?.question || "").normalize("NFKC")
+    .match(/^\s*(?:jämför|compare)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s+(?:och|and)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s*[?.!]*\s*$/iu);
+  if (!match) return "";
+  const operands = match.slice(1).map((operand) => semanticQuestionTokenSequence({ question: operand }).join(" "));
+  if (operands.some((operand) => !operand)) return "";
+  return operands.sort().join(" <-> ");
+}
+
+function semanticQuestionTokens(question) {
+  return new Set(semanticQuestionTokenSequence(question));
+}
+
+function semanticConceptTag(question) {
+  return String(question?.concept_tag || question?.concept || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function questionIntents(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  return new Set(QUESTION_INTENT_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([intent]) => intent));
+}
+
+function canonicalLogicalStructure(structure, sourceText) {
+  const tokens = structure.map((entry) => ({ ...entry }));
+  while (true) {
+    const stack = [];
+    const matchingClose = new Map();
+    const depthAt = [];
+    let depth = 0;
+    for (let index = 0; index < tokens.length; index++) {
+      if (tokens[index].token === "(") {
+        depthAt[index] = depth;
+        stack.push(index);
+        depth++;
+      } else if (tokens[index].token === ")") {
+        depth = Math.max(0, depth - 1);
+        depthAt[index] = depth;
+        if (stack.length) matchingClose.set(stack.pop(), index);
+      } else {
+        depthAt[index] = depth;
+      }
+    }
+
+    let removedRedundantPair = false;
+    for (const [open, close] of matchingClose) {
+      const pairDepth = depthAt[open];
+      const insideOperators = tokens.slice(open + 1, close)
+        .filter((entry, offset) => depthAt[open + 1 + offset] === pairDepth + 1 &&
+          (entry.token === "and" || entry.token === "or"))
+        .map((entry) => entry.token);
+      const outsideOperators = tokens
+        .filter((entry, index) => depthAt[index] === pairDepth &&
+          (index < open || index > close) && (entry.token === "and" || entry.token === "or"))
+        .map((entry) => entry.token);
+      const innerText = sourceText.slice(tokens[open].end, tokens[close].start);
+      const redundantAtomicGrouping = /^[\s\p{L}\p{N}_]+$/u.test(innerText) &&
+        semanticQuestionTokenSequence({ question: innerText }).length === 1;
+      const redundantExpressionGrouping = insideOperators.length > 0 && (
+        outsideOperators.length === 0 ||
+        insideOperators.every((operator) => operator === "and") ||
+        (insideOperators.every((operator) => operator === "or") &&
+          outsideOperators.every((operator) => operator === "or"))
+      );
+      const redundantNestedGrouping = tokens[open + 1]?.token === "(" &&
+        matchingClose.get(open + 1) === close - 1;
+      if (redundantAtomicGrouping || redundantExpressionGrouping || redundantNestedGrouping) {
+        tokens.splice(close, 1);
+        tokens.splice(open, 1);
+        removedRedundantPair = true;
+        break;
+      }
+    }
+    if (!removedRedundantPair) return tokens.map((entry) => entry.token);
+  }
+}
+
+function questionLogicalStructureSequence(question) {
+  const text = String(question?.question || "").normalize("NFKC");
+  const matches = [...text.matchAll(/[\p{L}\p{N}]+|[()]/gu)];
+  const structure = [];
+  const connectors = [];
+  let hasConnective = false;
+  for (const match of matches) {
+    const token = match[0].toLowerCase();
+    if (token === "och" || token === "and") {
+      const connector = { token: "and", start: match.index, end: match.index + match[0].length };
+      structure.push(connector);
+      connectors.push(connector);
+      hasConnective = true;
+    } else if (token === "eller" || token === "or") {
+      const connector = { token: "or", start: match.index, end: match.index + match[0].length };
+      structure.push(connector);
+      connectors.push(connector);
+      hasConnective = true;
+    } else if (token === "(" || token === ")") {
+      structure.push({ token, start: match.index, end: match.index + match[0].length });
+    }
+  }
+  if (!hasConnective) return [];
+
+  // A malformed candidate must not make a valid question look like a duplicate.
+  const hasOperandOnBothSides = connectors.every(({ start, end }) => {
+    const before = text.slice(0, start).trimEnd().at(-1) || "";
+    const after = text.slice(end).trimStart()[0] || "";
+    return /[\p{L}\p{N}_)\]]/u.test(before) && /[\p{L}\p{N}_(\[]/u.test(after);
+  });
+  return hasOperandOnBothSides ? canonicalLogicalStructure(structure, text) : null;
+}
+
+function semanticDuplicateQuestion(left, right) {
+  const leftStructure = questionLogicalStructureSequence(left);
+  const rightStructure = questionLogicalStructureSequence(right);
+  if (leftStructure === null || rightStructure === null) return false;
+  if (leftStructure.length !== rightStructure.length ||
+      leftStructure.some((token, index) => token !== rightStructure[index])) return false;
+  if (leftStructure.length) {
+    const leftSequence = semanticQuestionTokenSequence(left);
+    const rightSequence = semanticQuestionTokenSequence(right);
+    const sameSequence = leftSequence.length === rightSequence.length &&
+      leftSequence.every((token, index) => token === rightSequence[index]);
+    const sameCommutativeComparison = commutativeComparisonSignature(left) &&
+      commutativeComparisonSignature(left) === commutativeComparisonSignature(right);
+    if (!sameSequence && !sameCommutativeComparison) return false;
+  }
+
+  const leftTokens = semanticQuestionTokens(left);
+  const rightTokens = semanticQuestionTokens(right);
+  const sharedTokens = [...leftTokens].filter((token) => rightTokens.has(token));
+  const unionSize = new Set([...leftTokens, ...rightTokens]).size;
+  if (!unionSize) return false;
+
+  const leftConcept = semanticConceptTag(left);
+  const sameConcept = Boolean(leftConcept && leftConcept === semanticConceptTag(right));
+  if (sharedTokens.length < (sameConcept ? 2 : 4)) return false;
+  if (sharedTokens.length / unionSize < (sameConcept ? 0.70 : 0.65)) return false;
+
+  const leftIntents = questionIntents(left);
+  return [...leftIntents].some((intent) => questionIntents(right).has(intent));
 }
 
 function mathQuestionIntent(question) {
@@ -617,7 +801,14 @@ function mathQuestionExpression(question) {
 
 function isDuplicateQuestion(left, right) {
   const signature = questionDedupeSignature(left);
-  if (signature && signature === questionDedupeSignature(right)) return true;
+  if (signature && signature === questionDedupeSignature(right)) {
+    const leftStructure = questionLogicalStructureSequence(left);
+    const rightStructure = questionLogicalStructureSequence(right);
+    if (leftStructure !== null && rightStructure !== null &&
+        leftStructure.length === rightStructure.length &&
+        leftStructure.every((token, index) => token === rightStructure[index])) return true;
+  }
+  if (semanticDuplicateQuestion(left, right)) return true;
   const leftIntent = mathQuestionIntent(left);
   const expression = mathQuestionExpression(left);
   return Boolean(leftIntent && expression

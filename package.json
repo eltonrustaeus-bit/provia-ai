@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "a11y-audit": "node scripts/a11y-audit.mjs"
+    "a11y-audit": "node scripts/a11y-audit.mjs",
+    "xeliov:context": "node scripts/xeliov-agent-context.mjs",
+    "xeliov:context:test": "node --test tests/docs/xeliov-agent-context.test.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",

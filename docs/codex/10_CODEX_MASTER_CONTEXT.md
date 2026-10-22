@@ -2,6 +2,15 @@
 
 Läs denna först i framtida Codex-sessioner. Den är en kompakt onboarding för ExGen-kodbasen.
 
+## Återanvändbara agenter och lärdomar
+
+Inför substantiellt ExGen-arbete: läs `docs/codex/15_AGENT_PLAYBOOK.md` för
+granskarkort och körbara granskningspaket, och `docs/codex/16_LEARNING_LEDGER.md`
+för verifierade, begränsade lärdomar. Återanvänd roller, inte antagandet att en
+historisk agentinstans finns kvar. Håll en huvudskribent, delegera avgränsade
+skrivskyddade granskningar och verifiera fynd i kod/test innan de blir bestående
+lärdomar. Handoffs är AI-rapporterade tills källorna har kontrollerats.
+
 ## Vad ExGen är
 
 ExGen är en studieplattform för grundskole- och gymnasieelever. Kärnloopen:
