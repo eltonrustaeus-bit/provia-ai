@@ -2,6 +2,25 @@
 
 Prepared 2026-10-22. This is a reviewable release scope, not execution authority.
 
+## Execution result — 2026-10-22
+
+User explicitly approved this package. Code commit `f06ad7d` was pushed to
+the feature branch and is READY in Preview `dpl_5iw7aHseSpgXNaYXLkZqQ5bm9i1V`.
+All four migrations below were applied to staging in order. Hosted RPC/client
+ACL checks and deployed public staging-runtime checks passed. Production and
+main were not changed. The baseline below is the pre-execution snapshot.
+
+The one approved synthetic 12-question live test failed full-count acceptance:
+job `080ceb86-2647-46da-8399-2c9dd3d4ee2b` reached only 2/12 after four batches,
+then failed with `STAGE_RETRY_LIMIT`, issuing no exam. UI correctly described
+the incomplete outcome, but live progress was written to the hidden legacy UI.
+Later batches lost their approved candidate at the duplicate guard; inline
+repair was skipped three times and failed normalization once. No successful
+live completion or replay is claimed. See `08_CURRENT_STATUS.md` for timings,
+review findings and limitations. Remaining authorized budget is USD 4.530004;
+this is not a fresh allowance. Further work needs real cross-request repair,
+visible progress and diagnosis separating ID collisions from semantic duplicates.
+
 ## Verified baseline
 
 - Checkout: feature worktree, branch `codex/exgen-generation-quality-2026-10-20`.

@@ -1,5 +1,50 @@
 # 08 Current Status
 
+## Approved staging package executed; live 12-question acceptance failed — 2026-10-22
+
+This section supersedes earlier pending-approval/deployment snapshots below.
+
+- [x] User approved the staging package. Committed generation changes as
+  `f06ad7df27162f4f29dac3c0710db342f679ad59` and pushed the existing feature
+  branch only. Vercel deployment `dpl_5iw7aHseSpgXNaYXLkZqQ5bm9i1V` is READY
+  at that SHA. Its automatic branch alias retained a usable staging session;
+  no credentials or alias configuration were changed.
+- [x] Applied the four checklist migrations in order to staging
+  `yhcinqejsocpmmetazpz` only. Hosted checks deny anon/authenticated execution
+  of all four new RPCs and grant service_role execution. Pipeline and schedule
+  ownership tables have RLS enabled and deny client SELECT; retention cron is
+  active every 15 minutes. The ownership migration does not itself enable RLS,
+  so its observed hosted RLS state is not proof of portable migration behavior.
+- [x] Verified Preview branch-scoped variable metadata without reading values,
+  and fetched deployed public runtime configuration: staging project present,
+  production project absent. Post-commit sitemap test passed. Independent
+  release reviewer reran 22 local pipeline/HTTP/PGlite tests successfully.
+- [!] One synthetic Mathematics 2b/C/short-answer/12-question UI test ran as
+  job `080ceb86-2647-46da-8399-2c9dd3d4ee2b`, 16:54:51–16:57:04 UTC.
+  Four batches requested three candidates each; reviewer approved 2/1/1/1
+  and rejected 1/2/2/2. Each later approved candidate hit the duplicate guard.
+  Progress remained 2/12; terminal code was `STAGE_RETRY_LIMIT`. No exam was
+  issued, ledger is retryable with no response, private checkpoints were
+  scrubbed on terminal failure. UI correctly reported 2/12 and no issued exam.
+  This is a failed full-count acceptance test, not pilot readiness.
+- [!] Batch latencies were 29.605/30.441/32.329/33.093 seconds. Inline repair
+  did not start in the first three batches; the last attempted repair failed
+  normalization. Review failures included answer_alignment and required_changes.
+  Source review confirms the repair time gate needs more than 16 seconds
+  remaining within the roughly 45-second worker budget. No rejected-candidate
+  feedback is persisted for the next batch; the repair stage is not entered.
+  Duplicate telemetry combines ID collisions and semantic matches, so this
+  evidence does not distinguish their contributions.
+- [!] Visible exam-flow UI kept the static under-a-minute promise; progress
+  updates currently target the hidden legacy status element. Bridge progress
+  into the visible flow and implement reviewed cross-request repair next.
+- [x] Budget before/after: spent USD 0.208611 -> 0.244268, reserved unchanged
+  at 0.225728, remaining USD 4.530004 of total cap 5. Delta USD 0.035657 is
+  application budget accounting, not a verified provider invoice. No further
+  live attempt, account/role/quota/secrets change, main merge or production write.
+- [!] Successful live issuance/replay, hosted concurrent claims and full-count
+  acceptance remain unverified. Do not restart paid attempts on unchanged code.
+
 ## Failed AI-cost settlement preserves the cap — 2026-10-22
 
 - [x] Added a PGlite integration test connecting the actual budgeted-fetch and
