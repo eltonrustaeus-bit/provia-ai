@@ -50,14 +50,21 @@ assert.equal(generateExam.pickModel({ isMath: true, env: { OPENAI_MODEL_EXAM: "g
   "the explicit math model remains the most specific override");
 assert.equal(generateExam.minimumDeliverableQuestionCount(3), 2);
 assert.equal(generateExam.minimumDeliverableQuestionCount(10), 6);
-assert.equal(generateExam.qualityRepairCandidateCountFor(3, null, 0), 6,
-  "a 0/3 first-pass result requests the bounded maximum of six repair candidates");
-assert.equal(generateExam.qualityRepairCandidateCountFor(2, null, 1), 3,
-  "a partially approved exam retains the ordinary one-spare repair count");
-assert.equal(generateExam.qualityRepairCandidateCountFor(3, { mc: 2, short: 1 }, 0), 6,
-  "zero-approved mixed repairs remain balanced within the six-candidate cap");
-assert.equal(generateExam.qualityRepairCandidateCountFor(20, null, 0), 6,
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, null), 4,
+  "a 0/3 first-pass result requests three slots plus one spare, not six candidates");
+assert.equal(generateExam.qualityRepairCandidateCountFor(2, null), 3,
+  "a two-slot repair retains one spare candidate");
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, { mc: 2, short: 1 }), 5,
+  "zero-approved mixed repairs retain one spare per missing type within the cap");
+assert.equal(generateExam.qualityRepairCandidateCountFor(20, null), 6,
   "repair candidate output remains capped at six for large exams");
+const zeroApprovedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: generateExam.qualityRepairCandidateCountFor(3, null), qType: "short" });
+assert.equal(zeroApprovedRepair.text.format.schema.properties.questions.maxItems, 4,
+  "the actual zero-approved 0/3 repair schema is bounded to four candidates");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "mc" }, { type: "short" }], { requested: 3, qType: "mix" }), true,
   "a partial mixed exam still contains both requested formats");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }, { type: "short" }], { requested: 3, qType: "mix" }), false,
@@ -1759,8 +1766,8 @@ try {
   }, "zero-question rejection records safe aggregate reviewer categories");
   const noApprovedRepairCall = calls.findLast((call) => call.body?.stream
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
-  assert.equal(noApprovedRepairCall.body.text.format.schema.properties.questions.minItems, 6,
-    "a complete first-pass rejection expands only the bounded repair batch");
+  assert.equal(noApprovedRepairCall.body.text.format.schema.properties.questions.minItems, 4,
+    "a complete 0/3 rejection uses three needed candidates plus one spare");
   const noApprovedRepairInstruction = noApprovedRepairCall.body.input.at(-1).content;
   assert.match(noApprovedRepairInstruction, /"low_factual_accuracy":3/);
   assert.match(noApprovedRepairInstruction, /"answer_alignment":3/);
@@ -1811,7 +1818,7 @@ try {
   const solverOnlyRepairCall = calls.findLast((call) => call.body?.stream
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
   const solverOnlyRepairInstruction = solverOnlyRepairCall.body.input.at(-1).content;
-  assert.equal(solverOnlyRepairCall.body.text.format.schema.properties.questions.minItems, 6);
+  assert.equal(solverOnlyRepairCall.body.text.format.schema.properties.questions.minItems, 4);
   assert.match(solverOnlyRepairInstruction, /"solver_implausible_option":3/,
     "solver-only failures provide the repair with a safe aggregate category");
   assert.match(solverOnlyRepairInstruction, /byt ut varje distraktor mot ett naturligt, etablerat ämnesbegrepp/i,

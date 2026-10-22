@@ -1143,11 +1143,11 @@ function repairCandidateCountFor(missingSlots, missingTypes = null) {
   return Math.min(6, slots + Math.max(1, missingTypeCount));
 }
 
-function qualityRepairCandidateCountFor(missingSlots, missingTypes, approvedCount) {
-  const slots = Math.max(1, Number(missingSlots) || 1);
-  const standardCount = repairCandidateCountFor(slots, missingTypes);
-  if (Number(approvedCount) > 0) return standardCount;
-  return Math.min(6, Math.max(standardCount, slots * 2));
+function qualityRepairCandidateCountFor(missingSlots, missingTypes) {
+  // Keep one spare candidate, as in structural repair. Doubling a completely
+  // rejected batch can make its structured response too large for the same
+  // function budget needed by verification and issuance.
+  return repairCandidateCountFor(missingSlots, missingTypes);
 }
 
 function mixedTypeTargets(numQuestions) {
@@ -1970,7 +1970,7 @@ module.exports = async function handler(req, res) {
               ? selectMixedQuestions(round1ApprovedQuestions, mixedTypeTargets(numQuestions)).missing
               : null;
             const repairCount = qualityRepairCandidateCountFor(
-              repairSlots, missingTypes, round1ApprovedQuestions.length,
+              repairSlots, missingTypes,
             );
             const repairPayload = buildRepairPayload(payload, {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
