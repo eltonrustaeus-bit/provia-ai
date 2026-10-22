@@ -1411,7 +1411,7 @@ try {
   assert.equal(exhaustedRepairBudgetLog.structuralRepairAttempted, true);
   assert.equal(exhaustedRepairBudgetLog.qualityRepairAttempted, false,
     "quality repair is not started when its protected generation/review/finalization budget is unavailable");
-  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 32_000,
+  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 30_000,
     "the synthetic latency leaves less than the required bounded repair window");
   assert.equal(exhaustedRepairBudgetLog.qualityRepairGenerationTimeoutMs, null);
   assert.equal(exhaustedRepairBudgetLog.finalQuestionCount, 0,

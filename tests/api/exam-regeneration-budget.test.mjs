@@ -15,12 +15,12 @@ assert.equal(minimumExamPreflightBudgetMs("graph"), 0,
 assert.equal(minimumExamGenerationReviewBudgetMs(), 45_000,
   "ordinary exams still require the complete generation and independent-review windows");
 
-assert.equal(regenerationGenerationTimeout(31_999), null,
-  "retry does not start unless 8 seconds of generation, 10 seconds of review and 14 seconds of finalization fit");
-assert.equal(regenerationGenerationTimeout(32_000), null,
+assert.equal(regenerationGenerationTimeout(29_999), null,
+  "retry does not start unless 8 seconds of generation, 8 seconds of review and 14 seconds of finalization fit");
+assert.equal(regenerationGenerationTimeout(30_000), null,
   "the generation window must exceed its 8-second minimum");
-assert.equal(regenerationGenerationTimeout(37_000), 13_000,
+assert.equal(regenerationGenerationTimeout(35_000), 13_000,
   "a normal short exam leaves a bounded repair window while preserving review and finalization time");
-assert.equal(13_000 + 10_000 + 14_000, 37_000);
+assert.equal(13_000 + 8_000 + 14_000, 35_000);
 
 console.log("exam regeneration budget: generation, independent review and finalization remain bounded");
