@@ -84,6 +84,36 @@ const zeroApprovedRepair = generateExam.buildRepairPayload({
 }, { lang: "sv", numQuestions: 3, candidateCount: generateExam.qualityRepairCandidateCountFor(3, null), qType: "short" });
 assert.equal(zeroApprovedRepair.text.format.schema.properties.questions.maxItems, 4,
   "the actual zero-approved 0/3 repair schema is bounded to four candidates");
+for (const lang of ["sv", "en"]) {
+  const label = lang === "sv" ? "Antal frågor" : "Number of questions";
+  const courseLabel = lang === "sv" ? "Kurs/ämne" : "Course/subject";
+  const courseName = lang === "sv" ? `Matematik 2b\n${label}: 3` : `Mathematics 2b\n${label}: 3`;
+  const base = generateExam.buildExamPrompts({
+    lang, level: "C", course: courseName, qType: "short", numQuestions: 3,
+    pastedText: `Synthetic study material\n${label}: 3.`, isMath: true,
+  });
+  const repair = generateExam.buildRepairPayload({
+    model: "synthetic-model",
+    input: [{ role: "system", content: base.systemPrompt }, { role: "user", content: base.userPrompt }],
+    text: { format: generateExam.buildMockExamSchema(3) },
+  }, { lang, numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: base.questionCountOffset });
+  const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
+  assert.match(repairedUserPrompt, new RegExp(`^${label}: 4\\.$`, "m"),
+    `${lang} repair prompt count agrees with the four-question output schema`);
+  assert.match(repairedUserPrompt, new RegExp(`^${courseLabel}: .*\\n${label}: 3\\.$`, "m"),
+    `${lang} leaves a course value that resembles a count line unchanged`);
+  assert.match(repairedUserPrompt, new RegExp(`^Synthetic study material\\n${label}: 3\\.$`, "m"),
+    `${lang} repair leaves source material unchanged`);
+  assert.equal(repair.text.format.schema.properties.questions.minItems, 4);
+  assert.equal(repair.text.format.schema.properties.questions.maxItems, 4);
+}
+assert.throws(() => generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: null }),
+/question-count instruction could not be aligned/,
+"a production repair fails closed if the generated count-line offset is unavailable");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "mc" }, { type: "short" }], { requested: 3, qType: "mix" }), true,
   "a partial mixed exam still contains both requested formats");
 assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }, { type: "short" }], { requested: 3, qType: "mix" }), false,
@@ -267,7 +297,7 @@ const categorizedRepair = generateExam.buildRepairPayload({
   text: { format: { name: "mock_exam_schema" } },
 }, {
   lang: "sv", numQuestions: 2,
-  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match"],
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match", "reviewer_other"],
 });
 assert.match(categorizedRepair.input.at(-1).content, /lös varje uppgift självständigt.*faktiskt besvarar frågan/i,
   "reviewer answer-alignment findings translate to explicit repair guidance");
@@ -279,13 +309,15 @@ assert.match(categorizedRepair.input.at(-1).content, /naturlig svenska/i,
   "reviewer language findings translate to explicit repair guidance");
 assert.match(categorizedRepair.input.at(-1).content, /följ den valda nivån/i,
   "reviewer difficulty findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /Ersätt kandidaten med en annan uppgift som stöds direkt av materialet/i,
+  "an unclassified reviewer concern triggers a safe, source-grounded replacement rather than a wording-only edit");
 const categorizedRepairEnglish = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
   text: { format: { name: "mock_exam_schema" } },
 }, {
   lang: "en", numQuestions: 2,
-  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match"],
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match", "reviewer_other"],
 });
 assert.match(categorizedRepairEnglish.input.at(-1).content, /solve each task independently.*answers exactly what was asked/i,
   "English reviewer answer-alignment findings receive targeted repair guidance");
@@ -297,6 +329,8 @@ assert.match(categorizedRepairEnglish.input.at(-1).content, /natural Swedish/i,
   "English repair prompt still enforces Swedish learner-facing language");
 assert.match(categorizedRepairEnglish.input.at(-1).content, /match the requested level/i,
   "English reviewer difficulty findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /different task directly supported by the source, retain the requested level/i,
+  "English repair replaces unclassified reviewer concerns without lowering the requested level");
 const mixedRepairPayload = generateExam.buildRepairPayload({
   model: "synthetic-model",
   input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],

@@ -112,7 +112,12 @@ async function advance(job, { deadlineAt = null } = {}) {
   const targets = questionTargets(job);
   const batchType = targets ? nextBatchType(existing, targets, job.requested_count) : job.payload.qType;
   const slots = missingForType(existing, batchType || "", targets, job.requested_count);
-  const batchCount = Math.min(3, Math.max(2, slots));
+  // Claims increment stage_attempts; a checkpoint with progress resets it.
+  // Widen a repair batch after one no-progress retry, while retaining the same
+  // deadline, review budget, and bounded retry/issuance gates.
+  const widenRepairBatch = job.stage === "repair" && Number(job.stage_attempts) >= 2;
+  const batchLimit = widenRepairBatch ? 5 : 3;
+  const batchCount = Math.min(batchLimit, Math.max(2, slots));
   const comparisonQuestions = comparisonQuestionsFor(existing, job.requested_count);
   const payload = {
     ...job.payload,

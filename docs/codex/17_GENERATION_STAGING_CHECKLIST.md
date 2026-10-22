@@ -137,3 +137,65 @@ The total authorized staging cap is USD 5, not a new allowance per run. No
 production, main merge, secrets, accounts or quota configuration changes are
 included. The goal remains incomplete until hosted evidence supports the
 requested behavior.
+
+## Follow-up staging result — 2026-10-22
+
+- Applied the approved repair-feedback RPC migration only in staging. Supabase
+  recorded version `20261022172446`; hosted ACL check showed `service_role` and
+  database owner only.
+- Pushed only `fadbb3a` and `d95daa8` to the existing feature branch. READY
+  Preview: `dpl_EKKRoewXkvjv2fzh6ryr95MA6qrN`, SHA
+  `d95daa84c2919127e6631521bea5b081fbd9cd93`. Preview variables were confirmed
+  branch-scoped without reading values; public runtime resolved to staging.
+- One approved synthetic C-level Mathematics 2b short-answer run requested 12.
+  Job `3509275b-2696-44c7-a45f-a6e16e27acff` completed five batches and stopped
+  at 2/12 with `STAGE_RETRY_LIMIT`. No exam/submission was issued. The UI showed
+  the live accepted count and correctly described the incomplete result.
+- Sanitized review telemetry showed no structural drops or duplicates; repeated
+  review failures included low source alignment, answer alignment and scoring
+  alignment. Repair ran and accepted two questions over separate rounds, but
+  two later rounds added none. This demonstrates the new repair path, not the
+  requested full-count reliability.
+- Terminal job payload and accepted set were scrubbed; idempotency is retryable,
+  response payload is null, and no submission exists. We did not retry the
+  failed request because another UI retry could make another paid model call.
+- Budget moved from `$0.244268` spent / `$0.225728` reserved to `$0.367660`
+  spent / `$0.225728` reserved. Remaining under the existing `$5` cap is
+  `$4.406612`; the `$0.123392` delta is application accounting, not a provider
+  invoice. Do not treat it as a fresh allowance.
+
+**Acceptance:** staging package deployed and repair behavior exercised;
+12-question acceptance failed (2/12), with no exam issuance. Further code work
+and independent review are required. No additional paid live attempt is
+authorized by this result.
+
+## Local repair prompt consistency fix — 2026-10-22
+
+- Source review found that oversampled structural/inline-quality repairs could
+  receive conflicting counts: the repair schema and final repair instruction
+  used `repairCount`, while the base user prompt still said `numQuestions`.
+  This is a proven code inconsistency, not a proven cause of the hosted 2/12
+  outcome; original private candidate/prompt text was not retained.
+- The prompt builder now returns the exact generated count-line offset.
+  Repair updates only that location and fails closed if the supplied offset is
+  invalid. Swedish/English tests include a multiline course value and source
+  material containing count-like lines and verify neither is altered.
+- Later no-progress repair batches widen from three to at most five candidates.
+  Tests cover the threshold, non-repair batches, the one-slot minimum-two
+  candidate policy, and the invariant that accepted questions never exceed the
+  requested total. Existing verification, solver, source, duplicate and final
+  issuance gates are unchanged.
+- The existing safe `reviewer_other` category now maps to source-grounded
+  replacement guidance in Swedish and English, including keeping the requested
+  level and checking answer/rubric alignment. Raw reviewer notes remain
+  excluded from persistence and repair prompts.
+- Independent API and security reviewers found no blocker and confirmed the
+  null-offset fail-fast correction. The focused 9-file offline suite passed
+  64/64; syntax checks and `git diff --check` passed.
+- These changes are local and uncommitted on top of `d95daa8`; they are not in
+  the READY Preview. No migration, push, deployment, or further paid AI request
+  occurred. The only live acceptance remains 2/12 under the existing `$5` cap.
+
+**Acceptance:** prompt/schema consistency and adaptive-batch behavior have
+offline evidence only; a new separately authorized Preview and staging test
+are still required to measure whether live yield improves.

@@ -160,6 +160,76 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   }
 });
 
+test("repair batches widen after no progress without overfilling the requested exam", async () => {
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  try {
+    for (const { attempts, stage, existingCount, expectedBatch, expectedAccepted } of [
+      { attempts: 1, stage: "repair", existingCount: 2, expectedBatch: 3, expectedAccepted: 3 },
+      { attempts: 2, stage: "repair", existingCount: 2, expectedBatch: 5, expectedAccepted: 5 },
+      { attempts: 2, stage: "repair", existingCount: 10, expectedBatch: 2, expectedAccepted: 2 },
+      { attempts: 2, stage: "repair", existingCount: 11, expectedBatch: 2, expectedAccepted: 1 },
+      { attempts: 2, stage: "generate", existingCount: 0, expectedBatch: 3, expectedAccepted: 3 },
+    ]) {
+      const job = {
+        id: "00000000-0000-4000-8000-000000000015",
+        user_id: "11111111-1111-4111-8111-111111111111",
+        idempotency_key: "22222222-2222-4222-8222-222222222222",
+        request_hash: "a".repeat(64),
+        attempt_id: "33333333-3333-4333-8333-333333333333",
+        lease_token: "44444444-4444-4444-8444-444444444444",
+        deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        stage,
+        stage_attempts: attempts,
+        requested_count: 12,
+        payload: { qType: "short", numQuestions: 12 },
+        accepted_questions: Array.from({ length: existingCount }, (_, index) => ({
+          id: `approved-${index + 1}`, type: "short", question: `Approved ${index + 1}`,
+          validation_status: "verified",
+        })),
+        progress_current: existingCount,
+      };
+      let checkpointedQuestions = null;
+      let requestedBatch = null;
+      operations.renewGenerationLease = async () => true;
+      operations.checkpointPipelineJob = async (input) => {
+        checkpointedQuestions = input.acceptedQuestions;
+        return { status: "checkpointed", stage: input.nextStage, progress_current: input.progressCurrent };
+      };
+      generation.generateVerifiedBatch = async ({ payload }) => {
+        requestedBatch = payload.numQuestions;
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            questions: Array.from({ length: payload.numQuestions }, (_, index) => ({
+              id: `repair-${attempts}-${index + 1}`,
+              type: "short",
+              question: `Verified repair ${attempts}-${index + 1}`,
+              validation_status: "verified",
+            })),
+          },
+        };
+      };
+
+      const result = await pipeline.advance(job, { deadlineAt: Date.now() + 50_000 });
+
+      assert.equal(requestedBatch, expectedBatch);
+      assert.equal(checkpointedQuestions.length, existingCount + expectedAccepted);
+      assert.equal(result.status, "progress");
+      assert.equal(result.approved, existingCount + expectedAccepted);
+      assert.equal(result.requested, 12);
+    }
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
 test("an all-duplicate batch stores repair feedback without advancing the exam", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000015",

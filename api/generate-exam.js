@@ -1161,7 +1161,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
      Den står också i USER-prompten och inte i systemprompten: den gäller just
      den här elevens just det här provet, medan systemprompten är samma för
      alla och cachas. */
-  const userSv = [
+  const userSvParts = [
     `Skapa ett mockprov på nivå ${level}.`,
     cognitiveLevelInstruction(level, "sv"),
     course ? `Kurs/ämne: ${course}.` : "",
@@ -1174,9 +1174,9 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "",
     "Material (använd bara detta som underlag):",
     pastedText
-  ].filter(Boolean).join("\n");
+  ];
 
-  const userEn = [
+  const userEnParts = [
     `Create a mock exam at level ${level}.`,
     cognitiveLevelInstruction(level, "en"),
     course ? `Course/subject: ${course}.` : "",
@@ -1189,9 +1189,22 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "",
     "Material (use only this as the source):",
     pastedText
-  ].filter(Boolean).join("\n");
+  ];
 
-  return { systemPrompt, userPrompt: lang === "sv" ? userSv : userEn };
+  const userPromptParts = (lang === "sv" ? userSvParts : userEnParts).filter(Boolean);
+  const questionCountLine = lang === "en"
+    ? `Number of questions: ${numQuestions}.`
+    : `Antal frågor: ${numQuestions}.`;
+  const questionCountIndex = userPromptParts.indexOf(questionCountLine);
+  const questionCountOffset = questionCountIndex < 0
+    ? null
+    : userPromptParts.slice(0, questionCountIndex).join("\n").length + (questionCountIndex > 0 ? 1 : 0);
+
+  return {
+    systemPrompt,
+    userPrompt: userPromptParts.join("\n"),
+    questionCountOffset,
+  };
 }
 
 function repairCandidateCountFor(missingSlots, missingTypes = null) {
@@ -1285,7 +1298,23 @@ function normalizeRepairFeedback(value) {
   };
 }
 
-function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, qType, missingTypes = null }) {
+function alignRepairPromptQuestionCount(input, lang, numQuestions, repairCount, offset) {
+  if (!Array.isArray(input) || !Number.isInteger(offset) || offset < 0) {
+    return { input: Array.isArray(input) ? input : [], aligned: false };
+  }
+  const label = lang === "en" ? "Number of questions" : "Antal frågor";
+  const expected = `${label}: ${numQuestions}.`;
+  const itemIndex = input.findIndex((item) => item?.role === "user" && typeof item.content === "string");
+  if (itemIndex < 0) return { input, aligned: false };
+  const item = input[itemIndex];
+  if (item.content.slice(offset, offset + expected.length) !== expected) return { input, aligned: false };
+  const content = item.content.slice(0, offset) + `${label}: ${repairCount}.` + item.content.slice(offset + expected.length);
+  const alignedInput = [...input];
+  alignedInput[itemIndex] = { ...item, content };
+  return { input: alignedInput, aligned: true };
+}
+
+function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, qType, missingTypes = null, questionCountOffset }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
   const repairCount = Math.min(6, Math.max(missingSlots, Number(candidateCount) || repairCandidateCountFor(missingSlots, missingTypes)));
@@ -1356,6 +1385,9 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "The reviewer found a level mismatch: match the requested level and avoid hidden or advanced requirements."
           : "",
+        failures.has("reviewer_other")
+          ? "The reviewer found a concern that could not be safely classified. Replace the candidate with a different task directly supported by the source, retain the requested level, solve it independently, and align the answer and rubric to the exact request; do not only rephrase it."
+          : "",
       ].filter(Boolean).join(" ")
     : [
         failures.has("option_quality_failed")
@@ -1395,6 +1427,9 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
         failures.has("difficulty_mismatch") || failures.has("difficulty_match")
           ? "Granskningen hittade nivåavvikelse: följ den valda nivån och undvik dolda eller avancerade krav."
           : "",
+        failures.has("reviewer_other")
+          ? "Granskningen hittade ett problem som inte kunde klassificeras säkert. Ersätt kandidaten med en annan uppgift som stöds direkt av materialet, behåll den valda nivån, lös uppgiften självständigt och låt svar och matris stämma med exakt det frågan ber om; byt inte bara formulering."
+          : "",
       ].filter(Boolean).join(" ");
   const repairTypes = mixedRepairCandidateTypes(repairCount, missingTypes);
   const mixedTypeGuidance = ["mix", "mixed"].includes(qType)
@@ -1405,11 +1440,17 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
   const instruction = lang === "en"
     ? `QUALITY REPAIR: The previous candidate set did not pass independent review. Create exactly ${repairCount} new question candidates of the already selected type and level to fill ${missingSlots} missing exam slot${missingSlots === 1 ? "" : "s"}. ${mixedTypeGuidance} Ground every question and answer in specific information from the supplied material; copy a short verbatim excerpt from the material into source_references, not a paraphrase or invented heading. For short answer, use one self-contained task with a clear answer target; in mathematics, include every value and condition needed to solve it. Make the points and rubric assess only work explicitly requested by the question. For multiple choice, use only plausible, relevant distractors in the same category as the correct option; never invent nonsense or unrelated choices. ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Do not repeat these questions already retained in the current draft: ${JSON.stringify(existingStems)}. Avoid unsupported outside facts, ambiguous wording, overlapping concepts, and repeated stems. Check that each model_answer answers exactly what its question asks and that its scoring rubric agrees. Keep the same strict quality standards; output only the required JSON.`
     : `KVALITETSREPARATION: Den första frågeuppsättningen klarade inte den oberoende granskningen. Skapa exakt ${repairCount} nya frågekandidater av den redan valda typen och nivån för att fylla ${missingSlots} saknade provplatser. ${mixedTypeGuidance} Förankra varje fråga och svar i konkreta uppgifter från materialet och kopiera ett kort ORDAGRANT utdrag från materialet till source_references, inte en parafras eller påhittad rubrik. För kortsvar: skriv en självständig, tydligt avgränsad uppgift med ett klart svarsmål; i matematik ska alla värden och villkor som behövs för lösningen stå i frågan. Poäng och matris ska bara bedöma sådant frågan uttryckligen ber eleven göra. För flervalsfrågor: använd bara rimliga, relevanta distraktorer i samma kategori som det rätta alternativet; hitta aldrig på nonsens eller orelaterade svar. ${reviewGuidance} ${reviewFailureSummary} ${solverFailureSummary} Upprepa inte de här frågor som redan finns kvar i utkastet: ${JSON.stringify(existingStems)}. Undvik obestyrkta fakta utifrån, tvetydiga formuleringar, överlappande begrepp och upprepade frågestammar. Kontrollera att varje model_answer faktiskt besvarar frågan och att bedömningsmatrisen stämmer. Behåll samma strikta kvalitetskrav och returnera endast JSON enligt schemat.`;
+  const { input: repairInput, aligned: countAligned } = alignRepairPromptQuestionCount(
+    payload?.input, lang, numQuestions, repairCount, questionCountOffset,
+  );
+  if (questionCountOffset !== undefined && !countAligned) {
+    throw new Error("Repair question-count instruction could not be aligned with its output schema");
+  }
   return {
     ...payload,
     text: { ...payload.text, format: buildMockExamSchema(repairCount) },
     input: [
-      ...(Array.isArray(payload?.input) ? payload.input : []),
+      ...repairInput,
       { role: "user", content: instruction },
     ],
   };
@@ -1685,7 +1726,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     const model = pickModel({ isMath });
     const responseFormat = buildMockExamSchema(numQuestions);
 
-    const { systemPrompt, userPrompt } = buildExamPrompts({
+    const { systemPrompt, userPrompt, questionCountOffset } = buildExamPrompts({
       lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, comparisonQuestions
     });
 
@@ -1700,7 +1741,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     if (internalBatch && internalContext.pipelineStage === "repair") {
       const feedback = normalizeRepairFeedback(internalContext.repairFeedback);
       payload = buildRepairPayload(payload, {
-        lang, numQuestions, candidateCount: numQuestions, qType,
+        lang, numQuestions, candidateCount: numQuestions, qType, questionCountOffset,
         reviewFailureCodes: Object.keys(feedback.reviewFailureCounts),
         reviewFailureCounts: feedback.reviewFailureCounts,
         solverFailureCounts: feedback.solverFailureCounts,
@@ -1874,6 +1915,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         const repairCount = repairCandidateCountFor(repairSlots, missingTypes);
         const repairPayload = buildRepairPayload(payload, {
           lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
+          questionCountOffset,
         });
         const response = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -2129,7 +2171,7 @@ module.exports = async function handler(req, res, internalContext = null) {
               lang, numQuestions, existingQuestions: round1ApprovedQuestions, candidateCount: repairCount,
               reviewFailureCodes: Object.keys(initialVerifierFailureCodes),
               reviewFailureCounts: initialVerifierFailureCodes,
-              solverFailureCounts: solverOutcome.reasons, qType, missingTypes,
+              solverFailureCounts: solverOutcome.reasons, qType, missingTypes, questionCountOffset,
             });
             repairFailureStage = "repair_generation";
             const repairStream = await streamGeneration({

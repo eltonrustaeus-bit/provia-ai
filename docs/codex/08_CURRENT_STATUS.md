@@ -1148,3 +1148,76 @@ Read-only staging quota snapshot, 2026-10-21: profile role `gratis`, exam quota 
 - [!] Ingen push, Preview, migration eller live-modellförfrågan utfördes. Senaste verifierade externa synk ovan visar fortfarande att staging/Preview ligger efter arbetskopian.
 
 **PILOT NOT READY.** Nästa steg är att reda ut auth-gate-svitens flakighet och först därefter synka exakt revision och schema för ett separat godkänt stagingprov.
+
+## Ny staging-Preview och syntetiskt 12-frågeprov — 2026-10-22
+
+- [x] Tillämpade enbart repair-feedback-RPC-migreringen i staging
+  `yhcinqejsocpmmetazpz`. Supabase registrerade den som version
+  `20261022172446` (`checkpoint_exam_repair_feedback`). ACL-kontrollen visar
+  `EXECUTE` för `service_role` och databasägaren; `anon` och `authenticated`
+  saknar rättigheten.
+- [x] Pushade endast `fadbb3a` och `d95daa8` till den befintliga
+  feature-branchen. Vercel Preview `dpl_EKKRoewXkvjv2fzh6ryr95MA6qrN` blev
+  READY på SHA `d95daa84c2919127e6631521bea5b081fbd9cd93`. Branchens variabler
+  verifierades som Preview-scope utan att läsa värden; den publika runtime
+  pekade på staging och innehöll inte produktionsprojektets URL.
+- [!] Ett syntetiskt Matematik 2b/C/kortsvar-jobb, ID
+  `3509275b-2696-44c7-a45f-a6e16e27acff`, bad om 12 frågor. Fem genererings-
+  och reparationsbatchar tog cirka 30–38 sekunder vardera. Första batchen
+  godkände 0/2; därefter steg godkända frågor till 1 och 2. Två senare
+  reparationsbatchar godkände inga nya frågor. Totalt: 2/12, terminalt
+  `STAGE_RETRY_LIMIT`; inget prov eller någon submission utfärdades.
+- [x] UI:t visade progressräknaren och slutligen korrekt text: 2 av 12
+  klarade kontrollen, inget prov lämnades ut. Telemetrin rapporterade inga
+  strukturellt bortsorterade eller dubbla kandidater. De vanligaste
+  granskningsfelen var källstöd, svarsalignment och scoring alignment.
+- [x] Terminalkontroll visade att jobbpåslaget och accepterade checkpoints var
+  rensade, idempotensraden var `retryable`, svarspayload saknades och
+  `submission_id` var null. Ingen ny generering gjordes efter terminalstatus.
+- [x] Stagingbudgeten ändrades från spenderat `$0.244268` till `$0.367660`;
+  reserverat belopp låg kvar på `$0.225728`. Återstående av den befintliga
+  totala `$5`-gränsen är `$4.406612`. Delta `$0.123392` är appens budgetbokning,
+  inte en verifierad faktura från modellleverantören.
+- [!] Livekörningen bekräftar att serverns reparationssteg startar, feedbacken
+  påverkar fortsatta omgångar och felaktigt prov inte utfärdas. Den bekräftar
+  inte tillförlitlig 12-frågeyield. Nästa förbättring måste öka andelen
+  källförankrade och svarskorrekta kandidater utan att sänka granskningskraven.
+  Ytterligare liveanrop kräver ny uttrycklig bekräftelse och en ny budgetkontroll.
+
+**PILOT NOT READY.** Hosted version är nu uppdaterad, men detta accepterade
+12-frågeprov misslyckades med 2/12 och använde cirka `$0.123392` av appens
+stagingbudget. Fortsätt med kod-/promptanalys och offlinebevis innan en ny
+begäran om stagingtest.
+
+## Lokal reparationskvalitet efter stagingresultatet — 2026-10-22
+
+- [x] Källgranskning fann en konkret promptinkonsekvens i reparationsvägar som
+  översamplar: JSON-schemat och reparationsinstruktionen begärde `repairCount`,
+  medan den ursprungliga användarprompten fortfarande angav `numQuestions`.
+  Detta kan förvirra kandidatantalet i strukturell och inline-kvalitetsrepair.
+  Det är inte bevisat som orsaken till stagingresultatet 2/12; de sparade,
+  sanerade uppgifterna innehåller inte det ursprungliga prompt-/frågeinnehållet.
+- [x] `buildExamPrompts` returnerar nu offset för sin genererade antalrad.
+  Reparationen ändrar bara raden på exakt offset till `repairCount`; explicit
+  saknad/felaktig offset avbryter fail-closed. Kursfält och studiematerial,
+  även när de innehåller en liknande rad, lämnas oförändrade.
+- [x] Den lokala pipelineändringen breddar endast senare repair-batcher efter
+  upprepade resultatlösa försök från 3 till högst 5 kandidater. Den fortsätter
+  att acceptera endast `verified`, avvisa dubbletter/fel typer och begränsa
+  lagrade frågor till begärt antal. Kvalitetsgrindar och quota-/issueflöde är
+  oförändrade.
+- [x] `reviewer_other` gav tidigare ingen konkret reparationsväg trots att
+  kategorin överlevde den säkra checkpointen. Svensk och engelsk repair-prompt
+  ber nu om en annan direkt källstödd uppgift, bibehållen nivå, självständig
+  lösning och en matris som motsvarar frågan. Råa reviewer-kommentarer sparas
+  eller skickas fortfarande inte mellan batchar.
+- [x] Fokuserad 9-filerssvit passerade 64/64; syntaxkontroll för generator och
+  test, samt `git diff --check`, passerade. Oberoende API- och säkerhetsgranskare
+  bekräftade att offsetkorrigeringen bevarar material och grindar; inga
+  blockerare återstår i den granskade lokala diffen.
+- [!] Denna kod är lokal ovanpå `d95daa8`; den har inte committats, pushats,
+  deployats eller körts mot staging. Inget nytt modellanrop gjordes. Föregående
+  stagingacceptans står kvar som 2/12; inget förbättrat live-utfall är visat.
+
+**PILOT NOT READY.** Nästa evidenssteg kräver en separat godkänd push/Preview
+och ett färskt stagingbudgetbesked före ett nytt syntetiskt modellanrop.
