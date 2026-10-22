@@ -1,5 +1,45 @@
 # 08 Current Status
 
+## Releasegrind efter Preview-push — 2026-10-23
+
+- [x] Den semantiska jämförelsegrinden känner nu igen enkla, omkastade
+  tvåledade frågor av typen "Jämför X och Y" / "Compare X and Y". Svenska och
+  engelska dubblettregressioner passerar; frågor med ytterligare kontextled
+  förblir separata. Oberoende read-only review fann inga fynd i denna snäva
+  normalisering.
+- [x] Commit `0d5394b` innehåller den granskade kod-/test-/XelioV-uppdateringen;
+  `44fdcb4` för in senaste `main` (`7dc2e9a`) och bevarar P.E.R:s
+  kvotreservation och begränsade allmänna studiehjälp.
+- [x] Branchen pushades till
+  `codex/exgen-generation-quality-2026-10-20`. Draft-PR #123 är öppen mot
+  `main`; den är inte mergad. Vercel Preview `dpl_Dp9HqPP1SsS3MDQYuBDvTgYhHEy5`
+  är `READY` för exakt commit `44fdcb47c173db20c4fab9afe8297647910cec1c` och
+  öppnades i sidbrowserflik 76. Den visar inloggningsgrinden; ingen inloggning
+  eller live-AI-begäran gjordes.
+- [x] Read-only produktionskontroll med Supabase bekräftade att
+  `mock_exam_generation_pipeline_jobs`,
+  `claim_mock_exam_generation_pipeline_job`,
+  `checkpoint_mock_exam_generation_pipeline_batch` och
+  `reserve_per_chat_quota` saknas. Migrationslistan innehåller inte den nya
+  pipeline-/P.E.R-kvotschemakedjan. En merge till `main` skulle därför
+  auto-deploya kod med saknade database contracts och är spärrad tills exakt
+  produktionsmigrationsplan granskats och separat godkänts.
+- [x] Staging saknar fortfarande
+  `20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql`.
+  Ingen Supabase-migration, produktionsdatabasändring eller Vercel Production-
+  deploy gjordes. `.temp/cli-latest` är en befintlig lokal ändring och lämnades
+  utanför committen.
+- [x] Full seriell offline-svit avslutades med exit 0 över 193 testfiler; den
+  kördes medan den sista lilla dedupliceringsfixen redigerades, så den riktade
+  `tests/api/exam-pipeline-offline.test.mjs` kördes om efter fixen. P.E.R-
+  handler + kvotmigration passerade 52/52 efter merge med `main`.
+  `npm run xeliov:context:test` passerade 4/4; `node --check` och
+  `git diff --check` passerade.
+
+**PILOT NOT READY.** Kod/Preview är pushad för granskning, men produktionens
+schema är inte versionssynkat. Draft-PR #123 ska inte mergas innan databasens
+förkrav har granskats, godkänts och verifierats.
+
 ## Integrerad dubblettreparation och rollbackskydd — 2026-10-23
 
 - [x] Semantisk dubblettkontroll fångar även svenska förklaringsparafraser
