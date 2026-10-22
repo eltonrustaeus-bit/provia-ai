@@ -1752,8 +1752,8 @@ module.exports = async function handler(req, res, internalContext = null) {
       if (feedback.duplicateCount > 0) payload.input.push({
         role: "user",
         content: lang === "en"
-          ? "The previous batch repeated an approved question. Choose a different source-supported task or relationship; changing only the wording is not enough."
-          : "Föregående omgång upprepade en godkänd fråga. Välj en annan källstödd uppgift eller relation; att bara byta formulering räcker inte.",
+          ? "Earlier candidate batches included one or more candidates that repeated approved questions. Choose a different source-supported task or relationship; changing only the wording is not enough."
+          : "Tidigare kandidatbatcher innehöll en eller flera kandidater som upprepade redan godkända frågor. Välj en annan källstödd uppgift eller relation; att bara byta formulering räcker inte.",
       });
     }
 

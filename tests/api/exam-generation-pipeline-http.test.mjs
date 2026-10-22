@@ -827,7 +827,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       [repairTimeoutJob.id, JSON.stringify({
         reviewFailureCounts: { answer_alignment: 1 },
         solverFailureCounts: {},
-        duplicateCount: 0,
+        duplicateCount: 1,
       })],
     );
     const repairTimeoutIssuancesBefore = (await db.query(
@@ -859,6 +859,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       assert.ok(repairState.payload.repairFeedback.reviewFailureCounts.low_source_alignment > 0);
       assert.equal(repairState.payload.repairFeedback.reviewFailureCounts.answer_alignment, 1,
         "checkpoint retains failure categories from the earlier attempt");
+      assert.equal(repairState.payload.repairFeedback.duplicateCount, 1,
+        "historical duplicate feedback remains available after a clean retry");
       const nextInstructionIndex = mockedGenerationInstructions.length;
       assert.equal(mockedProviderStages.filter(stage => stage === "mock_exam_schema").length, 2);
       assert.equal(mockedProviderStages.filter(stage => stage === "exam_verifier_schema").length, 1);
@@ -883,6 +885,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         "bounded independent-review feedback is carried across requests");
       assert.match(mockedGenerationInstructions[nextInstructionIndex], /answer_alignment/,
         "earlier independent-review feedback remains in the next repair prompt");
+      assert.match(mockedGenerationInstructions[nextInstructionIndex], /Tidigare kandidatbatcher innehöll/,
+        "cumulative duplicate feedback is described as historical, not as the immediately previous batch or repair-only");
       assert.equal(repairTimeoutResult.body.meta.partial, false);
       const finalRepairCheckpoint = mockedPipelineCheckpoints.at(-1);
       assert.equal(finalRepairCheckpoint.length, 12);
