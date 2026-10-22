@@ -960,6 +960,22 @@ async function getUserId() {
   return data?.user?.id || null;
 }
 
+async function getGenerationAuthSnapshot() {
+  if (!db) return null;
+  try {
+    const { data, error } = await db.auth.getSession();
+    const session = data?.session;
+    const token = session?.access_token;
+    if (error || typeof token !== "string" || !token) return null;
+    const { data: userData, error: userError } = await db.auth.getUser(token);
+    const userId = userData?.user?.id;
+    if (userError || typeof userId !== "string" || !userId || (session.user?.id && session.user.id !== userId)) return null;
+    return { userId, token };
+  } catch {
+    return null;
+  }
+}
+
 async function readQuotaCount() {
   const uid = (await getUserId()) || "guest";
   const key = quotaStorageKey(currentRole, uid);
@@ -2148,9 +2164,9 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
-  async function runResumableGeneration(payload,onProgress){
+  async function runResumableGeneration(payload,onProgress,token){
     const startedAt=Date.now();
-    const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
+    const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000,token});
     if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
     if(started.status!==202||!started.data?.operationId)return started;
     const operationId=started.data.operationId;
@@ -2171,7 +2187,7 @@ try{
     };
     updateProgress(started.data);
     while(Date.now()-startedAt<14*60*1000){
-      const step=await postJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000});
+      const step=await postJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000,token});
       if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
       if(step.status===202&&step.data?.ok){
         consecutiveNetworkFailures=0;
@@ -2199,7 +2215,7 @@ try{
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
         consecutiveWorkingPolls=0;
-        const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
+        const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000,token});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;
         if(current.status===200&&current.data?.ok){
@@ -2227,11 +2243,22 @@ try{
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
     const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||3),focusTerms:selectedExamFocusTerms};
+    const authSnapshot=await getGenerationAuthSnapshot();
+    if(!authSnapshot){
+      const message=LANG==="sv"?"Din inloggning kunde inte bekräftas. Logga in igen innan du skapar prov.":"Your sign-in could not be verified. Sign in again before creating an exam.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
     let idempotencyKey;
     try {
-      idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(await getUserId(),payload);
-    } catch {
-      const message=LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.";
+      idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
+    } catch (error) {
+      const message=error?.message==="DUPLICATE_PENDING_REQUEST"
+        ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
+        :error?.message==="PENDING_REQUEST_LIMIT"
+        ?(LANG==="sv"?"Flera provbegäranden väntar på återupptagning. Använd samma material och inställningar för att fortsätta ett väntande jobb; inga väntande jobb har tagits bort.":"Several exam requests are still available to resume. Use the same material and settings to continue a pending job; no pending job was removed.")
+        :error?.message==="CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"
+          ?(LANG==="sv"?"Den här webbläsaren saknar stöd för säker samordning av provstart mellan flikar. Uppdatera till en aktuell version av Chrome, Edge eller Safari och försök igen.":"This browser cannot safely coordinate exam starts across tabs. Update to a current version of Chrome, Edge, or Safari and try again.")
+          :(LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.");
       setStatus(message,"bad");return {ok:false,error:message};
     }
     payload.idempotencyKey=idempotencyKey;
@@ -2239,8 +2266,8 @@ try{
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=payload.qType==="graph"
-      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000})
-      :await runResumableGeneration(payload,onProgress);
+      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
+      :await runResumableGeneration(payload,onProgress,authSnapshot.token);
     const clearGenerationPlaceholder=()=>{
       const body=examBodyEl();
       if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
@@ -2257,7 +2284,7 @@ try{
       return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
-      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
+      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
@@ -2303,19 +2330,24 @@ try{
       if(res.data?.error==="generation_in_progress"){
         const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
         const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
+        const canResumeAfterClose=window.ExGenGenerationRequest?.supportsCrossTabResume?.()===true;
         const message=LANG==="sv"
-          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Samma begäran kan återupptas utan ett nytt kvotdrag; kontrollera materialet och tryck Skapa prov igen.`
-          :`The exam is not ready yet (${approved} of ${requested} questions approved). The same request can resume without another quota reservation; check the material and press Generate exam again.`;
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag genom att använda exakt samma material och provinställningar och trycka Skapa prov igen.${canResumeAfterClose?"":" Ladda om i samma flik om det behövs; stäng inte fliken, eftersom webbläsaren inte stöder säker återupptagning efter stängning."}`
+          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation by using the exact same material and exam settings, then pressing Generate exam again.${canResumeAfterClose?"":" Reload this same tab if needed; do not close it because this browser does not support safe recovery after closing."}`;
         setStatus(message,"warn");hideDebug();
         return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
       }
       if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
-        window.ExGenGenerationRequest.clear(idempotencyKey);
+        let cleanupFailed=false;
+        try { await window.ExGenGenerationRequest.clear(idempotencyKey); } catch { cleanupFailed=true; }
         const message=LANG==="sv"
           ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
           :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
-        setStatus(message,"bad");hideDebug();
-        return {ok:false,error:message,errorCode:"generation_request_expired"};
+        const cleanupMessage=cleanupFailed?(LANG==="sv"
+          ?" Återupptagningsnyckeln kunde inte rensas säkert. Försök igen senare eller kontakta pilotansvarig; upprepa inte provstarten ännu."
+          :" The resume key could not be safely cleared. Try again later or contact the pilot lead; do not restart generation yet."):"";
+        setStatus(message+cleanupMessage,"bad");hideDebug();
+        return {ok:false,error:message+cleanupMessage,errorCode:"generation_request_expired"};
       }
       if(res.data?.error==="MATERIAL_TOO_LONG"){
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
@@ -2371,7 +2403,7 @@ try{
 
     // Servern är auktoritativ när persisted quota är aktiv; localStorage används bara för UI-visning/fallback.
     if(res.data.meta&&res.data.meta.quota&&res.data.meta.quota.enforced&&typeof res.data.meta.quota.count==="number"){
-      localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.meta.quota.count));
+      localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.meta.quota.count));
     }else{
       await bumpQuotaCount();
     }
@@ -2379,7 +2411,9 @@ try{
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
-    window.ExGenGenerationRequest.clear(idempotencyKey);
+    let resumeKeyCleared=true;
+    try { await window.ExGenGenerationRequest.clear(idempotencyKey); }
+    catch { resumeKeyCleared=false; }
     const generationMeta=res.data.meta||{};
     const questionCount=res.data.exam?.questions?.length||0;
     const requestedCount=generationMeta.requested;
@@ -2387,7 +2421,11 @@ try{
     const completionMessage=partialExam
       ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
       :t.genDone;
-    setBusy(false);setStatus(completionMessage,"ok");showToast(completionMessage,"ok");setWizardStep(2);
+    const cleanupWarning=resumeKeyCleared?"":(LANG==="sv"
+      ?" Provet skapades, men återupptagningsnyckeln kunde inte rensas. Ett nytt försök med samma material och inställningar kan visa samma prov."
+      :" The exam was created, but its resume key could not be cleared. A new attempt with the same material and settings may show the same exam.");
+    const visibleCompletionMessage=completionMessage+cleanupWarning;
+    setBusy(false);setStatus(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");showToast(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");setWizardStep(2);
     if(partialExam){const guide=$("examGuide");if(guide)guide.textContent=completionMessage;}
 
     // Uppdatera floating bar hint med antal frågor

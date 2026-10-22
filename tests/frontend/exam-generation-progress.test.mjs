@@ -4,16 +4,51 @@ import test from "node:test";
 import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
-const start = html.indexOf("async function runResumableGeneration(payload,onProgress)");
+const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token)");
 const end = html.indexOf("\n  async function runGenerate(onProgress)", start);
 assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
 const helper = html.slice(start, end);
 
 async function runWith(context) {
-  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload)})()`, context);
+  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token)})()`, {
+    onProgress: undefined,
+    token: "synthetic-session-token",
+    ...context,
+  });
 }
 
 test("client reports a resumable job instead of a generic timeout or network failure", async (t) => {
+  await t.test("one session token is reused for start, advance and status recovery", async () => {
+    const authTokens = [];
+    const exam = { questions: [{ id: "q1" }] };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      token: "snapshot-account-a-token",
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path, _payload, options) => {
+        authTokens.push([path, options?.token]);
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-auth-snapshot", requested: 3, approved: 0 } };
+        }
+        if (authTokens.filter(([url]) => url.endsWith("pipeline=advance")).length === 1) {
+          return { status: 503, data: { error: "generation_worker_unavailable" } };
+        }
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async (_path, options) => {
+        authTokens.push(["status", options?.token]);
+        return { status: 200, data: { ok: true, state: "queued", requested: 3, approved: 0 } };
+      },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(authTokens.map(([, token]) => token), Array(authTokens.length).fill("snapshot-account-a-token"));
+    assert.equal(authTokens.some(([path]) => path === "status"), true, "status recovery also keeps the original request owner");
+  });
+
   await t.test("operation budget reached", async () => {
     let clockCalls = 0;
     const statuses = [];

@@ -312,6 +312,25 @@ function questions(count) {
   });
 }
 
+function mixedQuestions(mcCount, shortCount) {
+  const short = questions(shortCount).map((question) => {
+    const { correct_index, options, ...openQuestion } = question;
+    return {
+      ...openQuestion,
+      type: "short",
+      options: [],
+      scoring_rubric: {
+        parts: [{ description: "Rätt svar", points: 1 }],
+        full_score_requirements: "Korrekt svar.",
+        partial_credit_notes: "",
+      },
+      accepted_answers: [question.model_answer],
+      estimated_answer_length: "short",
+    };
+  });
+  return [...questions(mcCount), ...short];
+}
+
 test("separate authenticated advance requests persist full 3/6/12 runs, retry safely, and label partial delivery", async () => {
   db = new PGlite();
   const quotaMigration = fs.readFileSync(new URL("../../supabase/migrations/20261012103944_refund_failed_mock_exam_quota.sql", import.meta.url), "utf8");
@@ -335,7 +354,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   await db.exec(ownerClaimMigration);
   await db.exec(preflightReleaseMigration);
   await db.exec(feedbackMigration);
-  const seedJob = async (ordinal, requested, stage = "generate") => {
+  const seedJob = async (ordinal, requested, stage = "generate", qType = "mc") => {
     const jobId = testUuid(100 + ordinal);
     const idempotencyKey = testUuid(200 + ordinal);
     const attemptId = testUuid(300 + ordinal);
@@ -349,7 +368,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       (id,user_id,idempotency_key,request_hash,attempt_id,quota_request_id,state,stage,payload,requested_count,deadline_at)
       values($1,$2,$3,$4,$5,$6,'queued',$7,$8::jsonb,$9,clock_timestamp()+interval '10 minutes')`,[
         jobId,userId,idempotencyKey,hash,attemptId,quotaId,stage,JSON.stringify({
-          lang:"sv",level:"C",course:"Aritmetik",qType:"mc",numQuestions:requested,pastedText:source,
+          lang:"sv",level:"C",course:"Aritmetik",qType,numQuestions:requested,pastedText:source,
           idempotencyKey,attemptId,quotaPeriod:"2026-W43",quota:{ok:true,count:1,limit:100,period:"2026-W43",enforced:true},entitlements:{},requestHash:hash,
         }),requested,
       ]);
@@ -1446,6 +1465,94 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     assert.equal(finalizationInvocations, belowFloorFinalizationsBefore,
       "below-floor deadline failure never starts assembly");
 
+    for (const { ordinal, requested, mc, short, shouldIssue } of [
+      { ordinal: 95, requested: 3, mc: 1, short: 1, shouldIssue: true },
+      { ordinal: 96, requested: 3, mc: 2, short: 0, shouldIssue: false },
+      { ordinal: 97, requested: 3, mc: 1, short: 0, shouldIssue: false },
+      { ordinal: 98, requested: 6, mc: 2, short: 2, shouldIssue: true },
+      { ordinal: 99, requested: 6, mc: 4, short: 0, shouldIssue: false },
+      { ordinal: 100, requested: 6, mc: 2, short: 1, shouldIssue: false },
+      { ordinal: 101, requested: 12, mc: 4, short: 4, shouldIssue: true },
+      { ordinal: 102, requested: 12, mc: 8, short: 0, shouldIssue: false },
+      { ordinal: 103, requested: 12, mc: 3, short: 4, shouldIssue: false },
+    ]) {
+      const quotaBaseline = (await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [userId],
+      )).rows[0].mock_quota_count;
+      const issuanceBaseline = (await db.query(
+        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+      )).rows[0].n;
+      const { jobId, quotaId } = await seedJob(ordinal, requested, "generate", "mix");
+      const acceptedAtDeadline = mixedQuestions(mc, short);
+      await db.query(`update public.mock_exam_generation_pipeline_jobs
+        set accepted_questions=$2::jsonb,progress_current=$3,deadline_at=clock_timestamp()-interval '1 second'
+        where id=$1`, [jobId, JSON.stringify(acceptedAtDeadline), acceptedAtDeadline.length]);
+      if (shouldIssue) {
+        const stored = (await db.query(
+          "select payload,accepted_questions from public.mock_exam_generation_pipeline_jobs where id=$1", [jobId],
+        )).rows[0];
+        await prior.finalize({ userId, payload: stored.payload, questions: stored.accepted_questions });
+      }
+      const batchCallsBefore = generationBatchInvocations;
+      const finalizationsBefore = finalizationInvocations;
+      const result = await callAdvance(jobId);
+
+      if (shouldIssue) {
+        assert.equal(result.statusCode, 200, `an eligible ${acceptedAtDeadline.length}/${requested} mixed deadline partial is issuable: ${JSON.stringify(result.body)}`);
+        assert.equal(result.body.exam.questions.length, acceptedAtDeadline.length);
+        assert.equal(result.body.exam.questions.filter((question) => question.type === "mc").length, mc);
+        assert.equal(result.body.exam.questions.filter((question) => question.type === "short").length, short);
+        assert.equal(result.body.meta.requested, requested);
+        assert.equal(result.body.meta.partial, true);
+        assert.equal((await db.query(
+          "select status from public.mock_exam_quota_reservations where request_id=$1", [quotaId],
+        )).rows[0].status, "consumed");
+        assert.equal((await db.query(
+          "select mock_quota_count from public.profiles where id=$1", [userId],
+        )).rows[0].mock_quota_count, quotaBaseline + 1);
+        assert.equal((await db.query(
+          "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+        )).rows[0].n, issuanceBaseline + 1);
+      } else {
+        assert.equal(result.statusCode, 502, `${acceptedAtDeadline.length}/${requested} mixed partial fails closed without both formats or the approved minimum`);
+        assert.equal(result.body.error, "incomplete_exam");
+        assert.equal(result.body.requested, requested);
+        assert.equal(result.body.received, acceptedAtDeadline.length);
+        assert.equal(Object.hasOwn(result.body, "exam"), false);
+        assert.equal((await db.query(
+          "select status from public.mock_exam_quota_reservations where request_id=$1", [quotaId],
+        )).rows[0].status, "refunded");
+        assert.equal((await db.query(
+          "select mock_quota_count from public.profiles where id=$1", [userId],
+        )).rows[0].mock_quota_count, quotaBaseline);
+        assert.equal((await db.query(
+          "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+        )).rows[0].n, issuanceBaseline);
+        assert.deepEqual((await db.query(
+          "select state,stage,payload,accepted_questions,progress_current from public.mock_exam_generation_pipeline_jobs where id=$1",
+          [jobId],
+        )).rows[0], {
+          state: "failed",
+          stage: "terminal",
+          payload: {},
+          accepted_questions: [],
+          progress_current: acceptedAtDeadline.length,
+        }, "mixed deadline failure scrubs study material and verified checkpoint content");
+      }
+      assert.equal(generationBatchInvocations, batchCallsBefore, "deadline handling does not start another provider batch");
+      assert.equal(finalizationInvocations, finalizationsBefore + Number(shouldIssue));
+      const replay = await callAdvance(jobId);
+      assert.deepEqual(replay.body, result.body, "mixed deadline outcome replays without changing the response");
+      assert.equal(generationBatchInvocations, batchCallsBefore, "mixed deadline replay does not start model work");
+      assert.equal(finalizationInvocations, finalizationsBefore + Number(shouldIssue), "mixed deadline replay does not issue twice");
+      assert.equal((await db.query(
+        "select status from public.mock_exam_quota_reservations where request_id=$1", [quotaId],
+      )).rows[0].status, shouldIssue ? "consumed" : "refunded", "mixed deadline replay preserves the single quota settlement");
+      assert.equal((await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [userId],
+      )).rows[0].mock_quota_count, quotaBaseline + Number(shouldIssue), "mixed deadline replay does not change quota again");
+    }
+
     for (const [index, requested] of [3, 6, 12].entries()) {
       const partialFloor = Math.max(2, Math.ceil(requested * 0.6));
       for (const acceptedCount of [partialFloor, partialFloor - 1]) {
@@ -1514,8 +1621,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,23,
-      "full runs, real-generator and repair paths, retries, deadline salvages, and timeout recovery issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,26,
+      "full runs, real-generator and repair paths, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],

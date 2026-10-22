@@ -221,6 +221,39 @@ async function toExam(page, reuseStart = false) {
   await page.waitForTimeout(300);
 }
 
+// Browsers without Web Locks must stop before either exam route can reserve quota.
+{
+  const { ctx, page, errs } = await mk();
+  let generationApiCalls = 0;
+  try {
+    await signIn(page, "no-web-locks-generation");
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
+    });
+    await page.route("**/api/generate-exam*", route => {
+      generationApiCalls++;
+      return route.fulfill({ status: 500, json: { ok: false, error: "unexpected_generation_request" } });
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP och citronsyracykeln sker i matrix.");
+    await page.waitForTimeout(150);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("saknar stöd"));
+    const message = await page.locator("#status").textContent();
+    ok("webbläsare utan Web Locks stoppas innan prov-API eller kvotreservation",
+      generationApiCalls === 0 && message.includes("Uppdatera") && errs.length === 0,
+      `${generationApiCalls} API-anrop; ${message}; ${errs.join(" | ")}`);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // Exercise the real engine callback in the visible flow while a later batch is
 // still running; a hidden legacy status update must not satisfy this check.
 {

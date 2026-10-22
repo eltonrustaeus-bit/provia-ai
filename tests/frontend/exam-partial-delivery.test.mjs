@@ -20,11 +20,16 @@ try {
     };
     const { ctx: pageContext, page } = await openPage(browser, `${server.url}/app.html`, {
       state: { user: { id: `partial-delivery-user-${requested}`, email: "partial@example.test" } },
-      mocks: { extra: [["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: {
-        ok: true,
-        exam: partialExam,
-        meta: { partial: true, requested, quota: { enforced: false } },
-      } })]] },
+      mocks: { extra: [
+        [`**/auth/v1/user`, route => route.fulfill({ json: {
+          id: `partial-delivery-user-${requested}`, email: "partial@example.test",
+        } })],
+        ["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: {
+          ok: true,
+          exam: partialExam,
+          meta: { partial: true, requested, quota: { enforced: false } },
+        } })],
+      ] },
       settle: 0,
     });
     ctx = pageContext;

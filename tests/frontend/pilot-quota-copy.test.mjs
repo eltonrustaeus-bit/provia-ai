@@ -10,7 +10,7 @@ try {
   await seed(page);
   await page.route("**/js/exgen-runtime.js", (route) => route.fulfill({
     contentType: "text/javascript",
-    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
+    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"sb_publishable_synthetic_frontend_test_key_only_000000",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
   }));
   await page.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   const copy = await page.evaluate(async () => {
@@ -31,14 +31,19 @@ try {
   console.log("pilot quota copy: confirmed denials give accurate reset timing and inviter support");
 
   const quotaPage = await browser.newPage({ viewport: { width: 1280, height: 860 } });
-  await mockApis(quotaPage, { extra: [["**/api/generate-exam?pipeline=start", route => route.fulfill({
-    status: 429,
-    json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
-  })]] });
+  await mockApis(quotaPage, { extra: [
+    ["**/api/generate-exam?pipeline=start", route => route.fulfill({
+      status: 429,
+      json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
+    })],
+    ["**/auth/v1/user", route => route.fulfill({ json: {
+      id: "quota-student", email: "quota-student@example.test",
+    } })],
+  ] });
   await seed(quotaPage, { user: { id: "quota-student", email: "quota-student@example.test" } });
   await quotaPage.route("**/js/exgen-runtime.js", route => route.fulfill({
     contentType: "text/javascript",
-    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"synthetic-test-key",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
+    body: `window.ExGenRuntime=Object.freeze({environment:"pilot",projectRef:"synthetic-pilot",supabaseUrl:"https://synthetic-pilot.invalid",publishableKey:"sb_publishable_synthetic_frontend_test_key_only_000000",appOrigin:"${server.url}",authStorageKey:"${AUTH_KEY}"});`,
   }));
   await quotaPage.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
   const quotaResult = await quotaPage.evaluate(async () => {
@@ -55,7 +60,7 @@ try {
       gradeDisabled: document.querySelector("#gradeBtn")?.disabled,
     };
   });
-  assert.equal(quotaResult.result.quota, true);
+  assert.equal(quotaResult.result.quota, true, JSON.stringify(quotaResult));
   assert.equal(quotaResult.skeletonCount, 0, "quota denial must clear loading placeholders");
   assert.equal(quotaResult.examMeta, "Ingen provdata ännu.");
   assert.match(quotaResult.status, /på måndag/);

@@ -675,20 +675,37 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       }
     });
 
-    await t.test("mixed retry partial requires at least one of each question format", async () => {
+    await t.test("mixed retry partial boundaries preserve both formats for 3, 6 and 12 questions", async () => {
       const makeUuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
-      for (const [index,hasShort] of [true,false].entries()) {
-        const base=4000+index*10, k=makeUuid(base), a=makeUuid(base+1), q=makeUuid(base+2), id=makeUuid(base+3);
-        await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
-        const approved=Array.from({length:8},(_,i)=>({id:`retry-mix-${index}-${i}`,type:hasShort&&i===7?"short":"mc",validation_status:"verified"}));
-        await addJob(db,{id,userId:u1,idempotencyKey:k,attemptId:a,quotaRequestId:q,state:"queued",requested:12,progress:8,attempts:3,accepted:approved,payload:{qType:"mix",pastedText:"synthetic"}});
-        const result=(await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r;
-        if (hasShort) {
-          assert.equal(result.status,"claimed");
-          assert.equal(result.job.stage,"assemble");
-        } else {
-          assert.equal(result.status,"retry_limit");
-          assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+      let ordinal=4000;
+      for (const requested of [3,6,12]) {
+        const minimum=Math.max(2,Math.ceil(requested*0.6));
+        const scenarios=[
+          {approvedCount:minimum,includeShort:true,shouldAssemble:true},
+          {approvedCount:minimum,includeShort:false,shouldAssemble:false},
+          {approvedCount:minimum-1,includeShort:false,shouldAssemble:false},
+        ];
+        if (requested > 3) scenarios.push({approvedCount:minimum-1,includeShort:true,shouldAssemble:false});
+        for (const {approvedCount,includeShort,shouldAssemble} of scenarios) {
+          const base=ordinal; ordinal+=10;
+          const k=makeUuid(base), a=makeUuid(base+1), q=makeUuid(base+2), id=makeUuid(base+3);
+          await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
+          const approved=Array.from({length:approvedCount},(_,i)=>({
+            id:`retry-mix-${requested}-${base}-${i}`,
+            type:includeShort&&i===approvedCount-1?"short":"mc",
+            validation_status:"verified",
+          }));
+          await addJob(db,{id,userId:u1,idempotencyKey:k,attemptId:a,quotaRequestId:q,state:"queued",requested,progress:approvedCount,attempts:3,accepted:approved,payload:{qType:"mix",pastedText:"synthetic"}});
+          const result=(await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r;
+          if (shouldAssemble) {
+            assert.equal(result.status,"claimed",`${approvedCount}/${requested} with both formats remains eligible`);
+            assert.equal(result.job.stage,"assemble");
+          } else {
+            assert.equal(result.status,"retry_limit",`${approvedCount}/${requested} without the required partial shape fails closed`);
+            const row=(await db.query("select state,stage from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0];
+            assert.deepEqual(row,{state:"failed",stage:"terminal"});
+            assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+          }
         }
       }
     });
