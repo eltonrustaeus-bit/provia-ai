@@ -712,7 +712,7 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
   }
 });
 
-test("latest ungraded issuance gates context-free PER until a verified grade exists", async () => {
+test("latest ungraded issuance keeps exam context gated but allows restricted all-app study chat", { timeout: 90_000 }, async () => {
   const priorPilotMode = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
@@ -720,22 +720,90 @@ test("latest ungraded issuance gates context-free PER until a verified grade exi
   latestSubmissionId = proof.receipt.split(".")[1];
   calls.length = 0;
   try {
-    const ended = await invoke({ userQuestion: "Give me the exact answer", helpLevel: 3 }, "POST", "application/json");
+    const ended = await invoke({
+      userQuestion: "Vad är en lösning i kemi?",
+      helpLevel: 3,
+      pageContext: { page: "app", course: "Biologi" },
+    }, "POST", "application/json");
     assert.equal(ended.statusCode, 200);
-    assert.equal(ended.body.examState, "expired");
-    assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
-    assert.equal(ended.body.helpCap, 2);
+    assert.equal(ended.body.examState, undefined);
+    assert.equal(ended.body.helpCap, 1);
+    assert.equal(ended.body.helpLevelUsed, 1);
+    assert.equal(ended.body.answer, defaultProviderAnswer);
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")));
+    assert.ok(calls.some(({ url }) => url.includes("commit_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("acquire_per_answer_lease")));
+
+    calls.length = 0;
+    activeCount = 1;
+    issuanceState = "active";
+    const unrelatedDuringExam = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      helpLevel: 3,
+      pageContext: {
+        page: "prov",
+        course: "Biologi",
+        currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" },
+        questions: [{ text: "Vad beskriver k i y = kx + m?" }],
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(unrelatedDuringExam.statusCode, 200);
+    assert.equal(unrelatedDuringExam.body.helpCap, 1);
+    assert.equal(unrelatedDuringExam.body.helpLevelUsed, 1);
+    const unrelatedProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(unrelatedProvider);
+    assert.doesNotMatch(unrelatedProvider.body, /Vad beskriver k i y = kx/);
+    assert.doesNotMatch(unrelatedProvider.body, /submissionId/);
+    assert.doesNotMatch(unrelatedProvider.body, /## HJÄLPTAK|provläget tillåter/i);
+
+    calls.length = 0;
+    const onTopicDuringExam = await invoke({
+      userQuestion: "Vad betyder den här lutningen?",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" },
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(onTopicDuringExam.statusCode, 200);
+    assert.equal(onTopicDuringExam.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+
+    activeCount = 0;
+    issuanceState = "expired";
+    calls.length = 0;
+    const inExam = await invoke({
+      userQuestion: "Ge mig facit",
+      helpLevel: 3,
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" },
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(inExam.statusCode, 200);
+    assert.equal(inExam.body.examState, "expired");
+    assert.match(inExam.body.answer, /fullständigt svar kräver verifierad rättning/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_per_chat_quota")));
 
     calls.length = 0;
     issuanceState = "abandoned";
-    const abandoned = await invoke({ userQuestion: "Give me the exact answer", helpLevel: 3 }, "POST", "application/json");
+    const abandoned = await invoke({
+      userQuestion: "Förklara vad fotosyntes är",
+      helpLevel: 3,
+      pageContext: { page: "app" },
+    }, "POST", "application/json");
     assert.equal(abandoned.statusCode, 200);
-    assert.equal(abandoned.body.examState, "abandoned");
-    assert.match(abandoned.body.answer, /fullständigt svar kräver verifierad rättning/i);
-    assert.equal(abandoned.body.helpCap, 2);
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")));
+    assert.equal(abandoned.body.helpCap, 1);
+    assert.equal(abandoned.body.helpLevelUsed, 1);
+    assert.equal(abandoned.body.answer, defaultProviderAnswer);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")));
+    assert.ok(calls.some(({ url }) => url.includes("commit_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
     const abandonedReview = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } }, "POST", "application/json");
@@ -1365,7 +1433,7 @@ test("an exam-marked request without a valid issuance identity cannot reach the 
   }
 });
 
-test("exam page labels without server state stay on useful answer-free guidance", async () => {
+test("an unrelated study question remains available from an exam page without exposing exam data", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
@@ -1373,16 +1441,16 @@ test("exam page labels without server state stay on useful answer-free guidance"
     for (const page of ["prov", "resultat"]) {
       calls.length = 0;
       const response = await invoke({
-        userQuestion: "Explain a biology concept",
+        userQuestion: "Explain photosynthesis",
         helpLevel: 3,
-        pageContext: { page },
+        pageContext: { page, currentQuestion: { text: "EXAM_ONLY_PROMPT_SENTINEL" } },
       }, "POST", "application/json");
       assert.equal(response.statusCode, 200);
-      assert.equal(response.body.helpCap, 2);
-      assert.equal(response.body.helpLevelUsed, 2);
-      assert.equal(response.body.examState, "unverified");
-      assert.match(response.body.answer, /fullständigt svar kräver verifierad rättning/i);
-      assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+      assert.equal(response.body.helpCap, 1);
+      assert.equal(response.body.helpLevelUsed, 1);
+      assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.doesNotMatch(provider.body, /EXAM_ONLY_PROMPT_SENTINEL|submissionId/);
     }
   } finally {
     activeCount = 0;
@@ -1451,9 +1519,10 @@ test("verified inactive exam metadata allows ordinary help but does not bypass a
       pageContext: { examState: { phase: "exam" } },
     }, "POST", "application/json");
     assert.equal(unboundExamState.statusCode, 200);
-    assert.equal(unboundExamState.body.examState, "unverified");
-    assert.match(unboundExamState.body.answer, /kan inte verifiera provets status/i);
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+    assert.equal(unboundExamState.body.helpCap, 1);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    const unboundProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.doesNotMatch(unboundProvider.body, /examState|Aktiv fråga/);
 
     activeCount = 1;
     calls.length = 0;

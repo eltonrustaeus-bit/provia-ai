@@ -132,7 +132,9 @@ const tak = (råPageContext, options) => {
 
 {
   const r = tak({ page: "förbättring" }, { pilotMode: true });
-  ok("G8 pilot utan provkontext ger inte direktfacit", r.tak === 1, `tak ${r.tak}`);
+  ok("G8 pilot utan provkontext behåller allmän studiehjälp", r.tak === 3, `tak ${r.tak}`);
+  const pending = tak({ page: "app" }, { pilotMode: true, pendingExam: true });
+  ok("G9 olöst prov begränsar global studiehjälp utan att stänga den", pending.tak === 1, `tak ${pending.tak}`);
 }
 
 console.log(`\nper-context-cap: ${pass} ok, ${fail.length} fail`);

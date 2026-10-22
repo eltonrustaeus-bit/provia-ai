@@ -700,6 +700,8 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
 }
 
 async function gateActiveExam(req, res, body, user) {
+  delete body._perExamStudyOnly;
+  delete body._perPendingExamStudy;
   const context = body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)
     ? body.pageContext
     : null;
@@ -708,7 +710,65 @@ async function gateActiveExam(req, res, body, user) {
   const hasOtherPage = Boolean(page && !examPage);
   const hasCurrentQuestion = context?.currentQuestion && typeof context.currentQuestion === "object";
   const hasExamPhase = typeof context?.examState?.phase === "string" && context.examState.phase.trim().length > 0;
-  const examContextDeclared = examPage || (!hasOtherPage && (hasCurrentQuestion || hasExamPhase));
+  const hasSubmissionIdentity = typeof context?.examState?.submissionId === "string"
+    && /^[a-f0-9]{32}$/.test(context.examState.submissionId);
+  const hasExamQuestions = Array.isArray(context?.questions) && context.questions.length > 0;
+  const examContextDeclared = examPage || (!hasOtherPage &&
+    (hasCurrentQuestion || hasExamPhase || hasSubmissionIdentity || hasExamQuestions));
+  const ordinaryStudyChat = typeof body.userQuestion === "string" && body.userQuestion.trim().length > 0
+    && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
+    && body.landingMode !== true && !Array.isArray(body.scores)
+    && body.question == null && body.correct == null;
+
+  function referencesExamQuestion() {
+    const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
+    if (/\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)) return true;
+    if (examContextDeclared && /\b(den här|det här|denna fråga|den frågan|detta|dessa|här|this|that|it|those)\b/i.test(query)) return true;
+    const targets = [
+      context?.currentQuestion?.text,
+      context?.currentQuestion?.question,
+      context?.currentQuestion?.category,
+      context?.currentQuestion?.answer,
+      ...(Array.isArray(context?.currentQuestion?.options) ? context.currentQuestion.options : []),
+      ...(Array.isArray(context?.questions) ? context.questions.flatMap((item) => [
+        item?.text || item?.question, item?.category, item?.answer,
+        ...(Array.isArray(item?.options) ? item.options : []),
+      ]) : []),
+    ]
+      .filter((value) => typeof value === "string");
+    if (!targets.length) return false;
+    const ignored = new Set("vad betyder beskriv förklara varför hur kan jag mitt din med från till detta den det som och eller är var was what does explain how why with from that this question about which tell me please help solve find use give answer the a an is of in on for it".split(" "));
+    const stem = (word) => word.replace(/(?:arna|erna|ande|en|et|ar|er|or|s)$/u, (suffix) =>
+      word.length - suffix.length >= 4 ? "" : suffix);
+    const queryWords = new Set((query.normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || []).map(stem));
+    for (const target of targets) {
+      const targetWords = target.toLocaleLowerCase("sv-SE").normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || [];
+      if (targetWords.some((word) => !ignored.has(word) && queryWords.has(stem(word)))) return true;
+    }
+    return false;
+  }
+
+  function isClearlyGeneralQuestion() {
+    return /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)\b/i
+      .test(String(body.userQuestion || ""));
+  }
+
+  function allowRestrictedStudyChat({ pendingExam = true } = {}) {
+    if (!ordinaryStudyChat || referencesExamQuestion()) return false;
+    if (examContextDeclared && !isClearlyGeneralQuestion()) return false;
+    // This server-owned marker only limits ordinary study chat. Exam-related
+    // questions and specialized answer routes remain behind their own gates.
+    body._perExamStudyOnly = true;
+    if (pendingExam) body._perPendingExamStudy = true;
+    if (context) {
+      body.pageContext = { ...context };
+      delete body.pageContext.currentQuestion;
+      delete body.pageContext.questions;
+      delete body.pageContext.examState;
+      if (examPage) delete body.pageContext.page;
+    }
+    return true;
+  }
 
   // A verified post-grade request carries its own signed completion proof.
   // Treat client issuance metadata as stale display context here; still block
@@ -743,6 +803,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (state === "active" || state === "grading") {
+      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
@@ -752,6 +813,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (activeCount > 0) {
+      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body);
       return true;
     }
@@ -761,6 +823,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
+      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
@@ -771,6 +834,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (examContextDeclared) {
+      if (allowRestrictedStudyChat({ pendingExam: false })) return false;
       // A verified result can be reviewed through the signed completion flow;
       // a plain chat request on the exam view still does not get the answer.
       sendActiveExamGuidance(req, res, body, state);
@@ -799,13 +863,12 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      // Until the latest issued exam has a verified saved grade, keep even
-      // context-free PER requests on fixed method guidance. A new graded exam
-      // becomes the verified checkpoint that restores ordinary study help.
+      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
     if (examContextDeclared) {
+      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
@@ -819,6 +882,7 @@ async function gateActiveExam(req, res, body, user) {
     }
     return false;
   }
+  if (allowRestrictedStudyChat()) return false;
   sendActiveExamGuidance(req, res, body);
   return true;
 }
@@ -996,8 +1060,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
   if (await gateActiveExam(req, res, body, user)) return;
-  const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+  if (body._perExamStudyOnly !== true) {
+    const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
+    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+  }
 
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
   if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
@@ -1108,7 +1174,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const sales = decideSalesMode({ loggedIn: true, pageContext, userQuestion });
     const salesGuardrail = buildSalesGuardrail(sales.mode, { role });
 
-    const intent      = isPilotMode() ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
+    const intent      = (isPilotMode() || body._perExamStudyOnly === true) ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
       ? 'support'
       : sales.mode === SALES_MODE.ASKED
         ? 'sales'
@@ -1229,7 +1295,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        märkas, och en enstaka udda session ska inte fastna för alltid. */
     const style = deriveStyleSignals(history);
 
-    const helpCap = helpCapFor(pageContext, { pilotMode: isPilotMode() });
+    const helpCap = helpCapFor(pageContext, {
+      pilotMode: isPilotMode(),
+      pendingExam: body._perPendingExamStudy === true,
+    });
     const requestedLevel = badOmNivå !== null ? badOmNivå : defaultHelpLevel(pageContext);
     const helpLevel = Math.min(requestedLevel, helpCap);
 
@@ -1243,6 +1312,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       helpLevel,
       requestedLevel,
       helpCap,
+      quietHelpCap: body._perPendingExamStudy === true,
       clarifyReply,
       style,
       pageContext,
