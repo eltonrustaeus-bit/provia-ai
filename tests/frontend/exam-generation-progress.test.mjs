@@ -4,8 +4,8 @@ import test from "node:test";
 import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
-const start = html.indexOf("async function runResumableGeneration(payload)");
-const end = html.indexOf("\n  async function runGenerate()", start);
+const start = html.indexOf("async function runResumableGeneration(payload,onProgress)");
+const end = html.indexOf("\n  async function runGenerate(onProgress)", start);
 assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
 const helper = html.slice(start, end);
 

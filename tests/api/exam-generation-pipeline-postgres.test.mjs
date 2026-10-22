@@ -8,6 +8,7 @@ const ownerClaimMigration = fs.readFileSync(new URL("../../supabase/migrations/2
 const retentionMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140200_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140200_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
+const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
@@ -40,6 +41,7 @@ async function makeDb() {
   await db.exec(ownerClaimMigration);
   await db.exec(retentionMigration);
   await db.exec(preflightReleaseMigration);
+  await db.exec(feedbackMigration);
   return db;
 }
 
@@ -92,6 +94,81 @@ async function addJob(db, options = {}) {
     job.attempts,job.leaseToken]);
   return job;
 }
+
+test("private repair feedback shares checkpoint/retry fencing, bounds and terminal cleanup", async () => {
+  const db = await makeDb();
+  const feedback = { reviewFailureCounts: { answer_alignment: 2 }, solverFailureCounts: {}, duplicateCount: 1 };
+  const accepted = [{ id: "server-q1", type: "mc", question: "Synthetic approved task", validation_status: "verified" }];
+  const checkpoint = async (lease, expected, questions, value = feedback, next = "repair") =>
+    (await db.query("select public.checkpoint_mock_exam_generation_pipeline_batch($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb) as r",
+      [jobId, lease, expected, next, JSON.stringify(questions), questions.length, JSON.stringify(value)])).rows[0].r;
+  const row = async () => (await db.query("select * from public.mock_exam_generation_pipeline_jobs where id=$1", [jobId])).rows[0];
+  try {
+    await addParent(db);
+    await addJob(db, { requested: 12, state: "running", leaseToken: token, attempts: 1 });
+    const before = await row();
+    for (const bad of [
+      { ...feedback, rawText: "untrusted text" },
+      { ...feedback, reviewFailureCounts: { ignore_previous_instructions: 1 } },
+      { ...feedback, reviewFailureCounts: { answer_alignment: "text" } },
+      { ...feedback, reviewFailureCounts: { answer_alignment: 21 } },
+      { ...feedback, duplicateCount: 4 },
+      { ...feedback, solverFailureCounts: { answer_alignment: 1 } },
+      { ...feedback, rawText: "x".repeat(3000) },
+      null,
+    ]) {
+      assert.equal((await checkpoint(token, "generate", accepted, bad)).status, "invalid_checkpoint");
+      assert.deepEqual(await row(), before, "invalid feedback cannot advance or write a private payload");
+    }
+    assert.equal((await checkpoint(quota, "generate", accepted)).status, "fenced");
+    assert.equal((await checkpoint(token, "repair", accepted)).status, "fenced");
+    assert.equal((await checkpoint(token, "generate", [{ ...accepted[0], validation_status: "gate_only" }])).status, "invalid_checkpoint");
+    assert.deepEqual(await row(), before);
+
+    assert.equal((await checkpoint(token, "generate", accepted)).status, "checkpointed");
+    const saved = await row();
+    assert.equal(saved.stage, "repair");
+    assert.deepEqual(saved.payload.repairFeedback, feedback);
+    assert.equal(saved.progress_current, 1);
+    assert.equal(saved.stage_attempts, 0);
+    assert.equal((await checkpoint(token, "generate", accepted)).status, "fenced",
+      "a lost response cannot make the old worker replay a metadata write");
+    assert.deepEqual(await row(), saved);
+
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [u1]);
+    const publicStatus = (await db.query("select public.get_mock_exam_generation_pipeline_status($1) as r", [jobId])).rows[0].r;
+    assert.ok(!JSON.stringify(publicStatus).includes("answer_alignment"));
+    assert.ok(!Object.hasOwn(publicStatus, "payload"));
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [u2]);
+    assert.equal((await db.query("select public.get_mock_exam_generation_pipeline_status($1) as r", [jobId])).rows[0].r, null);
+    for (const role of ["anon", "authenticated"]) {
+      await db.exec(`set role ${role}`);
+      await assert.rejects(() => checkpoint(token, "repair", accepted), /permission denied/);
+      await assert.rejects(() => db.query("select payload from public.mock_exam_generation_pipeline_jobs"), /permission denied/);
+      await db.exec("reset role");
+    }
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const claim = (await db.query("select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r", [jobId,u1])).rows[0].r;
+      assert.equal(claim.status, "claimed");
+      assert.deepEqual(claim.job.payload.repairFeedback, feedback);
+      assert.equal(claim.job.stage_attempts, attempt);
+      const originalRow = await row();
+      await db.query("update public.mock_exam_generation_pipeline_jobs set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1", [jobId]);
+      const expired = await row();
+      assert.equal((await checkpoint(claim.job.lease_token, "repair", accepted)).status, "fenced");
+      assert.deepEqual(await row(), expired, "expired feedback writes are fully fenced");
+      await db.query("update public.mock_exam_generation_pipeline_jobs set lease_expires_at=$2 where id=$1", [jobId,originalRow.lease_expires_at]);
+      const retry = await checkpoint(claim.job.lease_token, "repair", accepted);
+      assert.equal(retry.status, attempt < 3 ? "retry_queued" : "retry_limit");
+    }
+    const terminal = await row();
+    assert.equal(terminal.state, "failed");
+    assert.deepEqual(terminal.payload, {}, "terminal failure scrubs source and repair metadata together");
+    assert.deepEqual(terminal.accepted_questions, []);
+    assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [u1])).rows[0].mock_quota_count, 0);
+  } finally { await db.close(); }
+});
 
 test("retention cron rollback removes only the schedule created by this migration", async () => {
   const makeCronDb = async (preexistingJob = null) => {
@@ -490,7 +567,7 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       await addParent(db, { userId: ownerId, idempotencyKey, attemptId: ownerAttempt, quotaRequestId });
       await addJob(db, {
         id: pipelineId, userId: ownerId, idempotencyKey, attemptId: ownerAttempt,
-        quotaRequestId, state: "queued", payload: { pastedText: "synthetic source material" },
+        quotaRequestId, state: "queued", payload: { pastedText: "synthetic source material", repairFeedback: { reviewFailureCounts: { answer_alignment: 1 }, solverFailureCounts: {}, duplicateCount: 0 } },
         accepted: [question], progress: 1, deadline: "clock_timestamp()-interval '23 hours 59 minutes 59 seconds'",
       });
       const recentCleanup = (await db.query(

@@ -1,5 +1,66 @@
 # 08 Current Status
 
+## Repair feedback, batch identities and visible progress prepared locally — 2026-10-22
+
+- [x] Confirmed a source-level cause of lost approved questions: model IDs are
+  local to a generation batch, but pipeline accumulation previously treated
+  their reuse as an exam-wide duplicate. Reviewed candidates now receive IDs
+  scoped to the server job/lease before checkpointing. Content-based duplicate
+  checks remain unchanged; telemetry distinguishes content duplicates from
+  within-batch ID collisions. This does not prove which duplicate category
+  caused the older hosted run, whose private candidates were already scrubbed.
+- [x] Also fixed raw ID collisions between first-round and inline repair
+  candidates: rename only after independent verifier/solver acceptance and
+  preserve the matching verifier-map entry used for final validation metadata.
+  Rejected candidates remain excluded.
+- [x] Underfilled reviewed batches now enter the existing repair stage for a
+  fresh request budget. A new service-only checkpoint wrapper atomically writes
+  bounded, allowlisted review/solver counts into the private job payload;
+  zero-progress retries retain the existing attempt limit. Existing terminal
+  and retention scrubbing clears the feedback with the rest of the payload.
+  No rejected candidate text, source excerpts or answer keys are added to it.
+- [x] Added an engine progress callback to the visible exam flow, a polite
+  status beside the generation button and accurate multi-minute waiting copy.
+  The result-screen regenerate path reuses the same status component.
+- [x] Focused eight-file offline suite passed 62/62. Actual generator HTTP tests
+  use mocked provider/reviewer/solver responses, deliberately reuse q1/q2/q3
+  across 3/6/12 runs and within inline repair, assert cross-request feedback
+  prompts, reject old question stems, preserve verified checkpoints and exercise
+  issuance/replay/quota invariants. SQL/PGlite tests also reject invalid feedback,
+  wrong/expired leases, wrong stages and client-role reads/execution; preserve
+  bounded retries and terminal cleanup. These are sequential local checks.
+- [x] Reused API and independent safety reviewers found no remaining blocker
+  in the local implementation; both reran the HTTP test. Server JS syntax,
+  all four inline app scripts and diff whitespace checks passed.
+- [x] Browser regression passed 191 checks with zero failures. Reviewed desktop
+  and 390px mobile progress screenshots; the count is inside the viewport beside
+  the generation button and is announced politely. The language fixture now
+  reuses its already-open start screen rather than aborting a pending mocked
+  Auth request with an unnecessary reload; Auth errors are still checked.
+- [!] Migration `20261022170148_checkpoint_exam_repair_feedback.sql` and the
+  new code remain local. Apply the migration before the matching feature
+  Preview; old code does not require the new function. No new hosted write,
+  push/deploy, paid test, account/role/quota change, main or production change
+  was made during this follow-up. A corrected live 12-question run is still
+  required. Read-only refresh confirms the enabled USD 5 cap and remaining
+  USD 4.530004; the latest hosted migration is still the preflight-release
+  migration, so the new repair-feedback function is not installed.
+
+Commands executed for this follow-up:
+
+```sh
+node --test --test-reporter=spec tests/api/exam-generation-pipeline.test.mjs tests/api/exam-generation-pipeline-http.test.mjs tests/api/exam-generation-pipeline-postgres.test.mjs tests/frontend/exam-generation-progress.test.mjs tests/api/exam-pipeline-offline.test.mjs tests/api/exam-generation-recovery.test.mjs tests/api/exam-regeneration-budget.test.mjs tests/api/ai-budget.test.mjs
+node tests/frontend/exam-flow.regression.mjs
+node --check api/generate-exam.js
+node --check api/_exam-generation-pipeline.cjs
+node --check api/_exam-generation-operations.cjs
+node --check js/exam-flow.js
+git diff --check
+```
+
+Additionally parsed the four inline app scripts with `vm.Script`. The exact
+14-file release scope is in `17_GENERATION_STAGING_CHECKLIST.md`.
+
 ## Approved staging package executed; live 12-question acceptance failed — 2026-10-22
 
 This section supersedes earlier pending-approval/deployment snapshots below.

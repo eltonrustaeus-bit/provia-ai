@@ -1539,10 +1539,12 @@
     err.setAttribute("aria-atomic", "true");
     b.appendChild(err);
 
+    var generationProgress = createGenerationProgress();
+    b.appendChild(generationProgress);
     var act = el("div", "xf-act");
     var go = el("button", "xf-btn primary", tx("Skapa provet", "Create exam"));
     go.type = "button";
-    go.addEventListener("click", function () { build(go, err); });
+    go.addEventListener("click", function () { build(go, err, generationProgress); });
     act.appendChild(go);
     var perButton = el("button", "xf-btn ghost xf-contract-per", tx("Fråga P.E.R", "Ask P.E.R"));
     perButton.type = "button";
@@ -1572,21 +1574,38 @@
 
   // ── Generering ───────────────────────────────────────────────────────────
 
-  function build(btn, err) {
+  function createGenerationProgress() {
+    var progress = el("p", "xf-note xf-generation-progress");
+    progress.setAttribute("role", "status");
+    progress.setAttribute("aria-live", "polite");
+    progress.setAttribute("aria-atomic", "true");
+    progress.hidden = true;
+    return progress;
+  }
+
+  function build(btn, err, generationProgress) {
     // Varje generering drar ur elevens kvot. Ett dubbelklick, eller "Gör om"
     // tryckt två gånger, får inte kosta två prov.
     if (S.generating) return;
     S.generating = true;
     var requestOwnerId = uid();
+    if (!generationProgress) {
+      generationProgress = err.parentNode.querySelector(".xf-generation-progress") || createGenerationProgress();
+      if (!generationProgress.parentNode) err.after(generationProgress);
+    }
 
     btn.disabled = true;
     btn.textContent = tx("Bygger…", "Building…");
     busy(true);
     err.textContent = "";
-    say(tx("Bygger ditt prov.", "Building your exam."), tx("Tar oftast under en minut.", "This usually takes less than a minute."));
+    generationProgress.hidden = false;
+    generationProgress.textContent = tx("Skapar och granskar frågor…", "Creating and checking questions…");
+    say(tx("Bygger ditt prov.", "Building your exam."), tx("Frågorna skapas och granskas i omgångar. Större prov kan ta några minuter.", "Questions are created and checked in batches. Larger exams can take a few minutes."));
 
     function done() {
       S.generating = false;
+      generationProgress.hidden = true;
+      generationProgress.textContent = "";
       busy(false);
       btn.disabled = false;
       btn.textContent = tx("Skapa provet", "Create exam");
@@ -1597,7 +1616,16 @@
       num: S.num, material: S.material, focusTerms: S.focusTerms || []
     });
 
-    window.ExGenEngine.generate().then(function (r) {
+    window.ExGenEngine.generate({ onProgress: function (progress) {
+      if (!S.generating || uid() !== requestOwnerId) return;
+      var requested = Number.isInteger(progress.requested) ? progress.requested : S.num;
+      var approved = Math.max(0, Math.min(requested, Number.isInteger(progress.approved) ? progress.approved : 0));
+      generationProgress.textContent = approved + tx(" av ", " of ") + requested +
+        tx(" frågor godkända. ", " questions approved. ") +
+        (progress.stage === "assemble"
+          ? tx("Färdigställer provet.", "Preparing your exam.")
+          : tx("Jag skapar och granskar resten.", "Creating and checking the remaining questions."));
+    } }).then(function (r) {
       done();
       if (uid() !== requestOwnerId) {
         err.textContent = tx("Kontot ändrades medan provet skapades. Logga in igen för att fortsätta.", "The account changed while the exam was being created. Sign in again to continue.");

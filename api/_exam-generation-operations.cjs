@@ -116,15 +116,18 @@ async function checkpointPipelineJob(input) {
       !["generate", "repair", "assemble"].includes(input.nextStage) ||
       !Array.isArray(input.acceptedQuestions) || input.acceptedQuestions.length > 20 ||
       !Number.isInteger(input.progressCurrent) || input.progressCurrent < 0 || input.progressCurrent > 20) return null;
-  const result = await callRpc("checkpoint_mock_exam_generation_pipeline_job", {
+  const withFeedback = input.repairFeedback !== undefined;
+  const result = await callRpc(withFeedback
+    ? "checkpoint_mock_exam_generation_pipeline_batch" : "checkpoint_mock_exam_generation_pipeline_job", {
     p_job_id: input.jobId,
     p_lease_token: input.leaseToken,
     p_expected_stage: input.expectedStage,
     p_next_stage: input.nextStage,
     p_accepted_questions: input.acceptedQuestions,
     p_progress_current: input.progressCurrent,
+    ...(withFeedback ? { p_feedback: input.repairFeedback } : {}),
   });
-  return result?.status === "checkpointed" ? result : result?.status === "fenced" ? result : null;
+  return ["checkpointed", "retry_queued", "partial_ready", "retry_limit", "fenced"].includes(result?.status) ? result : null;
 }
 
 async function retryPipelineStep({ jobId, leaseToken, errorCode } = {}) {

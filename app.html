@@ -2148,7 +2148,7 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
-  async function runResumableGeneration(payload){
+  async function runResumableGeneration(payload,onProgress){
     const startedAt=Date.now();
     const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
     if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
@@ -2165,6 +2165,9 @@ try{
       const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
       const label=LANG==="sv"?`Skapar och granskar prov: ${approved} av ${requested} frågor godkända.`:`Generating and reviewing exam: ${approved} of ${requested} questions approved.`;
       setStatus(label,"warn");
+      if(typeof onProgress==="function"){
+        try{onProgress({approved,requested,stage:state?.stage||"generate"});}catch{}
+      }
     };
     updateProgress(started.data);
     while(Date.now()-startedAt<14*60*1000){
@@ -2215,7 +2218,7 @@ try{
     return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
       requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
   }
-  async function runGenerate(){
+  async function runGenerate(onProgress){
     hideDebug();setStatus("");const t=T[LANG];
     const pastedText=(pastedTextEl()?.value||"").trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
@@ -2237,7 +2240,7 @@ try{
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=payload.qType==="graph"
       ?await postJson("/api/generate-exam",payload,{timeoutMs:62000})
-      :await runResumableGeneration(payload);
+      :await runResumableGeneration(payload,onProgress);
     const clearGenerationPlaceholder=()=>{
       const body=examBodyEl();
       if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
@@ -2687,7 +2690,7 @@ try{
       const search = document.getElementById("courseSearch");
       if (search) search.value = String(course || "").trim();
     },
-    generate() { return runGenerate(); },
+    generate(options) { return runGenerate(options?.onProgress); },
     grade(answers) { return runGrade(answers); },
     async abandonExam() {
       if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {

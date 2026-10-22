@@ -31,6 +31,12 @@ function noSemanticDuplicate(questions, candidate) {
     String(question.id) === String(candidate.id) || assessment.isDuplicateQuestion(question, candidate));
 }
 
+function batchQuestionId(job, question) {
+  return "q-" + crypto.createHash("sha256")
+    .update(JSON.stringify([job.id, job.lease_token, String(question.id)]))
+    .digest("hex").slice(0, 32);
+}
+
 function safeRequestId(value) {
   return typeof value === "string" && (REQUEST_ID_PATTERN.test(value)
     || PIPELINE_REQUEST_ID_PATTERN.test(value)) ? value : null;
@@ -120,6 +126,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   delete payload.quota;
   delete payload.entitlements;
   delete payload.requestHash;
+  delete payload.repairFeedback;
 
   const generationStartedAt = Date.now();
   const setupMs = generationStartedAt - pipelineStartedAt;
@@ -130,6 +137,8 @@ async function advance(job, { deadlineAt = null } = {}) {
     payload,
     deadlineAt,
     pipelineJobId: job.id,
+    pipelineStage: job.stage,
+    repairFeedback: job.payload.repairFeedback,
   }); }
   catch { generated = null; }
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
@@ -171,13 +180,23 @@ async function advance(job, { deadlineAt = null } = {}) {
   let unverifiedCandidates = 0;
   let wrongTypeCandidates = 0;
   let duplicateCandidates = 0;
+  let batchIdCollisions = 0;
+  let semanticDuplicateCandidates = 0;
   let overLimitCandidates = 0;
   for (const question of generated.body.questions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
     if (targets && question.type !== batchType) { wrongTypeCandidates++; continue; }
     if (acceptedOfType >= typeLimit || accepted.length >= job.requested_count) { overLimitCandidates++; continue; }
-    if (!noSemanticDuplicate(accepted, question)) { duplicateCandidates++; continue; }
-    accepted.push(question);
+    // Model IDs are local to each reviewed batch. Namespace them only after all
+    // checks; semantic duplicate detection still compares the question content.
+    const candidate = { ...question, id: batchQuestionId(job, question) };
+    if (accepted.some((prior) => prior.id === candidate.id)) {
+      batchIdCollisions++; duplicateCandidates++; continue;
+    }
+    if (!noSemanticDuplicate(accepted, candidate)) {
+      semanticDuplicateCandidates++; duplicateCandidates++; continue;
+    }
+    accepted.push(candidate);
     acceptedOfType += 1;
   }
   const diagnosticCount = (value) => Number.isInteger(value) && value >= 0 ? Math.min(value, 100) : null;
@@ -215,19 +234,12 @@ async function advance(job, { deadlineAt = null } = {}) {
     unverifiedCandidates,
     wrongTypeCandidates,
     duplicateCandidates,
+    batchIdCollisions,
+    semanticDuplicateCandidates,
     overLimitCandidates,
     acceptedAfter: accepted.length,
     latencyMs: Date.now() - generationStartedAt,
   }));
-
-  if (accepted.length === existing.length) {
-    const retry = await operations.retryPipelineStep({
-      jobId: job.id,
-      leaseToken: job.lease_token,
-      errorCode: "NO_NEW_APPROVED_QUESTIONS",
-    });
-    return retryOutcome(retry, job, "NO_NEW_APPROVED_QUESTIONS");
-  }
 
   const complete = accepted.length >= job.requested_count;
   const nearDeadline = Date.parse(job.deadline_at) - Date.now() < 75_000;
@@ -238,10 +250,14 @@ async function advance(job, { deadlineAt = null } = {}) {
     jobId: job.id,
     leaseToken: job.lease_token,
     expectedStage: job.stage,
-    nextStage: complete || partialReady ? "assemble" : job.stage,
+    nextStage: accepted.length > existing.length && (complete || partialReady) ? "assemble" : "repair",
     acceptedQuestions: accepted,
     progressCurrent: accepted.length,
+    repairFeedback: generation.normalizeRepairFeedback({ ...quality, duplicateCount: duplicateCandidates }),
   });
+  if (["retry_queued", "retry_limit", "partial_ready"].includes(checkpoint?.status)) {
+    return retryOutcome(checkpoint.status, job, "NO_NEW_APPROVED_QUESTIONS");
+  }
   if (checkpoint?.status !== "checkpointed") return { status: "fenced", error: "CHECKPOINT_FAILED" };
   return { status: "progress", stage: checkpoint.stage, approved: accepted.length, requested: job.requested_count };
 }
@@ -274,4 +290,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

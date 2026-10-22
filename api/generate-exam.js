@@ -1273,6 +1273,18 @@ const SAFE_REPAIR_SOLVER_FAILURE_CODES = new Set([
   "solver_low_confidence",
 ]);
 
+function normalizeRepairFeedback(value) {
+  const counts = (input, allowed) => Object.fromEntries(Object.entries(
+    input && typeof input === "object" && !Array.isArray(input) ? input : {},
+  ).filter(([code, count]) => allowed.has(code) && Number.isInteger(count) && count > 0)
+    .map(([code, count]) => [code, Math.min(20, count)]));
+  return {
+    reviewFailureCounts: counts(value?.reviewFailureCounts, SAFE_REPAIR_FAILURE_CODES),
+    solverFailureCounts: counts(value?.solverFailureCounts, SAFE_REPAIR_SOLVER_FAILURE_CODES),
+    duplicateCount: Number.isInteger(value?.duplicateCount) ? Math.max(0, Math.min(3, value.duplicateCount)) : 0,
+  };
+}
+
 function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [], candidateCount, reviewFailureCodes = [], reviewFailureCounts = {}, solverFailureCounts = {}, qType, missingTypes = null }) {
   const existing = Array.isArray(existingQuestions) ? existingQuestions : [];
   const missingSlots = Math.max(1, numQuestions - existing.length);
@@ -1677,7 +1689,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, comparisonQuestions
     });
 
-    const payload = {
+    let payload = {
       model,
       input: [
         { role: "system", content: systemPrompt },
@@ -1685,6 +1697,21 @@ module.exports = async function handler(req, res, internalContext = null) {
       ],
       text: { format: responseFormat }
     };
+    if (internalBatch && internalContext.pipelineStage === "repair") {
+      const feedback = normalizeRepairFeedback(internalContext.repairFeedback);
+      payload = buildRepairPayload(payload, {
+        lang, numQuestions, candidateCount: numQuestions, qType,
+        reviewFailureCodes: Object.keys(feedback.reviewFailureCounts),
+        reviewFailureCounts: feedback.reviewFailureCounts,
+        solverFailureCounts: feedback.solverFailureCounts,
+      });
+      if (feedback.duplicateCount > 0) payload.input.push({
+        role: "user",
+        content: lang === "en"
+          ? "The previous batch repeated an approved question. Choose a different source-supported task or relationship; changing only the wording is not enough."
+          : "Föregående omgång upprepade en godkänd fråga. Välj en annan källstödd uppgift eller relation; att bara byta formulering räcker inte.",
+      });
+    }
 
     // Ordinary AI-authored items need a complete review window. Do not start an
     // expensive generation if the remaining function time cannot accommodate it.
@@ -1750,6 +1777,7 @@ module.exports = async function handler(req, res, internalContext = null) {
       return fail(normalizedInitial.failure.status, normalizedInitial.failure.payload);
     }
     exam = normalizedInitial.exam;
+    const initialCandidateCount = exam.questions.length;
 
     failureStage = "quality_review";
     // ── STRUCTURAL GATE (subject-agnostic, deterministic) ─────────────────
@@ -2234,11 +2262,20 @@ module.exports = async function handler(req, res, internalContext = null) {
                     const combinedIds = new Set(combinedQuestions.map(q => String(q.id)));
                     if (!completeRetry) {
                       for (const q of repairQuestions) {
-                        const id = String(q.id);
+                        let id = String(q.id);
                         if (combinedQuestions.length >= numQuestions) break;
-                        if (combinedIds.has(id) || combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
+                        if (combinedQuestions.some((accepted) => assessment.isDuplicateQuestion(accepted, q))) {
                           repairCrossRoundDuplicateCount++;
                           continue;
+                        }
+                        if (combinedIds.has(id)) {
+                          // Preserve this repair's review result when its local
+                          // ID collides with an independently approved first round.
+                          const renamed = "repair-" + crypto.createHash("sha256")
+                            .update(JSON.stringify([quotaRequestId, id])).digest("hex").slice(0, 32);
+                          v2.perQuestion.set(renamed, v2.perQuestion.get(id));
+                          q.id = renamed;
+                          id = renamed;
                         }
                         combinedIds.add(id);
                         combinedQuestions.push(q);
@@ -2399,7 +2436,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         },
         qualityDiagnostics: {
           ...(internalBatch ? { requestId: quotaRequestId } : {}),
-          candidates: normalizedInitial.exam.questions.length + generatedRepairCandidateTotal,
+          candidates: initialCandidateCount + generatedRepairCandidateTotal,
           structuralDropped: gate.dropped.length,
           structuralIssueCounts: Object.fromEntries(Object.entries(gate.dropped.reduce((counts, item) => {
             for (const issue of item.issues || []) {
@@ -2782,7 +2819,8 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   };
   return { submissionId, response };
 };
-module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null, pipelineJobId = null }) {
+module.exports.normalizeRepairFeedback = normalizeRepairFeedback;
+module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null, pipelineJobId = null, pipelineStage = "generate", repairFeedback = null }) {
   if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object") {
     throw new TypeError("Invalid internal batch request");
   }
@@ -2798,7 +2836,8 @@ module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ us
     setHeader(name, value) { this.headers[name] = value; },
     end(body) { this.body = body; },
   };
-  await module.exports(req, response, { kind: "verified_batch", userId, deadlineAt, pipelineJobId });
+  await module.exports(req, response, { kind: "verified_batch", userId, deadlineAt, pipelineJobId,
+    pipelineStage, repairFeedback: normalizeRepairFeedback(repairFeedback) });
   let body;
   try { body = JSON.parse(response.body || "{}"); } catch { body = null; }
   return { status: response.statusCode, body };

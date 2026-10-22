@@ -2,6 +2,53 @@
 
 Prepared 2026-10-22. This is a reviewable release scope, not execution authority.
 
+## Prepared follow-up package — 2026-10-22
+
+The next local package fixes batch-local and inline repair ID collisions,
+preserves content deduplication, carries bounded independent-review feedback
+across requests and shows progress beside the visible generation button.
+It requires the new service-only function in
+`20261022170148_checkpoint_exam_repair_feedback.sql`; the matching rollback
+refuses while active feedback-bearing jobs exist. No new table or backfill is
+introduced. Feedback shares the private payload's existing cleanup lifecycle.
+
+After approval: apply only that migration to staging `yhcinqejsocpmmetazpz`,
+then push the reviewed generation commit plus existing local status commit
+`fadbb3a` to the existing feature branch. Let Vercel build a Preview and verify
+exact SHA, branch, staging runtime, RPC ACL and remaining total USD 5 cap.
+Use the automatic branch alias to reuse the existing browser session; no
+manual alias/secret/account change is needed. Run one synthetic 12-question
+test and check accepted/issued counts, repair progress, sanitized telemetry,
+terminal cleanup and replay without another model charge. Further attempts
+are not part of this package. Production and main remain outside this scope.
+
+Offline coverage: 62 passing focused tests, including real generator code with
+mocked providers for repeated q1/q2/q3, inline collision recovery and resumed
+repair prompts. Independent read-only API and security reviews found no local
+blocker. Browser regression passed 191 checks with zero failures; desktop and
+mobile screenshots confirm visible progress beside the generation button.
+The prior live failure below remains the latest hosted behavior until this
+specific package is installed and verified; offline passes do not replace it.
+
+Exact follow-up file scope (exclude agent-context files and `.temp/cli-latest`):
+
+```text
+api/_exam-generation-operations.cjs
+api/_exam-generation-pipeline.cjs
+api/generate-exam.js
+app.html
+js/exam-flow.js
+supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql
+supabase/migrations/20261022170148_checkpoint_exam_repair_feedback_ROLLBACK.sql
+tests/api/exam-generation-pipeline.test.mjs
+tests/api/exam-generation-pipeline-http.test.mjs
+tests/api/exam-generation-pipeline-postgres.test.mjs
+tests/frontend/exam-generation-progress.test.mjs
+tests/frontend/exam-flow.regression.mjs
+docs/codex/08_CURRENT_STATUS.md
+docs/codex/17_GENERATION_STAGING_CHECKLIST.md
+```
+
 ## Execution result — 2026-10-22
 
 User explicitly approved this package. Code commit `f06ad7d` was pushed to

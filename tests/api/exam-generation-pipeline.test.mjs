@@ -137,12 +137,14 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     const result = await pipeline.advance(job);
     assert.equal(result.status, "progress");
     assert.equal(job.progress_current, 2, "the duplicate does not fill a requested slot");
-    assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", "distinct"]);
+    assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", pipeline.batchQuestionId(job, { id: "distinct" })]);
     assert.deepEqual(noveltyContext, [{ id: "approved-1", concept_tag: "Ekvationer", question: "Beräkna x när x + 2 = 5." }]);
     assert.ok(!JSON.stringify(noveltyContext).includes("x = 3"), "answer keys are not sent as novelty context");
     assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer options are not sent as novelty context");
     assert.equal(diagnosticLogs.length, 1);
     assert.equal(diagnosticLogs[0].duplicateCandidates, 1);
+    assert.equal(diagnosticLogs[0].semanticDuplicateCandidates, 1);
+    assert.equal(diagnosticLogs[0].batchIdCollisions, 0);
     assert.equal(diagnosticLogs[0].acceptedAfter, 2);
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x när x + 2 = 5."),
       "pipeline telemetry contains counts only, never student-facing question content");
@@ -158,7 +160,7 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   }
 });
 
-test("an all-duplicate batch retries without advancing or checkpointing the exam", async () => {
+test("an all-duplicate batch stores repair feedback without advancing the exam", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000015",
     user_id: "11111111-1111-4111-8111-111111111111",
@@ -196,7 +198,13 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
   operations.retryPipelineStep = async () => { retryCalls += 1; return "retry_queued"; };
-  operations.checkpointPipelineJob = async () => { checkpointCalls += 1; return { status: "checkpointed" }; };
+  operations.checkpointPipelineJob = async (input) => {
+    checkpointCalls += 1;
+    assert.equal(input.progressCurrent, job.progress_current);
+    assert.equal(input.nextStage, "repair");
+    assert.equal(input.repairFeedback.duplicateCount, 2);
+    return { status: "retry_queued" };
+  };
   operations.completePipelineJob = async () => { completeCalls += 1; return { status: "completed" }; };
   generation.finalizeVerifiedExam = async () => { finalizeCalls += 1; return { status: "completed" }; };
   generation.generateVerifiedBatch = async ({ payload }) => {
@@ -218,8 +226,8 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
 
     assert.equal(result.status, "retry");
     assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
-    assert.equal(retryCalls, 1);
-    assert.equal(checkpointCalls, 0);
+    assert.equal(retryCalls, 0, "retry and feedback are one fenced database operation");
+    assert.equal(checkpointCalls, 1);
     assert.equal(completeCalls, 0);
     assert.equal(finalizeCalls, 0);
     assert.equal(job.progress_current, 1);
@@ -234,6 +242,13 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
       "the event uses stable job correlation rather than the per-batch idempotency key");
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x"),
       "retry telemetry reports counts only, never question text");
+    job.accepted_questions.push({ id: "keep-second", type: "short", question: "Bestäm nollställena till x²-4.", validation_status: "verified" });
+    job.progress_current = 2;
+    job.deadline_at = new Date(Date.now() + 30_000).toISOString();
+    const nearDeadline = await pipeline.advance(job);
+    assert.equal(nearDeadline.status, "retry",
+      "zero progress near the deadline uses the bounded retry path even above the partial floor");
+    assert.equal(job.progress_current, 2);
   } finally {
     console.info = priorConsoleInfo;
     generation.generateVerifiedBatch = prior.generateVerifiedBatch;
@@ -255,6 +270,27 @@ test("pipeline diagnostic UUID sanitizer rejects non-correlation data", () => {
   assert.equal(generation.generationRequestId(true, "00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
   assert.notEqual(generation.generationRequestId(false, "00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
   assert.match(generation.generationRequestId(true, "invalid"), /^[0-9a-f-]{36}$/i);
+});
+
+test("batch-local IDs are deterministic within a lease and distinct across leases", () => {
+  const job = { id: "11111111-1111-4111-8111-111111111111", lease_token: "22222222-2222-4222-8222-222222222222" };
+  const question = { id: "q1" };
+  const first = pipeline.batchQuestionId(job, question);
+  assert.equal(pipeline.batchQuestionId(job, question), first);
+  assert.notEqual(pipeline.batchQuestionId({ ...job, lease_token: "33333333-3333-4333-8333-333333333333" }, question), first);
+  assert.match(first, /^q-[a-f0-9]{32}$/);
+});
+
+test("repair feedback keeps only bounded fixed categories and no free text", () => {
+  assert.deepEqual(generation.normalizeRepairFeedback({
+    reviewFailureCounts: { answer_alignment: 999, source_support: 1, raw_message: 1, low_scoring_quality: "private text" },
+    solverFailureCounts: { solver_disagrees_on_key: 2, arbitrary_instructions: 2 },
+    duplicateCount: 99,
+    question: "private text",
+  }), {
+    reviewFailureCounts: { answer_alignment: 20, source_support: 1 },
+    solverFailureCounts: { solver_disagrees_on_key: 2 }, duplicateCount: 3,
+  });
 });
 
 test("pipeline telemetry accepts all emitted repair stage codes", () => {

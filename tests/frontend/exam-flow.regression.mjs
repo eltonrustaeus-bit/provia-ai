@@ -181,7 +181,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
       && await page.locator("#perSizeBtn").getAttribute("aria-label") === "Återställ normal storlek");
     await page.locator("#langBtnDesktop").click();
     await page.waitForFunction(() => document.querySelector("#perInput")?.getAttribute("aria-label") === "Ask P.E.R a question");
-    await toExam(page);
+    await toExam(page, true);
     ok("aktivt prov har engelska navigeringskontroller och frågerubrik",
       await page.locator(".xf-exam-nav .xf-btn.ghost").textContent() === "Previous"
       && await page.locator(".xf-exam-nav .xf-btn.primary").textContent() === "Next"
@@ -204,8 +204,10 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
   }
 }
 
-async function toExam(page) {
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+async function toExam(page, reuseStart = false) {
+  // The language scenario is already at the start screen. Reloading there can
+  // abort its pending mocked Auth request and manufacture an unrelated error.
+  if (!reuseStart) await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
@@ -217,6 +219,54 @@ async function toExam(page) {
   await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
   await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
   await page.waitForTimeout(300);
+}
+
+// Exercise the real engine callback in the visible flow while a later batch is
+// still running; a hidden legacy status update must not satisfy this check.
+{
+  const { ctx, page, errs } = await mk();
+  let releaseFinal;
+  const finalBatch = new Promise(resolve => { releaseFinal = resolve; });
+  let advances = 0;
+  try {
+    await signIn(page, "visible-generation-progress");
+    await page.route("**/api/generate-exam*", async route => {
+      if (route.request().url().includes("pipeline=start")) {
+        return route.fulfill({ status: 202, json: { ok: true, operationId: "11111111-1111-4111-8111-111111111111", requested: 3, approved: 0 } });
+      }
+      advances++;
+      if (advances === 1) return route.fulfill({ status: 202, json: {
+        ok: true, state: "queued", stage: "repair", requested: 3, approved: 2,
+      } });
+      await finalBatch;
+      return route.fulfill({ json: { ok: true, exam: EXAM, meta: { requested: 3, partial: false } } });
+    });
+    const completed = toExam(page);
+    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor godkända"));
+    await page.waitForTimeout(850);
+    const progress = page.locator("#xf .xf-generation-progress");
+    ok("synliga provvyn visar varaktig godkänd progress", await progress.isVisible()
+      && (await progress.innerText()).includes("2 av 3 frågor godkända"));
+    ok("stegvis generering lovar inte under en minut", !(await page.locator("#xf").innerText()).includes("under en minut"));
+    await page.screenshot({ path: SHOT + "/generation-progress-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileFit = await progress.evaluate(node => ({
+      width: node.getBoundingClientRect().width,
+      scroll: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+      live: node.getAttribute("aria-live"),
+      top: node.getBoundingClientRect().top,
+      bottom: node.getBoundingClientRect().bottom,
+      height: window.innerHeight,
+    }));
+    ok("mobil progress får plats och annonseras", mobileFit.width > 0 && mobileFit.scroll <= mobileFit.viewport && mobileFit.live === "polite"
+      && mobileFit.top >= 0 && mobileFit.bottom < mobileFit.height, JSON.stringify(mobileFit));
+    await page.screenshot({ path: SHOT + "/generation-progress-mobile.png" });
+    releaseFinal();
+    await completed;
+    ok("progress övergår till det färdiga provet", await page.locator(".xf-exam.on").count() === 1);
+    ok("progressbryggan saknar konsolfel", errs.length === 0, errs.join(" | "));
+  } finally { releaseFinal(); await ctx.close(); }
 }
 
 async function waitForScreenEntrance(page) {
@@ -466,14 +516,14 @@ async function toMaterial(page) {
     const contract = await page.locator("#xf .xf-screen[data-screen='contract']").textContent();
     const contractHeading = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-say").getAttribute("aria-label");
     ok("provöversikten visas på engelska", /Review your exam/.test(contractHeading || "") && /Course/.test(contract || "") && /Create exam/.test(contract || ""), contract);
-    const englishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    const englishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").textContent();
     ok("engelsk provöversikt beskriver AI-underlaget utan garanti",
       /using your material as a reference/i.test(englishGroundingNote || "")
         && /may miss details/i.test(englishGroundingNote || "")
         && /as you work through the exam/i.test(englishGroundingNote || "")
         && !/based only on concepts/i.test(englishGroundingNote || ""), englishGroundingNote || "");
     await desktopLanguage.click();
-    const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").textContent();
     ok("P.E.R-kontrollerna följer språkbytet tillbaka till svenska",
       await page.locator("#perInput").getAttribute("aria-label") === "Ställ en fråga till P.E.R"
       && await page.locator("#perSendBtn").textContent() === "Skicka");
@@ -486,7 +536,7 @@ async function toMaterial(page) {
     await page.locator(".welcomeAnim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
     await page.screenshot({ path: path.join(OUT, "exam-flow-language-contract-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
-    const noteLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").boundingBox();
+    const noteLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").boundingBox();
     const perActionLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-contract-per").boundingBox();
     const contractPerState = await page.evaluate(() => ({
       bubbleDisplay: getComputedStyle(document.querySelector("#perBubble")).display,
