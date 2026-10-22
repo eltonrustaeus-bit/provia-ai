@@ -32,6 +32,8 @@ assert.equal(regenerationGenerationTimeout(25_999), null,
   "retry does not start unless 4 seconds of generation, 8 seconds of review and 14 seconds of finalization fit");
 assert.equal(regenerationGenerationTimeout(26_000), null,
   "the generation window must exceed its 4-second minimum");
+assert.equal(regenerationGenerationTimeout(26_001), 4_001,
+  "the first eligible millisecond starts repair with just over four seconds of generation time");
 assert.equal(regenerationGenerationTimeout(27_839), 5_839,
   "a real-world 27.8-second remainder can start a bounded streamed repair");
 assert.equal(regenerationGenerationTimeout(35_000), 13_000,
@@ -42,6 +44,8 @@ assert.equal(regenerationGenerationTimeout(15_999, true), null,
   "internal batches keep their usage flush and response reserve but do not reserve ordinary quota/issuance work");
 assert.equal(regenerationGenerationTimeout(16_000, true), null,
   "internal repair must exceed, not merely equal, its minimum generation window");
+assert.equal(regenerationGenerationTimeout(16_001, true), 4_001,
+  "the first eligible internal-repair millisecond preserves just over four seconds for generation");
 assert.equal(regenerationGenerationTimeout(17_000, true), 5_000,
   "internal batches can use repair earlier while preserving the full independent review window");
 assert.equal(5_000 + 8_000 + 4_000, 17_000);

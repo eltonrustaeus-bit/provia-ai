@@ -185,7 +185,13 @@ function measuredEmbeddingTokens(usage) {
   return tokens;
 }
 
-function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, model, usage, latencyMs }) {
+function qualityGatePassed(callOk, checked, rejected) {
+  if (callOk !== true || !Number.isInteger(checked) || checked < 1 ||
+      !Number.isInteger(rejected) || rejected < 0 || rejected > checked) return null;
+  return rejected === 0;
+}
+
+function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, model, usage, latencyMs, verificationPassed }) {
   const embeddingTokens = step === "embed" ? measuredEmbeddingTokens(usage) : null;
   const tokens = step === "embed" ? null : measuredTokens(usage);
   if ((step === "embed" ? embeddingTokens === null : !tokens) || !STEPS.has(step) || !FEATURES.has(feature) || (!userId && feature !== "per_landing") || !model) return null;
@@ -199,6 +205,7 @@ function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, mode
     model: String(model).slice(0, 120),
     ...(tokens || { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, embedding_tokens: embeddingTokens }),
     latency_ms: Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0,
+    ...(typeof verificationPassed === "boolean" ? { verification_passed: verificationPassed } : {}),
   };
 }
 
@@ -241,7 +248,7 @@ async function logAiUsage(inputs, { env = process.env, fetchImpl = globalThis.fe
 const logMockExamUsage = logAiUsage;
 
 module.exports = {
-  measuredTokens, measuredEmbeddingTokens, usageEvent, logAiUsage, logMockExamUsage, safeFailureDetails,
+  measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logAiUsage, logMockExamUsage, safeFailureDetails,
   PILOT_STAGING_REF, PILOT_USER_ID, PILOT_BUDGET_USD, RATES_PER_MILLION,
   isBudgetedPilot, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
   reserveAiSpend, settleAiSpend, budgetedOpenAIFetch, budgetFailureStatus,

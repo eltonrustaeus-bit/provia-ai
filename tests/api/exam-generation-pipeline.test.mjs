@@ -370,6 +370,7 @@ test("pipeline telemetry accepts all emitted repair stage codes", () => {
     "insufficient_structural_repair",
     "repair_generation",
     "repair_normalization",
+    "repair_structural_validation",
     "repair_verification",
     "insufficient_unique_repair",
   ];

@@ -3,7 +3,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { measuredTokens, measuredEmbeddingTokens, usageEvent, logMockExamUsage, safeFailureDetails } = require("../../api/_ai-usage.cjs");
+const { measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logMockExamUsage, safeFailureDetails } = require("../../api/_ai-usage.cjs");
 
 const sample = {
   userId: "00000000-0000-4000-8000-000000000001",
@@ -27,6 +27,10 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(measuredTokens({ input_tokens: 2_147_483_648, output_tokens: 20 }), null);
   assert.equal(measuredTokens({ input_tokens: 20, output_tokens: 2_147_483_648 }), null);
   assert.equal(usageEvent({ ...sample, step: "unknown" }), null);
+  assert.equal(usageEvent({ ...sample, verificationPassed: true }).verification_passed, true);
+  assert.equal(usageEvent({ ...sample, verificationPassed: false }).verification_passed, false);
+  assert.equal(usageEvent({ ...sample, verificationPassed: null }).verification_passed, undefined);
+  assert.equal(usageEvent({ ...sample, verificationPassed: "passed" }).verification_passed, undefined);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", step: "validate" }).feature, "per_chat");
   assert.equal(usageEvent({ ...sample, feature: "per_landing", userId: null }).user_id, null);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", userId: null }), null);
@@ -50,6 +54,14 @@ test("embedding events use only measured embedding tokens", () => {
     output_tokens: event.output_tokens,
   }, { step: "embed", feature: "per_landing", embedding_tokens: 16, input_tokens: 0, output_tokens: 0 });
   assert.equal(usageEvent({ ...sample, step: "embed", usage: { total_tokens: -1 } }), null);
+});
+
+test("quality telemetry distinguishes failed reviews from unavailable results", () => {
+  assert.equal(qualityGatePassed(true, 3, 0), true);
+  assert.equal(qualityGatePassed(true, 3, 1), false);
+  assert.equal(qualityGatePassed(false, 3, 3), null);
+  assert.equal(qualityGatePassed(true, 0, 0), null);
+  assert.equal(qualityGatePassed(true, 2, 3), null);
 });
 
 test("batch insert contains only whitelisted metrics and uses the server key", async () => {

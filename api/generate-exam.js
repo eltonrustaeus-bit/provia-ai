@@ -14,7 +14,7 @@ const { filterSourceReferences, deriveSourceExcerpt } = require("./_source-refer
 const examCompletion = require("./_exam-completion.cjs");
 const examGenerationOperations = require("./_exam-generation-operations.cjs");
 const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
-const { logMockExamUsage } = require("./_ai-usage.cjs");
+const { logMockExamUsage, qualityGatePassed } = require("./_ai-usage.cjs");
 const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const materialInput = require("./_material.cjs");
 
@@ -1688,8 +1688,8 @@ module.exports = async function handler(req, res, internalContext = null) {
 
   const usageEvents = [];
   let usageFlushed = false;
-  function recordUsage(step, model, usage, latencyMs) {
-    usageEvents.push({
+  function recordUsage(step, model, usage, latencyMs, verificationPassed = null) {
+    const event = {
       userId: user.id,
       requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
       tier: role,
@@ -1697,7 +1697,10 @@ module.exports = async function handler(req, res, internalContext = null) {
       model,
       usage,
       latencyMs,
-    });
+      ...(typeof verificationPassed === "boolean" ? { verificationPassed } : {}),
+    };
+    usageEvents.push(event);
+    return event;
   }
   async function flushUsage() {
     if (usageFlushed) return;
@@ -2067,8 +2070,8 @@ module.exports = async function handler(req, res, internalContext = null) {
           timeoutMs: Math.max(1000, budget.remaining() - RESPONSE_RESERVE_MS),
         }),
       ]);
-      recordUsage("verify_compare", v1.model, v1.usage, v1.latencyMs);
-      recordUsage("verify_blind", s1.model, s1.usage, s1.latencyMs);
+      const verifierUsageEvent = recordUsage("verify_compare", v1.model, v1.usage, v1.latencyMs);
+      const solverUsageEvent = recordUsage("verify_blind", s1.model, s1.usage, s1.latencyMs);
       solverOutcome.callOk = s1.callOk;
       solverOutcome.model = s1.model;
       verifierOutcome.callOk = v1.callOk;
@@ -2115,6 +2118,12 @@ module.exports = async function handler(req, res, internalContext = null) {
           if (verifierOk && solverOk) approvedIds.add(String(q.id));
           else rejectedIds.push(String(q.id));
         }
+        verifierUsageEvent.verificationPassed = qualityGatePassed(
+          v1.callOk, verifierOutcome.checked, verifierOutcome.rejected,
+        );
+        solverUsageEvent.verificationPassed = qualityGatePassed(
+          s1.callOk, solverOutcome.checked, solverOutcome.rejected,
+        );
         // Tracks whichever verifier result map is currently authoritative for
         // per-question stamping below — round 1 unless a regeneration round
         // actually succeeds and replaces exam.questions with round-2 output.
@@ -2221,8 +2230,10 @@ module.exports = async function handler(req, res, internalContext = null) {
                 recordRepairGateRejections(candidateGate);
                 const candidateQuestions = candidateGate.questions;
                 repairCandidateCount = candidateQuestions.length;
+                repairFailureStage = candidateQuestions.length > 0
+                  ? "repair_verification"
+                  : "repair_structural_validation";
                 if (candidateQuestions.length > 0) {
-                  repairFailureStage = "repair_verification";
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       userId: user.id,
@@ -2243,8 +2254,8 @@ module.exports = async function handler(req, res, internalContext = null) {
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                   ]);
-                  recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
-                  recordUsage("verify_blind", s2.model, s2.usage, s2.latencyMs);
+                  const repairVerifierUsageEvent = recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
+                  const repairSolverUsageEvent = recordUsage("verify_blind", s2.model, s2.usage, s2.latencyMs);
                   repairVerifierCallOk = v2.callOk;
                   repairVerifierChecked = v2.callOk ? candidateQuestions.length : 0;
                   repairVerifierFailure = v2.failureReason || null;
@@ -2278,6 +2289,12 @@ module.exports = async function handler(req, res, internalContext = null) {
                       else outcome2.rejected++;
                       if (verifierOk && solverOk) kept.push(q);
                     }
+                    repairVerifierUsageEvent.verificationPassed = qualityGatePassed(
+                      v2.callOk, outcome2.checked, outcome2.rejected,
+                    );
+                    repairSolverUsageEvent.verificationPassed = qualityGatePassed(
+                      s2.callOk, solverOutcome2.checked, solverOutcome2.rejected,
+                    );
                     repairVerifierApproved = kept.length;
                     const retryUniqueQuestions = [];
                     const retryIds = new Set();

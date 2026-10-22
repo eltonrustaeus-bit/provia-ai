@@ -53,6 +53,7 @@ const REPAIR_STAGES = new Set([
   "insufficient_structural_repair",
   "repair_generation",
   "repair_normalization",
+  "repair_structural_validation",
   "repair_verification",
   "insufficient_unique_repair",
 ]);

@@ -2018,6 +2018,35 @@ try {
   verifierRejectQuestionId = null;
 
   activeQuestions = questions;
+  regenerationQuestions = repairedQuestions.slice(0, 2).map((question, index) => ({
+    ...question,
+    id: `unsupported-retry-${index + 1}`,
+    options: ["4", "5", ""],
+    correct_index: 1,
+    model_answer: "5",
+  }));
+  verifierRejectQuestionId = "q-3";
+  const verifierCountBeforeStructuralRepair = verifierInputs.length;
+  const solverCountBeforeStructuralRepair = solverInputs.length;
+  const structurallyRejectedRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertVerifiedPartialExamDelivered(structurallyRejectedRepair, "structural gate rejects the repair batch", 2);
+  assert.equal(verifierInputs.length, verifierCountBeforeStructuralRepair + 1,
+    "only the initial candidates reach the verifier when every repair candidate is structurally rejected");
+  assert.equal(solverInputs.length, solverCountBeforeStructuralRepair + 1,
+    "structurally rejected repair candidates are never sent to the blind solver");
+  const structurallyRejectedLog = JSON.parse(qualityLogs.at(-2));
+  assert.equal(structurallyRejectedLog.repairNormalizationIssue, null,
+    "a successfully normalized repair does not report a normalization issue");
+  assert.equal(structurallyRejectedLog.repairStructuralDropped, 2,
+    "both repair candidates with an empty answer option are rejected by the structural gate");
+  assert.equal(structurallyRejectedLog.repairFailureStage, "repair_structural_validation",
+    "repair telemetry distinguishes structural rejection from parse/normalization failure");
+  regenerationQuestions = null;
+  verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
   verifierRejectQuestionId = ["q-1", "q-2", "q-3", "retry-1", "retry-2", "retry-3"];
   const noApprovedQuestions = await invoke(generateExam, {

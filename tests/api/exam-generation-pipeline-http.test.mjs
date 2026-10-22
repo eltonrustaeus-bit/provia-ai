@@ -36,8 +36,17 @@ let rejectNextActualVerifierQuestion = false;
 let rejectActualVerifierIndex = 0;
 let abortRepairAfterRejection = false;
 let abortNextActualStream = false;
+let failNextActualGenerationStreams = 0;
+let inflateNextActualGenerationBatch = false;
+let mismatchNextActualSolverKey = false;
+let mismatchedActualSolverStem = null;
 const mockedProviderStages = [];
 const mockedGenerationInstructions = [];
+const actualGenerationRequests = [];
+const actualGenerationCandidateStems = [];
+const actualGenerationDeadlines = [];
+const actualVerifierPayloadLengths = [];
+const actualVerifierQuestionCounts = [];
 const rejectedActualStems = [];
 const mockedUsageEvents = [];
 const mockedPipelineCheckpoints = [];
@@ -49,6 +58,7 @@ let lastBatchRemainingMs = null;
 const originalFetch = globalThis.fetch;
 const originalDateNow = Date.now;
 const originalSetTimeout = globalThis.setTimeout;
+const originalConsoleInfo = console.info;
 const require = createRequire(import.meta.url);
 const generation = require("../../api/generate-exam.js");
 const originalGenerateBatch = generation.generateVerifiedBatch;
@@ -71,6 +81,15 @@ globalThis.fetch = async (input, init = {}) => {
       });
       if (body.stream === true && stage === "mock_exam_schema") {
         mockedGenerationInstructions.push(body.input.map(item => item.content).join("\n"));
+        actualGenerationRequests.push({
+          minItems: schema.schema.properties.questions.minItems,
+          maxItems: schema.schema.properties.questions.maxItems,
+          repair: body.input.map(item => item.content).join("\n").includes("KVALITETSREPARATION"),
+        });
+        if (failNextActualGenerationStreams > 0) {
+          failNextActualGenerationStreams -= 1;
+          return ok({ error: { message: "synthetic transient generation failure" } }, 503);
+        }
         if (abortNextActualStream) {
           abortNextActualStream = false;
           return new Response(new ReadableStream({
@@ -83,11 +102,32 @@ globalThis.fetch = async (input, init = {}) => {
           }), { headers: { "Content-Type": "text/event-stream" } });
         }
         const count = schema.schema.properties.questions.minItems;
-        const candidates = questions(count).map(({ validation_status, ...question }, index) => ({
+        let candidates = questions(count).map(({ validation_status, ...question }, index) => ({
           ...question,
           ...(reuseActualProviderIds ? { id: `q${index + 1}` } : {}),
           graph_spec: null,
         }));
+        actualGenerationCandidateStems.push(...candidates.map(question => question.question));
+        if (mismatchNextActualSolverKey) {
+          mismatchNextActualSolverKey = false;
+          if (candidates[1]) {
+            mismatchedActualSolverStem = candidates[1].question;
+            candidates[1].correct_index = (candidates[1].correct_index + 1) % candidates[1].options.length;
+          }
+        }
+        if (inflateNextActualGenerationBatch) {
+          inflateNextActualGenerationBatch = false;
+          const repeatToLength = (value, length) => value.repeat(Math.ceil(length / value.length)).slice(0, length);
+          candidates = candidates.map((question) => ({
+            ...question,
+            model_answer: repeatToLength("synthetic verifier payload ", 5_000),
+            rubric: repeatToLength("synthetic rubric payload ", 2_500),
+            scoring_rubric: {
+              ...question.scoring_rubric,
+              full_score_requirements: repeatToLength("synthetic scoring payload ", 1_000),
+            },
+          }));
+        }
         const events = [
           { type: "response.output_text.delta", delta: JSON.stringify({ title: "Addition", level: "C", questions: candidates }) },
           { type: "response.completed", response: { model: body.model, usage } },
@@ -97,6 +137,8 @@ globalThis.fetch = async (input, init = {}) => {
       }
       if (stage === "exam_verifier_schema") {
         const review = JSON.parse(body.input[1].content);
+        actualVerifierPayloadLengths.push(body.input[1].content.length);
+        actualVerifierQuestionCounts.push(review.questions.length);
         const rejectedQuestion = rejectNextActualVerifierQuestion ? review.questions[rejectActualVerifierIndex] : null;
         const rejectedId = rejectedQuestion?.id || null;
         if (rejectedId) rejectedActualStems.push(rejectedQuestion.question);
@@ -321,10 +363,12 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     loadUserRole: generation.loadUserRole,
   };
   generated = 0;
+  console.info = () => {};
   generation.generateVerifiedBatch = async ({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback }) => {
     generationBatchInvocations += 1;
     if (useActualGeneratorForNextBatch || useActualGeneratorForPipeline) {
       useActualGeneratorForNextBatch = false;
+      actualGenerationDeadlines.push(deadlineAt);
       return prior.generate({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback });
     }
     if (setupDelays) {
@@ -929,7 +973,17 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         generate: actualBatchCount,
         verify_compare: actualBatchCount,
         verify_blind: actualBatchCount,
-      }, "privacy-safe telemetry records each generator and independent review step once per batch");
+      }, "the captured usage POST includes each generator and independent review step once per batch");
+      for (const step of ["verify_compare", "verify_blind"]) {
+        const reviewEvents = mockedUsageEvents.filter(event => event.pipeline_step === step);
+        assert.equal(reviewEvents.length, actualBatchCount,
+          `the actual ${requested}-question path records one ${step} result per batch`);
+        assert.ok(reviewEvents.every(event => event.verification_passed === true),
+          `the actual ${requested}-question path marks each fully approved ${step} batch as passed`);
+      }
+      assert.ok(mockedUsageEvents.filter(event => event.pipeline_step === "generate")
+        .every(event => !Object.hasOwn(event, "verification_passed")),
+      "generation usage events do not masquerade as quality-review outcomes");
       assert.doesNotMatch(JSON.stringify(mockedUsageEvents), /Beräkna|Addition|2\+3=5|3\+3=6|4\+3=7/,
         "usage telemetry excludes question text and study material");
       assert.equal((await db.query(
@@ -970,6 +1024,197 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       )).rows[0].n, actualIssuanceBaseline + 1,
       "actual-generator replay does not create a second issuance");
     }
+
+    const materialParagraph = "Addition: summan av två tal beräknas genom att lägga ihop termerna. Exempel: 2+3=5; 3+3=6; 4+3=7. ";
+    const nearLimitMaterial = materialParagraph.repeat(Math.ceil(10_500 / materialParagraph.length)).slice(0, 10_500);
+    const widenedQuotaBaseline = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    const widenedStartKey = testUuid(13_000);
+    const widenedStart = await callStart({
+      ...startPayload, numQuestions: 12, pastedText: nearLimitMaterial, idempotencyKey: widenedStartKey,
+    });
+    assert.equal(widenedStart.statusCode, 202, JSON.stringify(widenedStart.body));
+    const widenedJob = (await db.query(
+      "select id,quota_request_id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+      [widenedStartKey],
+    )).rows[0];
+    assert.ok(widenedJob?.id && widenedJob?.quota_request_id);
+    const widenedIssuanceBaseline = (await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n;
+    mockedProviderStages.length = 0;
+    actualGenerationRequests.length = 0;
+    actualGenerationDeadlines.length = 0;
+    actualVerifierPayloadLengths.length = 0;
+    actualVerifierQuestionCounts.length = 0;
+    mockedPipelineCheckpoints.length = 0;
+    rejectedActualStems.length = 0;
+    generated = 0;
+    mockActualProviderResponses = true;
+    useActualGeneratorForPipeline = true;
+    let firstWidenedProgress;
+    const widenedBatchEvents = [];
+    const originalBatchInfo = console.info;
+    console.info = (value) => {
+      try {
+        const event = JSON.parse(value);
+        if (event.event === "exam_generation_pipeline_batch" && event.requestId === `exam-pipeline:${widenedJob.id}`) {
+          widenedBatchEvents.push(event);
+        }
+      } catch {}
+    };
+    try {
+      firstWidenedProgress = await callAdvance(widenedJob.id);
+    } finally {
+      useActualGeneratorForPipeline = false;
+    }
+    assert.equal(firstWidenedProgress.statusCode, 202);
+    assert.equal(firstWidenedProgress.body.approved, 3);
+    assert.deepEqual((await db.query(
+      "select stage,stage_attempts,progress_current from public.mock_exam_generation_pipeline_jobs where id=$1",
+      [widenedJob.id],
+    )).rows[0], { stage: "repair", stage_attempts: 0, progress_current: 3 },
+    "an authenticated start and real verified checkpoint move the same job into repair");
+
+    failNextActualGenerationStreams = 1;
+    useActualGeneratorForPipeline = true;
+    let noProgressRepair;
+    try {
+      noProgressRepair = await callAdvance(widenedJob.id);
+    } finally {
+      useActualGeneratorForPipeline = false;
+    }
+    assert.equal(noProgressRepair.statusCode, 202);
+    assert.equal(noProgressRepair.body.state, "retrying");
+    assert.equal(noProgressRepair.body.approved, 3);
+    assert.deepEqual((await db.query(
+      "select stage,stage_attempts,progress_current from public.mock_exam_generation_pipeline_jobs where id=$1",
+      [widenedJob.id],
+    )).rows[0], { stage: "repair", stage_attempts: 1, progress_current: 3 },
+    "a failed first repair attempt preserves the verified checkpoint and increments the persisted attempt count");
+
+    const widenedOriginalClock = Date.now;
+    const batchStartedAt = widenedOriginalClock();
+    fakeNow = batchStartedAt;
+    Date.now = () => fakeNow;
+    setupDelays = {
+      "/auth/v1/user": 1_500,
+      "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user": 1_500,
+      "/rest/v1/rpc/renew_mock_exam_generation_lease": 1_000,
+      "/v1/responses": 9_000,
+      "/rest/v1/rpc/checkpoint_mock_exam_generation_pipeline_batch": 1_000,
+    };
+    rejectNextActualVerifierQuestion = true;
+    rejectActualVerifierIndex = 0;
+    mismatchNextActualSolverKey = true;
+    inflateNextActualGenerationBatch = true;
+    useActualGeneratorForPipeline = true;
+    const widenedRepairStemOffset = actualGenerationCandidateStems.length;
+    let widenedBatchResponse;
+    try {
+      widenedBatchResponse = await callAdvance(widenedJob.id);
+    } finally {
+      useActualGeneratorForPipeline = false;
+      setupDelays = null;
+      Date.now = widenedOriginalClock;
+      console.info = originalBatchInfo;
+    }
+    assert.equal(widenedBatchResponse.statusCode, 202);
+    assert.equal(widenedBatchResponse.body.approved, 6,
+      "the five-candidate repair batch accepts only the three candidates that pass both independent gates");
+    const widenedRepairCandidateStems = actualGenerationCandidateStems.slice(widenedRepairStemOffset);
+    assert.equal(widenedRepairCandidateStems.length, 5,
+      "the telemetry privacy check captures every generated repair candidate stem");
+    const widenedEvent = widenedBatchEvents.find(event => event.stage === "repair" && event.requested === 5);
+    assert.ok(widenedEvent, "sanitized batch telemetry confirms the requested five-candidate repair stage");
+    assert.ok(widenedEvent.verifierRejected >= 1, "the independent verifier rejection is recorded in batch diagnostics");
+    assert.ok(widenedEvent.solverRejected >= 1, "the blind solver rejection is recorded in batch diagnostics");
+    const widenedTelemetry = JSON.stringify(widenedBatchEvents);
+    for (const privateValue of [
+      nearLimitMaterial,
+      "Addition: summan av två tal beräknas",
+      "Exempel: 2+3=5; 3+3=6; 4+3=7.",
+      "synthetic verifier payload",
+      "synthetic rubric payload",
+      "synthetic scoring payload",
+      ...widenedRepairCandidateStems,
+      ...rejectedActualStems,
+      mismatchedActualSolverStem,
+    ]) {
+      assert.equal(widenedTelemetry.includes(privateValue), false,
+        "batch telemetry excludes source material, rejected question text and private candidate payloads");
+    }
+    assert.deepEqual(actualGenerationRequests.at(-1), { minItems: 5, maxItems: 5, repair: true },
+      "the real generator receives an exact five-candidate repair schema after a persisted no-progress attempt");
+    assert.ok(actualVerifierPayloadLengths.at(-1) >= 54_000 && actualVerifierPayloadLengths.at(-1) < 60_000,
+      `the actual verifier input stays near but below its 60,000-character ceiling (${actualVerifierPayloadLengths.at(-1)})`);
+    assert.equal(actualVerifierQuestionCounts.at(-1), 5,
+      "the near-ceiling payload is the actual verifier request for all five widened candidates");
+    assert.ok(fakeNow - batchStartedAt >= 27_000 && fakeNow - batchStartedAt <= 33_000,
+      "the five-candidate generation and independent checks fit a simulated ~30-second request window");
+    assert.ok(actualGenerationDeadlines.at(-1) - fakeNow >= 12_000,
+      "the synthetic clock leaves at least 12 seconds before the actual route deadline after checkpoint work");
+    assert.ok(rejectedActualStems.length === 1);
+    const widenedCheckpoint = (await db.query(
+      "select accepted_questions,progress_current,stage_attempts from public.mock_exam_generation_pipeline_jobs where id=$1",
+      [widenedJob.id],
+    )).rows[0];
+    assert.equal(widenedCheckpoint.progress_current, 6);
+    assert.equal(widenedCheckpoint.stage_attempts, 0);
+    assert.ok(widenedCheckpoint.accepted_questions.every(question => question.validation_status === "verified"));
+    assert.equal(widenedCheckpoint.accepted_questions.some(question => rejectedActualStems.includes(question.question)), false,
+      "the verifier-rejected candidate is never checkpointed");
+    assert.ok(mismatchedActualSolverStem, "the fixture records the exact candidate with the injected answer-key mismatch");
+    assert.equal(widenedCheckpoint.accepted_questions.some(question => question.question === mismatchedActualSolverStem), false,
+      "the exact blind-solver candidate with a mismatched answer key is never checkpointed");
+    const widenedQualityEvents = mockedUsageEvents.filter(event => event.request_id === `exam-pipeline:${widenedJob.id}`);
+    assert.deepEqual(widenedQualityEvents.reduce((counts, event) => {
+      counts[event.pipeline_step] = (counts[event.pipeline_step] || 0) + 1;
+      return counts;
+    }, {}), { generate: 2, verify_compare: 2, verify_blind: 2 },
+    "captured usage POST includes both successful generation batches and their independent review steps; the upstream 503 has no usage data");
+    assert.ok(widenedQualityEvents.some(event => event.pipeline_step === "verify_compare" && event.verification_passed === false),
+      "captured usage POST distinguishes a batch rejected by the independent verifier");
+    assert.ok(widenedQualityEvents.some(event => event.pipeline_step === "verify_blind" && event.verification_passed === false),
+      "captured usage POST distinguishes a batch rejected by the blind solver");
+
+    let widenedResult = null;
+    for (let attempt = 0; attempt < 8 && !widenedResult; attempt++) {
+      const response = await callAdvance(widenedJob.id);
+      if (response.statusCode === 200) widenedResult = response;
+      else assert.equal(response.statusCode, 202, JSON.stringify(response.body));
+    }
+    assert.ok(widenedResult);
+    assert.equal(widenedResult.body.exam.questions.length, 12);
+    assert.equal(widenedResult.body.meta.partial, false);
+    assert.equal((await db.query(
+      "select status from public.mock_exam_quota_reservations where request_id=$1", [widenedJob.quota_request_id],
+    )).rows[0].status, "consumed");
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, widenedIssuanceBaseline + 1);
+    const widenedQuotaCountAfterCompletion = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    assert.equal(widenedQuotaCountAfterCompletion, widenedQuotaBaseline + 1,
+      "the widened repair path commits exactly one quota unit on first issuance");
+    const widenedProviderCallsBeforeReplay = mockedProviderStages.length;
+    const widenedQuotaCountBeforeReplay = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    assert.deepEqual((await callAdvance(widenedJob.id)).body, widenedResult.body);
+    assert.equal(mockedProviderStages.length, widenedProviderCallsBeforeReplay,
+      "completed widened repair replays without another model request");
+    assert.equal((await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count, widenedQuotaCountBeforeReplay,
+    "completed widened repair replay does not charge quota twice");
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, widenedIssuanceBaseline + 1,
+    "completed widened repair replay does not create a second issuance");
+    mockActualProviderResponses = false;
 
     const timeoutJob = await seedJob(32, 12);
     const beforeTimeout = await callAdvance(timeoutJob.jobId);
@@ -1253,7 +1498,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,22,
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,23,
       "full runs, real-generator and repair paths, retries, deadline salvages, and timeout recovery issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
@@ -1514,6 +1759,16 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     }
   } finally {
     rejectAllBatches = false;
+    failNextActualGenerationStreams = 0;
+    inflateNextActualGenerationBatch = false;
+    mismatchNextActualSolverKey = false;
+    mismatchedActualSolverStem = null;
+    actualGenerationCandidateStems.length = 0;
+    rejectNextActualVerifierQuestion = false;
+    mockActualProviderResponses = false;
+    useActualGeneratorForPipeline = false;
+    setupDelays = null;
+    console.info = originalConsoleInfo;
     failFinalizations = 0;
     generation.generateVerifiedBatch=prior.generate;
     generation.finalizeVerifiedExam=prior.finalize;
@@ -1527,6 +1782,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
 test.after(() => {
   globalThis.fetch = originalFetch;
   Date.now = originalDateNow;
+  console.info = originalConsoleInfo;
   generation.generateVerifiedBatch = originalGenerateBatch;
   for (const [key,value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key];
