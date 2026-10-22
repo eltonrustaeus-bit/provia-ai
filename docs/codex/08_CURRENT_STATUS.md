@@ -1,5 +1,176 @@
 # 08 Current Status
 
+## Staging quality-diagnostic package deployed — 2026-10-22
+
+- [x] The approved generation diagnostic package is on feature branch
+  `codex/exgen-generation-quality-2026-10-20`, commit
+  `af37cfa40924f1c09d9b3e54300706457bbabef0`. Vercel deployment
+  `dpl_GjZgfGUr6wTxssvPi1Sp1RSwoTHu` is READY as a branch Preview. No
+  Production or `main` change was made.
+- [x] Added nullable, batch-level `verification_passed` diagnostics to
+  verifier/blind-solver usage events, including initial and repair checks.
+  Completed checks record true only when all checked candidates pass, false
+  when any are rejected, and null/omitted when the check is unavailable or
+  has no usable candidates. No candidate acceptance or quality gate changed.
+- [x] Corrected the reported failure stage when normalized repair output has
+  no structurally valid candidates: it now records
+  `repair_structural_validation`, not the stale `repair_normalization` stage.
+  Added HTTP-path coverage proving rejected repair candidates do not reach the
+  verifier or solver, plus serialization and privacy assertions.
+- [x] The existing staging schema already has nullable boolean
+  `ai_usage_events.verification_passed`; no migration was required or applied.
+  Preview variable metadata is branch-scoped to the feature branch; values
+  were not read. No account, role, quota or secret was changed.
+- [x] Focused nine-file generation/API/PGlite/budget/recovery/progress tests
+  passed 71/71. Browser exam-flow regression passed 191/191. Relevant
+  `node --check` and `git diff --check` passed. Independent API/time and
+  security/idempotency reviewers found no blocker in the reviewed scope.
+- [!] No new paid/live model request was made for this commit. The existing
+  browser session still contains an active 12-question exam with unanswered
+  questions; it was left untouched. The prior staging ledger snapshot showed
+  one successful 12/12 job among four recent jobs, which is insufficient to
+  establish repeat reliability. The earlier recorded budget balance is a
+  point-in-time snapshot, not a current balance or authorization.
+
+**PILOT NOT READY.** The next live evidence requires a clean, signed-in
+staging session after the existing exam is safely completed or cleared by its
+owner. Then run one bounded synthetic 12-question test and inspect its
+sanitized quality outcomes, progress and spend. Do not claim that the new
+telemetry has been verified in hosted persistence until that test succeeds.
+
+## Local quality-gate outcome telemetry — 2026-10-22
+
+- [x] Added batch-level `verification_passed` usage metadata for completed
+  verifier and blind-solver checks. A completed check with any rejected
+  candidate records `false`; a fully accepted checked batch records `true`.
+  Unavailable calls, empty checks and invalid counts remain `null`/omitted.
+- [x] Confirmed the staging `ai_usage_events.verification_passed` column is
+  nullable boolean, so this change needs no migration. The serializer accepts
+  strict booleans only, and the helper does not alter candidate acceptance or
+  quality gates.
+- [x] Focused offline suite passed 58/58. The actual HTTP generator path for
+  3/6/12 asserts `true` for fully approved verifier and solver batches, while
+  the rejected repair fixture asserts `false`; source-privacy assertions still
+  exclude question and study text. This does not prove hosted persistence.
+- [x] Repair-budget assertions now pin both sides of the strict minimum:
+  26,000ms declines ordinary repair while 26,001ms allows 4,001ms generation;
+  internal repair similarly transitions at 16,001ms. The budget itself is
+  unchanged.
+- [x] The browser exam-flow regression passed 191/191 with mocked APIs. The
+  separate budget/recovery suite passed 14/14 before the two exact-boundary
+  assertions were added; the updated budget test then passed again.
+- [!] The telemetry change is local and not deployed. Staging persistence and
+  aggregate diagnosis remain to be verified after a separately approved,
+  revision-synced Preview test.
+
+## Staging package revalidated — 2026-10-22
+
+- [x] Read-only Vercel check found the latest READY Preview on the approved
+  feature branch at `9fedd1029d1f88ad9b4287b77665da53961d5163`. The Supabase
+  migration ledger contains the resumable pipeline, owner-scoped claim,
+  retention, scheduled cleanup, preflight-budget release and repair-feedback
+  migrations. No migration needed to be applied in this pass.
+- [x] The protected staging budget currently reports cap `$5.000000`, spent
+  `$0.528050`, reserved `$0.225728`, remaining `$4.246222` at 17:59 UTC. This
+  internal ledger is not a provider invoice and is not additional authorization.
+- [x] A fresh focused offline run passed 49/49 across the pipeline unit/HTTP,
+  Postgres-emulation, issuance-idempotency and progress-recovery tests.
+- [x] Sanitized staging aggregates for the last 14 days show four 12-question
+  jobs: one succeeded at 12/12 on the current Preview, two terminalized at 2/12
+  with `STAGE_RETRY_LIMIT`, and one hit `OPERATION_DEADLINE` at 0/12 before any
+  model event. For the retry-exhausted jobs, the stored usage aggregate shows
+  23 model events (9 generation, 14 comparison-verifier), mean latency 11.3s
+  and max 24.2s. The successful job shows 16 model events, mean latency 9.2s
+  and max 23.4s. This supports quality/retry and latency/setup failure paths,
+  but does not reveal individual candidate rejection reasons.
+- [!] The staging browser still has an active 12-question exam with all
+  questions unanswered; its branch alias resolves to the latest READY Preview
+  at `9fedd10`. The matching staging job succeeded at 12/12 at 17:59:48 UTC.
+  The exam was left untouched and no additional paid model call was started.
+  A 6-hour runtime-log query was unavailable under the current Vercel retention,
+  and narrower queries returned no runtime events, so per-batch rejection
+  reasons cannot be recovered from hosted logs.
+- [x] Latest independent API/time and security/idempotency review found no
+  blocker in the widened repair test. Added explicit assertions for all five
+  repair candidate stems and private payload markers absent from batch
+  telemetry, exactly one quota increment on initial issuance, and no second
+  issuance or quota charge on replay. The focused HTTP test passed 2/2.
+
+**PILOT NOT READY.** After the active exam is completed or safely cleared by
+its owner, run another bounded synthetic 12-question test to assess repeat
+yield, then inspect spend and any new sanitized failure aggregates. Current
+live evidence is one success in four recent staging jobs; do not describe this
+as reliable repeatability.
+
+## Staging refresh and deadline assertion — 2026-10-22
+
+- [x] Read-only refresh confirmed the READY feature Preview at commit `9fedd10`
+  uses the approved staging project and branch. The staging migration list
+  includes the resumable pipeline, repair-feedback and budget-guard migrations.
+- [x] The generation implementation at `9fedd10` is identical to successful
+  live-run commit `a607edc`; the intervening diff contains only these status
+  documents. Existing staging UI showed an already-open 12-question exam, so
+  it was left untouched and no additional paid model request was started.
+- [x] Current protected staging spend row: cap `$5.000000`, spent `$0.528050`,
+  reserved `$0.225728`, remaining `$4.246222`. This internal ledger is not a
+  provider invoice and the remaining amount is not a new allowance.
+- [x] Focused nine-file generation/API/PGlite/recovery/budget/progress/runtime
+  suite passed 67/67. Reused API/time and independent security reviewers found
+  no implementation blocker. A test-evidence finding was fixed: the simulated
+  remaining-time assertion now uses the actual `deadlineAt` passed to the
+  generator rather than a hard-coded route duration. The HTTP test passed 2/2;
+  syntax and diff checks passed.
+- [x] Browser-backed exam-flow regression passed 191/191 with zero failures,
+  including visible progress, resume, incomplete-answer states, mobile layout
+  and P.E.R context. This is local UI evidence with mocked APIs.
+- [x] Rechecked the 4-second streamed-repair minimum: the helper starts repair
+  only when the minimum generation window plus independent-review and
+  finalization reserves fit. Truncated repair output is normalized and gated;
+  verifier approval and the MC blind solver remain required before acceptance.
+  Budget and offline-pipeline tests passed 2/2 in this follow-up.
+- [x] Postgres/PGlite ownership, lease-fencing, 3/6/12 partial floors,
+  idempotent issuance/replay, quota commit/refund and private ACL tests passed
+  20/20. This is local database-emulation evidence, not hosted RLS proof.
+- [!] The timing test remains fake-clock arithmetic with mocked provider
+  responses; it is not measured live latency or real timeout-abort evidence.
+  This refresh does not add another live model run or prove repeated yield.
+
+**PILOT NOT READY.** Keep the existing staging exam intact. After it is
+completed or otherwise safely cleared by its owner, run another bounded,
+synthetic 12-question test to measure repeatability under the existing cap.
+
+## Offline HTTP coverage for widened repair boundary — 2026-10-22
+
+- [x] Extended `tests/api/exam-generation-pipeline-http.test.mjs` to reach the
+  five-candidate repair batch through authenticated HTTP start/advance and
+  PGlite-backed claim/checkpoint operations. The path begins with three
+  independently verified questions, preserves them across a failed first
+  repair attempt, and confirms the subsequent persisted claim requests exactly
+  five candidates.
+- [x] The actual generator, verifier, blind solver, and issuance logic run
+  against deterministic synthetic provider responses. The five-question
+  verifier request is asserted between 54,000 and 60,000 serialized characters.
+  One verifier-rejected question and one exact solver/key-mismatch candidate
+  are both excluded; only verified candidates checkpoint. The same job then
+  resumes to 12/12, issues once, and replays without new provider calls or a
+  second quota charge.
+- [x] Synthetic Date.now advancement covers setup, three model endpoints, and
+  the checkpoint RPC, leaving at least 12 seconds by arithmetic. This is a
+  fake-clock budget test, not measured wall-clock latency or a timeout/abort
+  experiment.
+- [x] Focused eight-file pipeline/API/PGlite/recovery/budget/progress suite
+  passed 63/63. The HTTP test passed 2/2; `node --check` and `git diff --check`
+  passed. API/timeout and security/idempotency reviewers found no blocker after
+  the follow-up assertions.
+- [!] Provider/reviewer/solver outputs remain mocks and database behavior is
+  local PGlite. No staging, live-model, concurrency, Vercel, production, push,
+  migration, or paid verification was performed. Earlier staging evidence is
+  one successful 12/12 run, not general yield reliability.
+
+**PILOT NOT READY.** Next evidence step remains a separately approved,
+budget-checked staging run on a revision-synced Preview; this local test does
+not establish real model latency, quality or yield.
+
 ## Repair feedback, batch identities and visible progress prepared locally — 2026-10-22
 
 - [x] Confirmed a source-level cause of lost approved questions: model IDs are
@@ -1260,8 +1431,11 @@ och ett färskt stagingbudgetbesked före ett nytt syntetiskt modellanrop.
   inte att yield eller kvalitet är tillförlitlig i allmänhet. Adaptiv
   breddning ökar möjliga utdata inom oförändrad 45-sekunders arbetstid;
   agentgranskningen noterar att större payload kan nå verifierarens fasta
-  60 000-teckensgräns. Ett offline-HTTP-test för riktig 5-kandidatbatch nära
-  payload-/tidsgränsen saknas fortfarande.
+  60 000-teckensgräns. Det lokala HTTP-testet täcker nu en riktig 5-kandidat-
+  reparationsbatch med en cirka 54–60k teckens verifierar-payload, simulerad
+  ungefär 30-sekunders arbetstid och minst 12 sekunders deadline-reserv. Det
+  använder mockade provider-/granskarresultat och fake clock; det bevisar inte
+  live-yield, verklig latens eller timeoutbeteende.
 - [!] Stagingprovet står öppet i testkontot och har inte lämnats in. Ingen
   cleanup eller ytterligare AI-körning utfördes.
 
