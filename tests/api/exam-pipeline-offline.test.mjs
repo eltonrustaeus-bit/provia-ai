@@ -11,6 +11,14 @@ const verifierModule = require("../../api/_verifier.js");
 const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
 const examCompletion = require("../../api/_exam-completion.cjs");
+assert.deepEqual(generateExam.mergeDiagnosticCounts(
+  { low_source_alignment: 2, reviewer_other: 1 },
+  { low_source_alignment: 3, unsafe: "not-a-count", "bad code": 9 },
+), { low_source_alignment: 5, reviewer_other: 1 },
+"quality telemetry sums repeated fixed-category failures and excludes invalid keys or counts");
+assert.equal(generateExam.addRepairCandidateCount(
+  generateExam.addRepairCandidateCount(0, 4), 3,
+), 7, "candidate telemetry accumulates across multiple bounded repair attempts");
 
 const originalStreamFetch = globalThis.fetch;
 const streamedPartialQuestion = '{"title":"Syntetiskt","level":"C","questions":[{"id":"partial-1","question":"2 + 2?"},';
@@ -94,6 +102,25 @@ const biologyPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
   pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
 });
+const batchWithNoveltyContext = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
+  pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
+  comparisonQuestions: [{ id: "approved-1", concept_tag: "Kloroplaster", question: "Var sker fotosyntesen?" }],
+});
+assert.match(batchWithNoveltyContext.userPrompt, /redan godkända i samma prov/i,
+  "later generation batches are instructed to avoid repeating approved questions");
+assert.match(batchWithNoveltyContext.userPrompt, /Var sker fotosyntesen\?/,
+  "the generation prompt receives existing questions only as novelty context");
+const internalPayloadWithEscapedSource = Buffer.from(JSON.stringify({
+  pastedText: "\0".repeat(12000),
+  comparisonQuestions: [{ question: "Approved question ".repeat(350) }],
+}), "utf8");
+assert.ok(internalPayloadWithEscapedSource.byteLength > 64 * 1024 && internalPayloadWithEscapedSource.byteLength < 128 * 1024);
+const internalRequestStream = async function* () { yield internalPayloadWithEscapedSource; };
+assert.equal((await generateExam.readJsonBody(internalRequestStream(), 128 * 1024)).pastedText.length, 12000,
+  "bounded internal batches can transport valid maximum-length material plus comparison context");
+await assert.rejects(() => generateExam.readJsonBody(internalRequestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" },
+  "the ordinary 64 KiB request envelope still rejects oversized public-style bodies");
 assert.match(biologyPrompt.systemPrompt, /ORDAGRANT utdrag kopierat direkt från materialet, inte en parafras/i,
   "the generator must use exact source excerpts that survive the server's literal-reference check");
 assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp/i,

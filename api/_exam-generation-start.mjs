@@ -1,12 +1,11 @@
 import crypto from "node:crypto";
-import { createRequire } from "node:module";
 import { requireAuth } from "./_auth.js";
+import generation from "./generate-exam.js";
+import operations from "./_exam-generation-operations.cjs";
+import materialInput from "./_material.cjs";
+import supabaseServer from "./_supabase-server-key.cjs";
 
-const require = createRequire(import.meta.url);
-const generation = require("./generate-exam.js");
-const operations = require("./_exam-generation-operations.cjs");
-const materialInput = require("./_material.cjs");
-const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseAdminHeaders } = supabaseServer;
 
 function respond(res, status, body) {
   res.status(status).json(body);

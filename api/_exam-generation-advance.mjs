@@ -1,11 +1,10 @@
 import crypto from "node:crypto";
 import { requireAuth } from "./_auth.js";
-import { createRequire } from "node:module";
+import pipeline from "./_exam-generation-pipeline.cjs";
+import operations from "./_exam-generation-operations.cjs";
+import supabaseServer from "./_supabase-server-key.cjs";
 
-const require = createRequire(import.meta.url);
-const pipeline = require("./_exam-generation-pipeline.cjs");
-const operations = require("./_exam-generation-operations.cjs");
-const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseAdminHeaders } = supabaseServer;
 
 function respond(res, status, body) { res.status(status).json(body); }
 

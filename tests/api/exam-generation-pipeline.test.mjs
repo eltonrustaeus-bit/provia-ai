@@ -36,6 +36,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       };
       let sequence = 0;
       const batchSizes = [];
+      const comparisonIdsByBatch = [];
       operations.renewPipelineLease = async () => true;
       operations.renewGenerationLease = async () => true;
       operations.retryPipelineStep = async () => "retry_queued";
@@ -47,6 +48,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       };
       generation.generateVerifiedBatch = async ({ payload }) => {
         batchSizes.push(payload.numQuestions);
+        comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
         const questions = Array.from({ length: Math.min(payload.numQuestions, 2) }, () => {
           sequence += 1;
           return {
@@ -66,10 +68,103 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       assert.equal(job.accepted_questions.length, requested);
       assert.ok(batchSizes.every((size) => size <= 3));
       assert.ok(batchSizes.length > 1, "under-delivered batches must resume until the requested count is reached");
+      assert.deepEqual(comparisonIdsByBatch[0], [], "the initial batch has no prior approved questions to exclude");
+      assert.deepEqual(comparisonIdsByBatch[1], ["approved-1", "approved-2"],
+        "later batches receive only already-approved question references for novelty checks");
       assert.equal(result.status, "progress");
       assert.equal(result.stage, "assemble");
     });
   }
+});
+
+test("later batch uses approved stems for novelty while duplicate filtering remains enforced", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000014",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "generate",
+    requested_count: 3,
+    payload: { qType: "short", numQuestions: 3 },
+    accepted_questions: [{
+      id: "approved-source", type: "short", question: "Beräkna x när x + 2 = 5.",
+      concept_tag: "Ekvationer", model_answer: "x = 3", options: ["answer key"], validation_status: "verified",
+    }],
+    progress_current: 1,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  const priorConsoleInfo = console.info;
+  const diagnosticLogs = [];
+  console.info = (entry) => diagnosticLogs.push(JSON.parse(entry));
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  let noveltyContext;
+  operations.checkpointPipelineJob = async (input) => {
+    job.accepted_questions = input.acceptedQuestions;
+    job.progress_current = input.progressCurrent;
+    job.stage = input.nextStage;
+    return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    noveltyContext = payload.comparisonQuestions;
+    return { status: 200, body: { ok: true, questions: [
+      { id: "duplicate", type: "short", question: "Beräkna x när x + 2 = 5.", validation_status: "verified" },
+      { id: "distinct", type: "short", question: "Bestäm nollställena till f(x)=x²-4.", validation_status: "verified" },
+    ] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(result.status, "progress");
+    assert.equal(job.progress_current, 2, "the duplicate does not fill a requested slot");
+    assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", "distinct"]);
+    assert.deepEqual(noveltyContext, [{ id: "approved-1", concept_tag: "Ekvationer", question: "Beräkna x när x + 2 = 5." }]);
+    assert.ok(!JSON.stringify(noveltyContext).includes("x = 3"), "answer keys are not sent as novelty context");
+    assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer options are not sent as novelty context");
+    assert.equal(diagnosticLogs.length, 1);
+    assert.equal(diagnosticLogs[0].duplicateCandidates, 1);
+    assert.equal(diagnosticLogs[0].acceptedAfter, 2);
+    assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x när x + 2 = 5."),
+      "pipeline telemetry contains counts only, never student-facing question content");
+    assert.ok(!JSON.stringify(diagnosticLogs).includes(job.id));
+    assert.ok(!JSON.stringify(diagnosticLogs).includes(job.user_id));
+  } finally {
+    console.info = priorConsoleInfo;
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("comparison context and maximum escaped material fit the bounded internal request", async () => {
+  const largeAcceptedSet = Array.from({ length: 20 }, (_, index) => ({
+    concept_tag: `Begrepp ${index} åäö`,
+    question: `Förklara skillnaden mellan ${"🧮".repeat(900)} och uttryck ${index}.`,
+    model_answer: "must not be copied",
+  }));
+  const context = pipeline.comparisonQuestionsFor(largeAcceptedSet, 20);
+  assert.ok(Buffer.byteLength(JSON.stringify(context), "utf8") <= pipeline.MAX_COMPARISON_CONTEXT_BYTES);
+  assert.ok(context.length > 1, "the bounded context retains multiple approved questions");
+  assert.ok(context.every((question) => !Object.hasOwn(question, "model_answer")));
+  const requestBody = Buffer.from(JSON.stringify({
+    lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
+    pastedText: "\0".repeat(12000),
+    focusTerms: ["begrepp".repeat(20), "funktion".repeat(20)],
+    comparisonQuestions: context,
+    idempotencyKey: "12345678-1234-4123-8123-123456789012",
+  }), "utf8");
+  assert.ok(requestBody.byteLength < 128 * 1024, "the full worst-case internal payload remains below 128 KiB");
+  const requestStream = async function* () { yield requestBody; };
+  assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).pastedText.length, 12000);
+  await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
 });
 
 test("mixed batches preserve requested type balance and never accept unverified or duplicate questions", async () => {
@@ -89,6 +184,7 @@ test("mixed batches preserve requested type balance and never accept unverified 
   };
   let sequence = 0;
   const generatedTypes = [];
+  const seenComparisons = [];
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
   operations.retryPipelineStep = async () => "retry_queued";
@@ -100,6 +196,7 @@ test("mixed batches preserve requested type balance and never accept unverified 
   };
   generation.generateVerifiedBatch = async ({ payload }) => {
     generatedTypes.push(payload.qType);
+    seenComparisons.push(payload.comparisonQuestions);
     const questions = Array.from({ length: payload.numQuestions }, () => {
       sequence += 1;
       return {
@@ -127,6 +224,10 @@ test("mixed batches preserve requested type balance and never accept unverified 
     assert.equal(job.accepted_questions.filter((question) => question.type === "short").length, 6);
     assert.ok(job.accepted_questions.every((question) => question.validation_status === "verified"));
     assert.ok(generatedTypes.includes("mc") && generatedTypes.includes("short"));
+    assert.ok(seenComparisons.some((questions) => questions.length > 0),
+      "mixed batches also receive approved questions as novelty context");
+    assert.ok(seenComparisons.flat().every((question) => !Object.hasOwn(question, "model_answer") && !Object.hasOwn(question, "options")),
+      "novelty context excludes answer keys and options");
   } finally {
     generation.generateVerifiedBatch = original.generateVerifiedBatch;
     operations.renewPipelineLease = original.renewPipelineLease;

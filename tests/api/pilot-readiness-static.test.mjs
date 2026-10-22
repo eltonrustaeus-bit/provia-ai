@@ -41,10 +41,16 @@ assert.match(gradeApi, /bodyBytes > 256 \* 1024/, "grading request body has a st
 assert.match(gradeApi, /submittedQuestions\.length > 20/, "grading question count matches the exam generator maximum");
 assert.match(gradeApi, /answerChars > 24000/, "AI grading has a total student-answer text cap");
 assert.match(generatorApi, /correct_index, model_answer, rubric, scoring_rubric, accepted_answers/, "answer keys and grading rubrics are stripped from browser payloads");
-assert.match(generatorApi, /bytes > 64 \* 1024/, "exam generation request is capped while streaming");
+assert.match(generatorApi, /async function readJsonBody\(req, maxBytes = 64 \* 1024\)/,
+  "public exam-generation requests retain the 64 KiB body cap");
+assert.match(generatorApi, /if \(bytes > maxBytes\)/, "request body size is checked against its explicit bound");
+assert.match(generatorApi, /readJsonBody\(req, internalBatch \? 128 \* 1024 : 64 \* 1024\)/,
+  "only server-internal generation batches use the bounded larger request envelope");
+assert.match(generatorApi, /internalBatch && Array\.isArray\(parsed\.comparisonQuestions\)/,
+  "public clients cannot inject approved-question comparison context");
 assert.match(generatorApi, /error: "quality_review_unavailable"/, "ordinary exams are not delivered when review is unavailable");
 assert.match(generatorApi, /qType !== "graph"\s*&&\s*regenerationTimeoutMs !== null/, "regeneration stays limited to supported non-graph exams with enough time");
-assert.match(generatorApi, /REGENERATION_MIN_GENERATION_MS = 8_000/, "the optional repair generation has a realistic minimum window");
+assert.match(generatorApi, /REGENERATION_MIN_GENERATION_MS = 4_000/, "the optional streamed repair can use its bounded minimum window");
 assert.match(generatorApi, /REGENERATION_REVIEW_TIMEOUT_MS = 8_000/, "the optional retry review has a bounded timeout");
 assert.match(generatorApi, /REGENERATION_POST_REVIEW_RESERVE_MS = 14_000/, "regeneration reserves time for issue, quota and usage finalization");
 assert.match(generatorApi, /solver\.solveQuestions\(candidateQuestions/, "regenerated MC items receive a fresh independent blind-solver check");
