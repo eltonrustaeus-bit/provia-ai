@@ -170,8 +170,8 @@ const generateStart = source.indexOf("const model = pickModel", quotaStart);
 assert.ok(claimStart >= 0 && quotaStart > claimStart && generateStart > quotaStart);
 assert.ok(failStart > quotaStart && failRpc > failStart && failureResponse > failRpc,
   "generation attempt is fenced and its reservation refunded before the HTTP error response");
-assert.match(source, /catch \{\s*await examGenerationOperations\.failGeneration/,
-  "an ambiguous reserve timeout is reconciled through the same idempotency operation");
+assert.match(source, /catch \{[\s\S]*?if \(!internalBatch\) await examGenerationOperations\.failGeneration/,
+  "an ambiguous public reservation is reconciled through the same idempotency operation while trusted batches bypass quota state");
 assert.match(source, /reserve_mock_exam_quota/);
 assert.match(source, /completeGeneration\(\{/);
 const quotaDeniedResponse = source.slice(source.indexOf("if (!quota.ok)"), source.indexOf("const usageEvents"));

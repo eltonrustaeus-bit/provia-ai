@@ -732,7 +732,7 @@ const VERIFIER_RESERVE_MS = 30_000;
 const MIN_VERIFIER_MS = 8_000;          // below this, skip verification entirely
 const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
 const PRE_GENERATION_RESERVE_MS = 6_000; // quota (5 s) and adaptive focus (4 s) run concurrently, plus margin
-const REGENERATION_MIN_GENERATION_MS = 8_000; // a short repair may return a salvageable complete set
+const REGENERATION_MIN_GENERATION_MS = 4_000; // streamed repair may salvage complete candidates before timeout
 const REGENERATION_REVIEW_TIMEOUT_MS = 8_000; // optional retry; timeout safely falls back to round 1
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
 
@@ -1345,15 +1345,19 @@ function buildRepairPayload(payload, { lang, numQuestions, existingQuestions = [
   };
 }
 
-module.exports = async function handler(req, res) {
+module.exports = async function handler(req, res, internalContext = null) {
   const budget = makeBudget(Date.now());
+  const internalBatch = internalContext?.kind === "verified_batch" &&
+    examGenerationOperations.UUID.test(internalContext.userId || "");
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
   }
 
-  const auth = await requireAuth(req);
+  const auth = internalBatch
+    ? { ok: true, user: { id: internalContext.userId } }
+    : await requireAuth(req);
   if (!auth.ok) {
     return auth.unavailable
       ? json(res, 503, { ok: false, error: "AUTH_VERIFICATION_UNAVAILABLE" })
@@ -1361,7 +1365,7 @@ module.exports = async function handler(req, res) {
   }
   const user = auth.user;
 
-  if (!process.env.EXAM_SIGNING_SECRET) {
+  if (!internalBatch && !process.env.EXAM_SIGNING_SECRET) {
     return json(res, 503, { ok: false, error: "EXAM_SIGNING_NOT_CONFIGURED" });
   }
 
@@ -1470,54 +1474,61 @@ module.exports = async function handler(req, res) {
   }
 
   const quotaPeriod = rules.currentPeriodKey(mockLimit.period);
-  let generationClaim;
-  try {
-    generationClaim = await examGenerationOperations.claimGeneration({
-      userId: user.id,
-      idempotencyKey,
-      payloadHash: requestHash,
-      attemptId,
-      quotaRequestId,
-      quotaPeriod,
-      quotaEnforced: mockLimit.cap !== Infinity,
-    });
-  } catch {
-    generationClaim = null;
-  }
-  if (!generationClaim) {
-    return json(res, 503, {
-      ok: false,
-      error: "generation_request_state_unavailable",
-      requestId: quotaRequestId,
-      message: lang === "en"
-        ? "Exam creation could not safely start. Please try again."
-        : "Provet kunde inte startas säkert. Försök igen.",
-    });
-  }
-  if (generationClaim.status === "replay") {
-    const replayResponse = refreshReplayManifest(generationClaim.response, user.id, course, pastedText);
-    if (!replayResponse) return json(res, 503, { ok: false, error: "exam_replay_unavailable" });
-    return json(res, 200, replayResponse);
-  }
-  if (generationClaim.status === "payload_conflict") {
-    return json(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" });
-  }
-  if (generationClaim.status === "in_progress") {
-    return json(res, 409, { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true });
-  }
-  if (generationClaim.status === "expired") {
-    return json(res, 409, { ok: false, error: "GENERATION_REQUEST_EXPIRED", retryable: false });
+  if (!internalBatch) {
+    let generationClaim;
+    try {
+      generationClaim = await examGenerationOperations.claimGeneration({
+        userId: user.id,
+        idempotencyKey,
+        payloadHash: requestHash,
+        attemptId,
+        quotaRequestId,
+        quotaPeriod,
+        quotaEnforced: mockLimit.cap !== Infinity,
+      });
+    } catch {
+      generationClaim = null;
+    }
+    if (!generationClaim) {
+      return json(res, 503, {
+        ok: false,
+        error: "generation_request_state_unavailable",
+        requestId: quotaRequestId,
+        message: lang === "en"
+          ? "Exam creation could not safely start. Please try again."
+          : "Provet kunde inte startas säkert. Försök igen.",
+      });
+    }
+    if (generationClaim.status === "replay") {
+      const replayResponse = refreshReplayManifest(generationClaim.response, user.id, course, pastedText);
+      if (!replayResponse) return json(res, 503, { ok: false, error: "exam_replay_unavailable" });
+      return json(res, 200, replayResponse);
+    }
+    if (generationClaim.status === "payload_conflict") {
+      return json(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" });
+    }
+    if (generationClaim.status === "in_progress") {
+      return json(res, 409, { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true });
+    }
+    if (generationClaim.status === "expired") {
+      return json(res, 409, { ok: false, error: "GENERATION_REQUEST_EXPIRED", retryable: false });
+    }
   }
 
   let quota;
   let focusInstruction = "";
   try {
-    [quota, focusInstruction] = await Promise.all([
-      consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId),
-      buildAdaptiveFocus(user.id, { numQuestions, lang }),
-    ]);
+    [quota, focusInstruction] = internalBatch
+      ? await Promise.all([
+          Promise.resolve({ ok: true, count: 0, limit: null, period: quotaPeriod, periodUnit: mockLimit.period, unlimited: true, enforced: false }),
+          buildAdaptiveFocus(user.id, { numQuestions, lang }),
+        ])
+      : await Promise.all([
+          consumeMockExamQuota(user.id, mockLimit, quotaPeriod, quotaRequestId),
+          buildAdaptiveFocus(user.id, { numQuestions, lang }),
+        ]);
   } catch {
-    await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
+    if (!internalBatch) await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
     console.error(JSON.stringify({
       event: "exam_generation_failed",
       requestId: quotaRequestId,
@@ -1533,7 +1544,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (!quota.ok) {
-    await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
+    if (!internalBatch) await examGenerationOperations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
     return json(res, 429, {
       ok: false,
       error: "Quota exceeded",
@@ -1559,11 +1570,13 @@ module.exports = async function handler(req, res) {
   async function fail(status, payload) {
     if (!cleaned) {
       cleaned = true;
-      const failed = await examGenerationOperations.failGeneration({
-        userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId,
-      });
-      if (failed !== "retryable") {
-        console.warn(JSON.stringify({ event: "exam_generation_operation_release_failed", requestId: quotaRequestId }));
+      if (!internalBatch) {
+        const failed = await examGenerationOperations.failGeneration({
+          userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId,
+        });
+        if (failed !== "retryable") {
+          console.warn(JSON.stringify({ event: "exam_generation_operation_release_failed", requestId: quotaRequestId }));
+        }
       }
     }
     await flushUsage();
@@ -1691,6 +1704,7 @@ module.exports = async function handler(req, res) {
     let repairAttempted = false;
     let structuralRepairAttempted = false;
     let qualityRepairAttempted = false;
+    let qualityRepairSkipReason = null;
     let repairFailureStage = null;
     let qualityRepairBudgetRemainingMs = null;
     let qualityRepairGenerationTimeoutMs = null;
@@ -1953,7 +1967,15 @@ module.exports = async function handler(req, res) {
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
         const needsRepair = approvedIds.size < numQuestions
           || (rejectedIds.length > 0 && rejectedIds.length / reviewedQuestionCount > 0.3);
-        if (needsRepair && canRegenerate && !qualityRepairAttempted) {
+        const bestCaseRepairCount = qualityRepairCandidateCountFor(
+          Math.max(1, numQuestions - approvedIds.size), null,
+        );
+        const repairCanReachMinimum = approvedIds.size + bestCaseRepairCount
+          >= minimumDeliverableQuestionCount(numQuestions);
+        if (needsRepair && canRegenerate && !qualityRepairAttempted && !repairCanReachMinimum) {
+          qualityRepairSkipReason = "repair_cannot_reach_minimum_delivery";
+        }
+        if (needsRepair && canRegenerate && !qualityRepairAttempted && repairCanReachMinimum) {
           repairAttempted = true;
           qualityRepairAttempted = true;
           const originalGatedQuestions = exam.questions;
@@ -2265,6 +2287,24 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    if (internalBatch) {
+      if (exam.questions.some((question) => question.validation_status !== "verified" && question.type !== "graph")) {
+        return fail(503, { ok: false, error: "unverified_internal_candidate" });
+      }
+      await flushUsage();
+      return json(res, 200, {
+        ok: true,
+        questions: exam.questions,
+        requested: numQuestions,
+        partial: exam.questions.length < numQuestions,
+        quality: {
+          structuralApproved: exam.questions.length,
+          verifierApproved: exam.questions.filter((question) => question.validation_status === "verified").length,
+          solverApprovedMc: exam.questions.filter((question) => question.type === "mc").length,
+        },
+      });
+    }
+
     if (!canDeliverVerifiedQuestions(exam.questions, { requested: numQuestions, qType })) {
       const structuralIssueCounts = {};
       for (const item of gate.dropped) {
@@ -2293,6 +2333,7 @@ module.exports = async function handler(req, res) {
         repairAttempted,
         structuralRepairAttempted,
         qualityRepairAttempted,
+        qualityRepairSkipReason,
         qualityRepairBudgetRemainingMs,
         qualityRepairGenerationTimeoutMs,
         repairFailureStage,
@@ -2353,6 +2394,7 @@ module.exports = async function handler(req, res) {
         repairAttempted,
         structuralRepairAttempted,
         qualityRepairAttempted,
+        qualityRepairSkipReason,
         qualityRepairBudgetRemainingMs,
         qualityRepairGenerationTimeoutMs,
         repairFailureStage,
@@ -2401,6 +2443,7 @@ module.exports = async function handler(req, res) {
       solverReasons: solverOutcome.reasons,
       structuralRepairAttempted,
       qualityRepairAttempted,
+      qualityRepairSkipReason,
       qualityRepairBudgetRemainingMs,
       qualityRepairGenerationTimeoutMs,
       repairFailureStage,
@@ -2537,3 +2580,104 @@ module.exports.streamGeneration = streamGeneration; // transport — exercised b
 module.exports.refundMockExamQuota = refundMockExamQuota;
 module.exports.commitMockExamQuota = commitMockExamQuota;
 module.exports.consumeMockExamQuota = consumeMockExamQuota;
+module.exports.loadCentralRules = loadCentralRules;
+module.exports.loadUserRole = loadUserRole;
+module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ userId, payload, questions }) {
+  if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object" || !Array.isArray(questions)) {
+    throw new TypeError("Invalid verified exam finalization");
+  }
+  const { lang, level, course, qType, numQuestions, pastedText } = payload;
+  if (questions.length < minimumDeliverableQuestionCount(numQuestions) ||
+      !canDeliverVerifiedQuestions(questions, { requested: numQuestions, qType }) ||
+      questions.some((question) => question.validation_status !== "verified")) {
+    throw new Error("Verified exam does not meet delivery requirements");
+  }
+  const subjectProfile = assessment.detectSubjectProfile(course, pastedText);
+  const finalGate = assessment.gateExam({ questions }, {
+    profile: subjectProfile,
+    requireSourceReferences: true,
+    reviewSingleWordOptionOutliers: lang === "sv",
+    requireSourceSupportedOptionOutliers: lang === "sv",
+    sourceMaterial: pastedText,
+    requestedQuestionType: qType,
+  });
+  if (finalGate.dropped.length > 0 || finalGate.questions.length !== questions.length) {
+    throw new Error("Final structural validation rejected a candidate");
+  }
+  const distinct = [];
+  for (const question of finalGate.questions) {
+    if (distinct.some((accepted) => assessment.isDuplicateQuestion(accepted, question))) {
+      throw new Error("Duplicate question in verified exam");
+    }
+    distinct.push(question);
+  }
+  const balanced = ["mix", "mixed"].includes(qType)
+    ? selectMixedQuestions(distinct, mixedTypeTargets(numQuestions))
+    : { questions: distinct.slice(0, numQuestions) };
+  if (balanced.questions.length !== distinct.length || balanced.questions.length < minimumDeliverableQuestionCount(numQuestions)) {
+    throw new Error("Question mix does not meet delivery requirements");
+  }
+  const clientQuestions = balanced.questions.map((question) => {
+    const {
+      validation_status, confidence_score, detected_issues, graph_spec,
+      correct_index, model_answer, rubric, scoring_rubric, accepted_answers,
+      akey_sig, ...clientQuestion
+    } = question;
+    clientQuestion.grade_task = gradeTasks.sealQuestion(question, undefined, gradeTasks.hashContext(pastedText, course, userId));
+    if (!clientQuestion.grade_task) throw new Error("Grade-task encryption unavailable or invalid question");
+    return clientQuestion;
+  });
+  const exam = { questions: clientQuestions };
+  exam.exam_manifest = examCompletion.issueExamManifest(userId, course, pastedText, clientQuestions);
+  if (!exam.exam_manifest) throw new Error("Exam manifest unavailable");
+  const submissionId = examCompletion.submissionId(userId, course, clientQuestions);
+  if (!submissionId) throw new Error("Exam submission identity unavailable");
+  const quota = payload.quota || {};
+  const response = {
+    ok: true,
+    exam,
+    meta: {
+      isMath: looksLikeMath(course, pastedText),
+      subjectProfile,
+      partial: clientQuestions.length < numQuestions,
+      truncated: false,
+      verifierSkipped: false,
+      requested: numQuestions,
+      gate: { profile: subjectProfile, dropped: 0, flagged: 0 },
+      verifier: { checked: balanced.questions.length, approved: balanced.questions.length, rejected: 0, callOk: true },
+      solver: { checked: balanced.questions.filter((question) => question.type === "mc").length, rejected: 0, callOk: true, model: null, reasons: {} },
+      model: pickModel({ isMath: looksLikeMath(course, pastedText) }),
+      entitlements: payload.entitlements || {},
+      quota: {
+        feature: "mockExam",
+        period: quota.period || payload.quotaPeriod,
+        count: quota.count ?? 0,
+        limit: quota.limit ?? null,
+        unlimited: quota.unlimited === true,
+        enforced: quota.enforced === true,
+      },
+    },
+  };
+  return { submissionId, response };
+};
+module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload }) {
+  if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object") {
+    throw new TypeError("Invalid internal batch request");
+  }
+  const encoded = Buffer.from(JSON.stringify(payload));
+  const req = {
+    method: "POST",
+    headers: {},
+    async *[Symbol.asyncIterator]() { yield encoded; },
+  };
+  const response = {
+    statusCode: 200,
+    headers: {},
+    setHeader(name, value) { this.headers[name] = value; },
+    end(body) { this.body = body; },
+  };
+  await module.exports(req, response, { kind: "verified_batch", userId });
+  let body;
+  try { body = JSON.parse(response.body || "{}"); } catch { body = null; }
+  return { status: response.statusCode, body };
+};

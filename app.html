@@ -1062,6 +1062,24 @@ async function postJson(path,payload,opts){
     return{ok:false,status:0,raw:"",data:null,timedOut,networkError:!timedOut,error:String(err&&err.message||err)};
   }finally{ if(timer)clearTimeout(timer); }
 }
+async function getJson(path,opts={}){
+  const timeoutMs=Number(opts.timeoutMs)||10000;
+  const ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+  let timer=null;
+  try{
+    return await Promise.race([
+      (async()=>{
+        const token=opts.token??await getAccessToken();
+        const headers=token?{"Authorization":`Bearer ${token}`} : {};
+        const response=await fetch(path,{method:"GET",headers,signal:ctrl?ctrl.signal:undefined});
+        const raw=await response.text();let data=null;try{data=JSON.parse(raw);}catch{}
+        return{ok:response.ok,status:response.status,raw,data,timedOut:false,networkError:false};
+      })(),
+      new Promise((_,reject)=>{timer=setTimeout(()=>{if(ctrl)ctrl.abort();const error=new Error("Request timed out");error.name="AbortError";reject(error);},timeoutMs);})
+    ]);
+  }catch(error){return{ok:false,status:0,raw:"",data:null,timedOut:error?.name==="AbortError",networkError:error?.name!=="AbortError"};}
+  finally{if(timer)clearTimeout(timer);}
+}
 
 function applyServerEntitlements(entitlements){
   if(!entitlements||typeof entitlements!=="object")return;
@@ -2130,6 +2148,46 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
+  async function runResumableGeneration(payload){
+    const startedAt=Date.now();
+    const started=await postJson("/api/exam-generation",payload,{timeoutMs:12000});
+    if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
+    if(started.status!==202||!started.data?.operationId)return started;
+    const operationId=started.data.operationId;
+    let consecutiveNetworkFailures=0;
+    let lastState=started.data;
+    const updateProgress=(state)=>{
+      lastState=state;
+      const approved=Number.isInteger(state?.approved)?state.approved:0;
+      const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
+      const label=LANG==="sv"?`Skapar och granskar prov: ${approved} av ${requested} frågor godkända.`:`Generating and reviewing exam: ${approved} of ${requested} questions approved.`;
+      setStatus(label,"warn");
+    };
+    updateProgress(started.data);
+    while(Date.now()-startedAt<14*60*1000){
+      const step=await postJson("/api/exam-generation-advance",{operationId},{timeoutMs:62000});
+      if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
+      if(step.status===202&&step.data?.ok){
+        consecutiveNetworkFailures=0;
+        updateProgress(step.data);
+        if(step.data.state==="working")await new Promise(resolve=>setTimeout(resolve,1200));
+        continue;
+      }
+      if(step.status===0||step.timedOut||step.networkError){
+        consecutiveNetworkFailures++;
+        const current=await getJson(`/api/exam-generation?operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
+        if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
+        if(current.data?.error==="incomplete_exam")return current;
+        if(current.status===200&&current.data?.ok){updateProgress(current.data);consecutiveNetworkFailures=0;continue;}
+        if(consecutiveNetworkFailures<3)continue;
+        return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+          requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+      }
+      return step;
+    }
+    return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+      requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+  }
   async function runGenerate(){
     hideDebug();setStatus("");const t=T[LANG];
     const pastedText=(pastedTextEl()?.value||"").trim();
@@ -2150,7 +2208,9 @@ try{
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
-    const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
+    const res=payload.qType==="graph"
+      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000})
+      :await runResumableGeneration(payload);
     const clearGenerationPlaceholder=()=>{
       const body=examBodyEl();
       if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
@@ -2189,6 +2249,13 @@ try{
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message,errorCode:"generation_request_state_unavailable"};
       }
+      if(res.status===503&&["EXAM_SIGNING_NOT_CONFIGURED","AI_GENERATION_NOT_CONFIGURED"].includes(res.data?.error)){
+        const message=LANG==="sv"
+          ?"Provskapandet är tillfälligt inte konfigurerat. Inget prov eller kvotdrag skapades; kontakta pilotansvarig."
+          :"Exam creation is temporarily not configured. No exam or quota charge was created; contact the pilot lead.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error};
+      }
       if(res.status===401||res.data?.error==="Unauthorized"){
         const message=LANG==="sv"
           ?"Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter."
@@ -2202,6 +2269,15 @@ try{
           :"The exam is still being created. Wait a moment and retry; the same request continues without a new quota reservation.";
         setStatus(message,"warn");hideDebug();
         return {ok:false,error:message,errorCode:"generation_in_progress"};
+      }
+      if(res.data?.error==="generation_in_progress"){
+        const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
+        const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
+        const message=LANG==="sv"
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Samma begäran kan återupptas utan ett nytt kvotdrag; kontrollera materialet och tryck Skapa prov igen.`
+          :`The exam is not ready yet (${approved} of ${requested} questions approved). The same request can resume without another quota reservation; check the material and press Generate exam again.`;
+        setStatus(message,"warn");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
       }
       if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
         window.ExGenGenerationRequest.clear(idempotencyKey);

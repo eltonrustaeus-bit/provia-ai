@@ -18,7 +18,7 @@ try {
   };
   const { ctx: pageContext, page } = await openPage(browser, `${server.url}/app.html`, {
     state: { user: { id: "partial-delivery-user", email: "partial@example.test" } },
-    mocks: { extra: [["**/api/generate-exam", route => route.fulfill({ json: {
+    mocks: { extra: [["**/api/exam-generation", route => route.fulfill({ json: {
       ok: true,
       exam: partialExam,
       meta: { partial: true, requested: 3, quota: { enforced: false } },

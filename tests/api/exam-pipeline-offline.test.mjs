@@ -49,7 +49,18 @@ assert.equal(generateExam.pickModel({ isMath: false, env: { OPENAI_MODEL: "gpt-4
 assert.equal(generateExam.pickModel({ isMath: true, env: { OPENAI_MODEL_EXAM: "gpt-5-mini", OPENAI_MATH_MODEL: "gpt-4.1-mini" } }), "gpt-4.1-mini",
   "the explicit math model remains the most specific override");
 assert.equal(generateExam.minimumDeliverableQuestionCount(3), 2);
+assert.equal(generateExam.minimumDeliverableQuestionCount(6), 4,
+  "a six-question exam must have at least four independently approved questions before partial delivery");
 assert.equal(generateExam.minimumDeliverableQuestionCount(10), 6);
+assert.equal(generateExam.minimumDeliverableQuestionCount(12), 8,
+  "a twelve-question partial exam must have at least eight independently approved questions");
+for (const [requested, minimum] of [[3, 2], [6, 4], [12, 8]]) {
+  const verifiedQuestions = Array.from({ length: minimum }, () => ({ type: "mc" }));
+  assert.equal(generateExam.canDeliverVerifiedQuestions(verifiedQuestions, { requested, qType: "mc" }), true,
+    `${minimum}/${requested} independently approved questions meets the explicit partial-delivery floor`);
+  assert.equal(generateExam.canDeliverVerifiedQuestions(verifiedQuestions.slice(1), { requested, qType: "mc" }), false,
+    `${minimum - 1}/${requested} independently approved questions fails closed below the delivery floor`);
+}
 assert.equal(generateExam.qualityRepairCandidateCountFor(3, null), 4,
   "a 0/3 first-pass result requests three slots plus one spare, not six candidates");
 assert.equal(generateExam.qualityRepairCandidateCountFor(2, null), 3,
@@ -444,6 +455,9 @@ let throwOnRepair = false;
 let truncateQualityRepairStream = false;
 let truncateQualityRepairAfter = 1;
 let simulatedNow = null;
+let simulatedInitialGenerationMs = 10_000;
+let simulatedQualityRepairMs = 20_000;
+let simulatedVerifierMs = 0;
 let issuanceUnavailable = false;
 let quotaDenied = false;
 let lastInvokeCallStart = 0;
@@ -553,7 +567,7 @@ globalThis.fetch = async (input, init = {}) => {
     const isQualityRepair = typeof body.input?.at?.(-1)?.content === "string"
       && body.input.at(-1).content.includes("KVALITETSREPARATION");
     if (body.stream && schemaName === "mock_exam_schema" && isQualityRepair) {
-      if (simulatedNow !== null) simulatedNow += 20_000;
+      if (simulatedNow !== null) simulatedNow += simulatedQualityRepairMs;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
       if (!batch) throw new Error("unexpected synthetic quality-repair request");
@@ -581,7 +595,7 @@ globalThis.fetch = async (input, init = {}) => {
         providerHttpFailure = false;
         return new Response(JSON.stringify({ error: { message: "synthetic-provider-body-sentinel" } }), { status: 429 });
       }
-      if (simulatedNow !== null) simulatedNow += 10_000;
+      if (simulatedNow !== null) simulatedNow += simulatedInitialGenerationMs;
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
       const event = { type: "response.output_text.delta", delta: generationTextOverride || JSON.stringify({ title: "Syntetiskt prov", level: "C", questions: activeQuestions }) };
       const completed = { type: "response.completed", response: {
@@ -591,7 +605,7 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
     if (schemaName === "mock_exam_schema") {
-      if (simulatedNow !== null) simulatedNow += 20_000;
+      if (simulatedNow !== null) simulatedNow += 25_000;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
       if (!batch) throw new Error("unexpected synthetic repair request");
@@ -603,6 +617,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
       verifierInputs.push(reviewInput);
+      if (simulatedNow !== null) simulatedNow += simulatedVerifierMs;
       if (verifierUnavailableInitially) return new Response("synthetic verifier outage", { status: 503 });
       if (verifierThrowsForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry verifier timeout");
@@ -1391,8 +1406,8 @@ try {
   activeQuestions = unsupportedQuestions;
   regenerationQuestions = repairedQuestions;
   verifierRejectQuestionId = repairedQuestions.map((question) => question.id);
-  const originalDateNow = Date.now;
-  simulatedNow = originalDateNow();
+  const originalTwelveDateNow = Date.now;
+  simulatedNow = originalTwelveDateNow();
   Date.now = () => simulatedNow;
   calls.length = 0;
   let exhaustedRepairBudget;
@@ -1401,7 +1416,7 @@ try {
       lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
     });
   } finally {
-    Date.now = originalDateNow;
+    Date.now = originalTwelveDateNow;
     simulatedNow = null;
   }
   assertIncompleteExamNotDelivered(exhaustedRepairBudget, "structural repair leaves insufficient quality-repair time");
@@ -1411,8 +1426,8 @@ try {
   assert.equal(exhaustedRepairBudgetLog.structuralRepairAttempted, true);
   assert.equal(exhaustedRepairBudgetLog.qualityRepairAttempted, false,
     "quality repair is not started when its protected generation/review/finalization budget is unavailable");
-  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 30_000,
-    "the synthetic latency leaves less than the required bounded repair window");
+  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 26_000,
+    "the synthetic latency leaves less than the minimum generation, review and finalization window");
   assert.equal(exhaustedRepairBudgetLog.qualityRepairGenerationTimeoutMs, null);
   assert.equal(exhaustedRepairBudgetLog.finalQuestionCount, 0,
     "unreviewed or rejected candidates are never issued as a fallback");
@@ -1452,6 +1467,110 @@ try {
   assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairGenerationTimeoutMs),
     "quality repair logs its actual provider timeout budget");
   assert.equal(partialBatchRepairLog.finalQuestionCount, 3);
+
+  const makeMathQuestion = (index, idPrefix) => {
+    const left = index + 2;
+    const right = 3;
+    const answer = left + right;
+    return {
+      ...questions[index % questions.length],
+      id: `${idPrefix}-${index + 1}`,
+      question: `Beräkna ${left} + ${right}.`,
+      options: [String(answer - 1), String(answer), String(answer + 1)],
+      correct_index: 1,
+      model_answer: String(answer),
+      topic: "Aritmetik",
+      subtopic: "Addition",
+      concept_tag: `Addition ${index + 1}`,
+      source_references: ["addition, subtraktion och multiplikation"],
+    };
+  };
+  const twelveQuestionSet = Array.from({ length: 12 }, (_, index) => makeMathQuestion(index, "twelve"));
+  const twelveQuestionRepairs = Array.from({ length: 5 }, (_, index) => makeMathQuestion(index + 20, "twelve-repair"));
+  activeQuestions = twelveQuestionSet;
+  regenerationQuestionBatches = [twelveQuestionRepairs];
+  verifierRejectQuestionId = twelveQuestionSet.slice(8).map((question) => question.id);
+  const originalDateNow = Date.now;
+  simulatedNow = originalDateNow();
+  simulatedInitialGenerationMs = 26_900;
+  simulatedQualityRepairMs = 5_000;
+  simulatedVerifierMs = 2_261;
+  Date.now = () => simulatedNow;
+  calls.length = 0;
+  let repairedTwelveQuestionExam;
+  try {
+    repairedTwelveQuestionExam = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 12,
+    });
+  } finally {
+    Date.now = originalDateNow;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    simulatedQualityRepairMs = 20_000;
+    simulatedVerifierMs = 0;
+  }
+  assert.equal(repairedTwelveQuestionExam.status, 200, JSON.stringify(repairedTwelveQuestionExam.body));
+  assert.equal(repairedTwelveQuestionExam.body.exam.questions.length, 12,
+    "a 12-question exam is completed when one bounded repair supplies enough independently approved candidates");
+  assert.equal(repairedTwelveQuestionExam.body.meta.partial, false,
+    "a repaired exam with the requested count is not labeled partial");
+  assert.equal(repairedTwelveQuestionExam.body.exam.questions.some((question) => question.id.startsWith("twelve-9")), false,
+    "the four first-pass questions rejected by the reviewer are never delivered");
+  const twelveQuestionRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(twelveQuestionRepairLog.qualityRepairAttempted, true);
+  assert.equal(twelveQuestionRepairLog.repairCandidateCount, 5,
+    "the repair requests four missing slots plus one candidate for review rejection");
+  assert.ok(twelveQuestionRepairLog.qualityRepairBudgetRemainingMs >= 27_500
+    && twelveQuestionRepairLog.qualityRepairBudgetRemainingMs < 28_200,
+  "the handler starts the repair when the first generation and review leave about 27.8 seconds");
+  assert.ok(twelveQuestionRepairLog.qualityRepairGenerationTimeoutMs >= 5_500
+    && twelveQuestionRepairLog.qualityRepairGenerationTimeoutMs < 6_200,
+  "the streamed repair keeps its generation timeout bounded while reserving review and finalization time");
+  assert.ok(verifierInputs.at(-1).questions.every((question) => question.id.startsWith("twelve-repair-")),
+    "every repaired question is independently reviewed before it can fill a requested slot");
+  assert.equal(twelveQuestionRepairLog.finalQuestionCount, 12);
+
+  const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
+    ...question, id: `six-${index + 1}`,
+  }));
+  const sixQuestionRepairs = Array.from({ length: 3 }, (_, index) => makeMathQuestion(index + 40, "six-repair"));
+  activeQuestions = sixQuestionSet;
+  regenerationQuestionBatches = [sixQuestionRepairs];
+  verifierRejectQuestionId = sixQuestionSet.slice(4).map((question) => question.id);
+  calls.length = 0;
+  const repairedSixQuestionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 6,
+  });
+  assert.equal(repairedSixQuestionExam.status, 200, JSON.stringify(repairedSixQuestionExam.body));
+  assert.equal(repairedSixQuestionExam.body.exam.questions.length, 6,
+    "a six-question exam is completed when repair candidates pass both independent quality checks");
+  assert.equal(repairedSixQuestionExam.body.meta.partial, false);
+  assert.equal(repairedSixQuestionExam.body.exam.questions.some((question) => question.id === "six-5" || question.id === "six-6"), false,
+    "rejected first-pass questions are withheld from a repaired six-question exam");
+  assert.ok(verifierInputs.at(-1).questions.every((question) => question.id.startsWith("six-repair-")),
+    "every repaired six-question candidate is reviewed before delivery");
+
+  activeQuestions = twelveQuestionSet;
+  verifierRejectQuestionId = twelveQuestionSet.map((question) => question.id);
+  calls.length = 0;
+  const impossibleTwelveQuestionRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 12,
+  });
+  assert.equal(impossibleTwelveQuestionRepair.status, 502);
+  assert.equal(impossibleTwelveQuestionRepair.body.error, "incomplete_exam");
+  assert.equal(impossibleTwelveQuestionRepair.body.exam, undefined,
+    "zero approved questions cannot be presented as a complete or partial 12-question exam");
+  const impossibleRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(impossibleRepairLog.qualityRepairAttempted, false,
+    "the capped six-candidate repair is skipped when it cannot reach the eight-question minimum");
+  assert.equal(impossibleRepairLog.qualityRepairSkipReason, "repair_cannot_reach_minimum_delivery");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 0,
+  "an impossible repair does not incur a second model call");
+
+  regenerationQuestionBatches = null;
+  verifierRejectQuestionId = null;
+  activeQuestions = questions;
 
   activeQuestions = questions;
   regenerationQuestionBatches = [qualityCandidates];
