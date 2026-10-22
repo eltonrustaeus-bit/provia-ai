@@ -241,7 +241,14 @@ test("an all-duplicate batch stores repair feedback without advancing the exam",
     deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
     stage: "generate",
     requested_count: 3,
-    payload: { qType: "short", numQuestions: 3 },
+    payload: {
+      qType: "short", numQuestions: 3,
+      repairFeedback: {
+        reviewFailureCounts: { low_source_alignment: 2 },
+        solverFailureCounts: { solver_cannot_judge: 1 },
+        duplicateCount: 1,
+      },
+    },
     accepted_questions: [{
       id: "already-approved", type: "short", question: "Beräkna x när x + 2 = 5.",
       validation_status: "verified",
@@ -272,7 +279,11 @@ test("an all-duplicate batch stores repair feedback without advancing the exam",
     checkpointCalls += 1;
     assert.equal(input.progressCurrent, job.progress_current);
     assert.equal(input.nextStage, "repair");
-    assert.equal(input.repairFeedback.duplicateCount, 2);
+    assert.deepEqual(input.repairFeedback, {
+      reviewFailureCounts: { answer_alignment: 1, low_source_alignment: 2 },
+      solverFailureCounts: { solver_cannot_judge: 1, solver_disagrees_on_key: 2 },
+      duplicateCount: 3,
+    });
     return { status: "retry_queued" };
   };
   operations.completePipelineJob = async () => { completeCalls += 1; return { status: "completed" }; };
@@ -285,6 +296,8 @@ test("an all-duplicate batch stores repair feedback without advancing the exam",
         requestId: payload.idempotencyKey,
         repairFailureStage: "insufficient_unique_repair",
         repairOutcomeStage: "repair_combined",
+        reviewFailureCounts: { answer_alignment: 1, untrusted_text: 99 },
+        solverFailureCounts: { solver_disagrees_on_key: 2 },
       }, questions: [1, 2].map((index) => ({
         id: `repeated-${index}`, type: "short", question: "Beräkna x när x + 2 = 5.",
         validation_status: "verified",
@@ -360,6 +373,24 @@ test("repair feedback keeps only bounded fixed categories and no free text", () 
   }), {
     reviewFailureCounts: { answer_alignment: 20, source_support: 1 },
     solverFailureCounts: { solver_disagrees_on_key: 2 }, duplicateCount: 3,
+  });
+});
+
+test("repair feedback accumulates safe categories across retries within storage bounds", () => {
+  assert.deepEqual(pipeline.mergeRepairFeedback({
+    reviewFailureCounts: { low_source_alignment: 18, raw_message: 4 },
+    solverFailureCounts: { solver_cannot_judge: 2 },
+    duplicateCount: 2,
+    question: "private material",
+  }, {
+    reviewFailureCounts: { low_source_alignment: 9, answer_alignment: 2 },
+    solverFailureCounts: { solver_disagrees_on_key: 3 },
+    duplicateCount: 3,
+    source: "private material",
+  }), {
+    reviewFailureCounts: { answer_alignment: 2, low_source_alignment: 20 },
+    solverFailureCounts: { solver_cannot_judge: 2, solver_disagrees_on_key: 3 },
+    duplicateCount: 3,
   });
 });
 

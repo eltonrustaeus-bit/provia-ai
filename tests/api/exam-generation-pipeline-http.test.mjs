@@ -822,6 +822,14 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       "select id,quota_request_id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
       [testUuid(11_998)],
     )).rows[0];
+    await db.query(
+      "update public.mock_exam_generation_pipeline_jobs set payload=jsonb_set(payload, '{repairFeedback}', $2::jsonb, true) where id=$1",
+      [repairTimeoutJob.id, JSON.stringify({
+        reviewFailureCounts: { answer_alignment: 1 },
+        solverFailureCounts: {},
+        duplicateCount: 0,
+      })],
+    );
     const repairTimeoutIssuancesBefore = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
     )).rows[0].n;
@@ -849,6 +857,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       )).rows[0];
       assert.equal(repairState.stage, "repair", "incomplete reviewed batch enters a fresh-request repair stage");
       assert.ok(repairState.payload.repairFeedback.reviewFailureCounts.low_source_alignment > 0);
+      assert.equal(repairState.payload.repairFeedback.reviewFailureCounts.answer_alignment, 1,
+        "checkpoint retains failure categories from the earlier attempt");
       const nextInstructionIndex = mockedGenerationInstructions.length;
       assert.equal(mockedProviderStages.filter(stage => stage === "mock_exam_schema").length, 2);
       assert.equal(mockedProviderStages.filter(stage => stage === "exam_verifier_schema").length, 1);
@@ -871,6 +881,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         "the next request uses a repair prompt with a fresh time budget");
       assert.match(mockedGenerationInstructions[nextInstructionIndex], /low_source_alignment/,
         "bounded independent-review feedback is carried across requests");
+      assert.match(mockedGenerationInstructions[nextInstructionIndex], /answer_alignment/,
+        "earlier independent-review feedback remains in the next repair prompt");
       assert.equal(repairTimeoutResult.body.meta.partial, false);
       const finalRepairCheckpoint = mockedPipelineCheckpoints.at(-1);
       assert.equal(finalRepairCheckpoint.length, 12);

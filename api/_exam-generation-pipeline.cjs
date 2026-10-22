@@ -100,6 +100,21 @@ function comparisonQuestionsFor(questions, requested) {
   return comparisons;
 }
 
+function mergeRepairFeedback(previous, current) {
+  const prior = generation.normalizeRepairFeedback(previous);
+  const latest = generation.normalizeRepairFeedback(current);
+  const mergeCounts = (left, right) => Object.fromEntries(
+    [...new Set([...Object.keys(left), ...Object.keys(right)])]
+      .sort()
+      .map((code) => [code, Math.min(20, (left[code] || 0) + (right[code] || 0))]),
+  );
+  return {
+    reviewFailureCounts: mergeCounts(prior.reviewFailureCounts, latest.reviewFailureCounts),
+    solverFailureCounts: mergeCounts(prior.solverFailureCounts, latest.solverFailureCounts),
+    duplicateCount: Math.min(3, prior.duplicateCount + latest.duplicateCount),
+  };
+}
+
 async function advance(job, { deadlineAt = null } = {}) {
   const pipelineStartedAt = Date.now();
 
@@ -259,7 +274,10 @@ async function advance(job, { deadlineAt = null } = {}) {
     nextStage: accepted.length > existing.length && (complete || partialReady) ? "assemble" : "repair",
     acceptedQuestions: accepted,
     progressCurrent: accepted.length,
-    repairFeedback: generation.normalizeRepairFeedback({ ...quality, duplicateCount: duplicateCandidates }),
+    repairFeedback: mergeRepairFeedback(job.payload.repairFeedback, {
+      ...quality,
+      duplicateCount: duplicateCandidates,
+    }),
   });
   if (["retry_queued", "retry_limit", "partial_ready"].includes(checkpoint?.status)) {
     return retryOutcome(checkpoint.status, job, "NO_NEW_APPROVED_QUESTIONS");
@@ -296,4 +314,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
