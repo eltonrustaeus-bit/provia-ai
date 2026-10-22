@@ -199,3 +199,32 @@ authorized by this result.
 **Acceptance:** prompt/schema consistency and adaptive-batch behavior have
 offline evidence only; a new separately authorized Preview and staging test
 are still required to measure whether live yield improves.
+
+## Verification result for repair-prompt package — 2026-10-22
+
+- Commit `a607edc608bebf80923aa88db3c612593f0e0534` is on the existing
+  feature branch and READY in Vercel Preview `dpl_GmjwwREV1JEPbrVcPx7nsXSkkF9m`.
+  The automatic alias was reused; runtime config confirmed pilot environment
+  and staging project ref. Production and `main` were untouched.
+- The previously approved pipeline and repair-feedback migrations were already
+  present in staging, so this package applied no DDL.
+- One synthetic Matematik 2b, C-level, 12-short-answer test issued a 12-question
+  exam after nine batches. The repair selector widened from three to five after
+  a no-progress batch; the following batch accepted three and the final batch
+  accepted the remaining three. All 12 were independently approved. UI review
+  found all questions on-topic. The test exam remains open; no answers or grade
+  were submitted.
+- Current internal spend ledger: cap `$5`, spent `$0.528050`, reserved
+  `$0.225728`, remaining `$4.246222`. The run delta of `$0.160390` is app-side
+  accounting, not a provider invoice. No role, quota configuration, or account
+  changes were made.
+- Local focused tests passed 64/64; independent review reported 65/65 and no
+  blocker. Existing quality gates, ownership, fencing, idempotency, quota
+  settlement and issuance controls were unchanged.
+- Live evidence is one successful case, not a general reliability claim. A
+  real HTTP test of a five-candidate repair near the 45-second deadline and
+  verifier 60,000-character payload limit remains a gap. No replay or second
+  model call was made.
+
+**Status:** this package has fresh 12/12 live evidence; general pilot
+reliability is not yet established.

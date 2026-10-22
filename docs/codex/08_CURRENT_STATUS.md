@@ -1221,3 +1221,51 @@ begäran om stagingtest.
 
 **PILOT NOT READY.** Nästa evidenssteg kräver en separat godkänd push/Preview
 och ett färskt stagingbudgetbesked före ett nytt syntetiskt modellanrop.
+
+## Stagingverifiering av repair-prompt och adaptiv batch — 2026-10-22
+
+- [x] Commit `a607edc608bebf80923aa88db3c612593f0e0534` pushades endast till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_GmjwwREV1JEPbrVcPx7nsXSkkF9m` blev READY på exakt denna SHA. Den
+  befintliga branch-aliasen återanvände staginginloggningen; publikt runtime-
+  config bekräftade `environment=pilot` och stagingref
+  `yhcinqejsocpmmetazpz`, utan produktionsref.
+- [x] Migrationslistan visade redan pipeline-, retention-, budget- och
+  repair-feedback-migrationerna. Ingen migration tillämpades på nytt i denna
+  körning; ingen produktionsdatabas ändrades.
+- [x] Ett syntetiskt Matematik 2b-prov på C-nivå begärde 12 kortsvarsfrågor.
+  UI:t öppnade ett prov med exakt 12 frågor. Genomgång av samtliga frågor i
+  UI visade varierade uppgifter om nollställen, vertex, symmetrilinje,
+  parabelriktning och linjära funktioner, inom det syntetiska materialets
+  ämnesområde. Inga svar lämnades in och ingen rättning kördes.
+- [x] Sanerad runtime-telemetri visar nio batcher: 12 frågor godkändes av
+  oberoende granskning och accepterades successivt. Efter en batch utan
+  framsteg växte reparationsbredden från 3 till 5 kandidater; nästa batch
+  accepterade 3 frågor och den sista 3, vilket gav 12/12. Två tidigare
+  repair-batcher rapporterade `insufficient_unique_repair` och en
+  `repair_normalization`; inga underkända eller o-verifierade kandidater
+  accepterades. Samlad batchlatens var cirka 286 sekunder över nio separata
+  requests.
+- [x] Appens stagingbudget före körningen var `$0.367660` spenderat och
+  `$0.225728` reserverat. Efteråt: `$0.528050` spenderat, `$0.225728`
+  reserverat, `$4.246222` kvar av det befintliga `$5`-taket. Delta
+  `$0.160390` är intern appbokföring, inte leverantörsfaktura. Konto, roll,
+  kvotkonfiguration och produktionsresurser ändrades inte.
+- [x] Fokuserad lokal svit passerade 64/64, syntaxkontroll och
+  `git diff --check` passerade. Oberoende granskning fann ingen blockerare;
+  dess egen niofilssvit rapporterades som 65/65. Granskningen bekräftar att
+  ägarskap, lease fencing, idempotens, kvotavräkning och utfärdandespärrar
+  inte ändrades.
+- [!] En lyckad livekörning visar att den här 12-frågebegäran kan fullföljas,
+  inte att yield eller kvalitet är tillförlitlig i allmänhet. Adaptiv
+  breddning ökar möjliga utdata inom oförändrad 45-sekunders arbetstid;
+  agentgranskningen noterar att större payload kan nå verifierarens fasta
+  60 000-teckensgräns. Ett offline-HTTP-test för riktig 5-kandidatbatch nära
+  payload-/tidsgränsen saknas fortfarande.
+- [!] Stagingprovet står öppet i testkontot och har inte lämnats in. Ingen
+  cleanup eller ytterligare AI-körning utfördes.
+
+**PILOT NOT READY.** Första färska livekörningen på `a607edc` nådde 12/12
+utan att försvaga kvalitetsgrindarna. Nästa tekniska steg är att täcka
+5-kandidatbatchens timeout-/payloadgränser offline och samla fler fristående
+stagingresultat först efter ny budgetkontroll och uttryckligt godkännande.
