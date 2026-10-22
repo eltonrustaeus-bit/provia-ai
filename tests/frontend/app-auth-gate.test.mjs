@@ -197,7 +197,7 @@ try {
     const second = await context.newPage();
     for (const tab of [first, second]) {
       await mockApis(tab, { allow: true, role: "gratis", extra: [
-        ["**/api/generate-exam", route => route.fulfill({ json: { ok: true, exam: {
+        ["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: { ok: true, exam: {
           title: "Syntetiskt prov", level: "C", exam_manifest: `v2.${"f".repeat(32)}.authGateTestProof`,
           questions: [{ id: "q1", type: "mc", points: 1, question: "Var sker cellandning?",
             options: ["Mitokondrien", "Kärnan"], correct_index: 0, topic: "Cellandning",

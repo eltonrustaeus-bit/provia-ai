@@ -2155,6 +2155,9 @@ try{
     if(started.status!==202||!started.data?.operationId)return started;
     const operationId=started.data.operationId;
     let consecutiveNetworkFailures=0;
+    let consecutivePreflightMisses=0;
+    let consecutiveWorkingPolls=0;
+    let lastApproved=Number.isInteger(started.data.approved)?started.data.approved:0;
     let lastState=started.data;
     const updateProgress=(state)=>{
       lastState=state;
@@ -2169,12 +2172,30 @@ try{
       if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
       if(step.status===202&&step.data?.ok){
         consecutiveNetworkFailures=0;
+        const approved=Number.isInteger(step.data.approved)?step.data.approved:lastApproved;
+        if(approved>lastApproved)consecutiveWorkingPolls=0;
+        lastApproved=Math.max(lastApproved,approved);
         updateProgress(step.data);
-        if(step.data.state==="working")await new Promise(resolve=>setTimeout(resolve,1200));
+        if(step.data.state==="working"){
+          consecutivePreflightMisses=0;
+          consecutiveWorkingPolls++;
+          const delayMs=Math.min(15000,1200*2**Math.min(consecutiveWorkingPolls-1,4));
+          await new Promise(resolve=>setTimeout(resolve,delayMs));
+        }else if(step.data.error==="GENERATION_BUDGET_INSUFFICIENT"){
+          consecutiveWorkingPolls=0;
+          consecutivePreflightMisses++;
+          const delayMs=Math.min(15000,1200*2**Math.min(consecutivePreflightMisses-1,4));
+          await new Promise(resolve=>setTimeout(resolve,delayMs));
+        }else{
+          consecutiveWorkingPolls=0;
+          consecutivePreflightMisses=0;
+          await new Promise(resolve=>setTimeout(resolve,1200));
+        }
         continue;
       }
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
+        consecutiveWorkingPolls=0;
         const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;

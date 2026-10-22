@@ -747,23 +747,39 @@ const RESPONSE_RESERVE_MS = 3_000;      // serialising and returning the respons
 // generation that gets squeezed by this degrades into a shortened exam via the
 // salvage path, which is much better than the function being killed outright.
 const VERIFIER_RESERVE_MS = 30_000;
+const INTERNAL_VERIFIER_RESERVE_MS = 18_000; // verifier timeout cap; the response reserve is deducted separately from remaining time
 const MIN_VERIFIER_MS = 8_000;          // below this, skip verification entirely
 const MIN_GENERATION_MS = 15_000;       // below this, do not start a generation
 const PRE_GENERATION_RESERVE_MS = 6_000; // quota (5 s) and adaptive focus (4 s) run concurrently, plus margin
 const REGENERATION_MIN_GENERATION_MS = 4_000; // streamed repair may salvage complete candidates before timeout
 const REGENERATION_REVIEW_TIMEOUT_MS = 8_000; // optional retry; timeout safely falls back to round 1
 const REGENERATION_POST_REVIEW_RESERVE_MS = 14_000; // 5 s issuance + 6 s quota + 1.5 s usage + margin
+const INTERNAL_REGENERATION_POST_REVIEW_RESERVE_MS = 4_000; // internal batches skip issuance/quota and retain usage-flush margin
 
-function minimumExamPreflightBudgetMs(qType) {
-  return qType === "graph" ? 0 : MIN_GENERATION_MS + VERIFIER_RESERVE_MS + PRE_GENERATION_RESERVE_MS;
+function minimumExamPreflightBudgetMs(qType, internalBatch = false) {
+  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
+  return qType === "graph" ? 0 : MIN_GENERATION_MS + verifierReserveMs + PRE_GENERATION_RESERVE_MS;
 }
 
-function minimumExamGenerationReviewBudgetMs() {
-  return MIN_GENERATION_MS + VERIFIER_RESERVE_MS;
+function minimumExamGenerationReviewBudgetMs(internalBatch = false) {
+  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
+  return MIN_GENERATION_MS + verifierReserveMs;
 }
 
-function regenerationGenerationTimeout(remainingMs) {
-  const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + REGENERATION_POST_REVIEW_RESERVE_MS;
+function initialVerifierTimeoutMs(remainingMs, internalBatch = false) {
+  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
+  return Math.max(1_000, Math.min(verifierReserveMs, Math.floor(remainingMs - RESPONSE_RESERVE_MS)));
+}
+
+function regenerationPostReviewReserveMs(internalBatch = false) {
+  return internalBatch
+    ? INTERNAL_REGENERATION_POST_REVIEW_RESERVE_MS
+    : REGENERATION_POST_REVIEW_RESERVE_MS;
+}
+
+function regenerationGenerationTimeout(remainingMs, internalBatch = false) {
+  const postReviewReserveMs = regenerationPostReviewReserveMs(internalBatch);
+  const verificationAndFinalization = REGENERATION_REVIEW_TIMEOUT_MS + postReviewReserveMs;
   if (remainingMs <= REGENERATION_MIN_GENERATION_MS + verificationAndFinalization) return null;
   return remainingMs - verificationAndFinalization;
 }
@@ -905,7 +921,6 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
     reservation = r.aiSpendReservation || null;
     if (!r.ok) {
       await r.text().catch(() => "");
-      clearTimeout(timer);
       return { ok: false, status: r.status, latencyMs: Date.now() - t0 };
     }
 
@@ -937,9 +952,7 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
       else throw e;
     }
   } catch (e) {
-    clearTimeout(timer);
     if (e && (e.name === "AbortError" || controller.signal.aborted)) {
-      if (usage) await settleAiSpend(reservation, usage);
       return { ok: true, text, cutShort: true, usage, model: providerModel, latencyMs: Date.now() - t0 };
     }
     return {
@@ -949,10 +962,11 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
       failureKind: e?.name === "TypeError" ? "network" : "other",
       latencyMs: Date.now() - t0,
     };
+  } finally {
+    clearTimeout(timer);
+    await settleAiSpend(reservation, usage, { conservativeFallback: true });
   }
 
-  clearTimeout(timer);
-  if (usage) await settleAiSpend(reservation, usage);
   return { ok: true, text, cutShort, usage, model: providerModel, latencyMs: Date.now() - t0 };
 }
 
@@ -1401,6 +1415,10 @@ module.exports = async function handler(req, res, internalContext = null) {
   }
   const internalBatch = internalContext?.kind === "verified_batch" &&
     examGenerationOperations.UUID.test(internalContext.userId || "");
+  const pipelineJobId = internalBatch && examGenerationOperations.UUID.test(internalContext.pipelineJobId || "")
+    ? internalContext.pipelineJobId
+    : null;
+  const verifierReserveMs = internalBatch ? INTERNAL_VERIFIER_RESERVE_MS : VERIFIER_RESERVE_MS;
   const budget = makeBudget(Date.now(), internalBatch ? internalContext.deadlineAt : null);
 
   if (req.method !== "POST") {
@@ -1520,12 +1538,12 @@ module.exports = async function handler(req, res, internalContext = null) {
 
   // Quota and adaptive-focus requests are independent, so reserve their
   // concurrent ceiling rather than adding both timeouts to the critical path.
-  const preflightRequiredMs = minimumExamPreflightBudgetMs(qType);
+  const preflightRequiredMs = minimumExamPreflightBudgetMs(qType, internalBatch);
   if (preflightRequiredMs && budget.remaining() < preflightRequiredMs) {
     logBudgetGate("preflight", preflightRequiredMs);
     return json(res, 503, {
       ok: false,
-      error: "quality_review_unavailable",
+      error: internalBatch ? "generation_budget_insufficient" : "quality_review_unavailable",
       requestId: quotaRequestId,
       message: lang === "en"
         ? "There is not enough time to generate and check a reliable exam. Please try again."
@@ -1618,7 +1636,15 @@ module.exports = async function handler(req, res, internalContext = null) {
   const usageEvents = [];
   let usageFlushed = false;
   function recordUsage(step, model, usage, latencyMs) {
-    usageEvents.push({ userId: user.id, requestId: quotaRequestId, tier: role, step, model, usage, latencyMs });
+    usageEvents.push({
+      userId: user.id,
+      requestId: pipelineJobId ? `exam-pipeline:${pipelineJobId}` : quotaRequestId,
+      tier: role,
+      step,
+      model,
+      usage,
+      latencyMs,
+    });
   }
   async function flushUsage() {
     if (usageFlushed) return;
@@ -1662,20 +1688,20 @@ module.exports = async function handler(req, res, internalContext = null) {
 
     // Ordinary AI-authored items need a complete review window. Do not start an
     // expensive generation if the remaining function time cannot accommodate it.
-    const generationReviewRequiredMs = minimumExamGenerationReviewBudgetMs();
+    const generationReviewRequiredMs = minimumExamGenerationReviewBudgetMs(internalBatch);
     const canVerify = budget.remaining() >= generationReviewRequiredMs;
     if (!canVerify && qType !== "graph") {
       logBudgetGate("after_quota_and_focus", generationReviewRequiredMs);
       return fail(503, {
         ok: false,
-        error: "quality_review_unavailable",
+        error: internalBatch ? "generation_budget_insufficient" : "quality_review_unavailable",
         requestId: quotaRequestId,
         message: lang === "en"
           ? "There is not enough time to generate and check a reliable exam. Please try again."
           : "Det finns inte tid nog att skapa och kvalitetskontrollera ett tillförlitligt prov. Försök igen."
       });
     }
-    const generationBudget = budget.remaining() - (canVerify ? VERIFIER_RESERVE_MS : 0);
+    const generationBudget = budget.remaining() - (canVerify ? verifierReserveMs : 0);
 
     failureStage = "model_generation";
     const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget, userId: user.id });
@@ -1805,7 +1831,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     // weak questions without spending the function budget on two generations.
     const structuralRepairTimeout = qType === "graph"
       ? null
-      : regenerationGenerationTimeout(budget.remaining());
+      : regenerationGenerationTimeout(budget.remaining(), internalBatch);
     if (exam.questions.length === 0 && structuralRepairTimeout !== null) {
       repairAttempted = true;
       structuralRepairAttempted = true;
@@ -1828,9 +1854,12 @@ module.exports = async function handler(req, res, internalContext = null) {
           signal: AbortSignal.timeout(structuralRepairTimeout),
         }, { userId: user.id });
         repairHttpStatus = response.status;
-        const raw = await response.text();
-        try { repairResponse = JSON.parse(raw); } catch { repairResponse = null; }
-        if (repairResponse?.usage) await settleAiSpend(response.aiSpendReservation, repairResponse.usage);
+        try {
+          const raw = await response.text();
+          try { repairResponse = JSON.parse(raw); } catch { repairResponse = null; }
+        } finally {
+          await settleAiSpend(response.aiSpendReservation, repairResponse?.usage, { conservativeFallback: true });
+        }
         repairResponseStatus = typeof repairResponse?.status === "string" ? repairResponse.status : "unknown";
         if (response.ok && repairResponse) {
           repairFailureStage = "structural_repair_normalization";
@@ -1946,16 +1975,13 @@ module.exports = async function handler(req, res, internalContext = null) {
       // running them concurrently makes wall time the max of the two rather
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
-      const initialVerifierTimeoutMs = Math.max(1_000, Math.min(
-        VERIFIER_RESERVE_MS,
-        Math.floor(budget.remaining() - RESPONSE_RESERVE_MS),
-      ));
+      const verifierTimeoutMs = initialVerifierTimeoutMs(budget.remaining(), internalBatch);
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
           userId: user.id,
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
           comparisonQuestions,
-          timeoutMs: initialVerifierTimeoutMs,
+          timeoutMs: verifierTimeoutMs,
           reviewHintsById: gate.flagged
             .flatMap((item) => item.issues
               .filter((issue) => issue === "single_word_option_outlier_review"
@@ -2030,7 +2056,7 @@ module.exports = async function handler(req, res, internalContext = null) {
         // cross-round fixture is covered. Ordinary and MC batches share the
         // same server normalization, gate, verifier and (for MC) blind solver.
         qualityRepairBudgetRemainingMs = Math.max(0, Math.floor(budget.remaining()));
-        const regenerationTimeoutMs = regenerationGenerationTimeout(qualityRepairBudgetRemainingMs);
+        const regenerationTimeoutMs = regenerationGenerationTimeout(qualityRepairBudgetRemainingMs, internalBatch);
         qualityRepairGenerationTimeoutMs = regenerationTimeoutMs;
         const canRegenerate = qType !== "graph" && regenerationTimeoutMs !== null;
         const reviewedQuestionCount = exam.questions.length + duplicateQuestionIds.length;
@@ -2139,12 +2165,12 @@ module.exports = async function handler(req, res, internalContext = null) {
                           .map((issue) => [item.id, issue]))
                         .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
                       comparisonQuestions: round1ApprovedQuestions,
-                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
+                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                     solver.solveQuestions(candidateQuestions, {
                       userId: user.id,
                       apiKey, model, subjectProfile, lang, material: pastedText,
-                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
+                      timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                   ]);
                   recordUsage("verify_compare", v2.model, v2.usage, v2.latencyMs);
@@ -2670,6 +2696,7 @@ module.exports.generationRequestId = generationRequestId;
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
 module.exports.minimumExamPreflightBudgetMs = minimumExamPreflightBudgetMs; // pure — unit-tested
 module.exports.minimumExamGenerationReviewBudgetMs = minimumExamGenerationReviewBudgetMs; // pure — unit-tested
+module.exports.initialVerifierTimeoutMs = initialVerifierTimeoutMs; // pure — includes the response reserve
 module.exports.qualityRepairCandidateCountFor = qualityRepairCandidateCountFor; // pure — unit-tested
 module.exports.streamGeneration = streamGeneration; // transport — exercised by the eval
 module.exports.refundMockExamQuota = refundMockExamQuota;
@@ -2755,7 +2782,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   };
   return { submissionId, response };
 };
-module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null }) {
+module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null, pipelineJobId = null }) {
   if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object") {
     throw new TypeError("Invalid internal batch request");
   }
@@ -2771,7 +2798,7 @@ module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ us
     setHeader(name, value) { this.headers[name] = value; },
     end(body) { this.body = body; },
   };
-  await module.exports(req, response, { kind: "verified_batch", userId, deadlineAt });
+  await module.exports(req, response, { kind: "verified_batch", userId, deadlineAt, pipelineJobId });
   let body;
   try { body = JSON.parse(response.body || "{}"); } catch { body = null; }
   return { status: response.statusCode, body };

@@ -102,7 +102,7 @@ async function run() {
     // ligger därför i `extra` — som registreras sist och därmed vinner.
     await mockApis(page, {
       extra: [
-        ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+        ["**/api/generate-exam?pipeline=start", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
         ["**/api/explain", r => r.fulfill({ json: { ok: true, answer: "Citronsyracykeln sker i mitokondriens matrix — inte i cytoplasman. Titta på var pyruvat transporteras in efter glykolysen." } })],
       ],
     });

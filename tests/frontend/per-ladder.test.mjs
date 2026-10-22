@@ -54,7 +54,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
 const page = await ctx.newPage();
 await mockApis(page, {
   extra: [
-    ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
+    ["**/api/generate-exam?pipeline=start", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } })],
     ["**/api/explain", r => {
       try { bodies.push(JSON.parse(r.request().postData() || "{}")); } catch (_) { bodies.push(null); }
       // JSON, inte SSE. Båda grenarna i shared.js ska bära fälten, och

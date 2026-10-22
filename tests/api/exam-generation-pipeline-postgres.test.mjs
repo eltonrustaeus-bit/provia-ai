@@ -4,6 +4,12 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 const migration = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline.sql", import.meta.url), "utf8");
+const ownerClaimMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140100_owner_scoped_pipeline_claim.sql", import.meta.url), "utf8");
+const retentionMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140200_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
+const retentionRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140200_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
+const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
+const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
+const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
 const idempotencyMigration = fs.readFileSync(new URL("../../supabase/migrations/20261020190719_mock_exam_generation_idempotency.sql", import.meta.url), "utf8");
 const quotaMigration = fs.readFileSync(new URL("../../supabase/migrations/20261012103944_refund_failed_mock_exam_quota.sql", import.meta.url), "utf8");
@@ -31,6 +37,9 @@ async function makeDb() {
   await db.exec(quotaMigration);
   await db.exec(idempotencyMigration);
   await db.exec(migration);
+  await db.exec(ownerClaimMigration);
+  await db.exec(retentionMigration);
+  await db.exec(preflightReleaseMigration);
   return db;
 }
 
@@ -84,6 +93,112 @@ async function addJob(db, options = {}) {
   return job;
 }
 
+test("retention cron rollback removes only the schedule created by this migration", async () => {
+  const makeCronDb = async (preexistingJob = null) => {
+    const db = new PGlite();
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role;
+      create schema cron;
+      create table cron.job(
+        jobid bigint primary key, jobname text not null, schedule text, command text,
+        database text, username text, active boolean
+      );
+      create sequence cron.job_ids start 1;
+      create function cron.schedule(p_jobname text, p_schedule text, p_command text)
+      returns bigint language plpgsql as $$
+      declare v_id bigint;
+      begin
+        v_id := nextval('cron.job_ids');
+        insert into cron.job(jobid,jobname,schedule,command,database,username,active)
+        values(v_id,p_jobname,p_schedule,p_command,current_database(),current_user,true);
+        return v_id;
+      end;
+      $$;
+      create function cron.unschedule(p_job_id bigint)
+      returns boolean language plpgsql as $$
+      begin
+        delete from cron.job where jobid=p_job_id;
+        return found;
+      end;
+      $$;
+      create function public.cleanup_expired_mock_exam_generation_pipeline_jobs()
+      returns integer language sql as $$ select 0 $$;
+    `);
+    if (preexistingJob) {
+      const context = (await db.query("select current_database() as database, current_user as username")).rows[0];
+      await db.query(`insert into cron.job(jobid,jobname,schedule,command,database,username,active)
+        values(77,'exgen-mock-exam-pipeline-retention',$1,$2,$3,$4,$5)`, [
+          preexistingJob.schedule ?? "*/15 * * * *",
+          preexistingJob.command ?? "select public.cleanup_expired_mock_exam_generation_pipeline_jobs();",
+          preexistingJob.database ?? context.database,
+          preexistingJob.username ?? context.username,
+          preexistingJob.active ?? true,
+        ]);
+    }
+    return db;
+  };
+  const scheduleSql = retentionScheduleMigration.replace(/^create extension if not exists pg_cron with schema pg_catalog;\s*/m, "");
+
+  const createdDb = await makeCronDb(false);
+  try {
+    await createdDb.exec(scheduleSql);
+    const ownedJob = (await createdDb.query("select job_id from public.exgen_mock_exam_retention_schedule_ownership where migration_key='20261022140300'")).rows[0];
+    assert.equal(ownedJob.job_id, 1);
+    await createdDb.exec(retentionScheduleRollback);
+    assert.equal((await createdDb.query("select count(*)::int as n from cron.job")).rows[0].n, 0);
+    assert.equal((await createdDb.query("select to_regclass('public.exgen_mock_exam_retention_schedule_ownership') as name")).rows[0].name, null);
+    await createdDb.exec(retentionRollback);
+    assert.equal((await createdDb.query("select to_regprocedure('public.cleanup_expired_mock_exam_generation_pipeline_jobs()') as name")).rows[0].name, null,
+      "the cleanup function can be removed after its migration-owned schedule is unscheduled");
+  } finally {
+    await createdDb.close();
+  }
+
+  const existingDb = await makeCronDb({ command: "pre-existing job" });
+  try {
+    await assert.rejects(existingDb.exec(scheduleSql), /cron job name conflicts with the ExGen retention schedule/,
+      "a same-name cron job with a different command must fail instead of silently skipping cleanup");
+    assert.deepEqual((await existingDb.query("select jobid,jobname from cron.job")).rows, [
+      { jobid: 77, jobname: "exgen-mock-exam-pipeline-retention" },
+    ]);
+  } finally {
+    await existingDb.close();
+  }
+
+  for (const [label, override] of [
+    ["inactive", { active: false }],
+    ["wrong database", { database: "another_database" }],
+    ["wrong execution role", { username: "authenticated" }],
+  ]) {
+    const invalidDb = await makeCronDb(override);
+    try {
+      await assert.rejects(invalidDb.exec(scheduleSql), /cron job name conflicts with the ExGen retention schedule/,
+        `a same-name ${label} job must not silently suppress the cleanup worker`);
+    } finally {
+      await invalidDb.close();
+    }
+  }
+
+  const matchingDb = await makeCronDb({});
+  try {
+    await matchingDb.exec(scheduleSql);
+    assert.equal((await matchingDb.query("select count(*)::int as n from public.exgen_mock_exam_retention_schedule_ownership")).rows[0].n, 0,
+      "a matching active schedule is reused without claiming ownership");
+    await matchingDb.exec(retentionScheduleRollback);
+    assert.equal((await matchingDb.query("select count(*)::int as n from cron.job")).rows[0].n, 1,
+      "rollback preserves a matching schedule that predated this migration");
+    await assert.rejects(matchingDb.exec(retentionRollback),
+      /Retention rollback refused while a cron job still calls the cleanup function/,
+      "function rollback fails closed instead of leaving the existing schedule broken");
+    assert.ok((await matchingDb.query("select to_regprocedure('public.cleanup_expired_mock_exam_generation_pipeline_jobs()') as name")).rows[0].name,
+      "the function remains available to the pre-existing schedule");
+  } finally {
+    await matchingDb.close();
+  }
+});
+
 test("private resumable pipeline migration enforces leases, stage transitions, quota and issue gates", async (t) => {
   const db = await makeDb();
   try {
@@ -93,8 +208,47 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       const acl = (await db.query(`select
         (select relrowsecurity from pg_class where oid='public.mock_exam_generation_pipeline_jobs'::regclass) as rls,
         has_table_privilege('authenticated','public.mock_exam_generation_pipeline_jobs','select') as user_read,
-        has_function_privilege('anon','public.get_mock_exam_generation_pipeline_status(uuid)','execute') as anon_rpc`)).rows[0];
-      assert.deepEqual(acl, { rls: true, user_read: false, anon_rpc: false });
+        has_function_privilege('anon','public.get_mock_exam_generation_pipeline_status(uuid)','execute') as anon_rpc,
+        (select bool_and(has_function_privilege('service_role',signature::regprocedure,'execute'))
+          from unnest(array[
+            'public.renew_mock_exam_generation_lease(uuid,uuid,text,uuid,uuid,uuid,integer)',
+            'public.claim_mock_exam_generation_pipeline_job(uuid,integer)',
+            'public.claim_mock_exam_generation_pipeline_job_for_user(uuid,uuid,integer)',
+            'public.refund_orphaned_mock_exam_generation_reservation(uuid,uuid,uuid)',
+            'public.cleanup_expired_mock_exam_generation_pipeline_jobs()',
+            'public.renew_mock_exam_generation_pipeline_lease(uuid,uuid,integer)',
+            'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
+            'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
+            'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+          ]) as rpc(signature)) as service_pipeline_rpcs,
+        (select bool_and(not has_function_privilege('anon',signature::regprocedure,'execute')
+          and not has_function_privilege('authenticated',signature::regprocedure,'execute'))
+          from unnest(array[
+            'public.renew_mock_exam_generation_lease(uuid,uuid,text,uuid,uuid,uuid,integer)',
+            'public.claim_mock_exam_generation_pipeline_job(uuid,integer)',
+            'public.claim_mock_exam_generation_pipeline_job_for_user(uuid,uuid,integer)',
+            'public.refund_orphaned_mock_exam_generation_reservation(uuid,uuid,uuid)',
+            'public.cleanup_expired_mock_exam_generation_pipeline_jobs()',
+            'public.renew_mock_exam_generation_pipeline_lease(uuid,uuid,integer)',
+            'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
+            'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
+            'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+          ]) as rpc(signature)) as user_pipeline_rpcs_denied`)).rows[0];
+      assert.deepEqual(acl, {
+        rls: true,
+        user_read: false,
+        anon_rpc: false,
+        service_pipeline_rpcs: true,
+        user_pipeline_rpcs_denied: true,
+      });
+      assert.match(retentionScheduleMigration, /cron\.schedule\(/,
+        "the separate deployment migration schedules the bounded retention worker");
+      assert.match(retentionScheduleMigration, /'\*\/15 \* \* \* \*'/,
+        "retention cleanup is scheduled every 15 minutes");
+      assert.match(retentionScheduleMigration, /exgen_mock_exam_retention_schedule_ownership/,
+        "rollback can identify only the job created by this migration");
       await db.query("select set_config('request.jwt.claim.sub',$1,false)", [u2]);
       assert.equal((await db.query("select public.get_mock_exam_generation_pipeline_status($1) as s", [jobId])).rows[0].s, null);
       await db.query("select set_config('request.jwt.claim.sub',$1,false)", [u1]);
@@ -102,6 +256,266 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       assert.equal(status.approved, 0);
       assert.equal(Object.hasOwn(status, "payload"), false);
       assert.equal(Object.hasOwn(status, "accepted_questions"), false);
+    });
+
+    await t.test("owner-scoped claim atomically renews the parent lease and leaves another owner's job untouched", async () => {
+      const ownerId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      const id = "77777777-7777-4777-8777-777777777777";
+      const k = "88888888-8888-4888-8888-888888888888";
+      const a = "99999999-9999-4999-8999-999999999999";
+      const q = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      await db.query("insert into auth.users(id) values($1)", [ownerId]);
+      await addParent(db, { userId: ownerId, idempotencyKey: k, attemptId: a, quotaRequestId: q });
+      await addJob(db, {
+        id, userId: ownerId, idempotencyKey: k, attemptId: a, quotaRequestId: q,
+        state: "queued", stage: "generate",
+      });
+
+      const before = (await db.query(`select j.state,j.lease_token,j.stage_attempts,j.progress_current,
+          r.lease_expires_at as parent_lease,
+          (select mock_quota_count from public.profiles where id=$2) as quota_count
+        from public.mock_exam_generation_pipeline_jobs j
+        join public.mock_exam_generation_requests r on r.user_id=j.user_id and r.idempotency_key=j.idempotency_key
+        where j.id=$1`, [id, ownerId])).rows[0];
+      const wrongOwner = (await db.query(
+        "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r", [id, u2],
+      )).rows[0].r;
+      assert.equal(wrongOwner.status, "none");
+      const afterWrongOwner = (await db.query(`select j.state,j.lease_token,j.stage_attempts,j.progress_current,
+          r.lease_expires_at as parent_lease,
+          (select mock_quota_count from public.profiles where id=$2) as quota_count
+        from public.mock_exam_generation_pipeline_jobs j
+        join public.mock_exam_generation_requests r on r.user_id=j.user_id and r.idempotency_key=j.idempotency_key
+        where j.id=$1`, [id, ownerId])).rows[0];
+      assert.deepEqual(afterWrongOwner, before, "a wrong owner cannot claim, renew, or consume quota");
+
+      const ownerClaim = (await db.query(
+        "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r", [id, ownerId],
+      )).rows[0].r;
+      assert.equal(ownerClaim.status, "claimed");
+      const afterClaim = (await db.query(`select j.state,j.lease_token,j.stage_attempts,
+          r.lease_expires_at > clock_timestamp()+interval '200 seconds' as parent_renewed
+        from public.mock_exam_generation_pipeline_jobs j
+        join public.mock_exam_generation_requests r on r.user_id=j.user_id and r.idempotency_key=j.idempotency_key
+        where j.id=$1`, [id])).rows[0];
+      assert.deepEqual(afterClaim, {
+        state: "running",
+        lease_token: ownerClaim.job.lease_token,
+        stage_attempts: 1,
+        parent_renewed: true,
+      });
+
+      const mismatchJobId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+      const mismatchKey = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+      const expectedAttempt = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+      const jobAttempt = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+      const mismatchQuota = "abababab-abab-4aba-8aba-abababababab";
+      await addParent(db, {
+        userId: ownerId, idempotencyKey: mismatchKey, attemptId: expectedAttempt,
+        quotaRequestId: mismatchQuota,
+      });
+      await addJob(db, {
+        id: mismatchJobId, userId: ownerId, idempotencyKey: mismatchKey,
+        attemptId: jobAttempt, quotaRequestId: mismatchQuota, state: "queued",
+      });
+      const mismatch = (await db.query(
+        "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r",
+        [mismatchJobId, ownerId],
+      )).rows[0].r;
+      assert.equal(mismatch.status, "expired");
+      const reset = (await db.query(`select state,stage,lease_token,lease_expires_at,error_code,
+          payload,accepted_questions,stage_attempts
+        from public.mock_exam_generation_pipeline_jobs where id=$1`, [mismatchJobId])).rows[0];
+      assert.deepEqual(reset, {
+        state: "failed", stage: "terminal", lease_token: null, lease_expires_at: null,
+        error_code: "PARENT_LEASE_MISMATCH", payload: {}, accepted_questions: [], stage_attempts: 1,
+      }, "a persistent parent identity mismatch cannot loop on worker retries or retain private payload");
+      assert.equal((await db.query(`select status from public.mock_exam_quota_reservations where request_id=$1`, [mismatchQuota])).rows[0].status,
+        "reserved", "a different parent attempt is not refunded or mutated by the mismatched job");
+
+      const newerParentKey = "abababab-abab-4aba-8aba-111111111111";
+      const newerAttempt = "abababab-abab-4aba-8aba-222222222222";
+      const currentQuota = "abababab-abab-4aba-8aba-333333333333";
+      const staleQuota = "abababab-abab-4aba-8aba-444444444444";
+      const staleJobId = "abababab-abab-4aba-8aba-555555555555";
+      await addParent(db, {
+        userId: ownerId, idempotencyKey: newerParentKey, attemptId: newerAttempt,
+        quotaRequestId: currentQuota,
+      });
+      await db.query(`insert into public.mock_exam_quota_reservations(request_id,user_id,period_key,status)
+        values($1,$2,'2026-W43','reserved')`, [staleQuota, ownerId]);
+      await db.query(`update public.profiles set mock_quota_count=mock_quota_count+1 where id=$1`, [ownerId]);
+      await addJob(db, {
+        id: staleJobId, userId: ownerId, idempotencyKey: newerParentKey,
+        attemptId: jobAttempt, quotaRequestId: staleQuota, state: "queued",
+      });
+      const countBeforeStaleRefund = (await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [ownerId],
+      )).rows[0].mock_quota_count;
+      const staleMismatch = (await db.query(
+        "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r",
+        [staleJobId, ownerId],
+      )).rows[0].r;
+      assert.equal(staleMismatch.status, "expired");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1", [staleQuota])).rows[0].status,
+        "refunded", "the stale job's own orphan reservation is recovered");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1", [currentQuota])).rows[0].status,
+        "reserved", "the newer active attempt's reservation is untouched");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [ownerId])).rows[0].mock_quota_count,
+        countBeforeStaleRefund - 1, "only the stale job's reserved quota is released");
+
+    });
+
+    await t.test("preflight-only misses release the lease without consuming a generation attempt or quota", async () => {
+      const ownerId = "23232323-2323-4323-8323-232323232323";
+      const id = "19191919-1919-4919-8919-191919191919";
+      const key = "20202020-2020-4020-8020-202020202020";
+      const attempt = "21212121-2121-4121-8121-212121212121";
+      const quota = "22222222-2222-4222-8222-222222222223";
+      await db.query("insert into auth.users(id) values($1)", [ownerId]);
+      await addParent(db, { userId: ownerId, idempotencyKey: key, attemptId: attempt, quotaRequestId: quota });
+      await addJob(db, {
+        id, userId: ownerId, idempotencyKey: key, attemptId: attempt, quotaRequestId: quota,
+        requested: 12, payload: { qType: "mc", pastedText: "synthetic private source" },
+      });
+      const claim = (await db.query(
+        "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r", [id,ownerId],
+      )).rows[0].r;
+      assert.equal(claim.status, "claimed");
+      const wrongLease = (await db.query(
+        "select public.release_mock_exam_generation_pipeline_preflight($1,$2) as r", [id,token],
+      )).rows[0].r;
+      assert.equal(wrongLease.status, "fenced");
+      const released = (await db.query(
+        "select public.release_mock_exam_generation_pipeline_preflight($1,$2) as r", [id,claim.job.lease_token],
+      )).rows[0].r;
+      assert.equal(released.status, "retry_queued");
+      assert.deepEqual((await db.query(`select state,stage,stage_attempts,lease_token,lease_expires_at,
+          progress_current,payload,accepted_questions,error_code
+        from public.mock_exam_generation_pipeline_jobs where id=$1`, [id])).rows[0], {
+        state: "queued", stage: "generate", stage_attempts: 0, lease_token: null, lease_expires_at: null,
+        progress_current: 0, payload: { qType: "mc", pastedText: "synthetic private source" },
+        accepted_questions: [], error_code: "GENERATION_BUDGET_INSUFFICIENT",
+      });
+      assert.equal((await db.query(
+        "select status from public.mock_exam_quota_reservations where request_id=$1", [quota],
+      )).rows[0].status, "reserved", "a preflight miss neither commits nor refunds the request quota");
+
+      for (const [suffix, expiredField] of [["lease", "lease_expires_at"], ["deadline", "deadline_at"]]) {
+        const fencedId = suffix === "lease"
+          ? "31313131-3131-4131-8131-313131313131"
+          : "32323232-3232-4232-8232-323232323232";
+        const fencedKey = suffix === "lease"
+          ? "33333333-3333-4333-8333-333333333331"
+          : "33333333-3333-4333-8333-333333333332";
+        const fencedAttempt = suffix === "lease"
+          ? "34343434-3434-4434-8434-343434343431"
+          : "34343434-3434-4434-8434-343434343432";
+        const fencedQuota = suffix === "lease"
+          ? "35353535-3535-4535-8535-353535353531"
+          : "35353535-3535-4535-8535-353535353532";
+        await addParent(db, { userId: ownerId, idempotencyKey: fencedKey, attemptId: fencedAttempt, quotaRequestId: fencedQuota });
+        await addJob(db, {
+          id: fencedId, userId: ownerId, idempotencyKey: fencedKey, attemptId: fencedAttempt, quotaRequestId: fencedQuota,
+        });
+        const fencedClaim = (await db.query(
+          "select public.claim_mock_exam_generation_pipeline_job_for_user($1,$2,90) as r", [fencedId,ownerId],
+        )).rows[0].r;
+        assert.equal(fencedClaim.status, "claimed");
+        await db.query(`update public.mock_exam_generation_pipeline_jobs
+          set ${expiredField}=clock_timestamp()-interval '1 second' where id=$1`, [fencedId]);
+        const beforeDeniedRelease = (await db.query(`select to_jsonb(j) as snapshot
+          from public.mock_exam_generation_pipeline_jobs j where id=$1`, [fencedId])).rows[0].snapshot;
+        const beforeParentRequest = (await db.query(`select to_jsonb(r) as snapshot
+          from public.mock_exam_generation_requests r where user_id=$1 and idempotency_key=$2`,
+        [ownerId,fencedKey])).rows[0].snapshot;
+        const beforeQuotaCount = (await db.query(
+          "select mock_quota_count from public.profiles where id=$1", [ownerId],
+        )).rows[0].mock_quota_count;
+        const deniedRelease = (await db.query(
+          "select public.release_mock_exam_generation_pipeline_preflight($1,$2) as r",
+          [fencedId,fencedClaim.job.lease_token],
+        )).rows[0].r;
+        assert.equal(deniedRelease.status, "fenced", `expired ${suffix} cannot be released as a retryable preflight miss`);
+        const afterDeniedRelease = (await db.query(`select to_jsonb(j) as snapshot
+          from public.mock_exam_generation_pipeline_jobs j where id=$1`, [fencedId])).rows[0].snapshot;
+        assert.deepEqual(afterDeniedRelease, beforeDeniedRelease,
+          `expired ${suffix} fencing leaves the complete job row unchanged`);
+        assert.deepEqual((await db.query(`select to_jsonb(r) as snapshot
+          from public.mock_exam_generation_requests r where user_id=$1 and idempotency_key=$2`,
+        [ownerId,fencedKey])).rows[0].snapshot, beforeParentRequest,
+        `expired ${suffix} fencing leaves the parent request unchanged`);
+        assert.equal((await db.query(
+          "select status from public.mock_exam_quota_reservations where request_id=$1", [fencedQuota],
+        )).rows[0].status, "reserved", `expired ${suffix} keeps quota untouched for the normal recovery path`);
+        assert.equal((await db.query(
+          "select mock_quota_count from public.profiles where id=$1", [ownerId],
+        )).rows[0].mock_quota_count, beforeQuotaCount,
+        `expired ${suffix} fencing does not change the profile quota count`);
+      }
+    });
+
+    await t.test("expired idempotency results are scrubbed after their replay window", async () => {
+      const ownerId = "16161616-1616-4616-8616-161616161616";
+      const key = "17171717-1717-4717-8717-171717171717";
+      await db.query("insert into auth.users(id) values($1)", [ownerId]);
+      await db.query(`insert into public.mock_exam_generation_requests
+        (user_id,idempotency_key,request_hash,state,quota_period_key,quota_enforced,
+         submission_id,response_payload,expires_at)
+        values($1,$2,$3,'succeeded','2026-W43',true,$4,$5::jsonb,clock_timestamp()-interval '1 second')`, [
+        ownerId, key, "b".repeat(64), "18181818181848188818181818181818",
+        JSON.stringify({ ok: true, exam: { questions: [{ question: "synthetic expired answer" }] } }),
+      ]);
+      const firstCleanup = (await db.query(
+        "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
+      )).rows[0].count;
+      assert.equal(firstCleanup, 1);
+      assert.deepEqual((await db.query(`select state,response_payload from public.mock_exam_generation_requests
+        where user_id=$1 and idempotency_key=$2`, [ownerId,key])).rows[0], {
+        state: "expired", response_payload: null,
+      });
+      assert.equal((await db.query(
+        "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
+      )).rows[0].count, 0, "subsequent cleanup is idempotent");
+    });
+
+    await t.test("expired pipeline retention clears source and accepted questions and settles the exact quota", async () => {
+      const ownerId = "abababab-abab-4aba-8aba-aaaaaaaaaaaa";
+      const idempotencyKey = "abababab-abab-4aba-8aba-bbbbbbbbbbbb";
+      const quotaRequestId = "abababab-abab-4aba-8aba-cccccccccccc";
+      const pipelineId = "abababab-abab-4aba-8aba-dddddddddddd";
+      const ownerAttempt = "abababab-abab-4aba-8aba-eeeeeeeeeeee";
+      const question = { id: "synthetic-q1", question: "Synthetic question", validation_status: "verified" };
+      await db.query("insert into auth.users(id) values($1)", [ownerId]);
+      await addParent(db, { userId: ownerId, idempotencyKey, attemptId: ownerAttempt, quotaRequestId });
+      await addJob(db, {
+        id: pipelineId, userId: ownerId, idempotencyKey, attemptId: ownerAttempt,
+        quotaRequestId, state: "queued", payload: { pastedText: "synthetic source material" },
+        accepted: [question], progress: 1, deadline: "clock_timestamp()-interval '23 hours 59 minutes 59 seconds'",
+      });
+      const recentCleanup = (await db.query(
+        "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
+      )).rows[0].count;
+      assert.equal(recentCleanup, 0, "cleanup must not run before a job is at least 24 hours past its deadline");
+      await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()-interval '24 hours 1 second' where id=$1", [pipelineId]);
+
+      const cleaned = (await db.query(
+        "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
+      )).rows[0].count;
+      assert.equal(cleaned, 1);
+      assert.deepEqual((await db.query(`select state,stage,payload,accepted_questions,
+          error_code,lease_token,lease_expires_at,progress_current
+        from public.mock_exam_generation_pipeline_jobs where id=$1`, [pipelineId])).rows[0], {
+        state: "failed", stage: "terminal", payload: {}, accepted_questions: [],
+        error_code: "RETENTION_EXPIRED", lease_token: null, lease_expires_at: null, progress_current: 1,
+      });
+      assert.equal((await db.query("select state,quota_request_id from public.mock_exam_generation_requests where user_id=$1 and idempotency_key=$2", [ownerId,idempotencyKey])).rows[0].state,
+        "retryable", "an expired job releases only its matching parent attempt");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1", [quotaRequestId])).rows[0].status,
+        "refunded");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [ownerId])).rows[0].mock_quota_count, 0);
+      assert.equal((await db.query("select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count")).rows[0].count, 0,
+        "scrubbed terminal jobs are idempotently ignored on later sweeps");
     });
 
     await t.test("active pipeline protects idempotency and quota; live fencing token permits safe lease renewal", async () => {

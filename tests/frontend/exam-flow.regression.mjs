@@ -207,16 +207,23 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
 async function toExam(page) {
   await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
-  await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
-  await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);
-  await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+  await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos vid syrebrist i muskeln.");
   await page.waitForTimeout(150);
-  await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
   await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
   await page.waitForTimeout(300);
+}
+
+async function waitForScreenEntrance(page) {
+  await page.waitForFunction(() => {
+    const inner = document.querySelector("#xf .xf-screen.on > .xf-inner");
+    return !!inner && inner.getAnimations().every(animation => animation.playState !== "running");
+  });
 }
 
 async function toMaterial(page) {
@@ -675,13 +682,31 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
     const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
+    let qualityReceived = 0;
     await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: 1, requested: 3 },
+      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: qualityReceived, requested: 3 },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction((message) => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes(message), qualityMessage, { timeout: 5000 });
-    ok("ofullständigt prov visar kvalitetsfelet i stället för en HTTP-kod",
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+    const zeroCountStillOnContract = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => node.classList.contains("on"));
+    const zeroCountExamState = await page.locator("#examBody").evaluate(node => ({ text: node.textContent.trim(), skeleton: Boolean(node.querySelector(".skelBox")) }));
+    const zeroCountControls = await page.locator("#gradeBtn").evaluate(() => ({
+      gradeDisabled: document.getElementById("gradeBtn")?.disabled === true,
+      floatingBarHidden: !document.getElementById("floatingGradeBar")?.classList.contains("show"),
+    }));
+    ok("noll godkända frågor visas som 0 av 3 utan att öppna ett tomt prov",
+      zeroCountStillOnContract && zeroCountExamState.text === "" && !zeroCountExamState.skeleton &&
+        zeroCountControls.gradeDisabled && zeroCountControls.floatingBarHidden,
+      JSON.stringify({ zeroCountStillOnContract, zeroCountExamState, zeroCountControls }));
+    ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+    qualityReceived = 1;
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("1 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+    ok("delvis godkända men otillräckliga frågor visar korrekt 1 av 3-count",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
     await page.route("**/api/generate-exam*", route => route.fulfill({

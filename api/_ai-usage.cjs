@@ -112,7 +112,11 @@ async function reserveAiSpend({ userId, model, body, embedding = false }, option
 
 async function settleAiSpend(reservation, usage, options = {}) {
   if (!reservation?.enforced) return true;
-  const actualUsd = actualCostUsd(usage, reservation.model, { embedding: reservation.embedding });
+  let actualUsd = actualCostUsd(usage, reservation.model, { embedding: reservation.embedding });
+  if (actualUsd === null && options.conservativeFallback === true &&
+      Number.isFinite(reservation.reserveUsd) && reservation.reserveUsd > 0) {
+    actualUsd = reservation.reserveUsd;
+  }
   if (actualUsd === null) return false;
   const result = await callBudgetRpc("settle_ai_spend", {
     p_user_id: reservation.userId, p_reservation_id: reservation.reservationId,
@@ -141,7 +145,14 @@ async function budgetedOpenAIFetch(url, init, { userId, fetchImpl = globalThis.f
     return response;
   }
   const nextInit = reservation.enforced ? { ...init, body: JSON.stringify(reservation.body) } : init;
-  const response = await fetchImpl(url, nextInit);
+  let response;
+  try {
+    response = await fetchImpl(url, nextInit);
+  } catch (error) {
+    // The provider may have processed the request before the connection failed.
+    await settleAiSpend(reservation, null, { env, fetchImpl, conservativeFallback: true });
+    throw error;
+  }
   if (reservation.enforced) response.aiSpendReservation = reservation;
   return response;
 }

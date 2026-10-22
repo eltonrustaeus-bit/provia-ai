@@ -214,7 +214,7 @@ test("an expired outer deadline fails closed before another model request starts
       },
     });
     assert.equal(result.status, 503);
-    assert.equal(result.body.error, "quality_review_unavailable");
+    assert.equal(result.body.error, "generation_budget_insufficient");
     assert.equal(providerCalls, 0, "an expired shared deadline cannot fall back to a fresh provider budget");
   } finally {
     generationHandler.loadCentralRules = previous.loadCentralRules;
@@ -238,7 +238,7 @@ test("terminal generation failure survives a lost advance response and does not 
         request_hash: "a".repeat(64),
       }]);
     }
-    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job") {
+    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user") {
       return jsonResponse({ status: "none" });
     }
     throw new Error(`Unexpected network request: ${url.pathname}`);
@@ -267,7 +267,7 @@ test("expired pipeline lease produces a clear incomplete-exam response", async (
       if (url.searchParams.get("select") === "id") return jsonResponse([{ id: operationId }]);
       return jsonResponse([{ state: "failed", requested_count: 12, progress_current: 7 }]);
     }
-    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job") {
+    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user") {
       return jsonResponse({ status: "expired" });
     }
     throw new Error(`Unexpected network request: ${url.pathname}`);
@@ -283,4 +283,36 @@ test("expired pipeline lease produces a clear incomplete-exam response", async (
   assert.equal(response.body.error, "incomplete_exam");
   assert.equal(response.body.requested, 12);
   assert.equal(response.body.received, 7);
+});
+
+test("claim retry-limit returns the safe incomplete-exam counts without starting work", async () => {
+  let providerCalls = 0;
+  mockFetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs") {
+      return jsonResponse([{
+        state: "failed", requested_count: 12, progress_current: 7,
+        error_code: "STAGE_RETRY_LIMIT", idempotency_key: "22222222-2222-4222-8222-222222222222",
+        request_hash: "a".repeat(64),
+      }]);
+    }
+    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user") {
+      return jsonResponse({ status: "retry_limit" });
+    }
+    if (url.hostname === "api.openai.com") providerCalls += 1;
+    throw new Error(`Unexpected network request: ${url.pathname}`);
+  };
+  const response = responseRecorder();
+  await generationHandler({
+    method: "POST",
+    headers: { authorization: "Bearer synthetic-test-token" },
+    body: { operationId },
+    url: "/api/generate-exam?pipeline=advance",
+  }, response);
+  assert.equal(response.statusCode, 502);
+  assert.equal(response.body.error, "incomplete_exam");
+  assert.equal(response.body.requested, 12);
+  assert.equal(response.body.received, 7);
+  assert.equal(providerCalls, 0);
 });

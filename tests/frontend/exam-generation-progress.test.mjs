@@ -26,6 +26,7 @@ test("client reports a resumable job instead of a generic timeout or network fai
         ? { status: 202, data: { ok: true, operationId: "operation-budget", requested: 12, approved: 7 } }
         : { status: 202, data: { ok: true, state: "retrying", requested: 12, approved: 7 } },
       getJson: async () => { throw new Error("status check not expected"); },
+      setTimeout: (fn) => fn(),
     });
 
     assert.equal(result.status, 202);
@@ -54,6 +55,125 @@ test("client reports a resumable job instead of a generic timeout or network fai
     assert.equal(result.data.error, "generation_in_progress");
     assert.equal(result.data.operationId, "operation-network");
     assert.equal(result.data.approved, 2);
+  });
+
+  await t.test("repeated preflight budget misses back off before resuming the same operation", async () => {
+    let advances = 0;
+    const delays = [];
+    const exam = { questions: Array.from({ length: 12 }, (_, i) => ({ id: `q${i}` })) };
+    const result = await runWith({
+      payload: { numQuestions: 12 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-preflight", requested: 12, approved: 0 } };
+        }
+        advances++;
+        if (advances <= 2) {
+          return { status: 202, data: {
+            ok: true, state: "retrying", error: "GENERATION_BUDGET_INSUFFICIENT", requested: 12, approved: 0,
+          } };
+        }
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 12 } } };
+      },
+      getJson: async () => { throw new Error("status check not expected"); },
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.data.exam.questions.length, 12);
+    assert.equal(advances, 3, "the client resumes the same operation after the preflight miss clears");
+    assert.deepEqual(delays, [1200, 2400], "consecutive preflight misses use bounded exponential backoff");
+  });
+
+  await t.test("active worker leases back off instead of hammering advance", async () => {
+    let advances = 0;
+    const delays = [];
+    const exam = { questions: Array.from({ length: 3 }, (_, i) => ({ id: `q${i}` })) };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-working", requested: 3, approved: 0 } };
+        }
+        advances++;
+        if (advances <= 6) {
+          return { status: 202, data: { ok: true, state: "working", requested: 3, approved: 0 } };
+        }
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status check not expected"); },
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.data.exam.questions.length, 3);
+    assert.equal(advances, 7, "the same operation resumes after the active lease clears");
+    assert.deepEqual(delays, [1200, 2400, 4800, 9600, 15000, 15000]);
+  });
+
+  await t.test("newly approved progress resets active-lease polling backoff", async () => {
+    let advances = 0;
+    const delays = [];
+    const exam = { questions: Array.from({ length: 3 }, (_, i) => ({ id: `q${i}` })) };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-progress", requested: 3, approved: 0 } };
+        }
+        advances++;
+        if (advances === 1) return { status: 202, data: { ok: true, state: "working", requested: 3, approved: 0 } };
+        if (advances === 2) return { status: 202, data: { ok: true, state: "working", requested: 3, approved: 1 } };
+        if (advances === 3) return { status: 202, data: { ok: true, state: "working", requested: 3, approved: 1 } };
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status check not expected"); },
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(advances, 4);
+    assert.deepEqual(delays, [1200, 1200, 2400]);
+  });
+
+  await t.test("transport recovery resets active-lease polling backoff", async () => {
+    let advances = 0;
+    const delays = [];
+    const exam = { questions: Array.from({ length: 3 }, (_, i) => ({ id: `q${i}` })) };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-transport-reset", requested: 3, approved: 0 } };
+        }
+        advances++;
+        if (advances <= 2 || advances === 4) {
+          return { status: 202, data: { ok: true, state: "working", requested: 3, approved: 0 } };
+        }
+        if (advances === 3) return { status: 503, data: { error: "generation_worker_unavailable" } };
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => ({ status: 200, data: {
+        ok: true, operationId: "operation-transport-reset", state: "working", requested: 3, approved: 0,
+      } }),
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(advances, 5);
+    assert.deepEqual(delays, [1200, 2400, 1200, 1200]);
   });
 
   await t.test("HTTP gateway timeout recovers a completed operation through status", async () => {

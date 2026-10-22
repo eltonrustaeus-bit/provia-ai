@@ -1,5 +1,332 @@
 # 08 Current Status
 
+## Failed AI-cost settlement preserves the cap — 2026-10-22
+
+- [x] Added a PGlite integration test connecting the actual budgeted-fetch and
+  settlement helpers to the existing SQL migration. A provider transport error
+  followed by unavailable settlement leaves the reservation held at the cap;
+  the next request is rejected before another provider call. Later conservative
+  settlement, repeated twice, leaves spent at USD 5 and reserved at zero.
+- [x] Budget unit/stream and migration tests passed 9/9. Independent read-only
+  review found no blocker; syntax and diff checks passed. Renamed the existing
+  sequential cap test to avoid implying concurrency evidence.
+- [!] This proves sequential local SQL/client behavior with synthetic provider
+  and RPC routing. It does not establish hosted behavior, concurrency, or an
+  automatic recovery mechanism for historical held reservations. The already
+  requested staging-package approval remains pending; no external writes made.
+
+## Repair-stream timeout and conservative staging spend settlement — 2026-10-22
+
+- [x] Added a real-generator HTTP/PGlite scenario in which independent review
+  rejects one candidate and the subsequent repair stream aborts. Both approved
+  initial candidates survive; the same operation resumes to 12 verified
+  questions, issues once, charges exactly one exam quota unit, and replays
+  without new provider calls or quota use.
+- [x] Fixed handled provider failures leaving AI spend indefinitely reserved.
+  Generation stream finalization settles measured usage when available and
+  explicitly uses the full reservation estimate when usage is unknown. Fetch
+  exceptions settle conservatively before rethrowing. Non-stream structural
+  repair also settles in a finally block after response reading/parsing.
+  The cap is unchanged;
+  estimated settlement must not be reported as an exact provider invoice.
+- [x] Eight-file generation/budget/recovery/progress suite passed 59/59. The
+  repair-abort case uses actual generator logic and mocked provider streams;
+  budget tests enable the staging guard with synthetic requests and check abort,
+  fetch failure, HTTP failure, missing usage and measured usage.
+- [x] Reused independent reviewers checked the repair-abort assertions and
+  settlement changes. Follow-up assertions establish all 12 checkpointed
+  questions are verified and the entire operation uses one exam quota unit.
+  Final safety review found no blocker in the handled settlement paths.
+- [!] Process termination or a failed settlement RPC can still leave a safe
+  held reservation. Historical held amounts were not changed. No automatic
+  release of unknown provider costs is permitted by this fix.
+- [!] Read-only refresh confirms remote branch and latest READY Preview remain
+  at `a66a7f1`; local HEAD is `dd0b4f1` plus this diff. Hosted migrations still
+  stop at `20261022092012`. No current-code live yield is established.
+
+See `17_GENERATION_STAGING_CHECKLIST.md` for the scoped release and remaining
+live evidence. No push, deploy, migration, or production action was performed.
+
+## Correlate batch quality events with the pipeline job — 2026-10-22
+
+- [x] Successful and failed batch events now use the same strictly allowlisted
+  `exam-pipeline:<job UUID>` correlation key as pipeline setup and model-usage
+  events. Per-batch idempotency keys remain internal and are not confused with
+  the parent job. The event still excludes user ID, source material and question
+  text.
+- [x] Added sanitizer and end-to-end assertions for the shared correlation ID.
+  The focused seven-file generation/API/PGlite/recovery/budget/UI suite passed
+  52 tests; independent generation reviewer found no local blocker in the
+  reviewed changes.
+- [!] This enables future diagnosis only when the exact code reaches a synced
+  Preview and telemetry is captured. Current offline tests do not explain the
+  historical hosted zero-progress job or prove model yield.
+
+## Back off polling while a worker lease is active — 2026-10-22
+
+- [x] The browser now uses bounded exponential backoff (1.2, 2.4, 4.8, 9.6,
+  then 15 seconds) while an operation reports `working`, instead of repeatedly
+  calling the advance endpoint every 1.2 seconds during another worker's lease.
+  Newly approved progress or a transport failure resets the wait to 1.2 seconds.
+- [x] Added a UI regression proving the same operation resumes and returns its
+  complete exam after the lease clears. The focused seven-file pipeline/API/
+  PGlite/recovery/budget/UI suite passed 52 tests; the XelioV context-loader
+  suite passed 3/3; test syntax and `git diff --check` passed.
+- [!] This reduces polling pressure but does not make the job server-driven:
+  progress can still pause if the browser closes. Tests remain offline and do
+  not establish hosted lease behavior or live model yield.
+
+## Correlate generation setup failures — 2026-10-22
+
+- [x] The advance handler now emits one allowlisted setup event before every
+  claim-result branch, including RPC-unavailable responses. It records a
+  pipeline correlation UUID, outcome, and numeric auth/claim/remaining-time
+  measurements without database error text, user identity, or study content.
+- [x] HTTP/PGlite regression covers both failure boundaries. A pre-execution
+  RPC rejection returns 503 without state mutation. A committed claim whose
+  response is lost returns 503 with a running lease; immediate replay reports
+  `working` without a second stage attempt or quota effect, and the job issues
+  exactly once after lease expiry and recovery. Setup timing uses the earlier
+  of route and job deadlines.
+- [x] The focused seven-file generation/recovery/budget/UI suite passed 49
+  tests; the XelioV context-loader suite passed 3/3. Both reused reviewers
+  confirmed the retry lifecycle and found no new local blocker.
+- [!] Offline-only diagnostic coverage. It can distinguish a future claim/RPC
+  failure from time spent after claim, but cannot retrospectively identify the
+  cause of the old zero-progress staging job because its deployed code had no
+  correlated setup event.
+
+## Task-specific agent context loader — 2026-10-22
+
+- [x] Added `npm run xeliov:context -- --task "<task>"` to print a bounded
+  packet with relevant reusable reviewer roles and matching reviewed lessons.
+  It is deterministic, local, stdout-only, and does not invoke agents or write
+  into XelioV. `AGENTS.md` now asks substantive sessions to use it; full ledger
+  reads remain appropriate for broad audits.
+- [x] Added CLI regression tests for role/lesson selection and missing-task
+  usage. The independent read-only workflow review confirmed the existing
+  role-card/curated-ledger model and cautioned that snapshots can be stale and
+  captured agent claims require source verification.
+- [x] Applied the loader to the active generation task and changed it to surface
+  only `VERIFIED` ledger entries. A fixture confirms `PROPOSED` and `REJECTED`
+  lessons stay out of the reviewed-learning section; focused loader tests pass
+  3/3. The ExGen role packet and task-specific verified lessons were emitted
+  locally for this session.
+- [!] The packet is a lexical navigation aid, not automatic memory learning.
+  Status, source, Git state, live services, and each proposed ledger lesson must
+  still be checked; historical agent instances and private reasoning are not
+  preserved.
+
+## Make the project brain safer and usable in every coding session — 2026-10-22
+
+- [x] Codex and Claude project instructions now point to the same task-context
+  loader and closeout rules. The role cards, curated ledger, and task-ranked
+  packet are usable in this checkout; this is role reuse, not persistence of
+  historical agent instances.
+- [x] The loader no longer echoes the task argument, prints only allowlisted
+  status/evidence/finding/limitation fields for reviewed lessons, and redacts
+  common key, bearer, private-key, and email patterns. Added
+  `npm run xeliov:context:test`; the privacy/selection suite passed 4/4.
+- [x] Independent workflow and privacy reviews confirmed current usability and
+  identified the task echo/full-entry output risk; tests cover the mitigation.
+- [!] Redaction catches common patterns, not arbitrary sensitive content. Keep
+  task arguments and ledger entries free of secrets/private learner data; stale
+  lessons must still be checked against current source.
+
+**Next:** continue offline reliability work using the selected generation,
+quality, and recovery roles. Live staging/Preview steps remain subject to the
+existing explicit approval and version/schema synchronization gates.
+
+## Real generator through resumable HTTP issuance — 2026-10-22
+
+- [x] Added a synthetic Responses API fixture to the HTTP/PGlite harness and
+  exercised real `start → advance → issuance` flows for 3, 6 and 12 MC questions
+  through `generateVerifiedBatch`, structural checks, independent verifier,
+  blind solver, checkpoints and the existing quota/issuance path.
+- [x] Each requested count must complete exactly, checkpoint only
+  `validation_status=verified` questions, consume one reservation and issue
+  once. Replay returns the exact result without new generation, finalization,
+  usage events, quota consumption or issuance. Correlated generation/review
+  telemetry excludes question and source text; successful completion clears
+  private payload/checkpoint data.
+- [x] A read-only test/recovery reviewer independently identified the prior gap:
+  3/6/12 start/advance coverage used pre-verified generator stubs, while actual
+  internal generator coverage only exercised provider abort. The new fixture
+  closes that integration gap without calling a provider.
+- [x] The real-generator HTTP fixture now includes a verifier rejection and a
+  bounded repair batch for the 12-question request. The rejected candidate is
+  not issued; all final 12 pass the structural gate, independent verifier and
+  blind solver. This extends mocked/offline coverage, not live-model evidence.
+- [x] An independent security/idempotency/quota review found no weakened quality
+  gates. It also noted that sequential replay tests do not prove concurrent
+  claim contention or hosted RLS/ACL isolation. The focused seven-file offline
+  suite passed 49/49 in the latest rerun.
+- [!] Offline integration only. Mocked model outputs are predetermined and do
+  not establish real-model semantic quality, 12-question yield, hosted behavior,
+  or provider latency. The PGlite/fetch harness also does not establish hosted
+  Supabase RLS/ACL behavior or two-connection contention. Existing
+  staging/Preview synchronization and approvals remain prerequisites for live
+  verification.
+
+## Repair recovery and response-budget review — 2026-10-22
+
+- [x] Extended the actual-generator HTTP fixture with a verifier-rejected
+  low-source-alignment question. The real bounded repair runs, the rejected
+  question is absent from issuance, and all 12 replacement/retained questions
+  reaching the final checkpoint are verified by the structural gate, verifier,
+  and blind solver.
+- [x] Fixed a response-state mismatch after retry exhaustion: when the database
+  moves an eligible partial job to `assemble`, the API now reports
+  `state=assembling`, `stage=assemble`, and exact approved/requested counts
+  instead of incorrectly saying `retrying`. The HTTP test checks the
+  intermediate response before the final partial issuance.
+- [x] Clarified and tested the internal verifier's 18-second timeout cap. The
+  3-second response/usage margin is deducted separately from remaining time;
+  it is not part of the verifier cap. Existing generation and finalization
+  margins are unchanged.
+- [x] The API/timeout reviewer rechecked the follow-up corrections; the
+  security/idempotency reviewer found no blocker in the updated response/budget
+  paths. Focused tests and syntax checks passed; see this session's handoff for
+  exact commands.
+- [x] The standalone Playwright exam-flow regression now waits for the active
+  wizard panel's entrance animation before its next click; it passed 186/186.
+  Reduced-motion emulation was not retained because it masks animation-related
+  assertions. No live provider, staging, deployment, migration, or production
+  action was performed.
+
+## Fresh read-only Preview and staging verification — 2026-10-22
+
+- [x] Re-read the current branch and external state. Local HEAD is `dd0b4f1`
+  with an existing dirty worktree; the latest READY branch Preview remains
+  `a66a7f1` (`dpl_CGLkFkw6u6XRYkq5YUgH3fgczVd5`).
+- [x] Staging project `yhcinqejsocpmmetazpz` is `ACTIVE_HEALTHY`. Hosted
+  migrations end at `20261022092012`; local migrations `20261022140100` through
+  `20261022140400` are not applied there.
+- [x] Read-only budget aggregate: cap **$5.000000**, spent **$0.208611**,
+  reserved **$0.225728**, remaining **$4.565661**. This is a snapshot, not
+  authorization for a provider request.
+- [x] In the last seven days, one 12-question pipeline job failed with
+  `OPERATION_DEADLINE`, 0/12 progress, parent request `retryable`, and quota
+  enforcement false. No `exam-pipeline:` usage events exist for the period.
+- [!] Same-owner/time-window usage had 11 `generate` events (mean 22.619 s,
+  p95 25.712 s) and 16 `verify_compare` events (mean 5.447 s, p95 8.997 s).
+  The deployed `a66a7f1` predates the new job correlation; these nearby events
+  cannot be assigned to the failed job and contain no verified/rejected counts.
+  Exact zero-progress cause remains unresolved; do not infer model under-yield.
+- [!] Vercel runtime-log lookup for that historical window returned a retention
+  error: the project's Hobby plan only retains one hour. This is not evidence
+  that no logs existed; capture the correlated events immediately after the next
+  authorized Preview test.
+- [!] No push, deploy, migration or paid call was performed. The hosted project
+  cannot validate current local code until exact revision/schema sync is approved.
+
+## Reusable agent workflow applied to end-to-end generation — 2026-10-22
+
+- [x] Loaded the project role cards and ledger, then reused three read-only
+  reviewers for API/timeout, tests/recovery, and security/idempotency/quota.
+  One writer kept sole ownership of the test file.
+- [x] Test/recovery review found that 3/6/12 worker completion and 12-question
+  start replay were covered separately, but real HTTP `start -> advance ->
+  issue` was not covered for every requested count. Added that integration path
+  for 3, 6 and 12, checking exact final count, one quota consumption and one
+  issuance per run.
+- [x] Focused seven-file pipeline/API/PGlite/recovery/budget/progress suite
+  passed 49/49 after the addition. The HTTP/PGlite file passes 2/2; the browser
+  exam-flow regression passes 186/186; syntax check and `git diff --check` pass.
+- [x] Independent security review found no actionable local issue in
+  ownership, claim fencing, retry, quota or migration order. API/timeout review
+  confirmed setup beyond the six-second preflight allowance safely releases
+  the worker without consuming a generation attempt.
+- [!] Offline evidence only. Hosted setup latency, migration/ACL/cron behavior,
+  and real-model 12-question yield remain unverified. Keep the quality window
+  and gates unchanged; investigate setup latency from sanitized hosted metrics.
+
+## Persistent agent knowledge loop and current verification — 2026-10-22
+
+- [x] Made the reusable knowledge loop actionable in `AGENTS.md`: substantive
+  sessions load current status, role cards and the curated ledger; reviewers are
+  read-only by default; material status is recorded at closeout; only reusable,
+  independently checked findings enter the ledger. Replaced the unsafe default
+  `git add -A`/commit-before-feature instruction with exact-file staging and
+  explicit commit authorization.
+- [x] Reused the security/idempotency reviewer role on local HEAD `dd0b4f1` plus
+  the dirty diff. It reported no actionable local blocker. Its offline review
+  covered owner-scoped claims, lease fencing, preflight release, retention,
+  quota settlement and telemetry correlation; hosted ACLs, cron and deployment
+  behavior remain unverified.
+- [x] The complete serial offline test-file run exited 0:
+  `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js' | rg -v '^tests/live/')`.
+  The focused generation/API/Postgres-emulation/recovery/budget/progress suite
+  also exited 0; `git diff --check` and syntax checks passed.
+- [!] No push, deployment, hosted migration, quota change or paid provider call
+  occurred. The current local worktree is ahead of the READY Preview and the
+  new owner-scoped migration is not in staging; no live 12-question improvement
+  is claimed.
+
+## Backoff and retry-exhaustion boundaries — 2026-10-22
+
+- [x] Applied the reusable ExGen role cards in this work session: API/timeout, tests/recovery, and security/idempotency/quota reviewers worked read-only on the same local branch. One writer integrated fixes; follow-up reviews checked the resulting narrow diffs.
+- [x] Added bounded exponential client backoff for repeated `GENERATION_BUDGET_INSUFFICIENT` responses: 1.2s, 2.4s, 4.8s, 9.6s, capped at 15s. The same operation resumes after the miss clears. Frontend progress suite passes 8/8.
+- [x] Added HTTP/PGlite retry-exhaustion salvage boundaries for 3/6/12 questions: 2/3, 4/6 and 8/12 can be finalized as explicitly partial; one below each floor returns a safe 502, refunds once and issues nothing. Replay asserts response, generation/finalization count, quota reservation/profile count and issuance count.
+- [x] Added whole-row and parent-request before/after assertions that expired lease or persistent deadline rejects preflight release without mutating the job/request; reservation and profile quota count remain unchanged.
+- [x] Final focused generation pipeline/API/database/recovery/budget/progress/partial-delivery suite exited 0; the same suite previously reported **49/49**. `git diff --check` passed after the changes.
+- [!] Offline/synthetic only. A local mocked SSE stream now proves the actual internal generator's abort signal reaches the provider-fetch boundary; the pipeline preserves its prior checkpoint and resumes. The stream contains no usable SSE content, and recovery uses a stub generator, so partial stream salvage and live model yield remain unverified. The current READY Preview remains behind the dirty local worktree and staging migration `20261022140100` remains absent; no provider/staging request was made.
+
+**Next:** use the separately approved Preview/staging path only after exact branch/deployment/schema and current spend cap are reverified. Do not claim live 12-question yield improvement yet.
+
+## Fresh branch and staging readback — 2026-10-22
+
+- [x] Local branch is `codex/exgen-generation-quality-2026-10-20`, HEAD `dd0b4f1`; `origin/codex/exgen-generation-quality-2026-10-20` is an ancestor at `a66a7f1`, so local HEAD is two commits ahead (`c2b39f5`, `dd0b4f1`). The dirty working tree has additional local edits. Preserve them; do not force-push or assume the current Preview contains these changes.
+- [x] Vercel read-only lookup found the latest branch deployment READY at commit `a66a7f1`, URL `https://provia-854p66c3v-eltons-projects-4adfb1a3.vercel.app/app.html`. It is two commits and the dirty local edits behind the current local HEAD/worktree.
+- [x] Supabase read-only verification identifies `yhcinqejsocpmmetazpz` (`exgen-pilot-staging`) as `ACTIVE_HEALTHY`. Hosted migrations currently end at `20261022092012`; local owner-scoped claim migration `20261022140100` is absent.
+- [x] The read-only staging spend row is enabled with cap **$5.000000**, spent **$0.208611**, reserved **$0.225728**, remaining **$4.565661**. No provider call or schema change occurred in this readback.
+- [x] Sanitized last-seven-day model telemetry: `gpt-4o-mini-2024-07-18` initial generation 46 calls, average 14.024 s / p95 24.292 s / max 26.026 s; repair 25 calls, average 13.754 s / p95 20.382 s / max 22.896 s; comparison verification p95 6.393 s; blind solver p95 2.662 s. These aggregates are from the hosted period, not correlated to local HEAD.
+- [x] One hosted 12-question pipeline job ended `OPERATION_DEADLINE` at **0 approved questions**, after 1,558 seconds; its parent request was `retryable` and `quota_enforced=false`. This confirms a real no-progress deadline failure, but current safe aggregates do not establish whether model under-yield, quality rejection, or orchestration caused that individual job.
+- [!] Live verification remains blocked for the current local revision: the owner-scoped migration is absent, the existing READY Preview is two commits behind the local base plus dirty changes, and the current push/deploy/migration approval request has not been answered.
+
+## Reusable reviewer workflow applied to exam generation — 2026-10-22
+
+- [x] Loaded the project role cards and learning ledger, then used the existing security/idempotency/quota and test/recovery reviewers plus the exam-quality reviewer on the current local HEAD `dd0b4f1` and dirty diff. Security review found no concrete local blocker but left hosted ACL and true concurrent-connection contention unverified. Test/recovery review passed its focused suite and requested an integrated all-rejected HTTP regression. Exam-quality review found the terminal retry status bug fixed below, optional verifier/solver model separation, and a 3/6/12 gap in the all-rejected HTTP matrix. No agent edited code; one writer integrated and verified the changes.
+- [x] Added an integrated all-rejected HTTP/PGlite matrix for requested counts 3, 6 and 12. The terminal retry now returns `502 incomplete_exam` on the same final request after job terminalization/refund, with the actual requested/approved counts and no issued exam. Intermediate retries remain resumable.
+- [x] Propagated the same terminal response for repeated batch/transport failures, not only HTTP-200 batches whose candidates fail review. Added 3/6/12 coverage for terminal response, payload cleanup, exact quota refund, no issuance and stable terminal replay. The updated HTTP/PGlite file passes **2/2**.
+- [x] Follow-up test/recovery review identified residual gaps: replay after terminal all-rejected failure, exact `profiles.mock_quota_count` restoration, and the browser's 0/N failure state. Added coverage including exact terminal-response replay equality, no second generation/refund, and a disabled grade action. The HTTP/PGlite test passes **2/2**; `node tests/frontend/exam-flow.regression.mjs` passes **186/186**. One preceding browser run had a transient Supabase auth `ERR_ABORTED`; the immediate rerun passed all 186 checks.
+- [x] The focused pipeline, database-emulation, recovery, budget, progress and partial-delivery command passed **44/44** before those additional assertions; the changed HTTP/PGlite file was rerun afterward and passed **2/2**. A separate 17-file quality/assessment/UI run passed **36/36** before these test-only additions. This remains offline evidence; no model provider or staging request has run against local HEAD.
+- [x] The focused resumable-pipeline HTTP/PGlite/API suite passed **35/35**, including 3/6/12-question completion, partial eligibility/counts, retry/replay, quota/issuance gates, setup deadline and owner-scoped lease tests.
+- [x] A second targeted run of 12 verifier, solver, grounding, assessment, delivery and frontend-progress test files exited successfully. Node's test runner reported **26/26** formal subtests; the repository's assertion-script tests also printed their success markers. The partial-delivery browser test verified correct 2/3, 4/6 and 8/12 labels and rendering only approved questions.
+- [x] Fresh full serial run across **190** test files completed. All passed except the unrelated `tests/frontend/sitemap-lastmod.test.mjs`. The failure was reproduced alone: `sitemap.xml` says `app.html` was last modified on 2026-10-21, while the current Git date is 2026-10-22. `app-auth-gate` passed in this full run; the earlier full-run failure was not reproduced. The sitemap was left unchanged as out of scope.
+- [x] `node --check` passed on the four changed generation modules; `git diff --check` passed.
+- [!] This is offline evidence using mocked/model-independent fixtures. No live OpenAI generation was performed. The hosted staging schema still lacks the local owner-scoped claim migration, so this revision is not ready for provider-backed staging verification until the migration and exact Preview are separately authorized and present.
+- [!] The reviewers identified that model separation is configuration-dependent: verifier and solver can fall back to the generator model if their dedicated environment settings are absent. Runtime configuration was not inspected in this review; do not claim independent model weights until the exact Preview configuration is verified.
+- [x] The follow-up test/recovery reviewer verified the replay, exact quota baseline, and zero-count UI assertions in source. A final precision pass also verified exact response equality and disabled grading. Reviewer did not rerun tests; local commands above are the direct test evidence, not hosted behavior.
+
+**Next:** the outstanding approval for commit/push, exact Preview, staging migration and one bounded synthetic 12-question run is still required. Do not infer improved live-model yield from these offline results.
+
+## Retry-limit propagation follow-up — 2026-10-22
+
+- [x] Used the existing role cards and ledger as the working agent system; the playbook/ledger are loaded by `AGENTS.md` for each substantive ExGen task. Creating a separate Spaces spreadsheet was attempted, but the service rejected it with `invalid_page_schema`; no workbook was created, and the repository Markdown remains the source of truth.
+- [x] A second exam-quality review found two paths that could flatten terminal `retry_limit` to an ordinary retry: final assembly validation and the defensive invalid-stage branch. Both now preserve `retry_limit`, allowing the advance handler to return its existing `502 incomplete_exam` contract.
+- [x] Added HTTP/PGlite coverage for repeated finalization failure through terminalization, quota refund, payload/question cleanup, safe replay, and no duplicate generation; added a unit test for invalid-stage terminal propagation. The invalid stage cannot be seeded through the schema because its CHECK constraint rejects it, so that defensive branch is unit-tested only.
+- [x] Added no-repeat generation/finalization and unchanged quota/reservation assertions to successful full, partial, and eligible-partial replays. Focused five-file pipeline/HTTP/PGlite/recovery/budget suite passed **35/35** after the final assertions. The independent test reviewer confirmed the quota assertions match the migration semantics.
+- [x] Independent exam-quality reviewer confirmed all four `retryPipelineStep` callers preserve terminal status and found no remaining blocker in the reviewed return paths. No reviewer edited files.
+- [!] `node tests/frontend/exam-flow.regression.mjs` did not complete: after more than 90 seconds it was stopped while Chromium remained active, with no assertions emitted. This is not a passing result; earlier 186/186 evidence remains from the prior run only.
+- [!] All current evidence is offline with PGlite/stubs. No model provider or hosted staging request was made.
+
+**Next:** isolate and rerun the browser regression if its timeout proves generation-related; then seek/confirm the separate approval for the exact Preview, staging migration, and one synthetic 12-question model run before making a live-yield claim.
+
+## Owner-scoped resumable generation and reusable agent workflow — 2026-10-22
+
+- [x] The reusable agent system is now usable in this project: `AGENTS.md` loads `08_CURRENT_STATUS.md`, role cards in `15_AGENT_PLAYBOOK.md`, and the curated learning ledger at each substantive task. Earlier work applied API/timeout, test/recovery, and independent security roles with one writer. Historical agents are not persistent workers, and this is not an archive of every historical invocation. This turn could not obtain new reviewer capacity, so the latest fixture diagnosis and validation are local, not agent-reviewed.
+- [x] Replaced the advance route's separate owner GET and pipeline/parent lease round trips with a new owner-scoped, service-role-only claim RPC in `20261022140100_owner_scoped_pipeline_claim.sql`. It locks by both job and authenticated user, claims and renews the exact parent lease in one transaction, and fails closed on identity mismatch without mutating another attempt. Its rollback removes only the two new functions.
+- [x] The request deadline remains anchored to handler entry and clamped to the persisted job deadline. Content-free setup timing now measures auth + the combined claim RPC. No identities, source text or credentials enter these events. Question structure, independent review, solver, repair, quota and issuance gates were not weakened.
+- [x] HTTP/PGlite tests cover owner isolation, parent renewal, mismatch terminalization and payload cleanup, mismatch quota isolation, setup delays at 39s/38s, and resumable full 3/6/12 flows with retry/replay/issuance. The focused six-file suite passed **35/35** after the final mismatch change. Syntax checks and `git diff --check` passed.
+- [x] A focused browser run passed **8/8** checks for partial delivery and resumable progress. The UI renders only approved questions and labels the correct 2/3, 4/6, and 8/12 counts.
+- [x] Updated ten browser-test fixtures to intercept the real `?pipeline=start` route for ordinary exams; kept graph-only generation on its direct route. All ten targeted frontend files now pass (**10/10**), including auth/account-switch, graph flow and keyboard isolation, math rendering, P.E.R. context/ladder/mobile, quota copy, and solution-photo OCR UI. This repairs stale tests, not production behavior.
+- [!] The latest complete offline suite is still **not green**: `sitemap-lastmod` fails because `app.html`'s Git date is `2026-10-22` while the sitemap entry is `2026-10-21`; this unrelated failure was left unchanged. The previous `app-auth-gate` full-run failure did not recur in the fresh 190-file run. The sitemap failure remains outside the exam-generation scope.
+- [!] Read-only staging verification on 2026-10-22: `exgen-pilot-staging` (`yhcinqejsocpmmetazpz`) is `ACTIVE_HEALTHY`; its 5 USD pilot budget had 0.208611 spent and 0.225728 reserved, leaving **4.565661 USD at the time of that read**. The resumable-pipeline migration is present, but local `20261022140100_owner_scoped_pipeline_claim` is not listed in hosted migrations. No provider request was made. Current local code cannot be live-verified until the exact migrations and Preview are separately approved and available.
+- [!] Evidence is local offline/PGlite with synthetic questions and mocked generation. PGlite uses one serialized client, so it does not prove true two-connection claim contention. No live provider yield or hosted ACL/migration state was verified. The new migration is local only; no Supabase migration, OpenAI request, push, deploy, merge, account/quota change, `main`, or Production action occurred. Existing dirty `supabase/.temp/cli-latest` was preserved.
+
+**PILOT NOT READY.** Next: capture the full-suite `app-auth-gate` failure detail and decide whether it is a real timing race; the sitemap date mismatch is unrelated. Then verify the new migration and exact Preview in authorized staging before a bounded synthetic 12-question live test. A passing local 12-question fixture is not live-model improvement evidence.
+
 ## P.E.R all-app chat and bounded zero-pass repair — 2026-10-22
 
 - [x] Fresh staging latency aggregates (last 7 days, previous code) show p95: initial generation 15.6 s; repair 20.4 s; comparison verifier 4.6 s; blind solver 2.7 s; grading 5.1 s. The verifier and solver run concurrently for the retry review. This supports an offline-tested local adjustment reducing only the optional retry-review timeout from 10 s to 8 s, potentially returning 2 s to repair generation; the 14 s post-review reserve, 8 s minimum generation window, and all acceptance gates are unchanged. It is not yet pushed or live-verified.
@@ -616,3 +943,102 @@ Read-only staging quota snapshot, 2026-10-21: profile role `gratis`, exam quota 
 - [ ] Varken PGlite-testet eller katalogkontrollen bevisar två separata autentiserade JWT-sessioners faktiska radåtkomst via staging Data API. Inga stagingrader eller konton lästes eller ändrades.
 
 **PILOT NOT READY.** En central ägarpolicy har nu ett exekverat tvåkontotest lokalt. Hosted staging-RLS/IDOR och skolans operativa godkännanden är fortfarande öppna.
+
+## Offlineuppföljning av återupptagbar provgenerering — 2026-10-22
+
+- [x] Den HTTP/PGlite-baserade regressionskontrollen täcker nu deadline med 8/12 godkända frågor: API:t utfärdar tydligt 8/12 som delprov, använder den godkända kvoten exakt en gång och återspelning varken genererar eller utfärdar igen.
+- [x] Samma gränstest täcker 7/12 under delprovsgränsen: API:t returnerar `incomplete_exam` med faktiskt antal, rensar terminalt innehåll, återbetalar reservationen exakt en gång och utfärdar inget prov.
+- [x] Pipeline-enhetstestet har en övre gräns på tio steg, så fel i progressionen misslyckas tydligt i stället för att hänga.
+- [x] Riktade API- och UI-regressioner passerade: 43/43 över `exam-generation-pipeline-http`, `exam-generation-pipeline-postgres`, `exam-generation-pipeline`, `exam-generation-recovery`, `exam-regeneration-budget`, `exam-generation-progress` och `exam-partial-delivery`.
+- [x] Oberoende read-only-granskning fann inga blockerare; granskaren föreslog en extra assertion för att bekräfta att quota-reservationen förblir `consumed` efter replay. Assertionen lades till och hela riktade paketet passerade igen 43/43.
+- [ ] Detta är offlineverifiering med PGlite/mockad modell, inte bevis på verkligt modellutbyte, hosted migration/ACL eller förbättrad live-yield för 12 frågor. Den fulla webbläsarsviten kördes inte i denna uppföljning.
+
+**PILOT NOT READY.** Nästa tekniska bevis kräver att exakt Preview och staging-schema är synkade; därefter behövs ett kostnadsbegränsat syntetiskt provanrop. Ingen push, deploy, migration eller providerförfrågan gjordes här.
+
+## Read-only staging-/Preview-kontroll — 2026-10-22 13:32 UTC
+
+- [x] Supabase staging `yhcinqejsocpmmetazpz` rapporterar migrationsversioner endast till `20261022092012_resumable_mock_exam_pipeline`; lokala migrationer för owner-claim, retention och cron (`20261022140100`–`20261022140300`) saknas fortfarande.
+- [x] Den skyddade stagingbudgeten har en rad, cap `$5.000000`, spenderat `$0.208611`, reserverat `$0.225728`, kvar `$4.565661`, aktiv. Read-only-kontrollen läste inga användar-/provdata.
+- [x] Senaste READY Vercel Preview för målbranchen är `dpl_CGLkFkw6u6XRYkq5YUgH3fgczVd5`, SHA `a66a7f1`; aktuell lokal HEAD är `dd0b4f1` med ändringar. Den Previewn är därför inte exakt arbetskoden och staging saknar dess nya RPC.
+- [ ] Ingen schemaändring, push, deploy, merge eller modellförfrågan utfördes. En ny budgetavläsning krävs precis före ett godkänt liveanrop.
+
+**LIVEVERIFIERING BLOCKERAD AV VERSIONSSKEVHET.** Först behövs separat godkännande för migration i staging och push/Preview; därefter kan ett syntetiskt 12-frågeförsök göras om budgeten fortfarande medger det.
+
+## Intern reparationsbudget och migreringshärdning — 2026-10-22
+
+- [x] Interna verifierade batchar använder nu en 4-sekunders efterreserv efter reparationsgranskning i stället för den vanliga 14-sekundersreserven för kvot/utfärdande. Vanliga elevanrop behåller 14 sekunder; oberoende verifiering och blindlösare är fortsatt obligatoriska.
+- [x] Både strukturell reparation och verifierarstyrd reparation skickar rätt internbudget. Offline-regressionen kör en intern strukturell reparation med syntetisk tid där 14-sekundersreserven hade nekat försöket, och verifierar 3 av 3 kandidater oberoende.
+- [x] Migrationerna är ordnade efter pipelinekärnan: `20261022140100` owner-claim, `20261022140200` cleanup och `20261022140300` cron-schedule. Cron-rollback avregistrerar bara det exakta job-ID som migrationen själv skapade; ett förbefintligt jobb med samma namn lämnas kvar.
+- [x] Retentiontexten säger nu att jobb blir berättigade efter 24 timmar, medan 15-minuters schemaläggning är best effort med högst 100 poster per körning. Fördröjning/kö kan alltså överskrida 24 timmar; policy är fortfarande preliminär och måste godkännas av skolan.
+- [x] PGlite-testet verifierar retentionströskeln, exakt quota-settlement, cron-schedule ownership, rollback samt avslag för inaktivt jobb eller fel database/user/kommando. Den slutliga riktade provsviten passerade 45/45; offlinepipeline och regenereringsbudgettest passerade.
+- [!] Allt ovan är lokalt offlinebevis. Ingen Supabase-migration, push, Preview-deploy eller modellförfrågan gjordes. PGlite simulerar cron-katalogen; verklig `pg_cron`, hosted ACL, concurrency och providerlatens är inte verifierade.
+
+**PILOT NOT READY.** Slutför riktad regressionssvit och oberoende review. Därefter krävs separat godkännande för exakt push/Preview och stagingmigrationer, färsk kostnadsavläsning och ett syntetiskt 12-frågeprov.
+
+## Agent- och lärandearbetsflöde samt abortåterhämtning — 2026-10-22
+
+- [x] Projektets agent-playbook och lärandelogg användes i den här sessionen: en huvudskribent, återanvända skrivskyddade timeout- och testgranskare, verifiering mot kod/test och en kort evidensmärkt lärdom. Detta återanvänder rollkort; det återställer inte alla historiska agentinstanser eller privata resonemang.
+- [x] HTTP/PGlite-timeoutfallet kör nu ett steg genom den faktiska interna `generateVerifiedBatch`/`streamGeneration`-vägen. Den lokala fejkade OpenAI-strömmen avbryts endast när generatorns riktiga `AbortSignal` avbryter den; API:t behåller 2 redan checkpointade frågor och samma jobb kan därefter återupptas till 3 frågor.
+- [x] Den oberoende API-/timeoutgranskaren fann inga blockerare eller väsentlig testkontaminering. Timer- och testnyckeloverride återställs i `finally`.
+- [x] Fokuserad HTTP/PGlite-fil passerade 2/2; den fokuserade 7-fils pipeline-/UI-sviten passerade med exitkod 0; `git diff --check` passerade.
+- [!] Detta är fortfarande offlinebevis. Strömmen avbryts innan SSE-innehåll anländer och återhämtningsbatchen använder befintlig mockgenerator. Det bevisar abortpropagering, bevarande av tidigare checkpoint och återupptagbar pipeline, inte partiell JSON-salvage, modellens 12-frågeyield eller liveförbättring.
+- [ ] Ingen push, deploy, Supabase-ändring eller live-modellförfrågan gjordes. Exakt stagingversion/migreringssynk och kostnadsgräns måste verifieras innan tidigare godkänd liveverifiering kan utföras.
+
+**PILOT NOT READY.** Nästa steg är att kontrollera exakt aktuell Preview/staging-synk och, om det fortfarande är godkänt och inom kostnadsramen, mäta ett syntetiskt 12-frågeprov. Behåll tydlig skillnad mellan lokala tester och liveutfall.
+
+## Jobbkorrelerad telemetri och återhämtningsregression — 2026-10-22
+
+- [x] Resumable pipeline skickar parent-jobbets UUID vidare till den interna verifierade batchen. Händelserna korreleras i befintliga textfältet `request_id` med prefixet `exam-pipeline:`; pipeline-id skrivs inte i `job_id`, eftersom den kolumnens FK pekar på den separata `generation_jobs`-tabellen.
+- [x] Offlineintegrationen kontrollerar att generering, jämförande granskning och blindlösare loggas med samma pipeline-ID och att loggposterna saknar syntetiskt material och frågetext.
+- [x] Reparationstestet ger nu generatorn 39 sekunder, vilket modellerar 6 sekunders setup inom worker-vägens 45-sekundersdeadline. En 14-sekunders första generering följs av 5 sekunders strukturell reparation och oberoende verifiering i offline-fixturen.
+- [x] HTTP-regressionen täcker nu avbruten 12-frågegenerering med återupptagning, samt att terminalt prov under minsta delprovsgräns rensar payload/accepted questions och inte lämnar ett skenbart komplett prov.
+- [x] Offlinepipeline-testet passerade. Den fokuserade 9-fils API/UI-sviten avslutades med exitkod 0. Syntaxkontroll för `generate-exam.js`, `_ai-usage.cjs` och `_exam-generation-pipeline.cjs` samt `git diff --check` passerade.
+- [x] Tre oberoende read-only-roller granskade timeout/reparationsbudget, återhämtningsassertions samt säkerhet/idempotens/telemetri. Deras fynd verifierades och åtgärdades lokalt; slutgranskningen fann inga återstående blockers inom granskad kod.
+- [!] Detta bevisar korrelation och återhämtning i lokal/offline-mockad körning, inte att en verklig modell konsekvent producerar 12 kvalitetsgodkända frågor. Nya jobbkorrelerade telemetrirader finns inte förrän kodrevisionen är deployad och körd.
+- [!] Reparationsfixturen modellerar 6 sekunders route-setup genom att ge generatorn 39 sekunder av worker-vägens 45. Den går direkt in i generatorn och mockad provider svarar direkt; verklig setup- och modelllatens är inte mätt.
+- [x] Senaste read-only stagingkontroll: projektet `yhcinqejsocpmmetazpz` var `ACTIVE_HEALTHY`; migrationshistoriken slutade vid `20261022092012`, medan owner-scoped claim-migration `20261022140100` saknades. Senaste READY Preview var SHA `a66a7f1`, före aktuell lokal HEAD `dd0b4f1`. Budgetläsningen visade `$4.565661` kvar under stagingtaket `$5`; detta är en ögonblicksbild, inte ny tillåtelse till kostnad.
+- [ ] Push, Preview, migration och live-AI-anrop är inte gjorda i denna uppföljning. Liveverifiering är fortsatt blockerad av versions-/schema-skevhet.
+
+**PILOT NOT READY.** Nästa steg kräver separat godkänd push/Preview och stagingmigration, därefter kontroll av exakt SHA/schema och endast då ett syntetiskt 12-frågetest inom en färsk kostnadskontroll.
+
+## Full offline-regression och aktuell extern synk — 2026-10-22
+
+- [x] Efter att `sitemap.xml`-posten för `app.html` uppdaterats till senaste Git-datumet passerade `tests/frontend/sitemap-lastmod.test.mjs`.
+- [x] Hela upptäckta `*.test.mjs`/`*.test.js`-sviten under `tests/`, exklusive den uttryckligen livebaserade katalogen, kördes serialt och avslutades med exitkod 0. Detta inkluderar API-, PGlite-, bedömnings-, frontend- och examensgeneratorregressioner; inga live-provideranrop ingick.
+- [x] Färsk read-only Supabase-kontroll: staging `yhcinqejsocpmmetazpz` är `ACTIVE_HEALTHY`, men migrationerna slutar vid `20261022092012`. Owner-scoped claim `20261022140100` och senare lokala pipeline-migrationer saknas.
+- [x] Färsk read-only Vercel-kontroll: senaste READY branchtillhöriga deployment är fortfarande SHA `a66a7f1` (`dpl_CGLkFkw6u6XRYkq5YUgH3fgczVd5`), inte lokal HEAD `dd0b4f1` eller dess dirty ändringar.
+- [x] Budgetläsningen visade cap `$5.000000`, spenderat `$0.208611`, reserverat `$0.225728`, kvar `$4.565661`, aktiv. Ingen modellförfrågan, migration, push eller deploy utfördes.
+- [x] En aggregerad read-only join av de senaste 20 12-frågejobben mot `ai_usage_events.request_id` med både kvotreserv-ID och det nya pipeline-prefixet gav noll events för det observerade `OPERATION_DEADLINE`-jobbet med 0/12. Historiska AI-steg kan alltså inte kopplas till just det jobbet.
+- [!] Offline-sviten visar att repo-regressionerna passerar; den bevisar inte hosted RPC/ACL, stagingtelemetri eller 12-frågeyield med den verkliga modellen. Live-test kräver att exakt revision och schema synkas efter separat godkännande.
+
+**PILOT NOT READY.** Kod- och testsidan är starkare verifierad lokalt. Nästa nödvändiga evidens är ett syntetiskt stagingprov på exakt aktuell kodrevision och migrationskedja, inom en färsk budgetkontroll.
+
+## Start-replay och reparationsfelgränser — 2026-10-22
+
+- [x] HTTP/PGlite-testet kastar nu bort första handler-svaret i testklienten, hämtar operationen från beständig lagring och provar sedan samma idempotensnyckel igen: samma operation återanvänds, den riktiga `reserve_mock_exam_quota`-SQL-funktionen har skapat exakt en reservation och profilkvoten har bara ökats en gång. Kandidatdata och intern payload exponeras inte i retry-svaret.
+- [x] Testmatrisen täcker uttömda batchförsök från både `generate` och `repair` för 3, 6 och 12 frågor, exakt vid och under delprovsgränsen. Den verifierar tydligt delprov eller terminalt fel, exakt en issuance/refund samt replay utan ny generering, finalisering eller kvoteffekt.
+- [x] Den fokuserade sjufilssviten för pipeline, HTTP/PGlite, recovery, budget och progress avslutades med exitkod 0. `node --check` för HTTP-testet och advance-handlern samt `git diff --check` passerade.
+- [x] Återupptagen read-only test-/recoverygranskare bekräftade efter testförstärkningen att den riktiga SQL-kvotfunktionen lämnar en reservation och en profilökning vid sekventiell start-replay; inget blockerande fynd. Harnessen modellerar inte verkligt nätverksbortfall eller samtidiga starter. Repair-matrisen börjar med seedade repair-jobb och bevisar inte övergången generate→repair. Framgångsreplay mäter wrapperanrop, inte OpenAI-anrop.
+- [!] Evidensen är lokal/offline och säger inget om verklig modell-yield eller hosted RPC.
+- [!] Ingen push, deploy, migration eller modellförfrågan utfördes. READY Preview och staging-schemat är fortsatt äldre än lokal arbetskopia enligt senaste read-only-kontrollen ovan.
+
+**PILOT NOT READY.** Nästa bevissteg är oberoende granskning av testerna och därefter separat godkänd, versionssynkad Preview/staging-verifiering.
+
+## Browser-återupptagning och gräns för klientens väntetid — 2026-10-22
+
+- [x] Oberoende API-/timeoutgranskning följde klienten från `pipeline=start` genom advance/status och verifierade att samma användar-/payloadnyckel återupptar operationen, att bara ett svar med ett färdigställt prov räknas som success, samt att delprov och terminalt `incomplete_exam` visas separat.
+- [x] Granskaren noterade att klientens 14-minutersgräns är mjuk: ett redan startat advance kan ta upp till 62 sekunder och en statuskontroll upp till 10 sekunder extra. Det kan förlänga vänteläget men visar inte provet som klart eller lämnar UI:t fast; klienten returnerar i stället återupptagningsstatus. Ingen ändring bedömdes nödvändig.
+- [x] `tests/frontend/exam-generation-progress.test.mjs` och `tests/frontend/exam-flow.regression.mjs` passerade i samma riktade körning: 9/9 Node-tester och 186/186 browserregressioner.
+- [!] Browserharnessen använder lokala/mokade scenarier och mäter inte riktig 14-minutersdrift eller live-Supabase. Den senaste read-only staging-/Preview-synken står kvar enligt tidigare status; inget provideranrop gjordes.
+
+**PILOT NOT READY.** Lokal UI-/återupptagningsverifiering är grön. Kvar för att bekräfta riktig 12-frågeyield är versionssynkad Preview/staging och ett godkänt syntetiskt modellanrop.
+
+## Reparationstelemetri och verifierarbudget — 2026-10-22
+
+- [x] 12-fråge-HTTP-fixturen fångar nu sanerad `exam_generation_pipeline_batch`-telemetri och kräver både `repairAttempted=true` och `repairOutcomeStage=repair_combined`. Testet bevisar därmed den faktiska reparationsövergången i den integrerade mockade modellen, inte enbart att slutresultatet innehåller 12 frågor.
+- [x] Oberoende API-/timeoutgranskning hittade en missvisande kommentar: 18 sekunder är internverifierarens maxtak, medan svarsmarginalen på 3 sekunder dras separat från återstående budget. Kommentar och budgettesternas beskrivningar är korrigerade; runtime-budgeten är oförändrad.
+- [x] Riktad pipeline-/HTTP/PGlite-/recovery-/offline-/budgetsvit passerade 41/41. Syntaxkontroller och `git diff --check` passerade. Den fulla seriala sviten rapporterade ett fel i `tests/frontend/app-auth-gate.test.mjs`; samma test passerade 1/1 när det kördes isolerat efteråt, så ordnings-/miljöflakighet återstår att utreda.
+- [!] Reparationstestets provider-, verifierar- och lösarsvar är deterministiska mockar. Det bevisar kodväg, telemetri och oförsvagade grindar, inte verklig modellkvalitet eller 12-frågeyield.
+- [!] Ingen push, Preview, migration eller live-modellförfrågan utfördes. Senaste verifierade externa synk ovan visar fortfarande att staging/Preview ligger efter arbetskopian.
+
+**PILOT NOT READY.** Nästa steg är att reda ut auth-gate-svitens flakighet och först därefter synka exakt revision och schema för ett separat godkänt stagingprov.

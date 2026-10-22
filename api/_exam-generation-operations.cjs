@@ -88,10 +88,11 @@ async function renewGenerationLease(input) {
   return result?.status === "renewed" ? true : result?.status === "fenced" ? false : null;
 }
 
-async function claimPipelineJob({ jobId = null, leaseSeconds = 90 } = {}) {
-  if ((jobId !== null && !UUID.test(jobId || "")) || !Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 300) return null;
-  const result = await callRpc("claim_mock_exam_generation_pipeline_job", {
+async function claimPipelineJob({ jobId, userId, leaseSeconds = 90 } = {}) {
+  if (!UUID.test(jobId || "") || !UUID.test(userId || "") || !Number.isInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 300) return null;
+  const result = await callRpc("claim_mock_exam_generation_pipeline_job_for_user", {
     p_job_id: jobId,
+    p_user_id: userId,
     p_lease_seconds: leaseSeconds,
   });
   if (!result || !["claimed", "none", "retry_limit", "expired", "invalid_lease"].includes(result.status)) return null;
@@ -136,6 +137,15 @@ async function retryPipelineStep({ jobId, leaseToken, errorCode } = {}) {
   return ["retry_queued", "partial_ready", "retry_limit", "fenced"].includes(result?.status) ? result.status : null;
 }
 
+async function releasePipelineJobForPreflight({ jobId, leaseToken } = {}) {
+  if (!UUID.test(jobId || "") || !UUID.test(leaseToken || "")) return null;
+  const result = await callRpc("release_mock_exam_generation_pipeline_preflight", {
+    p_job_id: jobId,
+    p_lease_token: leaseToken,
+  });
+  return result?.status === "retry_queued" ? result.status : result?.status === "fenced" ? result.status : null;
+}
+
 async function completePipelineJob({ jobId, leaseToken, submissionId, response } = {}) {
   if (!UUID.test(jobId || "") || !UUID.test(leaseToken || "") ||
       !/^[a-f0-9]{32}$/.test(submissionId || "") || !response || typeof response !== "object" || Array.isArray(response)) return null;
@@ -153,5 +163,5 @@ async function completePipelineJob({ jobId, leaseToken, submissionId, response }
 module.exports = {
   UUID, HASH, claimGeneration, failGeneration, completeGeneration,
   renewGenerationLease, claimPipelineJob, renewPipelineLease,
-  checkpointPipelineJob, retryPipelineStep, completePipelineJob,
+  checkpointPipelineJob, retryPipelineStep, releasePipelineJobForPreflight, completePipelineJob,
 };

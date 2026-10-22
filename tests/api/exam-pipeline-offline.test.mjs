@@ -483,6 +483,7 @@ let truncateQualityRepairStream = false;
 let truncateQualityRepairAfter = 1;
 let simulatedNow = null;
 let simulatedInitialGenerationMs = 10_000;
+let simulatedStructuralRepairMs = 25_000;
 let simulatedQualityRepairMs = 20_000;
 let simulatedVerifierMs = 0;
 let issuanceUnavailable = false;
@@ -632,7 +633,7 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
     if (schemaName === "mock_exam_schema") {
-      if (simulatedNow !== null) simulatedNow += 25_000;
+      if (simulatedNow !== null) simulatedNow += simulatedStructuralRepairMs;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
       const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
       if (!batch) throw new Error("unexpected synthetic repair request");
@@ -1572,10 +1573,12 @@ try {
   simulatedInitialGenerationMs = 43_000;
   Date.now = () => simulatedNow;
   let nearDeadlineBatch;
+  const pipelineJobId = "00000000-0000-4000-8000-000000000569";
   try {
     nearDeadlineBatch = await generateExam.generateVerifiedBatch({
       userId,
       deadlineAt: simulatedNow + 52_000,
+      pipelineJobId,
       payload: {
         lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
         idempotencyKey: "00000000-0000-4000-8000-000000000567",
@@ -1591,6 +1594,53 @@ try {
   assert.equal(verifierTimeouts.length, 1);
   assert.ok(verifierTimeouts[0] <= 6_000,
     "the initial independent review is bounded by the 9 seconds left before its inherited 52-second deadline, minus response reserve");
+  const linkedUsageWrite = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
+  assert.ok(linkedUsageWrite, "the internal generation batch records its measured provider steps");
+  assert.ok(linkedUsageWrite.body.length > 0);
+  assert.deepEqual(linkedUsageWrite.body.map((event) => event.pipeline_step),
+    ["generate", "verify_compare", "verify_blind"],
+    "the internal batch records generation and both independent quality gates");
+  assert.ok(linkedUsageWrite.body.every((event) => event.request_id === `exam-pipeline:${pipelineJobId}`),
+    "the pipeline UUID correlates all internal usage events through the schema's text request_id field");
+  assert.ok(linkedUsageWrite.body.every((event) => !Object.hasOwn(event, "job_id")),
+    "the pipeline ID is not written into job_id, which references the separate generation_jobs table");
+  assert.doesNotMatch(JSON.stringify(linkedUsageWrite.body), /Grundläggande räkning|Vad är 2|Syntetiskt prov/,
+    "job correlation does not add learner material or generated question content to telemetry");
+
+  const originalStructuralRepairTime = simulatedStructuralRepairMs;
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  simulatedNow = originalTimeSource();
+  simulatedInitialGenerationMs = 14_000;
+  simulatedStructuralRepairMs = 5_000;
+  simulatedVerifierMs = 1_000;
+  Date.now = () => simulatedNow;
+  let repairedInternalStructuralBatch;
+  try {
+    repairedInternalStructuralBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 39_000,
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000568",
+      },
+    });
+  } finally {
+    Date.now = originalTimeSource;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    simulatedStructuralRepairMs = originalStructuralRepairTime;
+    simulatedVerifierMs = 0;
+  }
+  assert.equal(repairedInternalStructuralBatch.status, 200, JSON.stringify(repairedInternalStructuralBatch.body));
+  assert.equal(repairedInternalStructuralBatch.body.questions.length, 3,
+    "internal structural repair can use its smaller post-review reserve and still independently verify the full batch");
+  assert.equal(repairedInternalStructuralBatch.body.quality.verifierApproved, 3,
+    "the shorter reserve does not bypass independent review");
+  assert.equal(repairedInternalStructuralBatch.body.quality.solverApprovedMc, 3,
+    "the shorter reserve does not bypass blind solver checks");
+  activeQuestions = questions;
+  regenerationQuestions = null;
 
   const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
     ...question, id: `six-${index + 1}`,

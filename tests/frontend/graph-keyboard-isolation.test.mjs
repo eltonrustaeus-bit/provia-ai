@@ -11,7 +11,7 @@ test("graph arrow keys stay inside the active exam question", async () => {
     await mockApis(page, {
       profiles: { id: "keyboard-student", approved: true, role: "premium" },
       extra: [
-        ["**/api/generate-exam", (route) => route.fulfill({ json: {
+        ["**/api/generate-exam?pipeline=start", (route) => route.fulfill({ json: {
           ok: true,
           exam: {
             title: "Syntetiskt blandprov",

@@ -52,7 +52,7 @@ const page = await ctx.newPage();
 // registreras sist och därmed vinner.
 await mockApis(page, {
   extra: [
-    ["**/api/generate-exam", r => {
+    ["**/api/generate-exam?pipeline=start", r => {
       historyAllowed = false;
       r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
@@ -463,7 +463,7 @@ const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 } }
 const page2 = await ctx2.newPage();
 await mockApis(page2, {
   extra: [
-    ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM_SHORT)), meta: { quota: { enforced: false } } } })],
+    ["**/api/generate-exam?pipeline=start", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM_SHORT)), meta: { quota: { enforced: false } } } })],
     ["**/api/explain", r => r.fulfill({ json: { ok: true, answer: "Svar." } })],
     ["**/api/grade", r => r.fulfill({ json: { ok: true, exam_proof: `v2.${"e".repeat(32)}.syntheticShortProof`, result: {
       total_points: 6, max_points: 6,

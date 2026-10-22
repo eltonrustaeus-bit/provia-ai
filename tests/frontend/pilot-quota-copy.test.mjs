@@ -31,7 +31,7 @@ try {
   console.log("pilot quota copy: confirmed denials give accurate reset timing and inviter support");
 
   const quotaPage = await browser.newPage({ viewport: { width: 1280, height: 860 } });
-  await mockApis(quotaPage, { extra: [["**/api/generate-exam", route => route.fulfill({
+  await mockApis(quotaPage, { extra: [["**/api/generate-exam?pipeline=start", route => route.fulfill({
     status: 429,
     json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
   })]] });

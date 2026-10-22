@@ -21,7 +21,7 @@ const cancelRoute = roleApi.slice(cancelStart, cancelEnd);
 assert.doesNotMatch(cancelRoute, /details:\s*result\b/);
 assert.match(cancelRoute, /cancellation_failed[\s\S]*?Prenumerationen kunde inte avslutas/);
 
-const quotaStart = generator.indexOf("try {\n    [quota, focusInstruction] = await Promise.all");
+const quotaStart = generator.indexOf("  let quota;\n  let focusInstruction = \"\";");
 const quotaEnd = generator.indexOf("if (!quota.ok)", quotaStart);
 const quotaRoute = generator.slice(quotaStart, quotaEnd);
 assert.match(quotaRoute, /catch\s*\{[\s\S]*?await examGenerationOperations\.failGeneration\([\s\S]*?return json\(res, 503/,

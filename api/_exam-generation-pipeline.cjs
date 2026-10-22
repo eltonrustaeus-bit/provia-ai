@@ -3,6 +3,9 @@ const generation = require("./generate-exam.js");
 const operations = require("./_exam-generation-operations.cjs");
 const assessment = require("./_assessment");
 const MAX_COMPARISON_CONTEXT_BYTES = 8 * 1024;
+const REQUEST_ID_UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const REQUEST_ID_PATTERN = new RegExp(`^${REQUEST_ID_UUID}$`, "i");
+const PIPELINE_REQUEST_ID_PATTERN = new RegExp(`^exam-pipeline:${REQUEST_ID_UUID}$`, "i");
 
 function questionTargets(job) {
   if (!["mix", "mixed"].includes(job.payload.qType)) return null;
@@ -29,9 +32,13 @@ function noSemanticDuplicate(questions, candidate) {
 }
 
 function safeRequestId(value) {
-  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-    ? value
-    : null;
+  return typeof value === "string" && (REQUEST_ID_PATTERN.test(value)
+    || PIPELINE_REQUEST_ID_PATTERN.test(value)) ? value : null;
+}
+
+function pipelineRequestId(job, fallback) {
+  const value = operations.UUID.test(job?.id || "") ? `exam-pipeline:${job.id}` : fallback;
+  return safeRequestId(value);
 }
 
 const REPAIR_STAGES = new Set([
@@ -50,6 +57,22 @@ function safeRepairFailureStage(value) {
 
 function safeRepairOutcomeStage(value) {
   return value === "repair_combined" ? value : null;
+}
+
+function retryOutcome(retry, job, error) {
+  const status = retry === "fenced" ? "fenced"
+    : retry === "retry_limit" ? "retry_limit"
+      : retry === "partial_ready" ? "partial_ready" : "retry";
+  if (status === "partial_ready") {
+    return {
+      status,
+      stage: "assemble",
+      approved: job.progress_current,
+      requested: job.requested_count,
+      error,
+    };
+  }
+  return { status, error };
 }
 
 function comparisonQuestionsFor(questions, requested) {
@@ -71,28 +94,12 @@ function comparisonQuestionsFor(questions, requested) {
 }
 
 async function advance(job, { deadlineAt = null } = {}) {
-  const leaseOk = await operations.renewPipelineLease({ jobId: job.id, leaseToken: job.lease_token, leaseSeconds: 90 });
-  if (leaseOk !== true) {
-    return { status: "fenced", error: "LEASE_LOST" };
-  }
-  const ledgerOk = await operations.renewGenerationLease({
-    userId: job.user_id,
-    idempotencyKey: job.idempotency_key,
-    payloadHash: job.request_hash,
-    attemptId: job.attempt_id,
-    jobId: job.id,
-    leaseToken: job.lease_token,
-    leaseSeconds: 300,
-  });
-  if (ledgerOk !== true) {
-    await operations.retryPipelineStep({ jobId: job.id, leaseToken: job.lease_token, errorCode: "LEASE_LOST" });
-    return { status: "retry", error: "LEASE_LOST" };
-  }
+  const pipelineStartedAt = Date.now();
 
   if (job.stage === "assemble") return assemble(job);
   if (!["generate", "repair"].includes(job.stage)) {
-    await operations.retryPipelineStep({ jobId: job.id, leaseToken: job.lease_token, errorCode: "INVALID_STAGE" });
-    return { status: "retry", error: "INVALID_STAGE" };
+    const retry = await operations.retryPipelineStep({ jobId: job.id, leaseToken: job.lease_token, errorCode: "INVALID_STAGE" });
+    return retryOutcome(retry, job, "INVALID_STAGE");
   }
 
   const existing = Array.isArray(job.accepted_questions) ? job.accepted_questions : [];
@@ -115,18 +122,30 @@ async function advance(job, { deadlineAt = null } = {}) {
   delete payload.requestHash;
 
   const generationStartedAt = Date.now();
+  const setupMs = generationStartedAt - pipelineStartedAt;
+  const remainingAtBatchStartMs = Number.isFinite(deadlineAt) ? Math.max(0, deadlineAt - generationStartedAt) : null;
   let generated;
-  try { generated = await generation.generateVerifiedBatch({ userId: job.user_id, payload, deadlineAt }); }
+  try { generated = await generation.generateVerifiedBatch({
+    userId: job.user_id,
+    payload,
+    deadlineAt,
+    pipelineJobId: job.id,
+  }); }
   catch { generated = null; }
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
+    const preflightBudgetInsufficient = generated?.body?.error === "generation_budget_insufficient";
     console.info(JSON.stringify({
       event: "exam_generation_pipeline_batch",
-      requestId: safeRequestId(generated?.body?.qualityDiagnostics?.requestId || generated?.body?.requestId),
+      requestId: pipelineRequestId(job, generated?.body?.qualityDiagnostics?.requestId || generated?.body?.requestId),
       stage: job.stage,
       requested: batchCount,
       acceptedBefore: existing.length,
       acceptedAfter: existing.length,
-      failure: generated?.body?.error === "quality_review_unavailable"
+      setupMs,
+      remainingAtBatchStartMs,
+      failure: preflightBudgetInsufficient
+        ? "generation_budget_insufficient"
+        : generated?.body?.error === "quality_review_unavailable"
         ? "quality_review_unavailable"
         : generated?.body?.error === "independent_check_unavailable"
           ? "independent_check_unavailable"
@@ -135,12 +154,15 @@ async function advance(job, { deadlineAt = null } = {}) {
             : "batch_failed",
       latencyMs: Date.now() - generationStartedAt,
     }));
-    const retry = await operations.retryPipelineStep({
-      jobId: job.id,
-      leaseToken: job.lease_token,
-      errorCode: generated?.body?.error === "quality_review_unavailable" ? "REVIEW_UNAVAILABLE" : "BATCH_FAILED",
-    });
-    return { status: retry === "fenced" ? "fenced" : "retry", error: "BATCH_FAILED" };
+    const retry = preflightBudgetInsufficient
+      ? await operations.releasePipelineJobForPreflight({ jobId: job.id, leaseToken: job.lease_token })
+      : await operations.retryPipelineStep({
+          jobId: job.id,
+          leaseToken: job.lease_token,
+          errorCode: generated?.body?.error === "quality_review_unavailable" ? "REVIEW_UNAVAILABLE" : "BATCH_FAILED",
+        });
+    return retryOutcome(retry, job,
+      preflightBudgetInsufficient ? "GENERATION_BUDGET_INSUFFICIENT" : "BATCH_FAILED");
   }
 
   const accepted = [...existing];
@@ -168,10 +190,12 @@ async function advance(job, { deadlineAt = null } = {}) {
     : {};
   console.info(JSON.stringify({
     event: "exam_generation_pipeline_batch",
-    requestId: safeRequestId(quality.requestId),
+    requestId: pipelineRequestId(job, quality.requestId),
     stage: job.stage,
     requested: batchCount,
     acceptedBefore: existing.length,
+    setupMs,
+    remainingAtBatchStartMs,
     candidatesReturned: generated.body.questions.length,
     candidatesGenerated: diagnosticCount(quality.candidates),
     structuralDropped: diagnosticCount(quality.structuralDropped),
@@ -202,7 +226,7 @@ async function advance(job, { deadlineAt = null } = {}) {
       leaseToken: job.lease_token,
       errorCode: "NO_NEW_APPROVED_QUESTIONS",
     });
-    return { status: retry === "fenced" ? "fenced" : "retry", error: "NO_NEW_APPROVED_QUESTIONS" };
+    return retryOutcome(retry, job, "NO_NEW_APPROVED_QUESTIONS");
   }
 
   const complete = accepted.length >= job.requested_count;
@@ -236,7 +260,7 @@ async function assemble(job) {
       leaseToken: job.lease_token,
       errorCode: "FINAL_VALIDATION_FAILED",
     });
-    return { status: retry === "fenced" ? "fenced" : "retry", error: "FINAL_VALIDATION_FAILED" };
+    return retryOutcome(retry, job, "FINAL_VALIDATION_FAILED");
   }
   const completed = await operations.completePipelineJob({
     jobId: job.id,

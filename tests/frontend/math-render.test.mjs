@@ -62,7 +62,7 @@ async function öppna(exam, ämne) {
   await mockApis(page, {
     profiles: { id: "u1", approved: true, role: "premium" },
     extra: [
-      ["**/api/generate-exam", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(exam)), meta: { quota: { enforced: false } } } })],
+      ["**/api/generate-exam?pipeline=start", r => r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(exam)), meta: { quota: { enforced: false } } } })],
       ["**/api/grade", async r => {
         let b = {}; try { b = JSON.parse(r.request().postData() || "{}"); } catch {}
         const qs = b.questions || [];

@@ -37,9 +37,9 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       let sequence = 0;
       const batchSizes = [];
       const comparisonIdsByBatch = [];
+      const pipelineJobIds = [];
       const sharedDeadlineAt = Date.now() + 50_000;
       const forwardedDeadlines = [];
-      operations.renewPipelineLease = async () => true;
       operations.renewGenerationLease = async () => true;
       operations.retryPipelineStep = async () => "retry_queued";
       operations.checkpointPipelineJob = async (input) => {
@@ -48,10 +48,11 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         job.stage = input.nextStage;
         return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
       };
-      generation.generateVerifiedBatch = async ({ payload, deadlineAt }) => {
+      generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId }) => {
         forwardedDeadlines.push(deadlineAt);
         batchSizes.push(payload.numQuestions);
         comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
+        pipelineJobIds.push(pipelineJobId);
         const questions = Array.from({ length: Math.min(payload.numQuestions, 2) }, () => {
           sequence += 1;
           return {
@@ -66,13 +67,20 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       };
 
       let result;
-      while (job.stage !== "assemble") result = await pipeline.advance(job, { deadlineAt: sharedDeadlineAt });
+      let advances = 0;
+      while (job.stage !== "assemble") {
+        assert.ok(advances < 10, `${requested}-question pipeline must reach assembly within bounded advances`);
+        result = await pipeline.advance(job, { deadlineAt: sharedDeadlineAt });
+        advances++;
+      }
       assert.equal(job.progress_current, requested);
       assert.equal(job.accepted_questions.length, requested);
       assert.ok(batchSizes.every((size) => size <= 3));
       assert.ok(batchSizes.length > 1, "under-delivered batches must resume until the requested count is reached");
       assert.ok(forwardedDeadlines.length > 1 && forwardedDeadlines.every((value) => value === sharedDeadlineAt),
         "all generated batches share the outer request deadline instead of each starting a fresh budget");
+      assert.ok(pipelineJobIds.length > 1 && pipelineJobIds.every((value) => value === job.id),
+        "every generated batch carries the parent pipeline job ID for private usage correlation");
       assert.deepEqual(comparisonIdsByBatch[0], [], "the initial batch has no prior approved questions to exclude");
       assert.deepEqual(comparisonIdsByBatch[1], ["approved-1", "approved-2"],
         "later batches receive only already-approved question references for novelty checks");
@@ -138,7 +146,8 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     assert.equal(diagnosticLogs[0].acceptedAfter, 2);
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x när x + 2 = 5."),
       "pipeline telemetry contains counts only, never student-facing question content");
-    assert.ok(!JSON.stringify(diagnosticLogs).includes(job.id));
+    assert.equal(diagnosticLogs[0].requestId, `exam-pipeline:${job.id}`,
+      "pipeline events expose only the namespaced operation ID for sanitized correlation");
     assert.ok(!JSON.stringify(diagnosticLogs).includes(job.user_id));
   } finally {
     console.info = priorConsoleInfo;
@@ -220,7 +229,9 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
     assert.equal(diagnosticLogs[0].acceptedAfter, 1);
     assert.equal(diagnosticLogs[0].repairFailureStage, "insufficient_unique_repair");
     assert.equal(diagnosticLogs[0].repairOutcomeStage, "repair_combined");
-    assert.equal(diagnosticLogs[0].requestId, batchRequestId);
+    assert.equal(diagnosticLogs[0].requestId, `exam-pipeline:${job.id}`);
+    assert.notEqual(diagnosticLogs[0].requestId, batchRequestId,
+      "the event uses stable job correlation rather than the per-batch idempotency key");
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x"),
       "retry telemetry reports counts only, never question text");
   } finally {
@@ -237,6 +248,8 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
 
 test("pipeline diagnostic UUID sanitizer rejects non-correlation data", () => {
   assert.equal(pipeline.safeRequestId("00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
+  assert.equal(pipeline.safeRequestId("exam-pipeline:00000000-0000-4000-8000-000000000001"),
+    "exam-pipeline:00000000-0000-4000-8000-000000000001");
   assert.equal(pipeline.safeRequestId("student@example.com"), null);
   assert.equal(pipeline.safeRequestId("question text"), null);
   assert.equal(generation.generationRequestId(true, "00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
@@ -396,6 +409,31 @@ test("repair-stage checkpoint continues with only newly verified questions", asy
     operations.renewPipelineLease = original.renewPipelineLease;
     operations.renewGenerationLease = original.renewGenerationLease;
     operations.checkpointPipelineJob = original.checkpointPipelineJob;
+  }
+});
+
+test("invalid pipeline stage preserves a terminal retry limit", async () => {
+  const priorRetry = operations.retryPipelineStep;
+  const retryCalls = [];
+  operations.retryPipelineStep = async (input) => {
+    retryCalls.push(input);
+    return "retry_limit";
+  };
+  try {
+    const job = {
+      id: "00000000-0000-4000-8000-000000000099",
+      lease_token: "44444444-4444-4444-8444-444444444444",
+      stage: "unknown",
+    };
+    const result = await pipeline.advance(job);
+    assert.deepEqual(result, { status: "retry_limit", error: "INVALID_STAGE" });
+    assert.deepEqual(retryCalls, [{
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      errorCode: "INVALID_STAGE",
+    }], "the defensive branch terminalizes exactly the claimed job once");
+  } finally {
+    operations.retryPipelineStep = priorRetry;
   }
 });
 
