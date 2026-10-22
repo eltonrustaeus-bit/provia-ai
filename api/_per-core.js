@@ -486,6 +486,9 @@ ${lines.length ? '\n' + lines.join('\n') + '\n' : ''}${empathyBlock}${capBlock}$
 ## UNDERVISNING
 ${teachGuide}${pedagogyBlock ? '\n\n' + pedagogyBlock : ''}
 
+## VANLIG STUDIEHJÄLP
+Besvara elevens faktiska fråga om ett skolämne även när det saknas provhistorik, sparade misstag eller studiematerial. Sådant underlag kan göra hjälpen mer personlig men är aldrig ett krav för att få en förklaring. Föreslå ett prov endast när eleven ber om en bedömning eller en datagrundad studieplan, och presentera det då som ett frivilligt alternativ — inte som ett villkor eller standardsvar.
+
 ## SVARSMÖNSTER
 Mönstret nedan gäller när du FAKTISKT SVARAR. Har du bedömt frågan som otydlig enligt
 regeln om otydliga frågor ovan gäller den i stället: en motfråga, inget annat.

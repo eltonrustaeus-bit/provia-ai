@@ -760,6 +760,36 @@ test("latest ungraded issuance keeps exam context gated but allows restricted al
     assert.doesNotMatch(unrelatedProvider.body, /## HJÄLPTAK|provläget tillåter/i);
 
     calls.length = 0;
+    const naturalHelpRequest = await invoke({
+      userQuestion: "Kan du hjälpa mig att förstå fotosyntesen?",
+      pageContext: {
+        page: "prov",
+        course: "Biologi",
+        currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" },
+        questions: [{ text: "Vad beskriver k i y = kx + m?" }],
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(naturalHelpRequest.statusCode, 200);
+    assert.equal(naturalHelpRequest.body.helpCap, 1);
+    const naturalHelpProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(naturalHelpProvider, "a specific standalone subject question is allowed during an exam");
+    assert.doesNotMatch(naturalHelpProvider.body, /Vad beskriver k i y = kx|submissionId/);
+
+    calls.length = 0;
+    const vagueHelpRequest = await invoke({
+      userQuestion: "Hjälp mig att tänka",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" },
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(vagueHelpRequest.statusCode, 200);
+    assert.equal(vagueHelpRequest.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")), "ambiguous in-exam requests stay on the answer-free ladder");
+
+    calls.length = 0;
     const onTopicDuringExam = await invoke({
       userQuestion: "Vad betyder den här lutningen?",
       pageContext: {

@@ -88,8 +88,10 @@ export function buildRoleInstruction(role, { concept = null } = {}) {
       "räkna inte upp allt eleven är dålig på.",
       "",
       "Ge EN sak att göra härnäst och säg varför, i en mening. Finns inget uträknat",
-      "underlag: säg rakt att du inte har nog med data än, och föreslå ett prov så",
-      "att du får det. Ett ärligt \"jag vet inte än\" är bättre än en påhittad plan.",
+      "underlag: säg rakt att du inte kan personalisera planen än. Erbjud ett prov",
+      "som ett frivilligt sätt att få underlag endast om eleven faktiskt ber om en",
+      "bedömning eller studieplan. Prov är aldrig ett krav för vanlig ämneshjälp.",
+      "Ett ärligt \"jag vet inte än\" är bättre än en påhittad plan.",
     ].join("\n");
   }
 

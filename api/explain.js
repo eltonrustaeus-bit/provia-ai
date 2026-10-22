@@ -749,8 +749,15 @@ async function gateActiveExam(req, res, body, user) {
   }
 
   function isClearlyGeneralQuestion() {
-    return /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)\b/i
-      .test(String(body.userQuestion || ""));
+    const query = String(body.userQuestion || "").trim();
+    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)\b/i
+      .test(query);
+    // Natural standalone help requests need not use a textbook-style opening.
+    // Require an explicit subject after the request so vague prompts such as
+    // "hjälp mig att tänka" remain on the answer-free exam-help path.
+    const namedTopic = /^(?:kan du )?(?:hjälpa mig (?:att )?(?:förstå|med)|hjälp mig (?:att )?(?:förstå|med)|kan du (?:förklara|berätta om|gå igenom)|berätta om|gå igenom)\s+[\p{L}\p{N}]/iu
+      .test(query);
+    return direct || (hasSubmissionIdentity && namedTopic);
   }
 
   function allowRestrictedStudyChat({ pendingExam = true } = {}) {

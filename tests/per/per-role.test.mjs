@@ -25,6 +25,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const pr = await import(join(root, "api", "_per-role.js"));
+const core = await import(join(root, "api", "_per-core.js"));
 
 let failures = 0;
 const check = (n, c, d = "") => {
@@ -98,6 +99,8 @@ check("planeraren förbjuds gissa", /Gissa inte/.test(plan));
 /* En uppräkning av allt eleven är dålig på är inte en plan. */
 check("planeraren ger EN sak", /Ge EN sak att göra härnäst/.test(plan));
 check("planeraren får säga att den inte vet", /jag vet inte än/.test(plan));
+check("prov är frivilligt underlag, inte krav för ämneshjälp", /Prov är aldrig ett krav för vanlig ämneshjälp/.test(plan));
+check("grundprompten skiljer ämneshjälp från frivilliga prov", /aldrig ett krav för att få en förklaring/.test(core.buildPERSystemPrompt({ userQuestion: "förklara fotosyntesen" })));
 
 const utm = pr.buildRoleInstruction(pr.PER_ROLE.CHALLENGER, { concept: { label: "Fullmakt" } });
 check("utmanaren namnger begreppet", utm.includes("Fullmakt"));
