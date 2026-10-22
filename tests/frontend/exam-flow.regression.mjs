@@ -78,7 +78,7 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
         ? { ok: true, abandoned_count: 1 }
         : { ok: true, abandoned: true } });
     }],
-    ["**/api/generate-exam", r => {
+    ["**/api/generate-exam*", r => {
       try { lastGeneratePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
@@ -655,7 +655,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const requestId = "12345678-1234-4234-8234-123456789abc";
     const technicalFailureMessage = "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.";
-    await page.route("**/api/generate-exam", route => route.fulfill({
+    await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance", message: technicalFailureMessage },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
@@ -675,7 +675,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
     const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
-    await page.route("**/api/generate-exam", route => route.fulfill({
+    await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: 1, requested: 3 },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
@@ -684,7 +684,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("ofullständigt prov visar kvalitetsfelet i stället för en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
-    await page.route("**/api/generate-exam", route => route.fulfill({
+    await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
@@ -695,7 +695,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
       /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
       JSON.stringify({ quotaNotice, quotaError }));
-    await page.route("**/api/generate-exam", route => route.abort("failed"));
+    await page.route("**/api/generate-exam*", route => route.abort("failed"));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => /Anslutningen bröts/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
@@ -703,7 +703,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
     const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
-    await page.route("**/api/generate-exam", route => route.fulfill({
+    await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 401, json: { ok: false, error: "Unauthorized" },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");

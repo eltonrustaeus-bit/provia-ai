@@ -37,6 +37,8 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       let sequence = 0;
       const batchSizes = [];
       const comparisonIdsByBatch = [];
+      const sharedDeadlineAt = Date.now() + 50_000;
+      const forwardedDeadlines = [];
       operations.renewPipelineLease = async () => true;
       operations.renewGenerationLease = async () => true;
       operations.retryPipelineStep = async () => "retry_queued";
@@ -46,7 +48,8 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         job.stage = input.nextStage;
         return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
       };
-      generation.generateVerifiedBatch = async ({ payload }) => {
+      generation.generateVerifiedBatch = async ({ payload, deadlineAt }) => {
+        forwardedDeadlines.push(deadlineAt);
         batchSizes.push(payload.numQuestions);
         comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
         const questions = Array.from({ length: Math.min(payload.numQuestions, 2) }, () => {
@@ -63,11 +66,13 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       };
 
       let result;
-      while (job.stage !== "assemble") result = await pipeline.advance(job);
+      while (job.stage !== "assemble") result = await pipeline.advance(job, { deadlineAt: sharedDeadlineAt });
       assert.equal(job.progress_current, requested);
       assert.equal(job.accepted_questions.length, requested);
       assert.ok(batchSizes.every((size) => size <= 3));
       assert.ok(batchSizes.length > 1, "under-delivered batches must resume until the requested count is reached");
+      assert.ok(forwardedDeadlines.length > 1 && forwardedDeadlines.every((value) => value === sharedDeadlineAt),
+        "all generated batches share the outer request deadline instead of each starting a fresh budget");
       assert.deepEqual(comparisonIdsByBatch[0], [], "the initial batch has no prior approved questions to exclude");
       assert.deepEqual(comparisonIdsByBatch[1], ["approved-1", "approved-2"],
         "later batches receive only already-approved question references for novelty checks");

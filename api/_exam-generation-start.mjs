@@ -6,6 +6,7 @@ import materialInput from "./_material.cjs";
 import supabaseServer from "./_supabase-server-key.cjs";
 
 const { getSupabaseUrl, getSupabaseAdminHeaders } = supabaseServer;
+const PIPELINE_DEADLINE_MS = 15 * 60_000;
 
 function respond(res, status, body) {
   res.status(status).json(body);
@@ -166,7 +167,7 @@ async function start(req, res, user) {
         stage_attempts: 0,
         lease_token: null,
         lease_expires_at: null,
-        ...(reuseActive ? { deadline_at: previousJob.deadline_at } : {}),
+        deadline_at: reuseActive ? previousJob.deadline_at : new Date(Date.now() + PIPELINE_DEADLINE_MS).toISOString(),
         error_code: null,
       }),
     });

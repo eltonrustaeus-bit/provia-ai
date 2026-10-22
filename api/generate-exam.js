@@ -768,8 +768,11 @@ function regenerationGenerationTimeout(remainingMs) {
   return remainingMs - verificationAndFinalization;
 }
 
-function makeBudget(startedAt) {
-  const deadline = startedAt + FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS;
+function makeBudget(startedAt, hardDeadlineAt = null) {
+  const defaultDeadline = startedAt + FUNCTION_BUDGET_MS - RESPONSE_RESERVE_MS;
+  const deadline = Number.isFinite(hardDeadlineAt)
+    ? Math.min(defaultDeadline, hardDeadlineAt)
+    : defaultDeadline;
   return {
     startedAt,
     deadline,
@@ -1396,9 +1399,9 @@ module.exports = async function handler(req, res, internalContext = null) {
       return pipelineHandler(req, res);
     }
   }
-  const budget = makeBudget(Date.now());
   const internalBatch = internalContext?.kind === "verified_batch" &&
     examGenerationOperations.UUID.test(internalContext.userId || "");
+  const budget = makeBudget(Date.now(), internalBatch ? internalContext.deadlineAt : null);
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -1943,11 +1946,16 @@ module.exports = async function handler(req, res, internalContext = null) {
       // running them concurrently makes wall time the max of the two rather
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
+      const initialVerifierTimeoutMs = Math.max(1_000, Math.min(
+        VERIFIER_RESERVE_MS,
+        Math.floor(budget.remaining() - RESPONSE_RESERVE_MS),
+      ));
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
           userId: user.id,
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
           comparisonQuestions,
+          timeoutMs: initialVerifierTimeoutMs,
           reviewHintsById: gate.flagged
             .flatMap((item) => item.issues
               .filter((issue) => issue === "single_word_option_outlier_review"
@@ -2747,7 +2755,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   };
   return { submissionId, response };
 };
-module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload }) {
+module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null }) {
   if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object") {
     throw new TypeError("Invalid internal batch request");
   }
@@ -2763,7 +2771,7 @@ module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ us
     setHeader(name, value) { this.headers[name] = value; },
     end(body) { this.body = body; },
   };
-  await module.exports(req, response, { kind: "verified_batch", userId });
+  await module.exports(req, response, { kind: "verified_batch", userId, deadlineAt });
   let body;
   try { body = JSON.parse(response.body || "{}"); } catch { body = null; }
   return { status: response.statusCode, body };

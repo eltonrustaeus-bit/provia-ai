@@ -47,6 +47,7 @@ async function readSafeCounts(userId, jobId) {
 }
 
 export default async function handler(req, res) {
+  const pipelineDeadlineAt = Date.now() + 57_000;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return respond(res, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
   }
   if (claimed.status !== "claimed") return respond(res, 503, { ok: false, error: "generation_worker_unavailable" });
 
-  const result = await pipeline.advance(claimed.job);
+  const result = await pipeline.advance(claimed.job, { deadlineAt: pipelineDeadlineAt });
   if (result.status === "completed") return respond(res, 200, result.response);
   if (result.status === "fenced") return respond(res, 202, { ok: true, state: "working" });
   const counts = await readSafeCounts(user.id, operationId);

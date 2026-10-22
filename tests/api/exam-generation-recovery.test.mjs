@@ -114,6 +114,114 @@ test("CommonJS route dispatches a valid pipeline start through the explicit ESM 
   }
 });
 
+test("restarting a terminal job with the same idempotency key refreshes its deadline", async () => {
+  const previous = {
+    loadCentralRules: generationHandler.loadCentralRules,
+    loadUserRole: generationHandler.loadUserRole,
+    consumeMockExamQuota: generationHandler.consumeMockExamQuota,
+    claimGeneration: operations.claimGeneration,
+  };
+  const expiredDeadline = new Date(Date.now() - 60_000).toISOString();
+  let insertedJob;
+  mockFetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs" && init.method === "POST") {
+      insertedJob = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs") {
+      return jsonResponse([{
+        id: operationId,
+        state: "failed",
+        stage: "terminal",
+        requested_count: 12,
+        progress_current: 7,
+        deadline_at: expiredDeadline,
+        accepted_questions: [],
+      }]);
+    }
+    throw new Error(`Unexpected network request: ${url.pathname}`);
+  };
+  generationHandler.loadCentralRules = async () => ({
+    normalizeRole: (role) => role,
+    getFeatureLimit: () => ({ cap: Infinity, period: "monthly" }),
+    currentPeriodKey: () => "2026-10",
+    getEntitlementSnapshot: () => ({}),
+  });
+  generationHandler.loadUserRole = async () => "basic";
+  generationHandler.consumeMockExamQuota = async () => ({ ok: true, unlimited: true });
+  operations.claimGeneration = async () => ({ status: "claimed" });
+  try {
+    const response = responseRecorder();
+    await generationHandler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-test-token" },
+      body: {
+        course: "Matematik 2b",
+        qType: "short",
+        numQuestions: 12,
+        pastedText: "Syntetiskt material om funktioner, nollställen och skärningspunkter.",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      },
+      url: "/api/generate-exam?pipeline=start",
+    }, response);
+    assert.equal(response.statusCode, 202);
+    assert.notEqual(insertedJob.deadline_at, expiredDeadline);
+    assert.ok(Date.parse(insertedJob.deadline_at) > Date.now(), "a fresh attempt gets a future deadline");
+    assert.equal(insertedJob.progress_current, 0, "terminal-attempt questions are not carried into a new attempt");
+  } finally {
+    generationHandler.loadCentralRules = previous.loadCentralRules;
+    generationHandler.loadUserRole = previous.loadUserRole;
+    generationHandler.consumeMockExamQuota = previous.consumeMockExamQuota;
+    operations.claimGeneration = previous.claimGeneration;
+  }
+});
+
+test("an expired outer deadline fails closed before another model request starts", async () => {
+  const previous = {
+    loadCentralRules: generationHandler.loadCentralRules,
+    loadUserRole: generationHandler.loadUserRole,
+  };
+  let providerCalls = 0;
+  mockFetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.hostname === "api.openai.com") {
+      providerCalls += 1;
+      throw new Error("expired deadline must stop before model generation");
+    }
+    return jsonResponse([]);
+  };
+  generationHandler.loadCentralRules = async () => ({
+    normalizeRole: (role) => role,
+    getFeatureLimit: () => ({ cap: Infinity, period: "monthly" }),
+    currentPeriodKey: () => "2026-10",
+    getEntitlementSnapshot: () => ({}),
+  });
+  generationHandler.loadUserRole = async () => "basic";
+  try {
+    const result = await generationHandler.generateVerifiedBatch({
+      userId,
+      deadlineAt: Date.now() - 1,
+      payload: {
+        lang: "sv",
+        level: "C",
+        course: "Matematik 2b",
+        qType: "short",
+        numQuestions: 3,
+        pastedText: "Syntetiskt material om funktioner och nollställen.",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      },
+    });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.error, "quality_review_unavailable");
+    assert.equal(providerCalls, 0, "an expired shared deadline cannot fall back to a fresh provider budget");
+  } finally {
+    generationHandler.loadCentralRules = previous.loadCentralRules;
+    generationHandler.loadUserRole = previous.loadUserRole;
+  }
+});
+
 test("terminal generation failure survives a lost advance response and does not poll forever", async () => {
   mockFetch = async (input) => {
     const url = new URL(typeof input === "string" ? input : input.url);

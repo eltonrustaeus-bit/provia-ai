@@ -1557,6 +1557,41 @@ try {
     "every repaired question is independently reviewed before it can fill a requested slot");
   assert.equal(twelveQuestionRepairLog.finalQuestionCount, 12);
 
+  const originalVerifyQuestions = verifierModule.verifyQuestions;
+  const originalTimeSource = Date.now;
+  const verifierTimeouts = [];
+  verifierModule.verifyQuestions = async (reviewQuestions, options) => {
+    verifierTimeouts.push(options.timeoutMs);
+    return originalVerifyQuestions(reviewQuestions, options);
+  };
+  activeQuestions = questions;
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  calls.length = 0;
+  simulatedNow = originalTimeSource();
+  simulatedInitialGenerationMs = 43_000;
+  Date.now = () => simulatedNow;
+  let nearDeadlineBatch;
+  try {
+    nearDeadlineBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 52_000,
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000567",
+      },
+    });
+  } finally {
+    Date.now = originalTimeSource;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    verifierModule.verifyQuestions = originalVerifyQuestions;
+  }
+  assert.equal(nearDeadlineBatch.status, 200, JSON.stringify(nearDeadlineBatch.body));
+  assert.equal(verifierTimeouts.length, 1);
+  assert.ok(verifierTimeouts[0] <= 6_000,
+    "the initial independent review is bounded by the 9 seconds left before its inherited 52-second deadline, minus response reserve");
+
   const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
     ...question, id: `six-${index + 1}`,
   }));

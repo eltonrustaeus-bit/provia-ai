@@ -220,8 +220,37 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     assert.equal(partialResponse.body.meta.partial,true);
     assert.equal((await db.query("select state from public.mock_exam_generation_pipeline_jobs where id=$1",[partialJobId])).rows[0].state,"succeeded");
     assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[partialQuotaId])).rows[0].status,"consumed");
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,4,
-      "full runs and an eligible partial run each issue exactly once");
+
+    for (const [index, requested] of [3,6,12].entries()) {
+      const minimum=Math.max(2,Math.ceil(requested*0.6));
+      const {jobId,quotaId}=await seedJob(5+index,requested);
+      await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()+interval '60 seconds' where id=$1",[jobId]);
+      generated=0;
+      let response;
+      let calls=0;
+      do {
+        response=await callAdvance(jobId);
+        assert.equal(response.statusCode,202,JSON.stringify(response.body));
+        calls++;
+        assert.ok(calls<=6,"eligible partial reaches assembly in bounded batches");
+      } while (response.body.approved<minimum);
+      assert.equal(response.body.approved,minimum);
+      assert.equal(response.body.stage,"assemble");
+
+      const partial=await callAdvance(jobId);
+      assert.equal(partial.statusCode,200,JSON.stringify(partial.body));
+      assert.equal(partial.body.exam.questions.length,minimum);
+      assert.equal(partial.body.meta.requested,requested);
+      assert.equal(partial.body.meta.partial,true);
+      assert.equal((await db.query("select state from public.mock_exam_generation_pipeline_jobs where id=$1",[jobId])).rows[0].state,"succeeded");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[quotaId])).rows[0].status,"consumed");
+      const replay=await callAdvance(jobId);
+      assert.equal(replay.statusCode,200);
+      assert.deepEqual(replay.body,partial.body);
+    }
+
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,7,
+      "full runs and all eligible 3/6/12 partials issue exactly once");
   } finally {
     generation.generateVerifiedBatch=prior.generate;
     generation.finalizeVerifiedExam=prior.finalize;

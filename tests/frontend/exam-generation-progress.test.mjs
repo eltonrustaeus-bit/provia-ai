@@ -46,6 +46,7 @@ test("client reports a resumable job instead of a generic timeout or network fai
         ? { status: 202, data: { ok: true, operationId: "operation-network", requested: 6, approved: 2 } }
         : (advances++, { status: 0, networkError: true, timedOut: false }),
       getJson: async () => ({ status: 0, networkError: true, timedOut: false }),
+      setTimeout: (fn) => fn(),
     });
 
     assert.equal(advances, 3);
@@ -53,5 +54,108 @@ test("client reports a resumable job instead of a generic timeout or network fai
     assert.equal(result.data.error, "generation_in_progress");
     assert.equal(result.data.operationId, "operation-network");
     assert.equal(result.data.approved, 2);
+  });
+
+  await t.test("HTTP gateway timeout recovers a completed operation through status", async () => {
+    const paths = [];
+    const exam = { questions: [{ id: "q1" }] };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => {
+        paths.push(path);
+        return path.endsWith("pipeline=start")
+          ? { status: 202, data: { ok: true, operationId: "operation-504", requested: 3, approved: 2 } }
+          : { status: 504, data: { error: "FUNCTION_INVOCATION_TIMEOUT" } };
+      },
+      getJson: async (path) => {
+        paths.push(path);
+        return { status: 200, data: { ok: true, exam, meta: { partial: true, requested: 3 } } };
+      },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.data.exam, exam);
+    assert.match(paths[1], /pipeline=advance/);
+    assert.match(paths[2], /pipeline=status/);
+  });
+
+  await t.test("transient 503 with a still-running operation resumes from server status", async () => {
+    let advances = 0;
+    let statusChecks = 0;
+    const delays = [];
+    const exam = { questions: Array.from({ length: 3 }, (_, i) => ({ id: `q${i}` })) };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-503", requested: 3, approved: 0 } }
+        : (++advances === 1
+          ? { status: 503, data: { error: "generation_worker_unavailable" } }
+          : { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } }),
+      getJson: async () => (++statusChecks === 1
+        ? { status: 200, data: { ok: true, operationId: "operation-503", state: "queued", requested: 3, approved: 2 } }
+        : { status: 503, networkError: true }),
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(advances, 2);
+    assert.equal(statusChecks, 1);
+    assert.deepEqual(delays, [1200], "a transient gateway failure backs off before retrying the advance request");
+  });
+
+  await t.test("repeated status endpoint failures back off and stop with a resumable operation", async () => {
+    let advances = 0;
+    let statusChecks = 0;
+    const delays = [];
+    const result = await runWith({
+      payload: { numQuestions: 12 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-status-down", requested: 12, approved: 6 } }
+        : (++advances, { status: 503, data: { error: "generation_worker_unavailable" } }),
+      getJson: async () => (++statusChecks, { status: 503, networkError: true }),
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 202);
+    assert.equal(result.data.error, "generation_in_progress");
+    assert.equal(result.data.approved, 6);
+    assert.equal(advances, 3);
+    assert.equal(statusChecks, 3);
+    assert.deepEqual(delays, [1200, 1200], "status failures wait before each bounded retry");
+  });
+
+  await t.test("repeated advance network errors with healthy queued status stop after three attempts", async () => {
+    let advances = 0;
+    let statusChecks = 0;
+    const delays = [];
+    const result = await runWith({
+      payload: { numQuestions: 6 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path) => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-advance-down", requested: 6, approved: 2 } }
+        : (++advances, { status: 0, networkError: true, timedOut: false }),
+      getJson: async () => (++statusChecks, { status: 200, data: {
+        ok: true, operationId: "operation-advance-down", state: "queued", requested: 6, approved: 2,
+      } }),
+      setTimeout: (fn, ms) => { delays.push(ms); fn(); },
+    });
+
+    assert.equal(result.status, 202);
+    assert.equal(result.data.error, "generation_in_progress");
+    assert.equal(result.data.approved, 2);
+    assert.equal(advances, 3);
+    assert.equal(statusChecks, 3);
+    assert.deepEqual(delays, [1200, 1200, 1200]);
   });
 });

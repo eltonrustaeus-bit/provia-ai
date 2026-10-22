@@ -70,7 +70,7 @@ function comparisonQuestionsFor(questions, requested) {
   return comparisons;
 }
 
-async function advance(job) {
+async function advance(job, { deadlineAt = null } = {}) {
   const leaseOk = await operations.renewPipelineLease({ jobId: job.id, leaseToken: job.lease_token, leaseSeconds: 90 });
   if (leaseOk !== true) {
     return { status: "fenced", error: "LEASE_LOST" };
@@ -116,7 +116,7 @@ async function advance(job) {
 
   const generationStartedAt = Date.now();
   let generated;
-  try { generated = await generation.generateVerifiedBatch({ userId: job.user_id, payload }); }
+  try { generated = await generation.generateVerifiedBatch({ userId: job.user_id, payload, deadlineAt }); }
   catch { generated = null; }
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
     console.info(JSON.stringify({

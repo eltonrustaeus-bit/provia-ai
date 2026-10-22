@@ -2173,13 +2173,19 @@ try{
         if(step.data.state==="working")await new Promise(resolve=>setTimeout(resolve,1200));
         continue;
       }
-      if(step.status===0||step.timedOut||step.networkError){
+      if(step.status===0||step.status>=500||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
         const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;
-        if(current.status===200&&current.data?.ok){updateProgress(current.data);consecutiveNetworkFailures=0;continue;}
-        if(consecutiveNetworkFailures<3)continue;
+        if(current.status===200&&current.data?.ok){
+          updateProgress(current.data);
+          await new Promise(resolve=>setTimeout(resolve,1200));
+          if(consecutiveNetworkFailures<3)continue;
+          return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+            requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+        }
+        if(consecutiveNetworkFailures<3){await new Promise(resolve=>setTimeout(resolve,1200));continue;}
         return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
           requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
       }
