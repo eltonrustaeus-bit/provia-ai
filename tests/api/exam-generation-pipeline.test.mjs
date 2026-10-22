@@ -144,6 +144,81 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   }
 });
 
+test("an all-duplicate batch retries without advancing or checkpointing the exam", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000015",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "generate",
+    requested_count: 3,
+    payload: { qType: "short", numQuestions: 3 },
+    accepted_questions: [{
+      id: "already-approved", type: "short", question: "Beräkna x när x + 2 = 5.",
+      validation_status: "verified",
+    }],
+    progress_current: 1,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+    retryPipelineStep: operations.retryPipelineStep,
+    completePipelineJob: operations.completePipelineJob,
+    finalizeVerifiedExam: generation.finalizeVerifiedExam,
+  };
+  const priorConsoleInfo = console.info;
+  const diagnosticLogs = [];
+  let retryCalls = 0;
+  let checkpointCalls = 0;
+  let completeCalls = 0;
+  let finalizeCalls = 0;
+  console.info = (entry) => diagnosticLogs.push(JSON.parse(entry));
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.retryPipelineStep = async () => { retryCalls += 1; return "retry_queued"; };
+  operations.checkpointPipelineJob = async () => { checkpointCalls += 1; return { status: "checkpointed" }; };
+  operations.completePipelineJob = async () => { completeCalls += 1; return { status: "completed" }; };
+  generation.finalizeVerifiedExam = async () => { finalizeCalls += 1; return { status: "completed" }; };
+  generation.generateVerifiedBatch = async () => ({
+    status: 200,
+    body: { ok: true, questions: [1, 2].map((index) => ({
+      id: `repeated-${index}`, type: "short", question: "Beräkna x när x + 2 = 5.",
+      validation_status: "verified",
+    })) },
+  });
+  try {
+    const result = await pipeline.advance(job);
+
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+    assert.equal(retryCalls, 1);
+    assert.equal(checkpointCalls, 0);
+    assert.equal(completeCalls, 0);
+    assert.equal(finalizeCalls, 0);
+    assert.equal(job.progress_current, 1);
+    assert.deepEqual(job.accepted_questions.map((question) => question.id), ["already-approved"]);
+    assert.equal(diagnosticLogs.length, 1);
+    assert.equal(diagnosticLogs[0].duplicateCandidates, 2);
+    assert.equal(diagnosticLogs[0].acceptedAfter, 1);
+    assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x"),
+      "retry telemetry reports counts only, never question text");
+  } finally {
+    console.info = priorConsoleInfo;
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+    operations.retryPipelineStep = prior.retryPipelineStep;
+    operations.completePipelineJob = prior.completePipelineJob;
+  }
+});
+
 test("comparison context and maximum escaped material fit the bounded internal request", async () => {
   const largeAcceptedSet = Array.from({ length: 20 }, (_, index) => ({
     concept_tag: `Begrepp ${index} åäö`,
