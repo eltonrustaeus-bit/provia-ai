@@ -167,6 +167,7 @@ export function buildPERSystemPrompt({
      api/_per-help.js sänkt nivån, och eleven förtjänar ett skäl. */
   requestedLevel = null,
   helpCap = null,
+  quietHelpCap = false,
   /* Elevens val på en klargörande fråga. Enda stället i A3 där elevtext går in
      i systemprompten — se sanitering nedan. */
   clarifyReply = null,
@@ -348,7 +349,7 @@ export function buildPERSystemPrompt({
      kort, utan pekpinne — och ger sedan den hjälp som ryms. Blocket byggs bara
      när taket faktiskt sänkte något; annars nämns det inte alls, och en elev
      som inte stött på gränsen får aldrig höra att den finns. */
-  const capBlock = (typeof helpCap === 'number' && typeof requestedLevel === 'number' && helpCap < requestedLevel)
+  const capBlock = (!quietHelpCap && typeof helpCap === 'number' && typeof requestedLevel === 'number' && helpCap < requestedLevel)
     ? `\n## HJÄLPTAK\nEleven bad om mer hjälp än provläget tillåter. Säg det EN gång, kort och utan pekpinne — ungefär "det får du när du lämnat in, annars mäter provet inte dig" — och ge sedan den hjälp som ryms inom nivån. Upprepa det aldrig i samma samtal, och gör ingen poäng av det.\n`
     : '';
 

@@ -24,22 +24,22 @@
  *
  *  | Läge                                     | Tak |
  *  |------------------------------------------|-----|
- *  | fri modellhjälp i prov/oklar pilotstatus | 1 |
+ *  | fri studiehjälp med oavslutat prov       | 1 |
  *  | fast, svarsfri ledtrådsstege under prov  | 2 |
- *  | fri studiefråga utanför pilot            | 3 |
+ *  | vanlig studiefråga utanför provkontext   | 3 |
  *
  *  Fullständig hjälp om en rättad fråga hanteras separat efter att servern
  *  verifierat ett bevis från rättningen. Klientens phase är inte ett sådant bevis.
  *  `sendActiveExamGuidance` har en separat fast stege: nivåerna 0-2 är
  *  fördefinierade ledtrådar utan facit och skickas inte till en modell.
  */
-export function helpCapFor(pageContext, { pilotMode = false } = {}) {
-  if (pilotMode) return 1;
+export function helpCapFor(pageContext, { pilotMode = false, pendingExam = false } = {}) {
   const q = pageContext?.currentQuestion;
   const phase = pageContext?.examState?.phase;
-  if (phase === "exam" || phase === "result" ||
+  if (pendingExam || phase === "exam" || phase === "result" ||
       pageContext?.page === "prov" || pageContext?.page === "resultat" ||
       (typeof q?.text === "string" && q.text.trim())) return 1;
+  // Pilot mode limits exam help, not the ordinary all-app study assistant.
   return 3;
 }
 
