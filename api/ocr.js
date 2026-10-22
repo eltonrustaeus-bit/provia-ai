@@ -3,6 +3,7 @@
 const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const pilotScope = require("./_pilot-scope.cjs");
 const { logAiUsage } = require("./_ai-usage.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -76,14 +77,16 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey, u
   };
 
   let data;
+  let budgetReservation = null;
   const startedAt = Date.now();
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(60_000),
-    });
+    }, { userId });
+    budgetReservation = r.aiSpendReservation || null;
     const rawBody = await r.text();
     try { data = JSON.parse(rawBody); } catch {
       return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
@@ -97,6 +100,7 @@ async function handleSolution(res, { imageDataUrl, lang, questionText, apiKey, u
     userId, tier, feature: "ocr", step: "generate",
     model: data?.model || model, usage: data?.usage, latencyMs: Date.now() - startedAt,
   }, { timeoutMs: 750 });
+  if (data?.usage) await settleAiSpend(budgetReservation, data.usage);
 
   const parsed = S.parseSolutionResponse(data);
   if (!parsed.readable) {
@@ -227,6 +231,7 @@ module.exports = async function handler(req, res) {
         : "You are OCR. Extract all text exactly from the image. Return only plain text with no extra commentary.";
 
     const startedAt = Date.now();
+      let budgetReservation = null;
     try {
       const payload = {
         model,
@@ -242,12 +247,13 @@ module.exports = async function handler(req, res) {
         ]
       };
 
-      const r = await fetch("https://api.openai.com/v1/responses", {
+      const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(45_000)
-      });
+      }, { userId: user.id });
+      budgetReservation = r.aiSpendReservation || null;
 
       const rawBody = await r.text();
       let data;
@@ -255,6 +261,7 @@ module.exports = async function handler(req, res) {
         return json(res, 500, { ok: false, error: "Non-JSON from OpenAI", status: r.status });
       }
       if (!r.ok) return json(res, 500, { ok: false, error: "OpenAI error", status: r.status });
+      if (data?.usage) await settleAiSpend(budgetReservation, data.usage);
 
       await logAiUsage({
         userId: user.id, tier: role, feature: "ocr", step: "generate",

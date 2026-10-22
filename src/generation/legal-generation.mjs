@@ -120,7 +120,7 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
         }),
       },
     ],
-    { model: verifierModel(), schema: legalVerifierBlind.outputSchema(), timeout: 40000 }
+    { model: verifierModel(), schema: legalVerifierBlind.outputSchema(), timeout: 40000, userId }
   );
   await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "verify_blind", model: blind.model, usage: blind.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
   const blindResult = JSON.parse(blind.text);
@@ -142,7 +142,7 @@ async function runVerification({ supabase, jobId, userId, question, sourceChunks
         }),
       },
     ],
-    { model: verifierModel(), schema: legalVerifierCompare.outputSchema(), timeout: 40000 }
+    { model: verifierModel(), schema: legalVerifierCompare.outputSchema(), timeout: 40000, userId }
   );
   await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "verify_compare", model: compare.model, usage: compare.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
   const compareResult = JSON.parse(compare.text);
@@ -206,6 +206,7 @@ export async function generateVerifiedQuestion({
   const retrieved = await retrieveChunks(supabase, concept.definition, {
     matchCount,
     includePending,
+    userId,
   });
   if (!retrieved.length) {
     return { ok: false, reason: "no_chunks_retrieved", concept: concept.slug ?? concept.name };
@@ -219,7 +220,7 @@ export async function generateVerifiedQuestion({
       { role: "system", content: legalGenerator.systemPrompt(questionType, level, subject) },
       { role: "user", content: legalGenerator.buildUserPrompt({ concept: concept.name, sourceChunks, questionType, count: 1 }) },
     ],
-    { model: generatorModel(), schema: legalGenerator.outputSchema(1, questionType), timeout: 40000 }
+    { model: generatorModel(), schema: legalGenerator.outputSchema(1, questionType), timeout: 40000, userId }
   );
   await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "generate", model: generatedResponse.model, usage: generatedResponse.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
   const generated = JSON.parse(generatedResponse.text).items[0];
@@ -236,7 +237,7 @@ export async function generateVerifiedQuestion({
         { role: "system", content: legalRepair.systemPrompt(subject) },
         { role: "user", content: legalRepair.buildUserPrompt({ question, verificationResult: verification, sourceChunks }) },
       ],
-      { model: generatorModel(), schema: legalRepair.outputSchema(questionType), timeout: 40000 }
+      { model: generatorModel(), schema: legalRepair.outputSchema(questionType), timeout: 40000, userId }
     );
     await logGenerationUsage(supabase, { jobId, userId, pipelineStep: "repair", model: repair.model, usage: repair.usage, latencyMs: Date.now() - t0, concept, retrievedChunks: sourceChunks.length });
     const repairedFields = JSON.parse(repair.text);

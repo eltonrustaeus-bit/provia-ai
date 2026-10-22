@@ -4,6 +4,7 @@ import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
 import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import aiUsage from "./_ai-usage.cjs";
+import aiBudget from "./_ai-usage.cjs";
 import publicGuide from "./_per-public-guide.cjs";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
@@ -32,6 +33,7 @@ import examIssuance from "./_exam-issuance.cjs";
 import graphAnswers from "./_graph.js";
 const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 const { logAiUsage } = aiUsage;
+const { settleAiSpend } = aiBudget;
 const { publicGuideAnswer } = publicGuide;
 const { denyOutOfScopePilotRoute, isPilotExplainRequestAllowed, isPilotMode } = pilotScope;
 const { verifyCompletion } = examCompletion;
@@ -58,6 +60,7 @@ async function callMeasuredPerAI(messages, options, { userId, feature = "per_cha
   const result = await callAIRaw(messages, {
     ...options,
     model: options?.model || process.env.OPENAI_MODEL_PER || undefined,
+    userId,
   });
   await logAiUsage({
     userId, requestId: randomUUID(), feature, step,
@@ -400,6 +403,7 @@ async function handleLegalMode(req, res, body, user) {
     retrieved = await retrieveChunks(supabase, question, {
       matchCount: 4,
       includePending: false,
+      userId: user.id,
       onEmbeddingUsage: ({ model, usage, latencyMs }) => logAiUsage({
         userId: user.id, requestId: randomUUID(), feature: "per_chat", step: "embed",
         model, usage, latencyMs,
@@ -1369,13 +1373,16 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       let streamModel = null;
       let streamFinished = false;
       let streamTruncated = false;
+      let streamBudgetReservation = null;
       const streamStartedAt = Date.now();
       try {
         const stream = await callAIStream(msgs, {
           model: process.env.OPENAI_MODEL_PER || undefined,
           timeout: 55_000,
           includeUsage: true,
+          userId: user.id,
         });
+        streamBudgetReservation = stream?.aiSpendReservation || null;
         const reader = stream.getReader();
         const decoder = new TextDecoder();
         let buf = '';
@@ -1423,6 +1430,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         model: streamModel || process.env.OPENAI_MODEL_PER || process.env.OPENAI_MODEL || "gpt-4o-mini",
         usage: streamUsage, latencyMs: Date.now() - streamStartedAt,
       }, { timeoutMs: 750 });
+      await settleAiSpend(streamBudgetReservation, streamUsage);
       if (!fullText) {
         await usageWrite;
         await settlePerChatQuota(user.id, quota, false);

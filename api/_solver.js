@@ -44,6 +44,7 @@ const MIN_APPROVAL_CONFIDENCE = 0.7;
 // is generous; anything beyond it is handled by the CANNOT_JUDGE escape rather
 // than by guessing.
 const materialInput = require("./_material.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const MATERIAL_CHAR_CAP = 12000;
 
@@ -232,7 +233,7 @@ function parseSolverResults(results, questions) {
 // callOk:false, so the caller withholds MC items rather than issuing unchecked
 // answer keys. Verifier-approved short-answer items do not require this solver.
 async function solveQuestions(questions, opts) {
-  const { apiKey, model, subjectProfile, lang, material, timeoutMs } = opts || {};
+  const { apiKey, model, userId, subjectProfile, lang, material, timeoutMs } = opts || {};
   const mcs = (questions || []).filter(
     q => q && q.type === "mc" && Array.isArray(q.options) && q.options.length >= 2
   );
@@ -247,7 +248,7 @@ async function solveQuestions(questions, opts) {
 
   const startedAt = Date.now();
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -259,7 +260,7 @@ async function solveQuestions(questions, opts) {
         text: { format: buildSolverSchema(mcs.length) },
       }),
       signal: AbortSignal.timeout(Math.max(1000, Number(timeoutMs) || 25_000)),
-    });
+    }, { userId });
     if (!r.ok) return empty;
     const raw = await r.text();
     let data;
@@ -267,6 +268,7 @@ async function solveQuestions(questions, opts) {
     empty.usage = data?.usage || null;
     empty.model = data?.model || empty.model;
     empty.latencyMs = Date.now() - startedAt;
+    if (empty.usage) await settleAiSpend(r.aiSpendReservation, empty.usage);
     const outputText = extractOutputText(data);
     if (!outputText) return empty;
     let parsed;

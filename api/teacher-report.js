@@ -163,7 +163,7 @@ Skriv rapporten enligt formatet och kraven.`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      { model: MODEL, timeout: 45_000 }
+      { model: MODEL, timeout: 45_000, userId: user.id }
     );
     await logAiUsage({
       userId: user.id, requestId: randomUUID(), feature: "teacher_report", step: "generate",

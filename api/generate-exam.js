@@ -15,6 +15,7 @@ const examCompletion = require("./_exam-completion.cjs");
 const examGenerationOperations = require("./_exam-generation-operations.cjs");
 const { getSupabaseUrl, getSupabaseAdminHeaders } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const materialInput = require("./_material.cjs");
 
 function cognitiveVerbHint(lang) {
@@ -857,7 +858,7 @@ function safeNormalizationFailure(normalized) {
 // Streams a generation and stops at `budgetMs`, keeping whatever has arrived.
 // Returns the accumulated text plus whether the stream was cut short; parsing
 // and salvage are left to salvageExamJson so this stays a transport concern.
-async function streamGeneration({ apiKey, payload, budgetMs }) {
+async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(0, budgetMs));
   const t0 = Date.now();
@@ -865,14 +866,16 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   let cutShort = false;
   let usage = null;
   let providerModel = null;
+  let reservation = null;
 
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ ...payload, stream: true }),
       signal: controller.signal,
-    });
+    }, { userId });
+    reservation = r.aiSpendReservation || null;
     if (!r.ok) {
       await r.text().catch(() => "");
       clearTimeout(timer);
@@ -909,6 +912,7 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   } catch (e) {
     clearTimeout(timer);
     if (e && (e.name === "AbortError" || controller.signal.aborted)) {
+      if (usage) await settleAiSpend(reservation, usage);
       return { ok: true, text, cutShort: true, usage, model: providerModel, latencyMs: Date.now() - t0 };
     }
     return {
@@ -921,6 +925,7 @@ async function streamGeneration({ apiKey, payload, budgetMs }) {
   }
 
   clearTimeout(timer);
+  if (usage) await settleAiSpend(reservation, usage);
   return { ok: true, text, cutShort, usage, model: providerModel, latencyMs: Date.now() - t0 };
 }
 
@@ -1600,7 +1605,7 @@ module.exports = async function handler(req, res) {
     const generationBudget = budget.remaining() - (canVerify ? VERIFIER_RESERVE_MS : 0);
 
     failureStage = "model_generation";
-    const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget });
+    const gen = await streamGeneration({ apiKey, payload, budgetMs: generationBudget, userId: user.id });
     recordUsage("generate", gen.model || model, gen.usage, gen.latencyMs);
     if (!gen.ok) {
       console.warn(JSON.stringify({
@@ -1740,15 +1745,16 @@ module.exports = async function handler(req, res) {
         const repairPayload = buildRepairPayload(payload, {
           lang, numQuestions, existingQuestions: exam.questions, candidateCount: repairCount, qType, missingTypes,
         });
-        const response = await fetch("https://api.openai.com/v1/responses", {
+        const response = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(repairPayload),
           signal: AbortSignal.timeout(structuralRepairTimeout),
-        });
+        }, { userId: user.id });
         repairHttpStatus = response.status;
         const raw = await response.text();
         try { repairResponse = JSON.parse(raw); } catch { repairResponse = null; }
+        if (repairResponse?.usage) await settleAiSpend(response.aiSpendReservation, repairResponse.usage);
         repairResponseStatus = typeof repairResponse?.status === "string" ? repairResponse.status : "unknown";
         if (response.ok && repairResponse) {
           repairFailureStage = "structural_repair_normalization";
@@ -1865,6 +1871,7 @@ module.exports = async function handler(req, res) {
       // function budget at all.
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
+          userId: user.id,
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
           reviewHintsById: gate.flagged
             .flatMap((item) => item.issues
@@ -1875,6 +1882,7 @@ module.exports = async function handler(req, res) {
             .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
         }),
         solver.solveQuestions(exam.questions, {
+          userId: user.id,
           apiKey, model, subjectProfile, lang, pastedText,
           material: pastedText,
           timeoutMs: Math.max(1000, budget.remaining() - RESPONSE_RESERVE_MS),
@@ -1982,6 +1990,7 @@ module.exports = async function handler(req, res) {
             const repairStream = await streamGeneration({
               apiKey,
               payload: repairPayload,
+              userId: user.id,
               // Keep the same bounded review/finalization reserve while allowing
               // complete candidates to be salvaged if the provider runs long.
               budgetMs: regenerationTimeoutMs,
@@ -2028,6 +2037,7 @@ module.exports = async function handler(req, res) {
                   repairFailureStage = "repair_verification";
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
+                      userId: user.id,
                       apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
                       reviewHintsById: candidateGate.flagged
                         .flatMap((item) => item.issues
@@ -2040,6 +2050,7 @@ module.exports = async function handler(req, res) {
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),
                     solver.solveQuestions(candidateQuestions, {
+                      userId: user.id,
                       apiKey, model, subjectProfile, lang, material: pastedText,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - REGENERATION_POST_REVIEW_RESERVE_MS)),
                     }),

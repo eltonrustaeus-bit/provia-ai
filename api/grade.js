@@ -17,6 +17,7 @@ const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
 const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const { sanitizeHistory } = require("./_student-history.cjs");
 const materialInput = require("./_material.cjs");
 const { randomUUID } = require("crypto");
@@ -918,12 +919,12 @@ module.exports = async function handler(req, res) {
       }
       const gradingStartedAt = Date.now();
       try {
-        r = await fetch("https://api.openai.com/v1/responses", {
+        r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(providerTimeoutMs)
-        });
+        }, { userId: user.id });
       } catch {
         return failProvider("request", "transport_error", "grading_provider_unavailable",
           lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
@@ -946,6 +947,7 @@ module.exports = async function handler(req, res) {
         return failProvider("response_body", "invalid_json", "grading_provider_unavailable",
           lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
       }
+      if (data?.usage) await settleAiSpend(r.aiSpendReservation, data.usage);
       await logMockExamUsage({
         userId: user.id,
         requestId: claimed?.id,

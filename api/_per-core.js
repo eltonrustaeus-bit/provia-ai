@@ -15,6 +15,8 @@ import { getPlan, normalizeRole } from './_provia-rules.js';
 import { buildFounderKnowledge, buildUfKnowledge, IDENTITY_TRIGGER_REGEX, UF_TRIGGER_REGEX } from './_per-identity.js';
 
 import { perRole, PER_FULL, buildPerNameBlock, PER_NAME_TRIGGER_REGEX } from './_per-name.js';
+import aiBudget from './_ai-usage.cjs';
+const { budgetedOpenAIFetch, settleAiSpend } = aiBudget;
 
 const PROVIA_OPERATING_MAP = `## EXGEN-KARTA
 - Startsida: förklarar ExGen och leder nya elever vidare.
@@ -30,22 +32,23 @@ const PROVIA_OPERATING_MAP = `## EXGEN-KARTA
 // callAI() nedan delegerar hit och beter sig exakt som förut (returnerar bara texten), så
 // befintliga anropare (explain.js, smart-tips.js, teacher-report.js, legal-generation.mjs)
 // påverkas inte.
-export async function callAIRaw(messages, { model, schema, timeout = 30_000 } = {}) {
+export async function callAIRaw(messages, { model, schema, timeout = 30_000, userId } = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
   const m = model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const body = { model: m, input: messages };
   if (schema) body.text = { format: schema };
-  const r = await fetch('https://api.openai.com/v1/responses', {
+  const r = await budgetedOpenAIFetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeout),
-  });
+  }, { userId });
   const raw = await r.text();
   let data;
   try { data = JSON.parse(raw); } catch { data = {}; }
   if (!r.ok) throw new Error(data?.error?.message || `OpenAI ${r.status}`);
+  if (r.aiSpendReservation) await settleAiSpend(r.aiSpendReservation, data?.usage);
   return {
     text: extractText(data),
     usage: data?.usage || null,
@@ -53,8 +56,8 @@ export async function callAIRaw(messages, { model, schema, timeout = 30_000 } = 
   };
 }
 
-export async function callAI(messages, { model, schema, timeout = 30_000 } = {}) {
-  const { text } = await callAIRaw(messages, { model, schema, timeout });
+export async function callAI(messages, { model, schema, timeout = 30_000, userId } = {}) {
+  const { text } = await callAIRaw(messages, { model, schema, timeout, userId });
   return text;
 }
 
@@ -68,21 +71,22 @@ export function extractText(data) {
   );
 }
 
-export async function callAIStream(messages, { model, timeout = 55_000, includeUsage = false } = {}) {
+export async function callAIStream(messages, { model, timeout = 55_000, includeUsage = false, userId } = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
   const m = model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
-  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+  const r = await budgetedOpenAIFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model: m, messages, stream: true, ...(includeUsage ? { stream_options: { include_usage: true } } : {}) }),
     signal: AbortSignal.timeout(timeout),
-  });
+  }, { userId });
   if (!r.ok) {
     const raw = await r.text();
     let d; try { d = JSON.parse(raw); } catch { d = {}; }
     throw new Error(d?.error?.message || `OpenAI ${r.status}`);
   }
+  if (r.body && r.aiSpendReservation) r.body.aiSpendReservation = r.aiSpendReservation;
   return r.body;
 }
 

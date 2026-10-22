@@ -782,7 +782,7 @@ Skriv rapporten enligt formatet.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          { timeout: 45_000 }
+          { timeout: 45_000, userId: user.id }
         );
         await logAiUsage({
           userId: user.id, requestId: randomUUID(), tier: "teacher", feature: "teacher_class_insight", step: "generate",

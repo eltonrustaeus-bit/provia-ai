@@ -108,6 +108,7 @@ function classifyReviewFindings(requiredChanges) {
 }
 
 const materialInput = require("./_material.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const SOURCE_MATERIAL_CHAR_CAP = 12000;
 const REVIEW_PAYLOAD_CHAR_CAP = 60000;
 
@@ -293,7 +294,7 @@ function reviewHintsFor(reviewHintsById, questionId) {
 }
 
 async function verifyQuestions(questions, opts) {
-  const { apiKey, model, subjectProfile, lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById } = opts || {};
+  const { apiKey, model, userId, subjectProfile, lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById } = opts || {};
   const requestTimeoutMs = Math.max(1_000, Math.min(30_000, Number(timeoutMs) || 30_000));
   const sourceQuestions = Array.isArray(questions) ? questions : [];
   const items = sourceQuestions.map(q => ({
@@ -334,7 +335,7 @@ async function verifyQuestions(questions, opts) {
 
   const startedAt = Date.now();
   try {
-    const r = await fetch("https://api.openai.com/v1/responses", {
+    const r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -346,7 +347,7 @@ async function verifyQuestions(questions, opts) {
         text: { format: buildVerifierSchema(items.length) }
       }),
       signal: AbortSignal.timeout(requestTimeoutMs)
-    });
+    }, { userId });
     if (!r.ok) {
       failed.failureReason = `http_${r.status}`;
       return failed;
@@ -357,6 +358,7 @@ async function verifyQuestions(questions, opts) {
     failed.usage = data?.usage || null;
     failed.model = data?.model || reviewModel;
     failed.latencyMs = Date.now() - startedAt;
+    if (failed.usage) await settleAiSpend(r.aiSpendReservation, failed.usage);
     const outputText = extractOutputText(data);
     if (!outputText) { failed.failureReason = "missing_output_text"; return failed; }
     let parsed;
