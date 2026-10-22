@@ -180,6 +180,7 @@ fetch('https://api.openai.com/v1/chat/completions', {
 ```
 OPENAI_API_KEY              # OpenAI
 OPENAI_MODEL                # optional, default: gpt-4o-mini
+OPENAI_MODEL_PER            # optional, P.E.R-only model override (must support Responses + Chat Completions); falls back to OPENAI_MODEL
 OPENAI_MODEL_MATH           # optional, default: OPENAI_MODEL
 SUPABASE_URL                # Supabase project URL
 SUPABASE_SECRET_KEY         # Supabase server secret (preferred; server-side only, never expose)

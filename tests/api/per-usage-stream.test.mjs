@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const oldFetch = globalThis.fetch;
-const keys = ["SUPABASE_URL", "EXGEN_PILOT_SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PILOT_MODE", "OPENAI_MODEL"];
+const keys = ["SUPABASE_URL", "EXGEN_PILOT_SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "EXGEN_PILOT_MODE", "OPENAI_MODEL", "OPENAI_MODEL_PER"];
 const oldEnv = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const origin = "https://yhcinqejsocpmmetazpz.supabase.co";
 const userId = "44444444-4444-4444-8444-444444444444";
@@ -14,6 +14,7 @@ Object.assign(process.env, {
   OPENAI_API_KEY: "synthetic-provider-key",
   EXGEN_PILOT_MODE: "true",
   OPENAI_MODEL: "configured-model",
+  OPENAI_MODEL_PER: "per-configured-model",
 });
 
 const requests = [];
@@ -143,6 +144,7 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.match(res.chunks.join(""), /Börja med att hitta ett begrepp/);
   assert.doesNotMatch(res.chunks.join(""), /prompt_tokens|measured-stream-model/);
   const provider = requests.find((request) => request.url.endsWith("/chat/completions"));
+  assert.equal(provider.body.model, "per-configured-model");
   assert.deepEqual(provider.body.stream_options, { include_usage: true });
   assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")),
     "a completed streamed answer commits the reservation");
@@ -291,11 +293,22 @@ test("JSON P.E.R records Responses usage and preserves the answer", async () => 
   const res = await invoke("application/json");
   assert.equal(res.statusCode, 200);
   assert.match(res.body.answer, /Börja med begreppet/);
+  const provider = requests.find((request) => request.url === "https://api.openai.com/v1/responses");
+  assert.equal(provider.body.model, "per-configured-model");
   const usageWrite = requests.find((request) => request.url.endsWith("/rest/v1/ai_usage_events"));
   assert.ok(usageWrite);
   assert.equal(usageWrite.body[0].model, "measured-json-model");
   assert.equal(usageWrite.body[0].input_tokens, 45);
   assert.equal(usageWrite.body[0].output_tokens, 13);
+});
+
+test("P.E.R falls back to the shared model when its dedicated override is unset", async () => {
+  requests.length = 0;
+  delete process.env.OPENAI_MODEL_PER;
+  const res = await invoke("application/json");
+  assert.equal(res.statusCode, 200);
+  const provider = requests.find((request) => request.url === "https://api.openai.com/v1/responses");
+  assert.equal(provider.body.model, "configured-model");
 });
 
 test("ordinary study help sends bounded material as escaped source data to the model", async () => {

@@ -55,7 +55,10 @@ function refreshPerMemory(userId, history, learningSignals, epoch) {
 
 async function callMeasuredPerAI(messages, options, { userId, feature = "per_chat", step = "generate" }) {
   const startedAt = Date.now();
-  const result = await callAIRaw(messages, options);
+  const result = await callAIRaw(messages, {
+    ...options,
+    model: options?.model || process.env.OPENAI_MODEL_PER || undefined,
+  });
   await logAiUsage({
     userId, requestId: randomUUID(), feature, step,
     model: result.model, usage: result.usage, latencyMs: Date.now() - startedAt,
@@ -1368,7 +1371,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       let streamTruncated = false;
       const streamStartedAt = Date.now();
       try {
-        const stream = await callAIStream(msgs, { timeout: 55_000, includeUsage: true });
+        const stream = await callAIStream(msgs, {
+          model: process.env.OPENAI_MODEL_PER || undefined,
+          timeout: 55_000,
+          includeUsage: true,
+        });
         const reader = stream.getReader();
         const decoder = new TextDecoder();
         let buf = '';
@@ -1413,7 +1420,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
       const usageWrite = logAiUsage({
         userId: user.id, requestId: randomUUID(), feature: "per_chat", step: "generate",
-        model: streamModel || process.env.OPENAI_MODEL || "gpt-4o-mini",
+        model: streamModel || process.env.OPENAI_MODEL_PER || process.env.OPENAI_MODEL || "gpt-4o-mini",
         usage: streamUsage, latencyMs: Date.now() - streamStartedAt,
       }, { timeoutMs: 750 });
       if (!fullText) {
