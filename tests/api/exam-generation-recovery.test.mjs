@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { createRequire } from "node:module";
 
@@ -13,6 +14,8 @@ const originalEnv = {
   VERCEL: process.env.VERCEL,
   VERCEL_ENV: process.env.VERCEL_ENV,
   VERCEL_TARGET_ENV: process.env.VERCEL_TARGET_ENV,
+  EXAM_SIGNING_SECRET: process.env.EXAM_SIGNING_SECRET,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 };
 
 process.env.SUPABASE_URL = "https://pipeline-test.supabase.co";
@@ -22,12 +25,15 @@ delete process.env.EXGEN_PILOT_MODE;
 delete process.env.VERCEL;
 delete process.env.VERCEL_ENV;
 delete process.env.VERCEL_TARGET_ENV;
+process.env.EXAM_SIGNING_SECRET = "synthetic-test-signing-secret";
+process.env.OPENAI_API_KEY = "synthetic-test-api-key";
 
 let mockFetch = async () => { throw new Error("Unexpected network request"); };
 globalThis.fetch = (...args) => mockFetch(...args);
 
 const require = createRequire(import.meta.url);
 const generationHandler = require("../../api/generate-exam.js");
+const operations = require("../../api/_exam-generation-operations.cjs");
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -49,6 +55,62 @@ test.after(() => {
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
+  }
+});
+
+test("CommonJS route dispatches a valid pipeline start through the explicit ESM helper", async () => {
+  const source = fs.readFileSync(new URL("../../api/generate-exam.js", import.meta.url), "utf8");
+  assert.match(source, /import\("\.\/\_exam-generation-start\.mjs"\)/);
+  const previous = {
+    loadCentralRules: generationHandler.loadCentralRules,
+    loadUserRole: generationHandler.loadUserRole,
+    consumeMockExamQuota: generationHandler.consumeMockExamQuota,
+    claimGeneration: operations.claimGeneration,
+  };
+  let insertedJob;
+  mockFetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs" && init.method === "POST") {
+      insertedJob = JSON.parse(init.body);
+      return jsonResponse([]);
+    }
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs") return jsonResponse([]);
+    throw new Error(`Unexpected network request: ${url.pathname}`);
+  };
+  generationHandler.loadCentralRules = async () => ({
+    normalizeRole: (role) => role,
+    getFeatureLimit: () => ({ cap: Infinity, period: "monthly" }),
+    currentPeriodKey: () => "2026-10",
+    getEntitlementSnapshot: () => ({}),
+  });
+  generationHandler.loadUserRole = async () => "basic";
+  generationHandler.consumeMockExamQuota = async () => ({ ok: true, unlimited: true });
+  operations.claimGeneration = async () => ({ status: "claimed" });
+  try {
+    const response = responseRecorder();
+    await generationHandler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-test-token" },
+      body: {
+        course: "Matematik 2b",
+        qType: "short",
+        numQuestions: 12,
+        pastedText: "Syntetiskt material om linjära och kvadratiska funktioner, nollställen, symmetrilinje och skärningspunkter.",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      },
+      url: "/api/generate-exam?pipeline=start",
+    }, response);
+    assert.equal(response.statusCode, 202);
+    assert.equal(response.body.requested, 12);
+    assert.equal(response.body.state, "queued");
+    assert.equal(insertedJob.requested_count, 12);
+    assert.equal(insertedJob.progress_current, 0);
+  } finally {
+    generationHandler.loadCentralRules = previous.loadCentralRules;
+    generationHandler.loadUserRole = previous.loadUserRole;
+    generationHandler.consumeMockExamQuota = previous.consumeMockExamQuota;
+    operations.claimGeneration = previous.claimGeneration;
   }
 });
 
@@ -87,4 +149,30 @@ test("terminal generation failure survives a lost advance response and does not 
   assert.equal(statusResponse.statusCode, 502);
   assert.equal(statusResponse.body.error, "incomplete_exam");
   assert.equal(statusResponse.body.received, 7);
+});
+
+test("expired pipeline lease produces a clear incomplete-exam response", async () => {
+  mockFetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs") {
+      if (url.searchParams.get("select") === "id") return jsonResponse([{ id: operationId }]);
+      return jsonResponse([{ state: "failed", requested_count: 12, progress_current: 7 }]);
+    }
+    if (url.pathname === "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job") {
+      return jsonResponse({ status: "expired" });
+    }
+    throw new Error(`Unexpected network request: ${url.pathname}`);
+  };
+  const response = responseRecorder();
+  await generationHandler({
+    method: "POST",
+    headers: { authorization: "Bearer synthetic-test-token" },
+    body: { operationId },
+    url: "/api/generate-exam?pipeline=advance",
+  }, response);
+  assert.equal(response.statusCode, 502);
+  assert.equal(response.body.error, "incomplete_exam");
+  assert.equal(response.body.requested, 12);
+  assert.equal(response.body.received, 7);
 });

@@ -67,7 +67,7 @@ globalThis.fetch = async (input, init = {}) => {
   throw new Error(`Unexpected network request ${url.pathname}`);
 };
 
-const { default: advanceHandler } = await import("../../api/_exam-generation-advance.js");
+const { default: advanceHandler } = await import("../../api/_exam-generation-advance.mjs");
 
 function responseRecorder() {
   return {

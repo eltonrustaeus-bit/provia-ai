@@ -1350,8 +1350,8 @@ module.exports = async function handler(req, res, internalContext = null) {
     const pipelineMode = new URL(req.url || "/api/generate-exam", "https://exgen.invalid").searchParams.get("pipeline");
     if (["start", "advance", "status"].includes(pipelineMode)) {
       const pipelineHandler = pipelineMode === "advance"
-        ? (await import("./_exam-generation-advance.js")).default
-        : (await import("./_exam-generation-start.js")).default;
+        ? (await import("./_exam-generation-advance.mjs")).default
+        : (await import("./_exam-generation-start.mjs")).default;
       return pipelineHandler(req, res);
     }
   }
