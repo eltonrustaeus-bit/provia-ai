@@ -28,6 +28,30 @@ function noSemanticDuplicate(questions, candidate) {
     String(question.id) === String(candidate.id) || assessment.isDuplicateQuestion(question, candidate));
 }
 
+function safeRequestId(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
+}
+
+const REPAIR_STAGES = new Set([
+  "structural_repair_generation",
+  "structural_repair_normalization",
+  "insufficient_structural_repair",
+  "repair_generation",
+  "repair_normalization",
+  "repair_verification",
+  "insufficient_unique_repair",
+]);
+
+function safeRepairFailureStage(value) {
+  return REPAIR_STAGES.has(value) ? value : null;
+}
+
+function safeRepairOutcomeStage(value) {
+  return value === "repair_combined" ? value : null;
+}
+
 function comparisonQuestionsFor(questions, requested) {
   const comparisons = [];
   for (const [index, question] of (Array.isArray(questions) ? questions : []).slice(0, requested).entries()) {
@@ -97,6 +121,7 @@ async function advance(job) {
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
     console.info(JSON.stringify({
       event: "exam_generation_pipeline_batch",
+      requestId: safeRequestId(generated?.body?.qualityDiagnostics?.requestId || generated?.body?.requestId),
       stage: job.stage,
       requested: batchCount,
       acceptedBefore: existing.length,
@@ -143,6 +168,7 @@ async function advance(job) {
     : {};
   console.info(JSON.stringify({
     event: "exam_generation_pipeline_batch",
+    requestId: safeRequestId(quality.requestId),
     stage: job.stage,
     requested: batchCount,
     acceptedBefore: existing.length,
@@ -160,9 +186,8 @@ async function advance(job) {
     verifierCallOk: typeof quality.verifierCallOk === "boolean" ? quality.verifierCallOk : null,
     solverCallOk: typeof quality.solverCallOk === "boolean" ? quality.solverCallOk : null,
     repairAttempted: typeof quality.repairAttempted === "boolean" ? quality.repairAttempted : null,
-    repairFailureStage: ["structural_repair_generation", "structural_repair_normalization", "quality_repair_generation", "quality_repair_normalization", "repair_verification"].includes(quality.repairFailureStage)
-      ? quality.repairFailureStage
-      : null,
+    repairFailureStage: safeRepairFailureStage(quality.repairFailureStage),
+    repairOutcomeStage: safeRepairOutcomeStage(quality.repairOutcomeStage),
     unverifiedCandidates,
     wrongTypeCandidates,
     duplicateCandidates,
@@ -225,4 +250,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

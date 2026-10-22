@@ -177,6 +177,7 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
   let checkpointCalls = 0;
   let completeCalls = 0;
   let finalizeCalls = 0;
+  let batchRequestId;
   console.info = (entry) => diagnosticLogs.push(JSON.parse(entry));
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
@@ -184,13 +185,20 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
   operations.checkpointPipelineJob = async () => { checkpointCalls += 1; return { status: "checkpointed" }; };
   operations.completePipelineJob = async () => { completeCalls += 1; return { status: "completed" }; };
   generation.finalizeVerifiedExam = async () => { finalizeCalls += 1; return { status: "completed" }; };
-  generation.generateVerifiedBatch = async () => ({
-    status: 200,
-    body: { ok: true, questions: [1, 2].map((index) => ({
-      id: `repeated-${index}`, type: "short", question: "Beräkna x när x + 2 = 5.",
-      validation_status: "verified",
-    })) },
-  });
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    batchRequestId = payload.idempotencyKey;
+    return {
+      status: 200,
+      body: { ok: true, qualityDiagnostics: {
+        requestId: payload.idempotencyKey,
+        repairFailureStage: "insufficient_unique_repair",
+        repairOutcomeStage: "repair_combined",
+      }, questions: [1, 2].map((index) => ({
+        id: `repeated-${index}`, type: "short", question: "Beräkna x när x + 2 = 5.",
+        validation_status: "verified",
+      })) },
+    };
+  };
   try {
     const result = await pipeline.advance(job);
 
@@ -205,6 +213,9 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
     assert.equal(diagnosticLogs.length, 1);
     assert.equal(diagnosticLogs[0].duplicateCandidates, 2);
     assert.equal(diagnosticLogs[0].acceptedAfter, 1);
+    assert.equal(diagnosticLogs[0].repairFailureStage, "insufficient_unique_repair");
+    assert.equal(diagnosticLogs[0].repairOutcomeStage, "repair_combined");
+    assert.equal(diagnosticLogs[0].requestId, batchRequestId);
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x"),
       "retry telemetry reports counts only, never question text");
   } finally {
@@ -217,6 +228,31 @@ test("an all-duplicate batch retries without advancing or checkpointing the exam
     operations.retryPipelineStep = prior.retryPipelineStep;
     operations.completePipelineJob = prior.completePipelineJob;
   }
+});
+
+test("pipeline diagnostic UUID sanitizer rejects non-correlation data", () => {
+  assert.equal(pipeline.safeRequestId("00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
+  assert.equal(pipeline.safeRequestId("student@example.com"), null);
+  assert.equal(pipeline.safeRequestId("question text"), null);
+  assert.equal(generation.generationRequestId(true, "00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
+  assert.notEqual(generation.generationRequestId(false, "00000000-0000-4000-8000-000000000001"), "00000000-0000-4000-8000-000000000001");
+  assert.match(generation.generationRequestId(true, "invalid"), /^[0-9a-f-]{36}$/i);
+});
+
+test("pipeline telemetry accepts all emitted repair stage codes", () => {
+  const emitted = [
+    "structural_repair_generation",
+    "structural_repair_normalization",
+    "insufficient_structural_repair",
+    "repair_generation",
+    "repair_normalization",
+    "repair_verification",
+    "insufficient_unique_repair",
+  ];
+  for (const stage of emitted) assert.equal(pipeline.safeRepairFailureStage(stage), stage);
+  assert.equal(pipeline.safeRepairFailureStage("student@example.com"), null);
+  assert.equal(pipeline.safeRepairOutcomeStage("repair_combined"), "repair_combined");
+  assert.equal(pipeline.safeRepairOutcomeStage("repair_verification"), null);
 });
 
 test("comparison context and maximum escaped material fit the bounded internal request", async () => {

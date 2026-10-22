@@ -778,6 +778,12 @@ function makeBudget(startedAt) {
   };
 }
 
+function generationRequestId(internalBatch, idempotencyKey) {
+  return internalBatch && examGenerationOperations.UUID.test(idempotencyKey || "")
+    ? idempotencyKey
+    : crypto.randomUUID();
+}
+
 // Turns a truncated structured-output stream into the largest valid exam it
 // contains. Walks the raw text tracking string/escape state so a brace inside a
 // question's text cannot be mistaken for structure, remembers every point where
@@ -1459,6 +1465,7 @@ module.exports = async function handler(req, res, internalContext = null) {
   if (!examGenerationOperations.UUID.test(idempotencyKey)) {
     return json(res, 400, { ok: false, error: "GENERATION_REQUEST_ID_REQUIRED" });
   }
+  const quotaRequestId = generationRequestId(internalBatch, idempotencyKey);
 
   const numQuestionsRaw = toInt(parsed.numQuestions, 3);
   const numQuestions = qType === "graph" ? 1 : Math.min(20, Math.max(2, numQuestionsRaw));
@@ -1492,7 +1499,6 @@ module.exports = async function handler(req, res, internalContext = null) {
   }
 
   const attemptId = crypto.randomUUID();
-  const quotaRequestId = crypto.randomUUID();
   const requestHash = crypto.createHash("sha256").update(JSON.stringify({
     lang, level, course, qType, numQuestions, pastedText, focusTerms: selectedFocusTerms,
   })).digest("hex");
@@ -1757,6 +1763,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     let qualityRepairAttempted = false;
     let qualityRepairSkipReason = null;
     let repairFailureStage = null;
+    let repairOutcomeStage = null;
     let qualityRepairBudgetRemainingMs = null;
     let qualityRepairGenerationTimeoutMs = null;
     let repairCandidateCount = 0;
@@ -2204,9 +2211,8 @@ module.exports = async function handler(req, res, internalContext = null) {
                       }
                     }
                     combinedQuestionCount = combinedQuestions.length;
-                    repairFailureStage = combinedQuestionCount < numQuestions
-                      ? "insufficient_unique_repair"
-                      : "repair_combined";
+                    repairFailureStage = combinedQuestionCount < numQuestions ? "insufficient_unique_repair" : null;
+                    repairOutcomeStage = combinedQuestionCount >= numQuestions ? "repair_combined" : null;
                     if (combinedQuestions.length > round1ApprovedQuestions.length) {
                       exam = { ...exam, questions: combinedQuestions };
                       if (completeRetry) {
@@ -2358,6 +2364,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           solverApprovedMc: exam.questions.filter((question) => question.type === "mc").length,
         },
         qualityDiagnostics: {
+          ...(internalBatch ? { requestId: quotaRequestId } : {}),
           candidates: normalizedInitial.exam.questions.length + generatedRepairCandidateTotal,
           structuralDropped: gate.dropped.length,
           structuralIssueCounts: Object.fromEntries(Object.entries(gate.dropped.reduce((counts, item) => {
@@ -2377,6 +2384,7 @@ module.exports = async function handler(req, res, internalContext = null) {
           solverCallOk: solverOutcome.callOk,
           repairAttempted,
           repairFailureStage,
+          repairOutcomeStage,
         },
       });
     }
@@ -2650,6 +2658,7 @@ module.exports.looksLikeMath = looksLikeMath;
 module.exports.pickModel = pickModel;
 module.exports.salvageExamJson = salvageExamJson;   // pure — unit-tested
 module.exports.makeBudget = makeBudget;             // pure — unit-tested
+module.exports.generationRequestId = generationRequestId;
 module.exports.regenerationGenerationTimeout = regenerationGenerationTimeout; // pure — unit-tested
 module.exports.minimumExamPreflightBudgetMs = minimumExamPreflightBudgetMs; // pure — unit-tested
 module.exports.minimumExamGenerationReviewBudgetMs = minimumExamGenerationReviewBudgetMs; // pure — unit-tested
