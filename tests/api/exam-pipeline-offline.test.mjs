@@ -648,6 +648,7 @@ let simulatedInitialGenerationMs = 10_000;
 let simulatedStructuralRepairMs = 25_000;
 let simulatedQualityRepairMs = 20_000;
 let simulatedVerifierMs = 0;
+let deferVerifierClockAdvance = false;
 let issuanceUnavailable = false;
 let quotaDenied = false;
 let lastInvokeCallStart = 0;
@@ -807,7 +808,10 @@ globalThis.fetch = async (input, init = {}) => {
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
       verifierInputs.push(reviewInput);
-      if (simulatedNow !== null) simulatedNow += simulatedVerifierMs;
+      if (simulatedNow !== null) {
+        if (deferVerifierClockAdvance) await Promise.resolve();
+        simulatedNow += simulatedVerifierMs;
+      }
       if (verifierUnavailableInitially) return new Response("synthetic verifier outage", { status: 503 });
       if (verifierThrowsForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry verifier timeout");
@@ -1803,6 +1807,90 @@ try {
     "the shorter reserve does not bypass blind solver checks");
   activeQuestions = questions;
   regenerationQuestions = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = questions[2].id;
+  const originalRepairBudgetDateNow = Date.now;
+  const originalInternalRepairTiming = {
+    initialGenerationMs: simulatedInitialGenerationMs,
+    qualityRepairMs: simulatedQualityRepairMs,
+    verifierMs: simulatedVerifierMs,
+  };
+  const originalBoundarySetTimeout = globalThis.setTimeout;
+  const originalBoundaryVerifyQuestions = verifierModule.verifyQuestions;
+  const originalBoundarySolveQuestions = solverModule.solveQuestions;
+  const boundaryGenerationTimeouts = [];
+  const boundaryVerifierTimeouts = [];
+  const boundarySolverTimeouts = [];
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    boundaryGenerationTimeouts.push(delay);
+    return originalBoundarySetTimeout(callback, delay, ...args);
+  };
+  verifierModule.verifyQuestions = async (reviewQuestions, options) => {
+    boundaryVerifierTimeouts.push(options.timeoutMs);
+    return originalBoundaryVerifyQuestions(reviewQuestions, options);
+  };
+  solverModule.solveQuestions = async (reviewQuestions, options) => {
+    boundarySolverTimeouts.push(options.timeoutMs);
+    return originalBoundarySolveQuestions(reviewQuestions, options);
+  };
+  deferVerifierClockAdvance = true;
+  simulatedNow = originalRepairBudgetDateNow();
+  simulatedInitialGenerationMs = 24_000;
+  simulatedQualityRepairMs = 4_000;
+  simulatedVerifierMs = 6_000;
+  Date.now = () => simulatedNow;
+  const verifierCallsBeforeBoundaryRepair = verifierInputs.length;
+  const solverCallsBeforeBoundaryRepair = solverInputs.length;
+  let boundaryRepairedInternalBatch;
+  try {
+    boundaryRepairedInternalBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 46_001,
+      pipelineJobId: "00000000-0000-4000-8000-000000000570",
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000571",
+      },
+    });
+  } finally {
+    verifierModule.verifyQuestions = originalBoundaryVerifyQuestions;
+    solverModule.solveQuestions = originalBoundarySolveQuestions;
+    deferVerifierClockAdvance = false;
+    globalThis.setTimeout = originalBoundarySetTimeout;
+    Date.now = originalRepairBudgetDateNow;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = originalInternalRepairTiming.initialGenerationMs;
+    simulatedQualityRepairMs = originalInternalRepairTiming.qualityRepairMs;
+    simulatedVerifierMs = originalInternalRepairTiming.verifierMs;
+    verifierRejectQuestionId = null;
+    activeQuestions = questions;
+    regenerationQuestions = null;
+  }
+  assert.equal(boundaryRepairedInternalBatch.status, 200, JSON.stringify(boundaryRepairedInternalBatch.body));
+  assert.equal(boundaryRepairedInternalBatch.body.questions.length, 3,
+    "internal repair at its first eligible budget still completes the requested count");
+  assert.equal(boundaryRepairedInternalBatch.body.questions.some((question) => question.id === questions[2].id), false,
+    "the initially verifier-rejected item is not issued at the repair-time boundary");
+  assert.equal(boundaryRepairedInternalBatch.body.quality.verifierApproved, 3,
+    "the boundary repair still passes independent reviewer approval");
+  assert.equal(boundaryRepairedInternalBatch.body.quality.solverApprovedMc, 3,
+    "the boundary repair still passes independent blind-solver approval");
+  assert.equal(boundaryRepairedInternalBatch.body.qualityDiagnostics.repairAttempted, true);
+  assert.equal(boundaryRepairedInternalBatch.body.qualityDiagnostics.repairOutcomeStage, "repair_combined");
+  assert.ok(boundaryGenerationTimeouts.includes(4_001),
+    `the real internal repair stream receives exactly the first eligible 4,001 ms generation window: ${boundaryGenerationTimeouts.join(",")}`);
+  assert.deepEqual(boundaryVerifierTimeouts.slice(-2), [18_000, 8_000],
+    "the initial and repair verifier receive their independently bounded review windows");
+  assert.deepEqual(boundarySolverTimeouts.slice(-2), [19_001, 8_000],
+    "the parallel blind solver retains its computed initial and repair review windows");
+  assert.ok(verifierInputs.slice(verifierCallsBeforeBoundaryRepair).some((batch) =>
+    batch.questions.some((question) => question.id.startsWith("retry-"))),
+  "the replacement candidates reach the independent verifier");
+  assert.ok(solverInputs.slice(solverCallsBeforeBoundaryRepair).some((batch) =>
+    batch.some((question) => question.id.startsWith("retry-"))),
+  "the replacement candidates reach the independent blind solver");
 
   const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
     ...question, id: `six-${index + 1}`,

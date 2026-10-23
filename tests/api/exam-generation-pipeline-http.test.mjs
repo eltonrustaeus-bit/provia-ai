@@ -772,76 +772,118 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       console.info = originalInfo;
     }
 
-    const actualRepairStart = await callStart({
-      ...startPayload,
-      numQuestions: 12,
-      idempotencyKey: testUuid(11_999),
-    });
-    assert.equal(actualRepairStart.statusCode, 202, JSON.stringify(actualRepairStart.body));
-    const actualRepairPipelineId = (await db.query(
-      "select id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
-      [testUuid(11_999)],
-    )).rows[0].id;
-    mockedProviderStages.length = 0;
-    mockedUsageEvents.length = 0;
-    mockedPipelineCheckpoints.length = 0;
-    rejectedActualStems.length = 0;
-    generated = 0;
-    mockActualProviderResponses = true;
-    useActualGeneratorForPipeline = true;
-    rejectNextActualVerifierQuestion = true;
-    reuseActualProviderIds = true;
-    rejectActualVerifierIndex = 1;
-    const originalRepairInfo = console.info;
-    const repairTelemetry = [];
-    console.info = (value) => {
+    for (const [index, requested] of [3, 6, 12].entries()) {
+      const idempotencyKey = testUuid(12_500 + index);
+      const quotaBaseline = (await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [userId],
+      )).rows[0].mock_quota_count;
+      const actualRepairStart = await callStart({
+        ...startPayload,
+        numQuestions: requested,
+        idempotencyKey,
+      });
+      assert.equal(actualRepairStart.statusCode, 202, JSON.stringify(actualRepairStart.body));
+      const actualRepairJob = (await db.query(
+        "select id,quota_request_id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+        [idempotencyKey],
+      )).rows[0];
+      const issuanceBaseline = (await db.query(
+        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+      )).rows[0].n;
+      mockedProviderStages.length = 0;
+      mockedUsageEvents.length = 0;
+      mockedPipelineCheckpoints.length = 0;
+      rejectedActualStems.length = 0;
+      generated = 0;
+      mockActualProviderResponses = true;
+      useActualGeneratorForPipeline = true;
+      rejectNextActualVerifierQuestion = true;
+      reuseActualProviderIds = true;
+      rejectActualVerifierIndex = 1;
+      const originalRepairInfo = console.info;
+      const repairTelemetry = [];
+      console.info = (value) => {
+        try {
+          const event = JSON.parse(value);
+          if (event.event === "exam_generation_pipeline_batch") repairTelemetry.push(event);
+        } catch {}
+      };
+      let actualRepairResult = null;
       try {
-        const event = JSON.parse(value);
-        if (event.event === "exam_generation_pipeline_batch") repairTelemetry.push(event);
-      } catch {}
-    };
-    let actualRepairResult = null;
-    try {
-      for (let call = 0; call < 6 && !actualRepairResult; call++) {
-        const response = await callAdvance(actualRepairPipelineId);
-        if (response.statusCode === 200) actualRepairResult = response;
-        else assert.equal(response.statusCode, 202, JSON.stringify(response.body));
+        for (let call = 0; call < 8 && !actualRepairResult; call++) {
+          const response = await callAdvance(actualRepairJob.id);
+          if (response.statusCode === 200) actualRepairResult = response;
+          else assert.equal(response.statusCode, 202, JSON.stringify(response.body));
+        }
+      } finally {
+        useActualGeneratorForPipeline = false;
+        mockActualProviderResponses = false;
+        rejectNextActualVerifierQuestion = false;
+        reuseActualProviderIds = false;
+        rejectActualVerifierIndex = 0;
+        console.info = originalRepairInfo;
       }
-    } finally {
-      useActualGeneratorForPipeline = false;
-      mockActualProviderResponses = false;
-      rejectNextActualVerifierQuestion = false;
-      reuseActualProviderIds = false;
-      rejectActualVerifierIndex = 0;
-      console.info = originalRepairInfo;
+      assert.ok(actualRepairResult, `the actual generator repairs a rejected ${requested}-question HTTP batch before issuance`);
+      assert.equal(actualRepairResult.body.exam.questions.length, requested);
+      assert.equal(actualRepairResult.body.meta.requested, requested);
+      assert.equal(actualRepairResult.body.meta.partial, false);
+      assert.equal(actualRepairResult.body.exam.questions.some((question) => rejectedActualStems.includes(question.question)), false,
+        `${requested}: a question rejected by the independent verifier is not issued`);
+      const actualRepairAccepted = mockedPipelineCheckpoints.at(-1);
+      assert.equal(actualRepairAccepted.length, requested);
+      assert.ok(actualRepairAccepted.every((question) => question.validation_status === "verified"),
+        `${requested}: only structurally valid, independently reviewed and solved questions reach issuance`);
+      assert.deepEqual(actualRepairResult.body.exam.questions.map((question) => question.id).sort(),
+        actualRepairAccepted.map((question) => question.id).sort(),
+        `${requested}: issuance contains exactly the independently verified checkpointed questions`);
+      const generationBatchCount = Math.ceil(requested / 3) + 1;
+      assert.equal(mockedProviderStages.filter((stage) => stage === "mock_exam_schema").length, generationBatchCount,
+        `${requested}: the HTTP path runs bounded generation batches plus the inline repair batch`);
+      assert.equal(mockedProviderStages.filter((stage) => stage === "exam_verifier_schema").length, generationBatchCount,
+        `${requested}: all original and repair candidates receive independent verifier review`);
+      assert.equal(mockedProviderStages.filter((stage) => stage === "exam_solver_schema").length, generationBatchCount,
+        `${requested}: all original and repair MC candidates receive independent blind solving`);
+      assert.ok(repairTelemetry.some((event) => event.repairAttempted === true),
+        `${requested}: sanitized pipeline telemetry confirms the verifier rejection triggered repair`);
+      assert.ok(repairTelemetry.some((event) => event.repairOutcomeStage === "repair_combined"),
+        `${requested}: telemetry confirms independently approved repair candidates were combined`);
+      assert.ok(repairTelemetry.length > 0 && repairTelemetry.every((event) =>
+        event.requestId === `exam-pipeline:${actualRepairJob.id}`),
+      `${requested}: batch telemetry stays correlated to the content-free job ID`);
+      assert.equal((await db.query(
+        "select status from public.mock_exam_quota_reservations where request_id=$1", [actualRepairJob.quota_request_id],
+      )).rows[0].status, "consumed");
+      assert.equal((await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [userId],
+      )).rows[0].mock_quota_count, quotaBaseline + 1,
+      `${requested}: verified repair consumes exactly one quota unit`);
+      assert.equal((await db.query(
+        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+      )).rows[0].n, issuanceBaseline + 1,
+      `${requested}: verified repair issues exactly once`);
+      const providerStagesBeforeReplay = mockedProviderStages.length;
+      const usageEventsBeforeReplay = mockedUsageEvents.length;
+      const repairReplay = await callAdvance(actualRepairJob.id);
+      assert.equal(repairReplay.statusCode, 200);
+      assert.deepEqual(repairReplay.body, actualRepairResult.body,
+        `${requested}: replay returns the exact verified repair response`);
+      assert.equal(mockedProviderStages.length, providerStagesBeforeReplay,
+        `${requested}: replay makes no additional model or quality-review calls`);
+      assert.equal(mockedUsageEvents.length, usageEventsBeforeReplay,
+        `${requested}: replay records no additional AI usage`);
+      assert.equal((await db.query(
+        "select status from public.mock_exam_quota_reservations where request_id=$1", [actualRepairJob.quota_request_id],
+      )).rows[0].status, "consumed",
+      `${requested}: replay leaves the single reservation consumed rather than reserving or settling again`);
+      assert.equal((await db.query(
+        "select mock_quota_count from public.profiles where id=$1", [userId],
+      )).rows[0].mock_quota_count, quotaBaseline + 1,
+      `${requested}: replay does not consume another quota unit`);
+      assert.equal((await db.query(
+        "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+      )).rows[0].n, issuanceBaseline + 1,
+      `${requested}: replay does not issue a duplicate exam`);
     }
-    assert.ok(actualRepairResult, "the actual generator repairs an underfilled HTTP batch before issuance");
-    assert.equal(actualRepairResult.body.exam.questions.length, 12);
-    assert.equal(actualRepairResult.body.meta.partial, false);
-    assert.equal(actualRepairResult.body.exam.questions.some((question) => rejectedActualStems.includes(question.question)), false,
-      "a question rejected by the independent verifier is not issued");
-    const actualRepairAccepted = mockedPipelineCheckpoints.at(-1);
-    assert.equal(actualRepairAccepted.length, 12);
-    assert.ok(actualRepairAccepted.every((question) => question.validation_status === "verified"),
-      "only questions that passed structural, verifier, and blind-solver gates reach the pre-issuance checkpoint");
-    assert.ok(actualRepairAccepted.some(question => question.question === "Beräkna 5 + 3."),
-      "a verified inline repair reusing q1 is retained despite the initial q1 ID");
-    assert.deepEqual(actualRepairResult.body.exam.questions.map((question) => question.id).sort(),
-      actualRepairAccepted.map((question) => question.id).sort(),
-      "issuance contains exactly the independently verified checkpointed questions");
-    assert.equal(mockedProviderStages.filter((stage) => stage === "mock_exam_schema").length, 5,
-      "the real HTTP path runs four bounded generation batches plus one bounded repair batch");
-    assert.equal(mockedProviderStages.filter((stage) => stage === "exam_verifier_schema").length, 5,
-      "all original and repair candidates receive independent verifier review");
-    assert.equal(mockedProviderStages.filter((stage) => stage === "exam_solver_schema").length, 5,
-      "all original and repair MC candidates receive independent blind solving");
-    assert.ok(repairTelemetry.some((event) => event.repairAttempted === true),
-      "sanitized pipeline telemetry confirms the verifier rejection triggered a repair attempt");
-    assert.ok(repairTelemetry.some((event) => event.repairOutcomeStage === "repair_combined"),
-      "sanitized pipeline telemetry confirms repair candidates were independently accepted and combined");
-    assert.ok(repairTelemetry.length > 0 && repairTelemetry.every((event) =>
-      event.requestId === `exam-pipeline:${actualRepairPipelineId}`),
-    "success and repair batch telemetry use the same content-free job ID as setup and model usage events");
 
     const objectiveQuotaBefore = (await db.query(
       "select mock_quota_count from public.profiles where id=$1", [userId],
@@ -1742,8 +1784,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,27,
-      "full runs, repeated-objective repair, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,29,
+      "full 3/6/12 runs and repairs, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],

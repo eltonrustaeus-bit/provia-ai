@@ -1840,3 +1840,47 @@ och ett färskt stagingbudgetbesked före ett nytt syntetiskt modellanrop.
 utan att försvaga kvalitetsgrindarna. Nästa tekniska steg är att täcka
 5-kandidatbatchens timeout-/payloadgränser offline och samla fler fristående
 stagingresultat först efter ny budgetkontroll och uttryckligt godkännande.
+
+## HTTP-reparation verifierad för 3, 6 och 12 — 2026-10-23
+
+- [x] Den integrerade HTTP/PGlite-fixturen kör nu verifieraravslag och inline-
+  reparation genom den riktiga interna generatorn för samtliga begärda antal:
+  3, 6 och 12. Varje scenario kräver exakt fullständigt antal, verifierad
+  slutcheckpoint, frånvaro av den avvisade frågan samt exakt en kvotförbrukning
+  och issuance.
+- [x] Riktad pipeline-, HTTP/PGlite-, recovery-, budget- och UI-svit passerade
+  60/60. Separata verifierar-, lösar-, källstöds-, bedömnings- och
+  idempotenskontroller passerade 22/22. `node --check` på HTTP-testet och
+  `git diff --check` passerade. Hela seriella offline-sviten passerade 407/407
+  tester på cirka 10 minuter. Efter sista granskarfeedbacken lade vi till
+  replaykontroll av reservationsstatus samt en intern 4 001 ms-reparationstest
+  med samtidiga verifierar-/lösar-timeouts; slutlig fokuserad omkörning av de
+  tre berörda API-/generatorfilerna passerade 4/4, båda `node --check` och
+  `git diff --check` passerade. Testgranskningen fann inga blockerare;
+  timeoutgranskningen verifierar nu att fejkad parallell latens inte förkortar
+  lösarens beräknade tidsfönster.
+- [!] Provider-/granskarresultaten är mockade. Detta stärker offlinebevis för
+  den count-känsliga `generate -> repair -> issue`-vägen men bevisar inte
+  modellens live-yield, hosted schema/ACL eller beteende på staging.
+- [x] Boundary-regressionen kör den interna reparationsströmmen med exakt
+  4 001 ms generationstid; båda granskningsrollerna verifieras fortfarande,
+  med fångade timeoutfönster 18 000/8 000 ms för verifieraren och
+  19 001/8 000 ms för lösaren mellan första och reparationsrundan.
+- [x] Replay efter 3/6/12-frågereparation returnerar samma svar utan nya
+  modell-/usage-händelser, ytterligare kvot, ändrad reservationsstatus eller
+  duplicerad utfärdning.
+- [!] Ändringen är lokal och ocommittad på `5e0c63a`; ingen migration, push,
+  deploy, merge eller modellförfrågan gjordes. Den befintliga ändringen i
+  `supabase/.temp/cli-latest` lämnades orörd.
+- [x] Färsk read-only stagingkontroll 2026-10-23: migrationshistoriken slutar
+  vid `20261022172446_checkpoint_exam_repair_feedback`; migrationen
+  `20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql`
+  saknas. Budgettabellen har en rad med tak `$5.000000`, bokfört `$0.581394`
+  spenderat och `$0.225728` reserverat, men senaste `updated_at` är
+  `2026-10-22 21:50 UTC`. Det beräknade `$4.192878`-saldot är därför inte
+  färskt nog för ett nytt liveanrop och behandlas inte som ny kostnadstillåtelse.
+
+**PILOT NOT READY.** Nästa steg är fortsatt kod-/offlinegranskning och därefter
+versionssynkad stagingverifiering efter godkänd stagingmigration och färsk
+kostnadsavläsning. Produktionsschema saknar enligt tidigare read-only-kontroll
+pipeline- och P.E.R.-kvotskontrakten; merge/deploy till produktion är spärrad.
