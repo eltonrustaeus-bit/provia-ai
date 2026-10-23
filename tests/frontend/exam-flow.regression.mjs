@@ -440,6 +440,27 @@ async function toMaterial(page) {
 
 // The learner can decide which source-supported terms the generator should prioritize.
 {
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "default-focus-user");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Fotosyntes sker i kloroplaster där klorofyll fångar ljus. Växten använder koldioxid och vatten för att bilda glukos och syrgas. Cellandning frigör energi ur glukos med hjälp av syre.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const boxes = page.locator(".xf-focus-option input[type='checkbox']");
+    const noneSelected = await boxes.evaluateAll(nodes => nodes.length > 0 && nodes.every(node => !node.checked));
+    await page.getByRole("button", { name: "Skapa provet" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    ok("T14 fokusord är avvalda från början så avsnittsbredd kan styras",
+      noneSelected && Array.isArray(lastGeneratePayload?.focusTerms)
+      && lastGeneratePayload.focusTerms.length === 0);
+  } finally {
+    await ctx.close();
+  }
+}
+
+{
   const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "focus-scope-user");
@@ -450,15 +471,15 @@ async function toMaterial(page) {
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const boxes = page.locator(".xf-focus-option input[type='checkbox']");
     const count = await boxes.count();
-    const initialSelection = await boxes.evaluateAll(nodes => nodes.every(node => node.checked));
+    const initiallyUnselected = await boxes.evaluateAll(nodes => nodes.every(node => !node.checked));
     const focusValues = await boxes.evaluateAll(nodes => nodes.map(node => node.value));
-    const sourceTerm = count ? await boxes.first().inputValue() : "";
-    if (count) await boxes.first().uncheck();
-    const remainingTerms = count > 1 ? await boxes.evaluateAll(nodes => nodes.filter(node => node.checked).map(node => node.value)) : [];
+    const selectedTerm = count ? await boxes.first().inputValue() : "";
+    const unselectedTerm = count > 1 ? await boxes.nth(1).inputValue() : "";
+    if (count) await boxes.first().check();
     await page.getByRole("button", { name: "Skapa provet" }).click();
     await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
     ok("T14a fokusval visas som tillgängliga val med tydlig täckningsbegränsning",
-      count > 0 && initialSelection
+      count > 1 && initiallyUnselected
       && focusValues.every(term => term.length <= 48 && /^[a-zåäö][a-zåäö-]{3,}[a-zåäö]$/.test(term))
       && !focusValues.includes("alltså")
       && !focusValues.includes("övningsmaterial")
@@ -468,12 +489,12 @@ async function toMaterial(page) {
       && await page.locator(".xf-focus legend").textContent() === "Prioritera ord"
       && await page.locator(".xf-focus").getAttribute("aria-describedby") === "xf-focus-help"
       && /ingen fullständig kurskarta/.test(await page.locator(".xf-focus-help").textContent() || ""));
-    ok("T14b elevens avval och kvarvarande fokusbegrepp följer med till generatorn",
+    ok("T14b bara elevens aktiva fokusval följer med till generatorn",
       lastGeneratePayload?.pastedText === material
       && Array.isArray(lastGeneratePayload?.focusTerms)
-      && lastGeneratePayload.focusTerms.length === remainingTerms.length
-      && lastGeneratePayload.focusTerms.includes(remainingTerms[0])
-      && !lastGeneratePayload.focusTerms.includes(sourceTerm), JSON.stringify(lastGeneratePayload?.focusTerms));
+      && lastGeneratePayload.focusTerms.length === 1
+      && lastGeneratePayload.focusTerms.includes(selectedTerm)
+      && !lastGeneratePayload.focusTerms.includes(unselectedTerm), JSON.stringify(lastGeneratePayload?.focusTerms));
     ok("T14c fokusvalet lämnar inga klientfel", errs.length === 0, errs.join(" | "));
   } finally {
     await ctx.close();

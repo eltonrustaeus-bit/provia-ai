@@ -5,7 +5,9 @@
 - [x] Målkoden committades som `cefde2e` och pushades endast till
   `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
   `dpl_Ghhv5etnRPAenHLFi6TxuBYWtK6S` blev `READY` för exakt den
-  revisionen. `main`, produktion, databas, konton och hemligheter ändrades inte.
+  revisionen. Rättningsfixen `432024d` blev också `READY` i Preview
+  `dpl_FBuiESjdpnrXt6zDT3Vh8xNeV1Tx`. `main`, produktion, konton och
+  hemligheter ändrades inte.
 - [x] Ett nytt syntetiskt Biologi 1-prov med 12 begärda kortsvarsfrågor gav
   12/12 i denna Preview. P.E.R. nekade facit under aktivt prov och gav en
   svarsfri ledtråd. Frågorna saknade dock helt genetik trots ett tredelat
@@ -26,8 +28,12 @@
   idé om kortare lagringsreserv skickades inte. Den nu lokala lösningen ger
   varje fyragrupp ett strikt JSON-objekt med exakt fyra obligatoriska slotar,
   återställer 30 sekunders lagringsreserv och validerar fortfarande varje
-  modellsvar mot sin signerade fråga. Den måste verifieras live innan
-  pilotstatus ändras.
+  modellsvar mot sin signerade fråga. Denna fix rättade de 12 syntetiska
+  svaren live, sparade 22/23 poäng serververifierat och spelade upp samma
+  resultat utan ny modellkostnad. Ett äldre, oavslutat syntetiskt stagingprov
+  blockerade först facit enligt provskyddet. Efter separat godkännande
+  avbröts endast det äldre provet med `abandon_exam_issuance`-funktionen;
+  det nya, verifierade resultatet visades sedan i appen.
 
 - [x] En staging-Preview med tidigare kod skapade ett syntetiskt 3/3-prov.
   P.E.R. gav en svarsfri ledtråd under provet och kunde förklara efter
@@ -43,6 +49,14 @@
   tunna avsnitt och frågor som jämför avsnitt får inte ensamma stoppa 12
   godkända frågor. Telemetrin beskriver refererade avsnitt, inte semantiskt
   garanterad täckning.
+- [!] Liveprovet med 12/12 skapades innan korrigeringen av fokusvalet.
+  Gränssnittet valde då automatiskt alla extraherade ord, vilket stängde av
+  avsnittsstyrningen i pipelinen. En lokal ändring lämnar nu fokusorden
+  avvalda från början; eleven kan fortfarande välja dem aktivt. Det stora
+  gränssnittstestet passerade 193/193 kontroller, inklusive standardval och
+  aktivt fokusval. API-testerna för avsnittsstyrning med uttryckligen tomt
+  fokusval passerade. En ny 12-frågegenerering i Preview måste visa om
+  detta förbättrar bredden.
 - [x] Lokalt rättas öppna svar i grupper om högst fyra, med högst tre samtidiga
   modellförfrågningar. Varje grupp måste matcha sina signerade frågor och alla
   grupper måste passera innan ett enda resultat sparas. Tester täcker 12 och
@@ -56,12 +70,12 @@
   passerade. Oberoende granskare fann inga kvarstående blockerande fynd i
   den ändrade avsnittsprioriteringen och rättningsflödet.
 - [!] Arbetskopian är detached och innehåller en orelaterad lokal
-  `förbättring.html`-ändring som inte följer med målets commits. En ny
-  feature-Preview med fast JSON-schema samt kontroll av innehållsbredd, kostnad
-  och P.E.R. efter verifierad rättning återstår. Inga produktionsåtgärder ingår.
+  `förbättring.html`-ändring som inte följer med målets commits. Ny Preview
+  och livekontroll av innehållsbredd samt P.E.R. efter rättning återstår.
+  Inga produktionsåtgärder ingår.
 
-**PILOT NOT READY.** Lokala kontrakt är starkare, men den nya revisionen måste
-verifieras i staging mot verkliga modellutdata före skolpilot eller merge.
+**PILOT NOT READY.** 12 frågor och rättning fungerar nu i ett stagingfall,
+men avsnittsbredd, duplicering och reproducerbarhet måste verifieras innan skolpilot.
 
 ## UI-skydd för ofullständiga prov — 2026-10-23
 

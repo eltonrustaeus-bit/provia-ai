@@ -1544,7 +1544,7 @@
 
     var t = terms(S.material);
     if (t.length && !S.resumeRequest) {
-      if (!Array.isArray(S.focusTerms)) S.focusTerms = t.slice();
+      if (!Array.isArray(S.focusTerms)) S.focusTerms = [];
       S.focusTerms = S.focusTerms.filter(function (term) { return t.indexOf(term) !== -1; });
 
       var focus = el("fieldset", "xf-focus");

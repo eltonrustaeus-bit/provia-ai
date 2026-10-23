@@ -83,7 +83,7 @@ test("a thin source section does not prevent twelve independently verified quest
     lease_token: "44444444-4444-4444-8444-444444444444",
     deadline_at: new Date(Date.now() + 300_000).toISOString(),
     stage: "repair", stage_attempts: 3, requested_count: 12,
-    payload: { qType: "short", numQuestions: 12, pastedText: source },
+    payload: { qType: "short", numQuestions: 12, pastedText: source, focusTerms: [] },
     accepted_questions: Array.from({ length: 11 }, (_, index) => ({
       id: `prior-${index}`, type: "short", question: `Distinct verified task ${index}`,
       source_references: ["Växter använder ljus, vatten och koldioxid för att bilda glukos."],
@@ -220,7 +220,7 @@ test("twelve verified questions from four headed sections complete with balanced
     lease_token: "44444444-4444-4444-8444-444444444444",
     deadline_at: new Date(Date.now() + 300_000).toISOString(),
     stage: "generate", stage_attempts: 1, requested_count: 12,
-    payload: { qType: "short", numQuestions: 12, pastedText: source },
+    payload: { qType: "short", numQuestions: 12, pastedText: source, focusTerms: [] },
     accepted_questions: [], progress_current: 0,
   };
   const stems = {
