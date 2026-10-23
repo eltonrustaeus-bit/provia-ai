@@ -2,6 +2,29 @@
 
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 
+## Senaste stagingprov — `16d4f14`, 2026-10-23
+
+- [x] Commit `16d4f14951d3e2bfcd19fcc0debb7fa473b1e0c6` är pushad endast till
+  `codex/exgen-generation-quality-2026-10-20` och Preview `dpl_39qpVp7vWwtXn27T3yP2ZVZDpMiE`
+  blev READY. Vercel visade separata, krypterade Preview-variabler på just den
+  branchen; Production och `main` ändrades inte.
+- [!] Ett syntetiskt Biologi 1-prov begärde 12 kortsvarsfrågor. UI och privat
+  jobbmetadata nådde 8/12 godkända frågor efter upprepade generationer,
+  oberoende granskning och reparation. Inget komplett prov utfärdades.
+  Därefter visade UI:t att provtjänsten inte kunde verifiera inloggningen.
+  Innehållsfri jobbmetadata låg kvar som `queued`, `repair`, 8/12 med
+  `NO_NEW_APPROVED_QUESTIONS`; orsaken till autentiseringsfelet är inte
+  fastställd. Ingen ny generering kördes efter felet.
+- [x] Kostnadsgränsen höll: senaste stagingläsningen visade 1,213161 USD
+  spenderat och 0,263628 USD reserverat av 5 USD, alltså 3,523211 USD kvar.
+  Telemetrin innehöll genererings-, reparations- och verifieringsrader utan
+  text från underlag eller frågor.
+- [!] Detta är inte bevis på att 12-frågeproblemet är löst. Källnära grinden
+  finns i Preview, men tjänstens auth/recovery-väg behöver återställas för att
+  slutföra och verifiera återupptagning. Separat kvarstår den tidigare
+  blockeraren att rubrik/poängdelar/alternativa svar inte deterministiskt
+  binds till samma källfacit.
+
 - [x] Ny lokal säkerhetsgrind för naturvetenskapliga kortsvar kräver att hela
   facitsvaret är en ordagrann, sammanhängande del av elevens material. Matchningen
   bevarar versalisering och jämförelsesymboler och kräver ord-/talgränser, så
