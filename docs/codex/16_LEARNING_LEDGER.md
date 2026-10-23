@@ -527,3 +527,19 @@ AI-reported until independently reviewed.
 - Limitation: Offline tests prove client branching and account/idempotency
   checks only. The fix has not yet been deployed or verified in staging; no
   live model call followed the observed auth failure.
+
+### 2026-10-23 — Repeat extractive answer constraints in repair prompts
+- Status: VERIFIED (prompt/test evidence; live impact unverified)
+- Evidence: staging Preview telemetry for a synthetic 12-question Biology 1
+  exam showed one accepted question, with `source_answer_not_extractable` the
+  dominant rejection; independent read-only review of the prompt change found
+  no blocker.
+- Finding: A rule present in the base generation prompt may not reliably carry
+  through a later repair call. Repeat the precise constraint in the repair
+  prompt: factual short-answer keys must contain only complete contiguous
+  sentences copied verbatim from the source, without prefixes, labels,
+  explanations, or paraphrases. Preserve the derived-answer exception for
+  mathematics and retain every existing structural and quality gate.
+- Limitation: The prompt update has not yet been deployed or tested against a
+  live model. One low-yield run identifies the leading observed rejection
+  reason, not proof that prompt wording alone explains all rejected candidates.

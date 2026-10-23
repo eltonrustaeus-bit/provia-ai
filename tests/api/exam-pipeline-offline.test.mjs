@@ -98,6 +98,19 @@ for (const lang of ["sv", "en"]) {
     text: { format: generateExam.buildMockExamSchema(3) },
   }, { lang, numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: base.questionCountOffset });
   const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
+  const repairInstruction = repair.input.filter((item) => item.role === "user").at(-1).content;
+  assert.match(repairInstruction, lang === "sv"
+    ? /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet/
+    : /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material/,
+  `${lang} repair repeats the extractive-answer gate explicitly`);
+  assert.match(repairInstruction, lang === "sv"
+    ? /utan inledning, etikett, förklaring eller omskrivning före eller efter citatet/
+    : /with no introduction, label, explanation, or paraphrase before or after/,
+  `${lang} repair forbids non-source text around an extractive answer`);
+  assert.match(repairInstruction, lang === "sv"
+    ? /Matematik får ha en korrekt härledd lösning/
+    : /Mathematics may use a correctly derived solution/,
+  `${lang} repair preserves the mathematical derivation exception`);
   assert.match(repairedUserPrompt, new RegExp(`^${label}: 4\\.$`, "m"),
     `${lang} repair prompt count agrees with the four-question output schema`);
   assert.match(repairedUserPrompt, new RegExp(`^${courseLabel}: .*\\n${label}: 3\\.$`, "m"),
@@ -171,6 +184,10 @@ assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan utt
   "the short-answer rubric cannot silently score unrequested work");
 assert.match(biologyPrompt.systemPrompt, /faktabaserade kortsvar måste model_answer dessutom bestå.*ordagranna meningar ur materialet/i,
   "the generator keeps factual science answer keys extractive");
+assert.match(biologyPrompt.systemPrompt, /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet.*ingen inledning, etikett, förklaring eller omskrivning/i,
+  "the generator forbids prefixes and paraphrases that would fail exact source extraction");
+assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt härledd lösning/i,
+  "the extractive instruction preserves derived mathematical answers");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
@@ -195,6 +212,8 @@ assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested b
   "English scoring criteria cannot silently require unrequested work");
 assert.match(englishPrompt.systemPrompt, /each task must be independently solvable from the material and question text/i,
   "math tasks retain the independent solvability requirement without extractive-only answers");
+assert.match(englishPrompt.systemPrompt, /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material.*no introduction, label, explanation, or paraphrase/i,
+  "English factual short answers cannot add text around a source quotation");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,

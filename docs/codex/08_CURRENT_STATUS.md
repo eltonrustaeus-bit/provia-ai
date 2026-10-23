@@ -20,14 +20,35 @@
   en verifierad refresh, ett idempotent återförsök och ett tydligt terminalt
   authfel. Ingen ny provgenerering, AI-kostnad, kvot-/rolländring eller
   databasändring har gjorts.
-- [!] Authfixen är ännu inte på Preview och inte stagingverifierad.
+- [x] Commit `29280c31c7608a2ac134fc32c3ea092a2a11f9e0` pushades endast till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview blev `READY` som
+  deployment `dpl_8KfrCVtAHMDkcZ3cwBCVYLAibuSY`; Vercel CLI visade pilotens
+  env-variabler branch-scopade till samma Preview-branch. Inga värden lästes.
+- [x] Ett syntetiskt Biologi 1-prov med 1 271 tecken begärde 12 kortsvarsfrågor
+  på denna Preview. Inget prov utfärdades: exakt 1/12 godkändes och pipelinen
+  avslutades säkert med `STAGE_RETRY_LIMIT` efter tre begränsade reparations-
+  försök. Sanerad Verceltelemetri visar att många kandidater underkändes med
+  `source_answer_not_extractable`; granskning underkände även källstöd,
+  svarslinje och poängkvalitet. Auth/setup anropen lyckades under försöket.
+- [x] Telemetrin visar att grundprompten redan krävde ordagranna meningar, men
+  reparationsprompten inte uttryckligen förbjöd inledning/förklaring runt
+  `model_answer`. Lokal uppföljningsändring förstärker samma extraktiva krav i
+  både grund- och reparationsprompt på svenska/engelska; inga kvalitetsgrindar
+  har sänkts. Oberoende read-only review fann inga blockerare och bekräftade
+  att ändringen svarar mot den dominerande observerade avvisningsorsaken.
+  Syntax, prompt-, budget-, pipeline-, HTTP- och Postgres/PGlite-tester passerade
+  lokalt; detta bekräftar inte live modellutbyte eller förbättrad yield.
+- [!] Stagingbudgeten lästes read-only kl. 19:33 UTC: tak `$5.000000`, spenderat
+  `$1.258479`, reserverat `$0.263628`, kvar `$3.477893` (budgetrad senast
+  uppdaterad 19:30 UTC). Den enda nya modellenkörningen bokfördes till ungefär
+  `$0.045318`; ingen andra modellkörning har gjorts. En ren, inloggad Previewflik
+  användes. Annan sparad provsession lämnades orörd.
 - [!] Äldre syntetiskt prov från 23 okt kl. 16:12 UTC var redan markerat
   avbrutet vid read-only-kontroll; ingen separat resultatpost fanns för det.
 
-**PILOT NOT READY.** Nästa steg efter gröna lokala regressioner är commit/push
-endast till godkänd feature-branch, verifiera exakt Vercel Preview, färsk
-stagingbudget och branchkoppling och därefter högst ett godkänt syntetiskt
-stagingprov. Ingen produktion eller `main`.
+**PILOT NOT READY.** Granska promptändringen oberoende, push endast till
+feature-branchen, invänta READY Preview och kör därefter ett nytt syntetiskt
+test inom den godkända kostnadsramen. Ingen produktion eller `main`.
 
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 
