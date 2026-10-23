@@ -140,7 +140,22 @@ function safeArrayStrings(x, maxItems = 8, maxLen = 40) {
   return out;
 }
 
-function buildNonMcGradeSchema() {
+function buildNonMcGradeSchema(itemCount) {
+  const slotNames = Array.from({ length: itemCount }, (_, index) => `slot_${index + 1}`);
+  const itemSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["id", "points", "max_points", "feedback", "model_answer", "concept_tag", "error_tags"],
+    properties: {
+      id: { type: "string" },
+      points: { type: "number" },
+      max_points: { type: "number" },
+      feedback: { type: "string" },
+      model_answer: { type: "string" },
+      concept_tag: { type: "string" },
+      error_tags: { type: "array", items: { type: "string" }, maxItems: 8 },
+    },
+  };
   return {
     type: "json_schema",
     name: "grade_non_mc_schema",
@@ -153,29 +168,23 @@ function buildNonMcGradeSchema() {
         total_points: { type: "number" },
         max_points: { type: "number" },
         per_question: {
-          type: "array",
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required: ["id", "points", "max_points", "feedback", "model_answer", "concept_tag", "error_tags"],
-            properties: {
-              id: { type: "string" },
-              points: { type: "number" },
-              max_points: { type: "number" },
-              feedback: { type: "string" },
-              model_answer: { type: "string" },
-              concept_tag: { type: "string" },
-              error_tags: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 8
-              }
-            }
-          }
+          type: "object",
+          additionalProperties: false,
+          required: slotNames,
+          properties: Object.fromEntries(slotNames.map((slot) => [slot, itemSchema])),
         }
       }
     }
   };
+}
+
+function gradeRowsFromModel(graded, items) {
+  if (Array.isArray(graded?.per_question)) return graded.per_question;
+  const slots = graded?.per_question;
+  if (!slots || typeof slots !== "object" || Array.isArray(slots) ||
+      Object.keys(slots).length !== items.length) return null;
+  const rows = items.map((_, index) => slots[`slot_${index + 1}`]);
+  return rows.every((row, index) => row?.id === items[index].id) ? rows : null;
 }
 
 function sanitizeMistakes(x) {
@@ -797,7 +806,6 @@ module.exports = async function handler(req, res) {
     if (!pastedText.trim()) return fail(400, { ok: false, error: "Missing pastedText for open questions" });
 
     const model = pickModel();
-    const responseFormat = buildNonMcGradeSchema();
 
     /* Samma ämnesdetektor som generate-exam.js använder för MATTE-LÄGE. Ett
        eget mönster här hade drivit isär: ett prov kunde genereras som matte men
@@ -908,9 +916,8 @@ module.exports = async function handler(req, res) {
     // A long exam is graded in small, independent groups. All groups must pass
     // the same signed-item contract before a single result is persisted.
     const gradeBatches = [];
-    const gradeBatchSize = nonMcPack.length <= 12 ? 2 : 4;
-    for (let offset = 0; offset < nonMcPack.length; offset += gradeBatchSize) {
-      gradeBatches.push(nonMcPack.slice(offset, offset + gradeBatchSize));
+    for (let offset = 0; offset < nonMcPack.length; offset += 4) {
+      gradeBatches.push(nonMcPack.slice(offset, offset + 4));
     }
     async function gradeBatch(items, timeoutMs) {
       const userPayload = {
@@ -924,11 +931,11 @@ module.exports = async function handler(req, res) {
           { role: "system", content: (lang === "sv"
               ? systemSv + (isMathGrading ? systemSvMath : "")
               : systemEn + (isMathGrading ? systemEnMath : "")) +
-              (lang === "sv" ? "\nReturnera exakt en rad per item, i samma ordning och med dess oförändrade ID."
-                : "\nReturn exactly one row per item, in the same order and with its unchanged ID.") },
+              (lang === "sv" ? "\nUtdata per_question: slot_1 bedömer första item, slot_2 andra och så vidare. Fyll varje schemaslot exakt en gång och kopiera dess oförändrade ID."
+                : "\nOutput per_question: slot_1 grades the first item, slot_2 the second, and so on. Fill every schema slot exactly once and copy its unchanged ID.") },
           { role: "user", content: JSON.stringify(userPayload) },
         ],
-        text: { format: responseFormat },
+        text: { format: buildNonMcGradeSchema(items.length) },
       };
       const gradingStartedAt = Date.now();
       let r;
@@ -970,10 +977,13 @@ module.exports = async function handler(req, res) {
       let graded;
       try { graded = JSON.parse(outputText); }
       catch { return { failure: ["response_output", "invalid_json", "grading_response_invalid"] }; }
-      const reason = nonMcGradeFailureReason(graded, items);
+      const rows = gradeRowsFromModel(graded, items);
+      const reason = nonMcGradeFailureReason({ per_question: rows }, items);
       if (reason !== "valid") return { failure: ["response_output", `contract_${reason}`, "grading_response_invalid"],
-        receivedCount: Array.isArray(graded?.per_question) ? graded.per_question.length : null };
-      return { rows: graded.per_question };
+        receivedCount: Array.isArray(graded?.per_question) ? graded.per_question.length
+          : graded?.per_question && typeof graded.per_question === "object"
+            ? Object.keys(graded.per_question).length : null };
+      return { rows };
     }
     async function recoverRowCount(items, originalFailure) {
       const recovered = [];

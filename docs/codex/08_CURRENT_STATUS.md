@@ -19,7 +19,15 @@
   rättningen fick åter HTTP 502: första fyragruppen gav två rader och den
   begränsade återhämtningen räckte inte inom tidsbudgeten. Ingen delrättning
   sparades. Ytterligare lokal ändring delar därför upp upp till 12 öppna svar
-  i grupper om två från början; även den måste liveverifieras.
+  i grupper om två från början. Den blev `READY` i Preview `6e20e37`
+  (`dpl_CmZNBB2M4Z5noswavmLdAXHLxmQa`) men samma svar fick HTTP 502:
+  fjärde tvågruppen nådde en `transport_error` vid den dåvarande
+  30-sekunders modellbudgeten. En testad men säkerhetsmässigt otillräcklig
+  idé om kortare lagringsreserv skickades inte. Den nu lokala lösningen ger
+  varje fyragrupp ett strikt JSON-objekt med exakt fyra obligatoriska slotar,
+  återställer 30 sekunders lagringsreserv och validerar fortfarande varje
+  modellsvar mot sin signerade fråga. Den måste verifieras live innan
+  pilotstatus ändras.
 
 - [x] En staging-Preview med tidigare kod skapade ett syntetiskt 3/3-prov.
   P.E.R. gav en svarsfri ledtråd under provet och kunde förklara efter
@@ -49,7 +57,7 @@
   den ändrade avsnittsprioriteringen och rättningsflödet.
 - [!] Arbetskopian är detached och innehåller en orelaterad lokal
   `förbättring.html`-ändring som inte följer med målets commits. En ny
-  feature-Preview med tvåsvarsgrupper samt kontroll av innehållsbredd, kostnad
+  feature-Preview med fast JSON-schema samt kontroll av innehållsbredd, kostnad
   och P.E.R. efter verifierad rättning återstår. Inga produktionsåtgärder ingår.
 
 **PILOT NOT READY.** Lokala kontrakt är starkare, men den nya revisionen måste
