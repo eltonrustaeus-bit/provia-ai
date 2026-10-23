@@ -13,15 +13,30 @@
   Källcitatet täcker alltså inte alltid hela svaret trots den nya
   fältnivågranskningen. 12/12 är framsteg för leveransantalet, inte bevis
   för pedagogisk pilotkvalitet.
-- [x] Lokalt efter livefyndet: generatorn instrueras att hålla varje
+- [x] I feature-Preview efter första livefyndet: generatorn instrueras att hålla varje
   poängkrav och facitpåstående inom materialet; granskaren instrueras att
   kontrollera facit sats för sats och rapportera explicit `duplicate_of`
   för frågor med samma lärandemål och svarsmål. Servern stoppar rapporterade
-  dubbletter. Offline-kontraktstester passerar, men effekten på livekvalitet
-  och leveransantal är ännu inte uppmätt.
-- [!] En separat lokal telemetrijustering ger batchade AI-kostnadsrader
-  samma kolumner. Den kan förklara tidigare `PGRST102`-fel i staging men är
-  ännu inte liveverifierad. Den hårda stagingbudgeten är separat och kvar.
+  dubbletter. Offline-kontraktstester passerar, men nästa liveprov visade
+  att detta inte räckte för semantisk källtrohet eller variation.
+- [x] En separat telemetrijustering ger batchade AI-kostnadsrader samma
+  kolumner. Rader har nu sparats i staging utan det tidigare `PGRST102`-felet
+  under ett syntetiskt 12-frågeprov. Den hårda stagingbudgeten är separat
+  och kvar; ett test utesluter inte alla andra telemetrifel.
+- [x] Nästa Preview (`eb37536`, `dpl_8bdXicRTAGAemtcaSkQZTk6wCcyi`)
+  levererade åter 12/12 från samma syntetiska underlag. Tom inlämning gav ett
+  serververifierat 0/24-resultat och visade alla facit. Alla tre källavsnitt
+  refererades. Stagingens `ai_usage_events` fick rader för generering,
+  reparation och granskning; det tidigare bulkfelet syntes inte i denna
+  körning. Budgeten efter testet var 1,172112 USD spenderat av 5 USD.
+- [!] Den nya revisionen löste inte semantisk källtrohet: första frågan hade
+  ett språkfel, flera frågor prövade samma samband, och facit lade till
+  detaljer om DNA-helix, elektroner/väte och ett ekosystemkretslopp som inte
+  fanns i det syntetiska materialet. `duplicate_of` och den strängare
+  instruktionen fångade inte dessa live. Detta är ett fortsatt pilotstopp.
+  Nästa åtgärd bör pröva en källnära facitkontrakt för faktabaserade
+  kortsvar, med separat undantag för beräkning/graf och test av hur många
+  godkända frågor som återstår. Sänk inte kvalitetsgrinden för att nå 12.
 
 - [x] Preview på `5dc2470` skapade ett syntetiskt Biologi 1-prov med 12/12
   frågor från ett tredelat material. Sanerad pipeline-status rapporterade att
@@ -42,10 +57,9 @@
   en del saknar stöd, pekar på ett ogiltigt utdrag eller saknar verdict.
   Endast en fast `source_support`-kod når reparationsfeedbacken; råa citat
   förs inte vidare dit. Befintliga poäng- och kvalitetsgrindar består.
-- [!] Fältnivågranskningen är liveprövad men visade sig otillräcklig:
-  modellen missade vissa obestyrkta tillägg. De efterföljande lokala
-  förbättringarna behöver ett nytt syntetiskt stagingprov på exakt nästa
-  kodrevision inom godkänd kostnadsram. `main` och Production lämnas orörda.
+- [!] Både fältnivågranskningen och de efterföljande prompt-/dubblettkraven
+  har liveprövats men är otillräckliga: modellen missar fortfarande vissa
+  obestyrkta tillägg. `main` och Production lämnas orörda.
 
 **PILOT NOT READY.** Källstödet i frågorna och facit är fortsatt en blockerare
 tills den skärpta granskningen prövats live och de kvarvarande pilotgrindarna
