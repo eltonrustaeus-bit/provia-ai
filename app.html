@@ -2416,8 +2416,8 @@ try{
     catch { resumeKeyCleared=false; }
     const generationMeta=res.data.meta||{};
     const questionCount=res.data.exam?.questions?.length||0;
-    const requestedCount=generationMeta.requested;
-    const partialExam=generationMeta.partial===true&&Number.isInteger(requestedCount)&&requestedCount>questionCount;
+    const requestedCount=payload.numQuestions;
+    const partialExam=questionCount<requestedCount;
     const completionMessage=partialExam
       ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
       :t.genDone;

@@ -1,5 +1,21 @@
 # 08 Current Status
 
+## UI-skydd för ofullständiga prov — 2026-10-23
+
+- [x] Appen avgör nu delprov genom att jämföra faktiskt antal returnerade
+  frågor med klientens begärda antal. `meta.partial` kan inte längre få ett
+  kortare prov att visas som komplett om flaggan är falsk eller saknas.
+- [x] Browserregression väljer 3, 6 och 12 frågor i wizardens UI, verifierar
+  att valt antal skickas till API:t och provar 2/3 med motsägande metadata,
+  4/6 utan metadata samt 8/12 med delprovsmetadata. Visad instruktion anger
+  godkänt antal och endast returnerade frågor renderas.
+- [x] Riktat browsertest passerade 1/1. Hela seriella offline-sviten över 193
+  testfiler passerade efter UI-fixen. Den oberoende granskningen fann inga
+  blockerare; staging/livebeteende är inte verifierat av dessa tester.
+- [!] Ingen commit, push, deploy, migration eller merge utförd i detta steg.
+  PR #123 är fortsatt draft. Produktionsschema saknar dokumenterat pipeline-
+  och P.E.R-kvotschema, därför är merge till `main` fortfarande osäker.
+
 ## Releasegrind efter Preview-push — 2026-10-23
 
 - [x] Den semantiska jämförelsegrinden känner nu igen enkla, omkastade
@@ -1919,3 +1935,38 @@ spärrad tills databasschemat är versionssynkat och verifierat.
 **PILOT NOT READY.** Kvar är färsk stagingmigrations-/budgetkontroll,
 versionssynkad stagingverifiering och därefter säker produktionsschema-plan
 innan PR #123 kan mergas.
+
+## Fortsatt offline- och stagingaudit — 2026-10-23
+
+- [x] Seriell offline-svit `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js')`
+  avslutades med exitkod 0 över samtliga 193 testfiler på den aktuella
+  12-fråge full-/delprovssalvagediffen. Den riktade sviten passerade 54/54.
+- [x] Tre återupptagna, read-only granskarroller (generering/timeout,
+  teståterhämtning och säkerhet/kvot) fann ingen ny blockerare i aktuell kod.
+  12-frågeflödet täcks genom HTTP/PGlite. Det interna repair-stream-
+  salvagetestet täcker nu även 12 frågor genom två kompletta ersättningar före
+  timeout efter att två ursprungsfrågor underkänts; samtliga utfärdade frågor
+  måste vara unika och passera verifierare och blind lösare. Ett separat
+  abortscenario med endast en av två ersättningar kräver exakt 11/12 och
+  `meta.partial=true`; full 12/12 kräver `meta.partial=false`. Den slutliga
+  teständringen passerade 54/54, syntax- och diffkontroll samt en oberoende
+  read-only testgranskning utan blockerare. Granskningarna är statiska
+  respektive offline och bevisar inte live-modellbeteende.
+- [x] Färsk stagingläsning: pipeline-jobb-/requesttabeller samt claim,
+  ägarskapsclaim, 7-arguments checkpoint och quota-reservation RPC finns.
+  Migrationshistoriken slutar ändå vid `20261022172446`; migrationen
+  `20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql`
+  saknas fortfarande.
+- [!] Stagingbudgetens rad visar cap `$5.000000`, spenderat `$0.581394`,
+  reserverat `$0.225728` och `updated_at=2026-10-22 21:50:17 UTC`. Den är inte
+  färsk nog för ett nytt live-modellanrop; inget anrop eller någon migration
+  utfördes.
+- [!] PR #123 är öppen som draft. Preview för `96aa89f` blev `READY` och
+  GitHub/Vercel-kontrollen är grön. Produktionsschemat saknar fortfarande
+  pipelinekontrakten enligt separat read-only kontroll; ingen merge, deploy
+  eller produktionsändring utfördes. Den befintliga ändringen i
+  `supabase/.temp/cli-latest` är orörd.
+
+**PILOT NOT READY.** Kvar är versionssynkad stagingmigration och ett nytt
+syntetiskt end-to-end-prov inom färsk kostnadsgräns. Produktionsschema och
+releaseordning måste granskas och godkännas separat före merge.

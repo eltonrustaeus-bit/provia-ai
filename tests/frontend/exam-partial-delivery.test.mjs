@@ -7,7 +7,13 @@ const browser = await chromium.launch();
 let ctx;
 
 try {
-  for (const [requested, approved] of [[3,2],[6,4],[12,8]]) {
+  const scenarios = [
+    { requested: 3, approved: 2, meta: { partial: false, requested: 3 } },
+    { requested: 6, approved: 4, meta: null },
+    { requested: 12, approved: 8, meta: { partial: true, requested: 12 } },
+  ];
+  for (const { requested, approved, meta } of scenarios) {
+    let postedQuestionCount = null;
     const partialExam = {
       title: "Syntetiskt biologi-prov",
       level: "C",
@@ -24,11 +30,15 @@ try {
         [`**/auth/v1/user`, route => route.fulfill({ json: {
           id: `partial-delivery-user-${requested}`, email: "partial@example.test",
         } })],
-        ["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: {
-          ok: true,
-          exam: partialExam,
-          meta: { partial: true, requested, quota: { enforced: false } },
-        } })],
+        ["**/api/generate-exam?pipeline=start", route => {
+          postedQuestionCount = route.request().postDataJSON().numQuestions;
+          const response = {
+            ok: true,
+            exam: partialExam,
+          };
+          if (meta) response.meta = { ...meta, quota: { enforced: false } };
+          return route.fulfill({ json: response });
+        }],
       ] },
       settle: 0,
     });
@@ -38,6 +48,8 @@ try {
       await page.click('#xf .xf-screen[data-screen="start"] .xf-btn.primary');
       await page.fill('#xf .xf-screen[data-screen="subject"] .xf-input', "Biologi 1");
       await page.click('#xf .xf-screen[data-screen="subject"] .xf-btn.primary');
+      await page.click('#xf .xf-screen[data-screen="aim"] .xf-btn.quiet');
+      await page.click(`#xf .xf-screen[data-screen="aim"] .xf-chips[aria-label="Antal"] .xf-chip:has-text("${requested}")`);
       await page.click('#xf .xf-screen[data-screen="aim"] .xf-btn.primary');
       await page.fill('#xf .xf-screen[data-screen="material"] .xf-area', "Klorofyll fångar ljus. Fotosyntesen sker i kloroplaster.");
       await page.click('#xf .xf-screen[data-screen="material"] .xf-btn.primary');
@@ -48,6 +60,7 @@ try {
       assert.match(await page.locator("#examGuide").textContent(), new RegExp(`${approved} av ${requested} begärda frågor`));
       assert.match(await page.locator("#floatingGradeHint").textContent(), new RegExp(`Besvara de ${approved} godkända frågorna`));
       assert.equal(await page.locator("#examBody .qBox").count(), approved);
+      assert.equal(postedQuestionCount, requested, "the selected requested count reaches the generation API");
     } finally {
       await ctx.close();
       ctx = null;

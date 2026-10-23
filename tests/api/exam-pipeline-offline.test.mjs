@@ -644,6 +644,7 @@ let throwOnRepair = false;
 let truncateQualityRepairStream = false;
 let truncateQualityRepairAfter = 1;
 let abortQualityRepairAfterCompleteCandidate = false;
+let abortQualityRepairCandidateCount = 1;
 let qualityRepairAbortTriggered = false;
 let simulatedNow = null;
 let simulatedInitialGenerationMs = 10_000;
@@ -770,7 +771,8 @@ globalThis.fetch = async (input, init = {}) => {
       const fullText = JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
       if (abortQualityRepairAfterCompleteCandidate) {
         const candidateText = JSON.stringify({
-          title: "Omgenererat syntetiskt prov", level: "C", questions: repaired.slice(0, 1),
+          title: "Omgenererat syntetiskt prov", level: "C",
+          questions: repaired.slice(0, abortQualityRepairCandidateCount),
         });
         const event = { type: "response.output_text.delta", delta: candidateText };
         const chunk = new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
@@ -1991,11 +1993,33 @@ try {
     { ...questions[1], id: "q-5", question: "Vad är 9 - 5?", options: ["3", "4", "5"], correct_index: 1, model_answer: "4" },
     { ...questions[2], id: "q-6", question: "Vad är 2 · 5?", options: ["8", "10", "12"], correct_index: 1, model_answer: "10" },
   ];
-  for (const [requested, firstRoundQuestions] of [[3, questions], [6, sixStreamQuestions]]) {
+  const twelveStreamQuestions = Array.from({ length: 12 }, (_, index) => {
+    const questionNumber = index + 1;
+    if (index < questions.length) return questions[index];
+    return {
+      ...questions[index % questions.length],
+      id: `q-${questionNumber}`,
+      question: `Vad är ${questionNumber} + 1?`,
+      options: [String(questionNumber), String(questionNumber + 1), String(questionNumber + 2)],
+      correct_index: 1,
+      model_answer: String(questionNumber + 1),
+    };
+  });
+  const repairAbortScenarios = [
+    { requested: 3, questions: questions, rejectedIds: ["q-1"], salvageCount: 1 },
+    { requested: 6, questions: sixStreamQuestions, rejectedIds: ["q-1"], salvageCount: 1 },
+    { requested: 12, questions: twelveStreamQuestions, rejectedIds: ["q-1", "q-2"], salvageCount: 2 },
+    { requested: 12, questions: twelveStreamQuestions, rejectedIds: ["q-1", "q-2"], salvageCount: 1, partial: true },
+  ];
+  for (const { requested, questions: firstRoundQuestions, rejectedIds: rejectedQuestionIds, salvageCount, partial = false } of repairAbortScenarios) {
     activeQuestions = firstRoundQuestions;
     regenerationQuestionBatches = [qualityCandidates];
-    verifierRejectQuestionId = "q-1";
+    const salvagedCandidateCount = salvageCount;
+    const salvagedCandidateIds = qualityCandidates.slice(0, salvageCount).map((question) => question.id);
+    const expectedQuestionCount = firstRoundQuestions.length - rejectedQuestionIds.length + salvageCount;
+    verifierRejectQuestionId = rejectedQuestionIds;
     abortQualityRepairAfterCompleteCandidate = true;
+    abortQualityRepairCandidateCount = salvagedCandidateCount;
     const originalAbortRepairSetTimeout = globalThis.setTimeout;
     const verifierCountBeforeAbortedRepair = verifierInputs.length;
     const solverCountBeforeAbortedRepair = solverInputs.length;
@@ -2015,6 +2039,7 @@ try {
     } finally {
       globalThis.setTimeout = originalAbortRepairSetTimeout;
       abortQualityRepairAfterCompleteCandidate = false;
+      abortQualityRepairCandidateCount = 1;
       verifierRejectQuestionId = null;
       regenerationQuestionBatches = null;
       activeQuestions = questions;
@@ -2024,31 +2049,37 @@ try {
       `${requested}: the initial generation timeout stays intact and only the repair-stream timeout is shortened`);
     assert.equal(qualityRepairAbortTriggered, true,
       `${requested}: the repair stream receives abort after emitting its complete candidate`);
-    assert.equal(abortedRepairExam.body.exam.questions.length, requested,
-      `${requested}: a streamed candidate survives abort only after passing both independent quality gates`);
-    assert.equal(abortedRepairExam.body.exam.questions.some((question) => question.id === "q-1"), false,
-      `${requested}: the question rejected before abort remains excluded`);
-    assert.equal(abortedRepairExam.body.exam.questions.some((question) => question.id === "quality-1"), true,
-      `${requested}: the complete candidate emitted before abort is salvaged after approval`);
+    assert.equal(abortedRepairExam.body.exam.questions.length, expectedQuestionCount,
+      `${requested}: complete streamed candidates survive abort only after passing both independent quality gates`);
+    assert.ok(rejectedQuestionIds.every((id) => !abortedRepairExam.body.exam.questions.some((question) => question.id === id)),
+      `${requested}: questions rejected before abort remain excluded`);
+    assert.ok(salvagedCandidateIds.every((id) => abortedRepairExam.body.exam.questions.some((question) => question.id === id)),
+      `${requested}: all complete candidates emitted before abort are salvaged after approval`);
     const expectedQuestionIds = [...firstRoundQuestions
-      .filter((question) => question.id !== "q-1")
-      .map((question) => question.id), "quality-1"].sort();
+      .filter((question) => !rejectedQuestionIds.includes(question.id))
+      .map((question) => question.id), ...salvagedCandidateIds].sort();
+    assert.equal(expectedQuestionIds.length, expectedQuestionCount);
     const issuedQuestionIds = abortedRepairExam.body.exam.questions.map((question) => question.id).sort();
     assert.deepEqual(issuedQuestionIds, expectedQuestionIds,
       `${requested}: issuance contains exactly the surviving original questions and the approved repair`);
-    assert.equal(new Set(issuedQuestionIds).size, requested,
+    assert.equal(abortedRepairExam.body.exam.questions.length, expectedQuestionCount,
+      `${requested}: delivery reports the exact number of approved questions after stream abort`);
+    assert.equal(abortedRepairExam.body.meta.requested, requested);
+    assert.equal(abortedRepairExam.body.meta.partial, partial,
+      `${requested}: an underfilled stream-abort result is explicitly marked partial`);
+    assert.equal(new Set(issuedQuestionIds).size, expectedQuestionCount,
       `${requested}: timeout salvage cannot create duplicate issued question IDs`);
     assert.ok(verifierInputs.slice(verifierCountBeforeAbortedRepair)
-      .some((batch) => batch.questions.some((question) => question.id === "quality-1")),
-    `${requested}: the salvaged candidate reaches the independent verifier`);
+      .some((batch) => salvagedCandidateIds.every((id) => batch.questions.some((question) => question.id === id))),
+    `${requested}: every salvaged candidate reaches the independent verifier`);
     assert.ok(solverInputs.slice(solverCountBeforeAbortedRepair)
-      .some((batch) => batch.some((question) => question.id === "quality-1")),
-    `${requested}: the salvaged candidate reaches the independent blind solver`);
+      .some((batch) => salvagedCandidateIds.every((id) => batch.some((question) => question.id === id))),
+    `${requested}: every salvaged candidate reaches the independent blind solver`);
     const abortedRepairLog = JSON.parse(qualityLogs.at(-1));
     assert.equal(abortedRepairLog.repairTransportError, "timeout");
     assert.equal(abortedRepairLog.repairResponseStatus, "incomplete");
-    assert.equal(abortedRepairLog.repairOutputQuestionCount, 1);
-    assert.equal(abortedRepairLog.finalQuestionCount, requested);
+    assert.equal(abortedRepairLog.repairOutputQuestionCount, salvagedCandidateCount);
+    assert.equal(abortedRepairLog.finalQuestionCount, expectedQuestionCount);
     const abortedRepairUsage = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
     assert.ok(abortedRepairUsage, `${requested}: abort recovery records its privacy-safe model usage chain`);
     assert.deepEqual(abortedRepairUsage.body.slice(-2).map((event) => event.pipeline_step),
@@ -2058,7 +2089,7 @@ try {
     const repairGateCallIndexes = calls.flatMap((call, index) => {
       const schema = call.body?.text?.format?.name;
       return ["exam_verifier_schema", "exam_solver_schema"].includes(schema)
-        && JSON.stringify(call.body?.input || []).includes("quality-1") ? [index] : [];
+        && salvagedCandidateIds.every((id) => JSON.stringify(call.body?.input || []).includes(id)) ? [index] : [];
     });
     assert.equal(repairGateCallIndexes.length, 2,
       `${requested}: the salvaged candidate is independently reviewed and solved exactly once`);
