@@ -2,6 +2,19 @@
 
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 
+- [x] Ny lokal säkerhetsgrind för naturvetenskapliga kortsvar kräver att hela
+  facitsvaret är en ordagrann, sammanhängande del av elevens material. Matchningen
+  bevarar versalisering och jämförelsesymboler och kräver ord-/talgränser, så
+  `CO`/`Co`, `7`/`70` eller `7`/`7,5` inte blandas ihop. En källhänvisning kan
+  inte längre bära ett facit med extra påståenden.
+  Matematikbehållare för härledda svar är undantagna; grafuppgifter har sin
+  befintliga deterministiska väg. Initiala kandidater, reparationer och slutlig
+  sammansättning använder grinden.
+- [!] Den deterministiska kontrollen gäller just `model_answer`. Rubric,
+  poängdelar och accepterade svar granskas fortsatt av verifierarmodellen,
+  som tidigare missat obestyrkta krav. Därför är källtrohet i hela
+  bedömningskontraktet fortfarande ett pilotstopp.
+
 - [x] Feature-Preview för `b676c8f` skapade ett nytt syntetiskt Biologi 1-prov
   med 12/12 godkända frågor från tre källavsnitt. Det färdiga provet lämnades
   in med tolv tomsvar för att visa alla fullpoängssvar; ett serververifierat

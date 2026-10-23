@@ -267,6 +267,39 @@ function normalizeGenericOption(value) {
     .toLocaleLowerCase("sv-SE");
 }
 
+function normalizeSourceAnswer(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function answerIsExtractive(question, sourceMaterial) {
+  const answer = normalizeSourceAnswer(question?.model_answer);
+  const source = normalizeSourceAnswer(sourceMaterial);
+  if (!answer || !source) return false;
+
+  const isWordCharacter = (value) => Boolean(value && /[\p{L}\p{N}_]/u.test(value));
+  const firstAnswerCharacter = Array.from(answer)[0];
+  const lastAnswerCharacter = Array.from(answer).at(-1);
+  let offset = source.indexOf(answer);
+  while (offset !== -1) {
+    const prefix = source.slice(0, offset);
+    const before = Array.from(prefix).at(-1);
+    const suffix = source.slice(offset + answer.length);
+    const after = Array.from(suffix)[0];
+    const decimalPrefix = /\p{N}[.,]$/u.test(prefix);
+    const leftBoundary = (!isWordCharacter(firstAnswerCharacter) || !isWordCharacter(before)) &&
+      !(isWordCharacter(firstAnswerCharacter) && decimalPrefix);
+    const decimalContinuation = /^[.,]\p{N}/u.test(suffix);
+    const rightBoundary = (!isWordCharacter(lastAnswerCharacter) || !isWordCharacter(after)) &&
+      !(isWordCharacter(lastAnswerCharacter) && decimalContinuation);
+    if (leftBoundary && rightBoundary) return true;
+    offset = source.indexOf(answer, offset + 1);
+  }
+  return false;
+}
+
 function generalQualityIssues(q, options) {
   const issues = [];
   if (!q || typeof q !== "object") return ["not_an_object"];
@@ -277,6 +310,10 @@ function generalQualityIssues(q, options) {
   if (!cogLevel) issues.push("cognitive_level_missing");
 
   const type = String(q.type || "");
+  if (type === "short" && options?.requireExtractiveAnswers === true &&
+      !answerIsExtractive(q, options.sourceMaterial)) {
+    issues.push("source_answer_not_extractable");
+  }
   if (type === "mc") {
     const opts = Array.isArray(q.options) ? q.options : [];
     if (opts.length < 2) issues.push("too_few_options");
@@ -570,6 +607,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
+  "source_answer_not_extractable",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",

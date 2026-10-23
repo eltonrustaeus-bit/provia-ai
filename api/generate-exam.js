@@ -988,7 +988,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "3c) Alla andra frågetyper ska ha graph_spec=null. " +
     "4) rubric ska vara kort och poängfokuserad. " +
     "5) model_answer ska alltid finnas. För mc: förklara varför rätt alternativ är rätt. För short: skriv ett fullpoängssvar. " +
-    "5b) Varje sakpåstående, exempel och krav i model_answer, rubric, scoring_rubric och accepted_answers måste stödjas av materialet eller vara en enkel härledning ur givna värden. Lägg inte till allmän ämneskunskap, nya exempel eller dolda poängkrav. Om underlaget är tunt: fråga smalare och skriv ett kortare, helt källbundet fullpoängssvar. " +
+    "5b) Varje sakpåstående och krav i model_answer, rubric, scoring_rubric och accepted_answers måste stödjas av materialet eller vara en enkel härledning ur givna värden. Lägg inte till allmän ämneskunskap, nya exempel eller dolda poängkrav. För faktabaserade kortsvar måste model_answer dessutom bestå av en eller flera sammanhängande, ordagranna meningar ur materialet, utan extra fakta, parafras eller tillägg. Skriv frågan så att de valda källmeningarna besvarar den. Om materialet inte innehåller ett tillräckligt svar: skapa inte frågan. För matematik får ett korrekt uträknat svar härledas från givna värden. " +
     "6) topic/subtopic/learning_objective ska kort beskriva vad frågan mäter. " +
     "6b) concept_tag ska vara SJÄLVA BEGREPPET frågan prövar, som en kort substantivfras på 1-4 ord — inte en beskrivning och inte en fråga. " +
     "Skriv samma begrepp likadant varje gång det återkommer. Exempel: 'Bytesrätt', 'Konjugatregeln', 'Fotosyntes', 'Derivatans definition', 'Ohms lag'. " +
@@ -1062,7 +1062,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     "3c) All other question types must have graph_spec=null. " +
     "4) rubric must be short and point-focused. " +
     "5) model_answer must always exist. For mc: explain why the correct option is correct. For short: provide a full-score answer. " +
-    "5b) Every factual claim, example, and requirement in model_answer, rubric, scoring_rubric and accepted_answers must be supported by the material or simply derived from given values. Do not add outside subject facts, new examples, or hidden grading requirements. When the source is thin, ask a narrower question and write a shorter, fully grounded full-score answer. " +
+    "5b) Every factual claim and requirement in model_answer, rubric, scoring_rubric and accepted_answers must be supported by the material or be a simple derivation from given values. Do not add outside subject facts, new examples, or hidden grading requirements. For factual short-answer questions, model_answer must additionally consist only of one or more contiguous, verbatim sentences from the material, with no extra facts, paraphrase, or additions. Write the question so those selected source sentences answer it. If the material does not contain enough to answer, do not create that item. Maths may use a correctly computed result derived from given values. " +
     "6) topic/subtopic/learning_objective must briefly describe what the question measures. " +
     "6b) concept_tag must be THE CONCEPT the question tests, as a short noun phrase of 1-4 words — not a description, not a question. " +
     "Write the same concept identically every time it recurs. Never write the question type, a chapter number, a generic word ('Principles', 'General'), or an empty value. " +
@@ -1850,6 +1850,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     let gate = assessment.gateExam(exam, {
       profile: subjectProfile,
       requireSourceReferences: true,
+      requireExtractiveAnswers: subjectProfile === "natural_sciences",
       reviewSingleWordOptionOutliers: lang === "sv",
       requireSourceSupportedOptionOutliers: lang === "sv",
       sourceMaterial: pastedText,
@@ -1970,6 +1971,7 @@ module.exports = async function handler(req, res, internalContext = null) {
             const repairGate = assessment.gateExam(normalized.exam, {
               profile: subjectProfile,
               requireSourceReferences: true,
+              requireExtractiveAnswers: subjectProfile === "natural_sciences",
               reviewSingleWordOptionOutliers: lang === "sv",
               requireSourceSupportedOptionOutliers: lang === "sv",
               sourceMaterial: pastedText,
@@ -2244,6 +2246,7 @@ module.exports = async function handler(req, res, internalContext = null) {
                 const candidateGate = assessment.gateExam(normalized2.exam, {
                   profile: subjectProfile,
                   requireSourceReferences: true,
+                  requireExtractiveAnswers: subjectProfile === "natural_sciences",
                   reviewSingleWordOptionOutliers: lang === "sv",
                   requireSourceSupportedOptionOutliers: lang === "sv",
                   sourceMaterial: pastedText,
@@ -2836,6 +2839,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   const finalGate = assessment.gateExam({ questions }, {
     profile: subjectProfile,
     requireSourceReferences: true,
+    requireExtractiveAnswers: subjectProfile === "natural_sciences",
     reviewSingleWordOptionOutliers: lang === "sv",
     requireSourceSupportedOptionOutliers: lang === "sv",
     sourceMaterial: pastedText,

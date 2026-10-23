@@ -169,8 +169,8 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
-assert.match(biologyPrompt.systemPrompt, /Varje sakpåstående, exempel och krav i model_answer.*måste stödjas av materialet/i,
-  "the generator keeps the full answer and scoring contract within the source");
+assert.match(biologyPrompt.systemPrompt, /faktabaserade kortsvar måste model_answer dessutom bestå.*ordagranna meningar ur materialet/i,
+  "the generator keeps factual science answer keys extractive");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
@@ -193,8 +193,8 @@ assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear a
   "English short-answer generation follows the same bounded-task rule");
 assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
   "English scoring criteria cannot silently require unrequested work");
-assert.match(englishPrompt.systemPrompt, /Every factual claim, example, and requirement in model_answer.*must be supported by the material/i,
-  "English generation has the same source-bound answer rule");
+assert.match(englishPrompt.systemPrompt, /each task must be independently solvable from the material and question text/i,
+  "math tasks retain the independent solvability requirement without extractive-only answers");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
@@ -450,6 +450,78 @@ assert.match(emptyNormalization.failure?.payload.message || "", /inga användbar
   "an empty draft explains that no usable questions were produced and what to try next");
 assert.equal(emptyNormalization.failure?.payload.exam, undefined,
   "an empty model response also returns no raw exam object");
+
+const extractiveAnswer = {
+  id: "source-answer", type: "short", question: "Vad bildas vid cellandning?", points: 2,
+  cognitive_level: "förstå", model_answer: "Koldioxid och vatten bildas.",
+  rubric: "Nämn båda produkterna.", source_references: ["Koldioxid och vatten bildas."],
+  scoring_rubric: { parts: [{ description: "Nämner båda produkterna", points: 2 }] },
+};
+const extractiveGate = assessment.gateExam({ questions: [extractiveAnswer] }, {
+  profile: "generic", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.", secret: signingSecret,
+});
+assert.equal(extractiveGate.questions.length, 1, "an exact source sentence can be issued as an answer");
+const unsupportedAnswerGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer,
+  model_answer: "Koldioxid och vatten bildas och frigör elektroner.",
+}] }, {
+  profile: "generic", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.", secret: signingSecret,
+});
+assert.equal(unsupportedAnswerGate.questions.length, 0,
+  "a source quote cannot license an unsupported addition to the full-score answer");
+assert.deepEqual(unsupportedAnswerGate.dropped[0].issues, ["source_answer_not_extractable"]);
+const contradictorySymbolGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "pH > 7 är surt.",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "pH < 7 är surt.", secret: signingSecret,
+});
+assert.equal(contradictorySymbolGate.questions.length, 0,
+  "extractive matching preserves meaning-bearing comparison symbols");
+const numericBoundaryGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "pH > 7",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "pH > 70 är basiskt.", secret: signingSecret,
+});
+assert.equal(numericBoundaryGate.questions.length, 0,
+  "extractive matching does not accept a number embedded in a longer number");
+for (const sourceMaterial of ["pH > 7,5 är basiskt.", "pH > 7.5 är basiskt."]) {
+  const decimalBoundaryGate = assessment.gateExam({ questions: [{
+    ...extractiveAnswer, model_answer: "pH > 7",
+  }] }, {
+    profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+    sourceMaterial, secret: signingSecret,
+  });
+  assert.equal(decimalBoundaryGate.questions.length, 0,
+    `extractive matching does not accept an integer prefix of ${sourceMaterial}`);
+  const decimalSuffixGate = assessment.gateExam({ questions: [{
+    ...extractiveAnswer, model_answer: "5 är basiskt.",
+  }] }, {
+    profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+    sourceMaterial, secret: signingSecret,
+  });
+  assert.equal(decimalSuffixGate.questions.length, 0,
+    `extractive matching does not accept the fractional suffix of ${sourceMaterial}`);
+}
+const chemicalCaseGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "CO bildas.",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Co bildas.", secret: signingSecret,
+});
+assert.equal(chemicalCaseGate.questions.length, 0,
+  "extractive matching preserves capitalization that distinguishes chemical species");
+const mathDerivationGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "x = 2", question: "Lös 2x = 4.",
+}] }, {
+  profile: "mathematics", requireSourceReferences: true, requireExtractiveAnswers: false,
+  sourceMaterial: "Lös ekvationen 2x = 4.", secret: signingSecret,
+});
+assert.equal(mathDerivationGate.questions.length, 1,
+  "math derivations use their existing independent verification path");
 
 const duplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "zero-first", question: "Vad får man som nollställ för funktionen y = 3x - 6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
