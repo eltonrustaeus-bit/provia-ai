@@ -1,5 +1,43 @@
 # 08 Current Status
 
+## Skolpilotens prov- och P.E.R.-grind — lokal arbetskopia, 2026-10-23
+
+- [x] En staging-Preview med tidigare kod skapade ett syntetiskt 3/3-prov.
+  P.E.R. gav en svarsfri ledtråd under provet och kunde förklara efter
+  verifierad rättning. Ett separat syntetiskt 12/12-prov skapades, men frågorna
+  koncentrerades till fotosyntes trots material med fyra avsnitt. Rättningen
+  av det provet fick `grading_response_invalid` och sparade inget verifierat
+  resultat. Detta är stagingfynd, inte bevis för den nuvarande lokala diffen.
+- [x] Lokalt styr den återupptagbara generatorn nya batcher mot mindre
+  refererade, tydligt rubriksatta källavsnitt. När fler redan verifierade
+  kandidater än platser finns prioriteras dem som tillför nya avsnitt.
+  Strukturell kontroll, källstöd, oberoende granskare, lösare och
+  dubblettkontroll är kvar. Avsnittsprioritering är inte en ny avslagsgrind;
+  tunna avsnitt och frågor som jämför avsnitt får inte ensamma stoppa 12
+  godkända frågor. Telemetrin beskriver refererade avsnitt, inte semantiskt
+  garanterad täckning.
+- [x] Lokalt rättas öppna svar i grupper om högst fyra, med högst tre samtidiga
+  modellförfrågningar. Varje grupp måste matcha sina signerade frågor och alla
+  grupper måste passera innan ett enda resultat sparas. Tester täcker 12 och
+  20 svar, saknad mittgrupp, HTTP-fel, kostnadshändelser, tidsbudget och
+  frisläppt rättningsanspråk. Den äldre stagingens 12-svarsfel är ännu inte
+  omtestat med denna ändring.
+- [x] Riktad prov-/rättningssvit: 39/39 tester passerade. P.E.R.-svit: 55/55
+  passerade. En seriell körning av samtliga 200 upptäckta lokala testfiler
+  utanför `tests/live/` avslutades med exitkod 0 efter att två föråldrade
+  testförväntningar uppdaterats. `git diff --check` och syntaxkontroller
+  passerade. Oberoende granskare fann inga kvarstående blockerande fynd i
+  den ändrade avsnittsprioriteringen och rättningsflödet.
+- [!] Arbetskopian är detached och innehåller ännu ocommittade måländringar
+  samt befintliga andra lokala ändringar. Ingen commit, push, ny Preview,
+  databasändring, merge till `main` eller produktionsåtgärd ingår här.
+  Modelljämförelse, verklig 12-frågeyield, full kostnad/väntetid och live
+  rättning på exakt denna revision återstår. Separat godkännande krävs för
+  feature-push/Preview och ytterligare betalda staginganrop.
+
+**PILOT NOT READY.** Lokala kontrakt är starkare, men den nya revisionen måste
+verifieras i staging mot verkliga modellutdata före skolpilot eller merge.
+
 ## UI-skydd för ofullständiga prov — 2026-10-23
 
 - [x] Appen avgör nu delprov genom att jämföra faktiskt antal returnerade

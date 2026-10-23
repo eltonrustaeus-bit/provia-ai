@@ -8,6 +8,7 @@
   var PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
   var PILOT_PENDING_QUESTION_KEY = "exgen_pilot_pending_per_question";
   var PILOT_REAUTH_REQUIRED_KEY = "exgen_pilot_reauth_required";
+  var PENDING_GENERATION_INPUT_KEY = "exgen_pending_generation_input_v1";
   var PRIVATE_KEYS = [
     "proviaai_history",
     "proviaai_mistakes",
@@ -26,14 +27,30 @@
     "proviaai_app_access"
   ];
 
+  function removeAndVerify(storage, key) {
+    try {
+      storage.removeItem(key);
+      return storage.getItem(key) === null;
+    } catch (_) { return false; }
+  }
+
   function clearPrivateData() {
-    PRIVATE_KEYS.forEach(function (key) { localStorage.removeItem(key); });
-    var teacherInsightKeys = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
-      if (key && key.indexOf("proviaai_teacher_insight_") === 0) teacherInsightKeys.push(key);
-    }
-    teacherInsightKeys.forEach(function (key) { localStorage.removeItem(key); });
+    var cleared = true;
+    PRIVATE_KEYS.forEach(function (key) {
+      if (!removeAndVerify(localStorage, key)) cleared = false;
+    });
+    if (!removeAndVerify(sessionStorage, PENDING_GENERATION_INPUT_KEY)) cleared = false;
+    try {
+      var teacherInsightKeys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && key.indexOf("proviaai_teacher_insight_") === 0) teacherInsightKeys.push(key);
+      }
+      teacherInsightKeys.forEach(function (key) {
+        if (!removeAndVerify(localStorage, key)) cleared = false;
+      });
+    } catch (_) { cleared = false; }
+    return cleared;
   }
 
   function examDataKeys(userId) {
@@ -44,7 +61,9 @@
 
   function hasLocalExamData(userId) {
     try {
-      return examDataKeys(userId).some(function (key) { return localStorage.getItem(key) !== null; });
+      if (examDataKeys(userId).some(function (key) { return localStorage.getItem(key) !== null; })) return true;
+      var pending = JSON.parse(sessionStorage.getItem(PENDING_GENERATION_INPUT_KEY) || "null");
+      return Array.isArray(pending?.requests) && pending.requests.some(function (record) { return record?.userId === String(userId); });
     } catch (_) { return true; }
   }
 
@@ -53,8 +72,19 @@
     if (!keys.length) return false;
     var cleared = true;
     keys.forEach(function (key) {
-      try { localStorage.removeItem(key); } catch (_) { cleared = false; }
+      if (!removeAndVerify(localStorage, key)) cleared = false;
     });
+    try {
+      var pending = JSON.parse(sessionStorage.getItem(PENDING_GENERATION_INPUT_KEY) || "null");
+      if (Array.isArray(pending?.requests)) {
+        var remaining = pending.requests.filter(function (record) { return record?.userId !== String(userId); });
+        if (remaining.length) sessionStorage.setItem(PENDING_GENERATION_INPUT_KEY, JSON.stringify({ version: 1, requests: remaining }));
+        else sessionStorage.removeItem(PENDING_GENERATION_INPUT_KEY);
+        var after = JSON.parse(sessionStorage.getItem(PENDING_GENERATION_INPUT_KEY) || "null");
+        if (Array.isArray(after?.requests) && after.requests.some(function (record) { return record?.userId === String(userId); })) cleared = false;
+        if (!remaining.length && after !== null) cleared = false;
+      }
+    } catch (_) { cleared = false; }
     return cleared;
   }
 
@@ -94,10 +124,11 @@
   }
 
   function clearForSignOut() {
-    clearPrivateData();
-    localStorage.removeItem(OWNER_KEY);
-    try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-    try { sessionStorage.removeItem(PILOT_REAUTH_REQUIRED_KEY); } catch (_) {}
+    var cleared = clearPrivateData();
+    if (!removeAndVerify(localStorage, OWNER_KEY)) cleared = false;
+    if (!removeAndVerify(sessionStorage, PILOT_PENDING_QUESTION_KEY)) cleared = false;
+    if (!removeAndVerify(sessionStorage, PILOT_REAUTH_REQUIRED_KEY)) cleared = false;
+    return cleared;
   }
 
   function clearPilotTransientForExternalSession(rawSession) {

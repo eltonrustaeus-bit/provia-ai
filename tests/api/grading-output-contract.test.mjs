@@ -67,6 +67,11 @@ const userId = "33333333-3333-4333-8333-333333333333";
 const signingSecret = "synthetic-invalid-output-secret";
 let providerOutput = "";
 let providerInput = null;
+const providerInputs = [];
+let providerStatus = () => 200;
+let providerDelayMs = 0;
+let activeProviderCalls = 0;
+let maxActiveProviderCalls = 0;
 const calls = [];
 const usageBatches = [];
 let issuanceState = "active";
@@ -108,8 +113,17 @@ globalThis.fetch = async (input, init = {}) => {
     return new Response(null, { status: 201 });
   }
   if (url === "https://api.openai.com/v1/responses") {
-    providerInput = JSON.parse(body.input.find((part) => part.role === "user").content);
-    return Response.json({ model: "measured-grade-model", usage: { input_tokens: 55, output_tokens: 13 }, output_text: providerOutput });
+    const inputPayload = JSON.parse(body.input.find((part) => part.role === "user").content);
+    providerInput = inputPayload;
+    providerInputs.push(inputPayload);
+    activeProviderCalls++;
+    maxActiveProviderCalls = Math.max(maxActiveProviderCalls, activeProviderCalls);
+    try {
+      if (providerDelayMs) await new Promise((resolve) => setTimeout(resolve, providerDelayMs));
+      return Response.json({ model: "measured-grade-model", usage: { input_tokens: 55, output_tokens: 13 },
+        output_text: typeof providerOutput === "function" ? providerOutput(inputPayload.items) : providerOutput },
+      { status: providerStatus(inputPayload.items) });
+    } finally { activeProviderCalls--; }
   }
   throw new Error(`Unexpected synthetic request: ${url}`);
 };
@@ -225,6 +239,103 @@ try {
   assert.deepEqual(persistedPayload.per_question.map((item) => item.feedback),
     fullCredit.body.result.per_question.map((item) => item.feedback),
     "the stored result and displayed result use the same normalized feedback");
+
+  const twelve = Array.from({ length: 12 }, (_, index) => ({ id: `q${index + 1}`, max_points: 2 }));
+  const twelveQuestions = twelve.map((item) => {
+    const question = {
+      id: item.id, type: "short", points: 2, question: `Förklara begrepp ${item.id}.`,
+      options: [], rubric: "Använd materialet.", model_answer: "En kort beskrivning.",
+      accepted_answers: [], concept_tag: "demokrati",
+    };
+    return { id: question.id, type: question.type, points: question.points, question: question.question,
+      options: [], grade_task: tasks.sealQuestion(question, signingSecret, tasks.hashContext(material, course, userId)) };
+  });
+  const body12 = { ...body, questions: twelveQuestions,
+    exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, twelveQuestions),
+    answers: twelve.map((item) => ({ id: item.id, answer: "Ett syntetiskt elevsvar." })) };
+  issuanceState = "active";
+  persistedPayload = null;
+  providerInputs.length = 0;
+  const usageBefore = usageBatches.length;
+  providerOutput = (items) => JSON.stringify({ per_question: items[0].id === "q5"
+    ? items.slice(0, -1).map((item) => row(item.id))
+    : items.map((item) => row(item.id)) });
+  const invalidMiddle = await invoke(body12);
+  assert.equal(invalidMiddle.status, 502);
+  assert.equal(invalidMiddle.body.error, "grading_response_invalid");
+  assert.equal(providerInputs.length, 3, "12 answers are graded in three bounded groups");
+  assert.deepEqual(providerInputs.map((input) => input.items.map((item) => item.id)), [
+    ["q1", "q2", "q3", "q4"], ["q5", "q6", "q7", "q8"], ["q9", "q10", "q11", "q12"],
+  ]);
+  assert.equal(usageBatches.length - usageBefore, 3, "every paid group is accounted for even on failure");
+  assert.equal(persistedPayload, null, "an invalid middle group cannot persist a partial score");
+  assert.equal(issuanceState, "active", "a rejected grade releases the exam claim for a safe retry");
+
+  providerInputs.length = 0;
+  providerOutput = (items) => JSON.stringify({ per_question: items.map((item) => row(item.id)) });
+  const validTwelve = await invoke(body12);
+  assert.equal(validTwelve.status, 200, JSON.stringify(validTwelve.body));
+  assert.equal(providerInputs.length, 3);
+  assert.deepEqual(validTwelve.body.result.per_question.map((item) => item.id), twelve.map((item) => item.id));
+  assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twelve.map((item) => item.id));
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerStatus = (items) => items[0].id === "q5" ? 502 : 200;
+  const usageBeforeHttpError = usageBatches.length;
+  const httpError = await invoke(body12);
+  assert.equal(httpError.status, 502);
+  assert.equal(usageBatches.length - usageBeforeHttpError, 3,
+    "usage from every provider response is recorded, including an HTTP error");
+  assert.equal(persistedPayload, null);
+  assert.equal(issuanceState, "active");
+  providerStatus = () => 200;
+
+  const twenty = Array.from({ length: 20 }, (_, index) => ({ id: `q${index + 1}`, max_points: 2 }));
+  const twentyQuestions = twenty.map((item) => {
+    const question = { id: item.id, type: "short", points: 2, question: `Beskriv del ${item.id}.`,
+      options: [], rubric: "Använd materialet.", model_answer: "En kort beskrivning.",
+      accepted_answers: [], concept_tag: "demokrati" };
+    return { id: question.id, type: question.type, points: question.points, question: question.question,
+      options: [], grade_task: tasks.sealQuestion(question, signingSecret, tasks.hashContext(material, course, userId)) };
+  });
+  const body20 = { ...body, questions: twentyQuestions,
+    exam_manifest: require("../../api/_exam-completion.cjs").issueExamManifest(userId, course, material, twentyQuestions),
+    answers: twenty.map((item) => ({ id: item.id, answer: "Ett syntetiskt elevsvar." })) };
+  issuanceState = "active";
+  persistedPayload = null;
+  providerDelayMs = 5;
+  maxActiveProviderCalls = 0;
+  providerInputs.length = 0;
+  const validTwenty = await invoke(body20);
+  assert.equal(validTwenty.status, 200, JSON.stringify(validTwenty.body));
+  assert.equal(providerInputs.length, 5);
+  assert.ok(maxActiveProviderCalls <= 3, "large submissions never launch more than three provider calls together");
+  assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twenty.map((item) => item.id));
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerDelayMs = 0;
+  providerInputs.length = 0;
+  const realNow = Date.now;
+  let syntheticNow = realNow();
+  let elapsedFirstWave = false;
+  Date.now = () => syntheticNow;
+  providerOutput = (items) => {
+    if (!elapsedFirstWave) {
+      syntheticNow += 27_000;
+      elapsedFirstWave = true;
+    }
+    return JSON.stringify({ per_question: items.map((item) => row(item.id)) });
+  };
+  try {
+    const timedOutTwenty = await invoke(body20);
+    assert.equal(timedOutTwenty.status, 502);
+    assert.equal(timedOutTwenty.body.error, "grading_provider_unavailable");
+    assert.equal(providerInputs.length, 3, "no second wave starts without persistence time remaining");
+    assert.equal(persistedPayload, null);
+    assert.equal(issuanceState, "active");
+  } finally { Date.now = realNow; }
 } finally {
   globalThis.fetch = oldFetch;
   for (const [key, value] of Object.entries(oldEnv)) {

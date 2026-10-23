@@ -546,8 +546,8 @@ test("direct chat calls during an exam get method guidance before quota, cache o
         },
         expected: [
           "Börja med att se vad axlarna visar. Vilket samband ber frågan dig att visa?",
-          "Välj två enkla x-värden i rutnätet och räkna fram deras y-värden. Håll beräkningarna åtskilda från själva ritandet.",
-          "Kontrollera att båda punkterna passar sambandet och att linjens riktning stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
+          "Pröva punkterna du väljer mot sambandet innan du ritar. Vilken del av materialet visar hur du kan kontrollera dem?",
+          "Kontrollera att det du ritat passar sambandet och att riktningen stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
         ],
         marker: "LINE_GRAPH_ANSWER_MARKER_65001",
       },
@@ -561,8 +561,8 @@ test("direct chat calls during an exam get method guidance before quota, cache o
         },
         expected: [
           "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
-          "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
-          "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
+          "Jämför tabellens rubriker med axlarnas namn. Vilket värde från en rad hör till respektive axel? Kontrollera rubriker och enheter innan du placerar punkten.",
+          "Kontrollera alla observationer innan du beskriver mönstret. Stämmer din beskrivning med varje punkt du placerat?",
         ],
         marker: "SCATTER_ANSWER_MARKER_73109",
       },
@@ -625,7 +625,7 @@ test("active-exam help uses the English hint ladder without forwarding question 
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.helpCap, 2);
   assert.equal(response.body.helpLevelUsed, 1);
-  assert.equal(response.body.answer, "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.");
+  assert.equal(response.body.answer, "Compare the table headings with the axis labels. For one row, which value belongs on each axis? Check labels and units before plotting it.");
   assert.doesNotMatch(response.body.answer, /ENGLISH_(?:PROMPT|QUESTION|ANSWER)_MARKER|777/);
   assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
 });
@@ -712,7 +712,7 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
   }
 });
 
-test("latest ungraded issuance keeps exam context gated but allows restricted all-app study chat", { timeout: 90_000 }, async () => {
+test("latest ungraded issuance blocks all model chat, even when client context looks unrelated", { timeout: 90_000 }, async () => {
   const priorPilotMode = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
@@ -726,14 +726,12 @@ test("latest ungraded issuance keeps exam context gated but allows restricted al
       pageContext: { page: "app", course: "Biologi" },
     }, "POST", "application/json");
     assert.equal(ended.statusCode, 200);
-    assert.equal(ended.body.examState, undefined);
-    assert.equal(ended.body.helpCap, 1);
-    assert.equal(ended.body.helpLevelUsed, 1);
-    assert.equal(ended.body.answer, defaultProviderAnswer);
+    assert.equal(ended.body.examState, "expired");
+    assert.equal(ended.body.helpCap, 2);
+    assert.equal(ended.body.helpLevelUsed, 2);
+    assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
-    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
-    assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")));
-    assert.ok(calls.some(({ url }) => url.includes("commit_per_chat_quota")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("per_chat_quota")));
     assert.ok(calls.every(({ url }) => !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
@@ -751,13 +749,9 @@ test("latest ungraded issuance keeps exam context gated but allows restricted al
       },
     }, "POST", "application/json");
     assert.equal(unrelatedDuringExam.statusCode, 200);
-    assert.equal(unrelatedDuringExam.body.helpCap, 1);
-    assert.equal(unrelatedDuringExam.body.helpLevelUsed, 1);
-    const unrelatedProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
-    assert.ok(unrelatedProvider);
-    assert.doesNotMatch(unrelatedProvider.body, /Vad beskriver k i y = kx/);
-    assert.doesNotMatch(unrelatedProvider.body, /submissionId/);
-    assert.doesNotMatch(unrelatedProvider.body, /## HJÄLPTAK|provläget tillåter/i);
+    assert.equal(unrelatedDuringExam.body.examActive, true);
+    assert.equal(unrelatedDuringExam.body.helpCap, 2);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
 
     calls.length = 0;
     const naturalHelpRequest = await invoke({
@@ -771,10 +765,37 @@ test("latest ungraded issuance keeps exam context gated but allows restricted al
       },
     }, "POST", "application/json");
     assert.equal(naturalHelpRequest.statusCode, 200);
-    assert.equal(naturalHelpRequest.body.helpCap, 1);
-    const naturalHelpProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
-    assert.ok(naturalHelpProvider, "a specific standalone subject question is allowed during an exam");
-    assert.doesNotMatch(naturalHelpProvider.body, /Vad beskriver k i y = kx|submissionId/);
+    assert.equal(naturalHelpRequest.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+
+    calls.length = 0;
+    const leakedClientFields = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      context: "PRIVATE_EXAM_CONTEXT_MARKER: lös y = kx + m",
+      topic: "PRIVATE_EXAM_TOPIC_MARKER",
+      history: [{ role: "assistant", content: "PRIVATE_EXAM_HISTORY_MARKER" }],
+      weakAreas: ["PRIVATE_EXAM_WEAK_AREA_MARKER"],
+      recentMistakes: [{ question: "PRIVATE_EXAM_MISTAKE_MARKER" }],
+      pageContext: {
+        page: "prov", course: "PRIVATE_EXAM_COURSE_MARKER",
+        studyMaterial: "PRIVATE_EXAM_MATERIAL_MARKER",
+        targets: [{ id: "exam", label: "PRIVATE_EXAM_TARGET_MARKER" }],
+        examState: { phase: "exam", submissionId: proof.receipt.split(".")[1] },
+      },
+    }, "POST", "application/json");
+    assert.equal(leakedClientFields.statusCode, 200);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")),
+      "untrusted context, history, topic and page metadata cannot reach a model during an exam");
+
+    calls.length = 0;
+    const hiddenExamQuestion = await invoke({
+      userQuestion: "Vad beskriver k i y = kx + m?",
+      helpLevel: 3,
+    }, "POST", "application/json");
+    assert.equal(hiddenExamQuestion.statusCode, 200);
+    assert.equal(hiddenExamQuestion.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("per_chat_quota")),
+      "omitting every client-side exam marker cannot unlock a direct answer");
 
     calls.length = 0;
     const vagueHelpRequest = await invoke({
@@ -827,12 +848,10 @@ test("latest ungraded issuance keeps exam context gated but allows restricted al
       pageContext: { page: "app" },
     }, "POST", "application/json");
     assert.equal(abandoned.statusCode, 200);
-    assert.equal(abandoned.body.helpCap, 1);
-    assert.equal(abandoned.body.helpLevelUsed, 1);
-    assert.equal(abandoned.body.answer, defaultProviderAnswer);
-    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
-    assert.ok(calls.some(({ url }) => url.includes("reserve_per_chat_quota")));
-    assert.ok(calls.some(({ url }) => url.includes("commit_per_chat_quota")));
+    assert.equal(abandoned.body.examState, "abandoned");
+    assert.equal(abandoned.body.helpCap, 2);
+    assert.match(abandoned.body.answer, /fullständigt svar kräver verifierad rättning/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("per_chat_quota")));
     assert.ok(calls.every(({ url }) => !url.includes("acquire_per_answer_lease")));
 
     calls.length = 0;
@@ -1015,12 +1034,12 @@ test("draft self-check guidance stays fixed, localized and answer-free for every
         en: [
           "If you have placed points, compare each one with the x and y values from the same table row.",
           "Check one point's labels and units against its row. What changes if its coordinates are reversed?",
-          "Compare the first and last observations, then describe the trend without assuming every point lies on a line.",
+          "Compare the observations you plotted. What pattern, if any, do they support? Check your claim against the source.",
         ],
         sv: [
           "Om du har placerat ut punkter, jämför varje punkt med x- och y-värdet från samma tabellrad.",
           "Kontrollera en punkts rubriker och enheter mot tabellraden. Vad ändras om koordinaterna byter plats?",
-          "Jämför första och sista observationen och beskriv trenden utan att anta att alla punkter ligger på en linje.",
+          "Jämför observationerna du placerat. Vilket mönster, om något, stöder de? Kontrollera ditt påstående mot materialet.",
         ],
       },
     },
@@ -1294,7 +1313,7 @@ test("active scatter-graph guidance is specific but never echoes point values", 
       pageContext: { currentQuestion: { type: "graph", graphMode: "scatter", text: "Placera (0, 4), (1, 3), (2, 1)." } },
     });
     assert.equal(response.statusCode, 200);
-    assert.match(response.body.answer, /första värdet är vågrätt \(x\)/i);
+    assert.match(response.body.answer, /vilket värde från en rad hör till respektive axel/i);
     assert.match(response.body.answer, /rubriker och enheter/i);
     assert.doesNotMatch(response.body.answer, /\(0, 4\)|\(1, 3\)|\(2, 1\)|0, 4|1, 3|2, 1/);
     assert.equal(response.body.helpLevelUsed, 1);
@@ -1322,7 +1341,7 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
       assert.equal(response.statusCode, 200);
       assert.equal(response.body.helpLevelUsed, helpLevel);
       assert.equal(response.body.examActive, true);
-      assert.match(response.body.answer, /lutning|förändring|täljaren|nämnaren/i);
+      assert.match(response.body.answer, /punkter|förändring|branthet|axlarna/i);
       assert.doesNotMatch(response.body.answer, /\(1, 5\)|\(3, 11\)|6\/2|ANSWER_LEAK_MARKER|\b3\b|\b11\b/);
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
       answers.push(response.body.answer);
@@ -1337,7 +1356,7 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
         text: "Förklara lutningen i ett linjärt samband.",
       } },
     });
-    assert.match(drafted.body.answer, /Jämför du dem i samma ordning/i);
+    assert.match(drafted.body.answer, /samma ordning som i materialet/i);
     assert.ok(sensitiveValues.every((value) => !drafted.body.answer.includes(value)));
 
     const english = await invoke({
@@ -1347,12 +1366,72 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
         type: "short", text: "Find the slope of a line through two points.",
       } },
     });
-    assert.match(english.body.answer, /Slope describes how much y changes/i);
+    assert.match(english.body.answer, /Look at points on the line/i);
     assert.equal(english.body.examActive, true);
     assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
   } finally {
     activeCount = 0;
   }
+});
+
+test("active conceptual questions do not receive their formula or axis mapping as a fixed hint", async () => {
+  activeCount = 1;
+  try {
+    calls.length = 0;
+    const slope = await invoke({
+      helpLevel: 2,
+      userQuestion: "Säg formeln direkt",
+      pageContext: { currentQuestion: { type: "short", text: "Skriv formeln för en linjes lutning." } },
+    });
+    assert.equal(slope.statusCode, 200);
+    assert.match(slope.body.answer, /förändringarna|material/i);
+    assert.doesNotMatch(slope.body.answer, /förändring(?:en)? i y delat med förändring(?:en)? i x|Δy\s*\/\s*Δx|k\s*=\s*/i);
+
+    calls.length = 0;
+    const scatter = await invoke({
+      helpLevel: 1,
+      userQuestion: "Säg vilken kolumn som är x",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "scatter", text: "Vilken tabellkolumn hör till x-axeln?" } },
+    });
+    assert.equal(scatter.statusCode, 200);
+    assert.match(scatter.body.answer, /tabellens rubriker|axlarnas namn/i);
+    assert.doesNotMatch(scatter.body.answer, /första värdet är vågrätt|andra värdet är lodrätt/i);
+
+    const line = await invoke({
+      helpLevel: 1,
+      userQuestion: "Hur många punkter behövs?",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "line", text: "Hur många punkter behövs för att rita en linje?" } },
+    });
+    assert.equal(line.statusCode, 200);
+    assert.match(line.body.answer, /Pröva punkterna/i);
+    assert.doesNotMatch(line.body.answer, /två punkter|två x-värden|\b2\b/i);
+
+    const scatterPattern = await invoke({
+      helpLevel: 2,
+      userQuestion: "Måste alla punkter ligga på en linje?",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "scatter", text: "Måste alla observationspunkter ligga på en linje?" } },
+    });
+    assert.equal(scatterPattern.statusCode, 200);
+    assert.match(scatterPattern.body.answer, /Kontrollera alla observationer/i);
+    assert.doesNotMatch(scatterPattern.body.answer, /Utgå inte från att alla punkter ligger på en linje/i);
+
+    const draftedLine = await invoke({
+      helpLevel: 2,
+      userQuestion: "Hur många punkter behövs för linjen?",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "line", answered: true, text: "Hur många punkter behövs för att rita linjen?" } },
+    });
+    assert.equal(draftedLine.statusCode, 200);
+    assert.doesNotMatch(draftedLine.body.answer, /båda punkterna|två punkter|\b2\b/i);
+
+    const draftedScatter = await invoke({
+      lang: "en", helpLevel: 2,
+      userQuestion: "Must all the points lie on one line?",
+      pageContext: { currentQuestion: { type: "graph", graphMode: "scatter", answered: true, text: "Must all observations lie on one line?" } },
+    });
+    assert.equal(draftedScatter.statusCode, 200);
+    assert.doesNotMatch(draftedScatter.body.answer, /without assuming every point lies on a line|not every point/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("per_chat_quota")));
+  } finally { activeCount = 0; }
 });
 
 test("unknown or contradictory graph modes get neutral graph guidance, not a wrong method", async () => {
@@ -1385,7 +1464,7 @@ test("unknown or contradictory graph modes get neutral graph guidance, not a wro
       helpLevel: 1,
       pageContext: { currentQuestion: { type: "graph", graph_ui: { mode: "scatter" } } },
     });
-    assert.match(scatterFromUi.body.answer, /Placera en rad i taget/i);
+    assert.match(scatterFromUi.body.answer, /Jämför tabellens rubriker med axlarnas namn/i);
   } finally {
     activeCount = 0;
   }
@@ -1463,10 +1542,12 @@ test("an exam-marked request without a valid issuance identity cannot reach the 
   }
 });
 
-test("an unrelated study question remains available from an exam page without exposing exam data", async () => {
+test("a verified completed exam allows unrelated study help without forwarding stale exam data", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
+  issuanceState = "completed";
+  latestSubmissionId = proof.receipt.split(".")[1];
   try {
     for (const page of ["prov", "resultat"]) {
       calls.length = 0;
@@ -1476,14 +1557,15 @@ test("an unrelated study question remains available from an exam page without ex
         pageContext: { page, currentQuestion: { text: "EXAM_ONLY_PROMPT_SENTINEL" } },
       }, "POST", "application/json");
       assert.equal(response.statusCode, 200);
-      assert.equal(response.body.helpCap, 1);
-      assert.equal(response.body.helpLevelUsed, 1);
       assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+      assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
       const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
       assert.doesNotMatch(provider.body, /EXAM_ONLY_PROMPT_SENTINEL|submissionId/);
     }
   } finally {
     activeCount = 0;
+    issuanceState = "active";
+    latestSubmissionId = null;
     if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = prior;
   }
@@ -1544,13 +1626,14 @@ test("verified inactive exam metadata allows ordinary help but does not bypass a
     assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
 
     calls.length = 0;
+    latestSubmissionId = submissionId;
     const unboundExamState = await invoke({
       userQuestion: "Explain a biology concept",
       pageContext: { examState: { phase: "exam" } },
     }, "POST", "application/json");
     assert.equal(unboundExamState.statusCode, 200);
-    assert.equal(unboundExamState.body.helpCap, 1);
     assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")));
     const unboundProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
     assert.doesNotMatch(unboundProvider.body, /examState|Aktiv fråga/);
 
@@ -1570,6 +1653,7 @@ test("verified inactive exam metadata allows ordinary help but does not bypass a
   } finally {
     activeCount = 0;
     issuanceState = "active";
+    latestSubmissionId = null;
     if (priorPilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = priorPilotMode;
   }

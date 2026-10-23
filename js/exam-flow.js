@@ -495,6 +495,7 @@
     questionCountNote: "",
     material: "",
     focusTerms: null,
+    resumeRequest: null,
     exam: null,
     draftPhase: "active",
     answers: questionState(),   // qid -> svar
@@ -848,6 +849,51 @@
       act.appendChild(back);
     }
 
+    if (window.ExGenEngine && window.ExGenEngine.pendingGenerations) {
+      var pendingArea = el("div", "xf-pending-generations");
+      act.appendChild(pendingArea);
+      window.ExGenEngine.pendingGenerations().then(function (records) {
+        if (renderVersion !== startVersion || !UI.screens.start.classList.contains("on")) return;
+        if (!Array.isArray(records) || !records.length) return;
+        pendingArea.appendChild(el("p", "xf-sub", tx(
+          "Du har ett sparat provförsök i den här fliken.",
+          "You have a saved exam attempt in this tab."
+        )));
+        records.forEach(function (record) {
+          var payload = record.payload;
+          var resume = el("button", "xf-btn ghost", tx(
+            "Återuppta " + payload.numQuestions + " frågor i " + (payload.course || "ditt material"),
+            "Resume " + payload.numQuestions + " questions in " + (payload.course || "your material")
+          ));
+          resume.type = "button";
+          resume.addEventListener("click", async function () {
+            var requestOwnerId = uid();
+            resume.disabled = true;
+            try {
+              var current = await window.ExGenEngine.pendingGenerations();
+              if (requestOwnerId === "anon" || uid() !== requestOwnerId ||
+                  !current.some(function (item) { return item.idempotencyKey === record.idempotencyKey; })) {
+                pendingArea.textContent = tx("Provbegäran finns inte längre. Ladda om sidan för att se aktuell status.", "The exam request is no longer available. Reload for the current status.");
+                return;
+              }
+              S.course = payload.course;
+              S.level = payload.level;
+              S.qType = payload.qType;
+              S.num = payload.numQuestions;
+              S.nonGraphNum = payload.qType === "graph" ? 12 : payload.numQuestions;
+              S.material = payload.pastedText;
+              S.focusTerms = payload.focusTerms.slice();
+              S.resumeRequest = record;
+              stepContract();
+            } catch (_) {
+              pendingArea.textContent = tx("Provbegäran kunde inte kontrolleras. Försök igen när anslutningen fungerar.", "The exam request could not be checked. Try again when your connection is working.");
+            } finally { resume.disabled = false; }
+          });
+          pendingArea.appendChild(resume);
+        });
+      }).catch(function () {});
+    }
+
     b.appendChild(act);
     if ((!draft || !draft.exam.exam_manifest) && window.ExGenEngine && window.ExGenEngine.activeExamCount) {
       var recovery = el("div", "xf-err xf-exam-recovery");
@@ -1003,6 +1049,7 @@
   // ── Steg 1: ämne ─────────────────────────────────────────────────────────
 
   function stepSubject() {
+    S.resumeRequest = null;
     // This is a neutral study/setup screen, not the prior result or question.
     if (window.clearPerContext) window.clearPerContext();
     else if (window.PER && window.PER.describe) window.PER.describe(null);
@@ -1328,6 +1375,7 @@
   }
 
   function stepMaterial(initialMessage) {
+    S.resumeRequest = null;
     UI.languageRerender = stepMaterial;
     var b = mount("material");
 
@@ -1495,7 +1543,7 @@
     b.appendChild(card);
 
     var t = terms(S.material);
-    if (t.length) {
+    if (t.length && !S.resumeRequest) {
       if (!Array.isArray(S.focusTerms)) S.focusTerms = t.slice();
       S.focusTerms = S.focusTerms.filter(function (term) { return t.indexOf(term) !== -1; });
 
@@ -1542,7 +1590,9 @@
     var generationProgress = createGenerationProgress();
     b.appendChild(generationProgress);
     var act = el("div", "xf-act");
-    var go = el("button", "xf-btn primary", tx("Skapa provet", "Create exam"));
+    var go = el("button", "xf-btn primary", S.resumeRequest
+      ? tx("Fortsätt provskapandet", "Resume exam creation")
+      : tx("Skapa provet", "Create exam"));
     go.type = "button";
     go.addEventListener("click", function () { build(go, err, generationProgress); });
     act.appendChild(go);
@@ -1560,8 +1610,9 @@
     act.appendChild(perButton);
     b.appendChild(act);
 
-    b.appendChild(el("div", "xf-note",
-      tx("AI skapar frågor med ditt material som underlag, men kan missa detaljer. Kontrollera att de passar kursen medan du arbetar igenom provet.", "AI creates questions using your material as a reference, but may miss details. Check that they fit your course as you work through the exam.")));
+    b.appendChild(el("div", "xf-note", S.resumeRequest
+      ? tx("Det här fortsätter samma provbegäran med samma material, val och språk. Vill du ändra något, gå tillbaka och starta ett nytt provförsök.", "This continues the same request with the same material, choices and language. To change anything, go back and start a new attempt.")
+      : tx("AI skapar frågor med ditt material som underlag, men kan missa detaljer. Kontrollera att de passar kursen medan du arbetar igenom provet.", "AI creates questions using your material as a reference, but may miss details. Check that they fit your course as you work through the exam.")));
 
     screen("contract");
   }
@@ -1608,7 +1659,9 @@
       generationProgress.textContent = "";
       busy(false);
       btn.disabled = false;
-      btn.textContent = tx("Skapa provet", "Create exam");
+      btn.textContent = S.resumeRequest
+        ? tx("Fortsätt provskapandet", "Resume exam creation")
+        : tx("Skapa provet", "Create exam");
     }
 
     window.ExGenEngine.setInputs({
@@ -1616,7 +1669,7 @@
       num: S.num, material: S.material, focusTerms: S.focusTerms || []
     });
 
-    window.ExGenEngine.generate({ onProgress: function (progress) {
+    window.ExGenEngine.generate({ resumeRequest: S.resumeRequest, onProgress: function (progress) {
       if (!S.generating || uid() !== requestOwnerId) return;
       var requested = Number.isInteger(progress.requested) ? progress.requested : S.num;
       var approved = Math.max(0, Math.min(requested, Number.isInteger(progress.approved) ? progress.approved : 0));
@@ -1624,6 +1677,8 @@
         tx(" frågor godkända. ", " questions approved. ") +
         (progress.stage === "assemble"
           ? tx("Färdigställer provet.", "Preparing your exam.")
+          : progress.state === "retrying"
+          ? tx("Jag inväntar nästa försök.", "Waiting for the next attempt.")
           : tx("Jag skapar och granskar resten.", "Creating and checking the remaining questions."));
     } }).then(function (r) {
       done();
@@ -1638,6 +1693,7 @@
         return;
       }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
+        if (r?.errorCode === "generation_request_expired") S.resumeRequest = null;
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
         var retryHint = r && r.errorCode === "incomplete_exam"
           ? tx("Lägg till mer relevant material eller avgränsa området tydligare.", "Add more relevant study material or narrow the topic.")
@@ -1646,6 +1702,7 @@
         return;
       }
       S.draftOwnerId = requestOwnerId;
+      S.resumeRequest = null;
       S.exam = normalizeIds(r.exam);
       S.draftPhase = "active";
       var got = S.exam.questions.length;

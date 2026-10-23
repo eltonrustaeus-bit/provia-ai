@@ -136,6 +136,8 @@ function reviewInputWithinLimits(input) {
         typeof question.question !== "string" || question.question.length > 3000) return false;
     if (question.concept_tag !== undefined &&
         (typeof question.concept_tag !== "string" || question.concept_tag.length > 100)) return false;
+    if (question.learning_objective !== undefined &&
+        (typeof question.learning_objective !== "string" || question.learning_objective.length > 140)) return false;
     size += JSON.stringify(question).length;
     if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
   }
@@ -204,8 +206,8 @@ const SUBJECT_HINTS = {
     en: "Social-studies-specific: verify that dates, people, sequences of events, institutions and figures are real and correctly stated. Watch especially for fabricated sources, quotations and statistics. Interpretive or evaluative questions often have several reasonable answers — such a question must be short-answer, not multiple choice, and otherwise gives approved=false.",
   },
   languages: {
-    sv: "Ämnesspecifikt för språk: kontrollera att målspråket är grammatiskt korrekt, att stavning och diakritiska tecken stämmer, och att inget distraktoralternativ råkar vara en lika godtagbar översättning, böjning eller synonym som facit. Idiomatiska uttryck har ofta fler än ett korrekt svar — då är frågan flertydig.",
-    en: "Language-specific: verify that the target language is grammatically correct, that spelling and diacritics are right, and that no distractor happens to be an equally acceptable translation, inflection or synonym as the answer key. Idiomatic expressions often have more than one correct answer — that makes the question ambiguous.",
+    sv: "Ämnesspecifikt för språk: kontrollera att målspråket är grammatiskt korrekt, att stavning och diakritiska tecken stämmer, och att inget distraktoralternativ råkar vara en lika godtagbar översättning, böjning eller synonym som facit. En flervalsfråga om idiom är flertydig om flera alternativ kan vara rätt; i kortsvar kan flera giltiga formuleringar godtas om bedömningsmatrisen rymmer dem.",
+    en: "Language-specific: verify that the target language is grammatically correct, that spelling and diacritics are right, and that no distractor happens to be an equally acceptable translation, inflection or synonym as the answer key. An idiom multiple-choice item is ambiguous if several options can be correct; a short-answer item may allow several valid phrasings when its rubric accepts them.",
   },
   programming: {
     sv: "Ämnesspecifikt för programmering: kontrollera att kod i frågan och i alternativen är syntaktiskt giltig i det angivna språket, och att den påstådda utdatan är vad koden faktiskt producerar — spåra igenom den rad för rad. Var uppmärksam på nollindexering, off-by-one och att språkversionens beteende stämmer.",
@@ -238,9 +240,10 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Du litar inte blint på frågans facit. Bedöm varje fråga på egna meriter mot ämneskunskap du känner till. " +
       "För varje kortsvarsfråga: lös uppgiften själv från grunden UTAN att först utgå från model_answer. Jämför sedan ditt svar med model_answer, rubric och scoring_rubric. " +
       "Sätt approved=false och ange required_changes om exempelsvaret är fel, motsägelsefullt, otillräckligt för utlovade poäng eller kräver något som frågan inte efterfrågar. " +
+      "Flera giltiga kortsvar är tillåtna när frågan är tydligt avgränsad och bedömningsmatrisen accepterar dem. " +
       "Använd source_material som begränsat faktaunderlag för source_alignment; om stödet saknas eller är oklart, sänk source_alignment och godkänn inte ett obestyrkt sakpåstående. " +
       "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Avvisa en kandidat som upprepar eller nära parafraserar samma lärandemål; comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
-      "Sätt approved=false om NÅGOT av följande gäller: faktafel, mer än ett rimligt svar, en hittad-på term/kategori/paragraf, " +
+      "Sätt approved=false om NÅGOT av följande gäller: faktafel, en flervalsfråga med fler än ett rimligt svar eller flera försvarbara tolkningar, ett giltigt kortsvar som bedömningsmatrisen inte accepterar, en hittad-på term/kategori/paragraf, " +
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
       "eller en svårighetsgrad som inte matchar den valda E/C/A-nivån och uppgiftens faktiska krav. cognitive_level är en separat beskrivning av tänkandet och får inte ensam avgöra nivån. " +
       "För option_quality ska du bedöma VARJE alternativ i samma ordning: true endast om alternativet är begripligt, språkligt rimligt och relevant som svar eller distraktor i ämnet; false för nonsensord, trasig text, oförklarad språkblandning eller uppenbart irrelevant alternativ. " +
@@ -254,9 +257,10 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Do not blindly trust the answer key. Judge each question on its own merits against your subject knowledge. " +
       "For every short-answer item, solve the task from scratch BEFORE relying on model_answer. Then compare your answer with model_answer, rubric, and scoring_rubric. " +
       "Set approved=false and explain required_changes if the exemplar is wrong, contradictory, insufficient for the promised points, or requires more than the question asks. " +
+      "Multiple valid short answers are acceptable when the question is clearly scoped and the grading rubric accepts them. " +
       "Use source_material as bounded factual evidence for source_alignment; if support is missing or unclear, lower source_alignment and do not approve unsupported claims. " +
       "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Reject a candidate that repeats or near-paraphrases the same learning objective; comparison_questions are context only and must not receive results. " +
-      "Set approved=false if ANY of the following apply: factual errors, more than one reasonable answer, a fabricated " +
+      "Set approved=false if ANY of the following apply: factual errors, a multiple-choice question with more than one reasonable answer or defensible interpretation, a valid short answer excluded by its grading rubric, a fabricated " +
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match the selected E/C/A target and actual task demand. cognitive_level describes the type of thinking separately and must not determine the target level by itself. " +
       "For option_quality, assess EVERY option in order: true only when it is intelligible, linguistically plausible, and relevant as an answer or distractor in the subject; false for nonsense words, broken text, unexplained language mixing, or clearly irrelevant choices. " +
@@ -328,6 +332,7 @@ async function verifyQuestions(questions, opts) {
       type: q?.type,
       question: q?.question,
       ...(typeof q?.concept_tag === "string" ? { concept_tag: q.concept_tag } : {}),
+      ...(typeof q?.learning_objective === "string" ? { learning_objective: q.learning_objective } : {}),
     }));
   }
   const reviewPayload = JSON.stringify(reviewInput);

@@ -23,6 +23,18 @@ test("MC candidates are withheld when the enabled blind solver fails", () => {
   assert.equal(result.solverReason, "solver_unavailable");
 });
 
+test("a rejected MC candidate still counts the independent solver decision", () => {
+  const result = decideFirstPass({ type: "mc" }, {
+    verifierCallOk: true, verifierResult: { approved: false },
+    solverEnabled: true, solverCallOk: true, solverResult: { keep: false, reason: "ambiguous" },
+  }, approve, keep);
+  assert.equal(result.approved, false);
+  assert.equal(result.verifierRejected, true);
+  assert.equal(result.solverChecked, true);
+  assert.equal(result.solverRejected, true);
+  assert.equal(result.solverReason, "ambiguous");
+});
+
 test("short-answer candidates do not depend on the MC solver", () => {
   const result = decideFirstPass({ type: "short" }, {
     verifierCallOk: true, verifierResult: { approved: true },

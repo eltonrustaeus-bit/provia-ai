@@ -14,7 +14,8 @@ for (const forbidden of [
 }
 
 assert.match(source, /grading_provider_unavailable[\s\S]*?Rättningen kunde inte slutföras/);
-assert.match(source, /grading_response_invalid[\s\S]*?Rättningen gav inget användbart resultat/);
+assert.match(source, /grading_response_invalid/);
+assert.match(source, /Rättningen gav ett ofullständigt resultat\. Försök igen\./);
 assert.match(source, /grading_failed[\s\S]*?Rättningen kunde inte slutföras/);
 
 console.log("grading error safety: provider, model output, and internal exceptions stay server-side");

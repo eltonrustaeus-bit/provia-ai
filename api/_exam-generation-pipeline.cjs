@@ -88,6 +88,7 @@ function comparisonQuestionsFor(questions, requested) {
     const candidate = {
       id: `approved-${index + 1}`,
       concept_tag: String(question?.concept_tag || question?.topic || "").slice(0, 100),
+      ...(question?.learning_objective ? { learning_objective: String(question.learning_objective).slice(0, 140) } : {}),
       question: String(question?.question || "").slice(0, 1200),
     };
     if (!candidate.question.trim()) continue;
@@ -135,11 +136,16 @@ async function advance(job, { deadlineAt = null } = {}) {
   const batchLimit = widenRepairBatch ? 5 : 3;
   const batchCount = Math.min(batchLimit, Math.max(2, slots));
   const comparisonQuestions = comparisonQuestionsFor(existing, job.requested_count);
+  const coverage = require("./_source-coverage.cjs");
+  const sections = Array.isArray(job.payload.focusTerms) && job.payload.focusTerms.length
+    ? [] : coverage.sourceSections(job.payload.pastedText);
+  const sourceTarget = coverage.nextSourceSection(sections, existing, Number(job.stage_attempts) - 1);
   const payload = {
     ...job.payload,
     qType: batchType || job.payload.qType,
     numQuestions: batchCount,
     comparisonQuestions,
+    sourceTarget: sourceTarget ? { title: sourceTarget.title, excerpt: sourceTarget.excerpt } : null,
     idempotencyKey: crypto.randomUUID(),
   };
   delete payload.attemptId;
@@ -204,7 +210,18 @@ async function advance(job, { deadlineAt = null } = {}) {
   let batchIdCollisions = 0;
   let semanticDuplicateCandidates = 0;
   let overLimitCandidates = 0;
-  for (const question of generated.body.questions) {
+  const sourceCounts = sourceTarget?.counts || [];
+  const rankedQuestions = generated.body.questions.map((question, index) => ({ question, index,
+    sourceIndices: coverage.questionSectionIndices(question, sections) }));
+  const eligibleCount = rankedQuestions.filter(({ question }) => question.validation_status === "verified" &&
+    (!targets || question.type === batchType) && noSemanticDuplicate(existing, question)).length;
+  if (sections.length && eligibleCount > slots) rankedQuestions.sort((left, right) => {
+    const newSections = (entry) => entry.sourceIndices.filter((index) => sourceCounts[index] === 0).length;
+    const lowestCount = (entry) => entry.sourceIndices.length
+      ? Math.min(...entry.sourceIndices.map((index) => sourceCounts[index])) : Infinity;
+    return newSections(right) - newSections(left) || lowestCount(left) - lowestCount(right) || left.index - right.index;
+  });
+  for (const { question } of rankedQuestions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
     if (targets && question.type !== batchType) { wrongTypeCandidates++; continue; }
     if (acceptedOfType >= typeLimit || accepted.length >= job.requested_count) { overLimitCandidates++; continue; }
@@ -259,6 +276,11 @@ async function advance(job, { deadlineAt = null } = {}) {
     semanticDuplicateCandidates,
     overLimitCandidates,
     acceptedAfter: accepted.length,
+    sourceSectionCount: sections.length,
+    sourceSectionsReferencedBefore: sourceTarget ? sourceTarget.counts.filter((count) => count > 0).length : null,
+    sourceSectionsReferencedAfter: sourceTarget
+      ? sections.filter((_, index) => accepted.some((question) => coverage.questionSectionIndices(question, sections).includes(index))).length
+      : null,
     latencyMs: Date.now() - generationStartedAt,
   }));
 

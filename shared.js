@@ -1505,11 +1505,10 @@ function finalizeMsg(div, text) {
           weakAreas = Object.keys(courseFreq).sort(function(a,b) { return courseFreq[b]-courseFreq[a]; }).slice(0,5);
         } catch (_) {}
 
-        var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply };
+        var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply, lang: perHistoryUsesEnglish() ? 'en' : 'sv' };
         if (opts && opts.examProof) {
           fetchBodyObj.examReview = true;
           fetchBodyObj.examProof = opts.examProof;
-          fetchBodyObj.lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en' ? 'en' : 'sv';
         }
         var fetchHdrs = { 'Content-Type': 'application/json' };
         if (isLandingMode) {

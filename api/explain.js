@@ -556,13 +556,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ],
       line: [
         "First identify what each axis represents. What relationship is the question asking you to show?",
-        "Choose two convenient x-values in the grid and work out their y-values. Keep your calculations separate from the drawing.",
-        "Check that both points fit the relationship and that the line's direction matches your reasoning. What could you verify before submitting?",
+        "Test the points you select against the relationship before drawing. Which part of your material shows how to check them?",
+        "Check that your plotted work fits the relationship and that the direction matches your reasoning. What could you verify before submitting?",
       ],
       scatter: [
         "Check what each axis represents and which column belongs on each axis. What does one row become on the graph?",
-        "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.",
-        "Compare the first and last observations, then describe the pattern you see. Do not assume every point lies on a line.",
+        "Compare the table headings with the axis labels. For one row, which value belongs on each axis? Check labels and units before plotting it.",
+        "Check all observations before describing the pattern. Does your description fit every point you placed?",
       ],
       genericGraph: [
         "Check what the axes and symbols show. Which part of your material could help you interpret them?",
@@ -583,13 +583,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ],
       line: [
         "Börja med att se vad axlarna visar. Vilket samband ber frågan dig att visa?",
-        "Välj två enkla x-värden i rutnätet och räkna fram deras y-värden. Håll beräkningarna åtskilda från själva ritandet.",
-        "Kontrollera att båda punkterna passar sambandet och att linjens riktning stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
+        "Pröva punkterna du väljer mot sambandet innan du ritar. Vilken del av materialet visar hur du kan kontrollera dem?",
+        "Kontrollera att det du ritat passar sambandet och att riktningen stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
       ],
       scatter: [
         "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
-        "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
-        "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
+        "Jämför tabellens rubriker med axlarnas namn. Vilket värde från en rad hör till respektive axel? Kontrollera rubriker och enheter innan du placerar punkten.",
+        "Kontrollera alla observationer innan du beskriver mönstret. Stämmer din beskrivning med varje punkt du placerat?",
       ],
       genericGraph: [
         "Se vad axlar och markeringar visar. Vilken del av ditt material kan hjälpa dig att tolka dem?",
@@ -617,7 +617,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       scatter: [
         "If you have placed points, compare each one with the x and y values from the same table row.",
         "Check one point's labels and units against its row. What changes if its coordinates are reversed?",
-        "Compare the first and last observations, then describe the trend without assuming every point lies on a line.",
+        "Compare the observations you plotted. What pattern, if any, do they support? Check your claim against the source.",
       ],
       genericGraph: [
         "If you have made a mark on the graph, explain what that mark represents using the axes.",
@@ -644,7 +644,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       scatter: [
         "Om du har placerat ut punkter, jämför varje punkt med x- och y-värdet från samma tabellrad.",
         "Kontrollera en punkts rubriker och enheter mot tabellraden. Vad ändras om koordinaterna byter plats?",
-        "Jämför första och sista observationen och beskriv trenden utan att anta att alla punkter ligger på en linje.",
+        "Jämför observationerna du placerat. Vilket mönster, om något, stöder de? Kontrollera ditt påstående mot materialet.",
       ],
       genericGraph: [
         "Om du har markerat något i grafen, förklara vad markeringen visar med hjälp av axlarna.",
@@ -669,25 +669,25 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   const slopeGuidance = en
     ? hasDraft
       ? [
-        "You have started answering a slope question. Which two points or changes are you using? Check that your method compares vertical change with horizontal change.",
-        "Write down the change in y and the change in x separately. Does your answer compare them in the same order?",
-        "Use the relationship between the change in y and the change in x, then check your signs and units. Keep your calculation in your own work.",
+        "You have started answering a slope question. Check that the quantities you chose, and their order, match the definition in your course material.",
+        "Write down the changes you chose separately. Does your answer use them in the order shown in your material?",
+        "Use your chosen method, then check signs and units. Keep the calculation in your own work.",
       ]
       : [
-        "Slope describes how much y changes when x changes. What two quantities would you compare to describe that change?",
-        "Find the change in y and the change in x between two points. Which change belongs in the numerator, and which in the denominator?",
-        "The method is change in y divided by change in x. Keep the subtraction order consistent; what does that tell you about the direction of the line?",
+        "Look at points on the line. What changes as you move from one to another?",
+        "Write down what changes between the points. Where in your course material is the rule that connects those changes?",
+        "Compare the two changes in the order shown in your material. Check signs and units, then explain what your result says about the line.",
       ]
     : hasDraft
       ? [
-        "Du har börjat svara på en lutningsfråga. Vilka två punkter eller förändringar utgår du från? Kontrollera att metoden jämför förändringen lodrätt med förändringen vågrätt.",
-        "Skriv förändringen i y och förändringen i x var för sig. Jämför du dem i samma ordning i ditt svar?",
-        "Använd sambandet mellan förändringen i y och förändringen i x och kontrollera tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
+        "Du har börjat svara på en lutningsfråga. Kontrollera att storheterna du valt, och deras ordning, stämmer med definitionen i ditt kursmaterial.",
+        "Skriv upp förändringarna du valt var för sig. Använder ditt svar dem i samma ordning som i materialet?",
+        "Använd din valda metod och kontrollera sedan tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
       ]
       : [
-        "Lutning beskriver hur mycket y förändras när x förändras. Vilka två storheter behöver du jämföra för att beskriva den förändringen?",
-        "Ta reda på förändringen i y och förändringen i x mellan två punkter. Vilken förändring ska stå i täljaren och vilken i nämnaren?",
-        "Metoden är förändring i y delat med förändring i x. Håll subtraktionsordningen konsekvent. Vad säger det om linjens riktning?",
+        "Titta på punkter på linjen. Vad förändras när du går från en punkt till en annan?",
+        "Skriv upp vad som förändras mellan punkterna. Var i ditt kursmaterial finns regeln som binder ihop förändringarna?",
+        "Jämför förändringarna i den ordning som visas i ditt material. Kontrollera tecken och enheter och förklara sedan vad resultatet säger om linjen.",
       ];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   const statusNote = issuanceState === "active" ? "" : issuanceState === "unverified"
@@ -707,8 +707,6 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
 }
 
 async function gateActiveExam(req, res, body, user) {
-  delete body._perExamStudyOnly;
-  delete body._perPendingExamStudy;
   const context = body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)
     ? body.pageContext
     : null;
@@ -767,20 +765,18 @@ async function gateActiveExam(req, res, body, user) {
     return direct || (hasSubmissionIdentity && namedTopic);
   }
 
-  function allowRestrictedStudyChat({ pendingExam = true } = {}) {
+  function allowVerifiedStudyChat() {
     if (!ordinaryStudyChat || referencesExamQuestion()) return false;
     if (examContextDeclared && !isClearlyGeneralQuestion()) return false;
-    // This server-owned marker only limits ordinary study chat. Exam-related
-    // questions and specialized answer routes remain behind their own gates.
-    body._perExamStudyOnly = true;
-    if (pendingExam) body._perPendingExamStudy = true;
-    if (context) {
-      body.pageContext = { ...context };
-      delete body.pageContext.currentQuestion;
-      delete body.pageContext.questions;
-      delete body.pageContext.examState;
-      if (examPage) delete body.pageContext.page;
-    }
+    // A verified, inactive exam may leave stale client-side question context.
+    // Remove it before ordinary chat; the answer lease is still required below.
+    body.pageContext = { page: "app" };
+    delete body.context;
+    delete body.history;
+    delete body.topic;
+    delete body.weakAreas;
+    delete body.recentMistakes;
+    delete body.clarifyReply;
     return true;
   }
 
@@ -817,7 +813,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (state === "active" || state === "grading") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
@@ -827,7 +822,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (activeCount > 0) {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body);
       return true;
     }
@@ -837,7 +831,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
@@ -848,7 +841,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat({ pendingExam: false })) return false;
+      if (allowVerifiedStudyChat()) return false;
       // A verified result can be reviewed through the signed completion flow;
       // a plain chat request on the exam view still does not get the answer.
       sendActiveExamGuidance(req, res, body, state);
@@ -877,12 +870,11 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat()) return false;
+      if (latestState === "completed" && allowVerifiedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
@@ -896,7 +888,6 @@ async function gateActiveExam(req, res, body, user) {
     }
     return false;
   }
-  if (allowRestrictedStudyChat()) return false;
   sendActiveExamGuidance(req, res, body);
   return true;
 }
@@ -1074,10 +1065,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
   if (await gateActiveExam(req, res, body, user)) return;
-  if (body._perExamStudyOnly !== true) {
-    const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
-  }
+  const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
+  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
 
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
   if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
@@ -1188,7 +1177,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const sales = decideSalesMode({ loggedIn: true, pageContext, userQuestion });
     const salesGuardrail = buildSalesGuardrail(sales.mode, { role });
 
-    const intent      = (isPilotMode() || body._perExamStudyOnly === true) ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
+    const intent      = isPilotMode() ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
       ? 'support'
       : sales.mode === SALES_MODE.ASKED
         ? 'sales'
@@ -1309,10 +1298,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        märkas, och en enstaka udda session ska inte fastna för alltid. */
     const style = deriveStyleSignals(history);
 
-    const helpCap = helpCapFor(pageContext, {
-      pilotMode: isPilotMode(),
-      pendingExam: body._perPendingExamStudy === true,
-    });
+    const helpCap = helpCapFor(pageContext, { pilotMode: isPilotMode() });
     const requestedLevel = badOmNivå !== null ? badOmNivå : defaultHelpLevel(pageContext);
     const helpLevel = Math.min(requestedLevel, helpCap);
 
@@ -1323,10 +1309,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       learnerProfile: [learnerContext, curriculumContext, roleInstruction, salesGuardrail].filter(Boolean).join('\n\n'),
       weakAreas: mergedWeakAreas,
       role,
+      language: body.lang === 'en' ? 'en' : 'sv',
       helpLevel,
       requestedLevel,
       helpCap,
-      quietHelpCap: body._perPendingExamStudy === true,
       clarifyReply,
       style,
       pageContext,

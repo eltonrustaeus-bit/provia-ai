@@ -48,6 +48,7 @@ try {
     localStorage.setItem("proviaai_history", JSON.stringify([{ course: "A-private" }]));
     localStorage.setItem("proviaai_per_history", JSON.stringify([{ content: "A-private" }]));
     localStorage.setItem("proviaai_teacher_insight_class-a", JSON.stringify({ insight: "A-private class report", ts: Date.now() }));
+    sessionStorage.setItem("exgen_pending_generation_input_v1", JSON.stringify({ version: 1, requests: [{ userId: "account-a", payload: { pastedText: "A-private pending material" } }] }));
     localStorage.setItem("exgen_flow_draft_account-b", JSON.stringify({ course: "B-private draft" }));
     localStorage.setItem("exgen_flow_progress_account-b", JSON.stringify({ answers: { q: "B-private answer" } }));
     localStorage.setItem(authKey, JSON.stringify({
@@ -61,6 +62,7 @@ try {
     history: localStorage.getItem("proviaai_history"),
     perHistory: localStorage.getItem("proviaai_per_history"),
     teacherInsight: localStorage.getItem("proviaai_teacher_insight_class-a"),
+    pendingGeneration: sessionStorage.getItem("exgen_pending_generation_input_v1"),
     pendingA: localStorage.getItem("proviaai_pending_exams:account-a"),
     draftA: localStorage.getItem("exgen_flow_draft_account-a"),
     draftB: localStorage.getItem("exgen_flow_draft_account-b"),
@@ -71,6 +73,7 @@ try {
   assert.equal(switched.history, null, "account switch clears the previous account's exam summary");
   assert.equal(switched.perHistory, null, "account switch clears the previous account's P.E.R transcript");
   assert.equal(switched.teacherInsight, null, "account switch clears cached teacher class reports");
+  assert.equal(switched.pendingGeneration, null, "account switch clears pending exam material from this tab");
   assert.ok(switched.pendingA, "the failed-save queue remains UID-scoped rather than being merged");
   assert.ok(switched.draftA, "account switching preserves the previous account's draft for recovery");
   assert.ok(switched.draftB, "the newly active account can resume only its own draft");
@@ -98,6 +101,7 @@ try {
     localStorage.setItem("proviaai_teacher_insight_class-b", JSON.stringify({ insight: "B-private class report", ts: Date.now() }));
     sessionStorage.setItem("exgen_pilot_pending_per_question", JSON.stringify({ question: "private draft", savedAt: Date.now() }));
     sessionStorage.setItem("exgen_pilot_reauth_required", "1");
+    sessionStorage.setItem("exgen_pending_generation_input_v1", JSON.stringify({ version: 1, requests: [{ userId: "account-a", payload: { pastedText: "pending material" } }] }));
     window.ExGenLocalDataBoundary.clearForSignOut();
   });
   const signedOut = await page.evaluate(() => ({
@@ -110,6 +114,7 @@ try {
     progressA: localStorage.getItem("exgen_flow_progress_account-a"),
     progressB: localStorage.getItem("exgen_flow_progress_account-b"),
     pendingQuestion: sessionStorage.getItem("exgen_pilot_pending_per_question"),
+    pendingGeneration: sessionStorage.getItem("exgen_pending_generation_input_v1"),
     reauth: sessionStorage.getItem("exgen_pilot_reauth_required")
   }));
   assert.equal(signedOut.owner, null);
@@ -121,6 +126,7 @@ try {
   assert.ok(signedOut.progressA, "sign-out preserves the account's saved exam progress");
   assert.ok(signedOut.progressB, "sign-out preserves other account progress under separate keys");
   assert.equal(signedOut.pendingQuestion, null, "sign-out clears a transient PER question draft");
+  assert.equal(signedOut.pendingGeneration, null, "sign-out clears transient pending generation material");
   assert.equal(signedOut.reauth, null, "sign-out clears the pilot reauthentication marker");
   const explicitClear = await page.evaluate(() => {
     const result = window.ExGenLocalDataBoundary.clearLocalExamData("account-a");
@@ -141,6 +147,47 @@ try {
   assert.ok(explicitClear.draftB, "explicit clear preserves another account's draft");
   assert.ok(explicitClear.progressB, "explicit clear preserves another account's progress");
   assert.ok(explicitClear.pendingB, "explicit clear preserves another account's result queue");
+  const failedClear = await page.evaluate(() => {
+    const key = "exgen_pending_generation_input_v1";
+    sessionStorage.setItem(key, JSON.stringify({ version: 1, requests: [{ userId: "account-a", payload: { pastedText: "sensitive material" } }] }));
+    const originalRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function (name) {
+      if (this === sessionStorage && name === key) return;
+      return originalRemoveItem.call(this, name);
+    };
+    try {
+      return {
+        signOutCleared: window.ExGenLocalDataBoundary.clearForSignOut(),
+        examDataCleared: window.ExGenLocalDataBoundary.clearLocalExamData("account-a"),
+        pendingInput: sessionStorage.getItem(key)
+      };
+    } finally {
+      Storage.prototype.removeItem = originalRemoveItem;
+      window.ExGenLocalDataBoundary.clearForSignOut();
+    }
+  });
+  assert.equal(failedClear.signOutCleared, false, "sign-out reports a silent pending-input removal failure");
+  assert.equal(failedClear.examDataCleared, false, "explicit clear reports a silent pending-input removal failure");
+  assert.match(failedClear.pendingInput, /sensitive material/, "the failure fixture actually retained the private input");
+  const thrownClear = await page.evaluate(() => {
+    localStorage.setItem("proviaai_history", "private history");
+    const originalRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function (name) {
+      if (this === localStorage && name === "proviaai_history") throw new Error("storage unavailable");
+      return originalRemoveItem.call(this, name);
+    };
+    try {
+      return {
+        cleared: window.ExGenLocalDataBoundary.clearForSignOut(),
+        history: localStorage.getItem("proviaai_history")
+      };
+    } finally {
+      Storage.prototype.removeItem = originalRemoveItem;
+      window.ExGenLocalDataBoundary.clearForSignOut();
+    }
+  });
+  assert.equal(thrownClear.cleared, false, "sign-out reports a thrown local-storage removal failure");
+  assert.equal(thrownClear.history, "private history", "the fixture retained data despite the attempted clear");
   await close();
   console.log("account-storage-boundary: shared caches clear, exam drafts stay UID-scoped through A-to-B-to-A/sign-out, explicit clear removes only its owner");
 } finally {

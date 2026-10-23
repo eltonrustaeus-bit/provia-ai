@@ -43,7 +43,7 @@ const verifiedA = { data: { user: { id: "account-a" } }, error: null };
   assert.equal(result, null, "an unverified session cannot start generation");
 }
 
-const runStart = html.indexOf("  async function runGenerate(onProgress)");
+const runStart = html.indexOf("  async function runGenerate(");
 const runEnd = html.indexOf("\n  async function runGrade", runStart);
 const runGenerate = html.slice(runStart, runEnd);
 assert.ok(runStart >= 0 && runEnd > runStart, "the app generation entrypoint exists");

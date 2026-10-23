@@ -54,6 +54,15 @@ try {
       await page.fill('#xf .xf-screen[data-screen="material"] .xf-area', "Klorofyll fångar ljus. Fotosyntesen sker i kloroplaster.");
       await page.click('#xf .xf-screen[data-screen="material"] .xf-btn.primary');
       await page.waitForSelector('#xf .xf-screen[data-screen="contract"].on', { timeout: 5000 });
+      if (requested === 3) {
+        await page.evaluate(() => {
+          const originalRemoveItem = Storage.prototype.removeItem;
+          Storage.prototype.removeItem = function (key) {
+            if (this === sessionStorage && key === "exgen_pending_generation_input_v1") return;
+            return originalRemoveItem.call(this, key);
+          };
+        });
+      }
       await page.click('#xf .xf-screen[data-screen="contract"] .xf-btn.primary');
 
       await page.waitForFunction((count) => document.querySelectorAll("#examBody .qBox").length === count, approved, { timeout: 5000 });
@@ -61,6 +70,12 @@ try {
       assert.match(await page.locator("#floatingGradeHint").textContent(), new RegExp(`Besvara de ${approved} godkända frågorna`));
       assert.equal(await page.locator("#examBody .qBox").count(), approved);
       assert.equal(postedQuestionCount, requested, "the selected requested count reaches the generation API");
+      if (requested === 3) {
+        assert.match(await page.locator("#status").textContent(), /lokalt sparat material kunde inte bekräftas rensat/i,
+          "a successful exam warns about retained plaintext material, not a failed resume key");
+        assert.ok(await page.evaluate(() => sessionStorage.getItem("exgen_pending_generation_input_v1")),
+          "the storage-failure fixture retained the pending material");
+      }
     } finally {
       await ctx.close();
       ctx = null;

@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
 const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token)");
-const end = html.indexOf("\n  async function runGenerate(onProgress)", start);
+const end = html.indexOf("\n  async function runGenerate(", start);
 assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
 const helper = html.slice(start, end);
 
@@ -52,8 +52,10 @@ test("client reports a resumable job instead of a generic timeout or network fai
   await t.test("operation budget reached", async () => {
     let clockCalls = 0;
     const statuses = [];
+    const progressUpdates = [];
     const result = await runWith({
       payload: { numQuestions: 12 },
+      onProgress: (progress) => progressUpdates.push(progress),
       LANG: "sv",
       Date: { now: () => [0, 0, 14 * 60 * 1000][Math.min(clockCalls++, 2)] },
       setStatus: (label) => statuses.push(label),
@@ -68,7 +70,8 @@ test("client reports a resumable job instead of a generic timeout or network fai
     assert.equal(result.data.error, "generation_in_progress");
     assert.equal(result.data.operationId, "operation-budget");
     assert.equal(result.data.approved, 7);
-    assert.equal(statuses.at(-1), "Skapar och granskar prov: 7 av 12 frågor godkända.");
+    assert.equal(statuses.at(-1), "Inväntar nästa försök: 7 av 12 frågor godkända.");
+    assert.equal(progressUpdates.at(-1).state, "retrying");
   });
 
   await t.test("status cannot be checked after repeated network failures", async () => {

@@ -4,6 +4,7 @@
   if (root) root.ExGenGenerationRequest = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   var STORAGE_KEY = "exgen_generation_request_v1";
+  var INPUT_STORAGE_KEY = "exgen_pending_generation_input_v1";
   var TTL_MS = 7 * 24 * 60 * 60 * 1000;
   var MAX_PENDING_REQUESTS = 5;
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -171,6 +172,28 @@
     }, opts.locks, storage);
   }
 
+  async function getExistingIdempotencyKey(userId, payload, idempotencyKey, options) {
+    var opts = options || {};
+    var lockApi = opts.locks || (typeof navigator !== "undefined" ? navigator.locks : null);
+    if (typeof window !== "undefined" && (!lockApi?.request || !supportsCrossTabResume())) {
+      throw new Error("CROSS_TAB_REQUEST_LOCK_UNAVAILABLE");
+    }
+    var storage = opts.storage || defaultStorage();
+    var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!UUID_RE.test(idempotencyKey || "")) throw new Error("PENDING_REQUEST_UNAVAILABLE");
+    var digest = await fingerprint(userId, payload, cryptoApi);
+    return withStorageLock(function () {
+      var matches = readRecords(storage, digest).filter(function (record) {
+        return record.fingerprint === digest && record.expiresAt > now;
+      });
+      if (matches.length !== 1 || matches[0].idempotencyKey !== idempotencyKey) {
+        throw new Error("PENDING_REQUEST_UNAVAILABLE");
+      }
+      return idempotencyKey;
+    }, opts.locks, storage);
+  }
+
   async function clear(idempotencyKey, storage, locks) {
     var target = storage || defaultStorage();
     if (!target || typeof target.getItem !== "function") throw new Error("Durable request ID cleanup unavailable");
@@ -197,10 +220,123 @@
     }
   }
 
+  function pendingInputStorage(options) {
+    if (options?.inputStorage) return options.inputStorage;
+    try { return typeof sessionStorage === "undefined" ? null : sessionStorage; }
+    catch { return null; }
+  }
+
+  function readPendingInputRecords(storage) {
+    if (!storage?.getItem) throw new Error("Pending exam input storage unavailable");
+    var raw;
+    try { raw = storage.getItem(INPUT_STORAGE_KEY); }
+    catch { throw new Error("Pending exam input storage unavailable"); }
+    if (!raw) return [];
+    try {
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed?.requests) || parsed.requests.length > MAX_PENDING_REQUESTS) throw new Error();
+      return parsed.requests;
+    } catch { throw new Error("Pending exam input storage unavailable"); }
+  }
+
+  function writePendingInputRecords(records, storage) {
+    if (records.length > MAX_PENDING_REQUESTS || !storage?.setItem || !storage?.getItem) {
+      throw new Error("Pending exam input storage unavailable");
+    }
+    var value = JSON.stringify({ version: 1, requests: records });
+    try {
+      storage.setItem(INPUT_STORAGE_KEY, value);
+      if (storage.getItem(INPUT_STORAGE_KEY) !== value) throw new Error();
+    } catch { throw new Error("Pending exam input storage unavailable"); }
+  }
+
+  async function savePendingInput(userId, payload, idempotencyKey, options) {
+    var opts = options || {};
+    var storage = pendingInputStorage(opts);
+    var keyStorage = opts.storage || defaultStorage();
+    var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!userId || !UUID_RE.test(idempotencyKey || "")) throw new Error("Pending exam input invalid");
+    var digest = await fingerprint(userId, payload, cryptoApi);
+    var matchingKey = readRecords(keyStorage, digest).find(function (record) {
+      return record.fingerprint === digest && record.idempotencyKey === idempotencyKey && record.expiresAt > now;
+    });
+    if (!matchingKey) throw new Error("Pending exam request key unavailable");
+    var records = readPendingInputRecords(storage).filter(function (record) {
+      return record && record.expiresAt > now && record.idempotencyKey !== idempotencyKey;
+    });
+    if (records.length >= MAX_PENDING_REQUESTS) throw new Error("PENDING_REQUEST_LIMIT");
+    records.push({ userId: String(userId), fingerprint: digest, idempotencyKey,
+      expiresAt: matchingKey.expiresAt,
+      payload: {
+        lang: payload.lang, level: payload.level, course: payload.course, qType: payload.qType,
+        numQuestions: payload.numQuestions, pastedText: payload.pastedText,
+        focusTerms: Array.isArray(payload.focusTerms) ? payload.focusTerms.slice() : [],
+      },
+    });
+    writePendingInputRecords(records, storage);
+    return true;
+  }
+
+  async function getPendingInputs(userId, options) {
+    var opts = options || {};
+    var storage = pendingInputStorage(opts);
+    var keyStorage = opts.storage || defaultStorage();
+    var cryptoApi = opts.crypto || (typeof crypto !== "undefined" ? crypto : null);
+    var now = Number.isFinite(opts.now) ? opts.now : Date.now();
+    if (!userId) return [];
+    var keys = readRecords(keyStorage).filter(function (record) { return record.expiresAt > now; });
+    var records = readPendingInputRecords(storage);
+    var valid = [];
+    var retained = [];
+    for (var record of records) {
+      if (!record || record.userId !== String(userId) || !record.payload || record.expiresAt <= now ||
+          !UUID_RE.test(record.idempotencyKey || "")) continue;
+      var digest = await fingerprint(userId, record.payload, cryptoApi);
+      if (digest !== record.fingerprint) continue;
+      if (!keys.some(function (key) {
+        return key.idempotencyKey === record.idempotencyKey && key.fingerprint === digest && key.expiresAt === record.expiresAt;
+      })) continue;
+      valid.push({ idempotencyKey: record.idempotencyKey, payload: record.payload });
+      retained.push(record);
+    }
+    if (retained.length !== records.length) {
+      if (retained.length) writePendingInputRecords(retained, storage);
+      else {
+        try {
+          storage.removeItem(INPUT_STORAGE_KEY);
+          if (storage.getItem(INPUT_STORAGE_KEY) !== null) throw new Error();
+        } catch { throw new Error("Pending exam input storage unavailable"); }
+      }
+    }
+    return valid;
+  }
+
+  function clearPendingInput(idempotencyKey, options) {
+    var storage = pendingInputStorage(options || {});
+    var records = readPendingInputRecords(storage);
+    var remaining = records.filter(function (record) { return record?.idempotencyKey !== idempotencyKey; });
+    if (remaining.length === records.length) return false;
+    if (remaining.length) writePendingInputRecords(remaining, storage);
+    else {
+      try {
+        storage.removeItem(INPUT_STORAGE_KEY);
+        if (storage.getItem(INPUT_STORAGE_KEY) !== null) throw new Error();
+      }
+      catch { throw new Error("Pending exam input storage unavailable"); }
+    }
+    return true;
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
+    INPUT_STORAGE_KEY: INPUT_STORAGE_KEY,
     getIdempotencyKey: getIdempotencyKey,
+    getExistingIdempotencyKey: getExistingIdempotencyKey,
     clear: clear,
+    savePendingInput: savePendingInput,
+    getPendingInputs: getPendingInputs,
+    clearPendingInput: clearPendingInput,
     supportsCrossTabResume: supportsCrossTabResume,
   };
 });

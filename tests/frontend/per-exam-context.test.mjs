@@ -174,6 +174,7 @@ await page.click(".xf-ask"); await page.waitForTimeout(400);
 await page.fill("#perInput", "hjälp mig med frågan");
 await page.click("#perSendBtn");
 await page.waitForTimeout(900);
+ok("svenskt språkval skickas även för vanlig P.E.R-hjälp", lastExplain?.lang === "sv");
 ok("T4a explain anropades", !!lastExplain);
 ok("T4a1 active exam requests do not include prior P.E.R transcripts", Array.isArray(lastExplain?.history) && lastExplain.history.length === 0,
   JSON.stringify(lastExplain?.history));
@@ -235,6 +236,7 @@ const englishRetry = "I can’t verify the exam status right now, so I can’t h
 await page.fill("#perInput", "How should I think about this?");
 await page.click("#perSendBtn");
 await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+ok("engelskt språkval skickas även för vanlig P.E.R-hjälp", lastExplain?.lang === "en");
 ok("T4m English status explains the safe retry", (await page.locator("#perMessages").innerText()).includes(englishRetry));
 ok("T4n English retry also preserves the question and send action", await page.locator("#perInput").inputValue() === "How should I think about this?"
    && await page.locator("#perSendBtn").isEnabled());

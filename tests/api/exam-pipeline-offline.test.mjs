@@ -2316,8 +2316,8 @@ try {
   }
   assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), duplicateAwareRepair.map(({ id }) => id),
     "the retry verifier receives the generated repair candidate");
-  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag }) => ({ id, type, question, concept_tag })),
-    "the retry verifier gets already approved question wording and concept tags only as comparison context");
+  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag, learning_objective }) => ({ id, type, question, concept_tag, learning_objective })),
+    "the retry verifier gets approved question wording, concept tags and learning goals only as comparison context");
   assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "at most one bounded missing-slot repair is requested");

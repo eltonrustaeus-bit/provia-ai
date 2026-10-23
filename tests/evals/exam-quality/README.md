@@ -4,7 +4,7 @@ Measures what a generator/verifier model swap actually buys for the school and
 upper-secondary side of ExGen, so a model decision rests on numbers instead of
 on how the output reads.
 
-Runs the **real** production pieces — `buildExamPrompts()` from
+Runs the **real** production pieces — prompt, parser and normalization from
 `api/generate-exam.js`, `gateExam()` from `api/_assessment.js`,
 `verifyQuestions()` from `api/_verifier.js`, and `solveQuestions()` from
 `api/_solver.js` — against six fixed course materials, one per subject profile.
@@ -19,12 +19,24 @@ Free, offline, no API key — always run this first:
 
 ```bash
 node tests/evals/exam-quality/check-detection.mjs
+node tests/evals/exam-quality/quality-gold-offline.test.mjs
+node tests/evals/exam-quality/eval-first-pass.test.mjs
 ```
+
+The offline gold cases exercise production normalization, the structural gate,
+the approval decision and deterministic graph grading with fixed short-answer
+and graph candidates. Negative short-answer cases supply a known reviewer
+verdict: they prove that a rejection is enforced, **not** that a live model
+will recognize every false answer or overreaching rubric. Graph cases prove
+source/spec consistency for supported equations and tables, not pedagogical
+quality. None of these offline checks measure model latency or cost. The paid
+runner separately reports raw generated, normalized and structurally retained
+counts so normalization failures are not misattributed to the gate.
 
 Paid, hits the OpenAI API:
 
 ```bash
-# today's production: gpt-4o-mini generating AND reviewing
+# example model combination; defaults are not proof of the deployed configuration
 node --env-file=.env.local tests/evals/exam-quality/run-eval.mjs
 
 # a candidate: cheap generator, independent stronger reviewer
@@ -38,8 +50,10 @@ FIXTURES=matematik-2b RUNS=5 GEN_MODEL=gpt-5 \
 
 | Env | Default | Meaning |
 |---|---|---|
-| `GEN_MODEL` | `gpt-4o-mini` | generator under test |
-| `VERIFIER_MODEL` | same as `GEN_MODEL` | reviewer under test (the default reproduces production, where both roles share one model) |
+| `GEN_MODEL` | `gpt-4o-mini` | generator under test; verify the deployed configuration separately |
+| `VERIFIER_MODEL` | `OPENAI_VERIFIER_MODEL`, then `GEN_MODEL` | reviewer under test |
+| `SOLVER_MODEL` | `OPENAI_SOLVER_MODEL`, then `GEN_MODEL` | blind solver under test |
+| `EVAL_PRICES_JSON` | historical table | explicit JSON map of model names to `{ "in": USD, "out": USD }` per million tokens |
 | `JUDGE_MODEL` | `gpt-5` | independent scorer — should always be at least as strong as anything under test |
 | `RUNS` | `2` | repetitions per fixture |
 | `NUM_QUESTIONS` | `12` | questions per exam |
@@ -81,10 +95,11 @@ for finalization. The replacement batch must pass the structural
 gate and verifier; regenerated multiple-choice items also need the independent
 blind solver. A retry replaces the original only when it delivers more fully
 approved questions. If generation, verification, or solving fails, only
-questions already approved in the first batch can be delivered. Graph retries
-remain off until a graph-specific cross-round fixture is covered. Track the
-delivered/requested ratio alongside error rate so a safer generator does not
-silently become unusably short.
+questions already approved in the first batch can be delivered if final issuance
+also succeeds. Graph retries remain off until a graph-specific cross-round
+fixture is covered. Track the first-pass approved/requested ratio alongside
+error rate, and measure actual endpoint delivery separately, so a safer
+generator does not silently become unusably short.
 
 **Gate drops and soft flags**, counted per issue code, so it is visible whether
 a rule is doing work or never firing.
@@ -100,14 +115,18 @@ Reasoning models can be slower; a timeout can prevent an exam from being
 delivered. The runner prints a warning when p95 crosses its configured
 threshold.
 
-**Token use and cost**, from the price table in `run-eval.mjs` (checked against
-<https://developers.openai.com/api/docs/pricing> on 2026-08-01). Reasoning
+**Token use and cost**, from the historical price table in `run-eval.mjs`
+(checked against <https://developers.openai.com/api/docs/pricing> on 2026-08-01)
+or the explicitly supplied `EVAL_PRICES_JSON`. Reasoning
 tokens are reported separately, since they bill as output and are the reason a
 reasoning model costs more than a naive input/output estimate suggests.
-The verifier and solver now return provider usage and the runner reports their
-tokens separately, including how many calls had measured usage. The price table
-is historical, and the displayed cost is still the generator's only. Do not
-read it as current pricing or a total production cost.
+The runner reports generator, reviewer and solver costs separately and gives a
+first-pass total only when all required usage and prices are known. The judge
+is an evaluation expense, not part of the production estimate. This runner
+does not execute repair, HTTP, quota or issuance steps, and failed attempts can
+have unreported provider usage. Its total must not be described as complete
+production cost or current pricing without a verified price override and a
+production-path measurement.
 
 ## First finding: subject routing was wrong before any model was swapped
 

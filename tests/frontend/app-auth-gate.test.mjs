@@ -235,7 +235,10 @@ try {
     assert.equal(await first.locator("#xf").isVisible(), false, "another tab's sign-out hides the wizard");
     assert.equal(await first.locator("#xf .xf-exam.on").count(), 0, "old active exam is not visible after sign-out");
     if (activeExam) {
-      assert.match(logoutPrompt, /behålla det lokalt/i, "manual sign-out explains the local exam data choice");
+      assert.match(logoutPrompt, /behålla färdiga provutkast och resultat lokalt/i,
+        "manual sign-out explains which local exam data is retained");
+      assert.match(logoutPrompt, /påbörjat provskapande kan inte återupptas/i,
+        "manual sign-out does not promise recovery of an in-progress generation");
       assert.ok(await first.evaluate(() => localStorage.getItem("exgen_flow_draft_u1")), "keeping local data preserves the exam draft after sign-out");
     }
     await context.close();

@@ -103,6 +103,7 @@ async function mk(path) {
   const t2b = await page.evaluate(() => window.__perTestCtx());
   ok("T2c userScore bevaras", typeof t2b.userScore === "number", String(t2b.userScore));
   ok("T2d sidan är förbättring", t2b.page === "förbättring", t2b.page);
+  ok("T2d1 provhistorik beskrivs inte som aktiv provstatus", t2b.examState === undefined);
 
   // Målet tar eleven till felbanken. Kontrollerade tidigare att #mistakeSection
   // tappade sin .collapsed — men Del B tog bort dragspelen, så det finns inget

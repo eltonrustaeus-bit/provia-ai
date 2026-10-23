@@ -92,21 +92,26 @@ function normalizeGradeFeedback(feedback, points, maxPoints, lang) {
 }
 
 function validateNonMcGradeOutput(graded, expectedItems) {
-  if (!graded || typeof graded !== "object" || !Array.isArray(graded.per_question) ||
-      graded.per_question.length !== expectedItems.length) return false;
+  return nonMcGradeFailureReason(graded, expectedItems) === "valid";
+}
+
+function nonMcGradeFailureReason(graded, expectedItems) {
+  if (!graded || typeof graded !== "object" || !Array.isArray(graded.per_question)) return "missing_rows";
+  if (graded.per_question.length !== expectedItems.length) return "row_count";
   const expected = new Map(expectedItems.map((item) => [String(item.id), item]));
   const seen = new Set();
   for (const item of graded.per_question) {
-    if (!item || typeof item.id !== "string" || !expected.has(item.id) || seen.has(item.id) ||
-        !Number.isFinite(item.points) || !Number.isFinite(item.max_points) ||
+    if (!item || typeof item.id !== "string" || !expected.has(item.id)) return "unexpected_id";
+    if (seen.has(item.id)) return "duplicate_id";
+    if (!Number.isFinite(item.points) || !Number.isFinite(item.max_points) ||
         typeof item.feedback !== "string" || typeof item.model_answer !== "string" ||
-        typeof item.concept_tag !== "string" || !Array.isArray(item.error_tags)) return false;
+        typeof item.concept_tag !== "string" || !Array.isArray(item.error_tags)) return "field_type";
     const trustedMax = Number(expected.get(item.id).max_points);
     if (!Number.isFinite(trustedMax) || trustedMax < 0 || item.max_points !== trustedMax ||
-        item.points < 0 || item.points > trustedMax) return false;
+        item.points < 0 || item.points > trustedMax) return "score_range";
     seen.add(item.id);
   }
-  return seen.size === expected.size;
+  return seen.size === expected.size ? "valid" : "missing_id";
 }
 
 function normalizeChoice(ans) {
@@ -894,60 +899,59 @@ module.exports = async function handler(req, res) {
       "7) error_tags: 0–5 tags from the provided list; only what you can see. If none: [].\n" +
       "8) Style: Professional. No fluff.\n";
 
-    const userPayload = {
-      material: pastedText,
-      student_context: { history, mistakes: mistakesCtx },
-      items: nonMcPack
-    };
+    const providerTimeoutMs = gradingProviderTimeoutMs(requestStartedAt);
+    if (providerTimeoutMs < GRADE_PROVIDER_MIN_MS) {
+      return failProvider("provider_budget", "insufficient_time_for_safe_persistence", "grading_provider_unavailable",
+        lang === "sv" ? "Rättningen kunde inte slutföras säkert inom tidsgränsen. Försök igen." : "Grading could not safely finish within the time limit. Please try again.");
+    }
 
-    const payload = {
+    // A long exam is graded in small, independent groups. All groups must pass
+    // the same signed-item contract before a single result is persisted.
+    const gradeBatches = [];
+    for (let offset = 0; offset < nonMcPack.length; offset += 4) {
+      gradeBatches.push(nonMcPack.slice(offset, offset + 4));
+    }
+    async function gradeBatch(items, timeoutMs) {
+      const userPayload = {
+        material: pastedText,
+        student_context: { history, mistakes: mistakesCtx },
+        items,
+      };
+      const payload = {
         model,
         input: [
           { role: "system", content: lang === "sv"
               ? systemSv + (isMathGrading ? systemSvMath : "")
               : systemEn + (isMathGrading ? systemEnMath : "") },
-          { role: "user", content: JSON.stringify(userPayload) }
+          { role: "user", content: JSON.stringify(userPayload) },
         ],
-        text: { format: responseFormat }
+        text: { format: responseFormat },
       };
-
-      let r;
-      const providerTimeoutMs = gradingProviderTimeoutMs(requestStartedAt);
-      if (providerTimeoutMs < GRADE_PROVIDER_MIN_MS) {
-        return failProvider("provider_budget", "insufficient_time_for_safe_persistence", "grading_provider_unavailable",
-          lang === "sv" ? "Rättningen kunde inte slutföras säkert inom tidsgränsen. Försök igen." : "Grading could not safely finish within the time limit. Please try again.");
-      }
       const gradingStartedAt = Date.now();
+      let r;
       try {
         r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(providerTimeoutMs)
+          signal: AbortSignal.timeout(timeoutMs),
         }, { userId: user.id });
       } catch {
-        return failProvider("request", "transport_error", "grading_provider_unavailable",
-          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
+        return { failure: ["request", "transport_error", "grading_provider_unavailable"] };
       }
-
       let raw;
-      try {
-        raw = await r.text();
-      } catch {
-        return failProvider("response_body", "read_error", "grading_provider_unavailable",
-          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
+      try { raw = await r.text(); }
+      catch {
+        await settleAiSpend(r.aiSpendReservation, null, { conservativeFallback: true });
+        return { failure: ["response_body", "read_error", "grading_provider_unavailable"] };
       }
-      if (!r.ok) return failProvider("response", "upstream_http_error", "grading_provider_unavailable",
-        lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.", r.status);
-
       let data;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        return failProvider("response_body", "invalid_json", "grading_provider_unavailable",
-          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
+      try { data = JSON.parse(raw); }
+      catch {
+        await settleAiSpend(r.aiSpendReservation, null, { conservativeFallback: true });
+        return { failure: ["response_body", "invalid_json", "grading_provider_unavailable"] };
       }
-      if (data?.usage) await settleAiSpend(r.aiSpendReservation, data.usage);
+      const settled = await settleAiSpend(r.aiSpendReservation, data?.usage, { conservativeFallback: true });
       await logMockExamUsage({
         userId: user.id,
         requestId: claimed?.id,
@@ -956,24 +960,55 @@ module.exports = async function handler(req, res) {
         usage: data?.usage,
         latencyMs: Date.now() - gradingStartedAt,
       });
+      if (!settled) return { failure: ["budget", "settlement_unavailable", "grading_provider_unavailable"] };
+      if (!r.ok) return { failure: ["response", "upstream_http_error", "grading_provider_unavailable", r.status] };
       const outputText = extractOutputText(data);
-      if (!outputText) {
-        return failProvider("response_output", "missing_text", "grading_response_invalid",
-          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
-      }
-
+      if (!outputText) return { failure: ["response_output", "missing_text", "grading_response_invalid"] };
       let graded;
-      try {
-        graded = JSON.parse(outputText);
-      } catch {
-        return failProvider("response_output", "invalid_json", "grading_response_invalid",
-          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
+      try { graded = JSON.parse(outputText); }
+      catch { return { failure: ["response_output", "invalid_json", "grading_response_invalid"] }; }
+      const reason = nonMcGradeFailureReason(graded, items);
+      if (reason !== "valid") return { failure: ["response_output", `contract_${reason}`, "grading_response_invalid"],
+        receivedCount: Array.isArray(graded?.per_question) ? graded.per_question.length : null };
+      return { rows: graded.per_question };
+    }
+    const batchResults = [];
+    for (let offset = 0; offset < gradeBatches.length; offset += 3) {
+      const remainingMs = gradingProviderTimeoutMs(requestStartedAt);
+      if (remainingMs < GRADE_PROVIDER_MIN_MS) {
+        batchResults.push({ failure: ["provider_budget", "insufficient_time_for_safe_persistence", "grading_provider_unavailable"] });
+        break;
       }
-
-      if (!validateNonMcGradeOutput(graded, nonMcPack)) {
-        return failProvider("response_output", "contract_failed", "grading_response_invalid",
-          lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again.");
-      }
+      const waveSettled = await Promise.allSettled(gradeBatches.slice(offset, offset + 3)
+        .map((items) => gradeBatch(items, remainingMs)));
+      const wave = waveSettled.map((result) => result.status === "fulfilled" ? result.value
+        : { failure: ["internal", "unexpected_batch_failure", "grading_provider_unavailable"] });
+      batchResults.push(...wave);
+      if (wave.some((result) => result.failure)) break;
+    }
+    const failedBatchIndex = batchResults.findIndex((result) => result.failure);
+    if (failedBatchIndex >= 0) {
+      const failure = batchResults[failedBatchIndex];
+      console.warn(JSON.stringify({
+        event: "exam_grade_batch_failure",
+        batch: failedBatchIndex + 1,
+        batchCount: gradeBatches.length,
+        expectedCount: gradeBatches[failedBatchIndex].length,
+        receivedCount: failure.receivedCount ?? null,
+        reason: failure.failure[1],
+      }));
+      const [stage, category, error, upstreamStatus] = failure.failure;
+      return failProvider(stage, category, error,
+        error === "grading_response_invalid"
+          ? (lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again.")
+          : (lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again."),
+        upstreamStatus);
+    }
+    const graded = { per_question: batchResults.flatMap((result) => result.rows) };
+    if (!validateNonMcGradeOutput(graded, nonMcPack)) {
+      return failProvider("response_output", "aggregate_contract_failed", "grading_response_invalid",
+        lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again.");
+    }
 
       const byId = new Map();
       for (const x of graded.per_question || []) byId.set(String(x.id), x);

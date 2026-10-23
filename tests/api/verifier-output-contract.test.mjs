@@ -109,12 +109,12 @@ const comparisonContext = await runWithResults(
   "",
   undefined,
   undefined,
-  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", correct_index: 2, model_answer: "Facit ska inte delas." }],
+  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", learning_objective: "Skilj cellandning från fotosyntes", correct_index: 2, model_answer: "Facit ska inte delas." }],
 );
 const comparisonPayload = JSON.parse(comparisonContext.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(comparisonPayload.comparison_questions, [{
   id: "approved-1", type: "mc", question: "Vilken process frigör energi?",
-  concept_tag: "Cellandning",
+  concept_tag: "Cellandning", learning_objective: "Skilj cellandning från fotosyntes",
 }], "repair review receives only approved question identity and wording, not answer keys or rubric");
 assert.deepEqual(comparisonPayload.questions.map(({ id }) => id), ["retry-1"],
   "comparison-only questions do not change the required review result IDs");
@@ -239,6 +239,16 @@ assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_r
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
 assert.match(buildVerifierPrompt("sv"), /ordagrant förekommande källhänvisning räcker inte/i);
+assert.match(buildVerifierPrompt("sv"), /ett giltigt kortsvar som bedömningsmatrisen inte accepterar/i);
+assert.match(buildVerifierPrompt("en"), /a valid short answer excluded by its grading rubric/i);
+assert.match(buildVerifierPrompt("sv"), /Flera giltiga kortsvar är tillåtna/i);
+assert.match(buildVerifierPrompt("en"), /Multiple valid short answers are acceptable/i);
+assert.match(buildVerifierPrompt("sv"), /flervalsfråga med fler än ett rimligt svar eller flera försvarbara tolkningar/i);
+assert.match(buildVerifierPrompt("en"), /multiple-choice question with more than one reasonable answer or defensible interpretation/i);
+assert.match(buildVerifierPrompt("sv", "languages"), /i kortsvar kan flera giltiga formuleringar godtas/i);
+assert.match(buildVerifierPrompt("en", "languages"), /a short-answer item may allow several valid phrasings/i);
+assert.doesNotMatch(buildVerifierPrompt("sv"), /faktafel, mer än ett rimligt svar/i,
+  "multiple valid short answers are allowed when the rubric accepts them");
 assert.match(buildVerifierPrompt("sv"), /Jämför kandidaterna sinsemellan/i);
 assert.match(buildVerifierPrompt("en"), /exact source quote is not enough/i);
 assert.match(buildVerifierPrompt("en"), /Compare candidate questions with each other/i);

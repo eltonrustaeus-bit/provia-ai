@@ -1608,8 +1608,8 @@ async function logout(options={}){
   const signOutUserId=verifiedUserId;
   if(!options.skipLocalDataConfirm&&signOutUserId&&window.ExGenLocalDataBoundary?.hasLocalExamData(signOutUserId)){
     const keepData=confirm(LANG==="sv"
-      ? "Ett provutkast eller osynkat provresultat finns kvar i webbläsaren. Vill du behålla det lokalt för samma konto och logga ut? Lokal lagring är inte krypterad."
-      : "An unfinished exam or unsynced result remains in this browser. Keep it locally for the same account and sign out? Local storage is not encrypted.");
+      ? "Ett provutkast, osynkat resultat eller påbörjat provförsök finns kvar. Vill du behålla färdiga provutkast och resultat lokalt för samma konto och logga ut? Påbörjat provskapande kan inte återupptas efter utloggning. Lokal lagring är inte krypterad."
+      : "An exam draft, unsynced result or pending generation attempt remains. Keep completed drafts and results locally for this account and sign out? In-progress generation cannot be resumed after sign-out. Local storage is not encrypted.");
     if(!keepData){
       const discardData=confirm(LANG==="sv"
         ? "Ta bort det här kontots lokala provutkast, svar och osynkade resultat och logga ut? Andra kontons lokala data påverkas inte."
@@ -1643,8 +1643,13 @@ async function logout(options={}){
   if(db){try{await db.auth.signOut();}catch{}}
   const{data:afterSignOut}=db?await db.auth.getSession().catch(()=>({data:null})):({data:null});
   if(afterSignOut?.session?.user?.id){location.reload();return;}
-  window.ExGenLocalDataBoundary?.clearForSignOut();
+  const localDataCleared=window.ExGenLocalDataBoundary?.clearForSignOut()!==false;
   showLock();
+  if(!localDataCleared){
+    setLockError(LANG==="sv"
+      ? "Du är utloggad, men lokalt sparat provmaterial kunde inte bekräftas rensat på den här enheten. Rensa webbplatsens lagring innan du delar enheten."
+      : "You are signed out, but locally saved exam material could not be confirmed erased on this device. Clear this site's storage before sharing it.");
+  }
   await refreshQuotaUi();
 }
 
@@ -2179,10 +2184,13 @@ try{
       lastState=state;
       const approved=Number.isInteger(state?.approved)?state.approved:0;
       const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
-      const label=LANG==="sv"?`Skapar och granskar prov: ${approved} av ${requested} frågor godkända.`:`Generating and reviewing exam: ${approved} of ${requested} questions approved.`;
+      const retrying=state?.state==="retrying";
+      const label=LANG==="sv"
+        ?`${retrying?"Inväntar nästa försök":"Skapar och granskar prov"}: ${approved} av ${requested} frågor godkända.`
+        :`${retrying?"Waiting for the next attempt":"Generating and reviewing exam"}: ${approved} of ${requested} questions approved.`;
       setStatus(label,"warn");
       if(typeof onProgress==="function"){
-        try{onProgress({approved,requested,stage:state?.stage||"generate"});}catch{}
+        try{onProgress({approved,requested,stage:state?.stage||"generate",state:state?.state||"queued"});}catch{}
       }
     };
     updateProgress(started.data);
@@ -2234,15 +2242,23 @@ try{
     return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
       requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
   }
-  async function runGenerate(onProgress){
+  async function runGenerate(onProgress,resumeRequest){
     hideDebug();setStatus("");const t=T[LANG];
-    const pastedText=(pastedTextEl()?.value||"").trim();
+    const savedPayload=resumeRequest?.payload;
+    const pastedText=(savedPayload?String(savedPayload.pastedText||""):(pastedTextEl()?.value||"")).trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
     if(Array.from(pastedText).length>MATERIAL_CHAR_LIMIT){const message=materialTooLongMessage();setStatus(message,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:message};}
 
-    const qType=qTypeEl()?.value||"mix";
+    const qType=savedPayload?.qType||qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
-    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||3),focusTerms:selectedExamFocusTerms};
+    const payload={
+      lang:savedPayload?.lang||LANG,
+      level:savedPayload?.level||levelEl()?.value||"C",
+      course:savedPayload?String(savedPayload.course||"").trim():(courseEl()?.value||"").trim(),
+      qType,pastedText,
+      numQuestions:savedPayload?.numQuestions??(qType==="graph"?1:Number(numQuestionsEl()?.value||3)),
+      focusTerms:savedPayload&&Array.isArray(savedPayload.focusTerms)?savedPayload.focusTerms.slice():selectedExamFocusTerms,
+    };
     const authSnapshot=await getGenerationAuthSnapshot();
     if(!authSnapshot){
       const message=LANG==="sv"?"Din inloggning kunde inte bekräftas. Logga in igen innan du skapar prov.":"Your sign-in could not be verified. Sign in again before creating an exam.";
@@ -2250,9 +2266,13 @@ try{
     }
     let idempotencyKey;
     try {
-      idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
+      idempotencyKey=resumeRequest
+        ?await window.ExGenGenerationRequest.getExistingIdempotencyKey(authSnapshot.userId,payload,resumeRequest.idempotencyKey)
+        :await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
     } catch (error) {
-      const message=error?.message==="DUPLICATE_PENDING_REQUEST"
+      const message=error?.message==="PENDING_REQUEST_UNAVAILABLE"
+        ?(LANG==="sv"?"Den sparade provbegäran finns inte längre eller matchar inte underlaget. Inget nytt prov startades; gå tillbaka och välj ett nytt provförsök.":"The saved exam request is unavailable or no longer matches its input. No new exam was started; go back and choose a new attempt.")
+        :error?.message==="DUPLICATE_PENDING_REQUEST"
         ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
         :error?.message==="PENDING_REQUEST_LIMIT"
         ?(LANG==="sv"?"Flera provbegäranden väntar på återupptagning. Använd samma material och inställningar för att fortsätta ett väntande jobb; inga väntande jobb har tagits bort.":"Several exam requests are still available to resume. Use the same material and settings to continue a pending job; no pending job was removed.")
@@ -2262,6 +2282,14 @@ try{
       setStatus(message,"bad");return {ok:false,error:message};
     }
     payload.idempotencyKey=idempotencyKey;
+    try {
+      await window.ExGenGenerationRequest.savePendingInput(authSnapshot.userId,payload,idempotencyKey);
+    } catch {
+      const message=LANG==="sv"
+        ?"Provunderlaget kunde inte sparas säkert för återupptagning i den här fliken. Kontrollera webbläsarens lagring och försök igen; inget prov startades."
+        :"The exam input could not be saved for safe recovery in this tab. Check browser storage and retry; no exam was started.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
@@ -2284,6 +2312,7 @@ try{
       return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
+      try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
@@ -2330,16 +2359,16 @@ try{
       if(res.data?.error==="generation_in_progress"){
         const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
         const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
-        const canResumeAfterClose=window.ExGenGenerationRequest?.supportsCrossTabResume?.()===true;
         const message=LANG==="sv"
-          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag genom att använda exakt samma material och provinställningar och trycka Skapa prov igen.${canResumeAfterClose?"":" Ladda om i samma flik om det behövs; stäng inte fliken, eftersom webbläsaren inte stöder säker återupptagning efter stängning."}`
-          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation by using the exact same material and exam settings, then pressing Generate exam again.${canResumeAfterClose?"":" Reload this same tab if needed; do not close it because this browser does not support safe recovery after closing."}`;
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag. Ladda om i samma flik om det behövs, men stäng inte fliken innan provet är färdigt.`
+          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation. Reload this tab if needed, but keep it open until the exam is ready.`;
         setStatus(message,"warn");hideDebug();
         return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
       }
       if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
         let cleanupFailed=false;
         try { await window.ExGenGenerationRequest.clear(idempotencyKey); } catch { cleanupFailed=true; }
+        try { window.ExGenGenerationRequest.clearPendingInput(idempotencyKey); } catch { cleanupFailed=true; }
         const message=LANG==="sv"
           ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
           :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
@@ -2350,10 +2379,12 @@ try{
         return {ok:false,error:message+cleanupMessage,errorCode:"generation_request_expired"};
       }
       if(res.data?.error==="MATERIAL_TOO_LONG"){
+        try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
       }
       if(res.data?.error==="GRAPH_GENERATION_REJECTED"||res.data?.error==="GRAPH_MATERIAL_UNSUPPORTED"){
+        try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
         const message=res.data.message||(LANG==="sv"
           ?"Grafuppgiften kunde inte skapas utifrån materialet. Kontrollera grafkraven och försök igen."
           :"The graph question could not be created from this material. Check the graph requirements and try again.");
@@ -2363,6 +2394,7 @@ try{
         return {ok:false,error:message};
       }
       if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+        if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
         const message=res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.";
         const hasSafeCounts=res.data?.error==="incomplete_exam"
           && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
@@ -2412,8 +2444,10 @@ try{
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
     let resumeKeyCleared=true;
+    let pendingInputCleared=true;
     try { await window.ExGenGenerationRequest.clear(idempotencyKey); }
     catch { resumeKeyCleared=false; }
+    if(resumeKeyCleared){try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{pendingInputCleared=false;}}
     const generationMeta=res.data.meta||{};
     const questionCount=res.data.exam?.questions?.length||0;
     const requestedCount=payload.numQuestions;
@@ -2421,11 +2455,15 @@ try{
     const completionMessage=partialExam
       ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
       :t.genDone;
-    const cleanupWarning=resumeKeyCleared?"":(LANG==="sv"
+    const cleanupWarning=!resumeKeyCleared?(LANG==="sv"
       ?" Provet skapades, men återupptagningsnyckeln kunde inte rensas. Ett nytt försök med samma material och inställningar kan visa samma prov."
-      :" The exam was created, but its resume key could not be cleared. A new attempt with the same material and settings may show the same exam.");
+      :" The exam was created, but its resume key could not be cleared. A new attempt with the same material and settings may show the same exam.")
+      :!pendingInputCleared?(LANG==="sv"
+        ?" Provet skapades, men lokalt sparat material kunde inte bekräftas rensat. Rensa webbplatsens lagring innan du delar enheten."
+        :" The exam was created, but locally saved material could not be confirmed erased. Clear this site's storage before sharing the device."):"";
     const visibleCompletionMessage=completionMessage+cleanupWarning;
-    setBusy(false);setStatus(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");showToast(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");setWizardStep(2);
+    const cleanupOk=resumeKeyCleared&&pendingInputCleared;
+    setBusy(false);setStatus(visibleCompletionMessage,cleanupOk?"ok":"warn");showToast(visibleCompletionMessage,cleanupOk?"ok":"warn");setWizardStep(2);
     if(partialExam){const guide=$("examGuide");if(guide)guide.textContent=completionMessage;}
 
     // Uppdatera floating bar hint med antal frågor
@@ -2728,7 +2766,12 @@ try{
       const search = document.getElementById("courseSearch");
       if (search) search.value = String(course || "").trim();
     },
-    generate(options) { return runGenerate(options?.onProgress); },
+    generate(options) { return runGenerate(options?.onProgress,options?.resumeRequest); },
+    async pendingGenerations() {
+      const authSnapshot=await getGenerationAuthSnapshot();
+      if(!authSnapshot)return [];
+      return window.ExGenGenerationRequest.getPendingInputs(authSnapshot.userId);
+    },
     grade(answers) { return runGrade(answers); },
     async abandonExam() {
       if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
