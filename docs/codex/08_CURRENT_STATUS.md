@@ -1869,18 +1869,49 @@ stagingresultat först efter ny budgetkontroll och uttryckligt godkännande.
 - [x] Replay efter 3/6/12-frågereparation returnerar samma svar utan nya
   modell-/usage-händelser, ytterligare kvot, ändrad reservationsstatus eller
   duplicerad utfärdning.
-- [!] Ändringen är lokal och ocommittad på `5e0c63a`; ingen migration, push,
-  deploy, merge eller modellförfrågan gjordes. Den befintliga ändringen i
-  `supabase/.temp/cli-latest` lämnades orörd.
-- [x] Färsk read-only stagingkontroll 2026-10-23: migrationshistoriken slutar
-  vid `20261022172446_checkpoint_exam_repair_feedback`; migrationen
+- [x] Test-/statusändringen pushades som `683d841` till
+  `codex/exgen-generation-quality-2026-10-20`; PR #123 är fortsatt draft och
+  Vercel Preview för exakt commiten blev `READY`. Ingen `main`-merge,
+  produktionsdeploy, migration eller live-modellförfrågan utfördes.
+- [!] Färsk read-only stagingkontroll i denna fortsättning: migrationshistoriken
+  slutar vid `20261022172446_checkpoint_exam_repair_feedback`; migrationen
   `20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql`
   saknas. Budgettabellen har en rad med tak `$5.000000`, bokfört `$0.581394`
-  spenderat och `$0.225728` reserverat, men senaste `updated_at` är
-  `2026-10-22 21:50 UTC`. Det beräknade `$4.192878`-saldot är därför inte
-  färskt nog för ett nytt liveanrop och behandlas inte som ny kostnadstillåtelse.
+  spenderat och `$0.225728` reserverat, men senaste `updated_at` var
+  `2026-10-22 21:50 UTC`. Dessa värden är inte färska nog för att tillåta ett
+  nytt liveanrop; inget liveanrop gjordes.
 
 **PILOT NOT READY.** Nästa steg är fortsatt kod-/offlinegranskning och därefter
 versionssynkad stagingverifiering efter godkänd stagingmigration och färsk
-kostnadsavläsning. Produktionsschema saknar enligt tidigare read-only-kontroll
-pipeline- och P.E.R.-kvotskontrakten; merge/deploy till produktion är spärrad.
+kostnadsavläsning. En ny read-only produktionsfråga i denna session fann inte
+`public.mock_exam_generation_pipeline_jobs` eller de förväntade claim-,
+checkpoint- och P.E.R.-kvots-RPC-signaturerna. Merge/deploy till produktion är
+spärrad tills databasschemat är versionssynkat och verifierat.
+
+## Salvage av kandidat före stream-timeout — 2026-10-23
+
+- [x] Offline-regressionen i `tests/api/exam-pipeline-offline.test.mjs` kör
+  repair-stream-timeout för begäranden om 3 och 6 frågor: strömmen lämnar en
+  hel kandidat och hänger tills dess faktiska AbortSignal avbryter. Timern för
+  startgenereringen behålls; endast repair-timern kortas i fixturen. HTTP-
+  timeoutvägen för 12 frågor täcks separat i PGlite.
+- [x] Båda scenarierna visar att kandidaten går till oberoende verifierare och blind
+  lösare, båda usage-händelserna rapporterar godkänd kvalitetsgrind, den
+  tidigare avslagna frågan förblir utesluten och provet endast utfärdas efter
+  att repair-kandidaten fyllt sista platsen. Transporttelemetrin anger timeout.
+- [x] Relevant pipeline-, PGlite/Postgres-, HTTP-, offlinegenerator-, budget-
+  och progress-UI-svit passerade 54/54 efter ändringen; syntax- och diffkontroll
+  passerade. Oberoende timeoutgranskare fann och fick åtgärdat en risk med
+  globalt förkortad timer, och verifierade den avgränsade slutversionen utan
+  kvarstående testfynd. Säkerhetsgranskningen fann inga åtgärdbara fynd i koden.
+- [!] Alla provider-/granskarresultat är syntetiska mocks. Detta testar den
+  integrerade timeout-/salvage-kontrollvägen, inte verklig modellyield,
+  hostad RLS/ACL eller staging.
+- [!] Endast `tests/api/exam-pipeline-offline.test.mjs` och denna statusfil är
+  lokalt ändrade efter `683d841`; `supabase/.temp/cli-latest` är en separat
+  befintlig användarändring och har lämnats orörd. Ingen ny push/deploy/merge
+  gjordes i denna fortsättning.
+
+**PILOT NOT READY.** Kvar är färsk stagingmigrations-/budgetkontroll,
+versionssynkad stagingverifiering och därefter säker produktionsschema-plan
+innan PR #123 kan mergas.

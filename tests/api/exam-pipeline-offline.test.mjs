@@ -643,6 +643,8 @@ let regenerationQuestionBatches = null;
 let throwOnRepair = false;
 let truncateQualityRepairStream = false;
 let truncateQualityRepairAfter = 1;
+let abortQualityRepairAfterCompleteCandidate = false;
+let qualityRepairAbortTriggered = false;
 let simulatedNow = null;
 let simulatedInitialGenerationMs = 10_000;
 let simulatedStructuralRepairMs = 25_000;
@@ -766,6 +768,24 @@ globalThis.fetch = async (input, init = {}) => {
       const repaired = batch.slice(0, repairCount);
       activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
       const fullText = JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
+      if (abortQualityRepairAfterCompleteCandidate) {
+        const candidateText = JSON.stringify({
+          title: "Omgenererat syntetiskt prov", level: "C", questions: repaired.slice(0, 1),
+        });
+        const event = { type: "response.output_text.delta", delta: candidateText };
+        const chunk = new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+        return new Response(new ReadableStream({
+          start(controller) {
+            controller.enqueue(chunk);
+            const abort = () => {
+              qualityRepairAbortTriggered = true;
+              controller.error(new DOMException("Aborted", "AbortError"));
+            };
+            if (init.signal?.aborted) abort();
+            else init.signal?.addEventListener("abort", abort, { once: true });
+          },
+        }));
+      }
       const outputText = truncateQualityRepairStream && repaired.length > 1
         ? JSON.stringify({
             title: "Omgenererat syntetiskt prov", level: "C",
@@ -1964,6 +1984,94 @@ try {
     "salvage does not add a second repair attempt");
   regenerationQuestionBatches = null;
   activeQuestions = questions;
+
+  const sixStreamQuestions = [
+    ...questions,
+    { ...questions[0], id: "q-4", question: "Vad är 8 + 1?", options: ["8", "9", "10"], correct_index: 1, model_answer: "9" },
+    { ...questions[1], id: "q-5", question: "Vad är 9 - 5?", options: ["3", "4", "5"], correct_index: 1, model_answer: "4" },
+    { ...questions[2], id: "q-6", question: "Vad är 2 · 5?", options: ["8", "10", "12"], correct_index: 1, model_answer: "10" },
+  ];
+  for (const [requested, firstRoundQuestions] of [[3, questions], [6, sixStreamQuestions]]) {
+    activeQuestions = firstRoundQuestions;
+    regenerationQuestionBatches = [qualityCandidates];
+    verifierRejectQuestionId = "q-1";
+    abortQualityRepairAfterCompleteCandidate = true;
+    const originalAbortRepairSetTimeout = globalThis.setTimeout;
+    const verifierCountBeforeAbortedRepair = verifierInputs.length;
+    const solverCountBeforeAbortedRepair = solverInputs.length;
+    const repairStreamTimeouts = [];
+    qualityRepairAbortTriggered = false;
+    calls.length = 0;
+    let abortedRepairExam;
+    try {
+      globalThis.setTimeout = (callback, delay, ...args) => {
+        repairStreamTimeouts.push(delay);
+        const timeout = repairStreamTimeouts.length === 2 ? Math.min(delay, 5) : delay;
+        return originalAbortRepairSetTimeout(callback, timeout, ...args);
+      };
+      abortedRepairExam = await invoke(generateExam, {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: requested,
+      });
+    } finally {
+      globalThis.setTimeout = originalAbortRepairSetTimeout;
+      abortQualityRepairAfterCompleteCandidate = false;
+      verifierRejectQuestionId = null;
+      regenerationQuestionBatches = null;
+      activeQuestions = questions;
+    }
+    assert.equal(abortedRepairExam.status, 200, `${requested}: ${JSON.stringify(abortedRepairExam.body)}`);
+    assert.equal(repairStreamTimeouts.length, 2,
+      `${requested}: the initial generation timeout stays intact and only the repair-stream timeout is shortened`);
+    assert.equal(qualityRepairAbortTriggered, true,
+      `${requested}: the repair stream receives abort after emitting its complete candidate`);
+    assert.equal(abortedRepairExam.body.exam.questions.length, requested,
+      `${requested}: a streamed candidate survives abort only after passing both independent quality gates`);
+    assert.equal(abortedRepairExam.body.exam.questions.some((question) => question.id === "q-1"), false,
+      `${requested}: the question rejected before abort remains excluded`);
+    assert.equal(abortedRepairExam.body.exam.questions.some((question) => question.id === "quality-1"), true,
+      `${requested}: the complete candidate emitted before abort is salvaged after approval`);
+    const expectedQuestionIds = [...firstRoundQuestions
+      .filter((question) => question.id !== "q-1")
+      .map((question) => question.id), "quality-1"].sort();
+    const issuedQuestionIds = abortedRepairExam.body.exam.questions.map((question) => question.id).sort();
+    assert.deepEqual(issuedQuestionIds, expectedQuestionIds,
+      `${requested}: issuance contains exactly the surviving original questions and the approved repair`);
+    assert.equal(new Set(issuedQuestionIds).size, requested,
+      `${requested}: timeout salvage cannot create duplicate issued question IDs`);
+    assert.ok(verifierInputs.slice(verifierCountBeforeAbortedRepair)
+      .some((batch) => batch.questions.some((question) => question.id === "quality-1")),
+    `${requested}: the salvaged candidate reaches the independent verifier`);
+    assert.ok(solverInputs.slice(solverCountBeforeAbortedRepair)
+      .some((batch) => batch.some((question) => question.id === "quality-1")),
+    `${requested}: the salvaged candidate reaches the independent blind solver`);
+    const abortedRepairLog = JSON.parse(qualityLogs.at(-1));
+    assert.equal(abortedRepairLog.repairTransportError, "timeout");
+    assert.equal(abortedRepairLog.repairResponseStatus, "incomplete");
+    assert.equal(abortedRepairLog.repairOutputQuestionCount, 1);
+    assert.equal(abortedRepairLog.finalQuestionCount, requested);
+    const abortedRepairUsage = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
+    assert.ok(abortedRepairUsage, `${requested}: abort recovery records its privacy-safe model usage chain`);
+    assert.deepEqual(abortedRepairUsage.body.slice(-2).map((event) => event.pipeline_step),
+      ["verify_compare", "verify_blind"]);
+    assert.deepEqual(abortedRepairUsage.body.slice(-2).map((event) => event.verification_passed), [true, true],
+      `${requested}: both independent gates approve the salvaged candidate`);
+    const repairGateCallIndexes = calls.flatMap((call, index) => {
+      const schema = call.body?.text?.format?.name;
+      return ["exam_verifier_schema", "exam_solver_schema"].includes(schema)
+        && JSON.stringify(call.body?.input || []).includes("quality-1") ? [index] : [];
+    });
+    assert.equal(repairGateCallIndexes.length, 2,
+      `${requested}: the salvaged candidate is independently reviewed and solved exactly once`);
+    const issuanceCallIndex = calls.findIndex((call) =>
+      call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")
+      || (call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"));
+    assert.ok(issuanceCallIndex >= 0, `${requested}: the normal idempotent issuance path is used`);
+    assert.ok(repairGateCallIndexes.every((index) => index < issuanceCallIndex),
+      `${requested}: both quality gates complete before the repair candidate can be issued`);
+    assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+      && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    `${requested}: abort salvage stays within the single bounded repair attempt`);
+  }
 
   activeQuestions = questions;
   regenerationQuestionBatches = [qualityCandidates];
