@@ -832,20 +832,39 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
     const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 401, json: { ok: false, error: "Unauthorized" },
+    await page.route("**/auth/v1/token?grant_type=refresh_token", route => route.fulfill({
+      json: {
+        access_token: "refreshed-synthetic-access-token",
+        refresh_token: "refreshed-synthetic-refresh-token",
+        expires_in: 3600,
+        token_type: "bearer",
+        user: { id: "generation-error-a11y", email: "generation-error-a11y@t.se" },
+      },
     }));
+    let authGenerationAttempts = 0;
+    await page.route("**/api/generate-exam*", route => {
+      authGenerationAttempts++;
+      return route.fulfill({
+        status: 401, json: { ok: false, error: "Unauthorized" },
+      });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(message => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
       ?.textContent?.includes(message), authMessage, { timeout: 5000 });
     const authError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
     ok("authfel blir begripligt och döljer rå Unauthorized-text",
-      authError.includes(authMessage) && !authError.includes("Unauthorized"));
+      authError.includes(authMessage) && !authError.includes("Unauthorized") && authGenerationAttempts === 2,
+      `requests=${authGenerationAttempts}`);
     ok("authfel behåller elevens material för återhämtning",
       await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
         .then(value => value.includes("Linjär funktion y = 2x + 1")));
   } catch (e) {
-    ok("genereringsfel annonseras för hjälpmedel", false, e.message);
+    const visibleState = await page.evaluate(() => ({
+      error: document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || "",
+      status: document.getElementById("status")?.textContent || "",
+      authGateVisible: !!document.querySelector("#authGate") && getComputedStyle(document.querySelector("#authGate")).display !== "none",
+    }));
+    ok("genereringsfel annonseras för hjälpmedel", false, `${e.message}; ${JSON.stringify(visibleState)}`);
   } finally {
     await ctx.close();
   }

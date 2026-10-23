@@ -50,8 +50,8 @@ assert.ok(runStart >= 0 && runEnd > runStart, "the app generation entrypoint exi
 assert.match(runGenerate, /getGenerationAuthSnapshot\(\)/);
 assert.match(runGenerate, /getIdempotencyKey\(authSnapshot\.userId,payload\)/,
   "the request fingerprint is bound to the verified owner");
-assert.match(runGenerate, /runResumableGeneration\(payload,onProgress,authSnapshot\.token\)/,
-  "the resumable operation receives the same auth snapshot token");
+assert.match(runGenerate, /runResumableGeneration\(payload,onProgress,authSnapshot\.token,authSnapshot\.userId\)/,
+  "the resumable operation receives the auth snapshot token and owner for safe refresh");
 assert.match(runGenerate, /postJson\("\/api\/generate-exam",payload,\{timeoutMs:62000,token:authSnapshot\.token\}\)/,
   "the single-request graph flow receives the same auth snapshot token");
 assert.doesNotMatch(runGenerate, /await getUserId\(\)/,

@@ -4,20 +4,213 @@ import test from "node:test";
 import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
-const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token)");
+const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token,userId)");
 const end = html.indexOf("\n  async function runGenerate(", start);
 assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
 const helper = html.slice(start, end);
 
 async function runWith(context) {
-  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token)})()`, {
+  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token,userId)})()`, {
     onProgress: undefined,
     token: "synthetic-session-token",
+    userId: "account-a",
+    db: null,
     ...context,
   });
 }
 
 test("client reports a resumable job instead of a generic timeout or network failure", async (t) => {
+  await t.test("expired access token refreshes once and retries the same advance for the same account", async () => {
+    const tokenCalls = [];
+    const verifiedTokens = [];
+    let refreshes = 0;
+    const auth = {
+      getSession: async () => ({ data: { session: { access_token: "synthetic-session-token", user: { id: "account-a" } } }, error: null }),
+      refreshSession: async () => { refreshes++; return { data: { session: { access_token: "fresh-token", user: { id: "account-a" } } }, error: null }; },
+      getUser: async token => { verifiedTokens.push(token); return { data: { user: token === "fresh-token" ? { id: "account-a" } : null }, error: token === "fresh-token" ? null : new Error("invalid token") }; },
+    };
+    let advanceCalls = 0;
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      db: { auth },
+      postJson: async (path, body, options) => {
+        tokenCalls.push({ path, body, token: options?.token });
+        if (path.endsWith("pipeline=start")) return { status: 202, data: { ok: true, operationId: "operation-refresh", requested: 3, approved: 0 } };
+        advanceCalls++;
+        if (advanceCalls === 1) return { status: 401, data: { error: "Unauthorized" } };
+        return { status: 200, data: { ok: true, exam: { questions: [{ id: "q1" }, { id: "q2" }, { id: "q3" }] }, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status recovery not expected after successful retry"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(tokenCalls.map(call => call.token), ["synthetic-session-token", "synthetic-session-token", "fresh-token"]);
+    assert.equal(tokenCalls[1].path, tokenCalls[2].path, "the same advance endpoint is retried");
+    assert.deepEqual(tokenCalls[1].body, tokenCalls[2].body, "the idempotent operation body is unchanged on retry");
+    assert.equal(tokenCalls[1].body.operationId, "operation-refresh");
+    assert.deepEqual(verifiedTokens, ["fresh-token"], "the refreshed token is verified against the original account");
+    assert.equal(refreshes, 1);
+  });
+
+  await t.test("refresh refuses a token verified as a different account", async () => {
+    let advances = 0;
+    let refreshes = 0;
+    const result = await runWith({
+      payload: { numQuestions: 6 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      db: { auth: {
+        getSession: async () => ({ data: { session: { access_token: "expired-token", user: { id: "account-a" } } }, error: null }),
+        refreshSession: async () => { refreshes++; return { data: { session: { access_token: "other-account-token", user: { id: "account-a" } } }, error: null }; },
+        getUser: async () => ({ data: { user: { id: "account-b" } }, error: null }),
+      } },
+      postJson: async path => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-refresh-owner", requested: 6, approved: 0 } }
+        : (++advances, { status: 401, data: { error: "Unauthorized" } }),
+      getJson: async () => { throw new Error("status recovery not expected after auth failure"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 401);
+    assert.equal(advances, 1, "a rejected request is not replayed under a different account");
+    assert.equal(refreshes, 1);
+  });
+
+  await t.test("expired token during start retries the exact idempotent request", async () => {
+    const calls = [];
+    let refreshes = 0;
+    const exam = { questions: [{ id: "q1" }, { id: "q2" }, { id: "q3" }] };
+    const result = await runWith({
+      payload: { numQuestions: 3, idempotencyKey: "same-request-key" },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      db: { auth: {
+        getSession: async () => ({ data: { session: { access_token: "synthetic-session-token", user: { id: "account-a" } } }, error: null }),
+        refreshSession: async () => { refreshes++; return { data: { session: { access_token: "fresh-token", user: { id: "account-a" } } }, error: null }; },
+        getUser: async token => ({ data: { user: token === "fresh-token" ? { id: "account-a" } : null }, error: token === "fresh-token" ? null : new Error("invalid token") }),
+      } },
+      postJson: async (path, body, options) => {
+        calls.push({ path, body: structuredClone(body), token: options?.token });
+        if (path.endsWith("pipeline=start") && calls.filter(call => call.path.endsWith("pipeline=start")).length === 1) {
+          return { status: 401, data: { error: "Unauthorized" } };
+        }
+        if (path.endsWith("pipeline=start")) return { status: 202, data: { ok: true, operationId: "operation-start-refresh", requested: 3, approved: 0 } };
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status recovery not expected"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(calls.slice(0, 2).map(call => call.path), ["/api/generate-exam?pipeline=start", "/api/generate-exam?pipeline=start"]);
+    assert.deepEqual(calls[0].body, calls[1].body);
+    assert.deepEqual(calls.slice(0, 2).map(call => call.token), ["synthetic-session-token", "fresh-token"]);
+    assert.equal(calls[0].body.idempotencyKey, "same-request-key");
+    assert.equal(refreshes, 1);
+  });
+
+  await t.test("expired token during status recovery retries the same operation lookup", async () => {
+    const statusCalls = [];
+    const verifiedTokens = [];
+    let advances = 0;
+    let refreshes = 0;
+    const exam = { questions: [{ id: "q1" }, { id: "q2" }, { id: "q3" }] };
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      db: { auth: {
+        getSession: async () => ({ data: { session: { access_token: "synthetic-session-token", user: { id: "account-a" } } }, error: null }),
+        refreshSession: async () => { refreshes++; return { data: { session: { access_token: "fresh-token", user: { id: "account-a" } } }, error: null }; },
+        getUser: async token => {
+          verifiedTokens.push(token);
+          return { data: { user: token === "fresh-token" ? { id: "account-a" } : null }, error: token === "fresh-token" ? null : new Error("invalid token") };
+        },
+      } },
+      postJson: async path => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-status-refresh", requested: 3, approved: 1 } }
+        : (++advances === 1
+          ? { status: 503, data: { error: "generation_worker_unavailable" } }
+          : { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } }),
+      getJson: async (path, options) => {
+        statusCalls.push({ path, token: options?.token });
+        return statusCalls.length === 1
+          ? { status: 401, data: { error: "Unauthorized" } }
+          : { status: 200, data: { ok: true, operationId: "operation-status-refresh", state: "working", requested: 3, approved: 1 } };
+      },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(statusCalls.length, 2);
+    assert.equal(statusCalls[0].path, statusCalls[1].path);
+    assert.deepEqual(statusCalls.map(call => call.token), ["synthetic-session-token", "fresh-token"]);
+    assert.match(statusCalls[0].path, /operationId=operation-status-refresh/);
+    assert.deepEqual(verifiedTokens, ["fresh-token"]);
+    assert.equal(refreshes, 1);
+  });
+
+  await t.test("failed refresh during status recovery returns auth failure without another advance", async () => {
+    let advances = 0;
+    let statusChecks = 0;
+    let refreshes = 0;
+    const result = await runWith({
+      payload: { numQuestions: 3 },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      db: { auth: {
+        getSession: async () => ({ data: { session: { access_token: "synthetic-session-token", user: { id: "account-a" } } }, error: null }),
+        refreshSession: async () => { refreshes++; return { data: { session: null }, error: new Error("refresh denied") }; },
+        getUser: async () => ({ data: { user: null }, error: new Error("not reached") }),
+      } },
+      postJson: async path => path.endsWith("pipeline=start")
+        ? { status: 202, data: { ok: true, operationId: "operation-status-refresh-failed", requested: 3, approved: 1 } }
+        : (++advances, { status: 503, data: { error: "generation_worker_unavailable" } }),
+      getJson: async () => (++statusChecks, { status: 401, data: { error: "Unauthorized" } }),
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 401);
+    assert.equal(result.data.error, "Unauthorized");
+    assert.equal(advances, 1);
+    assert.equal(statusChecks, 1);
+    assert.equal(refreshes, 1);
+  });
+
+  for (const authError of [
+    { name: "401", status: 401, data: { error: "Unauthorized" } },
+    { name: "auth-verification 503", status: 503, data: { error: "AUTH_VERIFICATION_UNAVAILABLE" } },
+  ]) {
+    await t.test(`status recovery returns terminal ${authError.name} instead of masking it`, async () => {
+      let advances = 0;
+      let statusChecks = 0;
+      const result = await runWith({
+        payload: { numQuestions: 3 },
+        LANG: "sv",
+        Date: { now: () => 0 },
+        setStatus: () => {},
+        postJson: async path => path.endsWith("pipeline=start")
+          ? { status: 202, data: { ok: true, operationId: "operation-status-auth", requested: 3, approved: 1 } }
+          : (++advances, { status: 503, data: { error: "generation_worker_unavailable" } }),
+        getJson: async () => (++statusChecks, authError),
+        setTimeout: (fn) => fn(),
+      });
+
+      assert.equal(result.status, authError.status);
+      assert.equal(result.data.error, authError.data.error);
+      assert.equal(advances, 1, "auth failure is returned without another advance attempt");
+      assert.equal(statusChecks, 1);
+    });
+  }
+
   await t.test("one session token is reused for start, advance and status recovery", async () => {
     const authTokens = [];
     const exam = { questions: [{ id: "q1" }] };

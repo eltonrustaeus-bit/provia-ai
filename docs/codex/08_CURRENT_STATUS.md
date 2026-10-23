@@ -1,5 +1,34 @@
 # 08 Current Status
 
+## Tokenutgång i återupptagbar provkörning — pågående, 2026-10-23
+
+- [x] Read-only staginglogg för körningen 23 okt kl. 19:01 UTC bekräftade
+  `bad_jwt` / `token is expired` på Supabase Auth `/user` (403). Tidigare
+  `/user`-kontroller och en refresh-tokenförnyelse hade lyckats. Ingen token,
+  fråga eller materialtext kopierades till dokumentationen.
+- [x] Grundorsaken i klientkoden var att den återupptagbara provkörningen tog
+  en verifierad token vid start och återanvände den genom hela den långa
+  pipeline-sessionen, även om Supabase hann rotera token. Ny klientåterhämtning
+  verifierar en ny token mot samma ursprungliga användar-ID och försöker samma
+  idempotenta start-/advance-/statusbegäran en gång till. Ett authfel i status
+  lämnas nu som authfel, inte som falsk `generation_in_progress`.
+- [x] Lokala progress-/snapshottester täcker utgången token i start, advance och
+  status, nekad token för annat konto, misslyckad refresh och terminala authfel.
+  Oberoende granskning fann inga blockerare i fixen och dess gränstester.
+- [x] Browserregressionen passerade 193/193 efter att dess syntetiska
+  refresh-session fick matcha rätt testkonto. Riktad browserkontroll passerade:
+  en verifierad refresh, ett idempotent återförsök och ett tydligt terminalt
+  authfel. Ingen ny provgenerering, AI-kostnad, kvot-/rolländring eller
+  databasändring har gjorts.
+- [!] Authfixen är ännu inte på Preview och inte stagingverifierad.
+- [!] Äldre syntetiskt prov från 23 okt kl. 16:12 UTC var redan markerat
+  avbrutet vid read-only-kontroll; ingen separat resultatpost fanns för det.
+
+**PILOT NOT READY.** Nästa steg efter gröna lokala regressioner är commit/push
+endast till godkänd feature-branch, verifiera exakt Vercel Preview, färsk
+stagingbudget och branchkoppling och därefter högst ett godkänt syntetiskt
+stagingprov. Ingen produktion eller `main`.
+
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 
 ## Senaste stagingprov — `16d4f14`, 2026-10-23

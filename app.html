@@ -2169,9 +2169,50 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
-  async function runResumableGeneration(payload,onProgress,token){
+  async function runResumableGeneration(payload,onProgress,token,userId){
     const startedAt=Date.now();
-    const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000,token});
+    let activeToken=token;
+    async function refreshPipelineToken(rejectedToken){
+      if(!db||!userId)return null;
+      const verifyToken=async(candidate)=>{
+        if(typeof candidate!=="string"||!candidate||candidate===rejectedToken)return null;
+        try{
+          const verified=await db.auth.getUser(candidate);
+          return !verified.error&&verified.data?.user?.id===userId?candidate:null;
+        }catch{return null;}
+      };
+      try{
+        const current=await db.auth.getSession();
+        const session=current.data?.session;
+        if(!current.error&&session?.user?.id===userId){
+          const currentToken=await verifyToken(session.access_token);
+          if(currentToken)return currentToken;
+        }
+        const refreshed=await db.auth.refreshSession();
+        const refreshedSession=refreshed.data?.session;
+        if(refreshed.error||refreshedSession?.user?.id!==userId)return null;
+        return await verifyToken(refreshedSession.access_token);
+      }catch{return null;}
+    }
+    async function postPipelineJson(path,body,options={}){
+      const requestOptions={...options,token:activeToken};
+      const response=await postJson(path,body,requestOptions);
+      if(response.status!==401)return response;
+      const refreshedToken=await refreshPipelineToken(activeToken);
+      if(!refreshedToken)return response;
+      activeToken=refreshedToken;
+      return postJson(path,body,{...options,token:activeToken});
+    }
+    async function getPipelineJson(path,options={}){
+      const requestOptions={...options,token:activeToken};
+      const response=await getJson(path,requestOptions);
+      if(response.status!==401)return response;
+      const refreshedToken=await refreshPipelineToken(activeToken);
+      if(!refreshedToken)return response;
+      activeToken=refreshedToken;
+      return getJson(path,{...options,token:activeToken});
+    }
+    const started=await postPipelineJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
     if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
     if(started.status!==202||!started.data?.operationId)return started;
     const operationId=started.data.operationId;
@@ -2195,7 +2236,7 @@ try{
     };
     updateProgress(started.data);
     while(Date.now()-startedAt<14*60*1000){
-      const step=await postJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000,token});
+      const step=await postPipelineJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000});
       if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
       if(step.status===202&&step.data?.ok){
         consecutiveNetworkFailures=0;
@@ -2223,9 +2264,10 @@ try{
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
         consecutiveWorkingPolls=0;
-        const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000,token});
+        const current=await getPipelineJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;
+        if(current.status===401||current.data?.error==="AUTH_VERIFICATION_UNAVAILABLE")return current;
         if(current.status===200&&current.data?.ok){
           updateProgress(current.data);
           await new Promise(resolve=>setTimeout(resolve,1200));
@@ -2295,7 +2337,7 @@ try{
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
     const res=payload.qType==="graph"
       ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
-      :await runResumableGeneration(payload,onProgress,authSnapshot.token);
+      :await runResumableGeneration(payload,onProgress,authSnapshot.token,authSnapshot.userId);
     const clearGenerationPlaceholder=()=>{
       const body=examBodyEl();
       if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}

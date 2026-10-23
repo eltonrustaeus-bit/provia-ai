@@ -511,3 +511,19 @@ AI-reported until independently reviewed.
 - Limitation: Synthetic provider results and a fake clock verify application
   branches and deadline arithmetic only. They do not measure wall-clock
   latency, timeout behavior, hosted SQL/RLS, or model quality/yield.
+
+### 2026-10-23 — Refresh and re-verify auth during resumable client workflows
+- Status: VERIFIED
+- Evidence: staging Auth log showed an expired access token rejected with
+  `bad_jwt` after earlier successful user checks and token refresh; offline
+  tests in `tests/frontend/exam-generation-progress.test.mjs` and
+  `tests/frontend/exam-generation-auth-snapshot.test.mjs`; independent
+  read-only security and test reviews
+- Finding: A long client workflow must not keep reusing the access token
+  captured before work began. After 401, use the current refreshed session or
+  refresh it, server-verify the new token still belongs to the original user,
+  then retry only the same idempotent request once. Return persistent auth
+  errors directly instead of disguising them as a still-running job.
+- Limitation: Offline tests prove client branching and account/idempotency
+  checks only. The fix has not yet been deployed or verified in staging; no
+  live model call followed the observed auth failure.
