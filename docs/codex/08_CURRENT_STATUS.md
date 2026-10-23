@@ -1,6 +1,22 @@
 # 08 Current Status
 
-## Skolpilotens prov- och P.E.R.-grind — lokal arbetskopia, 2026-10-23
+## Skolpilotens prov- och P.E.R.-grind — feature-Preview, 2026-10-23
+
+- [x] Målkoden committades som `cefde2e` och pushades endast till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_Ghhv5etnRPAenHLFi6TxuBYWtK6S` blev `READY` för exakt den
+  revisionen. `main`, produktion, databas, konton och hemligheter ändrades inte.
+- [x] Ett nytt syntetiskt Biologi 1-prov med 12 begärda kortsvarsfrågor gav
+  12/12 i denna Preview. P.E.R. nekade facit under aktivt prov och gav en
+  svarsfri ledtråd. Frågorna saknade dock helt genetik trots ett tredelat
+  underlag och hade flera snarlika uppgifter. Det är ett kvalitetsfynd, inte
+  pilotbevis.
+- [!] Rättning av de 12 syntetiska svaren gav HTTP 502 och sparade inget
+  verifierat resultat. Sanerad Vercel-logg visar att tredje fyragruppen gav
+  fem rader i stället för fyra (`contract_row_count`). Svaren fanns kvar i
+  klienten. En efterföljande lokal ändring känner igen vanliga fristående
+  rubriker och återhämtar högst en felande rättningsgrupp med individuellt
+  validerade anrop. Den ändringen är inte liveverifierad ännu.
 
 - [x] En staging-Preview med tidigare kod skapade ett syntetiskt 3/3-prov.
   P.E.R. gav en svarsfri ledtråd under provet och kunde förklara efter
@@ -28,12 +44,10 @@
   testförväntningar uppdaterats. `git diff --check` och syntaxkontroller
   passerade. Oberoende granskare fann inga kvarstående blockerande fynd i
   den ändrade avsnittsprioriteringen och rättningsflödet.
-- [!] Arbetskopian är detached och innehåller ännu ocommittade måländringar
-  samt befintliga andra lokala ändringar. Ingen commit, push, ny Preview,
-  databasändring, merge till `main` eller produktionsåtgärd ingår här.
-  Modelljämförelse, verklig 12-frågeyield, full kostnad/väntetid och live
-  rättning på exakt denna revision återstår. Separat godkännande krävs för
-  feature-push/Preview och ytterligare betalda staginganrop.
+- [!] Arbetskopian är detached och innehåller en orelaterad lokal
+  `förbättring.html`-ändring som inte följer med målets commits. En andra
+  feature-Preview och liveomtest av rättning, innehållsbredd, kostnad och
+  P.E.R. efter verifierad rättning återstår. Inga produktionsåtgärder ingår.
 
 **PILOT NOT READY.** Lokala kontrakt är starkare, men den nya revisionen måste
 verifieras i staging mot verkliga modellutdata före skolpilot eller merge.

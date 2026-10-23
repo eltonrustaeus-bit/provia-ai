@@ -67,6 +67,7 @@ const userId = "33333333-3333-4333-8333-333333333333";
 const signingSecret = "synthetic-invalid-output-secret";
 let providerOutput = "";
 let providerInput = null;
+let providerSystem = null;
 const providerInputs = [];
 let providerStatus = () => 200;
 let providerDelayMs = 0;
@@ -114,6 +115,7 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url === "https://api.openai.com/v1/responses") {
     const inputPayload = JSON.parse(body.input.find((part) => part.role === "user").content);
+    providerSystem = body.input.find((part) => part.role === "system").content;
     providerInput = inputPayload;
     providerInputs.push(inputPayload);
     activeProviderCalls++;
@@ -216,6 +218,10 @@ try {
   assert.equal(graded.status, 200, JSON.stringify({ body: graded.body, persistedPayload, issuanceState }));
   assert.deepEqual(providerInput.items[0].accepted_answers, ["Medborgare väljer sina representanter i fria val."],
     "the grader receives alternative phrasings from the signed grading task");
+  assert.equal(providerSystem.includes("Ett syntetiskt elevsvar."), false,
+    "student answer text cannot enter the system prompt");
+  assert.equal(providerSystem.includes('"q1"'), false,
+    "question IDs cannot enter the system prompt");
   assert.deepEqual(graded.body.result.per_question.map((item) => item.model_answer), [
     "En kort beskrivning.", "En kort beskrivning.",
   ], "the signed answer key is returned instead of a contradictory grader answer");
@@ -263,14 +269,41 @@ try {
   const invalidMiddle = await invoke(body12);
   assert.equal(invalidMiddle.status, 502);
   assert.equal(invalidMiddle.body.error, "grading_response_invalid");
-  assert.equal(providerInputs.length, 3, "12 answers are graded in three bounded groups");
-  assert.deepEqual(providerInputs.map((input) => input.items.map((item) => item.id)), [
+  assert.equal(providerInputs.length, 6, "recovery stops after the first failed retry wave");
+  assert.deepEqual(providerInputs.slice(0, 3).map((input) => input.items.map((item) => item.id)), [
     ["q1", "q2", "q3", "q4"], ["q5", "q6", "q7", "q8"], ["q9", "q10", "q11", "q12"],
   ]);
-  assert.equal(usageBatches.length - usageBefore, 3, "every paid group is accounted for even on failure");
+  assert.deepEqual(providerInputs.slice(3).map((input) => input.items.map((item) => item.id)),
+    [["q5"], ["q6"], ["q7"]]);
+  assert.equal(usageBatches.length - usageBefore, 6, "every paid retry is accounted for even on failure");
   assert.equal(persistedPayload, null, "an invalid middle group cannot persist a partial score");
   assert.equal(issuanceState, "active", "a rejected grade releases the exam claim for a safe retry");
 
+  issuanceState = "active";
+  persistedPayload = null;
+  providerInputs.length = 0;
+  providerOutput = (items) => JSON.stringify({ per_question: items.length === 4 && items[0].id === "q9"
+    ? [...items.map((item) => row(item.id)), row("q9")]
+    : items.map((item) => row(item.id)) });
+  const repairedTwelve = await invoke(body12);
+  assert.equal(repairedTwelve.status, 200, JSON.stringify(repairedTwelve.body));
+  assert.equal(providerInputs.length, 7, "one oversized response is retried without rerunning the other eight answers");
+  assert.deepEqual(repairedTwelve.body.result.per_question.map((item) => item.id), twelve.map((item) => item.id));
+  assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twelve.map((item) => item.id));
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerInputs.length = 0;
+  providerOutput = (items) => JSON.stringify({ per_question: ["q1", "q5"].includes(items[0].id)
+    ? items.slice(0, -1).map((item) => row(item.id))
+    : items.map((item) => row(item.id)) });
+  const multipleInvalidBatches = await invoke(body12);
+  assert.equal(multipleInvalidBatches.status, 502);
+  assert.equal(providerInputs.length, 3,
+    "no paid retry starts when more than one group already makes the submission invalid");
+  assert.equal(persistedPayload, null);
+
+  issuanceState = "active";
   providerInputs.length = 0;
   providerOutput = (items) => JSON.stringify({ per_question: items.map((item) => row(item.id)) });
   const validTwelve = await invoke(body12);
@@ -312,6 +345,17 @@ try {
   assert.equal(providerInputs.length, 5);
   assert.ok(maxActiveProviderCalls <= 3, "large submissions never launch more than three provider calls together");
   assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twenty.map((item) => item.id));
+
+  issuanceState = "active";
+  persistedPayload = null;
+  providerInputs.length = 0;
+  providerOutput = (items) => JSON.stringify({ per_question: items.slice(0, -1).map((item) => row(item.id)) });
+  const boundedRecovery = await invoke(body20);
+  assert.equal(boundedRecovery.status, 502);
+  assert.equal(providerInputs.length, 3,
+    "several failed groups cannot fan a 20-answer submission out to 25 calls");
+  assert.equal(persistedPayload, null);
+  assert.equal(issuanceState, "active");
 
   issuanceState = "active";
   persistedPayload = null;

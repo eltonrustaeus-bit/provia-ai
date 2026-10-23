@@ -920,9 +920,11 @@ module.exports = async function handler(req, res) {
       const payload = {
         model,
         input: [
-          { role: "system", content: lang === "sv"
+          { role: "system", content: (lang === "sv"
               ? systemSv + (isMathGrading ? systemSvMath : "")
-              : systemEn + (isMathGrading ? systemEnMath : "") },
+              : systemEn + (isMathGrading ? systemEnMath : "")) +
+              (lang === "sv" ? "\nReturnera exakt en rad per item, i samma ordning och med dess oförändrade ID."
+                : "\nReturn exactly one row per item, in the same order and with its unchanged ID.") },
           { role: "user", content: JSON.stringify(userPayload) },
         ],
         text: { format: responseFormat },
@@ -972,7 +974,24 @@ module.exports = async function handler(req, res) {
         receivedCount: Array.isArray(graded?.per_question) ? graded.per_question.length : null };
       return { rows: graded.per_question };
     }
+    async function recoverRowCount(items, originalFailure) {
+      const recovered = [];
+      for (let offset = 0; offset < items.length; offset += 3) {
+        const remainingMs = gradingProviderTimeoutMs(requestStartedAt);
+        if (remainingMs < GRADE_PROVIDER_MIN_MS) return originalFailure;
+        const settled = await Promise.allSettled(items.slice(offset, offset + 3)
+          .map((item) => gradeBatch([item], remainingMs)));
+        for (const result of settled) {
+          if (result.status !== "fulfilled") return originalFailure;
+          if (result.value.failure) return result.value;
+          recovered.push(...result.value.rows);
+        }
+      }
+      const graded = { per_question: recovered };
+      return validateNonMcGradeOutput(graded, items) ? { rows: recovered } : originalFailure;
+    }
     const batchResults = [];
+    let recoveryUsed = false;
     for (let offset = 0; offset < gradeBatches.length; offset += 3) {
       const remainingMs = gradingProviderTimeoutMs(requestStartedAt);
       if (remainingMs < GRADE_PROVIDER_MIN_MS) {
@@ -983,6 +1002,15 @@ module.exports = async function handler(req, res) {
         .map((items) => gradeBatch(items, remainingMs)));
       const wave = waveSettled.map((result) => result.status === "fulfilled" ? result.value
         : { failure: ["internal", "unexpected_batch_failure", "grading_provider_unavailable"] });
+      const failedIndices = wave.flatMap((result, index) => result.failure ? [index] : []);
+      if (failedIndices.length === 1) {
+        const index = failedIndices[0];
+        if (wave[index].failure[1] === "contract_row_count" && !recoveryUsed &&
+            gradeBatches[offset + index].length > 1) {
+          recoveryUsed = true;
+          wave[index] = await recoverRowCount(gradeBatches[offset + index], wave[index]);
+        }
+      }
       batchResults.push(...wave);
       if (wave.some((result) => result.failure)) break;
     }

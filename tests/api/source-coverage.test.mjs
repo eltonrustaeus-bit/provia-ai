@@ -48,6 +48,28 @@ test("only unique verbatim source references count toward section coverage", () 
     "Windows line endings retain section structure");
   assert.equal(sourceSections(source.replace(/# (\w+)/g, (_, heading) => heading.toLocaleUpperCase("sv-SE"))).length, 4,
     "plain uppercase headings are accepted");
+  assert.deepEqual(sourceSections(source.replace(/^# /gm, "")).map((section) => section.title),
+    ["Fotosyntes", "Cellandning", "Ekologi", "Genetik"],
+    "ordinary standalone headings in pasted student notes are accepted");
+  assert.deepEqual(sourceSections(source.replace(/^# (.+)$/gm, "$1\n")).map((section) => section.title),
+    ["Fotosyntes", "Cellandning", "Ekologi", "Genetik"],
+    "one-word headings followed by a blank line also delimit the material");
+  assert.deepEqual(sourceSections(`Fotosyntes\n\nVäxter använder ljus och vatten för att\nbilda glukos när koldioxid finns med.\nSyre frigörs under processen.\n\nCellandning\n\nCellen använder glukos och syrgas för att\nfrigöra energi. Koldioxid och vatten\nbildas som produkter i processen.`).map((section) => section.title),
+    ["Fotosyntes", "Cellandning"],
+    "wrapped note paragraphs still make standalone headings usable");
+  assert.deepEqual(sourceSections(source.replace(/^# (.+)$/gm, (_, title) =>
+    `${title} i skolan`)).map((section) => section.title), [],
+    "unmarked multiword lines require a blank line before the body");
+  assert.deepEqual(sourceSections(source.replace(/^# (.+)$/gm, (_, title) =>
+    `${title} i skolan\n`)).map((section) => section.title),
+    ["Fotosyntes i skolan", "Cellandning i skolan", "Ekologi i skolan", "Genetik i skolan"],
+    "multiword plain headings work when visually separated from their paragraphs");
+  assert.deepEqual(sourceSections("Växter använder ljus\n" + "a".repeat(75) +
+    "\n\nCeller bryter ner glukos\n" + "b".repeat(75)), [],
+    "short wrapped prose is not mistaken for section headings");
+  assert.deepEqual(sourceSections("En mening som beskriver något utan punkt\n" + "a".repeat(75) +
+    "\n\nNästa mening som beskriver något utan punkt\n" + "b".repeat(75)), [],
+    "long unmarked prose does not become source sections");
   assert.deepEqual(sourceSections("Fråga:\n" + "a".repeat(70) + "\nSvar:\n" + "b".repeat(70)), [],
     "generic question and answer labels are not mistaken for source topics");
 });

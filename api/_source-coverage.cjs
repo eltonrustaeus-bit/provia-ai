@@ -5,13 +5,27 @@ function sourceSections(material) {
   const lines = String(material || "").replace(/\r\n?/g, "\n").split("\n");
   const sections = [];
   let current = null;
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     const trimmed = line.trim();
+    const nextLine = lines[index + 1]?.trim() || "";
+    const bodyStart = index + (nextLine ? 1 : 2);
+    let followingLength = 0;
+    for (let cursor = bodyStart; cursor < lines.length && lines[cursor].trim(); cursor++) {
+      followingLength += lines[cursor].trim().length;
+      if (followingLength >= 60) break;
+    }
+    const words = trimmed.split(/\s+/);
+    const plainHeading = (index === 0 || !lines[index - 1].trim()) &&
+      followingLength >= 60 && trimmed.length >= 3 && trimmed.length <= 50 &&
+      (words.length === 1 || (!nextLine && words.length <= 6)) &&
+      /^[A-ZÅÄÖ][\p{L}\p{N}\s()/-]*$/u.test(trimmed);
     const heading = trimmed.match(/^(?:#{1,3}\s+|\d{1,2}[.)]\s+)(.{3,70})$/)
       || trimmed.match(/^([^.!?]{3,70}):$/)
       || (trimmed.length >= 3 && trimmed.length <= 70 && /[A-ZÅÄÖ]/.test(trimmed) &&
         trimmed === trimmed.toLocaleUpperCase("sv-SE") && !/[.!?:]/.test(trimmed)
-        ? [trimmed, trimmed] : null);
+        ? [trimmed, trimmed] : null)
+      || (plainHeading ? [trimmed, trimmed] : null);
     const genericLabel = heading && /^(?:fråga|svar|uppgift|question|answer|task)\s*\d*$/i.test(heading[1].trim());
     if (heading && !genericLabel) {
       if (current && current.body.trim().length >= 60) sections.push(current);
