@@ -14,9 +14,12 @@
 - [!] Rättning av de 12 syntetiska svaren gav HTTP 502 och sparade inget
   verifierat resultat. Sanerad Vercel-logg visar att tredje fyragruppen gav
   fem rader i stället för fyra (`contract_row_count`). Svaren fanns kvar i
-  klienten. En efterföljande lokal ändring känner igen vanliga fristående
-  rubriker och återhämtar högst en felande rättningsgrupp med individuellt
-  validerade anrop. Den ändringen är inte liveverifierad ännu.
+  klienten. En efterföljande Preview (`9ed797d`,
+  `dpl_CdbhYnqh5i2EGgP1N2MhQQgRv4Eh`) återupptog samma 12 svar men
+  rättningen fick åter HTTP 502: första fyragruppen gav två rader och den
+  begränsade återhämtningen räckte inte inom tidsbudgeten. Ingen delrättning
+  sparades. Ytterligare lokal ändring delar därför upp upp till 12 öppna svar
+  i grupper om två från början; även den måste liveverifieras.
 
 - [x] En staging-Preview med tidigare kod skapade ett syntetiskt 3/3-prov.
   P.E.R. gav en svarsfri ledtråd under provet och kunde förklara efter
@@ -45,9 +48,9 @@
   passerade. Oberoende granskare fann inga kvarstående blockerande fynd i
   den ändrade avsnittsprioriteringen och rättningsflödet.
 - [!] Arbetskopian är detached och innehåller en orelaterad lokal
-  `förbättring.html`-ändring som inte följer med målets commits. En andra
-  feature-Preview och liveomtest av rättning, innehållsbredd, kostnad och
-  P.E.R. efter verifierad rättning återstår. Inga produktionsåtgärder ingår.
+  `förbättring.html`-ändring som inte följer med målets commits. En ny
+  feature-Preview med tvåsvarsgrupper samt kontroll av innehållsbredd, kostnad
+  och P.E.R. efter verifierad rättning återstår. Inga produktionsåtgärder ingår.
 
 **PILOT NOT READY.** Lokala kontrakt är starkare, men den nya revisionen måste
 verifieras i staging mot verkliga modellutdata före skolpilot eller merge.

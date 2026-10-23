@@ -269,25 +269,25 @@ try {
   const invalidMiddle = await invoke(body12);
   assert.equal(invalidMiddle.status, 502);
   assert.equal(invalidMiddle.body.error, "grading_response_invalid");
-  assert.equal(providerInputs.length, 6, "recovery stops after the first failed retry wave");
+  assert.equal(providerInputs.length, 5, "only the failed two-answer group is retried");
   assert.deepEqual(providerInputs.slice(0, 3).map((input) => input.items.map((item) => item.id)), [
-    ["q1", "q2", "q3", "q4"], ["q5", "q6", "q7", "q8"], ["q9", "q10", "q11", "q12"],
+    ["q1", "q2"], ["q3", "q4"], ["q5", "q6"],
   ]);
   assert.deepEqual(providerInputs.slice(3).map((input) => input.items.map((item) => item.id)),
-    [["q5"], ["q6"], ["q7"]]);
-  assert.equal(usageBatches.length - usageBefore, 6, "every paid retry is accounted for even on failure");
+    [["q5"], ["q6"]]);
+  assert.equal(usageBatches.length - usageBefore, 5, "every paid retry is accounted for even on failure");
   assert.equal(persistedPayload, null, "an invalid middle group cannot persist a partial score");
   assert.equal(issuanceState, "active", "a rejected grade releases the exam claim for a safe retry");
 
   issuanceState = "active";
   persistedPayload = null;
   providerInputs.length = 0;
-  providerOutput = (items) => JSON.stringify({ per_question: items.length === 4 && items[0].id === "q9"
+  providerOutput = (items) => JSON.stringify({ per_question: items.length === 2 && items[0].id === "q9"
     ? [...items.map((item) => row(item.id)), row("q9")]
     : items.map((item) => row(item.id)) });
   const repairedTwelve = await invoke(body12);
   assert.equal(repairedTwelve.status, 200, JSON.stringify(repairedTwelve.body));
-  assert.equal(providerInputs.length, 7, "one oversized response is retried without rerunning the other eight answers");
+  assert.equal(providerInputs.length, 8, "one oversized response is retried without rerunning the other ten answers");
   assert.deepEqual(repairedTwelve.body.result.per_question.map((item) => item.id), twelve.map((item) => item.id));
   assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twelve.map((item) => item.id));
 
@@ -308,7 +308,7 @@ try {
   providerOutput = (items) => JSON.stringify({ per_question: items.map((item) => row(item.id)) });
   const validTwelve = await invoke(body12);
   assert.equal(validTwelve.status, 200, JSON.stringify(validTwelve.body));
-  assert.equal(providerInputs.length, 3);
+  assert.equal(providerInputs.length, 6, "twelve open answers use six two-answer groups");
   assert.deepEqual(validTwelve.body.result.per_question.map((item) => item.id), twelve.map((item) => item.id));
   assert.deepEqual(persistedPayload.per_question.map((item) => item.id), twelve.map((item) => item.id));
 

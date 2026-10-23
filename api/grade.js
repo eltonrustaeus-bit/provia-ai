@@ -908,8 +908,9 @@ module.exports = async function handler(req, res) {
     // A long exam is graded in small, independent groups. All groups must pass
     // the same signed-item contract before a single result is persisted.
     const gradeBatches = [];
-    for (let offset = 0; offset < nonMcPack.length; offset += 4) {
-      gradeBatches.push(nonMcPack.slice(offset, offset + 4));
+    const gradeBatchSize = nonMcPack.length <= 12 ? 2 : 4;
+    for (let offset = 0; offset < nonMcPack.length; offset += gradeBatchSize) {
+      gradeBatches.push(nonMcPack.slice(offset, offset + gradeBatchSize));
     }
     async function gradeBatch(items, timeoutMs) {
       const userPayload = {
