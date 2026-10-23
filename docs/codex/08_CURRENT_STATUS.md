@@ -12,7 +12,12 @@
 - [x] Riktat browsertest passerade 1/1. Hela seriella offline-sviten över 193
   testfiler passerade efter UI-fixen. Den oberoende granskningen fann inga
   blockerare; staging/livebeteende är inte verifierat av dessa tester.
-- [!] Ingen commit, push, deploy, migration eller merge utförd i detta steg.
+- [x] Den avgränsade ändringen är committad som `1804cf2` och pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_23iEGHpAgqZ23W5qAXbJCDw16Vzj` är `READY` för exakt commit
+  `1804cf2ce44544ba40d110cb46df98292cc3f9ec`; feature-aliasen är
+  `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Ingen migration, betald AI-förfrågan eller merge till `main` utfördes.
   PR #123 är fortsatt draft. Produktionsschema saknar dokumenterat pipeline-
   och P.E.R-kvotschema, därför är merge till `main` fortfarande osäker.
 
