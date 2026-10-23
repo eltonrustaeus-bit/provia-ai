@@ -11,7 +11,7 @@ try {
   const page = await browser.newPage();
   await mockApis(page, { profiles: [{ id: "account-a", approved: true, role: "premium" }], extra: [
     ["**/auth/v1/user", (route) => route.fulfill({ json: { id: currentAuthUser, email: "student@example.invalid" } })],
-    ["**/api/generate-exam", (route) => route.fulfill({ json: { ok: true, exam: {
+    ["**/api/generate-exam?pipeline=start", (route) => route.fulfill({ json: { ok: true, exam: {
       title: "Syntetiskt prov", level: "C", exam_manifest: "synthetic-manifest",
       questions: [{ id: "q1", type: "mc", points: 1, question: "Vad är demokrati?",
         options: ["Folkstyre", "Envälde"], grade_task: "synthetic-task" }],
@@ -72,7 +72,7 @@ try {
   const delayedPage = await browser.newPage();
   await mockApis(delayedPage, { profiles: [{ id: "account-a", approved: true, role: "premium" }], extra: [
     ["**/auth/v1/user", route => route.fulfill({ json: { id: currentAuthUser, email: "student@example.invalid" } })],
-    ["**/api/generate-exam", route => route.fulfill({ json: { ok: true, exam: {
+    ["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: { ok: true, exam: {
       title: "Syntetiskt prov", level: "C", exam_manifest: "synthetic-manifest-two",
       questions: [{ id: "q1", type: "mc", points: 1, question: "Vad är demokrati?",
         options: ["Folkstyre", "Envälde"], grade_task: "synthetic-task" }],

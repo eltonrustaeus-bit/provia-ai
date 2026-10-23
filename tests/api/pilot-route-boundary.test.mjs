@@ -71,10 +71,11 @@ test("every held-out route handler returns 404 before auth or external work in p
     vercel: process.env.VERCEL_ENV,
     target: process.env.VERCEL_TARGET_ENV,
     url: process.env.SUPABASE_URL,
+    pilotUrl: process.env.EXGEN_PILOT_SUPABASE_URL,
     key: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
   t.after(() => {
-    for (const [key, value] of [["EXGEN_PILOT_MODE", prior.pilot], ["VERCEL", prior.vercelRuntime], ["VERCEL_ENV", prior.vercel], ["VERCEL_TARGET_ENV", prior.target], ["SUPABASE_URL", prior.url], ["SUPABASE_SERVICE_ROLE_KEY", prior.key]]) {
+    for (const [key, value] of [["EXGEN_PILOT_MODE", prior.pilot], ["VERCEL", prior.vercelRuntime], ["VERCEL_ENV", prior.vercel], ["VERCEL_TARGET_ENV", prior.target], ["SUPABASE_URL", prior.url], ["EXGEN_PILOT_SUPABASE_URL", prior.pilotUrl], ["SUPABASE_SERVICE_ROLE_KEY", prior.key]]) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
@@ -84,6 +85,7 @@ test("every held-out route handler returns 404 before auth or external work in p
   process.env.VERCEL_ENV = "production";
   process.env.VERCEL_TARGET_ENV = "production";
   process.env.SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";
+  process.env.EXGEN_PILOT_SUPABASE_URL = "https://yhcinqejsocpmmetazpz.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "synthetic-pilot-route-test-key";
 
   for (const route of heldOut) {

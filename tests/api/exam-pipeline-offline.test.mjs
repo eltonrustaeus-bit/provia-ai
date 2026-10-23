@@ -1,11 +1,383 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const generateExam = require("../../api/generate-exam.js");
 const gradeExam = require("../../api/grade.js");
+const assessment = require("../../api/_assessment.js");
+const verifierModule = require("../../api/_verifier.js");
+const solverModule = require("../../api/_solver.js");
 const gradeTasks = require("../../api/_grade-task.js");
+const examCompletion = require("../../api/_exam-completion.cjs");
+assert.deepEqual(generateExam.mergeDiagnosticCounts(
+  { low_source_alignment: 2, reviewer_other: 1 },
+  { low_source_alignment: 3, unsafe: "not-a-count", "bad code": 9 },
+), { low_source_alignment: 5, reviewer_other: 1 },
+"quality telemetry sums repeated fixed-category failures and excludes invalid keys or counts");
+assert.equal(generateExam.addRepairCandidateCount(
+  generateExam.addRepairCandidateCount(0, 4), 3,
+), 7, "candidate telemetry accumulates across multiple bounded repair attempts");
+
+const originalStreamFetch = globalThis.fetch;
+const streamedPartialQuestion = '{"title":"Syntetiskt","level":"C","questions":[{"id":"partial-1","question":"2 + 2?"},';
+globalThis.fetch = async (_url, { signal }) => new Response(new ReadableStream({
+  start(controller) {
+    const event = { type: "response.output_text.delta", delta: streamedPartialQuestion };
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
+    signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+  },
+}));
+let interruptedRepairStream;
+try {
+  interruptedRepairStream = await generateExam.streamGeneration({ apiKey: "synthetic", payload: {}, budgetMs: 25 });
+} finally {
+  globalThis.fetch = originalStreamFetch;
+}
+assert.equal(interruptedRepairStream.ok, true);
+assert.equal(interruptedRepairStream.cutShort, true,
+  "a provider stream timeout is recognized as an expected bounded interruption");
+assert.match(interruptedRepairStream.text, /partial-1/,
+  "the response stream retains complete candidate bytes received before timeout");
+const parsedInterruptedRepair = generateExam.parseExamResponse({
+  status: "incomplete", output_text: interruptedRepairStream.text,
+});
+assert.equal(parsedInterruptedRepair.parseStatus, "salvaged_json");
+assert.equal(parsedInterruptedRepair.exam.questions.length, 1,
+  "the parser can recover a complete question before the interrupted JSON tail");
+
+assert.equal(assessment.MAX_MC_OPTIONS, 5);
+assert.equal(generateExam.pickModel({ isMath: false, env: {} }), "gpt-4o-mini",
+  "the exam model stays on the current inexpensive default until a candidate is deliberately selected");
+assert.equal(generateExam.pickModel({ isMath: false, env: { OPENAI_MODEL: "gpt-4.1-mini" } }), "gpt-4.1-mini",
+  "the existing general model override remains supported");
+assert.equal(generateExam.pickModel({ isMath: false, env: { OPENAI_MODEL: "gpt-4o-mini", OPENAI_MODEL_EXAM: "gpt-5-mini" } }), "gpt-5-mini",
+  "exam generation can be evaluated on a dedicated model without changing P.E.R or other AI features");
+assert.equal(generateExam.pickModel({ isMath: true, env: { OPENAI_MODEL_EXAM: "gpt-5-mini", OPENAI_MATH_MODEL: "gpt-4.1-mini" } }), "gpt-4.1-mini",
+  "the explicit math model remains the most specific override");
+assert.equal(generateExam.minimumDeliverableQuestionCount(3), 2);
+assert.equal(generateExam.minimumDeliverableQuestionCount(6), 4,
+  "a six-question exam must have at least four independently approved questions before partial delivery");
+assert.equal(generateExam.minimumDeliverableQuestionCount(10), 6);
+assert.equal(generateExam.minimumDeliverableQuestionCount(12), 8,
+  "a twelve-question partial exam must have at least eight independently approved questions");
+for (const [requested, minimum] of [[3, 2], [6, 4], [12, 8]]) {
+  const verifiedQuestions = Array.from({ length: minimum }, () => ({ type: "mc" }));
+  assert.equal(generateExam.canDeliverVerifiedQuestions(verifiedQuestions, { requested, qType: "mc" }), true,
+    `${minimum}/${requested} independently approved questions meets the explicit partial-delivery floor`);
+  assert.equal(generateExam.canDeliverVerifiedQuestions(verifiedQuestions.slice(1), { requested, qType: "mc" }), false,
+    `${minimum - 1}/${requested} independently approved questions fails closed below the delivery floor`);
+}
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, null), 4,
+  "a 0/3 first-pass result requests three slots plus one spare, not six candidates");
+assert.equal(generateExam.qualityRepairCandidateCountFor(2, null), 3,
+  "a two-slot repair retains one spare candidate");
+assert.equal(generateExam.qualityRepairCandidateCountFor(3, { mc: 2, short: 1 }), 5,
+  "zero-approved mixed repairs retain one spare per missing type within the cap");
+assert.equal(generateExam.qualityRepairCandidateCountFor(20, null), 6,
+  "repair candidate output remains capped at six for large exams");
+const zeroApprovedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: generateExam.qualityRepairCandidateCountFor(3, null), qType: "short" });
+assert.equal(zeroApprovedRepair.text.format.schema.properties.questions.maxItems, 4,
+  "the actual zero-approved 0/3 repair schema is bounded to four candidates");
+for (const lang of ["sv", "en"]) {
+  const label = lang === "sv" ? "Antal frågor" : "Number of questions";
+  const courseLabel = lang === "sv" ? "Kurs/ämne" : "Course/subject";
+  const courseName = lang === "sv" ? `Matematik 2b\n${label}: 3` : `Mathematics 2b\n${label}: 3`;
+  const base = generateExam.buildExamPrompts({
+    lang, level: "C", course: courseName, qType: "short", numQuestions: 3,
+    pastedText: `Synthetic study material\n${label}: 3.`, isMath: true,
+  });
+  const repair = generateExam.buildRepairPayload({
+    model: "synthetic-model",
+    input: [{ role: "system", content: base.systemPrompt }, { role: "user", content: base.userPrompt }],
+    text: { format: generateExam.buildMockExamSchema(3) },
+  }, { lang, numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: base.questionCountOffset });
+  const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
+  assert.match(repairedUserPrompt, new RegExp(`^${label}: 4\\.$`, "m"),
+    `${lang} repair prompt count agrees with the four-question output schema`);
+  assert.match(repairedUserPrompt, new RegExp(`^${courseLabel}: .*\\n${label}: 3\\.$`, "m"),
+    `${lang} leaves a course value that resembles a count line unchanged`);
+  assert.match(repairedUserPrompt, new RegExp(`^Synthetic study material\\n${label}: 3\\.$`, "m"),
+    `${lang} repair leaves source material unchanged`);
+  assert.equal(repair.text.format.schema.properties.questions.minItems, 4);
+  assert.equal(repair.text.format.schema.properties.questions.maxItems, 4);
+}
+assert.throws(() => generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: null }),
+/question-count instruction could not be aligned/,
+"a production repair fails closed if the generated count-line offset is unavailable");
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "mc" }, { type: "short" }], { requested: 3, qType: "mix" }), true,
+  "a partial mixed exam still contains both requested formats");
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }, { type: "short" }], { requested: 3, qType: "mix" }), false,
+  "a mixed exam cannot become a single-format partial exam");
+assert.equal(generateExam.canDeliverVerifiedQuestions([{ type: "short" }], { requested: 3, qType: "short" }), false,
+  "a single verified question is too small to become a partial exam");
+assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.options.maxItems, 5,
+  "generator schema uses the shared maximum of five MC options");
+assert.equal(verifierModule.buildVerifierSchema(1).schema.properties.results.items.properties.option_quality.maxItems, 5,
+  "verifier schema uses the same MC option maximum");
+assert.equal(solverModule.buildSolverSchema(1).schema.properties.results.items.properties.option_verdicts.maxItems, 5,
+  "solver schema uses the same MC option maximum");
+assert.equal(generateExam.buildMockExamSchema(1).schema.properties.questions.items.properties.source_references.minItems, 1,
+  "generated questions must cite at least one source excerpt");
+const biologyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
+  pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
+});
+const batchWithNoveltyContext = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
+  pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
+  comparisonQuestions: [{ id: "approved-1", concept_tag: "Kloroplaster", question: "Var sker fotosyntesen?" }],
+});
+assert.match(batchWithNoveltyContext.userPrompt, /redan godkända i samma prov/i,
+  "later generation batches are instructed to avoid repeating approved questions");
+assert.match(batchWithNoveltyContext.userPrompt, /Var sker fotosyntesen\?/,
+  "the generation prompt receives existing questions only as novelty context");
+const internalPayloadWithEscapedSource = Buffer.from(JSON.stringify({
+  pastedText: "\0".repeat(12000),
+  comparisonQuestions: [{ question: "Approved question ".repeat(350) }],
+}), "utf8");
+assert.ok(internalPayloadWithEscapedSource.byteLength > 64 * 1024 && internalPayloadWithEscapedSource.byteLength < 128 * 1024);
+const internalRequestStream = async function* () { yield internalPayloadWithEscapedSource; };
+assert.equal((await generateExam.readJsonBody(internalRequestStream(), 128 * 1024)).pastedText.length, 12000,
+  "bounded internal batches can transport valid maximum-length material plus comparison context");
+await assert.rejects(() => generateExam.readJsonBody(internalRequestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" },
+  "the ordinary 64 KiB request envelope still rejects oversized public-style bodies");
+assert.match(biologyPrompt.systemPrompt, /ORDAGRANT utdrag kopierat direkt från materialet, inte en parafras/i,
+  "the generator must use exact source excerpts that survive the server's literal-reference check");
+assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp/i,
+  "multiple-choice distractors must stay plausible and in the same subject category");
+assert.match(biologyPrompt.systemPrompt, /Hitta inte på nonsensord, trasig svenska/i,
+  "the generator explicitly avoids nonsense and broken Swedish options");
+assert.match(biologyPrompt.systemPrompt, /idiomatisk och grammatiskt korrekt svenska.*böjningar.*'linjens ekvation', aldrig 'linjären'/i,
+  "learner-facing Swedish must use natural technical-term inflections");
+assert.match(biologyPrompt.systemPrompt, /options ska ha exakt 3 alternativ/i,
+  "the generator limits multiple choice to the correct answer and two focused distractors");
+assert.match(biologyPrompt.systemPrompt, /frågetyp-valet är blandat.*välj short/i,
+  "mixed exams prefer a gradable short answer when the source cannot support plausible distractors");
+assert.match(biologyPrompt.systemPrompt, /cognitive_level beskriver vilket tänkande.*INTE samma skala som E\/C\/A/i,
+  "the generator does not conflate cognitive action labels with exam level");
+assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad uppgift med ett klart svarsmål/i,
+  "first-pass short answers have one clear and bounded answer target");
+assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
+  "the short-answer rubric cannot silently score unrequested work");
+const mathPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
+  pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
+});
+assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom flera tydliga matematiska steg.*inte genom öppna uppmaningar/i,
+  "A-level mathematics uses bounded multi-step work rather than open-ended wording");
+assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
+  "each mathematical short answer has one checkable answer target");
+assert.match(mathPrompt.systemPrompt, /frågan uttryckligen be eleven visa eller förklara lösningsmetoden om metodpoäng ska ges/i,
+  "method points require the question to explicitly request working");
+assert.match(mathPrompt.systemPrompt, /Om frågan bara ber om ett slutsvar ska matrisen bara bedöma slutsvaret/i,
+  "final-answer-only tasks cannot silently score method");
+assert.match(mathPrompt.systemPrompt, /Model_answer ska ändå.*får inte i sig utöka vad eleven måste göra för poäng/i,
+  "a complete worked model answer does not expand the scoring contract");
+const englishPrompt = generateExam.buildExamPrompts({
+  lang: "en", level: "C", course: "Mathematics 2b", qType: "short", numQuestions: 2,
+  pastedText: "A fixed fee is 50 SEK and each hour costs 30 SEK.", isMath: true,
+});
+assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear answer target/i,
+  "English short-answer generation follows the same bounded-task rule");
+assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
+  "English scoring criteria cannot silently require unrequested work");
+assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
+  "English math prompts align method points with requested student work");
+assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
+  "English final-answer-only tasks cannot silently score method");
+const sixOptionNormalization = generateExam.normalizeGeneratedExam({ questions: [{
+  id: "six-options", type: "mc", options: ["1", "2", "3", "4", "5", "6"], correct_index: 0,
+}] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 1,
+});
+assert.equal(sixOptionNormalization.failure?.payload.error, "MC options invalid",
+  "server normalization rejects more than five options even if a provider bypasses its schema");
+
+const completeRepairJson = JSON.stringify({ title: "Biologi", level: "C", questions: [{ id: "q1" }] });
+const completeRepairResponse = generateExam.parseExamResponse({
+  output: [{ type: "message", content: [{ type: "output_text", text: completeRepairJson }] }],
+});
+assert.equal(completeRepairResponse.parseStatus, "complete_json");
+assert.equal(completeRepairResponse.exam.questions.length, 1);
+const interruptedRepairResponse = generateExam.parseExamResponse({
+  status: "incomplete",
+  output: [{ type: "message", content: [{
+    type: "output_text",
+    text: '{"title":"Biologi","level":"C","questions":[{"id":"q1"},{"id":"q2","question":"',
+  }] }],
+});
+assert.equal(interruptedRepairResponse.parseStatus, "salvaged_json");
+assert.equal(interruptedRepairResponse.truncated, true);
+assert.equal(interruptedRepairResponse.exam.questions.length, 1,
+  "a complete candidate before a truncated tail remains available for independent quality gates");
+assert.equal(generateExam.parseExamResponse({ output: [] }).parseStatus, "missing_output_text");
+assert.equal(generateExam.safeNormalizationFailure({
+  failure: { payload: { error: "MC options invalid", question: { question: "private source text" } } },
+}), "mc_options_invalid",
+"repair diagnostics classify failures without retaining candidate or source text");
+
+const repairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3 });
+assert.deepEqual(repairPayload.input.slice(0, 2), [
+  { role: "system", content: "system prompt" },
+  { role: "user", content: "material prompt" },
+], "repair retains the original system prompt and source material");
+assert.match(repairPayload.input.at(-1).content, /exakt 4 nya frågekandidater.*fylla 3 saknade provplatser/i);
+assert.match(repairPayload.input.at(-1).content, /konkreta uppgifter från materialet/i);
+assert.match(repairPayload.input.at(-1).content, /självständig, tydligt avgränsad uppgift.*klart svarsmål/i);
+assert.match(repairPayload.input.at(-1).content, /alla värden och villkor.*behövs för lösningen/i);
+assert.match(repairPayload.input.at(-1).content, /ORDAGRANT utdrag från materialet.*inte en parafras/i);
+assert.match(repairPayload.input.at(-1).content, /rimliga, relevanta distraktorer.*samma kategori/i);
+assert.match(repairPayload.input.at(-1).content, /Behåll samma strikta kvalitetskrav/i);
+const categorizedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  reviewFailureCounts: {
+    low_source_alignment: 2,
+    low_scoring_quality: 1,
+    private_reviewer_note: "PRIVAT_GRANSKARTEXT_SENTINEL",
+    arbitrary_untrusted_code: 99,
+  },
+});
+const categorizedRepairInstruction = categorizedRepairPayload.input.at(-1).content;
+assert.match(categorizedRepairInstruction, /"low_source_alignment":2/);
+assert.match(categorizedRepairInstruction, /"low_scoring_quality":1/);
+assert.doesNotMatch(categorizedRepairInstruction, /PRIVAT_GRANSKARTEXT_SENTINEL|arbitrary_untrusted_code/,
+  "repair feedback includes only allowlisted numeric categories, never free-form reviewer content");
+const solverCategorizedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  solverFailureCounts: {
+    solver_implausible_option: 2,
+    solver_disagrees_on_key: 1,
+    solver_unavailable: 4,
+    private_solver_note: "PRIVAT_LOSARTEXT_SENTINEL",
+  },
+});
+const solverCategorizedInstruction = solverCategorizedRepairPayload.input.at(-1).content;
+assert.match(solverCategorizedInstruction, /"solver_implausible_option":2/);
+assert.match(solverCategorizedInstruction, /"solver_disagrees_on_key":1/);
+assert.match(solverCategorizedInstruction, /Den blinda lösaren hittade ett orimligt alternativ/);
+assert.doesNotMatch(solverCategorizedInstruction, /solver_unavailable|PRIVAT_LOSARTEXT_SENTINEL|private_solver_note/,
+  "repair feedback includes only allowlisted content categories, never infrastructure or free-form solver data");
+const mathScoringRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "math system" }, { role: "user", content: "synthetic math material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3, reviewFailureCodes: ["low_scoring_quality", "scoring_alignment"],
+  qType: "short", candidateCount: 4,
+});
+assert.match(mathScoringRepair.input.at(-1).content, /metodpoäng bara ges när frågan uttryckligen ber eleven visa eller förklara metoden/i,
+  "a classified math scoring failure produces precise repair guidance");
+assert.match(mathScoringRepair.input.at(-1).content, /delmomentens poäng summerar exakt till points/i,
+  "the targeted scoring repair requires parts to sum exactly to the total");
+const categorizedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 2,
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "repeated_learning_objective", "difficulty_match", "reviewer_other"],
+});
+assert.match(categorizedRepair.input.at(-1).content, /lös varje uppgift självständigt.*faktiskt besvarar frågan/i,
+  "reviewer answer-alignment findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /uttryckligen stöds av materialet/i,
+  "reviewer source-support findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /exakt ett försvarbart svar/i,
+  "reviewer clarity findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /naturlig svenska/i,
+  "reviewer language findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /verkligt annat begrepp eller en annan uppgiftstanke.*byt inte bara formulering/i,
+  "duplicate reviewer findings require a genuinely different learning objective, not a rewording");
+assert.match(categorizedRepair.input.at(-1).content, /följ den valda nivån/i,
+  "reviewer difficulty findings translate to explicit repair guidance");
+assert.match(categorizedRepair.input.at(-1).content, /Ersätt kandidaten med en annan uppgift som stöds direkt av materialet/i,
+  "an unclassified reviewer concern triggers a safe, source-grounded replacement rather than a wording-only edit");
+const categorizedRepairEnglish = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "en", numQuestions: 2,
+  reviewFailureCodes: ["answer_alignment", "source_support", "question_clarity", "language_quality", "difficulty_match", "reviewer_other"],
+});
+assert.match(categorizedRepairEnglish.input.at(-1).content, /solve each task independently.*answers exactly what was asked/i,
+  "English reviewer answer-alignment findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /explicitly supported by the supplied material/i,
+  "English reviewer source-support findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /exactly one defensible answer/i,
+  "English reviewer clarity findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /natural Swedish/i,
+  "English repair prompt still enforces Swedish learner-facing language");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /match the requested level/i,
+  "English reviewer difficulty findings receive targeted repair guidance");
+assert.match(categorizedRepairEnglish.input.at(-1).content, /different task directly supported by the source, retain the requested level/i,
+  "English repair replaces unclassified reviewer concerns without lowering the requested level");
+const mixedRepairPayload = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "sv", numQuestions: 3, candidateCount: 4, qType: "mix" });
+assert.match(mixedRepairPayload.input.at(-1).content, /exakt 2 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
+  "a four-candidate mixed repair explicitly requests two candidates of each type");
+const mixedRepairEnglish = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "mixed source prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, { lang: "en", numQuestions: 3, candidateCount: 3, qType: "mixed" });
+assert.match(mixedRepairEnglish.input.at(-1).content, /exactly 1 multiple-choice candidate\(s\) and 2 short-answer candidate\(s\)/i,
+  "an odd mixed repair allocates its extra candidate to short answer in English too");
+assert.deepEqual(generateExam.mixedTypeTargets(2), { mc: 1, short: 1 });
+assert.deepEqual(generateExam.mixedTypeTargets(3), { mc: 1, short: 2 },
+  "odd mixed exams give the extra slot to a gradable short-answer question");
+assert.deepEqual(generateExam.mixedRepairCandidateTypes(4, { mc: 0, short: 1 }), { mc: 0, short: 4 },
+  "repair oversamples the missing type instead of wasting candidates on the already-full type");
+assert.deepEqual(generateExam.selectMixedQuestions([
+  { id: "mc-1", type: "mc" }, { id: "mc-2", type: "mc" },
+  { id: "short-1", type: "short" }, { id: "short-2", type: "short" },
+], generateExam.mixedTypeTargets(3)).questions.map((question) => question.type), ["mc", "short", "short"]);
+assert.deepEqual(generateExam.safeAuthFailureDetails(Object.assign(
+  new TypeError("private-token-sentinel"),
+  { cause: Object.assign(new Error("private-message-sentinel"), { code: "ECONNRESET" }) },
+)), { errorClass: "TypeError", networkCode: "ECONNRESET", timedOut: false },
+"auth diagnostics retain only an allowlisted error class and network code");
+assert.deepEqual(generateExam.safeAuthFailureDetails(Object.assign(new Error("private-token-sentinel"), { code: "ETIMEDOUT" })),
+  { errorClass: "Error", networkCode: "ETIMEDOUT", timedOut: true },
+  "auth timeouts are distinguishable without logging the original error");
+const missingSlotRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system prompt" }, { role: "user", content: "material prompt" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 3,
+  existingQuestions: [{ id: "verified-1", concept_tag: "Aritmetik", question: "Vad är 2 + 3?" }],
+});
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.minItems, 3,
+  "repair requests one spare candidate beyond the two missing slots");
+assert.equal(missingSlotRepair.text.format.schema.properties.questions.maxItems, 3);
+assert.match(missingSlotRepair.input.at(-1).content, /exakt 3 nya frågekandidater.*fylla 2 saknade provplatser/i);
+assert.match(missingSlotRepair.input.at(-1).content, /Vad är 2 \+ 3\?/,
+  "existing stems are passed to repair so the model can avoid repeating them");
 
 const envKeys = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "EXAM_SIGNING_SECRET"];
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -48,19 +420,251 @@ const questions = [
   estimated_answer_length: "none",
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" },
 }));
+
+const underfilledNormalization = generateExam.normalizeGeneratedExam({ questions: structuredClone(questions.slice(0, 2)) }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(underfilledNormalization.exam?.questions.length, 2,
+  "a non-empty underfilled response can reach the bounded repair path");
+const overfilledNormalization = generateExam.normalizeGeneratedExam({ questions: [
+  ...structuredClone(questions),
+  { ...structuredClone(questions[0]), id: "extra-q", model_answer: "PRIVATE_MODEL_ANSWER_SENTINEL" },
+] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(overfilledNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
+assert.equal(overfilledNormalization.failure?.payload.exam, undefined,
+  "a question-count error never includes raw generated questions or answers");
+assert.match(overfilledNormalization.failure?.payload.message || "", /fel antal frågor.*tydligare material eller färre frågor/i,
+  "an overfilled draft gives a specific, actionable message rather than a generic completion error");
+assert.equal(JSON.stringify(overfilledNormalization.failure?.payload).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false);
+const emptyNormalization = generateExam.normalizeGeneratedExam({ questions: [] }, {
+  qType: "mc", graphMode: null, pointTable: null, isMath: true, pastedText: "", lang: "sv", numQuestions: 3,
+});
+assert.equal(emptyNormalization.failure?.payload.error, "GENERATION_QUESTION_COUNT_INVALID");
+assert.match(emptyNormalization.failure?.payload.message || "", /inga användbara frågor.*Lägg till relevant studiematerial eller prova med färre frågor/i,
+  "an empty draft explains that no usable questions were produced and what to try next");
+assert.equal(emptyNormalization.failure?.payload.exam, undefined,
+  "an empty model response also returns no raw exam object");
+
+const duplicateGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "zero-first", question: "Vad får man som nollställ för funktionen y = 3x - 6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[1], id: "zero-paraphrase", question: "Vad är nollstället för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[1], id: "zero-semantic-paraphrase", question: "Vid vilket x skär grafen y=3x-6 x-axeln?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[2], id: "slope-same-equation", question: "Vilken är lutningen för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Lutning" },
+  { ...questions[0], id: "zero-new-equation", question: "Vad är nollstället för funktionen y=2x+8?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+] }, { profile: "mathematics", secret: signingSecret });
+assert.deepEqual(duplicateGate.questions.map((question) => question.id), [
+  "zero-first", "slope-same-equation", "zero-new-equation",
+], "near-identical questions are removed without suppressing a different skill or equation");
+assert.deepEqual(duplicateGate.dropped, [
+  { id: "zero-paraphrase", issues: ["duplicate_question"] },
+  { id: "zero-semantic-paraphrase", issues: ["duplicate_question"] },
+]);
+
+const semanticDuplicateGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "capacity-definition", question: "Vad är ekosystemets bärförmåga och hur påverkas den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-paraphrase", question: "Vad är bärförmåga och vilka faktorer kan påverka den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-explanation", question: "Beskriv vad bärförmåga i ett ekosystem innebär.", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[0], id: "capacity-explanation-paraphrase", question: "Redogör för vad ett ekosystems bärförmåga betyder.", topic: "Ekologi", concept_tag: "Bärförmåga" },
+  { ...questions[2], id: "biodiversity-importance", question: "Varför är biologisk mångfald viktig för ekosystemets stabilitet?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+  { ...questions[0], id: "biodiversity-paraphrase", question: "Varför är biologisk mångfald viktig för ekosystemens stabilitet?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+  { ...questions[0], id: "photosynthesis-relationship", question: "Hur hänger fotosyntes och cellandning ihop i ett ekosystem?", topic: "Ekologi", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "photosynthesis-difference", question: "Vad är skillnaden mellan fotosyntes och cellandning?", topic: "Ekologi", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "respiration-rate", question: "Hur påverkar syre cellandningens hastighet?", topic: "Ekologi", concept_tag: "Cellandning" },
+  { ...questions[0], id: "respiration-energy", question: "Hur påverkar syre cellandningens energiproduktion?", topic: "Ekologi", concept_tag: "Cellandning" },
+  { ...questions[0], id: "biodiversity-measurement", question: "Hur mäts den biologiska mångfalden i ett område?", topic: "Ekologi", concept_tag: "Biologisk mångfald" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(semanticDuplicateGate.questions.map((question) => question.id), [
+  "capacity-definition", "capacity-paraphrase", "capacity-explanation", "biodiversity-importance", "photosynthesis-relationship",
+  "photosynthesis-difference", "respiration-rate", "respiration-energy", "biodiversity-measurement",
+], "semantic dedupe removes close paraphrases but preserves related questions with distinct answer targets");
+assert.deepEqual(semanticDuplicateGate.dropped, [
+  { id: "capacity-explanation-paraphrase", issues: ["duplicate_question"] },
+  { id: "biodiversity-paraphrase", issues: ["duplicate_question"] },
+]);
+
+const respirationSiblingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "respiration-rate-context", question: "Hur påverkar syre cellandningens hastighet i en muskelcell?", topic: "Cellandning", concept_tag: "Cellandning" },
+  { ...questions[0], id: "respiration-energy-context", question: "Hur påverkar syre cellandningens energiproduktion i en muskelcell?", topic: "Cellandning", concept_tag: "Cellandning" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(respirationSiblingGate.questions.map((question) => question.id), [
+  "respiration-rate-context", "respiration-energy-context",
+], "a shared concept and context cannot collapse questions with distinct learning outcomes");
+
+const logicalConnectorGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "cell-processes-and", question: "Jämför cellandning och fotosyntes.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "cell-processes-or", question: "Jämför cellandning eller fotosyntes.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalConnectorGate.questions.map((question) => question.id), [
+  "cell-processes-and", "cell-processes-or",
+], "semantic normalization preserves logical connectors that change the task meaning");
+
+const contextualLogicalConnectorGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "context-cell-processes-and", question: "Jämför fotosyntes och cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "context-cell-processes-or", question: "Jämför fotosyntes eller cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(contextualLogicalConnectorGate.questions.map((question) => question.id), [
+  "context-cell-processes-and", "context-cell-processes-or",
+], "logical connector changes remain distinct even when additional shared context raises similarity");
+
+for (const [language, first, reversed] of [
+  ["sv", "Jämför cellandning och fotosyntes.", "Jämför fotosyntes och cellandning."],
+  ["en", "Compare cellular respiration and photosynthesis.", "Compare photosynthesis and cellular respiration."],
+]) {
+  const comparisonGate = assessment.gateExam({ questions: [
+    { ...questions[0], id: `${language}-comparison`, question: first, topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+    { ...questions[0], id: `${language}-comparison-reversed`, question: reversed, topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  ] }, { profile: "generic", secret: signingSecret });
+  assert.deepEqual(comparisonGate.questions.map((question) => question.id), [`${language}-comparison`],
+    `${language}: reversing two simple comparison operands does not create a distinct question`);
+}
+
+const scopedComparisonGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "comparison-context-first", question: "Jämför cellandning och fotosyntes i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "comparison-context-reversed", question: "Jämför fotosyntes och cellandning i ett ekosystem.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(scopedComparisonGate.questions.map((question) => question.id), [
+  "comparison-context-first", "comparison-context-reversed",
+], "comparison operand normalization does not guess across contextual clauses");
+
+const logicalScopeGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "light-and-dark-or", question: "Jämför om fotosyntes och cellandning sker i ljus eller mörker.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+  { ...questions[0], id: "light-or-dark-and", question: "Jämför om fotosyntes eller cellandning sker i ljus och mörker.", topic: "Cellprocesser", concept_tag: "Cellprocesser" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalScopeGate.questions.map((question) => question.id), [
+  "light-and-dark-or", "light-or-dark-and",
+], "different logical scope remains distinct when connector counts match but order differs");
+
+const logicalGroupingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "and-or-grouping", question: "Vilka fall gäller när A och (B eller C) gäller?", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "or-and-grouping", question: "Vilka fall gäller när (A och B) eller C gäller?", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalGroupingGate.questions.map((question) => question.id), [
+  "and-or-grouping", "or-and-grouping",
+], "exact-signature matching preserves Boolean grouping when parentheses change scope");
+
+const malformedLogicalGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "valid-and", question: "Describe whether ruleA and ruleB applies.", topic: "Logic", concept_tag: "Logic" },
+  { ...questions[0], id: "malformed-and", question: "Describe whether (ruleA and) ruleB applies.", topic: "Logic", concept_tag: "Logic" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(malformedLogicalGate.questions.map((question) => question.id), [
+  "valid-and", "malformed-and",
+], "malformed Boolean fragments cannot collapse a valid question during semantic dedupe");
+
+const logicalOperandGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "ordered-operands", question: "Förklara om regelA och (regelB eller regelC) gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "same-operands-paraphrase", question: "Beskriv om regelA och (regelB eller regelC) gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "reassigned-operands", question: "Förklara om regelC och (regelB eller regelA) gäller.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(logicalOperandGate.questions.map((question) => question.id), [
+  "ordered-operands", "reassigned-operands",
+], "Boolean dedupe keeps operand positions while removing an equivalent paraphrase");
+assert.deepEqual(logicalOperandGate.dropped, [
+  { id: "same-operands-paraphrase", issues: ["duplicate_question"] },
+]);
+
+for (const [language, original, redundant] of [
+  ["sv", "Förklara om regelA och (regelB eller regelC) gäller.", "Förklara om regelA och ((regelB eller regelC)) gäller."],
+  ["en", "Explain whether ruleA and (ruleB or ruleC) applies.", "Explain whether ruleA and ((ruleB or ruleC)) applies."],
+  ["sv-atom", "Förklara om regelA och (regelB) eller regelC gäller.", "Förklara om regelA och regelB eller regelC gäller."],
+  ["en-atom", "Explain whether ruleA and (ruleB) or ruleC applies.", "Explain whether ruleA and ruleB or ruleC applies."],
+  ["sv-whole", "Förklara om (regelA och regelB) gäller.", "Förklara om regelA och regelB gäller."],
+  ["en-whole", "Explain whether (ruleA and ruleB) applies.", "Explain whether ruleA and ruleB applies."],
+  ["sv-precedence", "Förklara om (regelA och regelB) eller regelC gäller.", "Förklara om regelA och regelB eller regelC gäller."],
+  ["en-precedence", "Explain whether (ruleA and ruleB) or ruleC applies.", "Explain whether ruleA and ruleB or ruleC applies."],
+]) {
+  const redundantGroupingGate = assessment.gateExam({ questions: [
+    { ...questions[0], id: `${language}-grouping`, question: original, topic: "Logik", concept_tag: "Logik" },
+    { ...questions[0], id: `${language}-redundant-grouping`, question: redundant, topic: "Logik", concept_tag: "Logik" },
+  ] }, { profile: "generic", secret: signingSecret });
+  assert.deepEqual(redundantGroupingGate.questions.map((question) => question.id), [`${language}-grouping`],
+    `${language}: redundant nested parentheses do not hide a semantic duplicate`);
+}
+const mathGroupingGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "math-grouped", question: "Förklara om (regelA + regelB) och regelC gäller.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "math-ungrouped", question: "Förklara om regelA + regelB och regelC gäller.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(mathGroupingGate.questions.map((question) => question.id), ["math-grouped", "math-ungrouped"],
+  "mathematical grouping is not normalized as redundant Boolean parentheses");
+
+function assertIncompleteExamNotDelivered(response, scenario) {
+  assert.equal(response.status, 502, `${scenario}: ${JSON.stringify(response.body)}`);
+  assert.equal(response.body.error, "incomplete_exam", `${scenario}: explicit incomplete-exam error`);
+  assert.equal(response.body.exam, undefined, `${scenario}: no partial exam is exposed`);
+  assert.equal(typeof response.body.received, "number", `${scenario}: failed responses expose only a safe count`);
+  assert.ok(response.body.received < response.body.requested, `${scenario}: the reported safe count is below the requested threshold`);
+  const diagnostic = JSON.parse(qualityLogs.at(-1));
+  assert.equal(diagnostic.event, "exam_quality_rejected", `${scenario}: safe diagnostic event is emitted`);
+  assert.equal(diagnostic.requestId, response.body.requestId, `${scenario}: event correlates to the client request`);
+  assert.equal(typeof diagnostic.solverReasons, "object", `${scenario}: solver rejection categories are aggregated`);
+  assert.equal(JSON.stringify(diagnostic).includes("Vi tränar addition, subtraktion och multiplikation med heltal."), false,
+    `${scenario}: diagnostic omits submitted study material`);
+  const requestCalls = calls.slice(lastInvokeCallStart);
+  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
+    `${scenario}: failed operation releases its fenced claim and quota`);
+  assert.equal(requestCalls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
+    `${scenario}: incomplete exam is never issued`);
+}
+
+function assertVerifiedPartialExamDelivered(response, scenario, expectedCount = 2) {
+  assert.equal(response.status, 200, `${scenario}: ${JSON.stringify(response.body)}`);
+  assert.equal(response.body.ok, true, `${scenario}: a usable verified exam is delivered`);
+  assert.equal(response.body.exam.questions.length, expectedCount, `${scenario}: only retained questions are delivered`);
+  assert.equal(response.body.meta.partial, true, `${scenario}: shortened delivery is explicit`);
+  assert.equal(response.body.exam.questions.every((question) => question.grade_task && question.model_answer === undefined), true,
+    `${scenario}: delivered questions have sealed grading data and no exposed answer key`);
+  assert.equal(JSON.parse(qualityLogs.at(-2)).event, "exam_quality_partial_delivery",
+    `${scenario}: privacy-safe partial-delivery telemetry precedes the normal quality event`);
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), true,
+    `${scenario}: accepted questions are issued through the standard completion path`);
+}
+
 let activeQuestions = questions;
 let emptyGenerationResponse = false;
+let providerHttpFailure = false;
 let generationTextOverride = null;
 let gradingState = "active";
 let solverUnavailable = false;
 let solverUnavailableForRetry = false;
 let verifierUnavailableForRetry = false;
+let verifierUnavailableInitially = false;
 let solverThrowsForRetry = false;
 let verifierThrowsForRetry = false;
 let verifierRejectQuestionId = null;
+let verifierRejectOptionId = null;
+let verifierLanguageMismatchId = null;
+let verifierRejectComparisonDuplicate = false;
 let solverRejectQuestionId = null;
+let solverRejectNonsenseOption = true;
+let solverAnswerIndexOverrides = new Map();
 let regenerationQuestions = null;
+let regenerationQuestionBatches = null;
 let throwOnRepair = false;
+let truncateQualityRepairStream = false;
+let truncateQualityRepairAfter = 1;
+let abortQualityRepairAfterCompleteCandidate = false;
+let abortQualityRepairCandidateCount = 1;
+let qualityRepairAbortTriggered = false;
+let simulatedNow = null;
+let simulatedInitialGenerationMs = 10_000;
+let simulatedStructuralRepairMs = 25_000;
+let simulatedQualityRepairMs = 20_000;
+let simulatedVerifierMs = 0;
+let deferVerifierClockAdvance = false;
+let issuanceUnavailable = false;
+let quotaDenied = false;
+let lastInvokeCallStart = 0;
+const generationOperations = new Map();
+const failureLogs = [];
+const previousConsoleError = console.error;
+const previousConsoleWarn = console.warn;
+const qualityLogs = [];
+const authLogs = [];
+const previousConsoleLog = console.log;
+console.error = (line) => failureLogs.push(String(line));
+console.log = (line) => qualityLogs.push(String(line));
+console.warn = (line) => authLogs.push(String(line));
 
 function outputResponse(value) {
   return Response.json({
@@ -70,15 +674,56 @@ function outputResponse(value) {
   });
 }
 
+let authFetchFailure = null;
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input);
   const method = init.method || "GET";
   calls.push({ url, method, body: init.body ? JSON.parse(init.body) : null, headers: Object.fromEntries(new Headers(init.headers).entries()) });
 
-  if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId });
+  if (url === `${origin}/auth/v1/user`) {
+    if (Array.isArray(authFetchFailure)) {
+      const next = authFetchFailure.shift();
+      if (next instanceof Response) return next;
+      if (next) throw next;
+    } else if (authFetchFailure) {
+      throw authFetchFailure;
+    }
+    return Response.json({ id: userId });
+  }
   if (url.startsWith(`${origin}/rest/v1/profiles?select=role`)) return Response.json([{ role: "gratis" }]);
   if (url.startsWith(`${origin}/rest/v1/user_profiles?select=mastery`)) return Response.json([]);
+  if (url.endsWith("/rest/v1/rpc/claim_mock_exam_generation")) {
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (existing?.requestHash && existing.requestHash !== body.p_request_hash) return Response.json({ status: "payload_conflict" });
+    if (existing?.state === "succeeded") return Response.json({ status: "replay", response: existing.response });
+    if (existing?.state === "running") return Response.json({ status: "in_progress" });
+    generationOperations.set(body.p_idempotency_key, {
+      state: "running", requestHash: body.p_request_hash,
+      attemptId: body.p_attempt_id, quotaRequestId: body.p_quota_request_id,
+    });
+    return Response.json({ status: "claimed", attempt_id: body.p_attempt_id, quota_request_id: body.p_quota_request_id });
+  }
+  if (url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")) {
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (existing?.state === "running" && existing.attemptId === body.p_attempt_id) existing.state = "retryable";
+    return Response.json({ status: existing?.state === "retryable" ? "retryable" : "fenced" });
+  }
+  if (url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")) {
+    if (issuanceUnavailable) return Response.json({ message: "synthetic finalization unavailable" }, { status: 503 });
+    const body = JSON.parse(init.body);
+    const existing = generationOperations.get(body.p_idempotency_key);
+    if (!existing || existing.state !== "running" || existing.attemptId !== body.p_attempt_id) {
+      return Response.json({ status: "fenced" });
+    }
+    const response = body.p_response;
+    existing.state = "succeeded";
+    existing.response = response;
+    return Response.json({ status: "completed", response });
+  }
   if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
+    if (quotaDenied) return Response.json({ ok: false, count: 3, limit: 3, period: "synthetic", unlimited: false });
     return Response.json({ ok: true, count: 1, limit: 3, period: "synthetic", unlimited: false });
   }
   if (url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) return Response.json({ committed: true });
@@ -99,9 +744,12 @@ globalThis.fetch = async (input, init = {}) => {
     gradingState = "completed";
     return Response.json("saved");
   }
-  if (url.includes("/rest/v1/exam_issuances")) return method === "POST"
-    ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
-    : new Response(null, { status: 204 });
+  if (url.includes("/rest/v1/exam_issuances")) {
+    if (method === "POST" && issuanceUnavailable) return Response.json({ message: "synthetic schema unavailable" }, { status: 503 });
+    return method === "POST"
+      ? Response.json([{ submission_id: JSON.parse(init.body).submission_id }], { status: 201 })
+      : new Response(null, { status: 204 });
+  }
   if (url.includes("/rest/v1/mock_results")) return Response.json({ num_questions: 1 });
   if (url.includes("/rest/v1/") && url.includes("per_learner_loop_enabled")) return Response.json([]);
   if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
@@ -109,7 +757,58 @@ globalThis.fetch = async (input, init = {}) => {
 
   if (url === "https://api.openai.com/v1/responses") {
     const body = JSON.parse(init.body || "{}");
+    const schemaName = body.text?.format?.name;
+    const isQualityRepair = typeof body.input?.at?.(-1)?.content === "string"
+      && body.input.at(-1).content.includes("KVALITETSREPARATION");
+    if (body.stream && schemaName === "mock_exam_schema" && isQualityRepair) {
+      if (simulatedNow !== null) simulatedNow += simulatedQualityRepairMs;
+      if (throwOnRepair) throw new Error("synthetic repair transport timeout");
+      const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
+      if (!batch) throw new Error("unexpected synthetic quality-repair request");
+      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || batch.length;
+      const repaired = batch.slice(0, repairCount);
+      activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
+      const fullText = JSON.stringify({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
+      if (abortQualityRepairAfterCompleteCandidate) {
+        const candidateText = JSON.stringify({
+          title: "Omgenererat syntetiskt prov", level: "C",
+          questions: repaired.slice(0, abortQualityRepairCandidateCount),
+        });
+        const event = { type: "response.output_text.delta", delta: candidateText };
+        const chunk = new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+        return new Response(new ReadableStream({
+          start(controller) {
+            controller.enqueue(chunk);
+            const abort = () => {
+              qualityRepairAbortTriggered = true;
+              controller.error(new DOMException("Aborted", "AbortError"));
+            };
+            if (init.signal?.aborted) abort();
+            else init.signal?.addEventListener("abort", abort, { once: true });
+          },
+        }));
+      }
+      const outputText = truncateQualityRepairStream && repaired.length > 1
+        ? JSON.stringify({
+            title: "Omgenererat syntetiskt prov", level: "C",
+            questions: repaired.slice(0, Math.min(truncateQualityRepairAfter, repaired.length - 1)),
+          }).slice(0, -2) + "," + JSON.stringify(repaired[Math.min(truncateQualityRepairAfter, repaired.length - 1)]).slice(0, -1)
+        : fullText;
+      const events = [{ type: "response.output_text.delta", delta: outputText }];
+      if (!truncateQualityRepairStream) {
+        events.push({ type: "response.completed", response: {
+          model: "measured-generator-model",
+          usage: { input_tokens: 120, output_tokens: 40 },
+        } });
+      }
+      return new Response(`${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`);
+    }
     if (body.stream) {
+      if (providerHttpFailure) {
+        providerHttpFailure = false;
+        return new Response(JSON.stringify({ error: { message: "synthetic-provider-body-sentinel" } }), { status: 429 });
+      }
+      if (simulatedNow !== null) simulatedNow += simulatedInitialGenerationMs;
       if (emptyGenerationResponse) return new Response("data: [DONE]\n\n");
       const event = { type: "response.output_text.delta", delta: generationTextOverride || JSON.stringify({ title: "Syntetiskt prov", level: "C", questions: activeQuestions }) };
       const completed = { type: "response.completed", response: {
@@ -118,28 +817,51 @@ globalThis.fetch = async (input, init = {}) => {
       } };
       return new Response(`data: ${JSON.stringify(event)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
-    const schemaName = body.text?.format?.name;
     if (schemaName === "mock_exam_schema") {
+      if (simulatedNow !== null) simulatedNow += simulatedStructuralRepairMs;
       if (throwOnRepair) throw new Error("synthetic repair transport timeout");
-      if (!regenerationQuestions) throw new Error("unexpected synthetic repair request");
-      activeQuestions = regenerationQuestions;
-      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: regenerationQuestions });
+      const batch = regenerationQuestionBatches?.length ? regenerationQuestionBatches.shift() : regenerationQuestions;
+      if (!batch) throw new Error("unexpected synthetic repair request");
+      const repairCount = body.text?.format?.schema?.properties?.questions?.minItems || batch.length;
+      const repaired = batch.slice(0, repairCount);
+      activeQuestions = [...new Map([...activeQuestions, ...repaired].map((question) => [question.id, question])).values()];
+      return outputResponse({ title: "Omgenererat syntetiskt prov", level: "C", questions: repaired });
     }
     if (schemaName === "exam_verifier_schema") {
       const reviewInput = JSON.parse(body.input.find((item) => item.role === "user")?.content || "{}");
       verifierInputs.push(reviewInput);
+      if (simulatedNow !== null) {
+        if (deferVerifierClockAdvance) await Promise.resolve();
+        simulatedNow += simulatedVerifierMs;
+      }
+      if (verifierUnavailableInitially) return new Response("synthetic verifier outage", { status: 503 });
       if (verifierThrowsForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         throw new Error("synthetic retry verifier timeout");
       }
       if (verifierUnavailableForRetry && reviewInput.questions.some((question) => question.id.startsWith("retry-"))) {
         return new Response("synthetic retry verifier outage", { status: 503 });
       }
-      return outputResponse({ results: reviewInput.questions.map((q) => ({
-        id: q.id, approved: q.id !== verifierRejectQuestionId, factual_accuracy: q.id === verifierRejectQuestionId ? 0.2 : 1, ambiguity_score: 0,
+      return outputResponse({ results: reviewInput.questions.map((q) => {
+        const explicitlyRejected = Array.isArray(verifierRejectQuestionId)
+          ? verifierRejectQuestionId.includes(q.id)
+          : q.id === verifierRejectQuestionId;
+        const comparisonDuplicate = verifierRejectComparisonDuplicate &&
+          reviewInput.comparison_questions?.some((approved) =>
+            approved.id === "q-2" && approved.question === "Vad är 7 - 4?" &&
+            q.question === "Beräkna skillnaden mellan sju och fyra.");
+        const rejected = explicitlyRejected || comparisonDuplicate;
+        const optionRejected = Array.isArray(verifierRejectOptionId)
+          ? verifierRejectOptionId.includes(q.id)
+          : q.id === verifierRejectOptionId;
+        return {
+        id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
-        language_quality: 1, issues: q.id === verifierRejectQuestionId ? ["Exempelsvaret motsäger frågan."] : [],
-        required_changes: q.id === verifierRejectQuestionId ? ["Rätta exempelsvaret."] : [],
-      })) });
+        language_quality: 1, language_match: q.id !== verifierLanguageMismatchId, option_quality: Array.isArray(q.options)
+          ? q.options.map((_, index) => !(optionRejected && index === 2))
+          : [],
+        issues: rejected ? ["Exempelsvaret motsäger frågan."] : [],
+        required_changes: rejected ? ["Rätta exempelsvaret."] : [],
+      }; }) });
     }
     if (schemaName === "exam_solver_schema") {
       const userContent = body.input.find((item) => item.role === "user")?.content || "";
@@ -155,10 +877,17 @@ globalThis.fetch = async (input, init = {}) => {
       }
       return outputResponse({ results: requestedQuestions.map((requested) => {
         const q = activeQuestions.find((question) => question.id === requested.id);
-        if (!q) return { id: requested.id, option_verdicts: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
+        if (!q) return { id: requested.id, option_verdicts: [], option_plausibility: [], index: -1, confidence: 0, reason: "Unknown synthetic question." };
+        const expectedIndex = solverAnswerIndexOverrides.has(q.id)
+          ? solverAnswerIndexOverrides.get(q.id)
+          : q.correct_index;
+        const solverIndex = (Array.isArray(solverRejectQuestionId) ? solverRejectQuestionId.includes(q.id) : q.id === solverRejectQuestionId)
+          ? (expectedIndex + 1) % q.options.length
+          : expectedIndex;
         return {
-        id: q.id, option_verdicts: q.options.map((_, i) => i === (q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index)),
-        index: q.id === solverRejectQuestionId ? (q.correct_index + 1) % q.options.length : q.correct_index,
+        id: q.id, option_verdicts: q.options.map((_, i) => i === solverIndex),
+        option_plausibility: q.options.map((option) => !(solverRejectNonsenseOption && option === "Kesäkten")),
+        index: solverIndex,
         confidence: 1, reason: "Syntetiskt kontrollsvar.",
         };
       }) });
@@ -170,7 +899,8 @@ globalThis.fetch = async (input, init = {}) => {
 };
 
 function invoke(handler, body) {
-  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  lastInvokeCallStart = calls.length;
+  const req = Readable.from([Buffer.from(JSON.stringify({ ...body, idempotencyKey: body.idempotencyKey || randomUUID() }))]);
   req.method = "POST";
   req.headers = { authorization: "Bearer synthetic-user-token", "content-type": "application/json" };
   return new Promise((resolve, reject) => {
@@ -189,7 +919,68 @@ function invoke(handler, body) {
 
 try {
   const course = "Matematik 1b";
-  const pastedText = "Vi tränar addition, subtraktion och multiplikation med heltal.";
+  const pastedText = "Grundläggande räkning: Vi tränar addition, subtraktion och multiplikation med heltal.";
+  authFetchFailure = Object.assign(new TypeError("private-token-sentinel"), {
+    cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),
+  });
+  const authLookupCountBefore = calls.filter((call) => call.url === `${origin}/auth/v1/user`).length;
+  const authLookupFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(authLookupFailure.status, 503, "an auth lookup transport failure is reported as temporary service unavailability");
+  assert.deepEqual(authLookupFailure.body, { ok: false, error: "AUTH_VERIFICATION_UNAVAILABLE" });
+  assert.equal(calls.filter((call) => call.url === `${origin}/auth/v1/user`).length - authLookupCountBefore, 2,
+    "a retryable auth transport failure receives exactly one bounded retry");
+  const authLookupLog = JSON.parse(authLogs.at(-1));
+  assert.deepEqual(authLookupLog, {
+    event: "exam_auth_rejected", stage: "auth_user_lookup", errorClass: "TypeError",
+    attempts: 2, networkCode: "ETIMEDOUT", timedOut: true,
+  }, "auth transport diagnostics identify timeout class without exposing exception text");
+  assert.doesNotMatch(JSON.stringify(authLookupLog), /private-token-sentinel|private-message-sentinel|synthetic-user-token/);
+
+  providerHttpFailure = true;
+  calls.length = 0;
+  const providerFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(providerFailure.status, 502);
+  assert.equal(providerFailure.body.error, "exam_generation_failed");
+  assert.equal(providerFailure.body.stage, "model_generation");
+  assert.ok(providerFailure.body.requestId);
+  assert.match(providerFailure.body.message, /Inget prov lämnades ut/);
+  assert.doesNotMatch(JSON.stringify(providerFailure.body), /synthetic-provider-body-sentinel|details|OpenAI error/,
+    "provider response bodies are not returned to the browser");
+  const providerFailureLog = JSON.parse(authLogs.at(-1));
+  assert.deepEqual(providerFailureLog, {
+    event: "exam_generation_provider_failure",
+    requestId: providerFailure.body.requestId,
+    stage: "model_generation",
+    category: "upstream_http_error",
+    upstreamStatus: 429,
+  });
+  assert.doesNotMatch(JSON.stringify(providerFailureLog), /synthetic-provider-body-sentinel|synthetic-provider-key/);
+
+  authFetchFailure = [Object.assign(new TypeError("private-token-sentinel"), {
+    cause: Object.assign(new Error("private-message-sentinel"), { code: "ETIMEDOUT" }),
+  })];
+  const retryBefore = calls.filter((call) => call.url === `${origin}/auth/v1/user`).length;
+  const retriedAuth = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText: "", qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(retriedAuth.status, 400, "a transient auth timeout can recover before material validation without reaching generation");
+  assert.equal(calls.filter((call) => call.url === `${origin}/auth/v1/user`).length - retryBefore, 2);
+  assert.equal(calls.slice(lastInvokeCallStart).some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "auth retry regression does not spend an AI call");
+
+  authFetchFailure = [new Response("unauthorized", { status: 401 })];
+  const invalidAuth = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  authFetchFailure = null;
+  assert.equal(invalidAuth.status, 401, "a rejected user token remains an authentication error, not an outage");
+
   const unsupportedGraph = await invoke(generateExam, {
     lang: "sv", level: "C", course: "Matematik 2b", pastedText: "Parabeln ges av y = x^2.",
     qType: "graph", numQuestions: 1,
@@ -223,6 +1014,419 @@ try {
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
     "unsupported graph formats and line bounds do not consume a mock-exam quota");
 
+  calls.length = 0;
+  const defaultSizedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc",
+  });
+  assert.equal(defaultSizedExam.status, 200, JSON.stringify(defaultSizedExam.body));
+  assert.equal(defaultSizedExam.body.exam.questions.length, 3,
+    "the API defaults requests without a question count to a complete fast exam");
+
+  calls.length = 0;
+  activeQuestions = questions.slice(0, 2);
+  const twoQuestionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 2,
+  });
+  activeQuestions = questions;
+  assert.equal(twoQuestionExam.status, 200, JSON.stringify(twoQuestionExam.body));
+  assert.equal(twoQuestionExam.body.exam.questions.length, 2,
+    "a complete two-question exam is delivered when the learner explicitly selects two");
+  assert.equal(twoQuestionExam.body.meta.verifier.approved, 2,
+    "both questions still pass independent review");
+  assert.equal(twoQuestionExam.body.meta.solver.checked, 2,
+    "both questions still pass the solver check");
+
+  const mixedShortCandidates = Array.from({ length: 6 }, (_, index) => {
+    const answer = String(6 + index);
+    return {
+      id: `mixed-short-${index + 1}`, type: "short", points: 1,
+      question: `Beräkna ${answer} - 1.`, options: [], correct_index: -1,
+      rubric: `En poäng för ${answer - 1}.`, model_answer: String(Number(answer) - 1),
+      topic: "Aritmetik", subtopic: "Subtraktion", concept_tag: "Aritmetik",
+      learning_objective: "Beräkna en enkel differens.", source_references: ["Grundläggande räkning"],
+      cognitive_level: "tillämpa", accepted_answers: [String(Number(answer) - 1)], estimated_answer_length: "short",
+      scoring_rubric: { parts: [{ description: "Rätt differens", points: 1 }], full_score_requirements: "Rätt differens", partial_credit_notes: "" },
+    };
+  });
+
+  activeQuestions = [questions[0], { ...mixedShortCandidates[0], id: "mixed-rejected-short" }];
+  verifierRejectQuestionId = "mixed-rejected-short";
+  regenerationQuestionBatches = [mixedShortCandidates.slice(1, 5)];
+  calls.length = 0;
+  const repairedTwoQuestionMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  verifierRejectQuestionId = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedTwoQuestionMix.status, 200, JSON.stringify(repairedTwoQuestionMix.body));
+  assert.deepEqual(repairedTwoQuestionMix.body.exam.questions.map((question) => question.type).sort(), ["mc", "short"],
+    "a two-question verifier repair preserves one MC and one short answer");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 0 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
+    "quality repair targets the missing short-answer type");
+
+  const rejectedMixedMc = { ...questions[0], id: "mixed-rejected-mc" };
+  const rejectedMixedShort = { ...mixedShortCandidates[0], id: "mixed-rejected-short-both" };
+  const mixedRepairCandidates = [
+    { ...questions[0], id: "mixed-repair-mc-1", question: "Vilket tal är summan av 2 och 3?" },
+    { ...questions[0], id: "mixed-repair-mc-2", question: "Vilket tal är summan av 3 och 4?", model_answer: "7" },
+    { ...questions[0], id: "mixed-repair-mc-3", question: "Vilket tal är summan av 4 och 5?", model_answer: "9" },
+    { ...mixedShortCandidates[1], id: "mixed-repair-short-1" },
+    { ...mixedShortCandidates[2], id: "mixed-repair-short-2" },
+    { ...mixedShortCandidates[3], id: "mixed-repair-short-3" },
+  ];
+  activeQuestions = [rejectedMixedMc, rejectedMixedShort];
+  verifierRejectQuestionId = [rejectedMixedMc.id, rejectedMixedShort.id];
+  regenerationQuestionBatches = [mixedRepairCandidates];
+  calls.length = 0;
+  const repairedBothTypes = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  verifierRejectQuestionId = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedBothTypes.status, 200, JSON.stringify(repairedBothTypes.body));
+  assert.deepEqual(repairedBothTypes.body.exam.questions.map((question) => question.type).sort(), ["mc", "short"],
+    "one repair replaces both rejected types and preserves the requested mixed balance");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 2 flervalskandidat\(er\) och 2 kortsvarskandidat\(er\)/i,
+    "quality repair requests candidates for both simultaneously missing types");
+
+  activeQuestions = questions.slice(0, 3);
+  regenerationQuestionBatches = [mixedShortCandidates];
+  calls.length = 0;
+  const repairedThreeQuestionMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 3,
+  });
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(repairedThreeQuestionMix.status, 200, JSON.stringify(repairedThreeQuestionMix.body));
+  assert.deepEqual(repairedThreeQuestionMix.body.exam.questions.map((question) => question.type).sort(), ["mc", "short", "short"],
+    "a three-question structural repair enforces the requested mixed balance");
+  assert.match(calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body.input.at(-1).content.includes("KVALITETSREPARATION"))?.body.input.at(-1).content,
+    /exakt 0 flervalskandidat\(er\) och 3 kortsvarskandidat\(er\)/i,
+    "structural repair generates candidates for the missing short-answer slots");
+
+  const wrongTypeRepairCandidates = Array.from({ length: 6 }, (_, index) => ({
+    ...questions[index % questions.length],
+    id: `wrong-type-mix-${index + 1}`,
+    question: `Räkna ${index + 2} + ${index + 3}.`,
+    model_answer: String(index * 2 + 5),
+    options: [String(index * 2 + 4), String(index * 2 + 5), String(index * 2 + 6)],
+    correct_index: 1,
+    source_references: ["Grundläggande räkning"],
+  }));
+  activeQuestions = questions.slice(0, 2);
+  regenerationQuestionBatches = [wrongTypeRepairCandidates.slice(0, 4), wrongTypeRepairCandidates];
+  calls.length = 0;
+  const wrongTypeMix = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mix", numQuestions: 2,
+  });
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+  assert.equal(wrongTypeMix.status, 502, JSON.stringify(wrongTypeMix.body));
+  assert.equal(wrongTypeMix.body.error, "incomplete_exam");
+  assert.equal(wrongTypeMix.body.exam, undefined,
+    "repairs that ignore the missing type never deliver an unbalanced mixed exam");
+
+  const fourQuestionSet = [
+    ...questions,
+    {
+      ...questions[0], id: "q-4", question: "Vad blir 8 + 1?", options: ["8", "9", "10"],
+      correct_index: 1, model_answer: "9",
+    },
+  ];
+  activeQuestions = fourQuestionSet;
+  regenerationQuestions = [
+    { ...fourQuestionSet[3], id: "q-4-repair", question: "Vad blir 6 + 3?", options: ["8", "9", "10"] },
+    { ...fourQuestionSet[3], id: "q-4-repair-extra", question: "Vad blir 7 + 2?", options: ["8", "9", "10"] },
+  ];
+  verifierRejectQuestionId = "q-4";
+  calls.length = 0;
+  const fourQuestionRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 4,
+  });
+  assert.equal(fourQuestionRepair.status, 200, JSON.stringify(fourQuestionRepair.body));
+  assert.equal(fourQuestionRepair.body.exam.questions.length, 4,
+    "one rejected question in a four-question request triggers repair even when the rejection rate is only 25 percent");
+  assert.ok(fourQuestionRepair.body.exam.questions.some((question) => question.id === "q-4-repair"),
+    "the repair replaces the rejected question with a verified candidate");
+  assert.equal(fourQuestionRepair.body.exam.questions.some((question) => question.id === "q-4"), false,
+    "a rejected initial question is never restored to fill the requested count");
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  activeQuestions = questions;
+
+  const biologyCourse = "Biologi 1";
+  const biologyMaterial = "Fotosyntes sker i kloroplasterna. Växten använder ljusenergi, vatten och koldioxid för att bilda glukos och syre.";
+  const biologyQuestions = questions.map((question, index) => ({
+    ...question,
+    id: `biology-${index + 1}`,
+    question: [
+      "Var sker fotosyntesen i växtcellen?",
+      "Vilka ämnen använder växten i fotosyntesen?",
+      "Vilka ämnen bildas enligt materialet?",
+    ][index],
+    options: [
+      ["I cellkärnan", "I kloroplasterna", "I cellmembranet"],
+      ["Vatten och koldioxid", "Glukos och syre", "Protein och kväve"],
+      ["Glukos och syre", "Vatten och koldioxid", "Klorofyll och kväve"],
+    ][index],
+    correct_index: index === 0 ? 1 : 0,
+    model_answer: ["I kloroplasterna", "Vatten och koldioxid", "Glukos och syre"][index],
+    topic: "Fotosyntes",
+    subtopic: "Fotosyntesens reaktanter och produkter",
+    concept_tag: "Fotosyntes",
+    learning_objective: "Beskriva fotosyntesens plats, reaktanter och produkter.",
+    source_references: [["kloroplasterna"], ["vatten och koldioxid"], ["glukos och syre"]][index],
+  }));
+  activeQuestions = biologyQuestions;
+  solverAnswerIndexOverrides = new Map([["biology-1", 1], ["biology-2", 0], ["biology-3", 0]]);
+  const biologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(biologyExam.status, 200, JSON.stringify(biologyExam.body));
+  assert.equal(biologyExam.body.exam.questions.length, 3,
+    "a realistic three-question biology exam completes the full generation pipeline");
+  assert.equal(biologyExam.body.meta.verifier.approved, 3);
+  assert.equal(biologyExam.body.meta.solver.checked, 3);
+  assert.ok(biologyExam.body.exam.questions.every((question) =>
+    question.source_references.every((reference) => biologyMaterial.toLowerCase().includes(reference.toLowerCase()))),
+  "biology question references are grounded in the submitted source material");
+  assert.ok(verifierInputs.at(-1).source_material.includes("Fotosyntes sker i kloroplasterna"),
+    "the independent reviewer receives the synthetic biology source material");
+
+  activeQuestions = biologyQuestions.map((question) => question.id === "biology-2"
+    ? { ...question, source_references: ["Parafras som inte finns ordagrant i materialet"] }
+    : question);
+  const sourceExcerptRecoveryVerifierStart = verifierInputs.length;
+  const sourceExcerptRecoveryExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(sourceExcerptRecoveryExam.status, 200, JSON.stringify(sourceExcerptRecoveryExam.body));
+  assert.equal(sourceExcerptRecoveryExam.body.exam.questions.length, 3,
+    "a source-supported question is not dropped solely because the model supplied only a paraphrased citation");
+  const recoveredSourceQuestion = sourceExcerptRecoveryExam.body.exam.questions.find((question) => question.id === "biology-2");
+  assert.ok(recoveredSourceQuestion?.source_references.length > 0);
+  assert.ok(recoveredSourceQuestion.source_references.every((reference) => biologyMaterial.includes(reference)),
+    "fallback citations remain literal excerpts from the submitted material");
+  assert.ok(verifierInputs.slice(sourceExcerptRecoveryVerifierStart)
+    .some((review) => review.questions.some((question) => question.id === "biology-2")),
+  "the recovered candidate still must pass independent review");
+
+  activeQuestions = biologyQuestions.slice(0, 2);
+  calls.length = 0;
+  const twoQuestionBiologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 2,
+  });
+  assert.equal(twoQuestionBiologyExam.status, 200, JSON.stringify(twoQuestionBiologyExam.body));
+  assert.equal(twoQuestionBiologyExam.body.exam.questions.length, 2,
+    "a two-question non-math exam completes with exact requested count");
+  assert.equal(twoQuestionBiologyExam.body.meta.verifier.approved, 2);
+  assert.equal(twoQuestionBiologyExam.body.meta.solver.checked, 2,
+    "both non-math items receive independent answer checks");
+
+  const malformedBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["I cellkärnan", "I kloroplasterna", "Kesäkten"], correct_index: 1, model_answer: "I kloroplasterna" }
+    : question);
+  const repairedBiology = biologyQuestions.map((question, index) => ({
+    ...question,
+    id: `biology-repair-${index + 1}`,
+    question: `En ny fråga om fotosyntes: ${question.question}`,
+  }));
+  repairedBiology[0] = {
+    ...repairedBiology[0],
+    options: ["I cellkärnan", "Kloroplasterna", "I cellmembranet"],
+    correct_index: 1,
+    model_answer: "Kloroplasterna",
+  };
+  activeQuestions = malformedBiology;
+  regenerationQuestions = repairedBiology;
+  verifierRejectOptionId = "biology-1";
+  solverRejectNonsenseOption = false;
+  const verifierInputCountBeforeBiologyRepair = verifierInputs.length;
+  const solverInputCountBeforeVerifierRejection = solverInputs.length;
+  calls.length = 0;
+  const nonsenseBiologyExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(nonsenseBiologyExam.status, 200, JSON.stringify(nonsenseBiologyExam.body));
+  assert.equal(nonsenseBiologyExam.body.exam.questions.length, 3);
+  assert.equal(nonsenseBiologyExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "the deterministic source-support gate and bounded repair keep the nonsense out of the delivered exam");
+  assert.equal(verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
+    .some((review) => review.questions.some((question) => question.options.includes("Kesäkten"))), false,
+  "an unsupported single-word outlier is withheld before the independent verifier");
+  assert.equal(solverInputs.slice(solverInputCountBeforeVerifierRejection)
+    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
+  "an unsupported single-word outlier is withheld before the blind solver too");
+  const repairedOutlierReview = verifierInputs.slice(verifierInputCountBeforeBiologyRepair)
+    .flatMap((review) => review.questions)
+    .find((question) => question.id === "biology-repair-1");
+  assert.ok(repairedOutlierReview?.review_hints.includes("single_word_option_outlier_review"),
+    "a source-supported standalone technical option remains eligible and receives independent review");
+  assert.ok(nonsenseBiologyExam.body.exam.questions.some((question) =>
+    question.id === "biology-repair-1" && question.options.includes("Kloroplasterna")),
+  "a source-supported repair candidate can replace the deterministically dropped outlier");
+  verifierRejectOptionId = null;
+  solverRejectNonsenseOption = true;
+  regenerationQuestions = null;
+
+  activeQuestions = malformedBiology;
+  regenerationQuestions = repairedBiology;
+  const solverInputCountBeforeSolverRejection = solverInputs.length;
+  calls.length = 0;
+  const solverRejectedNonsenseExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(solverRejectedNonsenseExam.status, 200, JSON.stringify(solverRejectedNonsenseExam.body));
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.length, 3);
+  assert.equal(solverInputs.slice(solverInputCountBeforeSolverRejection)
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))), false,
+  "an unsupported outlier does not reach the blind solver in the subsequent request either");
+  assert.equal(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "the solver's option-plausibility rejection triggers bounded replacement when the verifier does not flag the item");
+  assert.ok(solverRejectedNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
+    "the solver-rejected item is replaced by an independently checked candidate");
+  regenerationQuestions = null;
+
+  const allWordNonsenseBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["Kloroplast", "Cellkärna", "Kesäkten"], correct_index: 0, model_answer: "Kloroplast" }
+    : question);
+  const verifierInputCountBeforeAllWordNonsense = verifierInputs.length;
+  const solverInputCountBeforeAllWordNonsense = solverInputs.length;
+  activeQuestions = allWordNonsenseBiology;
+  regenerationQuestions = repairedBiology;
+  verifierRejectOptionId = "biology-1";
+  solverRejectNonsenseOption = true;
+  const allWordNonsenseExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(allWordNonsenseExam.status, 200, JSON.stringify(allWordNonsenseExam.body));
+  assert.equal(allWordNonsenseExam.body.exam.questions.length, 3);
+  assert.equal(allWordNonsenseExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "an all-single-word nonsense distractor is rejected by independent review and solving before delivery");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordNonsense)
+    .some((review) => review.questions.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
+  "all-single-word options reach the independent reviewer when the structural pattern cannot prove an error");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordNonsense)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.review_hints.includes("mixed_source_support_single_word_options_review"))),
+  "mixed source support is passed as a non-blocking review hint for all-single-word options");
+  assert.ok(solverInputs.slice(solverInputCountBeforeAllWordNonsense)
+    .some((batch) => batch.some((question) => question.id === "biology-1" && question.options.includes("Kesäkten"))),
+  "the malformed option is also checked by the blind solver");
+  assert.ok(allWordNonsenseExam.body.exam.questions.some((question) => question.id === "biology-repair-1"),
+    "the doubly rejected item is replaced with an independently reviewed candidate");
+  verifierRejectOptionId = null;
+  solverRejectNonsenseOption = false;
+  regenerationQuestions = null;
+
+  const allWordValidBiology = biologyQuestions.map((question) => question.id === "biology-1"
+    ? { ...question, options: ["Kloroplast", "Cellkärna", "Cellmembran"], correct_index: 0, model_answer: "Kloroplast" }
+    : question);
+  const verifierInputCountBeforeAllWordValid = verifierInputs.length;
+  activeQuestions = allWordValidBiology;
+  solverAnswerIndexOverrides = new Map();
+  const allWordValidExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(allWordValidExam.status, 200, JSON.stringify(allWordValidExam.body));
+  assert.ok(allWordValidExam.body.exam.questions.some((question) => question.id === "biology-1"
+    && question.options.includes("Cellkärna")),
+  "the mixed-source-support signal does not prevent the verifier from approving valid technical options");
+  assert.ok(verifierInputs.slice(verifierInputCountBeforeAllWordValid)
+    .some((review) => review.questions.some((question) => question.id === "biology-1"
+      && question.review_hints.includes("mixed_source_support_single_word_options_review"))),
+  "valid all-word options receive the same non-blocking hint as the malformed case");
+
+  const languageMismatchQuestions = [
+    { ...questions[0], id: "language-mismatch-1", question: "What is 2 + 3?" },
+    { ...questions[1], id: "language-valid-2" },
+    { ...questions[2], id: "language-valid-3" },
+  ];
+  const languageRepairQuestions = [
+    { ...questions[0], id: "language-repair-1", question: "Vad blir produkten av 3 och 4?", options: ["7", "12", "9"], correct_index: 1, model_answer: "12" },
+    { ...questions[1], id: "language-repair-2", question: "Hur stor är skillnaden mellan 8 och 3?", options: ["5", "11", "24"], correct_index: 0, model_answer: "5" },
+  ];
+  activeQuestions = languageMismatchQuestions;
+  regenerationQuestions = languageRepairQuestions;
+  verifierLanguageMismatchId = "language-mismatch-1";
+  solverAnswerIndexOverrides = new Map([["language-mismatch-1", 1], ["language-valid-2", 1], ["language-valid-3", 1], ["language-repair-1", 1], ["language-repair-2", 0]]);
+  calls.length = 0;
+  const languageRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(languageRepairedExam.status, 200, JSON.stringify(languageRepairedExam.body));
+  assert.equal(languageRepairedExam.body.exam.questions.length, 3);
+  assert.equal(languageRepairedExam.body.exam.questions.some((question) => question.question.includes("What is")), false,
+    "a fluent question in the wrong selected language is replaced, never shown to the learner");
+  const firstGenerationCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.stream);
+  assert.match(firstGenerationCall.body.input[0].content, /Alla elevriktade fält ska vara naturlig, idiomatisk och grammatiskt korrekt svenska/i,
+    "the generator is explicitly instructed to match the requested Swedish output language");
+  const firstVerifierCall = calls.find((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_verifier_schema");
+  assert.ok(firstVerifierCall.body.text.format.schema.properties.results.items.required.includes("language_match"));
+  assert.match(firstVerifierCall.body.input[0].content, /language_match=true endast om alla elevriktade fält/i,
+    "the independent reviewer receives the same selected-language requirement");
+  verifierLanguageMismatchId = null;
+  regenerationQuestions = null;
+
+  const wrongKeyQuestion = {
+    ...questions[0], id: "wrong-key-initial", question: "Vad är 2 + 3?",
+    options: ["5", "4", "6"], correct_index: 1, model_answer: "4",
+  };
+  const correctKeyRepair = {
+    ...questions[0], id: "wrong-key-repair", question: "Vad är 4 + 2?",
+    options: ["6", "7", "8"], correct_index: 0, model_answer: "6",
+  };
+  const alternateCorrectKeyRepair = {
+    ...questions[1], id: "wrong-key-repair-alternate", question: "Vad blir summan av 5 och 4?",
+    options: ["8", "9", "10"], correct_index: 1, model_answer: "9",
+  };
+  activeQuestions = [wrongKeyQuestion, questions[1]];
+  regenerationQuestions = [correctKeyRepair, alternateCorrectKeyRepair];
+  solverAnswerIndexOverrides = new Map([
+    ["wrong-key-initial", 0], ["q-2", 1], ["wrong-key-repair", 0], ["wrong-key-repair-alternate", 1],
+  ]);
+  calls.length = 0;
+  const wrongKeyRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 2,
+  });
+  assert.equal(wrongKeyRepairedExam.status, 200, JSON.stringify(wrongKeyRepairedExam.body));
+  assert.equal(wrongKeyRepairedExam.body.exam.questions.length, 2);
+  assert.ok(wrongKeyRepairedExam.body.exam.questions.some((question) => question.id === "wrong-key-repair"),
+    "an independent solver answer that contradicts correct_index forces replacement");
+  assert.equal(wrongKeyRepairedExam.body.exam.questions.some((question) => question.id === "wrong-key-initial"), false);
+  assert.deepEqual(Object.keys(solverInputs.at(-2)[0]).sort(), ["id", "options", "question"],
+    "the solver mock is given no answer key or model answer for this integration case");
+  regenerationQuestions = null;
+  activeQuestions = questions;
+  solverAnswerIndexOverrides = new Map();
+
+  calls.length = 0;
+  quotaDenied = true;
+  const quotaDeniedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course: "Matematik 1b",
+    pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+  });
+  quotaDenied = false;
+  assert.equal(quotaDeniedExam.status, 429, "a denied mock-exam quota is returned before generation");
+  assert.equal(quotaDeniedExam.body.periodUnit, "week", "the quota response exposes the weekly unit");
+  assert.match(quotaDeniedExam.body.period, /^\d{4}-W\d{2}$/,
+    "the quota response exposes its captured ISO week period");
+  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 0,
+    "a quota denial never calls the model");
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
+    "a quota denial never creates a usable exam issuance");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/ai_usage_events")), false,
+  "a denied reservation triggers no commit, refund, or model-usage write");
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1,
+    "the request checks quota exactly once");
+
   activeQuestions = questions.map((question, index) => ({
     ...question,
     source_references: index === 0
@@ -247,7 +1451,11 @@ try {
     "a source-supported learner selection reaches the real generation handler's prompt");
   assert.doesNotMatch(generationUserPrompt, /påhittat/,
     "a client term absent from the source is removed before model input");
-  assert.match(generated.body.exam.exam_manifest, /^v1\.3\./);
+  const generatedSubmissionId = examCompletion.submissionId(userId, course, generated.body.exam.questions);
+  assert.match(generated.body.exam.exam_manifest, new RegExp(`^v2\\.${generatedSubmissionId}\\.[A-Za-z0-9_-]{43}$`));
+  assert.equal(examCompletion.verifyExamManifest(
+    generated.body.exam.exam_manifest, userId, course, pastedText, generated.body.exam.questions,
+  ), true, "the API response contains a manifest the server can verify for this exact issued set");
   for (const question of generated.body.exam.questions) {
     assert.ok(question.grade_task, "each delivered question has opaque signed grading material");
     for (const hidden of ["correct_index", "model_answer", "rubric", "scoring_rubric", "akey_sig", "confidence_score", "detected_issues"]) {
@@ -315,8 +1523,40 @@ try {
       { id: "q-3", points: 1, max_points: 1, feedback: "Rätt.", model_answer: "9", concept_tag: "Aritmetik", error_tags: [] },
     ],
   });
-  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")),
-    "a successfully generated exam commits its reserved quota");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")),
+    "a successfully generated exam atomically commits quota, issuance and replay result");
+
+  const badOptionQuestions = questions.map((question) => question.id === "q-1"
+    ? { ...question, options: ["4", "5", "Kesäkten"] }
+    : question);
+  const repairedOptionQuestions = badOptionQuestions.map((question, index) => ({
+    ...question,
+    id: `option-repair-${index + 1}`,
+    options: [["4", "5", "6"], ["2", "3", "4"], ["6", "9", "12"]][index],
+  }));
+  activeQuestions = badOptionQuestions;
+  regenerationQuestions = repairedOptionQuestions;
+  verifierRejectOptionId = null;
+  const verifierInputCountBeforeMalformedOption = verifierInputs.length;
+  const solverInputCountBeforeMalformedOption = solverInputs.length;
+  const nonsenseOptionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierRejectOptionId = null;
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  assert.equal(nonsenseOptionExam.status, 200, JSON.stringify(nonsenseOptionExam.body));
+  assert.equal(nonsenseOptionExam.body.exam.questions.length, 3,
+    "a bounded repair can replace a batch after the deterministic gate flags a malformed option");
+  assert.equal(verifierInputs.slice(verifierInputCountBeforeMalformedOption)
+    .some((batch) => batch.questions.some((question) => question.options.includes("Kesäkten"))), false,
+  "the mathematics structural gate rejects a nonnumeric option before model review");
+  assert.equal(solverInputs.slice(solverInputCountBeforeMalformedOption)
+    .some((batch) => batch.some((question) => question.options.includes("Kesäkten"))), false,
+  "the mathematics structural gate keeps the nonnumeric option away from the solver");
+  assert.equal(nonsenseOptionExam.body.exam.questions.some((question) => question.options.includes("Kesäkten")), false,
+    "an MC item with a nonsense distractor is withheld from the learner-facing exam");
 
   const retryOptions = [["4", "5", "7"], ["1", "3", "5"], ["8", "9", "10"]];
   const repairedQuestions = questions.map((question, index) => ({
@@ -327,44 +1567,958 @@ try {
     correct_index: 1,
     model_answer: retryOptions[index][1],
   }));
+  const unsupportedQuestions = questions.map((question) => ({
+    ...question,
+    question: "Vilket tal följer efter 80?",
+    options: ["80", "81", "82"],
+    correct_index: 1,
+    model_answer: "81",
+    topic: "Talserie",
+    subtopic: "Efterföljare",
+    concept_tag: "Efterföljare",
+    learning_objective: "Ange nästa tal i en talserie.",
+    source_references: ["Not found in the supplied material"],
+  }));
+
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  const verifierCountBeforeEmptyStructuralSet = verifierInputs.length;
+  const emptyStructuralSetExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(emptyStructuralSetExam.status, 200, JSON.stringify(emptyStructuralSetExam.body));
+  assert.equal(emptyStructuralSetExam.body.exam.questions.length, 3,
+    "one bounded structural repair can recover when the first gate rejects every question");
+  assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet).length, 1,
+    "repaired candidates receive one independent review batch");
+  assert.equal(verifierInputs.slice(verifierCountBeforeEmptyStructuralSet)[0].questions.length, 3,
+    "the verifier only sees the complete, structurally valid candidate set");
+  const structuralRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(structuralRepairLog.repairHttpStatus, 200,
+    "structural repair telemetry captures only the provider HTTP status");
+  assert.equal(structuralRepairLog.repairResponseStatus, "unknown");
+  assert.equal(structuralRepairLog.repairParseStatus, "complete_json");
+  assert.equal(structuralRepairLog.repairOutputQuestionCount, 3);
+  assert.equal(structuralRepairLog.repairTransportError, null);
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = unsupportedQuestions;
+  throwOnRepair = true;
+  const structuralRepairTransportFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(structuralRepairTransportFailure, "structural repair transport failure");
+  const structuralRepairFailureLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(structuralRepairFailureLog.repairTransportError, "other",
+    "transport diagnostics use a bounded error category, never the raw error");
+  assert.equal(structuralRepairFailureLog.repairHttpStatus, null);
+  assert.equal(JSON.stringify(structuralRepairFailureLog).includes("synthetic repair transport timeout"), false,
+    "repair diagnostics never expose raw provider errors");
+  throwOnRepair = false;
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = repairedQuestions.map((question) => question.id);
+  const originalTwelveDateNow = Date.now;
+  simulatedNow = originalTwelveDateNow();
+  Date.now = () => simulatedNow;
+  calls.length = 0;
+  let exhaustedRepairBudget;
+  try {
+    exhaustedRepairBudget = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    Date.now = originalTwelveDateNow;
+    simulatedNow = null;
+  }
+  assertIncompleteExamNotDelivered(exhaustedRepairBudget, "structural repair leaves insufficient quality-repair time");
+  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
+    "the request does not start a second generation after the structural repair consumes the quality-repair window");
+  const exhaustedRepairBudgetLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(exhaustedRepairBudgetLog.structuralRepairAttempted, true);
+  assert.equal(exhaustedRepairBudgetLog.qualityRepairAttempted, false,
+    "quality repair is not started when its protected generation/review/finalization budget is unavailable");
+  assert.ok(exhaustedRepairBudgetLog.qualityRepairBudgetRemainingMs < 26_000,
+    "the synthetic latency leaves less than the minimum generation, review and finalization window");
+  assert.equal(exhaustedRepairBudgetLog.qualityRepairGenerationTimeoutMs, null);
+  assert.equal(exhaustedRepairBudgetLog.finalQuestionCount, 0,
+    "unreviewed or rejected candidates are never issued as a fallback");
+  verifierRejectQuestionId = null;
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  const qualityCandidates = [
+    { ...questions[0], id: "quality-1", question: "Hur mycket är 10 - 5?", options: ["4", "5", "6"], correct_index: 1, model_answer: "5", source_references: ["addition, subtraktion och multiplikation"] },
+    { ...questions[1], id: "quality-2", question: "Vad är 2 · 4?", options: ["6", "8", "10"], correct_index: 1, model_answer: "8", source_references: ["addition, subtraktion och multiplikation"] },
+    { ...questions[2], id: "quality-3", question: "Beräkna 12 ÷ 3.", options: ["3", "4", "5"], correct_index: 1, model_answer: "4", source_references: ["addition, subtraktion och multiplikation"] },
+  ];
+  activeQuestions = questions.map((question, index) => index === 1
+    ? { ...question, source_references: ["Not found in the supplied material"] }
+    : question);
+  regenerationQuestionBatches = [qualityCandidates];
+  verifierRejectQuestionId = "q-1";
+  calls.length = 0;
+  const structuralThenQualityRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(structuralThenQualityRepair.status, 200, JSON.stringify(structuralThenQualityRepair.body));
+  assert.equal(structuralThenQualityRepair.body.exam.questions.length, 3,
+    "one verifier-driven repair fills a structural gap and replaces a rejected question");
+  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "a verifier-rejected first-round question is never delivered");
+  assert.equal(structuralThenQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
+    "the bounded repair supplies a newly reviewed question");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "a partial first batch uses one streamed repair generation, not a structural plus quality pair");
+  const partialBatchRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(partialBatchRepairLog.structuralRepairAttempted, false);
+  assert.equal(partialBatchRepairLog.qualityRepairAttempted, true);
+  assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairBudgetRemainingMs),
+    "quality repair logs the remaining bounded request budget without study content");
+  assert.ok(Number.isInteger(partialBatchRepairLog.qualityRepairGenerationTimeoutMs),
+    "quality repair logs its actual provider timeout budget");
+  assert.equal(partialBatchRepairLog.finalQuestionCount, 3);
+
+  const makeMathQuestion = (index, idPrefix) => {
+    const left = index + 2;
+    const right = 3;
+    const answer = left + right;
+    return {
+      ...questions[index % questions.length],
+      id: `${idPrefix}-${index + 1}`,
+      question: `Beräkna ${left} + ${right}.`,
+      options: [String(answer - 1), String(answer), String(answer + 1)],
+      correct_index: 1,
+      model_answer: String(answer),
+      topic: "Aritmetik",
+      subtopic: "Addition",
+      concept_tag: `Addition ${index + 1}`,
+      source_references: ["addition, subtraktion och multiplikation"],
+    };
+  };
+  const twelveQuestionSet = Array.from({ length: 12 }, (_, index) => makeMathQuestion(index, "twelve"));
+  const twelveQuestionRepairs = Array.from({ length: 5 }, (_, index) => makeMathQuestion(index + 20, "twelve-repair"));
+  activeQuestions = twelveQuestionSet;
+  regenerationQuestionBatches = [twelveQuestionRepairs];
+  verifierRejectQuestionId = twelveQuestionSet.slice(8).map((question) => question.id);
+  const originalDateNow = Date.now;
+  simulatedNow = originalDateNow();
+  simulatedInitialGenerationMs = 26_900;
+  simulatedQualityRepairMs = 5_000;
+  simulatedVerifierMs = 2_261;
+  Date.now = () => simulatedNow;
+  calls.length = 0;
+  let repairedTwelveQuestionExam;
+  try {
+    repairedTwelveQuestionExam = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 12,
+    });
+  } finally {
+    Date.now = originalDateNow;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    simulatedQualityRepairMs = 20_000;
+    simulatedVerifierMs = 0;
+  }
+  assert.equal(repairedTwelveQuestionExam.status, 200, JSON.stringify(repairedTwelveQuestionExam.body));
+  assert.equal(repairedTwelveQuestionExam.body.exam.questions.length, 12,
+    "a 12-question exam is completed when one bounded repair supplies enough independently approved candidates");
+  assert.equal(repairedTwelveQuestionExam.body.meta.partial, false,
+    "a repaired exam with the requested count is not labeled partial");
+  assert.equal(repairedTwelveQuestionExam.body.exam.questions.some((question) => question.id.startsWith("twelve-9")), false,
+    "the four first-pass questions rejected by the reviewer are never delivered");
+  const twelveQuestionRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(twelveQuestionRepairLog.qualityRepairAttempted, true);
+  assert.equal(twelveQuestionRepairLog.repairCandidateCount, 5,
+    "the repair requests four missing slots plus one candidate for review rejection");
+  assert.ok(twelveQuestionRepairLog.qualityRepairBudgetRemainingMs >= 27_500
+    && twelveQuestionRepairLog.qualityRepairBudgetRemainingMs < 28_200,
+  "the handler starts the repair when the first generation and review leave about 27.8 seconds");
+  assert.ok(twelveQuestionRepairLog.qualityRepairGenerationTimeoutMs >= 5_500
+    && twelveQuestionRepairLog.qualityRepairGenerationTimeoutMs < 6_200,
+  "the streamed repair keeps its generation timeout bounded while reserving review and finalization time");
+  assert.ok(verifierInputs.at(-1).questions.every((question) => question.id.startsWith("twelve-repair-")),
+    "every repaired question is independently reviewed before it can fill a requested slot");
+  assert.equal(twelveQuestionRepairLog.finalQuestionCount, 12);
+
+  const originalVerifyQuestions = verifierModule.verifyQuestions;
+  const originalTimeSource = Date.now;
+  const verifierTimeouts = [];
+  verifierModule.verifyQuestions = async (reviewQuestions, options) => {
+    verifierTimeouts.push(options.timeoutMs);
+    return originalVerifyQuestions(reviewQuestions, options);
+  };
+  activeQuestions = questions;
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  calls.length = 0;
+  simulatedNow = originalTimeSource();
+  simulatedInitialGenerationMs = 43_000;
+  Date.now = () => simulatedNow;
+  let nearDeadlineBatch;
+  const pipelineJobId = "00000000-0000-4000-8000-000000000569";
+  try {
+    nearDeadlineBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 52_000,
+      pipelineJobId,
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000567",
+      },
+    });
+  } finally {
+    Date.now = originalTimeSource;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    verifierModule.verifyQuestions = originalVerifyQuestions;
+  }
+  assert.equal(nearDeadlineBatch.status, 200, JSON.stringify(nearDeadlineBatch.body));
+  assert.equal(verifierTimeouts.length, 1);
+  assert.ok(verifierTimeouts[0] <= 6_000,
+    "the initial independent review is bounded by the 9 seconds left before its inherited 52-second deadline, minus response reserve");
+  const linkedUsageWrite = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
+  assert.ok(linkedUsageWrite, "the internal generation batch records its measured provider steps");
+  assert.ok(linkedUsageWrite.body.length > 0);
+  assert.deepEqual(linkedUsageWrite.body.map((event) => event.pipeline_step),
+    ["generate", "verify_compare", "verify_blind"],
+    "the internal batch records generation and both independent quality gates");
+  assert.ok(linkedUsageWrite.body.every((event) => event.request_id === `exam-pipeline:${pipelineJobId}`),
+    "the pipeline UUID correlates all internal usage events through the schema's text request_id field");
+  assert.ok(linkedUsageWrite.body.every((event) => !Object.hasOwn(event, "job_id")),
+    "the pipeline ID is not written into job_id, which references the separate generation_jobs table");
+  assert.doesNotMatch(JSON.stringify(linkedUsageWrite.body), /Grundläggande räkning|Vad är 2|Syntetiskt prov/,
+    "job correlation does not add learner material or generated question content to telemetry");
+
+  const originalStructuralRepairTime = simulatedStructuralRepairMs;
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  simulatedNow = originalTimeSource();
+  simulatedInitialGenerationMs = 14_000;
+  simulatedStructuralRepairMs = 5_000;
+  simulatedVerifierMs = 1_000;
+  Date.now = () => simulatedNow;
+  let repairedInternalStructuralBatch;
+  try {
+    repairedInternalStructuralBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 39_000,
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000568",
+      },
+    });
+  } finally {
+    Date.now = originalTimeSource;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = 10_000;
+    simulatedStructuralRepairMs = originalStructuralRepairTime;
+    simulatedVerifierMs = 0;
+  }
+  assert.equal(repairedInternalStructuralBatch.status, 200, JSON.stringify(repairedInternalStructuralBatch.body));
+  assert.equal(repairedInternalStructuralBatch.body.questions.length, 3,
+    "internal structural repair can use its smaller post-review reserve and still independently verify the full batch");
+  assert.equal(repairedInternalStructuralBatch.body.quality.verifierApproved, 3,
+    "the shorter reserve does not bypass independent review");
+  assert.equal(repairedInternalStructuralBatch.body.quality.solverApprovedMc, 3,
+    "the shorter reserve does not bypass blind solver checks");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = questions[2].id;
+  const originalRepairBudgetDateNow = Date.now;
+  const originalInternalRepairTiming = {
+    initialGenerationMs: simulatedInitialGenerationMs,
+    qualityRepairMs: simulatedQualityRepairMs,
+    verifierMs: simulatedVerifierMs,
+  };
+  const originalBoundarySetTimeout = globalThis.setTimeout;
+  const originalBoundaryVerifyQuestions = verifierModule.verifyQuestions;
+  const originalBoundarySolveQuestions = solverModule.solveQuestions;
+  const boundaryGenerationTimeouts = [];
+  const boundaryVerifierTimeouts = [];
+  const boundarySolverTimeouts = [];
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    boundaryGenerationTimeouts.push(delay);
+    return originalBoundarySetTimeout(callback, delay, ...args);
+  };
+  verifierModule.verifyQuestions = async (reviewQuestions, options) => {
+    boundaryVerifierTimeouts.push(options.timeoutMs);
+    return originalBoundaryVerifyQuestions(reviewQuestions, options);
+  };
+  solverModule.solveQuestions = async (reviewQuestions, options) => {
+    boundarySolverTimeouts.push(options.timeoutMs);
+    return originalBoundarySolveQuestions(reviewQuestions, options);
+  };
+  deferVerifierClockAdvance = true;
+  simulatedNow = originalRepairBudgetDateNow();
+  simulatedInitialGenerationMs = 24_000;
+  simulatedQualityRepairMs = 4_000;
+  simulatedVerifierMs = 6_000;
+  Date.now = () => simulatedNow;
+  const verifierCallsBeforeBoundaryRepair = verifierInputs.length;
+  const solverCallsBeforeBoundaryRepair = solverInputs.length;
+  let boundaryRepairedInternalBatch;
+  try {
+    boundaryRepairedInternalBatch = await generateExam.generateVerifiedBatch({
+      userId,
+      deadlineAt: simulatedNow + 46_001,
+      pipelineJobId: "00000000-0000-4000-8000-000000000570",
+      payload: {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+        idempotencyKey: "00000000-0000-4000-8000-000000000571",
+      },
+    });
+  } finally {
+    verifierModule.verifyQuestions = originalBoundaryVerifyQuestions;
+    solverModule.solveQuestions = originalBoundarySolveQuestions;
+    deferVerifierClockAdvance = false;
+    globalThis.setTimeout = originalBoundarySetTimeout;
+    Date.now = originalRepairBudgetDateNow;
+    simulatedNow = null;
+    simulatedInitialGenerationMs = originalInternalRepairTiming.initialGenerationMs;
+    simulatedQualityRepairMs = originalInternalRepairTiming.qualityRepairMs;
+    simulatedVerifierMs = originalInternalRepairTiming.verifierMs;
+    verifierRejectQuestionId = null;
+    activeQuestions = questions;
+    regenerationQuestions = null;
+  }
+  assert.equal(boundaryRepairedInternalBatch.status, 200, JSON.stringify(boundaryRepairedInternalBatch.body));
+  assert.equal(boundaryRepairedInternalBatch.body.questions.length, 3,
+    "internal repair at its first eligible budget still completes the requested count");
+  assert.equal(boundaryRepairedInternalBatch.body.questions.some((question) => question.id === questions[2].id), false,
+    "the initially verifier-rejected item is not issued at the repair-time boundary");
+  assert.equal(boundaryRepairedInternalBatch.body.quality.verifierApproved, 3,
+    "the boundary repair still passes independent reviewer approval");
+  assert.equal(boundaryRepairedInternalBatch.body.quality.solverApprovedMc, 3,
+    "the boundary repair still passes independent blind-solver approval");
+  assert.equal(boundaryRepairedInternalBatch.body.qualityDiagnostics.repairAttempted, true);
+  assert.equal(boundaryRepairedInternalBatch.body.qualityDiagnostics.repairOutcomeStage, "repair_combined");
+  assert.ok(boundaryGenerationTimeouts.includes(4_001),
+    `the real internal repair stream receives exactly the first eligible 4,001 ms generation window: ${boundaryGenerationTimeouts.join(",")}`);
+  assert.deepEqual(boundaryVerifierTimeouts.slice(-2), [18_000, 8_000],
+    "the initial and repair verifier receive their independently bounded review windows");
+  assert.deepEqual(boundarySolverTimeouts.slice(-2), [19_001, 8_000],
+    "the parallel blind solver retains its computed initial and repair review windows");
+  assert.ok(verifierInputs.slice(verifierCallsBeforeBoundaryRepair).some((batch) =>
+    batch.questions.some((question) => question.id.startsWith("retry-"))),
+  "the replacement candidates reach the independent verifier");
+  assert.ok(solverInputs.slice(solverCallsBeforeBoundaryRepair).some((batch) =>
+    batch.some((question) => question.id.startsWith("retry-"))),
+  "the replacement candidates reach the independent blind solver");
+
+  const sixQuestionSet = twelveQuestionSet.slice(0, 6).map((question, index) => ({
+    ...question, id: `six-${index + 1}`,
+  }));
+  const sixQuestionRepairs = Array.from({ length: 3 }, (_, index) => makeMathQuestion(index + 40, "six-repair"));
+  activeQuestions = sixQuestionSet;
+  regenerationQuestionBatches = [sixQuestionRepairs];
+  verifierRejectQuestionId = sixQuestionSet.slice(4).map((question) => question.id);
+  calls.length = 0;
+  const repairedSixQuestionExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 6,
+  });
+  assert.equal(repairedSixQuestionExam.status, 200, JSON.stringify(repairedSixQuestionExam.body));
+  assert.equal(repairedSixQuestionExam.body.exam.questions.length, 6,
+    "a six-question exam is completed when repair candidates pass both independent quality checks");
+  assert.equal(repairedSixQuestionExam.body.meta.partial, false);
+  assert.equal(repairedSixQuestionExam.body.exam.questions.some((question) => question.id === "six-5" || question.id === "six-6"), false,
+    "rejected first-pass questions are withheld from a repaired six-question exam");
+  assert.ok(verifierInputs.at(-1).questions.every((question) => question.id.startsWith("six-repair-")),
+    "every repaired six-question candidate is reviewed before delivery");
+
+  activeQuestions = twelveQuestionSet;
+  verifierRejectQuestionId = twelveQuestionSet.map((question) => question.id);
+  calls.length = 0;
+  const impossibleTwelveQuestionRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 12,
+  });
+  assert.equal(impossibleTwelveQuestionRepair.status, 502);
+  assert.equal(impossibleTwelveQuestionRepair.body.error, "incomplete_exam");
+  assert.equal(impossibleTwelveQuestionRepair.body.exam, undefined,
+    "zero approved questions cannot be presented as a complete or partial 12-question exam");
+  const impossibleRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(impossibleRepairLog.qualityRepairAttempted, false,
+    "the capped six-candidate repair is skipped when it cannot reach the eight-question minimum");
+  assert.equal(impossibleRepairLog.qualityRepairSkipReason, "repair_cannot_reach_minimum_delivery");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 0,
+  "an impossible repair does not incur a second model call");
+
+  regenerationQuestionBatches = null;
+  verifierRejectQuestionId = null;
+  activeQuestions = questions;
+
+  activeQuestions = questions;
+  regenerationQuestionBatches = [qualityCandidates];
   verifierRejectQuestionId = "q-1";
+  truncateQualityRepairStream = true;
+  calls.length = 0;
+  let salvagedQualityRepair;
+  try {
+    salvagedQualityRepair = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    truncateQualityRepairStream = false;
+    truncateQualityRepairAfter = 1;
+    verifierRejectQuestionId = null;
+  }
+  assert.equal(salvagedQualityRepair.status, 200, JSON.stringify(salvagedQualityRepair.body));
+  assert.equal(salvagedQualityRepair.body.exam.questions.length, 3,
+    "a complete repair candidate can be salvaged from a truncated streamed response");
+  assert.equal(salvagedQualityRepair.body.exam.questions.some((question) => question.id === "quality-1"), true,
+    "the salvaged candidate still fills only a slot after independent verification");
+  const salvagedQualityRepairLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(salvagedQualityRepairLog.repairParseStatus, "salvaged_json");
+  assert.equal(salvagedQualityRepairLog.repairResponseStatus, "incomplete");
+  assert.equal(salvagedQualityRepairLog.repairOutputQuestionCount, 1);
+  assert.equal(salvagedQualityRepairLog.finalQuestionCount, 3);
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "salvage does not add a second repair attempt");
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+
+  const sixStreamQuestions = [
+    ...questions,
+    { ...questions[0], id: "q-4", question: "Vad är 8 + 1?", options: ["8", "9", "10"], correct_index: 1, model_answer: "9" },
+    { ...questions[1], id: "q-5", question: "Vad är 9 - 5?", options: ["3", "4", "5"], correct_index: 1, model_answer: "4" },
+    { ...questions[2], id: "q-6", question: "Vad är 2 · 5?", options: ["8", "10", "12"], correct_index: 1, model_answer: "10" },
+  ];
+  const twelveStreamQuestions = Array.from({ length: 12 }, (_, index) => {
+    const questionNumber = index + 1;
+    if (index < questions.length) return questions[index];
+    return {
+      ...questions[index % questions.length],
+      id: `q-${questionNumber}`,
+      question: `Vad är ${questionNumber} + 1?`,
+      options: [String(questionNumber), String(questionNumber + 1), String(questionNumber + 2)],
+      correct_index: 1,
+      model_answer: String(questionNumber + 1),
+    };
+  });
+  const repairAbortScenarios = [
+    { requested: 3, questions: questions, rejectedIds: ["q-1"], salvageCount: 1 },
+    { requested: 6, questions: sixStreamQuestions, rejectedIds: ["q-1"], salvageCount: 1 },
+    { requested: 12, questions: twelveStreamQuestions, rejectedIds: ["q-1", "q-2"], salvageCount: 2 },
+    { requested: 12, questions: twelveStreamQuestions, rejectedIds: ["q-1", "q-2"], salvageCount: 1, partial: true },
+  ];
+  for (const { requested, questions: firstRoundQuestions, rejectedIds: rejectedQuestionIds, salvageCount, partial = false } of repairAbortScenarios) {
+    activeQuestions = firstRoundQuestions;
+    regenerationQuestionBatches = [qualityCandidates];
+    const salvagedCandidateCount = salvageCount;
+    const salvagedCandidateIds = qualityCandidates.slice(0, salvageCount).map((question) => question.id);
+    const expectedQuestionCount = firstRoundQuestions.length - rejectedQuestionIds.length + salvageCount;
+    verifierRejectQuestionId = rejectedQuestionIds;
+    abortQualityRepairAfterCompleteCandidate = true;
+    abortQualityRepairCandidateCount = salvagedCandidateCount;
+    const originalAbortRepairSetTimeout = globalThis.setTimeout;
+    const verifierCountBeforeAbortedRepair = verifierInputs.length;
+    const solverCountBeforeAbortedRepair = solverInputs.length;
+    const repairStreamTimeouts = [];
+    qualityRepairAbortTriggered = false;
+    calls.length = 0;
+    let abortedRepairExam;
+    try {
+      globalThis.setTimeout = (callback, delay, ...args) => {
+        repairStreamTimeouts.push(delay);
+        const timeout = repairStreamTimeouts.length === 2 ? Math.min(delay, 5) : delay;
+        return originalAbortRepairSetTimeout(callback, timeout, ...args);
+      };
+      abortedRepairExam = await invoke(generateExam, {
+        lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: requested,
+      });
+    } finally {
+      globalThis.setTimeout = originalAbortRepairSetTimeout;
+      abortQualityRepairAfterCompleteCandidate = false;
+      abortQualityRepairCandidateCount = 1;
+      verifierRejectQuestionId = null;
+      regenerationQuestionBatches = null;
+      activeQuestions = questions;
+    }
+    assert.equal(abortedRepairExam.status, 200, `${requested}: ${JSON.stringify(abortedRepairExam.body)}`);
+    assert.equal(repairStreamTimeouts.length, 2,
+      `${requested}: the initial generation timeout stays intact and only the repair-stream timeout is shortened`);
+    assert.equal(qualityRepairAbortTriggered, true,
+      `${requested}: the repair stream receives abort after emitting its complete candidate`);
+    assert.equal(abortedRepairExam.body.exam.questions.length, expectedQuestionCount,
+      `${requested}: complete streamed candidates survive abort only after passing both independent quality gates`);
+    assert.ok(rejectedQuestionIds.every((id) => !abortedRepairExam.body.exam.questions.some((question) => question.id === id)),
+      `${requested}: questions rejected before abort remain excluded`);
+    assert.ok(salvagedCandidateIds.every((id) => abortedRepairExam.body.exam.questions.some((question) => question.id === id)),
+      `${requested}: all complete candidates emitted before abort are salvaged after approval`);
+    const expectedQuestionIds = [...firstRoundQuestions
+      .filter((question) => !rejectedQuestionIds.includes(question.id))
+      .map((question) => question.id), ...salvagedCandidateIds].sort();
+    assert.equal(expectedQuestionIds.length, expectedQuestionCount);
+    const issuedQuestionIds = abortedRepairExam.body.exam.questions.map((question) => question.id).sort();
+    assert.deepEqual(issuedQuestionIds, expectedQuestionIds,
+      `${requested}: issuance contains exactly the surviving original questions and the approved repair`);
+    assert.equal(abortedRepairExam.body.exam.questions.length, expectedQuestionCount,
+      `${requested}: delivery reports the exact number of approved questions after stream abort`);
+    assert.equal(abortedRepairExam.body.meta.requested, requested);
+    assert.equal(abortedRepairExam.body.meta.partial, partial,
+      `${requested}: an underfilled stream-abort result is explicitly marked partial`);
+    assert.equal(new Set(issuedQuestionIds).size, expectedQuestionCount,
+      `${requested}: timeout salvage cannot create duplicate issued question IDs`);
+    assert.ok(verifierInputs.slice(verifierCountBeforeAbortedRepair)
+      .some((batch) => salvagedCandidateIds.every((id) => batch.questions.some((question) => question.id === id))),
+    `${requested}: every salvaged candidate reaches the independent verifier`);
+    assert.ok(solverInputs.slice(solverCountBeforeAbortedRepair)
+      .some((batch) => salvagedCandidateIds.every((id) => batch.some((question) => question.id === id))),
+    `${requested}: every salvaged candidate reaches the independent blind solver`);
+    const abortedRepairLog = JSON.parse(qualityLogs.at(-1));
+    assert.equal(abortedRepairLog.repairTransportError, "timeout");
+    assert.equal(abortedRepairLog.repairResponseStatus, "incomplete");
+    assert.equal(abortedRepairLog.repairOutputQuestionCount, salvagedCandidateCount);
+    assert.equal(abortedRepairLog.finalQuestionCount, expectedQuestionCount);
+    const abortedRepairUsage = calls.find((call) => call.url.endsWith("/rest/v1/ai_usage_events"));
+    assert.ok(abortedRepairUsage, `${requested}: abort recovery records its privacy-safe model usage chain`);
+    assert.deepEqual(abortedRepairUsage.body.slice(-2).map((event) => event.pipeline_step),
+      ["verify_compare", "verify_blind"]);
+    assert.deepEqual(abortedRepairUsage.body.slice(-2).map((event) => event.verification_passed), [true, true],
+      `${requested}: both independent gates approve the salvaged candidate`);
+    const repairGateCallIndexes = calls.flatMap((call, index) => {
+      const schema = call.body?.text?.format?.name;
+      return ["exam_verifier_schema", "exam_solver_schema"].includes(schema)
+        && salvagedCandidateIds.every((id) => JSON.stringify(call.body?.input || []).includes(id)) ? [index] : [];
+    });
+    assert.equal(repairGateCallIndexes.length, 2,
+      `${requested}: the salvaged candidate is independently reviewed and solved exactly once`);
+    const issuanceCallIndex = calls.findIndex((call) =>
+      call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")
+      || (call.url.includes("/rest/v1/exam_issuances") && call.method === "POST"));
+    assert.ok(issuanceCallIndex >= 0, `${requested}: the normal idempotent issuance path is used`);
+    assert.ok(repairGateCallIndexes.every((index) => index < issuanceCallIndex),
+      `${requested}: both quality gates complete before the repair candidate can be issued`);
+    assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+      && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    `${requested}: abort salvage stays within the single bounded repair attempt`);
+  }
+
+  activeQuestions = questions;
+  regenerationQuestionBatches = [qualityCandidates];
+  verifierRejectQuestionId = ["q-1", "q-2", "q-3"];
+  truncateQualityRepairStream = true;
+  truncateQualityRepairAfter = 2;
+  calls.length = 0;
+  let salvagedPartialExam;
+  try {
+    salvagedPartialExam = await invoke(generateExam, {
+      lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    truncateQualityRepairStream = false;
+    truncateQualityRepairAfter = 1;
+    verifierRejectQuestionId = null;
+  }
+  assert.equal(salvagedPartialExam.status, 200, JSON.stringify(salvagedPartialExam.body));
+  assert.equal(salvagedPartialExam.body.exam.questions.length, 2,
+    "two salvaged and independently approved repair candidates can satisfy the existing 2-of-3 partial-exam floor");
+  assert.equal(salvagedPartialExam.body.meta.partial, true,
+    "a salvaged underfilled repair is clearly labeled partial rather than presented as a complete exam");
+  assert.equal(salvagedPartialExam.body.exam.questions.every((question) => question.id.startsWith("quality-")), true,
+    "all rejected first-round candidates remain excluded from partial delivery");
+  const salvagedPartialLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(salvagedPartialLog.repairParseStatus, "salvaged_json");
+  assert.equal(salvagedPartialLog.repairOutputQuestionCount, 2);
+  assert.equal(salvagedPartialLog.finalQuestionCount, 2);
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+
+  verifierRejectQuestionId = null;
+  regenerationQuestions = null;
+  regenerationQuestionBatches = null;
+  activeQuestions = questions;
+
+  const structuralOutlierQuestions = repairedQuestions.map((question, index) => index === 0
+    ? {
+      ...question,
+      question: "Vilken sats beskriver sambandet mellan sidorna i en rätvinklig triangel?",
+      options: ["En regel för cirkelarea", "Pythagoras", "En metod för volym"],
+      correct_index: 1,
+      model_answer: "Pythagoras",
+    }
+    : question);
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = structuralOutlierQuestions;
+  const verifierCountBeforeStructuralOutlier = verifierInputs.length;
+  const structuralOutlierExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText: `${pastedText} Pythagoras`, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(structuralOutlierExam.status, 200, JSON.stringify(structuralOutlierExam.body));
+  const structuralOutlierReview = verifierInputs.slice(verifierCountBeforeStructuralOutlier)
+    .flatMap((review) => review.questions)
+    .find((question) => question.id === "retry-1");
+  assert.ok(structuralOutlierReview?.review_hints.includes("single_word_option_outlier_review"),
+    "the verifier receives the warning for a single-word distractor found by structural repair");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  generationTextOverride = JSON.stringify({
+    title: "Underfyllt syntetiskt prov", level: "C", questions: questions.slice(0, 2),
+  });
+  calls.length = 0;
+  const underfilledExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  generationTextOverride = null;
+  regenerationQuestions = null;
+  assert.equal(underfilledExam.status, 200, JSON.stringify(underfilledExam.body));
+  assert.deepEqual(underfilledExam.body.exam.questions.map((question) => question.id), ["q-1", "q-2", "retry-1"],
+    "two valid initial questions are reviewed and one bounded repair fills the third slot");
+  const underfilledRepairCall = calls.find((call) => call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.stream === true
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  assert.ok(underfilledRepairCall, "an underfilled complete response enters exactly one repair generation");
+  assert.equal(underfilledRepairCall.body.text.format.schema.properties.questions.minItems, 2,
+    "one missing slot requests one spare candidate so repair stays within its short review window");
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 1,
+    "only the complete three-question set is issued");
+  activeQuestions = questions;
+
+  generationTextOverride = JSON.stringify({
+    title: "Underfyllt syntetiskt prov", level: "C",
+    questions: questions.slice(0, 2).map((question, index) => index === 1
+      ? { ...question, model_answer: "PRIVATE_MODEL_ANSWER_SENTINEL" }
+      : question),
+  });
+  throwOnRepair = true;
+  const failedUnderfilledRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  generationTextOverride = null;
+  throwOnRepair = false;
+  assertVerifiedPartialExamDelivered(failedUnderfilledRepair, "underfilled response whose bounded repair fails");
+  assert.equal(JSON.stringify(failedUnderfilledRepair.body).includes("PRIVATE_MODEL_ANSWER_SENTINEL"), false,
+    "failed repair never returns the model answer or raw generated exam");
+  activeQuestions = questions;
+
+  activeQuestions = unsupportedQuestions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  const verifierCountBeforeMissingSource = verifierInputs.length;
+  const solverCountBeforeMissingSource = solverInputs.length;
+  const missingSourceExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(missingSourceExam.status, 200, JSON.stringify(missingSourceExam.body));
+  assert.equal(missingSourceExam.body.exam.questions.length, 3,
+    "a question with no retained source excerpt is replaced by an independently reviewed repair");
+  assert.equal(verifierInputs.slice(verifierCountBeforeMissingSource)
+    .some((batch) => batch.questions.some((question) => question.id === "q-1")), false,
+  "a question without a retained source reference never reaches the verifier");
+  assert.equal(solverInputs.slice(solverCountBeforeMissingSource)
+    .some((batch) => batch.some((question) => question.id === "q-1")), false,
+  "a question without a retained source reference never reaches the solver");
+  assert.equal(missingSourceExam.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "the original source-less question is not delivered");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = questions.map((question, index) => index === 0
+    ? {
+        ...question,
+        type: "short",
+        options: [],
+        correct_index: -1,
+        scoring_rubric: {
+          parts: [{ description: "Relevant svar", points: 1 }],
+          full_score_requirements: "Svaret stammer fran materialet.",
+          partial_credit_notes: "Ge poang for korrekt del av svaret.",
+        },
+      }
+    : question);
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  const verifierCountBeforeWrongType = verifierInputs.length;
+  const solverCountBeforeWrongType = solverInputs.length;
+  const wrongTypeExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(wrongTypeExam.status, 200, JSON.stringify(wrongTypeExam.body));
+  assert.equal(wrongTypeExam.body.exam.questions.length, 3,
+    "a valid question in the wrong requested format is replaced through bounded repair");
+  assert.equal(verifierInputs.slice(verifierCountBeforeWrongType)
+    .some((batch) => batch.questions.some((question) => question.id === "q-1")), false,
+  "a short-answer item is not reviewed for a multiple-choice request");
+  assert.equal(solverInputs.slice(solverCountBeforeWrongType)
+    .some((batch) => batch.some((question) => question.id === "q-1")), false,
+  "a short-answer item is not solved for a multiple-choice request");
+  assert.equal(wrongTypeExam.body.exam.questions.some((question) => question.id === "q-1"), false,
+    "the mismatched question is never delivered");
+  activeQuestions = questions;
+  regenerationQuestions = null;
+
+  activeQuestions = [
+    { ...questions[0], id: "duplicate-zero-a", question: "Vad är 2 + 3?" },
+    { ...questions[0], id: "duplicate-zero-b", question: "Vad får man som 2 + 3?" },
+    questions[2],
+  ];
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = null;
+  calls.length = 0;
+  const duplicateRepairedExam = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(duplicateRepairedExam.status, 200, JSON.stringify(duplicateRepairedExam.body));
+  assert.equal(duplicateRepairedExam.body.exam.questions.length, 3,
+    "a near-duplicate initial question is replaced by a distinct, independently reviewed repair");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "an underfilled exam triggers exactly one bounded repair generation");
+  const repairCall = calls.find((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  assert.match(repairCall.body.input.at(-1).content, /KVALITETSREPARATION/,
+    "the single repair generation receives explicit quality guidance");
+  assert.equal(new Set(duplicateRepairedExam.body.exam.questions.map(assessment.questionDedupeSignature)).size, 3,
+    "the repaired exam contains three distinct question signatures");
+
+  activeQuestions = questions;
+  const nearDuplicateRepair = {
+    ...repairedQuestions[0],
+    id: "retry-1",
+    question: "Beräkna skillnaden mellan sju och fyra.",
+    options: ["2", "3", "4"],
+    correct_index: 1,
+    model_answer: "3",
+  };
+  const duplicateAwareRepair = [nearDuplicateRepair, repairedQuestions[2]];
+  regenerationQuestions = duplicateAwareRepair;
+  verifierRejectQuestionId = "q-1";
+  verifierRejectComparisonDuplicate = true;
   calls.length = 0;
   solverInputs.length = 0;
   const repairedMcExam = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   assert.equal(repairedMcExam.status, 200, JSON.stringify(repairedMcExam.body));
-  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["retry-1", "retry-2", "retry-3"],
-    "a regenerated MC batch replaces the first only after all items pass the verifier and blind solver");
+  assert.deepEqual(repairedMcExam.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-3"],
+    "an approved first-round question is preserved and its verifier-identified near-paraphrase is withheld");
   assert.equal(repairedMcExam.body.meta.verifier.approved, 3);
-  assert.equal(repairedMcExam.body.meta.solver.checked, 3);
+  assert.equal(repairedMcExam.body.meta.solver.checked, 5);
   assert.deepEqual(solverInputs.at(-1).map(({ id, question, options }) => ({ id, question, options })),
-    repairedQuestions.map(({ id, question, options }) => ({ id, question, options })),
-    "the blind solver receives the actual regenerated IDs, wording and options");
+    duplicateAwareRepair.map(({ id, question, options }) => ({ id, question, options })),
+    "the blind solver reviews repair candidates only; the verifier controls duplicate rejection");
   for (const item of solverInputs.at(-1)) {
     assert.deepEqual(Object.keys(item).sort(), ["id", "options", "question"],
       "every retry solver item contains only the blind-solver input fields");
   }
-  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), repairedQuestions.map(({ id }) => id),
-    "the retry verifier receives that same regenerated batch");
-  assert.equal(calls.filter((call) => !call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema").length, 1,
-    "at most one bounded whole-exam retry is requested");
+  assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), duplicateAwareRepair.map(({ id }) => id),
+    "the retry verifier receives the generated repair candidate");
+  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag }) => ({ id, type, question, concept_tag })),
+    "the retry verifier gets already approved question wording and concept tags only as comparison context");
+  assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
+    "at most one bounded missing-slot repair is requested");
+  verifierRejectComparisonDuplicate = false;
 
   const unsafeRetryQuestions = repairedQuestions.map((question, index) => ({ ...question, id: `retry-fallback-${index + 1}` }));
   activeQuestions = questions;
   regenerationQuestions = unsafeRetryQuestions;
-  solverRejectQuestionId = "retry-fallback-1";
+  solverRejectQuestionId = ["retry-fallback-1", "retry-fallback-2", "retry-fallback-3"];
   calls.length = 0;
   const solverRejectedRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assert.equal(solverRejectedRetry.status, 200, JSON.stringify(solverRejectedRetry.body));
-  assert.deepEqual(solverRejectedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "a retry that does not improve the count falls back only to first-round approved questions");
-  assert.equal(solverRejectedRetry.body.meta.solver.checked, 3,
-    "fallback metadata remains tied to the authoritative first-round solver result");
+  assertVerifiedPartialExamDelivered(solverRejectedRetry, "solver rejects the sole missing-slot repair");
+
+  activeQuestions = questions;
+  regenerationQuestions = [
+    ...repairedQuestions.slice(0, 2),
+    { ...repairedQuestions[2], source_references: [] },
+  ];
+  solverRejectQuestionId = null;
+  verifierRejectQuestionId = ["q-1", "retry-1", "retry-2"];
+  const verifierRejectedRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertVerifiedPartialExamDelivered(verifierRejectedRepair, "verifier rejects the sole missing-slot repair");
+  const verifierRejectedLog = qualityLogs.map((line) => JSON.parse(line))
+    .findLast((entry) => entry.event === "exam_quality_partial_delivery");
+  assert.deepEqual(verifierRejectedLog.repairVerifierFailureCodes, {
+    reviewer_rejected: 2, required_changes: 2, low_factual_accuracy: 2, answer_alignment: 2,
+  },
+    "safe repair telemetry records only the review rejection category");
+  assert.equal(verifierRejectedLog.repairStructuralDropped, 0,
+    "the bounded two-candidate repair excludes the unused third fixture candidate");
+  assert.deepEqual(verifierRejectedLog.repairStructuralIssueCounts, {},
+    "unused repair candidates are not evaluated or counted");
+  assert.deepEqual({
+    round1ApprovedCount: verifierRejectedLog.round1ApprovedCount,
+    round1UniqueApprovedCount: verifierRejectedLog.round1UniqueApprovedCount,
+    repairUniqueApprovedCount: verifierRejectedLog.repairUniqueApprovedCount,
+    repairDuplicateCount: verifierRejectedLog.repairDuplicateCount,
+    repairCrossRoundDuplicateCount: verifierRejectedLog.repairCrossRoundDuplicateCount,
+    combinedQuestionCount: verifierRejectedLog.combinedQuestionCount,
+  }, {
+    round1ApprovedCount: 2,
+    round1UniqueApprovedCount: 2,
+    repairUniqueApprovedCount: 0,
+    repairDuplicateCount: 0,
+    repairCrossRoundDuplicateCount: 0,
+    combinedQuestionCount: 2,
+  }, "incomplete repair telemetry reports only approved/unique counts");
+  assert.equal(verifierRejectedLog.repairFailureStage, "insufficient_unique_repair");
+  verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions.slice(0, 2).map((question, index) => ({
+    ...question,
+    id: `unsupported-retry-${index + 1}`,
+    options: ["4", "5", ""],
+    correct_index: 1,
+    model_answer: "5",
+  }));
+  verifierRejectQuestionId = "q-3";
+  const verifierCountBeforeStructuralRepair = verifierInputs.length;
+  const solverCountBeforeStructuralRepair = solverInputs.length;
+  const structurallyRejectedRepair = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertVerifiedPartialExamDelivered(structurallyRejectedRepair, "structural gate rejects the repair batch", 2);
+  assert.equal(verifierInputs.length, verifierCountBeforeStructuralRepair + 1,
+    "only the initial candidates reach the verifier when every repair candidate is structurally rejected");
+  assert.equal(solverInputs.length, solverCountBeforeStructuralRepair + 1,
+    "structurally rejected repair candidates are never sent to the blind solver");
+  const structurallyRejectedLog = JSON.parse(qualityLogs.at(-2));
+  assert.equal(structurallyRejectedLog.repairNormalizationIssue, null,
+    "a successfully normalized repair does not report a normalization issue");
+  assert.equal(structurallyRejectedLog.repairStructuralDropped, 2,
+    "both repair candidates with an empty answer option are rejected by the structural gate");
+  assert.equal(structurallyRejectedLog.repairFailureStage, "repair_structural_validation",
+    "repair telemetry distinguishes structural rejection from parse/normalization failure");
+  regenerationQuestions = null;
+  verifierRejectQuestionId = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions;
+  verifierRejectQuestionId = ["q-1", "q-2", "q-3", "retry-1", "retry-2", "retry-3"];
+  const noApprovedQuestions = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(noApprovedQuestions, "all generated questions fail review");
+  const noApprovedLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(noApprovedLog.finalQuestionCount, 0);
+  assert.deepEqual(noApprovedLog.initialVerifierFailureCodes, {
+    reviewer_rejected: 3, required_changes: 3, low_factual_accuracy: 3, answer_alignment: 3,
+  }, "zero-question rejection records safe aggregate reviewer categories");
+  const noApprovedRepairCall = calls.findLast((call) => call.body?.stream
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  assert.equal(noApprovedRepairCall.body.text.format.schema.properties.questions.minItems, 4,
+    "a complete 0/3 rejection uses three needed candidates plus one spare");
+  const noApprovedRepairInstruction = noApprovedRepairCall.body.input.at(-1).content;
+  assert.match(noApprovedRepairInstruction, /"low_factual_accuracy":3/);
+  assert.match(noApprovedRepairInstruction, /"answer_alignment":3/);
+  assert.ok(questions.every((question) => !noApprovedRepairInstruction.includes(question.question)),
+    "the all-rejected 0/3 path passes only safe review categories, not rejected question text");
+  assert.equal(Object.hasOwn(noApprovedLog, "questions"), false);
+  assert.equal(JSON.stringify(noApprovedLog).includes("Vad är 2 + 3?"), false,
+    "zero-question diagnostics never include generated question text");
+  verifierRejectQuestionId = null;
+
+  const solverOnlyRejectedFirstPass = biologyQuestions.map((question, index) => ({
+    ...question,
+    id: `solver-only-${index + 1}`,
+    question: `REJECTED_STEM_SENTINEL_${index + 1}`,
+    options: ["Kloroplast", "Cellkärna", "Kesäkten"],
+    correct_index: 0,
+    model_answer: "REJECTED_ANSWER_KEY_SENTINEL",
+  }));
+  const solverOnlyRepairCandidates = [
+    ...repairedBiology.slice(0, 3).map((question, index) => ({
+      ...question,
+      id: `solver-repair-${index + 1}`,
+      question: `Återhämtad biologifråga ${index + 1}: ${question.question}`,
+    })),
+    ...repairedBiology.slice(0, 3).map((question, index) => ({
+      ...question,
+      id: `solver-repair-${index + 4}`,
+      question: `Underkänd biologikandidat ${index + 1}: ${question.question}`,
+      options: ["Kloroplast", "Cellkärna", "Kesäkten"],
+      correct_index: 0,
+      model_answer: "Kloroplast",
+    })),
+  ];
+  activeQuestions = solverOnlyRejectedFirstPass;
+  regenerationQuestions = solverOnlyRepairCandidates;
+  verifierRejectOptionId = ["solver-repair-4", "solver-repair-5", "solver-repair-6"];
+  solverRejectNonsenseOption = true;
+  calls.length = 0;
+  const solverOnlyRecovery = await invoke(generateExam, {
+    lang: "sv", level: "C", course: biologyCourse, pastedText: biologyMaterial, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(solverOnlyRecovery.status, 200, JSON.stringify(solverOnlyRecovery.body));
+  assert.equal(solverOnlyRecovery.body.exam.questions.length, 3,
+    "a 0/3 exam recovers to three verified biology questions when the initial solver alone rejects all candidates");
+  assert.ok(solverOnlyRecovery.body.exam.questions.every((question) => question.id.startsWith("solver-repair-")
+    && Number(question.id.slice("solver-repair-".length)) <= 3),
+  "only the three independently accepted repair candidates are delivered");
+  const solverOnlyRepairCall = calls.findLast((call) => call.body?.stream
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION"));
+  const solverOnlyRepairInstruction = solverOnlyRepairCall.body.input.at(-1).content;
+  assert.equal(solverOnlyRepairCall.body.text.format.schema.properties.questions.minItems, 4);
+  assert.match(solverOnlyRepairInstruction, /"solver_implausible_option":3/,
+    "solver-only failures provide the repair with a safe aggregate category");
+  assert.match(solverOnlyRepairInstruction, /byt ut varje distraktor mot ett naturligt, etablerat ämnesbegrepp/i,
+    "solver-only implausible options receive specific Swedish repair guidance");
+  assert.doesNotMatch(solverOnlyRepairInstruction, /REJECTED_STEM_SENTINEL|REJECTED_ANSWER_KEY_SENTINEL|Kloroplast.*Kesäkten/,
+    "repair receives no rejected stem or answer key");
+  verifierRejectOptionId = null;
+  solverRejectNonsenseOption = true;
+  regenerationQuestions = null;
+  activeQuestions = questions;
+
+  activeQuestions = questions;
+  regenerationQuestions = [
+    ...repairedQuestions,
+    { ...repairedQuestions[0], id: "retry-4", question: "Vad är 4 + 4?", options: ["7", "8", "9"], correct_index: 1, model_answer: "8" },
+  ];
+  verifierRejectOptionId = ["q-1", "q-2", "q-3", "retry-1", "retry-2", "retry-3", "retry-4"];
+  const optionQualityRejected = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assertIncompleteExamNotDelivered(optionQualityRejected, "option-quality audit rejection");
+  const optionQualityLog = JSON.parse(qualityLogs.at(-1));
+  assert.deepEqual(optionQualityLog.initialVerifierFailureCodes, {
+    option_quality_failed: 3,
+  }, "option plausibility failures have their own content-free diagnostic category");
+  const optionQualityRepairCall = calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
+    && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).at(-1);
+  assert.match(optionQualityRepairCall.body.input.at(-1).content,
+    /Granskningen hittade svaga eller orimliga svarsalternativ: föredra exakt tre alternativ totalt/i,
+    "option-quality rejection gives the bounded repair a specific distractor-quality correction");
+  assert.doesNotMatch(optionQualityRepairCall.body.input.at(-1).content,
+    /The reviewer found/,
+    "Swedish repair prompts keep their targeted feedback in Swedish");
+  assert.deepEqual(optionQualityLog.repairVerifierFailureCodes, {
+    option_quality_failed: 4,
+  }, `repair option plausibility failures are distinguished from other review failures: ${JSON.stringify(optionQualityLog)}`);
+  verifierRejectOptionId = null;
+
+  activeQuestions = questions;
+  regenerationQuestions = repairedQuestions.map((question, index) => ({
+    ...question,
+    id: `retry-same-stem-${index + 1}`,
+    question: "Hur löser du 10 + 4?",
+  }));
+  verifierRejectQuestionId = "q-1";
+  const duplicateStemRetry = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  assert.equal(duplicateStemRetry.status, 200, JSON.stringify(duplicateStemRetry.body));
+  assert.deepEqual(duplicateStemRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3", "retry-same-stem-1"],
+    "identical approved retry questions are deduplicated before filling missing slots");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -374,9 +2528,26 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierUnavailableForRetry = false;
-  assert.equal(verifierFailedRetry.status, 200, JSON.stringify(verifierFailedRetry.body));
-  assert.deepEqual(verifierFailedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry verifier failure falls back only to the already-approved first-round subset");
+  assertVerifiedPartialExamDelivered(verifierFailedRetry, "retry verifier failure");
+
+  activeQuestions = questions;
+  verifierUnavailableInitially = true;
+  const initialVerifierUnavailable = await invoke(generateExam, {
+    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
+  });
+  verifierUnavailableInitially = false;
+  assert.equal(initialVerifierUnavailable.status, 503, JSON.stringify(initialVerifierUnavailable.body));
+  assert.equal(initialVerifierUnavailable.body.error, "quality_review_unavailable");
+  const initialVerifierLog = JSON.parse(qualityLogs.at(-1));
+  assert.equal(initialVerifierLog.event, "exam_quality_review_unavailable");
+  assert.equal(initialVerifierLog.stage, "initial_verifier");
+  assert.equal(initialVerifierLog.failure, "http_503");
+  assert.ok(Number.isFinite(initialVerifierLog.generationMs));
+  assert.ok(Number.isFinite(initialVerifierLog.verifierLatencyMs));
+  assert.ok(Number.isFinite(initialVerifierLog.elapsedMs));
+  assert.deepEqual(Object.keys(initialVerifierLog).sort(), [
+    "elapsedMs", "event", "failure", "generationMs", "stage", "verifierLatencyMs",
+  ]);
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -385,9 +2556,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   verifierThrowsForRetry = false;
-  assert.equal(verifierTimeoutRetry.status, 200, JSON.stringify(verifierTimeoutRetry.body));
-  assert.deepEqual(verifierTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry verifier timeout cannot override or erase the safe first-round fallback");
+  assertVerifiedPartialExamDelivered(verifierTimeoutRetry, "retry verifier timeout");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -396,9 +2565,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverUnavailableForRetry = false;
-  assert.equal(solverUnavailableRetry.status, 200, JSON.stringify(solverUnavailableRetry.body));
-  assert.deepEqual(solverUnavailableRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry solver outage withholds all regenerated MC items and preserves the approved first-round subset");
+  assertVerifiedPartialExamDelivered(solverUnavailableRetry, "retry solver outage");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -407,24 +2574,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   solverThrowsForRetry = false;
-  assert.equal(solverTimeoutRetry.status, 200, JSON.stringify(solverTimeoutRetry.body));
-  assert.deepEqual(solverTimeoutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "retry solver timeout withholds every unchecked MC item and retains the first-round fallback");
-
-  activeQuestions = questions;
-  regenerationQuestions = [
-    { ...repairedQuestions[0], id: "retry-duplicate" },
-    { ...repairedQuestions[1], id: "retry-duplicate" },
-    { ...repairedQuestions[2], id: "retry-last" },
-  ];
-  solverRejectQuestionId = null;
-  calls.length = 0;
-  const malformedRetry = await invoke(generateExam, {
-    lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
-  });
-  assert.equal(malformedRetry.status, 200, JSON.stringify(malformedRetry.body));
-  assert.deepEqual(malformedRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "duplicate retry IDs are rejected before review and cannot displace the safe first-round subset");
+  assertVerifiedPartialExamDelivered(solverTimeoutRetry, "retry solver timeout");
 
   activeQuestions = questions;
   regenerationQuestions = repairedQuestions;
@@ -434,9 +2584,12 @@ try {
   const timedOutRetry = await invoke(generateExam, {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
-  assert.equal(timedOutRetry.status, 200, JSON.stringify(timedOutRetry.body));
-  assert.deepEqual(timedOutRetry.body.exam.questions.map((question) => question.id), ["q-2", "q-3"],
-    "repair transport failure preserves the already-approved first-round subset");
+  assertVerifiedPartialExamDelivered(timedOutRetry, "repair transport failure");
+  const timedOutRetryLog = JSON.parse(qualityLogs.at(-2));
+  assert.equal(timedOutRetryLog.repairTransportError, "other",
+    "quality-repair transport failures are classified without recording the raw error");
+  assert.equal(timedOutRetryLog.repairHttpStatus, null);
+  assert.equal(JSON.stringify(timedOutRetryLog).includes("synthetic repair transport timeout"), false);
   assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses" && call.body?.text?.format?.name === "exam_solver_schema"), true,
     "first-round MCs are independently solved before retry starts");
 
@@ -467,22 +2620,16 @@ try {
   activeQuestions = questions;
   verifierRejectQuestionId = null;
   assert.equal(shortExam.status, 200, JSON.stringify(shortExam.body));
-  assert.equal(shortExam.body.exam.questions.length, 4, "an open-response exemplar rejected by review is withheld");
-  assert.equal(shortExam.body.exam.questions.some((q) => q.id === "short-wrong-example"), false,
-    "a contradictory model answer cannot reach the learner when the reviewer rejects it");
-  assert.equal(shortExam.body.exam.questions.every((q) => !Object.hasOwn(q, "accepted_answers")), true,
-    "accepted short-answer variants never reach the learner before submission");
-  const publicShortQuestion = shortExam.body.exam.questions[0];
-  const openedShortQuestion = gradeTasks.openQuestion(
-    publicShortQuestion, publicShortQuestion.grade_task, undefined,
-    gradeTasks.hashContext(pastedText, course, userId)
-  );
-  assert.ok(openedShortQuestion.accepted_answers.length > 0,
-    "accepted variants remain available inside the server-sealed grading task");
-  const shortVerifierInput = verifierInputs.at(-1);
-  assert.equal(shortVerifierInput.source_material, pastedText);
-  assert.equal(shortVerifierInput.questions.find((q) => q.id === "short-wrong-example")?.model_answer, "x = 3");
-  assert.equal(shortExam.body.meta.verifier.rejected, 1);
+  assert.equal(shortExam.body.exam.questions.length, 4,
+    "a sufficiently large set of independently approved questions remains usable when one candidate is rejected");
+  assert.equal(shortExam.body.meta.partial, true, "the response explicitly marks a shortened verified exam");
+  assert.equal(shortExam.body.meta.requested, 5, "the requested question count remains visible for the UI notice");
+  assert.equal(shortExam.body.exam.questions.some((question) => question.id === "short-wrong-example"), false,
+    "a rejected question is never included in a partial exam");
+  assert.equal(JSON.parse(qualityLogs.at(-2)).event, "exam_quality_partial_delivery",
+    "shortened delivery is observable without recording study content");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), true,
+    "a verified partial exam is issued through the normal atomic completion path");
 
   calls.length = 0;
   solverUnavailable = true;
@@ -495,9 +2642,9 @@ try {
   assert.match(uncheckedMultipleChoice.body.message, /Inget prov lämnades ut; försök igen/i);
   const outageUrls = calls.map((call) => call.url);
   assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "the reserved quota is returned after the independent check fails");
-  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
+  assert.equal(outageUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
     "unchecked multiple-choice questions do not commit quota");
   assert.equal(outageUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an exam without an independent answer check is neither persisted nor counted toward mastery");
@@ -532,9 +2679,9 @@ try {
     assert.equal(rejected.body.error, "GENERATION_QUESTION_IDS_INVALID");
     const urls = calls.map((call) => call.url);
     assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
       `${malformed.label} IDs refund the reserved quota`);
-    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
+    assert.equal(urls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0);
     assert.equal(urls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
     assert.equal(urls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1,
       "invalid IDs are rejected before verifier or solver calls");
@@ -551,11 +2698,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedExam.status, 200, JSON.stringify(salvagedExam.body));
-  assert.equal(salvagedExam.body.exam.questions.length, 1,
-    "a truncated response keeps valid recovered questions and drops a malformed ID");
-  assert.equal(salvagedExam.body.exam.questions[0].id, "q-1");
-  assert.equal(salvagedExam.body.meta.truncated, true);
+  assertIncompleteExamNotDelivered(salvagedExam, "truncated response with fewer than requested questions");
 
   generationTextOverride = JSON.stringify({
     title: "Avkortat syntetiskt prov", level: "C",
@@ -565,10 +2708,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedDuplicate.status, 200, JSON.stringify(salvagedDuplicate.body));
-  assert.equal(salvagedDuplicate.body.exam.questions.length, 1,
-    "a structurally invalid first duplicate does not discard the later valid recovered question");
-  assert.equal(salvagedDuplicate.body.exam.questions[0].id, "q-1");
+  assertIncompleteExamNotDelivered(salvagedDuplicate, "truncated response with an invalid duplicate");
 
   generationTextOverride = JSON.stringify({
     title: "Avkortat syntetiskt prov", level: "C",
@@ -578,10 +2718,7 @@ try {
     lang: "sv", level: "C", course, pastedText, qType: "mc", numQuestions: 3,
   });
   generationTextOverride = null;
-  assert.equal(salvagedDuplicateAfterGate.status, 200, JSON.stringify(salvagedDuplicateAfterGate.body));
-  assert.equal(salvagedDuplicateAfterGate.body.exam.questions.length, 1,
-    "a quality-gate-rejected first duplicate does not suppress a later valid recovered question");
-  assert.equal(salvagedDuplicateAfterGate.body.exam.questions[0].id, "q-1");
+  assertIncompleteExamNotDelivered(salvagedDuplicateAfterGate, "truncated response with a rejected duplicate");
   activeQuestions = questions;
 
   const graphCourse = "Matematik 2b";
@@ -606,7 +2743,7 @@ try {
   const wrongGraphCalls = calls.slice();
   assert.equal(wrongGraphCalls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 1);
   assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(wrongGraphCalls.filter((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "the rejected non-graph response returns the reserved quota");
 
   activeQuestions = [{
@@ -855,8 +2992,8 @@ try {
   assert.equal(graphTimeout.status, 504, "an empty/timed-out graph generation does not produce a zero-score exam");
   const timeoutUrls = calls.map((call) => call.url);
   assert.equal(timeoutUrls.filter((url) => url === "https://api.openai.com/v1/responses").length, 1);
-  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1);
-  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0);
+  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1);
+  assert.equal(timeoutUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0);
   assert.equal(timeoutUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false);
 
   const mismatchCallsStart = calls.length;
@@ -877,12 +3014,38 @@ try {
   assert.ok(JSON.stringify(mismatchCalls.find((call) => call.url === "https://api.openai.com/v1/responses").body).includes(mismatchedMaterial),
     "the new source material reaches the generator request");
   assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")).length, 1);
-  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")).length, 1,
+  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")).length, 1,
     "a rejected generated graph refunds its reserved quota");
-  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")).length, 0,
+  assert.equal(mismatchUrls.filter((url) => url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 0,
     "a rejected generated graph does not commit quota");
   assert.equal(mismatchUrls.some((url) => url.includes("/rest/v1/mock_results") || url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), false,
     "an unsupported generated graph is not persisted and does not update mastery");
+
+  calls.length = 0;
+  activeQuestions = questions;
+  issuanceUnavailable = true;
+  const issuanceFailure = await invoke(generateExam, {
+    lang: "sv", level: "C", course: "Matematik 1b",
+    pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+  });
+  issuanceUnavailable = false;
+  assert.equal(issuanceFailure.status, 500, "a failed exam issuance is never returned as a usable exam");
+  assert.equal(issuanceFailure.body.error, "exam_generation_failed");
+  assert.equal(issuanceFailure.body.message, "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.",
+    "unexpected generation errors provide an actionable Swedish message");
+  assert.match(issuanceFailure.body.requestId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "the safe response includes an opaque correlation id");
+  assert.equal(calls.filter((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")).length, 1,
+    "an issuance/finalization failure reaches the atomic transaction exactly once");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
+    "an unissued exam refunds its reserved quota");
+  const issuanceEvent = failureLogs.map((line) => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).find((event) => event?.event === "exam_generation_failed" && event.stage === "generation_finalize");
+  assert.ok(issuanceEvent, "the privacy-safe diagnostic identifies atomic generation finalization");
+  assert.equal(issuanceEvent.requestId, issuanceFailure.body.requestId,
+    "the response reference correlates with the stage-only server diagnostic");
+  assert.doesNotMatch(JSON.stringify(issuanceEvent), /synthetic schema unavailable|Träna addition|synthetic-user-token/);
 
   assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")));
   for (const call of calls.filter((item) => item.url.startsWith(`${origin}/rest/v1/`))) {
@@ -891,15 +3054,16 @@ try {
   }
   assert.equal(calls.find((call) => call.url.startsWith(`${origin}/auth/v1/user`)).headers.authorization,
     "Bearer synthetic-user-token");
-  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 2,
-    "after the call log is reset, only the timed-out and mismatched graph generations reach the provider");
+  assert.equal(calls.filter((call) => call.url === "https://api.openai.com/v1/responses").length, 3,
+    "after the call log is reset, only the timed-out, mismatched graph, and issuance-failure generations reach the provider");
   const allowedSupabaseRoutes = [
     `${origin}/auth/v1/user`,
     `${origin}/rest/v1/profiles?select=role&id=eq.${userId}`,
     `${origin}/rest/v1/user_profiles?select=mastery&id=eq.${userId}`,
     `${origin}/rest/v1/rpc/reserve_mock_exam_quota`,
-    `${origin}/rest/v1/rpc/commit_mock_exam_quota`,
-    `${origin}/rest/v1/rpc/refund_mock_exam_quota`,
+    `${origin}/rest/v1/rpc/claim_mock_exam_generation`,
+    `${origin}/rest/v1/rpc/fail_mock_exam_generation`,
+    `${origin}/rest/v1/rpc/complete_mock_exam_generation`,
     `${origin}/rest/v1/rpc/consume_anon_rate`,
     `${origin}/rest/v1/rpc/try_replay_mock_learning_job`,
     `${origin}/rest/v1/rpc/persist_graded_exam_result`,
@@ -908,9 +3072,73 @@ try {
   ];
   assert.ok(calls.every((call) => call.url === "https://api.openai.com/v1/responses" || allowedSupabaseRoutes.includes(call.url)),
     `unexpected mock route: ${calls.map((call) => call.url).filter((url) => url !== "https://api.openai.com/v1/responses" && !allowedSupabaseRoutes.includes(url)).join(", ")}`);
+
+  calls.length = 0;
+  activeQuestions = questions;
+  const sealQuestion = gradeTasks.sealQuestion;
+  gradeTasks.sealQuestion = () => "";
+  let sealingFailure;
+  try {
+    sealingFailure = await invoke(generateExam, {
+      lang: "sv", level: "C", course: "Matematik 1b",
+      pastedText: "Grundläggande räkning: Träna addition och subtraktion med heltal.", qType: "mc", numQuestions: 3,
+    });
+  } finally {
+    gradeTasks.sealQuestion = sealQuestion;
+  }
+  assert.equal(sealingFailure.status, 500);
+  assert.equal(sealingFailure.body.error, "exam_generation_failed");
+  assert.equal(sealingFailure.body.stage, "grade_task_sealing",
+    "the safe response identifies the failure stage without exposing the exception");
+  assert.equal(sealingFailure.body.exam, undefined, "a signing failure never delivers an ungradeable exam");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
+    "a signing failure does not attempt issuance");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")), false,
+    "a signing failure does not commit the exam quota");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")), true,
+    "a signing failure refunds the reserved exam quota");
+
+  calls.length = 0;
+  activeQuestions = questions;
+  const stableKey = "00000000-0000-4000-8000-000000000555";
+  const stableRequest = {
+    lang: "sv", level: "C", course: "Matematik 1b", pastedText, qType: "mc", numQuestions: 3,
+    idempotencyKey: stableKey,
+  };
+  const firstStableResponse = await invoke(generateExam, stableRequest);
+  assert.equal(firstStableResponse.status, 200, JSON.stringify(firstStableResponse.body));
+  const firstStableSubmission = firstStableResponse.body.exam.questions.map((question) => question.grade_task);
+  generationOperations.get(stableKey).response.exam.exam_manifest = "v1.3.legacy-cached-manifest";
+  calls.length = 0;
+  const replayedStableResponse = await invoke(generateExam, stableRequest);
+  assert.equal(replayedStableResponse.status, 200, JSON.stringify(replayedStableResponse.body));
+  assert.deepEqual(replayedStableResponse.body.exam.questions, firstStableResponse.body.exam.questions,
+    "retry after a lost HTTP response returns the exact same questions and grading tasks");
+  assert.deepEqual(replayedStableResponse.body.meta, firstStableResponse.body.meta,
+    "replay preserves generation metadata");
+  assert.match(replayedStableResponse.body.exam.exam_manifest, /^v2\.[a-f0-9]{32}\./,
+    "replay refreshes a cached legacy manifest to the current version");
+  assert.equal(replayedStableResponse.body.exam.exam_manifest.split(".")[1],
+    examCompletion.submissionId(userId, stableRequest.course, replayedStableResponse.body.exam.questions),
+    "the refreshed replay manifest exposes the same exact submission ID as the persisted question set");
+  assert.equal(JSON.stringify(replayedStableResponse.body.exam.questions.map((question) => question.grade_task)),
+    JSON.stringify(firstStableSubmission));
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "a successful same-key retry never calls the model again");
+  assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")), false,
+    "a replay never reserves quota a second time");
+  const changedStableRequest = await invoke(generateExam, { ...stableRequest, pastedText: `${pastedText}\nEn ändrad rad.` });
+  assert.equal(changedStableRequest.status, 409);
+  assert.equal(changedStableRequest.body.error, "GENERATION_REQUEST_PAYLOAD_CONFLICT");
+  assert.equal(calls.some((call) => call.url === "https://api.openai.com/v1/responses"), false,
+    "a reused key with changed study material is rejected before generation");
+
   console.log("offline exam pipeline: MC and supported graph flows passed; unsupported source and mismatched generated graph are rejected safely");
 } finally {
   globalThis.fetch = previousFetch;
+  console.error = previousConsoleError;
+  console.warn = previousConsoleWarn;
+  console.log = previousConsoleLog;
   for (const [key, value] of Object.entries(previousEnv)) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;

@@ -518,7 +518,7 @@ export async function runCoach({
     questionText = sanitizeQuestionText(q?.payload?.question);
   }
 
-  const retrieved = await retrieveChunks(supabase, concept.definition || concept.name, { matchCount: 4 });
+  const retrieved = await retrieveChunks(supabase, concept.definition || concept.name, { matchCount: 4, userId });
   const chunks = sanitizeSourceChunks(
     (retrieved ?? []).map((r) => ({ chunk_id: r.chunk_id, section_ref: r.section_ref, content: r.content }))
   );
@@ -548,7 +548,7 @@ export async function runCoach({
         }),
       },
     ],
-    { model: process.env.OPENAI_MODEL || "gpt-4o-mini", schema: perCoach.outputSchema(), timeout: 30000 }
+    { model: process.env.OPENAI_MODEL || "gpt-4o-mini", schema: perCoach.outputSchema(), timeout: 30000, userId }
   );
   await logUsage(supabase, {
     jobId, userId, feature: "per_learner_loop", pipelineStep: "coach",

@@ -43,6 +43,7 @@ const A = require(join(root, "api", "_assessment.js"));
 const V = require(join(root, "api", "_verifier.js"));
 const S = require(join(root, "api", "_solver.js"));
 const G = require(join(root, "api", "generate-exam.js"));
+const { decideFirstPass } = require(join(here, "eval-delivery.cjs"));
 
 const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
@@ -240,8 +241,8 @@ async function runOnce(fixture, runIndex) {
     fixture: fixture.id, run: runIndex, course: fixture.course,
     profile: null, profileAsExpected: null, isMath: null, isMathAsExpected: null,
     requested: NUM_QUESTIONS, generated: 0, afterGate: 0, delivered: 0, truncated: false,
-    structurallyDropped: [], flagged: [],
-    verifierCallOk: false, verifierApproved: 0, verifierRejected: 0,
+    structurallyDropped: [], flagged: [], verifierLanguageMismatch: 0, verifierOptionQualityFailures: 0,
+    verifierCallOk: false, firstPassApproved: 0, verifierRejected: 0, deliveryRejected: 0,
     solverCallOk: false, solverModel: null, solverChecked: 0, solverRejected: 0, solverReasons: {},
     judgeCallOk: false, judged: 0, judgeAgreed: 0, keyErrors: 0, ambiguous: 0, lowConfidenceDisagreements: 0,
     disagreements: [],
@@ -296,7 +297,9 @@ async function runOnce(fixture, runIndex) {
   // adding the solver is the extra wall time over the verifier alone, not the
   // solver's own latency.
   const [v, sv] = await Promise.all([
-    V.verifyQuestions(gate.questions, { apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv" }),
+    V.verifyQuestions(gate.questions, {
+      apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", targetLevel: fixture.level,
+    }),
     SOLVER_ENABLED
       ? S.solveQuestions(gate.questions, { apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", material: fixture.material })
       : Promise.resolve({ perQuestion: new Map(), callOk: false, solved: 0, model: null }),
@@ -318,23 +321,30 @@ async function runOnce(fixture, runIndex) {
   if (v.callOk) {
     for (const q of gate.questions) {
       const r = v.perQuestion.get(String(q.id));
-      const verifierOk = !!(r && V.decideApproval(r));
-      let solverOk = true;
-      if (sv.callOk && q.type === "mc") {
-        const d = S.decideKeep(sv.perQuestion.get(String(q.id)), q);
-        solverOk = d.keep;
-        rec.solverChecked++;
-        if (!d.keep) {
-          rec.solverRejected++;
-          rec.solverReasons[d.reason] = (rec.solverReasons[d.reason] || 0) + 1;
-        }
+      if (r?.language_match === false) rec.verifierLanguageMismatch++;
+      if (r && (r.option_quality_contract_ok !== true ||
+          (Array.isArray(r.option_quality) && r.option_quality.some(quality => quality !== true)))) {
+        rec.verifierOptionQualityFailures++;
       }
-      if (verifierOk && solverOk) { approved.push(q); rec.verifierApproved++; }
-      else rec.verifierRejected++;
+      const outcome = decideFirstPass(q, {
+        verifierCallOk: v.callOk,
+        verifierResult: r,
+        solverEnabled: SOLVER_ENABLED,
+        solverCallOk: sv.callOk,
+        solverResult: sv.perQuestion.get(String(q.id)),
+      }, V.decideApproval, S.decideKeep);
+      if (outcome.solverChecked) rec.solverChecked++;
+      if (outcome.solverRejected) {
+        rec.solverRejected++;
+        rec.solverReasons[outcome.solverReason] = (rec.solverReasons[outcome.solverReason] || 0) + 1;
+      }
+      if (outcome.verifierRejected) rec.verifierRejected++;
+      if (outcome.approved) { approved.push(q); rec.firstPassApproved++; }
+      else rec.deliveryRejected++;
     }
   } else {
-    rec.errors.push("verifier call failed (fail-open: all gated questions ship)");
-    approved.push(...gate.questions);
+    rec.errors.push("verifier call failed (fail-closed: no questions delivered)");
+    rec.deliveryRejected += gate.questions.length;
   }
   rec.delivered = approved.length;
 
@@ -422,8 +432,8 @@ async function main() {
         fixture: f.id, run: r, course: f.course, profile: null,
         profileAsExpected: true, isMathAsExpected: true,
         requested: NUM_QUESTIONS, generated: 0, afterGate: 0, delivered: 0,
-        structurallyDropped: [], flagged: [],
-        verifierCallOk: false, verifierApproved: 0, verifierRejected: 0,
+        structurallyDropped: [], flagged: [], verifierLanguageMismatch: 0, verifierOptionQualityFailures: 0,
+        verifierCallOk: false, firstPassApproved: 0, verifierRejected: 0, deliveryRejected: 0,
         solverCallOk: false, solverModel: null, solverChecked: 0, solverRejected: 0, solverReasons: {},
         judgeCallOk: false, judged: 0, judgeAgreed: 0, keyErrors: 0, ambiguous: 0,
         lowConfidenceDisagreements: 0, disagreements: [],
@@ -455,6 +465,9 @@ async function main() {
     afterGate: sum(r => r.afterGate),
     delivered: sum(r => r.delivered),
     verifierRejected: sum(r => r.verifierRejected),
+    deliveryRejected: sum(r => r.deliveryRejected),
+    verifierLanguageMismatch: sum(r => r.verifierLanguageMismatch),
+    verifierOptionQualityFailures: sum(r => r.verifierOptionQualityFailures),
     solverRejected: sum(r => r.solverRejected),
     solverChecked: sum(r => r.solverChecked),
     judged: sum(r => r.judged),
@@ -503,7 +516,11 @@ async function main() {
   console.log(`\n── Resultat ──────────────────────────────────────────────`);
   console.log(`  Levererat / begärt        ${totals.delivered}/${totals.requested}  (${fmtPct(totals.delivered, totals.requested)})`);
   console.log(`  Struktur-grinden kastade  ${totals.generated - totals.afterGate}`);
-  console.log(`  Granskaren avslog         ${totals.verifierRejected}  (varav lösaren fällde ${totals.solverRejected} av ${totals.solverChecked} kontrollerade)`);
+  console.log(`  Granskaren avslog         ${totals.verifierRejected}`);
+  console.log(`  Hölls tillbaka totalt     ${totals.deliveryRejected}  (lösaren fällde ${totals.solverRejected} av ${totals.solverChecked} MC-kontroller)`);
+  console.log(`  Språkavvikelse flaggad    ${totals.verifierLanguageMismatch}  (granskarens språkutfall)`);
+  console.log(`  Alternativproblem flaggat ${totals.verifierOptionQualityFailures}  (granskarens kontrakt/alternativutfall)`);
+  console.log(`  Leveransmått              första granskningen; ingen reparationsrunda simuleras`);
   const defects = totals.keyErrors + totals.ambiguous;
   console.log(`  DEFEKTA FRÅGOR            ${defects}/${totals.judged}  (${fmtPct(defects, totals.judged)})   <-- huvudmåttet`);
   console.log(`    varav fel facit         ${totals.keyErrors}  (domaren valde ett annat alternativ, hög konfidens)`);
@@ -544,7 +561,7 @@ async function main() {
   const tag = `${GEN_MODEL}__verify-${VERIFIER_MODEL}`;
   const resultPath = join(OUT_DIR, `${stamp}__${tag}.json`);
   writeFileSync(resultPath, JSON.stringify({
-    config: { GEN_MODEL, VERIFIER_MODEL, JUDGE_MODEL, RUNS, NUM_QUESTIONS, fixtures: selected.map(f => f.id), judgeConfidenceFloor: JUDGE_CONFIDENCE_FLOOR },
+    config: { GEN_MODEL, VERIFIER_MODEL, JUDGE_MODEL, RUNS, NUM_QUESTIONS, fixtures: selected.map(f => f.id), judgeConfidenceFloor: JUDGE_CONFIDENCE_FLOOR, solverEnabled: SOLVER_ENABLED, deliveryScope: "initial_review_no_repair" },
     wallMs, totals, perFixture, dropCounts, flagCounts,
     usage: { generator: genUsage, verifier: verifierUsage, solver: solverUsage, judge: judgeUsage },
     cost: { generatorUsd: genCost.priced ? genCost.usd : null },

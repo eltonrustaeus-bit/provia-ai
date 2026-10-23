@@ -3,7 +3,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { measuredTokens, measuredEmbeddingTokens, usageEvent, logMockExamUsage } = require("../../api/_ai-usage.cjs");
+const { measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logMockExamUsage, safeFailureDetails } = require("../../api/_ai-usage.cjs");
 
 const sample = {
   userId: "00000000-0000-4000-8000-000000000001",
@@ -27,6 +27,10 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(measuredTokens({ input_tokens: 2_147_483_648, output_tokens: 20 }), null);
   assert.equal(measuredTokens({ input_tokens: 20, output_tokens: 2_147_483_648 }), null);
   assert.equal(usageEvent({ ...sample, step: "unknown" }), null);
+  assert.equal(usageEvent({ ...sample, verificationPassed: true }).verification_passed, true);
+  assert.equal(usageEvent({ ...sample, verificationPassed: false }).verification_passed, false);
+  assert.equal(usageEvent({ ...sample, verificationPassed: null }).verification_passed, undefined);
+  assert.equal(usageEvent({ ...sample, verificationPassed: "passed" }).verification_passed, undefined);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", step: "validate" }).feature, "per_chat");
   assert.equal(usageEvent({ ...sample, feature: "per_landing", userId: null }).user_id, null);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", userId: null }), null);
@@ -50,6 +54,14 @@ test("embedding events use only measured embedding tokens", () => {
     output_tokens: event.output_tokens,
   }, { step: "embed", feature: "per_landing", embedding_tokens: 16, input_tokens: 0, output_tokens: 0 });
   assert.equal(usageEvent({ ...sample, step: "embed", usage: { total_tokens: -1 } }), null);
+});
+
+test("quality telemetry distinguishes failed reviews from unavailable results", () => {
+  assert.equal(qualityGatePassed(true, 3, 0), true);
+  assert.equal(qualityGatePassed(true, 3, 1), false);
+  assert.equal(qualityGatePassed(false, 3, 3), null);
+  assert.equal(qualityGatePassed(true, 0, 0), null);
+  assert.equal(qualityGatePassed(true, 2, 3), null);
 });
 
 test("batch insert contains only whitelisted metrics and uses the server key", async () => {
@@ -95,10 +107,59 @@ test("telemetry failure is fail-open and cannot fabricate a zero-cost row", asyn
       fetchImpl: async () => { throw new Error("synthetic metrics outage"); },
     });
     assert.equal(result, false);
-    assert.deepEqual(warnings, ['{"event":"ai_usage_event_write_failed","count":1}']);
+    assert.deepEqual(JSON.parse(warnings[0]), {
+      event: "ai_usage_event_write_failed", count: 1, features: ["mock_exam"], steps: ["generate"], category: "network_or_fetch",
+      errorClass: "Error", networkCode: null, timedOut: false,
+    });
+    assert.doesNotMatch(warnings[0], /synthetic metrics outage|PRIVATE_STUDY_MATERIAL|PRIVATE_STUDENT_ANSWER/);
     assert.equal(await logMockExamUsage({ ...sample, usage: null }, { env, fetchImpl: () => { throw Error("unexpected"); } }), false);
     assert.equal(warnings.length, 1);
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test("telemetry diagnostics retain only HTTP status and a bounded database code", async () => {
+  const env = { SUPABASE_URL: "https://synthetic.supabase.invalid", SUPABASE_SECRET_KEY: "sb_secret_synthetic" };
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(message);
+  try {
+    await logMockExamUsage(sample, {
+      env,
+      fetchImpl: async () => Response.json({ code: "42501", message: "PRIVATE_DATABASE_DETAIL" }, { status: 403 }),
+    });
+    assert.deepEqual(JSON.parse(warnings[0]), {
+      event: "ai_usage_event_write_failed", count: 1, features: ["mock_exam"], steps: ["generate"],
+      category: "http_error", httpStatus: 403, databaseCode: "42501",
+    });
+    assert.doesNotMatch(warnings[0], /PRIVATE_DATABASE_DETAIL|sb_secret_synthetic|PRIVATE_STUDY_MATERIAL/);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("telemetry diagnostic error classes and network codes are allowlisted", () => {
+  assert.deepEqual(safeFailureDetails(Object.assign(new Error("private"), { cause: { code: "ETIMEDOUT" } })), {
+    category: "timeout", errorClass: "Error", networkCode: "ETIMEDOUT", timedOut: true,
+  });
+  assert.deepEqual(safeFailureDetails(Object.assign(new Error("private"), { name: "PrivateError", code: "PRIVATE_CODE" })), {
+    category: "network_or_fetch", errorClass: "UnknownError", networkCode: null, timedOut: false,
+  });
+});
+
+test("pilot telemetry fails open when its branch-scoped staging URL is missing", async () => {
+  const env = {
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    VERCEL_TARGET_ENV: "preview",
+    EXGEN_PILOT_MODE: "true",
+    SUPABASE_URL: "https://production.supabase.invalid",
+    SUPABASE_SECRET_KEY: "sb_secret_synthetic",
+  };
+  const result = await logMockExamUsage(sample, {
+    env,
+    fetchImpl: () => { throw new Error("must not send without a staging URL"); },
+  });
+  assert.equal(result, false);
 });

@@ -39,6 +39,7 @@ const EXAM = {
 };
 
 let lastGradePayload = null;
+let gradeCallCount = 0;
 let lastGeneratePayload = null;
 let lastAbandonPayload = null;
 let activeExamCountResponse = 0;
@@ -54,6 +55,12 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
   const errs = [];
   page.on("pageerror", e => errs.push("PAGEERROR " + e.message));
   page.on("console", m => { if (m.type() === "error" && !/404|Failed to load resource/.test(m.text())) errs.push(m.text()); });
+  page.on("requestfailed", request => {
+    const url = new URL(request.url());
+    if (url.hostname === "exgen-test-project.invalid" && url.pathname.startsWith("/auth/v1/")) {
+      errs.push(`AUTH_REQUEST_FAILED ${url.pathname} ${request.failure()?.errorText || "unknown"}`);
+    }
+  });
   // Baslagret från _harness.mjs; provgenereringen och rättningen ligger i
   // `extra` som registreras sist och därmed vinner.
   await mockApis(page, { extra: [
@@ -71,11 +78,12 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
         ? { ok: true, abandoned_count: 1 }
         : { ok: true, abandoned: true } });
     }],
-    ["**/api/generate-exam", r => {
+    ["**/api/generate-exam*", r => {
       try { lastGeneratePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
       return r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async r => {
+    gradeCallCount++;
     try { lastGradePayload = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
     if (!gradeOk) return r.fulfill({ status: 500, json: { ok: false, error: "server nere" } });
     if (gradeDelayMs > 0) await new Promise(resolve => setTimeout(resolve, gradeDelayMs));
@@ -95,7 +103,20 @@ async function mk(opts = {}, gradeOk = true, gradeResult = null, gradeDelayMs = 
 // Sessionen kommer från _harness.mjs. Två elever behövs i T6 (samma enhet,
 // olika konton), därför id:t som argument.
 const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") => {
-  await page.route("**/auth/v1/user**", route => route.fulfill({ json: { id: uid, email: uid + "@t.se" } }));
+  await page.route("**/auth/v1/user**", route => {
+    const corsHeaders = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+      "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+    };
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+    return route.fulfill({
+      json: { id: uid, email: uid + "@t.se" },
+      headers: corsHeaders,
+    });
+  });
   await page.route("**/rest/v1/profiles**", route => route.fulfill({ json: [{ id: uid, approved: true, role }] }));
   await seed(page, { user: { id: uid, email: uid + "@t.se" }, lang, storage });
 };
@@ -108,7 +129,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
       proviaai_per_corner: "bl",
       proviaai_per_size: "large",
     });
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const initialHeadingFocus = await page.evaluate(() => {
       const heading = document.querySelector("#xf .xf-screen.on .xf-say");
@@ -160,7 +181,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
       && await page.locator("#perSizeBtn").getAttribute("aria-label") === "Återställ normal storlek");
     await page.locator("#langBtnDesktop").click();
     await page.waitForFunction(() => document.querySelector("#perInput")?.getAttribute("aria-label") === "Ask P.E.R a question");
-    await toExam(page);
+    await toExam(page, true);
     ok("aktivt prov har engelska navigeringskontroller och frågerubrik",
       await page.locator(".xf-exam-nav .xf-btn.ghost").textContent() === "Previous"
       && await page.locator(".xf-exam-nav .xf-btn.primary").textContent() === "Next"
@@ -183,29 +204,141 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
   }
 }
 
-async function toExam(page) {
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+async function toExam(page, reuseStart = false) {
+  // The language scenario is already at the start screen. Reloading there can
+  // abort its pending mocked Auth request and manufacture an unrelated error.
+  if (!reuseStart) await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
-  await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
-  await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);
-  await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+  await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos vid syrebrist i muskeln.");
   await page.waitForTimeout(150);
-  await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await page.waitForTimeout(200);
+  await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
   await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
   await page.waitForTimeout(300);
 }
 
+// Browsers without Web Locks must stop before either exam route can reserve quota.
+{
+  const { ctx, page, errs } = await mk();
+  let generationApiCalls = 0;
+  try {
+    await signIn(page, "no-web-locks-generation");
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
+    });
+    await page.route("**/api/generate-exam*", route => {
+      generationApiCalls++;
+      return route.fulfill({ status: 500, json: { ok: false, error: "unexpected_generation_request" } });
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP och citronsyracykeln sker i matrix.");
+    await page.waitForTimeout(150);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await waitForScreenEntrance(page);
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("saknar stöd"));
+    const message = await page.locator("#status").textContent();
+    ok("webbläsare utan Web Locks stoppas innan prov-API eller kvotreservation",
+      generationApiCalls === 0 && message.includes("Uppdatera") && errs.length === 0,
+      `${generationApiCalls} API-anrop; ${message}; ${errs.join(" | ")}`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Exercise the real engine callback in the visible flow while a later batch is
+// still running; a hidden legacy status update must not satisfy this check.
+{
+  const { ctx, page, errs } = await mk();
+  let releaseFinal;
+  const finalBatch = new Promise(resolve => { releaseFinal = resolve; });
+  let advances = 0;
+  try {
+    await signIn(page, "visible-generation-progress");
+    await page.route("**/api/generate-exam*", async route => {
+      if (route.request().url().includes("pipeline=start")) {
+        return route.fulfill({ status: 202, json: { ok: true, operationId: "11111111-1111-4111-8111-111111111111", requested: 3, approved: 0 } });
+      }
+      advances++;
+      if (advances === 1) return route.fulfill({ status: 202, json: {
+        ok: true, state: "queued", stage: "repair", requested: 3, approved: 2,
+      } });
+      await finalBatch;
+      return route.fulfill({ json: { ok: true, exam: EXAM, meta: { requested: 3, partial: false } } });
+    });
+    const completed = toExam(page);
+    await page.waitForFunction(() => document.querySelector("#xf .xf-generation-progress")?.textContent.includes("2 av 3 frågor godkända"));
+    await page.waitForTimeout(850);
+    const progress = page.locator("#xf .xf-generation-progress");
+    ok("synliga provvyn visar varaktig godkänd progress", await progress.isVisible()
+      && (await progress.innerText()).includes("2 av 3 frågor godkända"));
+    ok("stegvis generering lovar inte under en minut", !(await page.locator("#xf").innerText()).includes("under en minut"));
+    await page.screenshot({ path: SHOT + "/generation-progress-desktop.png" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileFit = await progress.evaluate(node => ({
+      width: node.getBoundingClientRect().width,
+      scroll: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+      live: node.getAttribute("aria-live"),
+      top: node.getBoundingClientRect().top,
+      bottom: node.getBoundingClientRect().bottom,
+      height: window.innerHeight,
+    }));
+    ok("mobil progress får plats och annonseras", mobileFit.width > 0 && mobileFit.scroll <= mobileFit.viewport && mobileFit.live === "polite"
+      && mobileFit.top >= 0 && mobileFit.bottom < mobileFit.height, JSON.stringify(mobileFit));
+    await page.screenshot({ path: SHOT + "/generation-progress-mobile.png" });
+    releaseFinal();
+    await completed;
+    ok("progress övergår till det färdiga provet", await page.locator(".xf-exam.on").count() === 1);
+    ok("progressbryggan saknar konsolfel", errs.length === 0, errs.join(" | "));
+  } finally { releaseFinal(); await ctx.close(); }
+}
+
+async function waitForScreenEntrance(page) {
+  await page.waitForFunction(() => {
+    const inner = document.querySelector("#xf .xf-screen.on > .xf-inner");
+    return !!inner && inner.getAnimations().every(animation => animation.playState !== "running");
+  });
+}
+
 async function toMaterial(page) {
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
   await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
   await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+}
+
+// A click handler receives the PointerEvent as its first argument. The material
+// step accepts an optional user-facing message, so passing the handler directly
+// used to render "[object PointerEvent]" in the alert region.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "material-navigation-user");
+    await toMaterial(page);
+    ok("materialsteget visar inget klickobjekt som felmeddelande",
+      (await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").innerText()).trim() === "");
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Kort syntetiskt material för återgångstest.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.locator("#xf .xf-screen[data-screen='contract']")
+      .getByRole("button", { name: /Tillbaka|Back/ }).click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
+    ok("återgång från provöversikten visar inget klickobjekt som felmeddelande",
+      (await page.locator("#xf .xf-screen[data-screen='material'] .xf-err").innerText()).trim() === "");
+    ok("materialnavigeringen saknar sidfel", errs.length === 0, errs.join(" | "));
+  } finally { await ctx.close(); }
 }
 
 // Free-plan students see the OCR requirement before opening the camera; paid
@@ -289,7 +422,7 @@ async function toMaterial(page) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "long-training-material-user");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.__xfPrefill === "function", null, { timeout: 8000 });
     await page.evaluate(() => window.__xfPrefill("y".repeat(12001), "Biologi 1"));
     const area = page.locator("#xf .xf-screen[data-screen='material'] .xf-area");
@@ -311,7 +444,7 @@ async function toMaterial(page) {
   try {
     await signIn(page, "focus-scope-user");
     await toMaterial(page);
-    const material = "Fotosyntesen sker i växtens kloroplaster. Klorofyll fångar ljusenergi och koldioxid tas upp genom klyvöppningarna. Vatten transporteras från rötterna och används när växten bygger druvsocker. Syre bildas som en restprodukt under processen.";
+    const material = "Fotosyntesen sker alltså i växtens kloroplaster. Klorofyll fångar ljusenergi och koldioxid tas upp genom klyvöppningarna. Vatten transporteras från rötterna och används när växten bygger druvsocker. Syre bildas alltså som en restprodukt under processen. Övningsmaterial och testunderlag. Study guide.";
     await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", material);
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
@@ -327,6 +460,11 @@ async function toMaterial(page) {
     ok("T14a fokusval visas som tillgängliga val med tydlig täckningsbegränsning",
       count > 0 && initialSelection
       && focusValues.every(term => term.length <= 48 && /^[a-zåäö][a-zåäö-]{3,}[a-zåäö]$/.test(term))
+      && !focusValues.includes("alltså")
+      && !focusValues.includes("övningsmaterial")
+      && !focusValues.includes("testunderlag")
+      && !focusValues.includes("study")
+      && !focusValues.includes("guide")
       && await page.locator(".xf-focus legend").textContent() === "Prioritera ord"
       && await page.locator(".xf-focus").getAttribute("aria-describedby") === "xf-focus-help"
       && /ingen fullständig kurskarta/.test(await page.locator(".xf-focus-help").textContent() || ""));
@@ -347,7 +485,7 @@ async function toMaterial(page) {
   const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "language-wizard");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const desktopLanguage = page.locator("#langBtnDesktop");
     ok("desktop har ett synligt språkval", await desktopLanguage.isVisible());
@@ -411,14 +549,14 @@ async function toMaterial(page) {
     const contract = await page.locator("#xf .xf-screen[data-screen='contract']").textContent();
     const contractHeading = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-say").getAttribute("aria-label");
     ok("provöversikten visas på engelska", /Review your exam/.test(contractHeading || "") && /Course/.test(contract || "") && /Create exam/.test(contract || ""), contract);
-    const englishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    const englishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").textContent();
     ok("engelsk provöversikt beskriver AI-underlaget utan garanti",
       /using your material as a reference/i.test(englishGroundingNote || "")
         && /may miss details/i.test(englishGroundingNote || "")
         && /as you work through the exam/i.test(englishGroundingNote || "")
         && !/based only on concepts/i.test(englishGroundingNote || ""), englishGroundingNote || "");
     await desktopLanguage.click();
-    const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").textContent();
+    const swedishGroundingNote = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").textContent();
     ok("P.E.R-kontrollerna följer språkbytet tillbaka till svenska",
       await page.locator("#perInput").getAttribute("aria-label") === "Ställ en fråga till P.E.R"
       && await page.locator("#perSendBtn").textContent() === "Skicka");
@@ -431,7 +569,7 @@ async function toMaterial(page) {
     await page.locator(".welcomeAnim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
     await page.screenshot({ path: path.join(OUT, "exam-flow-language-contract-desktop.png") });
     await page.setViewportSize({ width: 390, height: 844 });
-    const noteLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note").boundingBox();
+    const noteLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-note:not(.xf-generation-progress)").boundingBox();
     const perActionLayout = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-contract-per").boundingBox();
     const contractPerState = await page.evaluate(() => ({
       bubbleDisplay: getComputedStyle(document.querySelector("#perBubble")).display,
@@ -467,7 +605,7 @@ async function toMaterial(page) {
   const { ctx, page, errs } = await mk({ viewport: { width: 390, height: 844 } });
   try {
     await signIn(page, "language-mobile");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     ok("desktop-språkknappen döljs på mobil", !(await page.locator("#langBtnDesktop").isVisible()));
     await page.click(".xg-menu-btn");
@@ -497,7 +635,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "wizard-progress");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
     const state = () => page.locator("#xf .xf-progress").evaluate(node => ({
       role: node.getAttribute("role"), min: node.getAttribute("aria-valuemin"),
@@ -605,16 +743,86 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
-    await page.route("**/api/generate-exam", route => route.fulfill({
-      status: 503, json: { ok: false, error: "Syntetiskt genereringsfel" },
+    const requestId = "12345678-1234-4234-8234-123456789abc";
+    const technicalFailureMessage = "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.";
+    await page.route("**/api/generate-exam*", route => route.fulfill({
+      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance", message: technicalFailureMessage },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Syntetiskt genereringsfel/.test(
+    await page.waitForFunction(() => /Steg: provstart/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    await page.waitForFunction(() => /Referens: 12345678-1234-4234-8234-123456789abc/.test(
       document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
     const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
       .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
-    ok("genereringsfel annonseras som ett sammanhållet larm", errorA11y.role === "alert" && errorA11y.atomic === "true",
+    ok("genereringsfel visar en säker korrelationsreferens i ett sammanhållet larm",
+      errorA11y.role === "alert" && errorA11y.atomic === "true",
       JSON.stringify(errorA11y));
+    ok("genereringsfel visar bara en tillåten, begriplig serverfas",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes("Steg: provstart") && !text.includes("exam_issuance")));
+    ok("genereringsfel visar en användbar förklaring i stället för ett generiskt återförsök",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
+    const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
+    let qualityReceived = 0;
+    await page.route("**/api/generate-exam*", route => route.fulfill({
+      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: qualityReceived, requested: 3 },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+    const zeroCountStillOnContract = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => node.classList.contains("on"));
+    const zeroCountExamState = await page.locator("#examBody").evaluate(node => ({ text: node.textContent.trim(), skeleton: Boolean(node.querySelector(".skelBox")) }));
+    const zeroCountControls = await page.locator("#gradeBtn").evaluate(() => ({
+      gradeDisabled: document.getElementById("gradeBtn")?.disabled === true,
+      floatingBarHidden: !document.getElementById("floatingGradeBar")?.classList.contains("show"),
+    }));
+    ok("noll godkända frågor visas som 0 av 3 utan att öppna ett tomt prov",
+      zeroCountStillOnContract && zeroCountExamState.text === "" && !zeroCountExamState.skeleton &&
+        zeroCountControls.gradeDisabled && zeroCountControls.floatingBarHidden,
+      JSON.stringify({ zeroCountStillOnContract, zeroCountExamState, zeroCountControls }));
+    ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+    qualityReceived = 1;
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes("1 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
+    ok("delvis godkända men otillräckliga frågor visar korrekt 1 av 3-count",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
+    await page.route("**/api/generate-exam*", route => route.fulfill({
+      status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")
+      ?.textContent === "Provkvoten är slut.", null, { timeout: 5000 });
+    const quotaNotice = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
+    const quotaError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
+      /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
+      JSON.stringify({ quotaNotice, quotaError }));
+    await page.route("**/api/generate-exam*", route => route.abort("failed"));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /Anslutningen bröts/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
+    ok("nätverksfel skiljs från serverfel och eleven kan försöka igen",
+      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+        text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
+    const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
+    await page.route("**/api/generate-exam*", route => route.fulfill({
+      status: 401, json: { ok: false, error: "Unauthorized" },
+    }));
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(message => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+      ?.textContent?.includes(message), authMessage, { timeout: 5000 });
+    const authError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    ok("authfel blir begripligt och döljer rå Unauthorized-text",
+      authError.includes(authMessage) && !authError.includes("Unauthorized"));
+    ok("authfel behåller elevens material för återhämtning",
+      await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
+        .then(value => value.includes("Linjär funktion y = 2x + 1")));
   } catch (e) {
     ok("genereringsfel annonseras för hjälpmedel", false, e.message);
   } finally {
@@ -637,7 +845,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       draft.ts = Date.now();
       localStorage.setItem(key, JSON.stringify(draft));
     }, oldStart);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
     await page.getByText(/har avslutats eller gått ut/).waitFor({ timeout: 5000 });
@@ -922,6 +1130,59 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await ctx.close();
 }
 
+// A successful grade survives a reload and is recovered only through the
+// server's verified/idempotent replay path, preserving P.E.R review proof.
+{
+  const { ctx, page } = await mk();
+  const originalGradeTasks = EXAM.questions.map(q => q.grade_task);
+  try {
+    EXAM.questions.forEach((q, index) => { q.grade_task = { task_id: `recovery-${index}`, rubric: "synthetic" }; });
+    await signIn(page, "result-recovery-user");
+    await toExam(page);
+    const initialGradeCalls = gradeCallCount;
+    await page.click(".xf-mc-opt >> nth=0");
+    await page.fill(".xf-answer", "syntetiskt svar");
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    await page.waitForTimeout(300);
+    await page.click(".xf-mc-opt >> nth=2");
+    await page.waitForTimeout(900);
+    await page.click(".xf-exam-nav .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const callsAfterFirstGrade = gradeCallCount;
+    const savedPhase = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find(name => name.startsWith("exgen_flow_draft_"));
+      return key ? JSON.parse(localStorage.getItem(key))?.phase : null;
+    });
+    ok("T1r lyckad rättning behåller signerad återhämtningskopia", savedPhase === "result-recovery", String(savedPhase));
+
+    examIssuanceStateResponse = "completed";
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    const restore = page.getByRole("button", { name: "Återställ resultatet" });
+    ok("T1r resultatutkast får en tydlig återställningsåtgärd", await restore.count() === 1);
+    await restore.click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    ok("T1r verifierat resultat återställs efter omladdning", await page.locator(".xf-item-own").count() === 3);
+    ok("T1r första inlämningen gör ett enda rättningsanrop", callsAfterFirstGrade === initialGradeCalls + 1,
+      `grade calls=${callsAfterFirstGrade - initialGradeCalls}`);
+    ok("T1r återhämtning använder exakt en idempotent rättningsåterspelning",
+      gradeCallCount === callsAfterFirstGrade + 1, `replay calls=${gradeCallCount - callsAfterFirstGrade}`);
+    ok("T1r P.E.R:s facitgranskning finns efter återhämtning", await page.locator(".xf-review-action").count() > 0);
+  } finally {
+    EXAM.questions.forEach((q, index) => { q.grade_task = originalGradeTasks[index]; });
+    examIssuanceStateResponse = "active";
+    await ctx.close();
+  }
+}
+
+if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
+  await browser.close();
+  await srv.close();
+  fail.forEach(f => console.log("  FEL  " + f));
+  console.log(`\n${pass.length} godkända, ${fail.length} fel`);
+  process.exit(fail.length ? 1 : 0);
+}
+
 // ── T1e: objektliknande modell-id bevaras genom signerad rättning ──────────
 {
   const originalIds = EXAM.questions.map(q => q.id);
@@ -934,7 +1195,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     await page.fill(".xf-answer", "syntetiskt svar");
     await page.click(".xf-exam-nav .xf-btn.primary"); await page.waitForTimeout(300);
     await page.click(".xf-mc-opt >> nth=2"); await page.waitForTimeout(900);
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
     await page.getByRole("button", { name: "Fortsätt provet du började" }).click();
     await page.waitForSelector(".xf-exam.on");
@@ -994,9 +1255,9 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   // elev B på samma webbläsare
   const b = await mk();
   await signIn(b.page, "elev-B");
-  await b.page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await b.page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await b.page.evaluate(() => localStorage.setItem("exgen_flow_draft_elev-A", JSON.stringify({ ts: Date.now(), uid: "elev-A", exam: { questions: [{ id: "x", question: "hemlig fråga" }] }, answers: { x: "elev A:s svar" } })));
-  await b.page.reload({ waitUntil: "networkidle" });
+  await b.page.reload({ waitUntil: "domcontentloaded" });
   await b.page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await b.page.waitForTimeout(500);
   const txt = await b.page.textContent("#xf .xf-screen[data-screen='start'] .xf-body");
@@ -1036,7 +1297,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 {
   const { ctx, page } = await mk();
   await signIn(page, "u1");
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.waitForTimeout(400);
   const sem = await page.evaluate(() => ({
@@ -1081,7 +1342,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   });
   // loadExamsFromAccountToLocal() skriver över felbanken från servern vid varje
   // laddning, så den måste sättas efter att den körts — annars testar vi tomt.
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1200);
   await page.evaluate(() => {
     localStorage.setItem("proviaai_mistakes", JSON.stringify([
@@ -1090,7 +1351,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ]));
     localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
-  await page.goto(`${srv.url}/app.html#train`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html#train`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3000);
   const st = await page.evaluate(() => {
     const on = document.querySelector("#xf .xf-screen.on");
@@ -1114,7 +1375,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   await toExam(page);
   await page.click(".xf-mc-opt >> nth=1");
   await page.waitForTimeout(3200);   // klockan måste hinna passera 00:02
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
   await page.waitForTimeout(500);
   const hasResume = await page.evaluate(() => !!Array.from(document.querySelectorAll(".xf-btn")).find(b => /Fortsätt provet/.test(b.textContent)));
@@ -1196,14 +1457,14 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 {
   const { ctx, page } = await mk();
   await signIn(page, "u1");
-  await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+  await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.evaluate(() => localStorage.setItem("exgen_flow_draft_u1", JSON.stringify({
     ts: Date.now(), uid: "u1", course: "Biologi 1", level: "C", qType: "mc", num: 3,
     material: "Cellandning sker i mitokondrien.",
     exam: { questions: [{ id: "old-1", question: "Var sker cellandningen?" }] },
     answers: { "old-1": "I mitokondrien" },
   })));
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
   ok("T7d gammalt utkast erbjuds inte som fortsatt prov",
     await page.getByRole("button", { name: "Fortsätt provet du började" }).count() === 0);
@@ -1352,7 +1613,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   const { ctx, page } = await mk();
   try {
     await signIn(page, "u1");
-    await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
     const recovery = page.locator(".xf-exam-recovery");
     await recovery.waitFor({ state: "visible", timeout: 8000 });
     ok("T10a förlorat prov kan upptäckas utan lokalt utkast", await recovery.textContent().then(text => /Ett prov finns kvar/.test(text)));

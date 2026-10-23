@@ -1,9 +1,9 @@
 import supabaseKeys from "./_supabase-server-key.cjs";
 
-const { createSupabaseServerClient } = supabaseKeys;
+const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 
 const supabase = createSupabaseServerClient(
-  process.env.SUPABASE_URL,
+  getSupabaseUrl(),
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 

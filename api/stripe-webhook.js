@@ -4,9 +4,9 @@ import crypto from "crypto";
 import { BRAND_NAME, SITE_ORIGIN, MAIL_FROM } from "./_site.js";
 import pilotScope from "./_pilot-scope.cjs";
 
-const { createSupabaseServerClient } = supabaseKeys;
+const { createSupabaseServerClient, getSupabaseUrl } = supabaseKeys;
 const supabase = createSupabaseServerClient(
-  process.env.SUPABASE_URL,
+  getSupabaseUrl(),
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 

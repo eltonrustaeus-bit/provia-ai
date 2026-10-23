@@ -27,7 +27,8 @@ function cleanQuestion(raw, { maxText = 280, includeType = false } = {}) {
   const text = cleanText(raw.text || raw.question || "", maxText);
   const options = cleanStringList(raw.options, 6, 90);
   const category = cleanText(raw.category || raw.course || raw.subcategory || "", 80);
-  const type = includeType ? cleanText(raw.type || raw.question_type || "", 20) : "";
+  const typeValue = includeType ? cleanText(raw.type || raw.question_type || "", 20) : "";
+  const type = ["mc", "short", "graph"].includes(typeValue) ? typeValue : "";
   const answer = cleanText(raw.answer || "", 200);
   if (number !== undefined) q.number = number;
   if (text) q.text = text;
@@ -113,8 +114,26 @@ export function buildPERContextPack({
   if (level) pageContext.level = level;
   if (mode) pageContext.mode = mode;
 
-  const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360 });
+  const examContextDeclared = Boolean(raw.currentQuestion || raw.examState)
+    || ["prov", "resultat", "exam", "exam-result"].includes(page);
+  if (!examContextDeclared && typeof raw.studyMaterial === "string") {
+    const studyMaterial = raw.studyMaterial.replace(/\u0000/g, "").trim().slice(0, 6000);
+    if (studyMaterial) pageContext.studyMaterial = studyMaterial;
+  }
+
+  const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });
   if (currentQuestion) {
+    if (currentQuestion.type === "graph") {
+      const declaredGraphModes = [];
+      if (Object.hasOwn(raw.currentQuestion, "graphMode")) declaredGraphModes.push(raw.currentQuestion.graphMode);
+      if (raw.currentQuestion.graph_ui && typeof raw.currentQuestion.graph_ui === "object"
+        && Object.hasOwn(raw.currentQuestion.graph_ui, "mode")) {
+        declaredGraphModes.push(raw.currentQuestion.graph_ui.mode);
+      }
+      const hasUnknownGraphMode = declaredGraphModes.some((mode) => mode !== "line" && mode !== "scatter");
+      const uniqueGraphModes = [...new Set(declaredGraphModes)];
+      if (!hasUnknownGraphMode && uniqueGraphModes.length === 1) currentQuestion.graphMode = uniqueGraphModes[0];
+    }
     pageContext.currentQuestion = currentQuestion;
     summaryLines.push(
       `Aktiv fråga: ${currentQuestion.number ? `#${currentQuestion.number} ` : ""}${currentQuestion.text}`.trim()

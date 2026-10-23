@@ -27,6 +27,7 @@ const server = await serve(ROOT, { indexFile: "app.html" });
 const browser = await chromium.launch({ headless: true });
 let generateBody = null;
 let generatedExam = null;
+let generationResponse = null;
 let gradeBody = null;
 let retryBody = null;
 let retryCount = 0;
@@ -85,6 +86,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) return Response.json({ ok: true, count: 1, limit: 3, period: "synthetic", unlimited: false });
   if (url.endsWith("/rest/v1/rpc/commit_mock_exam_quota")) return Response.json({ committed: true });
   if (url.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) return Response.json({ refunded: true });
+  if (url.endsWith("/rest/v1/rpc/claim_mock_exam_generation")) return Response.json({ status: "claimed" });
+  if (url.endsWith("/rest/v1/rpc/complete_mock_exam_generation")) return Response.json({ status: "completed", response: body.p_response });
+  if (url.endsWith("/rest/v1/rpc/fail_mock_exam_generation")) return Response.json({ status: "retryable" });
   if (url.endsWith("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1, limit: 20 });
   if (url.endsWith("/rest/v1/rpc/exam_issuance_state")) return Response.json(gradingState);
   if (url.endsWith("/rest/v1/rpc/claim_exam_grading")) {
@@ -119,7 +123,7 @@ globalThis.fetch = async (input, init = {}) => {
     const schemaName = request.text?.format?.name;
     if (schemaName === "exam_verifier_schema") return outputResponse({ results: providerQuestions.map((q) => ({
       id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
-      source_alignment: 1, scoring_quality: 1, language_quality: 1, issues: [], required_changes: [],
+      source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [], issues: [], required_changes: [],
     })) });
     if (schemaName === "exam_solver_schema") return outputResponse({ results: providerQuestions.map((q) => ({
       id: q.id, option_verdicts: [], index: -1, confidence: 1, reason: "Syntetisk grafkontroll.",
@@ -155,6 +159,7 @@ try {
       ["**/api/generate-exam", async (route) => {
         generateBody = route.request().postDataJSON();
         const generated = await invoke(generateExam, generateBody);
+        generationResponse = generated;
         generatedExam = generated.body?.exam || null;
         await route.fulfill({ status: generated.status, json: generated.body });
       }],
@@ -206,7 +211,10 @@ try {
   await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").fill(material);
   await page.locator("#xf .xf-screen[data-screen='material'] .xf-btn.primary").click();
   await page.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
-  await page.waitForSelector(".xf-exam.on .graph-answer");
+  await page.waitForFunction(() => document.querySelector(".xf-exam.on .graph-answer")
+    || document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent.trim(), null, { timeout: 10000 });
+  assert.equal(await page.locator(".xf-exam.on .graph-answer").count(), 1,
+    `graph exam should render; API=${JSON.stringify(generationResponse)} UI=${await page.locator("#xf .xf-screen[data-screen='contract']").innerText()}`);
 
   assert.equal(generateBody?.course, "Biologi 1");
   assert.equal(generateBody?.qType, "graph");

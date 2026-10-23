@@ -9,20 +9,20 @@ const ok = (name, condition, detail = "") => R.ok(name, condition, detail);
 const axeSource = await readFile(`${ROOT}/node_modules/axe-core/axe.min.js`, "utf8");
 let crash = null;
 
-const runtime = environment => `window.ExGenRuntime = Object.freeze({
+const runtime = (environment, appOrigin = "http://localhost") => `window.ExGenRuntime = Object.freeze({
   environment: ${JSON.stringify(environment)}, projectRef: "exgen-test-project",
   supabaseUrl: "https://exgen-test-project.invalid", publishableKey: "sb_publishable_synthetic_frontend_test_key_only_000000",
-  appOrigin: "http://localhost", authStorageKey: ${JSON.stringify(AUTH_KEY)}
+  appOrigin: ${JSON.stringify(appOrigin)}, authStorageKey: ${JSON.stringify(AUTH_KEY)}
 });`;
 
-async function open(path, environment, width = 1280, state = { signedIn: false, role: null }) {
+async function open(path, environment, width = 1280, state = { signedIn: false, role: null }, appOrigin = "http://localhost") {
   return openPage(browser, `${srv.url}/${path}`, {
     width, height: 900, reducedMotion: "reduce", settle: 500,
     state,
     mocks: {
       role: state.role || "gratis",
       extra: [
-        ["**/js/exgen-runtime.js", route => route.fulfill({ contentType: "application/javascript", body: runtime(environment) })],
+        ["**/js/exgen-runtime.js", route => route.fulfill({ contentType: "application/javascript", body: runtime(environment, appOrigin) })],
         ["**ungdrive.se/**", route => route.abort()],
       ],
     },
@@ -65,6 +65,44 @@ try {
     await page.locator(".pilotPricingIntro a").click();
     const pricingModal = await page.locator("#pvModal").innerText();
     ok("prissidans inloggningsväg öppnar pilotkontots inloggning", /SKOLPILOT · LOGGA IN/.test(pricingModal), `${page.url()} · ${pricingModal.slice(0, 100)}`);
+    await close();
+  }
+
+  {
+    const appOrigin = "https://pilot.example.test";
+    const { page, close } = await open("index.html", "pilot", 1280, { signedIn: false, role: null }, appOrigin);
+    let recoveryUrl = null;
+    await page.route("**/auth/v1/recover?**", async route => {
+      recoveryUrl = route.request().url();
+      await route.fulfill({ json: {} });
+    });
+    await page.locator("a[data-pv-auth='login']").first().click();
+    await page.locator("#pvToForgot").click();
+    await page.locator("#pvFE").fill("synthetic@example.test");
+    await page.locator("#pvFBtn").click();
+    await page.waitForFunction(() => document.querySelector("#pvFE2")?.textContent?.includes("Kolla mejlen"));
+    const redirect = recoveryUrl ? new URL(recoveryUrl).searchParams.get("redirect_to") : null;
+    ok("lösenordsåterställning använder Pilot-runtime-originens stabila callback", redirect === `${appOrigin}/aterstall.html`, String(redirect));
+    await close();
+  }
+
+  {
+    const recoveryPayload = Buffer.from(JSON.stringify({ email: "synthetic@example.test" })).toString("base64url");
+    const recoveryToken = `e30.${recoveryPayload}.synthetic-signature`;
+    const { page, close } = await open(`aterstall.html#access_token=${recoveryToken}&refresh_token=synthetic-refresh&expires_in=3600&type=recovery`, "pilot");
+    await page.evaluate((authKey) => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === authKey) throw new Error("synthetic storage failure");
+        return original.call(this, key, value);
+      };
+    }, AUTH_KEY);
+    await page.route("**/auth/v1/user", route => route.fulfill({ json: { id: "synthetic-user", email: "synthetic@example.test" } }));
+    await page.locator("#rsPass").fill("synthetic-new-password");
+    await page.locator("#rsPass2").fill("synthetic-new-password");
+    await page.locator("#rsSave").click();
+    await page.waitForFunction(() => document.querySelector("#rsMsg")?.textContent?.includes("automatisk inloggning misslyckades"));
+    ok("återställning påstår inte att användaren loggats in när sessionen inte kan sparas", await page.locator("#rsLoginHint").isVisible() && await page.locator("#rsSave").isDisabled() && page.url().includes("aterstall.html"));
     await close();
   }
 

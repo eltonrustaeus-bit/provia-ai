@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const P = await import(join(root, "api", "_per-pedagogy.js"));
+const C = await import(join(root, "api", "_per-core.js"));
 
 let failures = 0;
 const check = (n, c, d = "") => {
@@ -81,9 +82,25 @@ console.log("\n— HJÄLPNIVÅN 0 OCH 1 FÅR EN EGEN VARNING —");
    utförligt att uppgiften är löst på köpet. */
 const ledtråd = P.buildPedagogyBlock({ abilities: förmågor, helpLevel: 0 });
 check("hjälpnivå 0 varnar för att lösa uppgiften", /bad eleven om en ledtråd/i.test(ledtråd));
+check("övningsfråga får en konkret ledtråd före elevens nästa steg", /börja med en liten, relevant ledtråd/i.test(ledtråd));
+check("definitionsfråga får ett kort faktasvar, inte ett quiz", /svara kort och korrekt direkt/i.test(ledtråd) && /faktasvaret till ett quiz/i.test(ledtråd));
 check("hjälpnivå 1 varnar också", /bad eleven om en förklaring/i.test(P.buildPedagogyBlock({ helpLevel: 1 })));
 check("hjälpnivå 3 varnar inte", !/bad eleven om/i.test(P.buildPedagogyBlock({ helpLevel: 3 })));
 check("utan hjälpnivå varnar den inte heller", !/bad eleven om/i.test(P.buildPedagogyBlock({})));
+const stegvis = P.buildPedagogyBlock({ isMath: true, helpLevel: 2 });
+const full = P.buildPedagogyBlock({ isMath: true, helpLevel: 3 });
+check("nivå 2 tillåter den utlovade steg-för-steg-lösningen",
+  /På hjälpnivå 2 visar du lösningen steg för steg/i.test(stegvis)
+  && /genomföra uppgiften som eleven bett om/i.test(stegvis));
+check("nivå 2 får använda elevens exakta uppgift och givna värden",
+  /arbeta igenom elevens exakta uppgift/i.test(stegvis)
+  && !/Använd andra siffror än i uppgiften/i.test(stegvis));
+check("nivå 3 innehåller full förklaring och slutsvar utan en sista-steg-spärr",
+  /på nivå 3 ger du hela förklaringen och slutsvaret/i.test(full)
+  && !/Låt eleven göra nästa steg själv/i.test(full));
+check("nivå 0 fortsätter att skydda uppgiftens facit",
+  /stannar du före facit/i.test(ledtråd)
+  && /Använd andra siffror än i uppgiften/i.test(ledtråd));
 
 console.log("\n— TOMT UNDERLAG UTELÄMNAS, ALDRIG GISSAS —");
 /* Samma regel som TOO_FEW i _per-pulse.js och null-aktivitet i _per-brain.js:
@@ -111,12 +128,53 @@ console.log("\n— METODEN SÄGER NÅGOT KONKRET —");
    det ersätter. Kontrollerna nedan låser de råd som faktiskt styr beteende. */
 check("börja i elevens eget resonemang", /vad de redan kan|deras eget resonemang/i.test(ejMatte));
 check("ett steg i taget", /[Ee]tt steg i taget/.test(ejMatte));
-check("låt eleven ta sista steget", /sista steget/i.test(ejMatte));
+check("guided practice låter eleven ta nästa steg", /Låt eleven göra nästa steg själv/i.test(ejMatte));
 /* Det här är det råd som skiljer ett genomräknat exempel från att lösa
    elevens uppgift åt dem. */
 check("exempel ska använda ANDRA siffror", /[Aa]ndra siffror/.test(ejMatte));
 check("blocket är väsentligt större än de 154 tecken det ersätter",
   ejMatte.length > 800, `${ejMatte.length} tecken`);
+
+console.log("\n— LEVEL 0 SKILJER UPPGIFT FRÅN BEGREPPSFRÅGA —");
+const levelZeroPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Vad betyder fotosyntes?",
+  helpLevel: 0,
+});
+check("systemprompten leder med en uppgiftsledtråd när eleven övar",
+  /EN kort, specifik ledtråd/i.test(levelZeroPrompt) && /Ge inte facit/i.test(levelZeroPrompt));
+check("systemprompten tillåter ett kort direkt begreppssvar",
+  /svara kort och direkt på begreppet/i.test(levelZeroPrompt));
+check("systemprompten inte kräver en motfråga för varje faktasvar",
+  /Undvik motfrågor som ersätter ett enkelt faktasvar/i.test(levelZeroPrompt));
+
+console.log("\n— KURSKONTEXT VÄGLEDER MATTEPEDAGOGIKEN —");
+const vagMattefråga = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Matematik 1b" },
+});
+const vagHistoriefråga = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Historia 1b" },
+});
+check("vag fråga i matematikkurs får mattearbetsgång",
+  /ARBETSGÅNG VID PROBLEMLÖSNING/.test(vagMattefråga));
+check("vag fråga i historiekurs får inte mattearbetsgång",
+  !/ARBETSGÅNG VID PROBLEMLÖSNING/.test(vagHistoriefråga));
+
+const graphPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig tolka den?",
+  pageContext: {
+    course: "Matematik 1b",
+    currentQuestion: { type: "graph", graphMode: "line", text: "Beskriv sambandet i grafen." },
+  },
+});
+const textOnlyGraphPrompt = C.buildPERSystemPrompt({
+  userQuestion: "Kan du hjälpa mig?",
+  pageContext: { course: "Matematik 1b", currentQuestion: { text: "Beskriv sambandet." } },
+});
+check("linjegraf får stöd om lutning och skärning", /förändringen i y.*förändringen i x.*skärningen med y-axeln/i.test(graphPrompt));
+check("grafstödet säger åt P.E.R att inte hitta på osynliga data", /får inte själva bilden.*Hitta aldrig på koordinater/i.test(graphPrompt));
+check("vanlig textfråga får inte grafinstruktioner", !/Grafhandledning/.test(textOnlyGraphPrompt));
 
 console.log(failures ? `\n${failures} FEL\n` : "\nAllt grönt\n");
 process.exit(failures ? 1 : 0);

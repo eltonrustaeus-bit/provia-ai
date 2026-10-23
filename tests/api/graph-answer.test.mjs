@@ -163,18 +163,31 @@ const question = {
   id: "g-2", type: "graph", points: 2,
   question: "Rita grafen", model_answer: "två punkter",
   rubric: "1 p lutning, 1 p skärning",
-  scoring_rubric: { parts: [{ description: "Lutning", points: 1 }] },
+  scoring_rubric: { parts: [
+    { description: "Lutning", points: 1 },
+    { description: "Skärning med y-axeln", points: 1 },
+  ] },
   cognitive_level: "tillämpa", graph_spec: { slope: 2, intercept: 1 }
+};
+const scatterGateQuestion = {
+  ...question,
+  points: 3,
+  graph_spec: scatterSpec,
+  scoring_rubric: { parts: [
+    { description: "Första datapunkten", points: 1 },
+    { description: "Andra datapunkten", points: 1 },
+    { description: "Tredje datapunkten", points: 1 },
+  ] },
 };
 assert.deepEqual(assessment.gateExam({ questions: [question] }, { profile: "mathematics", secret }).questions.length, 1);
 assert.deepEqual(assessment.gateExam({ questions: [question] }, { profile: "generic", secret }).questions.length, 0);
 assert.deepEqual(assessment.gateExam({ questions: [{ ...question, graph_spec: { slope: 6, intercept: 1 } }] }, { profile: "mathematics", secret }).questions.length, 0);
 assert.equal(assessment.gateExam({ questions: [{ ...question, points: 3, graph_spec: q.graph_spec }] }, { profile: "natural_sciences", secret }).questions.length, 0,
   "natural-sciences gates do not accept mathematics-only line tasks");
-assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "natural_sciences", secret }).questions.length, 1);
-assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "social_sciences", secret }).questions.length, 1,
+assert.equal(assessment.gateExam({ questions: [scatterGateQuestion] }, { profile: "natural_sciences", secret }).questions.length, 1);
+assert.equal(assessment.gateExam({ questions: [scatterGateQuestion] }, { profile: "social_sciences", secret }).questions.length, 1,
   "social-science tasks accept only the deterministic table-based scatter contract");
-assert.equal(assessment.gateExam({ questions: [{ ...question, graph_spec: scatterSpec, points: 3 }] }, { profile: "mathematics", secret }).questions.length, 1,
+assert.equal(assessment.gateExam({ questions: [scatterGateQuestion] }, { profile: "mathematics", secret }).questions.length, 1,
   "mathematics accepts the same deterministic scatter contract when the source table is explicit");
 assert.equal(assessment.gateExam({ questions: [question] }, { profile: "social_sciences", secret }).questions.length, 0,
   "social-science tasks do not accept math line tasks");

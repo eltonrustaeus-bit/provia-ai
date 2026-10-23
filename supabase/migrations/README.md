@@ -92,6 +92,7 @@ handskrivna migrationer.
   dubbel refund/commit, periodbyte, avbruten provider, stale reaping och RPC-fel innan separat
   appliceringsgodkännande. Lokalt mocktest simulerar också att reserve-commit sker men HTTP-svaret
   tappas. Rollback är spärrad medan reservationer är aktiva; ingen SQL/Postgres-runtime har körts.
+- `20261020170419_fence_stale_exam_grading_claims.sql` and `20261020170431_fix_unverified_exam_abandonment_state.sql` were applied to staging `yhcinqejsocpmmetazpz` after explicit approval. The versions match the hosted migration ledger so a later CLI push will not replay them. They add per-attempt fencing for stale grading claims, align completion with `verified_at`, and require verified results before an issuance can be treated as completed. Old grading signatures deliberately fail closed until the matching API is deployed. Focused PGlite tests cover stale-owner fencing, persistence/recovery, grants, and unverified legacy rows; this is not a two-session PostgreSQL concurrency test. There is no executable rollback; see `docs/codex/rollback/20261020170419_fence_stale_exam_grading_claims.md` and `docs/codex/rollback/20261020170431_fix_unverified_exam_abandonment_state.md` for the recovery boundary.
 - Historiska migrationer skrivs inte om. En rättelse blir en ny fil.
 - Kör migrationer via Supabase MCP `apply_migration` eller CLI, **inte** via SQL Editor — annars
   hamnar de inte i ledgern och nästa genomgång får leta i schemat i stället.

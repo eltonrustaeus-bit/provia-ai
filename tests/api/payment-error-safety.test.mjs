@@ -21,11 +21,11 @@ const cancelRoute = roleApi.slice(cancelStart, cancelEnd);
 assert.doesNotMatch(cancelRoute, /details:\s*result\b/);
 assert.match(cancelRoute, /cancellation_failed[\s\S]*?Prenumerationen kunde inte avslutas/);
 
-const quotaStart = generator.indexOf("quota = await consumeMockExamQuota");
+const quotaStart = generator.indexOf("  let quota;\n  let focusInstruction = \"\";");
 const quotaEnd = generator.indexOf("if (!quota.ok)", quotaStart);
 const quotaRoute = generator.slice(quotaStart, quotaEnd);
-assert.match(quotaRoute, /catch\s*\{\s*await refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\);\s*return json\(res, 503/,
-  "an ambiguous reservation error is reconciled before returning a generic response");
+assert.match(quotaRoute, /catch\s*\{[\s\S]*?await examGenerationOperations\.failGeneration\([\s\S]*?return json\(res, 503/,
+  "an ambiguous reservation error is reconciled through its fenced generation operation before returning a generic response");
 assert.doesNotMatch(quotaRoute, /details:|String\(e\)|e\.details/);
 
 console.log("payment error safety: provider payloads are not exposed to clients");

@@ -5,9 +5,10 @@ upper-secondary side of ExGen, so a model decision rests on numbers instead of
 on how the output reads.
 
 Runs the **real** production pieces — `buildExamPrompts()` from
-`api/generate-exam.js`, `gateExam()` from `api/_assessment.js`, and
-`verifyQuestions()` from `api/_verifier.js` — against six fixed course
-materials, one per subject profile. It does not go through the HTTP endpoint,
+`api/generate-exam.js`, `gateExam()` from `api/_assessment.js`,
+`verifyQuestions()` from `api/_verifier.js`, and `solveQuestions()` from
+`api/_solver.js` — against six fixed course materials, one per subject profile.
+It does not go through the HTTP endpoint,
 so no account, quota or deploy is needed and any model combination can be
 compared in one sitting. Auth, quota and persistence are therefore out of scope
 here; the live smoke tests cover those.
@@ -62,7 +63,16 @@ social-studies item the judge can be the one who is wrong. **Every disagreement
 is written to `*__disagreements.json` — read them before drawing conclusions.**
 The judge is evidence, not an oracle.
 
-**Delivery rate.** `generate-exam.js` filters out every question the verifier
+**First-pass approval rate (not endpoint delivery).** The runner fails closed:
+if the verifier call fails, no candidate is counted as approved; if the enabled
+blind solver fails, multiple-choice items are withheld. Short-answer questions
+do not depend on the MC solver. This is intentionally a first-pass measurement:
+the runner does **not** simulate production's bounded regeneration, full HTTP
+deadline budget, quotas, or persistence. It therefore cannot predict the final
+number of questions the endpoint would deliver. `SOLVER=off` is a historical
+verifier-only experiment and is not comparable to the current production gate.
+
+In production, `generate-exam.js` filters out every question the verifier
 rejects. When more than 30% of a non-graph exam without multiple-choice items
 are rejected, and more than 44 seconds remain in the handler budget, it may
 make one bounded whole-exam regeneration attempt. That window reserves up to 15
@@ -78,6 +88,11 @@ silently become unusably short.
 
 **Gate drops and soft flags**, counted per issue code, so it is visible whether
 a rule is doing work or never firing.
+
+The summary separately reports reviewer language mismatches, malformed or
+implausible-option flags, solver plausibility rejections, and deterministic
+duplicate-question drops. These are observed signals from their respective
+review stages, not a claim that a model catches every such defect.
 
 **Latency p50/p95.** The API function has a 60-second ceiling and divides the
 remaining time between generation, independent review, and response delivery.

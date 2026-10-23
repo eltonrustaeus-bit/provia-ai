@@ -248,7 +248,7 @@ export async function assessAnswer({
             }),
           },
         ],
-        { model: assessorModel(), schema: errorClassifier.outputSchema(), timeout: 30000 }
+        { model: assessorModel(), schema: errorClassifier.outputSchema(), timeout: 30000, userId }
       );
       modelsUsed.push(out.model);
       await logUsage(supabase, {
@@ -337,7 +337,7 @@ export async function assessAnswer({
 
   let tStep = Date.now();
   const primaryOut = await callAIRaw(messages, {
-    model: assessorModel(), schema: perAssess.outputSchema(), timeout: 40000,
+    model: assessorModel(), schema: perAssess.outputSchema(), timeout: 40000, userId,
   });
   modelsUsed.push(primaryOut.model);
   await logUsage(supabase, {
@@ -361,7 +361,7 @@ export async function assessAnswer({
     tStep = Date.now();
     try {
       const verifyOut = await callAIRaw(messages, {
-        model: assessVerifierModel(), schema: perAssess.outputSchema(), timeout: 40000,
+        model: assessVerifierModel(), schema: perAssess.outputSchema(), timeout: 40000, userId,
       });
       modelsUsed.push(verifyOut.model);
       await logUsage(supabase, {

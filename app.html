@@ -4,6 +4,7 @@
   <script src="/js/exgen-runtime.js"></script>
   <script src="/js/site-gate.js"></script>
   <script src="/js/account-storage.js"></script>
+  <script src="/js/generation-request.js"></script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <script src="js/exgen-modules.js"></script>
@@ -701,7 +702,7 @@ white-space:nowrap;
 <div>
 <label class="fieldLabel" for="numQuestions" id="tNum">Antal frågor</label>
 <select id="numQuestions">
-<option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
+<option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
 <option>9</option><option>10</option><option>11</option><option>12</option>
 <option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
 </select>
@@ -855,7 +856,7 @@ sv:{
   noExam:"Ingen provdata ännu.",noGrade:"Ingen rättning ännu.",
   needMat:"Klistra in material först.",
   genWorking:"Skapar mockprov…",gradeWorking:"Rättar prov…",
-  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",gradeDone:"Rättning klar. Sparad till förbättring.",
+  genDone:"Prov klart! Besvara frågorna nedan och tryck Rätta prov.",genPartial:"Kvalitetskontrollen godkände {received} av {requested} begärda frågor. Ett kortare, kontrollerat prov är klart.",gradeDone:"Rättning klar. Sparad till förbättring.",
   wrongCode:"Fel kod.",ocrNoFile:"Välj en bild först.",
   ocrWorking:"OCR pågår…",ocrDone:"OCR klart. Texten lades in i materialet.",
   writeAnswer:"Skriv ditt svar här…",fullScore:"Modellsvar (full poäng)",
@@ -902,7 +903,7 @@ en:{
   noExam:"No exam data yet.",noGrade:"No grading yet.",
   needMat:"Paste material first.",
   genWorking:"Generating mock exam…",gradeWorking:"Grading…",
-  genDone:"Exam ready! Answer the questions below and press Grade exam.",gradeDone:"Grading done. Saved to Improve page.",
+  genDone:"Exam ready! Answer the questions below and press Grade exam.",genPartial:"Quality review approved {received} of {requested} requested questions. A shorter, checked exam is ready.",gradeDone:"Grading done. Saved to Improve page.",
   wrongCode:"Wrong code.",ocrNoFile:"Choose an image first.",
   ocrWorking:"Running OCR…",ocrDone:"OCR done. Text was added to the material.",
   writeAnswer:"Write your answer here…",fullScore:"Full-score model answer",
@@ -957,6 +958,22 @@ async function getUserId() {
   const { data, error } = await db.auth.getUser();
   if (error) return null;
   return data?.user?.id || null;
+}
+
+async function getGenerationAuthSnapshot() {
+  if (!db) return null;
+  try {
+    const { data, error } = await db.auth.getSession();
+    const session = data?.session;
+    const token = session?.access_token;
+    if (error || typeof token !== "string" || !token) return null;
+    const { data: userData, error: userError } = await db.auth.getUser(token);
+    const userId = userData?.user?.id;
+    if (userError || typeof userId !== "string" || !userId || (session.user?.id && session.user.id !== userId)) return null;
+    return { userId, token };
+  } catch {
+    return null;
+  }
 }
 
 async function readQuotaCount() {
@@ -1060,6 +1077,24 @@ async function postJson(path,payload,opts){
   }catch(err){
     return{ok:false,status:0,raw:"",data:null,timedOut,networkError:!timedOut,error:String(err&&err.message||err)};
   }finally{ if(timer)clearTimeout(timer); }
+}
+async function getJson(path,opts={}){
+  const timeoutMs=Number(opts.timeoutMs)||10000;
+  const ctrl=(typeof AbortController!=="undefined")?new AbortController():null;
+  let timer=null;
+  try{
+    return await Promise.race([
+      (async()=>{
+        const token=opts.token??await getAccessToken();
+        const headers=token?{"Authorization":`Bearer ${token}`} : {};
+        const response=await fetch(path,{method:"GET",headers,signal:ctrl?ctrl.signal:undefined});
+        const raw=await response.text();let data=null;try{data=JSON.parse(raw);}catch{}
+        return{ok:response.ok,status:response.status,raw,data,timedOut:false,networkError:false};
+      })(),
+      new Promise((_,reject)=>{timer=setTimeout(()=>{if(ctrl)ctrl.abort();const error=new Error("Request timed out");error.name="AbortError";reject(error);},timeoutMs);})
+    ]);
+  }catch(error){return{ok:false,status:0,raw:"",data:null,timedOut:error?.name==="AbortError",networkError:error?.name!=="AbortError"};}
+  finally{if(timer)clearTimeout(timer);}
 }
 
 function applyServerEntitlements(entitlements){
@@ -1498,6 +1533,10 @@ let currentExam=null;
 let currentExamProof=null;
 let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
+window.__getPerStudyMaterial=function(){
+  if(currentExam)return "";
+  return String(pastedTextEl()?.value||"").trim().slice(0,6000);
+};
 
 function setBusy(isBusy,label){
   const sw=spinWrap(),ms=miniStateEl();
@@ -1715,7 +1754,7 @@ function runTrainModeIfRequested(){
   if(pastedTextEl())pastedTextEl().value=mat;
   try{localStorage.setItem(LS_MATERIAL,mat);}catch{}
   if(qTypeEl())qTypeEl().value="mix";
-  if(numQuestionsEl())numQuestionsEl().value="12";
+  if(numQuestionsEl())numQuestionsEl().value="3";
 
   // Kursen tas från felbankens eget val när det finns; annars får flödet gissa
   // utifrån historiken.
@@ -1977,7 +2016,7 @@ function clearAll(){
   if(courseEl())courseEl().value="";
   if(levelEl())levelEl().value="C";
   if(qTypeEl())qTypeEl().value="mix";
-  if(numQuestionsEl())numQuestionsEl().value="12";
+  if(numQuestionsEl())numQuestionsEl().value="3";
   if(imageInputEl())imageInputEl().value="";
   setOcrStatus("");currentExam=null;currentExamProof=null;currentExamAnswers=null;
   const chk=document.getElementById("useCustomCourse"),cs=document.getElementById("courseSearch"),cc=document.getElementById("customCourse"),st=document.getElementById("coursePickerStatus");
@@ -2033,7 +2072,7 @@ try{
   }
   initReveal();
   hidePageLoader();
-  await refreshQuotaUi();
+  // The final startup quota refresh runs after ExGenEngine is registered below.
   setStatus("");
 
   // Handle return from Stripe Checkout
@@ -2125,7 +2164,77 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
-  async function runGenerate(){
+  async function runResumableGeneration(payload,onProgress,token){
+    const startedAt=Date.now();
+    const started=await postJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000,token});
+    if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
+    if(started.status!==202||!started.data?.operationId)return started;
+    const operationId=started.data.operationId;
+    let consecutiveNetworkFailures=0;
+    let consecutivePreflightMisses=0;
+    let consecutiveWorkingPolls=0;
+    let lastApproved=Number.isInteger(started.data.approved)?started.data.approved:0;
+    let lastState=started.data;
+    const updateProgress=(state)=>{
+      lastState=state;
+      const approved=Number.isInteger(state?.approved)?state.approved:0;
+      const requested=Number.isInteger(state?.requested)?state.requested:payload.numQuestions;
+      const label=LANG==="sv"?`Skapar och granskar prov: ${approved} av ${requested} frågor godkända.`:`Generating and reviewing exam: ${approved} of ${requested} questions approved.`;
+      setStatus(label,"warn");
+      if(typeof onProgress==="function"){
+        try{onProgress({approved,requested,stage:state?.stage||"generate"});}catch{}
+      }
+    };
+    updateProgress(started.data);
+    while(Date.now()-startedAt<14*60*1000){
+      const step=await postJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000,token});
+      if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
+      if(step.status===202&&step.data?.ok){
+        consecutiveNetworkFailures=0;
+        const approved=Number.isInteger(step.data.approved)?step.data.approved:lastApproved;
+        if(approved>lastApproved)consecutiveWorkingPolls=0;
+        lastApproved=Math.max(lastApproved,approved);
+        updateProgress(step.data);
+        if(step.data.state==="working"){
+          consecutivePreflightMisses=0;
+          consecutiveWorkingPolls++;
+          const delayMs=Math.min(15000,1200*2**Math.min(consecutiveWorkingPolls-1,4));
+          await new Promise(resolve=>setTimeout(resolve,delayMs));
+        }else if(step.data.error==="GENERATION_BUDGET_INSUFFICIENT"){
+          consecutiveWorkingPolls=0;
+          consecutivePreflightMisses++;
+          const delayMs=Math.min(15000,1200*2**Math.min(consecutivePreflightMisses-1,4));
+          await new Promise(resolve=>setTimeout(resolve,delayMs));
+        }else{
+          consecutiveWorkingPolls=0;
+          consecutivePreflightMisses=0;
+          await new Promise(resolve=>setTimeout(resolve,1200));
+        }
+        continue;
+      }
+      if(step.status===0||step.status>=500||step.timedOut||step.networkError){
+        consecutiveNetworkFailures++;
+        consecutiveWorkingPolls=0;
+        const current=await getJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000,token});
+        if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
+        if(current.data?.error==="incomplete_exam")return current;
+        if(current.status===200&&current.data?.ok){
+          updateProgress(current.data);
+          await new Promise(resolve=>setTimeout(resolve,1200));
+          if(consecutiveNetworkFailures<3)continue;
+          return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+            requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+        }
+        if(consecutiveNetworkFailures<3){await new Promise(resolve=>setTimeout(resolve,1200));continue;}
+        return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+          requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+      }
+      return step;
+    }
+    return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",operationId,
+      requested:payload.numQuestions,approved:lastState?.approved},timedOut:false,networkError:false};
+  }
+  async function runGenerate(onProgress){
     hideDebug();setStatus("");const t=T[LANG];
     const pastedText=(pastedTextEl()?.value||"").trim();
     if(!pastedText){setStatus(t.needMat,"bad");setWizardStep(0);document.querySelector("#material")?.scrollIntoView({behavior:"smooth"});return {ok:false,error:t.needMat};}
@@ -2133,19 +2242,113 @@ try{
 
     const qType=qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
-    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||12),focusTerms:selectedExamFocusTerms};
-    showSkeleton(Math.min(Number(numQuestionsEl()?.value||12),6));
+    const payload={lang:LANG,level:levelEl()?.value||"C",course:(courseEl()?.value||"").trim(),qType,pastedText,numQuestions:qType==="graph"?1:Number(numQuestionsEl()?.value||3),focusTerms:selectedExamFocusTerms};
+    const authSnapshot=await getGenerationAuthSnapshot();
+    if(!authSnapshot){
+      const message=LANG==="sv"?"Din inloggning kunde inte bekräftas. Logga in igen innan du skapar prov.":"Your sign-in could not be verified. Sign in again before creating an exam.";
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
+    let idempotencyKey;
+    try {
+      idempotencyKey=await window.ExGenGenerationRequest.getIdempotencyKey(authSnapshot.userId,payload);
+    } catch (error) {
+      const message=error?.message==="DUPLICATE_PENDING_REQUEST"
+        ?(LANG==="sv"?"Det finns flera väntande provbegäranden för samma material. Inget nytt jobb startades för att undvika dubbla prov eller kvotdrag. Behåll dina öppna ExGen-flikar och kontakta pilotansvarig för hjälp.":"Multiple pending exam requests exist for the same material. No new job was started to avoid duplicate exams or quota charges. Keep your open ExGen tabs and contact the pilot lead.")
+        :error?.message==="PENDING_REQUEST_LIMIT"
+        ?(LANG==="sv"?"Flera provbegäranden väntar på återupptagning. Använd samma material och inställningar för att fortsätta ett väntande jobb; inga väntande jobb har tagits bort.":"Several exam requests are still available to resume. Use the same material and settings to continue a pending job; no pending job was removed.")
+        :error?.message==="CROSS_TAB_REQUEST_LOCK_UNAVAILABLE"
+          ?(LANG==="sv"?"Den här webbläsaren saknar stöd för säker samordning av provstart mellan flikar. Uppdatera till en aktuell version av Chrome, Edge eller Safari och försök igen.":"This browser cannot safely coordinate exam starts across tabs. Update to a current version of Chrome, Edge, or Safari and try again.")
+          :(LANG==="sv"?"Provet kunde inte startas säkert i den här fliken. Ladda om sidan och försök igen.":"Exam creation could not start safely in this tab. Reload the page and try again.");
+      setStatus(message,"bad");return {ok:false,error:message};
+    }
+    payload.idempotencyKey=idempotencyKey;
+    showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
-    const res=await postJson("/api/generate-exam",payload,{timeoutMs:62000}); // matches 60s server maxDuration
+    const res=payload.qType==="graph"
+      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
+      :await runResumableGeneration(payload,onProgress,authSnapshot.token);
+    const clearGenerationPlaceholder=()=>{
+      const body=examBodyEl();
+      if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
+    };
+    const requestReference=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(res.data?.requestId||"")
+      ? (LANG==="sv"?`Referens: ${res.data.requestId}`:`Reference: ${res.data.requestId}`)
+      : "";
+    if(res.timedOut||res.networkError){
+      setBusy(false);clearGenerationPlaceholder();hideDebug();
+      const message=res.timedOut
+        ? (LANG==="sv"?"Provskapandet tog för lång tid. Ditt material finns kvar; försök igen.":"Exam creation timed out. Your material is still here; please try again.")
+        : (LANG==="sv"?"Anslutningen bröts innan provet kunde skapas. Ditt material finns kvar; kontrollera nätverket och försök igen.":"The connection failed before the exam was created. Your material is still here; check your connection and try again.");
+      setStatus(message,"bad");
+      return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
+    }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
-      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.count));
-      const msg = quotaLimitMessage(res.data.period || ROLE_LIMITS[currentRole]?.period);
-      setBusy(false);setStatus(msg,"bad");await refreshQuotaUi();
+      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.count));
+      const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
+      setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
       setBusy(false);
+      clearGenerationPlaceholder();
+      if(res.status===503&&res.data?.error==="AUTH_VERIFICATION_UNAVAILABLE"){
+        const message=LANG==="sv"
+          ?"Provtjänsten kunde inte nå inloggningen just nu. Ditt material finns kvar; försök igen om en liten stund."
+          :"The exam service could not reach sign-in just now. Your material is still here; please try again shortly.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"auth_verification_unavailable"};
+      }
+      if(res.status===503&&res.data?.error==="generation_request_state_unavailable"){
+        const message=LANG==="sv"
+          ?"Provstarten kunde inte säkras just nu. Ditt material finns kvar; vänta en liten stund och försök igen."
+          :"Exam creation could not be safely started. Your material is still here; wait briefly and try again.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_request_state_unavailable"};
+      }
+      if(res.status===503&&["EXAM_SIGNING_NOT_CONFIGURED","AI_GENERATION_NOT_CONFIGURED"].includes(res.data?.error)){
+        const message=LANG==="sv"
+          ?"Provskapandet är tillfälligt inte konfigurerat. Inget prov eller kvotdrag skapades; kontakta pilotansvarig."
+          :"Exam creation is temporarily not configured. No exam or quota charge was created; contact the pilot lead.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error};
+      }
+      if(res.status===401||res.data?.error==="Unauthorized"){
+        const message=LANG==="sv"
+          ?"Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter."
+          :"The exam service could not verify your sign-in. Your material is still here. Sign out and back in; contact the pilot lead if this continues.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:"unauthorized"};
+      }
+      if(res.status===409&&res.data?.error==="GENERATION_IN_PROGRESS"){
+        const message=LANG==="sv"
+          ?"Provet skapas fortfarande. Vänta en liten stund och försök sedan igen; samma begäran fortsätter utan ett nytt kvotdrag."
+          :"The exam is still being created. Wait a moment and retry; the same request continues without a new quota reservation.";
+        setStatus(message,"warn");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_in_progress"};
+      }
+      if(res.data?.error==="generation_in_progress"){
+        const approved=Number.isInteger(res.data.approved)?res.data.approved:0;
+        const requested=Number.isInteger(res.data.requested)?res.data.requested:payload.numQuestions;
+        const canResumeAfterClose=window.ExGenGenerationRequest?.supportsCrossTabResume?.()===true;
+        const message=LANG==="sv"
+          ?`Provet är inte färdigt ännu (${approved} av ${requested} frågor godkända). Du kan återuppta samma jobb utan ett nytt kvotdrag genom att använda exakt samma material och provinställningar och trycka Skapa prov igen.${canResumeAfterClose?"":" Ladda om i samma flik om det behövs; stäng inte fliken, eftersom webbläsaren inte stöder säker återupptagning efter stängning."}`
+          :`The exam is not ready yet (${approved} of ${requested} questions approved). You can resume the same job without another quota reservation by using the exact same material and exam settings, then pressing Generate exam again.${canResumeAfterClose?"":" Reload this same tab if needed; do not close it because this browser does not support safe recovery after closing."}`;
+        setStatus(message,"warn");hideDebug();
+        return {ok:false,error:message,errorCode:"generation_in_progress",operationId:res.data.operationId||null};
+      }
+      if(res.status===409&&["GENERATION_REQUEST_EXPIRED","GENERATION_REQUEST_PAYLOAD_CONFLICT"].includes(res.data?.error)){
+        let cleanupFailed=false;
+        try { await window.ExGenGenerationRequest.clear(idempotencyKey); } catch { cleanupFailed=true; }
+        const message=LANG==="sv"
+          ?"Den tidigare provbegäran kan inte återanvändas. Kontrollera materialet och starta ett nytt försök."
+          :"The earlier exam request cannot be reused. Check the material and start a new attempt.";
+        const cleanupMessage=cleanupFailed?(LANG==="sv"
+          ?" Återupptagningsnyckeln kunde inte rensas säkert. Försök igen senare eller kontakta pilotansvarig; upprepa inte provstarten ännu."
+          :" The resume key could not be safely cleared. Try again later or contact the pilot lead; do not restart generation yet."):"";
+        setStatus(message+cleanupMessage,"bad");hideDebug();
+        return {ok:false,error:message+cleanupMessage,errorCode:"generation_request_expired"};
+      }
       if(res.data?.error==="MATERIAL_TOO_LONG"){
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
@@ -2159,10 +2362,37 @@ try{
         setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
       }
-      if(res.data?.error==="quality_review_unavailable"){
-        setStatus(res.data.message||"Kvalitetskontrollen kunde inte slutföras. Försök igen.","bad");
+      if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
+        const message=res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.";
+        const hasSafeCounts=res.data?.error==="incomplete_exam"
+          && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
+          && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
+        const countNote=hasSafeCounts
+          ? (LANG==="sv"?` ${res.data.received} av ${res.data.requested} frågor klarade kontrollen.`:` ${res.data.received} of ${res.data.requested} questions passed review.`)
+          : "";
+        const fullMessage=message+countNote;
+        setStatus(fullMessage,"bad");
         hideDebug();
-        return {ok:false,error:res.data.message||res.data.error};
+        return {ok:false,error:fullMessage,errorCode:res.data.error};
+      }
+      if(res.data?.error==="mock_quota_unavailable"||res.data?.error==="exam_generation_failed"){
+        const message=res.data.error==="mock_quota_unavailable"
+          ? (LANG==="sv"?"Provkvoten kunde inte kontrolleras. Försök igen senare.":"The exam quota could not be checked. Please try again later.")
+          : (res.data?.message||(LANG==="sv"?"Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.":"A technical issue stopped exam creation. No exam was delivered. Please try again in a moment."));
+        const stages=LANG==="sv"?{
+          generation_setup:"förberedelse",model_generation:"frågegenerering",question_normalization:"bearbetning av frågor",
+          quality_review:"kvalitetskontroll",grade_task_sealing:"säkring av facit",exam_manifest:"slutkontroll av prov",
+          exam_issuance:"provstart",quota_finalization:"provkvot",generation_finalize:"säker registrering av provet",usage_flush:"slutförande",response_delivery:"leverans av prov"
+        }:{
+          generation_setup:"setup",model_generation:"question generation",question_normalization:"question processing",
+          quality_review:"quality review",grade_task_sealing:"answer-key security",exam_manifest:"exam validation",
+          exam_issuance:"exam start",quota_finalization:"exam quota",generation_finalize:"safe exam finalization",usage_flush:"finalization",response_delivery:"exam delivery"
+        };
+        const stageLabel=Object.hasOwn(stages,res.data?.stage)?stages[res.data.stage]:"";
+        const stageText=stageLabel?(LANG==="sv"?`Steg: ${stageLabel}`:`Stage: ${stageLabel}`):"";
+        const withReference=[message,stageText,requestReference].filter(Boolean).join(" ");
+        setStatus(withReference,"bad");hideDebug();
+        return {ok:false,error:withReference,requestId:res.data.requestId||null};
       }
       setStatus(`Error (HTTP ${res.status}).`,"bad");showDebug(res.raw);
       // 504 från generate-exam.js bär ett läsbart meddelande om att provet inte
@@ -2173,7 +2403,7 @@ try{
 
     // Servern är auktoritativ när persisted quota är aktiv; localStorage används bara för UI-visning/fallback.
     if(res.data.meta&&res.data.meta.quota&&res.data.meta.quota.enforced&&typeof res.data.meta.quota.count==="number"){
-      localStorage.setItem(quotaStorageKey(currentRole, await getUserId() || "guest"), String(res.data.meta.quota.count));
+      localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.meta.quota.count));
     }else{
       await bumpQuotaCount();
     }
@@ -2181,15 +2411,30 @@ try{
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
-    setBusy(false);setStatus(t.genDone,"ok");showToast(t.genDone,"ok");setWizardStep(2);
+    let resumeKeyCleared=true;
+    try { await window.ExGenGenerationRequest.clear(idempotencyKey); }
+    catch { resumeKeyCleared=false; }
+    const generationMeta=res.data.meta||{};
+    const questionCount=res.data.exam?.questions?.length||0;
+    const requestedCount=payload.numQuestions;
+    const partialExam=questionCount<requestedCount;
+    const completionMessage=partialExam
+      ?t.genPartial.replace("{received}",String(questionCount)).replace("{requested}",String(requestedCount))
+      :t.genDone;
+    const cleanupWarning=resumeKeyCleared?"":(LANG==="sv"
+      ?" Provet skapades, men återupptagningsnyckeln kunde inte rensas. Ett nytt försök med samma material och inställningar kan visa samma prov."
+      :" The exam was created, but its resume key could not be cleared. A new attempt with the same material and settings may show the same exam.");
+    const visibleCompletionMessage=completionMessage+cleanupWarning;
+    setBusy(false);setStatus(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");showToast(visibleCompletionMessage,resumeKeyCleared?"ok":"warn");setWizardStep(2);
+    if(partialExam){const guide=$("examGuide");if(guide)guide.textContent=completionMessage;}
 
     // Uppdatera floating bar hint med antal frågor
     const fh=$("floatingGradeHint");
     if(fh){
-      const qCount=res.data.exam?.questions?.length||0;
-      fh.innerHTML=LANG==="sv"
-        ?`Besvara alla <strong>${qCount} frågor</strong> och tryck rätta.`
-        :`Answer all <strong>${qCount} questions</strong> then grade.`;
+      const qCount=questionCount;
+      fh.textContent=partialExam
+        ?(LANG==="sv"?`Besvara de ${qCount} godkända frågorna och tryck Rätta.`:`Answer the ${qCount} approved questions and press Grade.`)
+        :(LANG==="sv"?`Besvara alla ${qCount} frågor och tryck Rätta.`:`Answer all ${qCount} questions then grade.`);
     }
     return {ok:true,exam:currentExam,meta:res.data.meta||null};
   }
@@ -2336,7 +2581,7 @@ try{
       /* Mastery skrivs av api/grade.js; resultatet visas först efter ägarkontroll. */
       const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
       const courseName=(courseEl()?.value||"").trim();
-      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||12),total_points:total,max_points:max,percent};
+      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||3),total_points:total,max_points:max,percent};
       const userId=gradingOwnerId;
       const localId=newLocalExamId();
       const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
@@ -2475,7 +2720,7 @@ try{
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
-      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(3, Number(num) || 12)));
+      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(2, Number(num) || 3)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
       selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den
@@ -2483,7 +2728,7 @@ try{
       const search = document.getElementById("courseSearch");
       if (search) search.value = String(course || "").trim();
     },
-    generate() { return runGenerate(); },
+    generate(options) { return runGenerate(options?.onProgress); },
     grade(answers) { return runGrade(answers); },
     async abandonExam() {
       if (!currentExam?.exam_manifest || !Array.isArray(currentExam.questions)) {
@@ -2527,20 +2772,41 @@ try{
       } catch { return null; }
       finally { clearTimeout(timer); }
     },
-    async examState(examManifest) {
+    async examState(examManifest, examContext) {
       const submissionId = submissionIdFromProof(examManifest);
       const token = await getAccessToken();
-      if (!submissionId || !token) return null;
+      if (!token) return null;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 10000);
       try {
-        const query = new URLSearchParams({ submission_id: submissionId });
-        const response = await fetch(`/api/abandon-exam?${query}`, {
-          headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
-        });
+        let response;
+        if (submissionId) {
+          const query = new URLSearchParams({ submission_id: submissionId });
+          response = await fetch(`/api/abandon-exam?${query}`, {
+            headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+          });
+        } else if (typeof examManifest === "string" && examContext && Array.isArray(examContext.questions)) {
+          response = await fetch("/api/abandon-exam", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              resolve_status: true,
+              course: examContext.course,
+              pastedText: examContext.pastedText,
+              questions: examContext.questions,
+              exam_manifest: examManifest,
+            }),
+            signal: ctrl.signal,
+          });
+        } else {
+          return null;
+        }
         const data = await response.json();
-        return response.ok && data?.ok && ["active", "grading", "completed", "abandoned", "expired", "missing"].includes(data.exam_state)
-          ? data.exam_state : null;
+        if (!response.ok || !data?.ok || !["active", "grading", "completed", "abandoned", "expired", "missing"].includes(data.exam_state)) return null;
+        return {
+          state: data.exam_state,
+          submissionId: submissionId || (typeof data.submission_id === "string" ? data.submission_id : ""),
+        };
       } catch { return null; }
       finally { clearTimeout(timer); }
     },

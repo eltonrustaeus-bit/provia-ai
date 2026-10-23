@@ -23,6 +23,8 @@ let savedResultPresent = true;
 let learnerLoopEnabled = false;
 let issuanceState = "active";
 let activeExamCount = 0;
+let leaseOutcomeOverride = null;
+let mockResultVerified = true;
 let savedCanonicalResult = null;
 let savedFingerprint = null;
 let replayFails = false;
@@ -42,6 +44,12 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url === `${origin}/rest/v1/rpc/exam_issuance_state`) return Response.json(issuanceState);
   if (url === `${origin}/rest/v1/rpc/active_exam_count`) return Response.json(activeExamCount);
+  if (url === `${origin}/rest/v1/rpc/acquire_per_answer_lease`) {
+    if (leaseOutcomeOverride) return Response.json(leaseOutcomeOverride);
+    return Response.json(activeExamCount > 0 ? "exam_active" : "acquired");
+  }
+  if (url === `${origin}/rest/v1/rpc/release_per_answer_lease`) return Response.json("released");
+  if (url.startsWith(`${origin}/rest/v1/exam_latest_issuances?`)) return Response.json([]);
   if (url === `${origin}/rest/v1/rpc/claim_exam_grading`) {
     const fingerprint = JSON.parse(init.body).p_answer_fingerprint;
     if (issuanceState === "completed") return Response.json(fingerprint === savedFingerprint ? "completed" : "conflict");
@@ -74,7 +82,9 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/feature_flags")) return Response.json(learnerLoopEnabled
     ? [{ key: "per_learner_loop_enabled", enabled: true, allowed_user_ids: [] }]
     : []);
-  if (url.includes("/rest/v1/mock_results")) return Response.json(savedResultPresent ? { num_questions: 1 } : null);
+  if (url.includes("/rest/v1/mock_results")) return Response.json(savedResultPresent
+    ? { num_questions: 1, verified_at: mockResultVerified ? "2026-10-16T12:00:00.000Z" : null }
+    : null);
   if (url.includes("/rest/v1/concepts")) {
     return init.method === "POST"
       ? Response.json([{ id: "22222222-2222-4222-8222-222222222222" }], { status: 201 })
@@ -150,6 +160,32 @@ try {
   savedResultPresent = true;
   calls.length = 0;
 
+  mockResultVerified = false;
+  const unverifiedResult = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  assert.equal(unverifiedResult.status, 403, "graph practice requires a server-verified saved grade");
+  assert.equal(unverifiedResult.body.result, undefined);
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/release_per_answer_lease")),
+    "a rejected verification check releases the answer lease");
+  mockResultVerified = true;
+
+  calls.length = 0;
+
+  leaseOutcomeOverride = "exam_active";
+  const racedPractice = await invoke({
+    lang: "sv", course, pastedText: material, mode: "graph_practice_retry", examProof,
+    questions: [publicQuestion],
+    answers: [{ id: question.id, answer: JSON.stringify({ type: "line", points: [{ x: -1, y: -1 }, { x: 1, y: 1 }] }) }],
+  });
+  leaseOutcomeOverride = null;
+  assert.equal(racedPractice.status, 409, "an exam starting after the preliminary check blocks answer release");
+  assert.equal(racedPractice.body.error, "EXAM_ACTIVE");
+  assert.equal(racedPractice.body.result, undefined);
+  calls.length = 0;
+
   const response = await invoke({
     lang: "sv",
     course,
@@ -167,6 +203,10 @@ try {
   assert.equal(response.body.result.correct, true);
   assert.equal(response.body.result.points, 2);
   assert.equal(response.body.result.model_answer, "Grafen till y = x går till exempel genom punkterna (-5, -5) och (5, 5).");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/acquire_per_answer_lease")),
+    "graph practice acquires the issuance-coordination lease");
+  assert.ok(calls.some((call) => call.url.endsWith("/rest/v1/rpc/release_per_answer_lease")),
+    "graph practice releases the lease after creating its response");
   assert.ok(calls.some((call) => call.url === `${origin}/rest/v1/rpc/consume_anon_rate`), "the actual handler checks the server quota");
   assert.ok(!calls.some((call) => call.url.includes("/rest/v1/mock_results") && call.method === "POST"), "a practice retry does not save an official result");
   assert.ok(!calls.some((call) => call.url.includes("apply_mock_mastery_once")), "a practice retry does not update mastery");
@@ -319,7 +359,9 @@ try {
   const saved = calls.find((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result"));
   assert.ok(saved, "the official graph submission writes its result through the persistence path");
   const savedPayload = JSON.parse(saved.body);
-  const { p_learning_payload: learningPayload, ...resultPayload } = savedPayload;
+  const { p_learning_payload: learningPayload, p_claim_id: claimId, ...resultPayload } = savedPayload;
+  assert.match(claimId, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    "the result write is fenced by the UUID claim owned by this grading request");
   assert.deepEqual({ ...resultPayload, p_submission_id: undefined }, {
     p_user_id: userId,
     p_submission_id: undefined,
@@ -354,12 +396,41 @@ try {
   assert.equal(recovered.status, 200, "a lost response can be recovered from the saved canonical result");
   assert.equal(recovered.body.recovered, true);
   assert.deepEqual(recovered.body.result, official.body.result);
+
+  mockResultVerified = false;
+  const unverifiedRecovery = await invoke(officialRequest);
+  assert.equal(unverifiedRecovery.status, 403, "recovery refuses a result without server verification");
+  assert.equal(unverifiedRecovery.body.error, "EXAM_RESULT_NOT_VERIFIED");
+  assert.equal(unverifiedRecovery.body.result, undefined, "unverified recovery never reveals answer data");
+  mockResultVerified = true;
+
+  savedResultPresent = false;
+  const missingVerifiedRow = await invoke(officialRequest);
+  assert.equal(missingVerifiedRow.status, 403, "recovery refuses a completed claim without its exact verified result row");
+  assert.equal(missingVerifiedRow.body.error, "EXAM_RESULT_NOT_VERIFIED");
+  assert.equal(missingVerifiedRow.body.result, undefined, "a missing result row never reveals cached answer data");
+  savedResultPresent = true;
+
+  const recoveryPayloadSnapshot = savedCanonicalResult;
+  savedCanonicalResult = null;
+  const expiredRecovery = await invoke(officialRequest);
+  assert.equal(expiredRecovery.status, 410, "an expired recovery payload is rejected");
+  assert.equal(expiredRecovery.body.error, "EXAM_RESULT_EXPIRED");
+  assert.equal(expiredRecovery.body.result, undefined, "an expired payload never reveals answer data");
+  savedCanonicalResult = recoveryPayloadSnapshot;
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/consume_anon_rate")), false,
     "recovery does not charge another grading request");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/persist_graded_exam_result")), false,
     "recovery cannot rewrite the official score");
   assert.equal(calls.some((call) => call.url.endsWith("/rest/v1/rpc/try_replay_mock_learning_job")), true,
     "recovery retries pending learning effects without another grade or quota charge");
+
+  leaseOutcomeOverride = "exam_active";
+  const racedRecovery = await invoke(officialRequest);
+  leaseOutcomeOverride = null;
+  assert.equal(racedRecovery.status, 409, "a new exam racing a lost-response recovery blocks answer-bearing result recovery");
+  assert.equal(racedRecovery.body.error, "EXAM_ACTIVE");
+  assert.equal(racedRecovery.body.result, undefined);
 
   calls.length = 0;
   const changedAnswers = await invoke({ ...officialRequest, answers: [{ id: question.id,

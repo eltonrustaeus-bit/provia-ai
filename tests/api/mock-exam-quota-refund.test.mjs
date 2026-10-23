@@ -30,6 +30,7 @@ try {
   );
   assert.equal(reservation.ok, true);
   assert.equal(reservation.period, "2026-10", "the request's captured period remains authoritative");
+  assert.equal(reservation.periodUnit, "month", "the quota period unit is separate from its storage key");
   assert.equal(seen.url, "https://synthetic.supabase.co/rest/v1/rpc/reserve_mock_exam_quota");
   assert.equal(seen.init.headers.apikey, "sb_secret_test_only");
   assert.equal(seen.init.headers.Authorization, undefined, "a Supabase secret API key is sent only as apikey");
@@ -93,6 +94,9 @@ try {
 let lostReservationResponse = false;
 let reconciledRefund;
 let lostReservationRequest;
+let claimedAttemptId;
+const generationKey = "11111111-1111-4111-8111-111111111111";
+const attemptId = "22222222-2222-4222-8222-222222222222";
 const savedFetchForHandler = global.fetch;
 process.env.SUPABASE_URL = "https://synthetic.supabase.co";
 process.env.SUPABASE_SECRET_KEY = "sb_secret_test_only";
@@ -101,26 +105,36 @@ process.env.EXAM_SIGNING_SECRET = "synthetic-exam-signing-secret";
 global.fetch = async (url, init = {}) => {
   const target = String(url);
   if (target.endsWith("/auth/v1/user")) {
-    return new Response(JSON.stringify({ id: "synthetic-student" }), { status: 200 });
+    return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333" }), { status: 200 });
   }
   if (target.includes("/rest/v1/profiles?select=role")) {
     return new Response(JSON.stringify([{ role: "gratis" }]), { status: 200 });
+  }
+  if (target.endsWith("/rest/v1/rpc/claim_mock_exam_generation")) {
+    const claim = JSON.parse(init.body);
+    assert.equal(claim.p_idempotency_key, generationKey);
+    assert.equal(claim.p_attempt_id.length > 0, true);
+    claimedAttemptId = claim.p_attempt_id;
+    return Response.json({ status: "claimed" });
   }
   if (target.endsWith("/rest/v1/rpc/reserve_mock_exam_quota")) {
     lostReservationResponse = true;
     lostReservationRequest = JSON.parse(init.body);
     throw new Error("synthetic timeout after database commit");
   }
-  if (target.endsWith("/rest/v1/rpc/refund_mock_exam_quota")) {
+  if (target.endsWith("/rest/v1/rpc/fail_mock_exam_generation")) {
     assert.equal(lostReservationResponse, true);
     reconciledRefund = JSON.parse(init.body);
-    return new Response(JSON.stringify({ refunded: true, duplicate: false }), { status: 200 });
+    assert.equal(reconciledRefund.p_attempt_id.length > 0, true);
+    assert.equal(reconciledRefund.p_idempotency_key, generationKey);
+    return Response.json({ status: "retryable" });
   }
   throw new Error(`Unexpected synthetic request: ${target}`);
 };
 
 const request = Readable.from([Buffer.from(JSON.stringify({
   course: "Biologi",
+  idempotencyKey: generationKey,
   pastedText: "Fotosyntesen omvandlar ljusenergi, vatten och koldioxid till druvsocker och syre."
 }))]);
 request.method = "POST";
@@ -143,25 +157,26 @@ else process.env.OPENAI_API_KEY = savedOpenAIKey;
 if (savedSigningSecret === undefined) delete process.env.EXAM_SIGNING_SECRET;
 else process.env.EXAM_SIGNING_SECRET = savedSigningSecret;
 assert.equal(response.status, 503, "a reservation response lost after commit is handled as a retriable quota check");
-assert.equal(reconciledRefund?.p_user_id, "synthetic-student");
-assert.equal(reconciledRefund?.p_request_id, lostReservationRequest?.p_request_id);
-assert.equal(reconciledRefund?.p_period_key, lostReservationRequest?.p_period_key,
-  "the compensation uses the exact period key sent with the reservation");
+assert.equal(reconciledRefund?.p_user_id, "33333333-3333-4333-8333-333333333333");
+assert.equal(reconciledRefund?.p_attempt_id, claimedAttemptId);
+assert.equal(reconciledRefund?.p_request_hash.length, 64);
 
-const quotaStart = source.indexOf("const quotaRequestId = crypto.randomUUID()");
-const quotaSuccess = source.indexOf("if (!quota.ok)", quotaStart);
-const failStart = source.indexOf("async function fail(status, payload)", quotaSuccess);
-const cleanupRefund = source.indexOf("refundMockExamQuota(user.id, quotaPeriod, quotaRequestId)", failStart);
+const claimStart = source.indexOf("claimGeneration({");
+const quotaStart = source.indexOf("consumeMockExamQuota(user.id", claimStart);
+const failStart = source.indexOf("async function fail(status, payload)", quotaStart);
+const failRpc = source.indexOf("examGenerationOperations.failGeneration", failStart);
 const failureResponse = source.indexOf("return json(res, status, payload)", failStart);
-const generateStart = source.indexOf("const model = pickModel", quotaSuccess);
-assert.ok(quotaStart >= 0 && quotaSuccess > quotaStart && generateStart > quotaSuccess);
-assert.ok(failStart > quotaSuccess && cleanupRefund > failStart && failureResponse > cleanupRefund,
-  "undelivered exam cleanup and quota refund finish before the HTTP error response");
-assert.match(source.slice(failStart, failureResponse), /removeUndeliveredExam\(user\.id, issuedSubmissionId\)/);
-assert.match(source, /catch \{\s*await refundMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\)/,
-  "an ambiguous reserve timeout is reconciled by request ID");
+const generateStart = source.indexOf("const model = pickModel", quotaStart);
+assert.ok(claimStart >= 0 && quotaStart > claimStart && generateStart > quotaStart);
+assert.ok(failStart > quotaStart && failRpc > failStart && failureResponse > failRpc,
+  "generation attempt is fenced and its reservation refunded before the HTTP error response");
+assert.match(source, /catch \{[\s\S]*?if \(!internalBatch\) await examGenerationOperations\.failGeneration/,
+  "an ambiguous public reservation is reconciled through the same idempotency operation while trusted batches bypass quota state");
 assert.match(source, /reserve_mock_exam_quota/);
-assert.match(source, /commitMockExamQuota\(user\.id, quotaPeriod, quotaRequestId\)/);
+assert.match(source, /completeGeneration\(\{/);
+const quotaDeniedResponse = source.slice(source.indexOf("if (!quota.ok)"), source.indexOf("const usageEvents"));
+assert.match(quotaDeniedResponse, /period: quota\.period,[\s\S]*periodUnit: quota\.periodUnit/,
+  "quota-denial response exposes both the period storage key and its display unit");
 
 assert.match(migration, /request_id uuid primary key/i);
 assert.match(migration, /create or replace function public\.reserve_mock_exam_quota/i);

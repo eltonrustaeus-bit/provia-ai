@@ -14,18 +14,18 @@ const practiceProof = `v2.${"b".repeat(32)}.syntheticPracticeProof`;
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mockApis(page, { profiles: { id: "u1", approved: true, role: "premium" }, extra: [
+    ["**/api/generate-exam?pipeline=start", async (route) => {
+      const body = route.request().postDataJSON();
+      trainingGenerateBody = body;
+      await route.fulfill({ json: { ok: true, exam: { title: "Träningsprov", level: "C", exam_manifest: "synthetic-training-manifest", questions: [{
+        id: "practice-1", type: "mc", points: 1,
+        question: "Vad beskriver lutningen i en rät linje?",
+        options: ["Y:s förändring när x ökar med 1", "Var linjen börjar på x-axeln", "Antalet punkter på linjen"],
+        topic: "Linjär funktion", grade_task: "opaque-practice-task"
+      }] }, meta: { quota: { enforced: false } } } });
+    }],
     ["**/api/generate-exam", async (route) => {
       const body = route.request().postDataJSON();
-      if (body.qType === "mix") {
-        trainingGenerateBody = body;
-        await route.fulfill({ json: { ok: true, exam: { title: "Träningsprov", level: "C", exam_manifest: "synthetic-training-manifest", questions: [{
-          id: "practice-1", type: "mc", points: 1,
-          question: "Vad beskriver lutningen i en rät linje?",
-          options: ["Y:s förändring när x ökar med 1", "Var linjen börjar på x-axeln", "Antalet punkter på linjen"],
-          topic: "Linjär funktion", grade_task: "opaque-practice-task"
-        }] }, meta: { quota: { enforced: false } } } });
-        return;
-      }
       if (rejectFirstGraphGeneration) {
         rejectFirstGraphGeneration = false;
         await route.fulfill({ status: 500, json: {
@@ -175,8 +175,8 @@ try {
   await page.getByRole("button", { name: "Interaktiv graf" }).click();
   const countChips = page.locator("#xf .xf-screen[data-screen='aim'] .xf-chips").nth(2);
   await page.getByRole("button", { name: "Blandat" }).click();
-  assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "12",
-    "switching out of graph mode restores a valid general exam size");
+  assert.equal(await page.locator("#xf .xf-screen[data-screen='aim'] .xf-row dd").nth(2).textContent(), "3",
+    "switching out of graph mode restores the fast default exam size");
   assert.equal(await countChips.getByRole("button", { name: "1", exact: true }).isDisabled(), true,
     "one-question count is unavailable for non-graph exams");
   await countChips.getByRole("button", { name: "6", exact: true }).click();

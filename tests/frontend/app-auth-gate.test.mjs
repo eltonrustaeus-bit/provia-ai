@@ -143,6 +143,23 @@ try {
   assert.equal(await approved.page.locator("#appSkipLink").getAttribute("href"), "#xf");
   await approved.close();
 
+  const accountToApp = await openPage(browser, `${server.url}/konto.html`, {
+    state: { signedIn: true, role: "gratis" },
+    mocks: { allow: true, role: "gratis", approved: true },
+  });
+  assert.equal(await accountToApp.page.locator("#kontoContent").isVisible(), true,
+    "the signed-in account page is available before navigating to the exam app");
+  assert.ok(await accountToApp.page.evaluate(key => localStorage.getItem(key), AUTH_KEY),
+    "the same-origin auth session exists before navigation");
+  await accountToApp.page.getByRole("link", { name: "Mockprov" }).first().click();
+  await accountToApp.page.waitForURL(/\/app\.html$/);
+  await accountToApp.page.waitForFunction(() => !document.body.classList.contains("app-locked"));
+  assert.equal(await accountToApp.page.locator("#xf").isVisible(), true,
+    "account-to-app navigation preserves the verified session");
+  assert.ok(await accountToApp.page.evaluate(key => localStorage.getItem(key), AUTH_KEY),
+    "the auth session remains present after same-origin navigation");
+  await accountToApp.close();
+
   let pendingApproved = false;
   const pending = await openPage(browser, `${server.url}/app.html`, {
     state: { signedIn: true, role: "gratis" },
@@ -180,7 +197,7 @@ try {
     const second = await context.newPage();
     for (const tab of [first, second]) {
       await mockApis(tab, { allow: true, role: "gratis", extra: [
-        ["**/api/generate-exam", route => route.fulfill({ json: { ok: true, exam: {
+        ["**/api/generate-exam?pipeline=start", route => route.fulfill({ json: { ok: true, exam: {
           title: "Syntetiskt prov", level: "C", exam_manifest: `v2.${"f".repeat(32)}.authGateTestProof`,
           questions: [{ id: "q1", type: "mc", points: 1, question: "Var sker cellandning?",
             options: ["Mitokondrien", "Kärnan"], correct_index: 0, topic: "Cellandning",

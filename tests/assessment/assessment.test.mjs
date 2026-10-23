@@ -42,6 +42,15 @@ check("drops mc with duplicate options", (() => {
   return g.questions.length === 0 && g.dropped[0].issues.includes("duplicate_options");
 })());
 
+check("generic: drops options equivalent after case, Unicode compatibility and final punctuation normalization", (() => {
+  const g = A.gateExam({ questions: [{
+    id: "4-equivalent", type: "mc", question: "Vilken stad?",
+    options: ["Stockholm", "ｓｔｏｃｋｈｏｌｍ.", "Göteborg"],
+    correct_index: 0, points: 1, cognitive_level: "minnas",
+  }] }, { profile: "generic" });
+  return g.questions.length === 0 && g.dropped[0].issues.includes("duplicate_options");
+})());
+
 check("drops open question with no model answer or rubric", (() => {
   const g = A.gateExam({ questions: [{ id: "5", type: "short", question: "Diskutera.", options: [], correct_index: -1, points: 4, cognitive_level: "förstå" }] }, { profile: "generic" });
   return g.questions.length === 0 && g.dropped[0].issues.includes("open_question_ungradeable");

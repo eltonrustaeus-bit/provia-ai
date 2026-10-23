@@ -496,6 +496,7 @@
     material: "",
     focusTerms: null,
     exam: null,
+    draftPhase: "active",
     answers: questionState(),   // qid -> svar
     helped: questionState(),    // qid -> true om P.E.R öppnades på just den frågan
     draftOwnerId: "",
@@ -576,7 +577,7 @@
       courses: courses,
       level: lvl,
       qType: qType,
-      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 12, 3, 20) : 12,
+      num: last && qType !== "graph" ? clamp(Number(last.numQuestions) || 3, 2, 20) : 3,
       missCountFor: function (course) {
         var c = String(course || "").trim().toLowerCase();
         return miss.filter(function (m) {
@@ -741,7 +742,11 @@
         var legacyNote = el("p", "xf-sub", tx("Det här provet skapades med en äldre version och kan inte rättas säkert. Ditt material finns kvar; skapa ett nytt prov för att fortsätta.", "This exam was created with an older version and cannot be graded safely. Your material is still here; create a new exam to continue."));
         act.appendChild(legacyNote);
       }
-      var back = el("button", "xf-btn ghost", legacyDraft ? tx("Skapa nytt prov av materialet", "Create a new exam from this material") : tx("Fortsätt provet du började", "Continue your exam"));
+      var back = el("button", "xf-btn ghost", legacyDraft
+        ? tx("Skapa nytt prov av materialet", "Create a new exam from this material")
+        : draft.phase === "result-recovery"
+          ? tx("Återställ resultatet", "Restore the result")
+          : tx("Fortsätt provet du började", "Continue your exam"));
       back.type = "button";
       var resumeStatus = el("p", "xf-sub");
       resumeStatus.hidden = true;
@@ -752,7 +757,15 @@
           back.disabled = true;
           resumeStatus.hidden = false;
           resumeStatus.textContent = tx("Kontrollerar att provet fortfarande är aktivt…", "Checking that the exam is still active…");
-          var issuanceState = await window.ExGenEngine.examState(draft.exam.exam_manifest);
+          var issuance = await window.ExGenEngine.examState(draft.exam.exam_manifest, {
+            course: draft.course || "",
+            pastedText: draft.material || "",
+            questions: draft.exam.questions,
+          });
+          var issuanceState = issuance && issuance.state;
+          if (issuance && /^[a-f0-9]{32}$/.test(issuance.submissionId || "")) {
+            draft.exam.submission_id = issuance.submissionId;
+          }
           if (issuanceState !== "active") {
             back.disabled = false;
             if (issuanceState === null) {
@@ -763,13 +776,48 @@
               resumeStatus.textContent = tx("Provet håller på att rättas. Vänta tills rättningen är klar innan du fortsätter.", "The exam is being graded. Wait until grading is complete before continuing.");
               return;
             }
+            if (issuanceState === "completed") {
+              back.disabled = true;
+              S.draftOwnerId = String(draft.uid || uid());
+              S.course = draft.course || "";
+              S.level = draft.level || "C";
+              S.qType = draft.qType || "mix";
+              S.num = draft.num || draft.exam.questions.length;
+              S.nonGraphNum = clamp(Number(draft.nonGraphNum) || S.num, 2, 20);
+              S.material = draft.material || "";
+              S.startedAt = Number(draft.startedAt) || Date.now();
+              S.exam = draft.exam;
+              S.answers = questionState(draft.answers);
+              S.helped = questionState(draft.helped);
+              S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
+              S.draftPhase = "result-recovery";
+              window.ExGenEngine.setInputs({ course: S.course, level: S.level, qType: S.qType, num: S.num, material: S.material });
+              window.ExGenEngine.adoptExam(S.exam);
+              saveDraft();
+              resumeStatus.textContent = tx("Provet är inlämnat. Hämtar det verifierade resultatet…", "The exam was submitted. Recovering the verified result…");
+              var answers = S.exam.questions.map(function (q, n) {
+                var id = qid(q, n);
+                return { id: id, answer: isAnswerComplete(q, S.answers[id]) ? String(S.answers[id] || "").trim() : "" };
+              });
+              try {
+                var recovered = await window.ExGenEngine.grade(answers);
+                if (!recovered || !recovered.ok || !recovered.result || uid() !== S.draftOwnerId) {
+                  resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
+                  back.disabled = false;
+                  return;
+                }
+                stopMachine().then(function () { stepResult(recovered.result, recovered.persistence, recovered.examProof, answers); });
+              } catch (_) {
+                resumeStatus.textContent = tx("Resultatet kunde inte verifieras just nu. Dina svar finns kvar; försök igen när anslutningen fungerar.", "The result could not be verified right now. Your answers are saved; try again when your connection is working.");
+                back.disabled = false;
+              }
+              return;
+            }
             clearDraft();
             S.material = draft.material || "";
             releasePerHistoryIfNoActiveExams();
             back.textContent = tx("Skapa nytt prov av materialet", "Create a new exam from this material");
-            resumeStatus.textContent = issuanceState === "completed"
-              ? tx("Provet är redan inlämnat. Materialet finns kvar om du vill skapa ett nytt.", "This exam has already been submitted. Your material is still here if you want to create a new one.")
-              : tx("Det tidigare provet har avslutats eller gått ut. Materialet finns kvar; skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your material is still here; create a new exam to continue.");
+            resumeStatus.textContent = tx("Det tidigare provet har avslutats eller gått ut. Dina sparade svar tas bort, men materialet finns kvar. Skapa ett nytt prov för att fortsätta.", "The previous exam has ended or expired. Your saved answers are removed, but the material remains. Create a new exam to continue.");
             back.dataset.expired = "true";
             return;
           }
@@ -779,10 +827,11 @@
         S.level = draft.level || "C";
         S.qType = draft.qType || "mix";
         S.num = draft.num || 12;
-        S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 3, 20);
+        S.nonGraphNum = clamp(Number(draft.nonGraphNum) || (S.qType === "graph" ? 12 : S.num), 2, 20);
         S.material = draft.material || "";
         if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
+        S.draftPhase = draft.phase === "result-recovery" ? "result-recovery" : "active";
         S.answers = questionState(draft.answers);
         S.helped = questionState(draft.helped);
         S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
@@ -954,6 +1003,9 @@
   // ── Steg 1: ämne ─────────────────────────────────────────────────────────
 
   function stepSubject() {
+    // This is a neutral study/setup screen, not the prior result or question.
+    if (window.clearPerContext) window.clearPerContext();
+    else if (window.PER && window.PER.describe) window.PER.describe(null);
     UI.languageRerender = stepSubject;
     var d = dna();
     var b = mount("subject");
@@ -1156,19 +1208,19 @@
       rType.querySelector("dd").textContent = typeText[v];
       graphHint.hidden = v !== "graph";
       if (v === "graph") {
-        if (!wasGraph && S.num >= 3) S.nonGraphNum = S.num;
+        if (!wasGraph && S.num >= 2) S.nonGraphNum = S.num;
         S.num = 1;
       } else if (wasGraph) {
-        S.num = clamp(Number(S.nonGraphNum) || d.num, 3, 20);
+        S.num = clamp(Number(S.nonGraphNum) || d.num, 2, 20);
         S.nonGraphNum = S.num;
       }
       rNum.querySelector("dd").textContent = v === "graph" ? tx("1 grafuppgift", "1 graph task") : String(S.num);
       setGraphCountMode(v === "graph", String(S.num));
     }, function (v) { return typeText[v]; }));
 
-    var countPicker = pickerRow(tx("Antal", "Count"), ["1", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
+    var countPicker = pickerRow(tx("Antal", "Count"), ["1", "2", "3", "6", "10", "12", "16", "20"], String(S.num), function (v) {
       var count = Number(v);
-      if ((S.qType === "graph" && count !== 1) || (S.qType !== "graph" && count < 3)) return;
+      if ((S.qType === "graph" && count !== 1) || (S.qType !== "graph" && count < 2)) return;
       S.num = count;
       if (S.qType !== "graph") S.nonGraphNum = count;
       rNum.querySelector("dd").textContent = S.qType === "graph" ? tx("1 grafuppgift", "1 graph task") : v;
@@ -1190,7 +1242,7 @@
     var act = el("div", "xf-act");
     var go = el("button", "xf-btn primary", tx("Stämmer — vidare", "Looks good — continue"));
     go.type = "button";
-    go.addEventListener("click", stepMaterial);
+    go.addEventListener("click", function () { stepMaterial(); });
     act.appendChild(go);
 
     var adj = el("button", "xf-btn quiet", tx("Ändra", "Adjust"));
@@ -1236,14 +1288,16 @@
 
   var STOP = ("och att det en som för med den de var på är av till om inte har " +
     "ett kan man vid han hon jag vi ni du sig men så där när eller alla också " +
-    "detta denna dessa vilket vilken samt under efter före mellan genom mycket " +
-    "andra vara blir blev hade skulle kunna finns bland utan över").split(" ");
+    "detta denna dessa vilket vilken samt under efter före mellan genom mycket alltså " +
+    "andra vara blir blev hade skulle kunna finns bland utan över anteckningar " +
+    "övningsmaterial presentation sammanfattning testunderlag worksheet studyguide summary").split(" ");
 
   /* Lokal ordheuristik för elevens val före provet. Ingen AI eller nätverksbegäran:
      återkommande och särpräglade ord väljs ur texten och eleven kan prioritera
      dem. Det är förslag, inte semantisk begreppsigenkänning. */
   function terms(text) {
-    var words = String(text).toLowerCase().match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || [];
+    var words = String(text).toLowerCase().replace(/\bstudy\s+guide\b/g, " ")
+      .match(/[a-zåäö][a-zåäö-]{3,}[a-zåäö]/g) || [];
     var freq = {};
     words.forEach(function (w) {
       if (w.length > 48 || STOP.indexOf(w) !== -1) return;
@@ -1485,10 +1539,12 @@
     err.setAttribute("aria-atomic", "true");
     b.appendChild(err);
 
+    var generationProgress = createGenerationProgress();
+    b.appendChild(generationProgress);
     var act = el("div", "xf-act");
     var go = el("button", "xf-btn primary", tx("Skapa provet", "Create exam"));
     go.type = "button";
-    go.addEventListener("click", function () { build(go, err); });
+    go.addEventListener("click", function () { build(go, err, generationProgress); });
     act.appendChild(go);
     var perButton = el("button", "xf-btn ghost xf-contract-per", tx("Fråga P.E.R", "Ask P.E.R"));
     perButton.type = "button";
@@ -1500,7 +1556,7 @@
       bubble.click();
       perButton.setAttribute("aria-expanded", panel.classList.contains("per-open") ? "true" : "false");
     });
-    act.appendChild(backBtn(stepMaterial));
+    act.appendChild(backBtn(function () { stepMaterial(); }));
     act.appendChild(perButton);
     b.appendChild(act);
 
@@ -1518,21 +1574,38 @@
 
   // ── Generering ───────────────────────────────────────────────────────────
 
-  function build(btn, err) {
+  function createGenerationProgress() {
+    var progress = el("p", "xf-note xf-generation-progress");
+    progress.setAttribute("role", "status");
+    progress.setAttribute("aria-live", "polite");
+    progress.setAttribute("aria-atomic", "true");
+    progress.hidden = true;
+    return progress;
+  }
+
+  function build(btn, err, generationProgress) {
     // Varje generering drar ur elevens kvot. Ett dubbelklick, eller "Gör om"
     // tryckt två gånger, får inte kosta två prov.
     if (S.generating) return;
     S.generating = true;
     var requestOwnerId = uid();
+    if (!generationProgress) {
+      generationProgress = err.parentNode.querySelector(".xf-generation-progress") || createGenerationProgress();
+      if (!generationProgress.parentNode) err.after(generationProgress);
+    }
 
     btn.disabled = true;
     btn.textContent = tx("Bygger…", "Building…");
     busy(true);
     err.textContent = "";
-    say(tx("Bygger ditt prov.", "Building your exam."), tx("Tar oftast under en minut.", "This usually takes less than a minute."));
+    generationProgress.hidden = false;
+    generationProgress.textContent = tx("Skapar och granskar frågor…", "Creating and checking questions…");
+    say(tx("Bygger ditt prov.", "Building your exam."), tx("Frågorna skapas och granskas i omgångar. Större prov kan ta några minuter.", "Questions are created and checked in batches. Larger exams can take a few minutes."));
 
     function done() {
       S.generating = false;
+      generationProgress.hidden = true;
+      generationProgress.textContent = "";
       busy(false);
       btn.disabled = false;
       btn.textContent = tx("Skapa provet", "Create exam");
@@ -1543,23 +1616,42 @@
       num: S.num, material: S.material, focusTerms: S.focusTerms || []
     });
 
-    window.ExGenEngine.generate().then(function (r) {
+    window.ExGenEngine.generate({ onProgress: function (progress) {
+      if (!S.generating || uid() !== requestOwnerId) return;
+      var requested = Number.isInteger(progress.requested) ? progress.requested : S.num;
+      var approved = Math.max(0, Math.min(requested, Number.isInteger(progress.approved) ? progress.approved : 0));
+      generationProgress.textContent = approved + tx(" av ", " of ") + requested +
+        tx(" frågor godkända. ", " questions approved. ") +
+        (progress.stage === "assemble"
+          ? tx("Färdigställer provet.", "Preparing your exam.")
+          : tx("Jag skapar och granskar resten.", "Creating and checking the remaining questions."));
+    } }).then(function (r) {
       done();
       if (uid() !== requestOwnerId) {
         err.textContent = tx("Kontot ändrades medan provet skapades. Logga in igen för att fortsätta.", "The account changed while the exam was being created. Sign in again to continue.");
         return;
       }
+      if (r && r.quota) {
+        var quotaMessage = r.error || tx("Provkvoten är slut just nu.", "Your exam quota has been reached.");
+        err.textContent = "";
+        say(tx("Provkvoten är slut.", "Exam quota reached."), quotaMessage);
+        return;
+      }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
-        say(tx("Det gick inte den här gången.", "That did not work this time."), tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions."));
+        var retryHint = r && r.errorCode === "incomplete_exam"
+          ? tx("Lägg till mer relevant material eller avgränsa området tydligare.", "Add more relevant study material or narrow the topic.")
+          : tx("Försök igen, gärna med färre frågor.", "Try again, perhaps with fewer questions.");
+        say(tx("Det gick inte den här gången.", "That did not work this time."), retryHint);
         return;
       }
       S.draftOwnerId = requestOwnerId;
       S.exam = normalizeIds(r.exam);
+      S.draftPhase = "active";
       var got = S.exam.questions.length;
       S.questionCountNote = got < S.num
-        ? tx("Du bad om " + S.num + " frågor. Det blev " + got + " " + (got === 1 ? "fråga" : "frågor") + " den här gången.",
-            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question is" : "questions are") + " ready this time.")
+        ? tx("Du bad om " + S.num + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
+            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question passed quality review and is included" : "questions passed quality review and are included") + " in this exam.")
         : "";
       S.answers = questionState();
       S.helped = questionState();
@@ -1840,7 +1932,7 @@
         answered: answered,
         remaining: qs.length - answered,
         elapsed: (UI.time && UI.time.dataset.elapsed) || "",
-        submissionId: (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
+        submissionId: S.exam.submission_id || (String(S.exam.exam_manifest || "").match(/^v2\.([a-f0-9]{32})\./) || [])[1] || "",
         /* Visningsfas för P.E.R. Servern litar inte på den som rättningsbevis. */
         phase: "exam"
       }
@@ -2399,8 +2491,10 @@
         backToExam((r && r.error) || "Rättningen gick inte igenom. Dina svar är kvar — prova att lämna in igen.");
         return;
       }
-      // Rättningen är i hamn: utkastet får försvinna först nu.
-      clearDraft();
+      // Behåll det signerade provet och svaren tills resultatskärmen har
+      // visats. Om fliken laddas om kan servern spela upp verifierat resultat.
+      S.draftPhase = "result-recovery";
+      saveDraft();
       stopMachine().then(function () { stepResult(r.result, r.persistence, r.examProof, answers); });
     }).catch(function (e) {
       /* Utan den här grenen blir ett oväntat avslag från motorn en mörk skärm
@@ -2765,6 +2859,7 @@
     fresh.type = "button";
     fresh.addEventListener("click", function () {
       S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";
+      S.draftPhase = "active";
       S.submitting = false;
       // Eleven har uttryckligen övergett provet. Låg utkastet kvar erbjöds det
       // tillbaka vid nästa sidladdning som "Fortsätt provet du började".
@@ -2789,6 +2884,7 @@
     var draft = {
       ts: Date.now(),
       uid: ownerId,
+      phase: S.draftPhase === "result-recovery" ? "result-recovery" : "active",
       startedAt: S.startedAt,
       course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
       material: S.material, exam: S.exam,
@@ -3124,7 +3220,7 @@
       var d = dna();
       S.level = d.level;
       S.qType = "mix";
-      S.num = clamp(d.num, 3, 20);
+      S.num = clamp(d.num, 2, 20);
       S.nonGraphNum = S.num;
       if (Array.from(mat).length > MATERIAL_MAX) {
         stepMaterial(tx("Träningsmaterialet är längre än gränsen. Korta ner texten innan du fortsätter.", "The practice material exceeds the limit. Shorten it before continuing."));

@@ -21,7 +21,7 @@ async function boot({ cachedCount, reply, viewport = { width: 390, height: 844 }
   let requests = 0;
   await mockApis(page, {
     role: "gratis",
-    extra: [["**/api/generate-exam", async (route) => {
+    extra: [["**/api/generate-exam?pipeline=start", async (route) => {
       requests++;
       await route.fulfill({ status: reply.status, json: reply.body });
     }]],
@@ -58,7 +58,7 @@ try {
       body: { ok: true, exam: EXAM, meta: { quota: { feature: "mockExam", period: "week", count: 1, limit: 3, unlimited: false, enforced: true } } },
     } });
     await submitFromWizard(page);
-    await page.waitForSelector(".xf-exam.on", { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector("#examBody .qBox"), null, { timeout: 8000 });
     assert.equal(requests(), 1, "stale local full-quota cache must still reach the server");
     await page.close();
   }
@@ -66,10 +66,13 @@ try {
   {
     const { page, requests } = await boot({ cachedCount: 0, reply: {
       status: 429,
-      body: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "week" },
+      body: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     } });
     await submitFromWizard(page);
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent.includes("testversionen"));
+    const quotaStatus = page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub");
+    await quotaStatus.waitFor({ state: "visible" });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-sub")?.textContent.includes("på måndag"));
+    assert.match(await quotaStatus.textContent(), /veckans prov/);
     assert.equal(requests(), 1, "server denial is returned after the authoritative request");
     await page.close();
   }

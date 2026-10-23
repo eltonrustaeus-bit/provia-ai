@@ -39,7 +39,9 @@ function proof(questions = examFor()) {
 test("the exam manifest binds the complete delivered set to its account and material", () => {
   const questions = examFor();
   const manifest = completion.issueExamManifest(userId, course, material, questions);
-  assert.match(manifest, /^v1\.2\.[A-Za-z0-9_-]{43}$/);
+  const id = completion.submissionId(userId, course, questions);
+  assert.match(manifest, new RegExp(`^v2\\.${id}\\.[A-Za-z0-9_-]{43}$`));
+  assert.equal(manifest.split(".")[1], id, "the client-readable ID is the exact signed issuance identity");
   assert.equal(completion.verifyExamManifest(manifest, userId, course, material, questions), true);
   assert.equal(completion.verifyExamManifest(manifest, userId, course, material, [...questions].reverse()), true);
   assert.equal(completion.verifyExamManifest(manifest, userId, course, material, [questions[0]]), false);
@@ -48,6 +50,20 @@ test("the exam manifest binds the complete delivered set to its account and mate
   assert.equal(completion.verifyExamManifest(manifest, userId, "Biologi 1", material, questions), false);
   assert.equal(completion.verifyExamManifest(manifest, userId, course, "annat material", questions), false);
   assert.equal(completion.verifyExamManifest("v1.2.forged", userId, course, material, questions), false);
+  assert.equal(completion.verifyExamManifest(`v2.${"0".repeat(32)}.${manifest.split(".")[2]}`, userId, course, material, questions), false,
+    "changing the exposed issuance ID invalidates the signature");
+});
+
+test("legacy v1 exam manifests remain valid for already issued exams", () => {
+  const questions = examFor();
+  const id = completion.submissionId(userId, course, questions);
+  const context = gradeTasks.hashContext(material, course, userId);
+  const signature = crypto.createHmac("sha256", process.env.EXAM_SIGNING_SECRET)
+    .update(`exgen-exam-manifest:v1:${context}:${questions.length}:${id}`)
+    .digest("base64url");
+  const legacyManifest = `v1.${questions.length}.${signature}`;
+  assert.equal(completion.verifyExamManifest(legacyManifest, userId, course, material, questions), true);
+  assert.equal(completion.verifyExamManifest(legacyManifest, "student-b", course, material, questions), false);
 });
 
 test("a graded full set authorizes only its signed question for its owner", () => {

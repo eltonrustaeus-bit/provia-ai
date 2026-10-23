@@ -4,6 +4,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, r
 import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildSync } from "esbuild";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PAGES = ["app.html", "konto.html", "integritetspolicy.html", "aterstall.html"];
@@ -578,32 +579,28 @@ function outputFingerprint(root) {
 function copyFunction(sourceRoot, functionsRoot, route, plan) {
   const functionRoot = path.join(functionsRoot, `api/${route}.func`);
   mkdirSync(functionRoot, { recursive: true });
-  for (const relative of plan.sourceFiles) {
-    const destination = path.join(functionRoot, "server", relative);
-    mkdirSync(path.dirname(destination), { recursive: true });
-    cpSync(path.join(sourceRoot, relative), destination, { errorOnExist: true, force: false, dereference: true });
-  }
   for (const relative of plan.dataFiles) {
     const source = path.join(sourceRoot, relative);
-    for (const prefix of ["", "server/"]) {
-      const destination = path.join(functionRoot, prefix, relative);
-      if (existsSync(destination)) continue;
-      mkdirSync(path.dirname(destination), { recursive: true });
-      cpSync(source, destination, { errorOnExist: true, force: false, dereference: true });
-    }
+    const destination = path.join(functionRoot, relative);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    cpSync(source, destination, { errorOnExist: true, force: false, dereference: true });
   }
 
-  for (const name of plan.packages) {
-    const from = packagePath(sourceRoot, name);
-    const to = path.join(functionRoot, "node_modules", ...name.split("/"));
-    mkdirSync(path.dirname(to), { recursive: true });
-    cpSync(from, to, { recursive: true, dereference: true });
-  }
+  buildSync({
+    entryPoints: [path.join(sourceRoot, "api", `${route}.js`)],
+    outfile: path.join(functionRoot, "index.cjs"),
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    target: "node24",
+    legalComments: "none",
+    logLevel: "silent",
+  });
 
   writeFileSync(path.join(functionRoot, "package.json"), "{\"private\":true}\n", { flag: "wx", mode: 0o644 });
   writeFileSync(path.join(functionRoot, ".vc-config.json"), JSON.stringify({
     runtime: "nodejs24.x",
-    handler: `server/api/${route}.js`,
+    handler: "index.cjs",
     launcherType: "Nodejs",
     maxDuration: 60,
     shouldAddHelpers: true,

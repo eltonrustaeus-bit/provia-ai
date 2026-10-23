@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import keys from "../../api/_supabase-server-key.cjs";
 
-const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed } = keys;
+const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient, assertSupabaseTargetAllowed } = keys;
 
 test("prefers the rotatable server secret and falls back during cutover", () => {
   assert.equal(getSupabaseServerKey({ SUPABASE_SECRET_KEY: "sb_secret_new", SUPABASE_SERVICE_ROLE_KEY: "legacy" }), "sb_secret_new");
@@ -18,7 +18,7 @@ test("non-production and pilot runtimes fail closed against the production Supab
   };
   assert.throws(
     () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "preview" }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.throws(
     () => getSupabaseServerKey({ ...productionSecrets, NODE_ENV: "development" }),
@@ -34,19 +34,19 @@ test("non-production and pilot runtimes fail closed against the production Supab
   );
   assert.throws(
     () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "production" }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.throws(
     () => getSupabaseServerKey({ ...productionSecrets, VERCEL: "1", VERCEL_ENV: "production", NODE_ENV: "production" }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.throws(
     () => getSupabaseServerKey({ ...productionSecrets, VERCEL_ENV: "preview", SUPABASE_URL: `${productionUrl}.` }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.throws(
     () => getSupabaseAdminHeaders({ ...productionSecrets, VERCEL_TARGET_ENV: "staging" }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.throws(
     () => createSupabaseServerClient(productionUrl, {}, { ...productionSecrets, EXGEN_PILOT_MODE: "true" }),
@@ -67,10 +67,11 @@ test("non-production and pilot runtimes fail closed against the production Supab
       VERCEL_TARGET_ENV: "preview",
       NODE_ENV: "production",
     }),
-    /Refusing to connect a non-production ExGen runtime/,
+    /requires EXGEN_PILOT_SUPABASE_URL/,
   );
   assert.equal(getSupabaseServerKey({
-    SUPABASE_URL: "https://yhcinqejsocpmmetazpz.supabase.co",
+    SUPABASE_URL: productionUrl,
+    EXGEN_PILOT_SUPABASE_URL: "https://yhcinqejsocpmmetazpz.supabase.co",
     SUPABASE_SECRET_KEY: "sb_secret_synthetic",
     VERCEL_ENV: "preview",
   }), "sb_secret_synthetic");
@@ -163,6 +164,37 @@ test("pilot and Vercel Preview runtimes require the exact staging Supabase proje
       SUPABASE_URL: stagingUrl,
     }), /Invalid EXGEN_PILOT_MODE/);
   }
+});
+
+test("pilot Preview resolves its branch-scoped URL and never falls back to shared Production URL", () => {
+  const productionUrl = "https://mnmotdluigzeehdjbhbu.supabase.co";
+  const stagingUrl = "https://yhcinqejsocpmmetazpz.supabase.co";
+  const previewEnv = {
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    VERCEL_TARGET_ENV: "preview",
+    EXGEN_PILOT_MODE: "true",
+    SUPABASE_URL: productionUrl,
+    EXGEN_PILOT_SUPABASE_URL: stagingUrl,
+    SUPABASE_SECRET_KEY: "sb_secret_staging_synthetic",
+  };
+  assert.equal(getSupabaseUrl(previewEnv), stagingUrl);
+  assert.equal(getSupabaseServerKey(previewEnv), "sb_secret_staging_synthetic");
+  assert.equal(getSupabaseAdminHeaders(previewEnv).apikey, "sb_secret_staging_synthetic");
+  assert.throws(
+    () => getSupabaseUrl({ ...previewEnv, EXGEN_PILOT_SUPABASE_URL: undefined }),
+    /requires EXGEN_PILOT_SUPABASE_URL/,
+  );
+
+  const productionEnv = {
+    ...previewEnv,
+    EXGEN_PILOT_MODE: "false",
+    VERCEL_ENV: "production",
+    VERCEL_TARGET_ENV: "production",
+    NODE_ENV: "production",
+  };
+  assert.equal(getSupabaseUrl(productionEnv), productionUrl,
+    "verified Production continues to use its existing Supabase URL");
 });
 
 test("uses opaque secret keys only as apikey credentials for raw REST calls", () => {

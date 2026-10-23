@@ -6,11 +6,13 @@
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
+import aiBudget from "../../api/_ai-usage.cjs";
+const { budgetedOpenAIFetch, settleAiSpend } = aiBudget;
 
 /**
  * Hämtar en embedding-vektor från OpenAI för en textsträng.
  * @param {string} text
- * @param {{ apiKey?: string, model?: string, fetchImpl?: typeof fetch }} [opts]
+ * @param {{ apiKey?: string, model?: string, userId?: string, fetchImpl?: typeof fetch }} [opts]
  * @returns {Promise<number[]>}
  */
 export async function getEmbedding(text, opts = {}) {
@@ -22,14 +24,14 @@ export async function getEmbedding(text, opts = {}) {
   if (!text || !text.trim()) throw new Error("text är obligatorisk för embedding");
 
   const startedAt = Date.now();
-  const res = await doFetch("https://api.openai.com/v1/embeddings", {
+  const res = await budgetedOpenAIFetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, input: text }),
-  });
+  }, { userId: opts.userId, fetchImpl: doFetch });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
@@ -37,6 +39,7 @@ export async function getEmbedding(text, opts = {}) {
   }
 
   const data = await res.json();
+  if (data?.usage) await settleAiSpend(res.aiSpendReservation, data.usage, { fetchImpl: doFetch });
   if (typeof opts.onUsage === "function" && data?.usage) {
     try {
       await opts.onUsage({ model: data.model || model, usage: data.usage, latencyMs: Date.now() - startedAt });
@@ -61,7 +64,7 @@ export async function getEmbedding(text, opts = {}) {
  *
  * @param {import("@supabase/supabase-js").SupabaseClient} supabase
  * @param {string} queryText
- * @param {{ matchCount?: number, tsvWeight?: number, vecWeight?: number, includePending?: boolean, apiKey?: string, fetchImpl?: typeof fetch, embedding?: number[] }} [opts]
+ * @param {{ matchCount?: number, tsvWeight?: number, vecWeight?: number, includePending?: boolean, apiKey?: string, userId?: string, fetchImpl?: typeof fetch, embedding?: number[] }} [opts]
  */
 export async function retrieveChunks(supabase, queryText, opts = {}) {
   if (!supabase) throw new Error("supabase-klient är obligatorisk");
@@ -69,6 +72,7 @@ export async function retrieveChunks(supabase, queryText, opts = {}) {
 
   const embedding = opts.embedding ?? (await getEmbedding(queryText, {
     apiKey: opts.apiKey,
+    userId: opts.userId,
     fetchImpl: opts.fetchImpl,
     onUsage: opts.onEmbeddingUsage,
   }));

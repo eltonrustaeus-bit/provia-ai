@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PRODUCTION_REF = "mnmotdluigzeehdjbhbu";
+const PILOT_REF = "yhcinqejsocpmmetazpz";
 const PRODUCTION_HOST = "exgen.se";
 
 export function renderPilotRuntimeConfig({ supabaseUrl, publishableKey, appOrigin }) {
@@ -16,6 +17,9 @@ export function renderPilotRuntimeConfig({ supabaseUrl, publishableKey, appOrigi
   const projectRef = match[1];
   if (projectRef === PRODUCTION_REF) {
     throw new Error("Pilot runtime config cannot target the production Supabase project.");
+  }
+  if (projectRef !== PILOT_REF) {
+    throw new Error("Pilot runtime config must target the approved ExGen staging project.");
   }
 
   const key = String(publishableKey || "").trim();

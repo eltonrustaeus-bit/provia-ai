@@ -12,6 +12,7 @@
 
 const crypto = require("crypto");
 const graphAnswers = require("./_graph.js");
+const MAX_MC_OPTIONS = 5;
 
 // ── Answer-key signing (integrity, not confidentiality) ─────────────────────
 // Keep question-integrity keys independent from database credentials.
@@ -201,7 +202,72 @@ function detectSubjectProfile(course, pastedText) {
 
 // ── General (subject-agnostic) quality checks ───────────────────────────────
 // Returns an array of issue codes; empty array = passes the general gate.
-function generalQualityIssues(q) {
+function optionFormatIssues(q, options) {
+  if (q?.type !== "mc" || options?.reviewSingleWordOptionOutliers !== true
+      || options?.profile === "languages") return [];
+
+  const optionsList = Array.isArray(q.options) ? q.options : [];
+  if (optionsList.length < 3) return [];
+
+  const words = (value) => String(value || "").match(/[\p{L}\p{M}\p{N}]+/gu) || [];
+  const lexicalSingleOptions = optionsList
+    .map((value, index) => ({
+      index,
+      value: String(value || "").normalize("NFKC").trim()
+        .replace(/^[^\p{L}\p{M}\p{N}]+|[^\p{L}\p{M}\p{N}]+$/gu, ""),
+    }))
+    .filter((item) => /^[\p{L}][\p{L}\p{M}'’\-]{4,}$/u.test(item.value));
+  const phraseOptions = optionsList.filter((value) => words(value).length >= 2);
+  const sourceTokens = new Set(
+    (String(options.sourceMaterial || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{M}]+/gu) || [])
+  );
+  const swedishInflectionForms = (value) => {
+    const suffixes = ["erna", "arna", "orna", "ande", "ende", "heten", "heter", "en", "et", "ar", "er", "or", "na", "n", "t", "s", "a"];
+    const forms = new Set([value]);
+    for (const suffix of suffixes) {
+      if (value.endsWith(suffix) && value.length - suffix.length >= 5) forms.add(value.slice(0, -suffix.length));
+    }
+    return forms;
+  };
+  const isSourceSupported = (value) => {
+    const option = value.toLocaleLowerCase("sv-SE");
+    const optionForms = swedishInflectionForms(option);
+    return [...sourceTokens].some((token) => {
+      const sourceForms = swedishInflectionForms(token);
+      return [...optionForms].some((form) => sourceForms.has(form));
+    });
+  };
+
+  if (lexicalSingleOptions.length === optionsList.length && optionsList.length >= 3) {
+    const supportedCount = lexicalSingleOptions.filter((item) => isSourceSupported(item.value)).length;
+    if (sourceTokens.size > 0) {
+      if (supportedCount === 0) return ["all_single_word_options_unmatched_source_review"];
+      if (supportedCount < lexicalSingleOptions.length) return ["mixed_source_support_single_word_options_review"];
+    }
+  }
+
+  if (lexicalSingleOptions.length !== 1 || phraseOptions.length !== optionsList.length - 1) return [];
+
+  if (options?.requireSourceSupportedOptionOutliers === true &&
+      lexicalSingleOptions[0].index !== q.correct_index) {
+    if (!isSourceSupported(lexicalSingleOptions[0].value)) return ["unsupported_single_word_option_outlier"];
+  }
+
+  // A single-word outlier is a review signal, not proof of an invalid option.
+  return ["single_word_option_outlier_review"];
+}
+
+function normalizeGenericOption(value) {
+  return String(value == null ? "" : value)
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/u, "")
+    .trim()
+    .toLocaleLowerCase("sv-SE");
+}
+
+function generalQualityIssues(q, options) {
   const issues = [];
   if (!q || typeof q !== "object") return ["not_an_object"];
   if (!String(q.question || "").trim()) issues.push("empty_prompt");
@@ -215,7 +281,18 @@ function generalQualityIssues(q) {
     const opts = Array.isArray(q.options) ? q.options : [];
     if (opts.length < 2) issues.push("too_few_options");
     if (opts.some(o => !String(o == null ? "" : o).trim())) issues.push("empty_option");
-    const norm = opts.map(o => String(o).trim().toLowerCase());
+    if (opts.some((option) => {
+      const text = String(option == null ? "" : option);
+      return [...text].some((char) => {
+        const code = char.codePointAt(0);
+        return code === 0xfffd
+          || (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d)
+          || (code >= 0x7f && code <= 0x9f);
+      });
+    })) issues.push("corrupted_option_text");
+    const norm = options?.profile === "mathematics"
+      ? opts.map(o => String(o).trim().toLowerCase())
+      : opts.map(normalizeGenericOption);
     if (new Set(norm).size !== norm.length) issues.push("duplicate_options");
     const ci = q.correct_index;
     if (!Number.isInteger(ci) || ci < 0 || ci >= opts.length) issues.push("answer_key_out_of_range");
@@ -268,6 +345,7 @@ function generalQualityIssues(q) {
       }
     }
   }
+  issues.push(...optionFormatIssues(q, options));
   return issues;
 }
 
@@ -386,6 +464,13 @@ const PROFILES = {
         if (vals.length >= 2 && new Set(vals).size !== vals.length) {
           issues.push("math_options_numerically_equal");
         }
+        // This catches malformed distractors such as "Kesäkten" in an
+        // otherwise numeric list. It checks format consistency, not spelling.
+        const wordOptions = q.options.filter(option => /^[\p{L}\p{M}]+(?:[-'][\p{L}\p{M}]+)*$/u.test(String(option || "").trim()));
+        if (vals.length >= 2 && wordOptions.length === 1 && q.options.length - vals.length === 1
+            && String(wordOptions[0]).trim().length >= 5) {
+          issues.push("math_option_type_mismatch");
+        }
       }
       return issues;
     },
@@ -484,11 +569,252 @@ function getProfile(key) { return PROFILES[key] || PROFILES.generic; }
 const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
-  "open_question_ungradeable", "leaked_instructions", "math_options_numerically_equal",
+  "source_reference_missing", "requested_type_mismatch",
+  "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
+  "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
   "science_options_quantitatively_equal", "language_options_equivalent",
   "graph_spec_invalid",
 ]);
+const DUPLICATE_QUESTION_FILLER = new Set([
+  "vad", "vilken", "vilket", "vilka", "är", "får", "man", "som", "för", "att", "av", "i", "på", "med", "till",
+  "hur", "ska", "kan", "du", "the", "what", "which", "is", "are", "a", "an", "of", "to", "for", "how",
+  "find", "solve", "calculate", "determine", "explain", "show",
+]);
+const SEMANTIC_DUPLICATE_FILLER = new Set([
+  ...DUPLICATE_QUESTION_FILLER,
+  "den", "det", "de", "en", "ett", "dessa", "dess", "och", "samt", "and",
+  "beskriv", "förklara", "definiera", "menas", "avses", "innebär", "varför", "viktig", "betydelse",
+  "betyder", "betyd", "innebä", "redogör", "redogöra", "redogö", "resonera", "exempel", "faktor", "faktorer", "påverka", "roll", "funktion", "skillnad", "jämför", "jämfö",
+  "describe", "explain", "define", "meaning", "why", "important", "importance", "example", "factor",
+  "role", "function", "difference", "compare", "affect", "affected", "outline", "discuss",
+]);
+const SEMANTIC_SHORT_TOKENS = new Set(["or", "no", "if", "vs", "x", "y", "z", "n", "m", "b", "c", "i", "j"]);
+const QUESTION_INTENT_PATTERNS = [
+  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
+  ["definition", /\b(?:vad\s+(?:menas|avses|innebär|är)|definiera|what\s+is|define|meaning)\b/u],
+  ["importance", /\b(?:varför|viktig|viktigt|betydelse|why|important|importance)\b/u],
+  ["effect", /\b(?:påverka\w*|faktor\w*|orsak\w*|affect\w*|factor\w*|cause\w*)\b/u],
+  ["relationship", /\b(?:samband|relater\w*|relation\w*|koppl\w*|relationship|connect\w*|relate\w*)\b/u],
+  ["difference", /\b(?:skillnad\w*|jämför\w*|difference\w*|compare\w*|contrast\w*)\b/u],
+  ["role", /\b(?:roll|bidrar|bidra|role|contribut\w*)\b/u],
+  ["process", /\b(?:process|processen|processer|processes|steg|steps)\b/u],
+];
+
+function questionDedupeSignature(question) {
+  const tokens = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-")
+    .match(/[\p{L}\p{N}]+/gu) || [];
+  const significant = tokens
+    .filter((token) => !DUPLICATE_QUESTION_FILLER.has(token))
+    .map((token) => token.length > 6 ? token.replace(/(?:en|et)$/u, "") : token);
+  return significant.length ? significant.join(" ") : "";
+}
+
+function semanticQuestionTokenSequence(question) {
+  const tokens = String(question?.question || "")
+    .normalize("NFKC")
+    .replace(/[−–—]/g, "-")
+    .match(/[\p{L}\p{N}]+/gu) || [];
+  return tokens.map((sourceToken) => {
+    const token = sourceToken.toLowerCase();
+    const isUppercaseVariable = /^[A-ZÅÄÖ]$/u.test(sourceToken);
+    const verbStem = token.replace(/(?:ar|as)$/u, "a");
+    return {
+      token: verbStem.length > 5
+        ? verbStem.replace(/(?:ens|ets|erna|arna|orna|en|et|ar|er|or|s|t|r)$/u, "")
+        : verbStem,
+      isUppercaseVariable,
+    };
+  }).filter(({ token, isUppercaseVariable }) =>
+    (isUppercaseVariable || token.length > 2 || SEMANTIC_SHORT_TOKENS.has(token)) &&
+    (isUppercaseVariable || !SEMANTIC_DUPLICATE_FILLER.has(token)))
+    .map(({ token }) => token);
+}
+
+function commutativeComparisonSignature(question) {
+  const match = String(question?.question || "").normalize("NFKC")
+    .match(/^\s*(?:jämför|compare)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s+(?:och|and)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s*[?.!]*\s*$/iu);
+  if (!match) return "";
+  const operands = match.slice(1).map((operand) => semanticQuestionTokenSequence({ question: operand }).join(" "));
+  if (operands.some((operand) => !operand)) return "";
+  return operands.sort().join(" <-> ");
+}
+
+function semanticQuestionTokens(question) {
+  return new Set(semanticQuestionTokenSequence(question));
+}
+
+function semanticConceptTag(question) {
+  return String(question?.concept_tag || question?.concept || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function questionIntents(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  return new Set(QUESTION_INTENT_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([intent]) => intent));
+}
+
+function canonicalLogicalStructure(structure, sourceText) {
+  const tokens = structure.map((entry) => ({ ...entry }));
+  while (true) {
+    const stack = [];
+    const matchingClose = new Map();
+    const depthAt = [];
+    let depth = 0;
+    for (let index = 0; index < tokens.length; index++) {
+      if (tokens[index].token === "(") {
+        depthAt[index] = depth;
+        stack.push(index);
+        depth++;
+      } else if (tokens[index].token === ")") {
+        depth = Math.max(0, depth - 1);
+        depthAt[index] = depth;
+        if (stack.length) matchingClose.set(stack.pop(), index);
+      } else {
+        depthAt[index] = depth;
+      }
+    }
+
+    let removedRedundantPair = false;
+    for (const [open, close] of matchingClose) {
+      const pairDepth = depthAt[open];
+      const insideOperators = tokens.slice(open + 1, close)
+        .filter((entry, offset) => depthAt[open + 1 + offset] === pairDepth + 1 &&
+          (entry.token === "and" || entry.token === "or"))
+        .map((entry) => entry.token);
+      const outsideOperators = tokens
+        .filter((entry, index) => depthAt[index] === pairDepth &&
+          (index < open || index > close) && (entry.token === "and" || entry.token === "or"))
+        .map((entry) => entry.token);
+      const innerText = sourceText.slice(tokens[open].end, tokens[close].start);
+      const redundantAtomicGrouping = /^[\s\p{L}\p{N}_]+$/u.test(innerText) &&
+        semanticQuestionTokenSequence({ question: innerText }).length === 1;
+      const redundantExpressionGrouping = insideOperators.length > 0 && (
+        outsideOperators.length === 0 ||
+        insideOperators.every((operator) => operator === "and") ||
+        (insideOperators.every((operator) => operator === "or") &&
+          outsideOperators.every((operator) => operator === "or"))
+      );
+      const redundantNestedGrouping = tokens[open + 1]?.token === "(" &&
+        matchingClose.get(open + 1) === close - 1;
+      if (redundantAtomicGrouping || redundantExpressionGrouping || redundantNestedGrouping) {
+        tokens.splice(close, 1);
+        tokens.splice(open, 1);
+        removedRedundantPair = true;
+        break;
+      }
+    }
+    if (!removedRedundantPair) return tokens.map((entry) => entry.token);
+  }
+}
+
+function questionLogicalStructureSequence(question) {
+  const text = String(question?.question || "").normalize("NFKC");
+  const matches = [...text.matchAll(/[\p{L}\p{N}]+|[()]/gu)];
+  const structure = [];
+  const connectors = [];
+  let hasConnective = false;
+  for (const match of matches) {
+    const token = match[0].toLowerCase();
+    if (token === "och" || token === "and") {
+      const connector = { token: "and", start: match.index, end: match.index + match[0].length };
+      structure.push(connector);
+      connectors.push(connector);
+      hasConnective = true;
+    } else if (token === "eller" || token === "or") {
+      const connector = { token: "or", start: match.index, end: match.index + match[0].length };
+      structure.push(connector);
+      connectors.push(connector);
+      hasConnective = true;
+    } else if (token === "(" || token === ")") {
+      structure.push({ token, start: match.index, end: match.index + match[0].length });
+    }
+  }
+  if (!hasConnective) return [];
+
+  // A malformed candidate must not make a valid question look like a duplicate.
+  const hasOperandOnBothSides = connectors.every(({ start, end }) => {
+    const before = text.slice(0, start).trimEnd().at(-1) || "";
+    const after = text.slice(end).trimStart()[0] || "";
+    return /[\p{L}\p{N}_)\]]/u.test(before) && /[\p{L}\p{N}_(\[]/u.test(after);
+  });
+  return hasOperandOnBothSides ? canonicalLogicalStructure(structure, text) : null;
+}
+
+function semanticDuplicateQuestion(left, right) {
+  const leftStructure = questionLogicalStructureSequence(left);
+  const rightStructure = questionLogicalStructureSequence(right);
+  if (leftStructure === null || rightStructure === null) return false;
+  if (leftStructure.length !== rightStructure.length ||
+      leftStructure.some((token, index) => token !== rightStructure[index])) return false;
+  if (leftStructure.length) {
+    const leftSequence = semanticQuestionTokenSequence(left);
+    const rightSequence = semanticQuestionTokenSequence(right);
+    const sameSequence = leftSequence.length === rightSequence.length &&
+      leftSequence.every((token, index) => token === rightSequence[index]);
+    const sameCommutativeComparison = commutativeComparisonSignature(left) &&
+      commutativeComparisonSignature(left) === commutativeComparisonSignature(right);
+    if (!sameSequence && !sameCommutativeComparison) return false;
+  }
+
+  const leftTokens = semanticQuestionTokens(left);
+  const rightTokens = semanticQuestionTokens(right);
+  const sharedTokens = [...leftTokens].filter((token) => rightTokens.has(token));
+  const unionSize = new Set([...leftTokens, ...rightTokens]).size;
+  if (!unionSize) return false;
+
+  const leftConcept = semanticConceptTag(left);
+  const sameConcept = Boolean(leftConcept && leftConcept === semanticConceptTag(right));
+  if (sharedTokens.length < (sameConcept ? 2 : 4)) return false;
+  if (sharedTokens.length / unionSize < (sameConcept ? 0.70 : 0.65)) return false;
+
+  const leftIntents = questionIntents(left);
+  return [...leftIntents].some((intent) => questionIntents(right).has(intent));
+}
+
+function mathQuestionIntent(question) {
+  const text = `${question?.concept_tag || ""} ${question?.question || ""}`
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  if (/nollst(?:ä|a)ll|nollpunkt|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
+  if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) return "slope";
+  if (/y-sk(?:ä|a)rning|y-axeln|y-axel|vertical intercept/u.test(text)) return "y-intercept";
+  if (/derivata|derivative|tangentlutning/u.test(text)) return "derivative";
+  return "";
+}
+
+function mathQuestionExpression(question) {
+  const text = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const equations = text.match(/[a-z]\s*=\s*[-+]?\d*\.?\d*\s*[a-z](?:\s*[-+]\s*\d*\.?\d+)?/gu) || [];
+  return equations.map((equation) => equation.replace(/\s+/g, "")).sort().join("|");
+}
+
+function isDuplicateQuestion(left, right) {
+  const signature = questionDedupeSignature(left);
+  if (signature && signature === questionDedupeSignature(right)) {
+    const leftStructure = questionLogicalStructureSequence(left);
+    const rightStructure = questionLogicalStructureSequence(right);
+    if (leftStructure !== null && rightStructure !== null &&
+        leftStructure.length === rightStructure.length &&
+        leftStructure.every((token, index) => token === rightStructure[index])) return true;
+  }
+  if (semanticDuplicateQuestion(left, right)) return true;
+  const leftIntent = mathQuestionIntent(left);
+  const expression = mathQuestionExpression(left);
+  return Boolean(leftIntent && expression
+    && leftIntent === mathQuestionIntent(right)
+    && expression === mathQuestionExpression(right));
+}
 // Non-blocking issues are flagged (soft warnings) but the question is kept —
 // they describe a weak or suspicious question, not an unanswerable one, and
 // dropping them would shrink the exam the student asked for:
@@ -512,14 +838,26 @@ function gateExam(exam, opts) {
   const flagged = [];
 
   for (const q of questions) {
+    const requestedType = options.requestedQuestionType;
+    const requestedTypeMismatch = requestedType === "mix"
+      ? !["mc", "short"].includes(String(q && q.type))
+      : (requestedType && String(q && q.type) !== requestedType);
     const issues = [
-      ...generalQualityIssues(q),
+      ...generalQualityIssues(q, options),
+      ...(requestedTypeMismatch ? ["requested_type_mismatch"] : []),
+      ...(options.requireSourceReferences && String(q && q.type) !== "graph" && (!Array.isArray(q && q.source_references)
+        || !q.source_references.some(reference => typeof reference === "string" && reference.trim()))
+        ? ["source_reference_missing"] : []),
       ...(profile.allowedTypes.includes(String(q && q.type)) ? [] : ["type_not_allowed_for_subject"]),
       ...(typeof profile.extraIssues === "function" ? profile.extraIssues(q) : []),
     ];
     const blocking = issues.filter(i => BLOCKING.has(i) || i === "type_not_allowed_for_subject");
     if (blocking.length) {
       dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: blocking });
+      continue;
+    }
+    if (kept.some((accepted) => isDuplicateQuestion(accepted, q))) {
+      dropped.push({ id: String(q && q.id != null ? q.id : ""), issues: ["duplicate_question"] });
       continue;
     }
     if (issues.length) flagged.push({ id: String(q && q.id != null ? q.id : ""), issues });
@@ -531,6 +869,7 @@ function gateExam(exam, opts) {
 }
 
 module.exports = {
+  MAX_MC_OPTIONS,
   detectSubjectProfile,
   getProfile,
   PROFILES,
@@ -544,5 +883,7 @@ module.exports = {
   signAnswerKey,
   verifyAnswerKey,
   answerKeyString,
+  questionDedupeSignature,
+  isDuplicateQuestion,
   COGNITIVE_VERBS,
 };

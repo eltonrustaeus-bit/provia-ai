@@ -46,7 +46,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       res.write('data: {"done":true,"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat."}],"helpCap":2}\n\n');
       const timer = setTimeout(() => {
         if (res.destroyed) return;
-        res.write('data: {"granskning":{"rättelse":"En kort precisering."}}\n\n');
+        res.write('data: {"granskning":{"rättelse":"En kort precisering."},"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat.\\n\\nP.E.R-kontroll: En kort precisering."}]}\n\n');
         res.end();
       }, 800);
       res.on("close", () => clearTimeout(timer));
@@ -178,12 +178,27 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(afterLogin.auth.user.id, "account-a");
     assert.equal(explainPosts, 1, "restoration never resends or charges the question automatically");
 
+    const reviewQuestion = "Förklara min rättning på fråga 1 steg för steg";
+    const reviewProof = {
+      receipt: "v2.synthetic-signed-completion-receipt",
+      course: "Matematik 1b",
+      material: "Syntetiskt material om linjära funktioner.",
+      questions: [{ id: "synthetic-question", question: "Vad visar m?", grade_task: "synthetic-grade-task" }],
+      answers: [{ id: "synthetic-question", answer: "Syntetiskt elevsvar." }],
+      selectedQuestionId: "synthetic-question"
+    };
+
     const switchPage = await openPilotPage(makeSession("account-a"), "account-b");
     await switchPage.locator("#perBubble").click();
-    await switchPage.locator("#perInput").waitFor({ state: "visible" });
-    await switchPage.locator("#perInput").fill(QUESTION);
-    await switchPage.locator("#perSendBtn").click();
+    await switchPage.evaluate(({ question, proof }) => window.PER.send(question, {
+      helpLevel: 3,
+      examProof: proof
+    }), { question: reviewQuestion, proof: reviewProof });
     await switchPage.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
+    const accountAReview = JSON.parse(await switchPage.evaluate(() =>
+      sessionStorage.getItem("exgen_pilot_pending_per_question")));
+    assert.deepEqual(accountAReview.requestOptions.examProof, reviewProof,
+      "the failed review is bound to account A before reauthentication");
     await switchPage.locator(".per-answer-cta").click();
     await switchPage.locator("#pvLE").fill("account-b@example.test");
     await switchPage.locator("#pvLP").fill("synthetic-password");
@@ -217,6 +232,47 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await expiredPage.locator("#pvModal").waitFor({ state: "visible" });
     assert.equal(await expiredPage.locator("#perInput").inputValue(), QUESTION,
       "an expired-but-refreshable stale session does not trap the pilot login CTA");
+
+    let reviewRetryCalls = 0;
+    let reviewRetryBody = null;
+    const reviewRecoveryPage = await openPilotPage(makeSession("account-a"), "account-a", null, async route => {
+      reviewRetryCalls++;
+      if (reviewRetryCalls === 1) return route.fulfill({ status: 401, json: { error: "Unauthorized" } });
+      reviewRetryBody = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8" },
+        body: 'data: {"delta":"Granskningen är återställd."}\n\ndata: {"done":true,"history":[],"helpCap":3}\n\n'
+      });
+    });
+    await reviewRecoveryPage.locator("#perBubble").click();
+    await reviewRecoveryPage.evaluate(({ question, proof }) => window.PER.send(question, {
+      helpLevel: 3,
+      examProof: proof
+    }), { question: reviewQuestion, proof: reviewProof });
+    await reviewRecoveryPage.locator("#perMessages").getByText("Din inloggning har gått ut.").waitFor();
+    const savedReview = JSON.parse(await reviewRecoveryPage.evaluate(() =>
+      sessionStorage.getItem("exgen_pilot_pending_per_question")));
+    assert.deepEqual(savedReview.requestOptions, { helpLevel: 3, examProof: reviewProof },
+      "same-account reauthentication temporarily preserves only the signed review request options");
+    await reviewRecoveryPage.locator(".per-answer-cta").click();
+    await reviewRecoveryPage.locator("#pvLE").fill("account-a@example.test");
+    await reviewRecoveryPage.locator("#pvLP").fill("synthetic-password");
+    await Promise.all([
+      reviewRecoveryPage.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      reviewRecoveryPage.locator("#pvLBtn").click()
+    ]);
+    await reviewRecoveryPage.waitForFunction((question) =>
+      [...document.querySelectorAll("#perMessages .per-msg.teacher")].some(el => el.textContent.includes("Din fråga är återställd"))
+      && document.getElementById("perPanel")?.classList.contains("per-open")
+      && document.getElementById("perInput")?.value === question, reviewQuestion, { timeout: 7000 });
+    await reviewRecoveryPage.evaluate(() => document.getElementById("perSendBtn").click());
+    await reviewRecoveryPage.waitForFunction(() =>
+      document.getElementById("perMessages")?.textContent.includes("Granskningen är återställd."), null, { timeout: 7000 });
+    assert.equal(reviewRetryCalls, 2, "the review is retried only after the student presses Send");
+    assert.equal(reviewRetryBody.examReview, true);
+    assert.deepEqual(reviewRetryBody.examProof, reviewProof,
+      "the deliberate post-login retry retains the original signed completion proof");
 
     const sharedContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     contexts.push(sharedContext);
@@ -266,6 +322,35 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await serverErrorPage.locator("#perInput").inputValue(), QUESTION,
       "HTTP failure restores the question for a deliberate retry");
 
+    const malformedJsonPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: "{" }));
+    await malformedJsonPage.locator("#perBubble").click();
+    await malformedJsonPage.locator("#perInput").fill(QUESTION);
+    await malformedJsonPage.locator("#perSendBtn").click();
+    await malformedJsonPage.locator("#perMessages").getByText("P.E.R fick inget användbart svar.").waitFor();
+    assert.equal(await malformedJsonPage.locator("#perInput").inputValue(), QUESTION,
+      "malformed JSON with HTTP 200 restores the question for a deliberate retry");
+    assert.match(await malformedJsonPage.locator("#perAnnouncement").textContent(), /Frågan finns kvar/,
+      "malformed JSON is announced to assistive technology");
+
+    const malformedServerJsonPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 502, headers: { "content-type": "application/json" }, body: "{" }));
+    await malformedServerJsonPage.locator("#perBubble").click();
+    await malformedServerJsonPage.locator("#perInput").fill(QUESTION);
+    await malformedServerJsonPage.locator("#perSendBtn").click();
+    await malformedServerJsonPage.locator("#perMessages").getByText("Fel — försök igen.").waitFor();
+    assert.equal(await malformedServerJsonPage.locator("#perInput").inputValue(), QUESTION,
+      "malformed JSON on an HTTP failure keeps the normal server-error recovery path");
+
+    const emptyAnswerPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({ status: 200, json: { answer: "   " } }));
+    await emptyAnswerPage.locator("#perBubble").click();
+    await emptyAnswerPage.locator("#perInput").fill(QUESTION);
+    await emptyAnswerPage.locator("#perSendBtn").click();
+    await emptyAnswerPage.locator("#perMessages").getByText("P.E.R fick inget användbart svar.").waitFor();
+    assert.equal(await emptyAnswerPage.locator("#perInput").inputValue(), QUESTION,
+      "an empty answer is not presented as success and restores the question");
+
     const incompleteStreamPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       route => route.fulfill({
         status: 200,
@@ -279,6 +364,21 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.equal(await incompleteStreamPage.locator("#perInput").inputValue(), QUESTION,
       "an SSE response without its completion event is not treated as a finished answer");
 
+    const interruptedProviderPage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.fulfill({
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8" },
+        body: 'data: {"delta":"Börja med en ledtråd."}\n\ndata: {"error":"P.E.R är tillfälligt otillgänglig. Försök igen senare."}\n\n'
+      }));
+    await interruptedProviderPage.locator("#perBubble").click();
+    await interruptedProviderPage.locator("#perInput").fill(QUESTION);
+    await interruptedProviderPage.locator("#perSendBtn").click();
+    await interruptedProviderPage.locator("#perMessages").getByText("P.E.R är tillfälligt otillgänglig. Försök igen senare.").waitFor();
+    assert.equal(await interruptedProviderPage.locator("#perInput").inputValue(), QUESTION,
+      "a provider error after partial output restores the question instead of presenting a partial answer");
+    assert.equal(await interruptedProviderPage.locator("#perMessages").getByText("Börja med en ledtråd.").count(), 0,
+      "partial streamed content is not shown as a completed answer after a provider error");
+
     const completeStreamPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       route => route.fulfill({
         status: 200,
@@ -291,6 +391,38 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await completeStreamPage.locator("#perMessages").getByText("Steg för steg.").waitFor();
     assert.equal(await completeStreamPage.locator("#perInput").inputValue(), "",
       "a complete stream keeps the normal success behavior");
+    assert.equal(await completeStreamPage.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")), null,
+      "a completed answer clears its recovery draft");
+
+    let releaseHeldExplain;
+    let heldExplainRoute;
+    const heldExplain = new Promise(resolve => { releaseHeldExplain = resolve; });
+    const requestCountBeforeReload = explainPosts;
+    const reloadDuringRequestPage = await openPilotPage(makeSession("account-a"), "account-a", null, route => {
+      if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, history: [] } });
+      heldExplainRoute = route;
+      return heldExplain.then(() => heldExplainRoute.abort().catch(() => {}));
+    });
+    await reloadDuringRequestPage.locator("#perBubble").click();
+    await reloadDuringRequestPage.locator("#perInput").fill(QUESTION);
+    const reloadExplainRequest = reloadDuringRequestPage.waitForRequest(request =>
+      request.url().includes("/api/explain") && request.method() === "POST");
+    await reloadDuringRequestPage.locator("#perSendBtn").click();
+    await reloadExplainRequest;
+    assert.equal(await reloadDuringRequestPage.evaluate(() => {
+      const pending = JSON.parse(sessionStorage.getItem("exgen_pilot_pending_per_question") || "null");
+      return pending?.question || null;
+    }), QUESTION, "the in-flight question is persisted before a provider response arrives");
+    await reloadDuringRequestPage.reload({ waitUntil: "domcontentloaded" });
+    await reloadDuringRequestPage.locator("#perMessages").getByText("Din fråga är återställd. Tryck Skicka när du vill fortsätta.").waitFor();
+    assert.equal(await reloadDuringRequestPage.locator("#perInput").inputValue(), QUESTION,
+      "reloading during an in-flight request restores the question for a deliberate retry");
+    assert.equal(await reloadDuringRequestPage.evaluate(() => sessionStorage.getItem("exgen_pilot_pending_per_question")), null,
+      "restoration consumes the transient recovery record");
+    releaseHeldExplain();
+    await reloadDuringRequestPage.waitForTimeout(50);
+    assert.equal(explainPosts, requestCountBeforeReload + 1,
+      "restoring after reload never automatically resends the question");
 
     const timeoutPage = await openPilotPage(makeSession("account-a"), "account-a", null,
       () => new Promise(() => {}));
@@ -316,6 +448,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       "the saved primary answer renders before the optional review correction arrives");
     await reviewPage.locator(".per-rattelse").waitFor();
     assert.equal(await reviewPage.locator(".per-rattelse").innerText(), "JAG KONTROLLERADE MITT SVAR\nEn kort precisering.");
+    assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll: En kort precisering/);
 
     const tokenSwitchPage = await openPilotPage(makeSession("account-a"));
     await tokenSwitchPage.locator("#perBubble").click();

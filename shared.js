@@ -128,6 +128,7 @@
   var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
+  var _pilotRestoredSend = null;
 
   var _examHistoryMasked = true;
   var _serverVerifiedPerHistoryRelease = false;
@@ -153,17 +154,36 @@
     } catch (_) { return ''; }
   }
 
-  function savePilotPendingQuestion(question, accountIdOverride) {
+  function savePilotPendingQuestion(question, accountIdOverride, requestOptions) {
     if (EXGEN_RUNTIME.environment !== 'pilot' || String(question).length > 2000) return false;
     var accountId = arguments.length > 1 ? (accountIdOverride || '') : (currentPilotAccountId() || '');
     try {
-      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify({
+      var pending = {
         question: String(question),
         savedAt: Date.now(),
         accountId: accountId || null
-      }));
+      };
+      if (requestOptions && requestOptions.examProof) {
+        pending.requestOptions = {
+          helpLevel: requestOptions.helpLevel,
+          examProof: requestOptions.examProof
+        };
+      }
+      sessionStorage.setItem(PILOT_PENDING_QUESTION_KEY, JSON.stringify(pending));
       return true;
     } catch (_) { return false; }
+  }
+
+  function clearPilotPendingQuestionForAccount(accountId) {
+    if (EXGEN_RUNTIME.environment !== 'pilot' || !accountId) return;
+    try {
+      var raw = sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      if (pending.accountId === accountId) sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+    }
   }
 
   function abortPerRequestForAccountId(nextAccountId) {
@@ -404,6 +424,14 @@
             return { id: t.id, label: t.label, hint: t.hint };
           });
         }
+      }
+
+      /* P.E.R. may use the material currently being prepared in ordinary
+         study mode. Never attach it to an exam/result context. */
+      if (ctx.page === 'app' && !ctx.currentQuestion && !ctx.examState
+          && typeof window.__getPerStudyMaterial === 'function') {
+        var studyMaterial = String(window.__getPerStudyMaterial() || '').trim().slice(0, 6000);
+        if (studyMaterial) ctx.studyMaterial = studyMaterial;
       }
 
       /* Elevens snitt ur lokal historik — bara om ingen sida angett något.
@@ -949,6 +977,7 @@
       try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+        _pilotRestoredSend = null;
       }
       var input = document.getElementById('perInput');
       if (input) input.value = '';
@@ -1324,14 +1353,35 @@ function finalizeMsg(div, text) {
       return div;
     }
 
+    function takeRestoredRequestOptions(question) {
+      var restored = _pilotRestoredSend;
+      _pilotRestoredSend = null;
+      return restored && restored.question === question && restored.accountId === (currentPilotAccountId() || null)
+        ? restored.options
+        : undefined;
+    }
+
     async function send(q, opts) {
       if (!q || _perActiveRequest) return;
       var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
-        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId);
+        if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
         if (input) input.value = q;
         return true;
+      }
+      function clearPendingQuestion() {
+        if (EXGEN_RUNTIME.environment !== 'pilot') return;
+        try {
+          var pending = JSON.parse(sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY) || 'null');
+          if (pending && pending.question === q && (pending.accountId || null) === (requestAccountId || null)) {
+            sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY);
+          }
+        } catch (_) {}
+      }
+      function announceFailure(message) {
+        var status = document.getElementById('perAnnouncement');
+        if (status) status.textContent = message;
       }
       if (EXGEN_RUNTIME.environment === 'pilot' && String(q).length > 2000) {
         var longQuestionInput = document.getElementById('perInput');
@@ -1339,9 +1389,7 @@ function finalizeMsg(div, text) {
         addMsg('Frågan är för lång för P.E.R. Korta ned den till högst 2 000 tecken.', 'teacher');
         return;
       }
-      if (EXGEN_RUNTIME.environment === 'pilot') {
-        try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-      }
+      if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
       var announcement = document.getElementById('perAnnouncement');
       if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
@@ -1390,6 +1438,7 @@ function finalizeMsg(div, text) {
       function requestStillOwned() {
         if (requestState.cancelled) return false;
         if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
+        clearPilotPendingQuestionForAccount(requestAccountId);
         abortPerRequestForAccountId(currentPilotAccountId());
         return false;
       }
@@ -1512,6 +1561,7 @@ function finalizeMsg(div, text) {
                   streamComplete = true;
                   if (!answerCommitted && answerText.trim()) {
                     answerCommitted = true;
+                    clearPendingQuestion();
                     clearTimeout(requestTimeout);
                     reviewTimeout = setTimeout(function () {
                       if (requestController) requestController.abort();
@@ -1532,6 +1582,7 @@ function finalizeMsg(div, text) {
                   _perRättelse = ev.granskning.rättelse;
                   if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
                 }
+                if (ev.granskning && ev.history) perSaveHist(ev.history);
                 // Taket kommer alltid härifrån, aldrig ur en egen uträkning.
                 if (typeof ev.helpCap === 'number') _perHelpCap = ev.helpCap;
               } catch (_) {}
@@ -1542,6 +1593,7 @@ function finalizeMsg(div, text) {
             if (typing) {
               typing.className = 'per-msg teacher';
               typing.textContent = streamError || 'Svaret avbröts innan det blev klart. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
+              announceFailure(typing.textContent);
             }
           } else if (!answerCommitted && typing && answerText) {
             finalizeMsg(typing, answerText);
@@ -1551,7 +1603,10 @@ function finalizeMsg(div, text) {
         } else {
           /* ── JSON fallback ── */
           var data = {};
-          try { data = await Promise.race([r.json(), requestDeadline]); }
+          try {
+            var parsed = await Promise.race([r.json(), requestDeadline]);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
+          }
           catch (err) { if (requestTimedOut) throw err; }
           if (!requestStillOwned()) return;
           stopThinking();
@@ -1565,6 +1620,7 @@ function finalizeMsg(div, text) {
                   try { sessionStorage.setItem(PILOT_REAUTH_REQUIRED_KEY, '1'); } catch (_) {}
                 }
               } else {
+                restoreFailedQuestion();
                 try { localStorage.removeItem(EXGEN_RUNTIME.authStorageKey); } catch (_) {}
                 if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.clearForSignOut();
               }
@@ -1576,6 +1632,7 @@ function finalizeMsg(div, text) {
                 typing.textContent = 'Din inloggning har gått ut. Logga in igen för personlig studiehjälp. Utan konto kan jag bara svara på frågor om ExGen.';
                 updateLandingBar();
               }
+              announceFailure(typing.textContent);
             } else if (!r.ok) {
               restoreFailedQuestion();
               typing.className = 'per-msg teacher';
@@ -1587,17 +1644,31 @@ function finalizeMsg(div, text) {
                 typing.textContent = language === 'en'
                   ? 'I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.'
                   : 'Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.';
-                var failureAnnouncement = document.getElementById('perAnnouncement');
-                if (failureAnnouncement) failureAnnouncement.textContent = typing.textContent;
               } else {
                 typing.textContent = data.error || 'Fel — försök igen.';
               }
+              announceFailure(typing.textContent);
             } else {
-              if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
-              finalizeMsg(typing, data.answer || 'Inget svar.');
-              if (data.history) perSaveHist(data.history);
-              if (isLandingMode) addAnswerCTA(typing);
-              stepsAfterAnswer(data.answer, isLandingMode);
+              var answer = data && typeof data.answer === 'string' ? data.answer.trim() : '';
+              if (!answer) {
+                restoreFailedQuestion();
+                typing.className = 'per-msg teacher';
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'P.E.R returned no usable answer. Your question is still here; press Send to try again.'
+                  : 'P.E.R fick inget användbart svar. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
+                announceFailure(typing.textContent);
+              } else {
+                clearPendingQuestion();
+                if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
+                finalizeMsg(typing, data.answer);
+                if (data.history) perSaveHist(data.history);
+                if (isLandingMode) addAnswerCTA(typing);
+                stepsAfterAnswer(data.answer, isLandingMode);
+              }
             }
           }
         }
@@ -1610,6 +1681,7 @@ function finalizeMsg(div, text) {
           typing.textContent = requestTimedOut
             ? 'P.E.R tog för lång tid att svara. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.'
             : 'Nätverksfel — frågan finns kvar i rutan. Tryck Skicka igen när du vill försöka på nytt.';
+          announceFailure(typing.textContent);
         }
       } finally {
         clearTimeout(requestTimeout);
@@ -2019,12 +2091,12 @@ function finalizeMsg(div, text) {
 
       document.getElementById('perSendBtn').onclick = function () {
         var q = (document.getElementById('perInput').value || '').trim();
-        if (q) send(q);
+        if (q) send(q, takeRestoredRequestOptions(q));
       };
       document.getElementById('perInput').onkeydown = function (e) {
         if (e.key === 'Enter') {
           var q = (this.value || '').trim();
-          if (q) send(q);
+          if (q) send(q, takeRestoredRequestOptions(q));
         }
       };
       document.getElementById('perClearBtn').onclick = function () {
@@ -2039,6 +2111,7 @@ function finalizeMsg(div, text) {
         localStorage.removeItem(PER_HIST_KEY);
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
+          _pilotRestoredSend = null;
         }
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');
@@ -2131,7 +2204,12 @@ function finalizeMsg(div, text) {
           _micListening = active;
           if (micBtn) micBtn.classList.toggle('listening', active);
           if (perAvEl) perAvEl.classList.toggle('per-listening', active);
-          if (perInpEl) perInpEl.placeholder = active ? 'Lyssnar…' : 'Fråga P.E.R…';
+          if (perInpEl) {
+            var english = perWidgetUsesEnglish();
+            perInpEl.placeholder = active
+              ? (english ? 'Listening…' : 'Lyssnar…')
+              : (english ? 'Ask P.E.R…' : 'Fråga P.E.R…');
+          }
         }
 
         function createRecognition() {
@@ -2192,6 +2270,13 @@ function finalizeMsg(div, text) {
               ? pending.accountId === currentAccountId
               : !currentAccountId;
             if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              if (pending.requestOptions && pending.requestOptions.examProof) {
+                _pilotRestoredSend = {
+                  question: pending.question,
+                  accountId: currentAccountId || null,
+                  options: pending.requestOptions
+                };
+              }
               perInpEl.value = pending.question;
               toggle();
               addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
@@ -3040,7 +3125,8 @@ function finalizeMsg(div, text) {
       errEl.style.color = ''; errEl.textContent = '';
       if (!email) { errEl.textContent = authText('forgotEmailRequired'); return; }
       btn.disabled = true; btn.textContent = authText('forgotLoading');
-      var redirect = location.origin + '/aterstall.html';
+      var appOrigin = String(window.ExGenRuntime?.appOrigin || '').trim().replace(/\/+$/, '');
+      var redirect = (appOrigin || location.origin) + '/aterstall.html';
       supaPost('recover?redirect_to=' + encodeURIComponent(redirect), { email: email }).then(function() {
         /* Supabase answers 200 whether or not the address exists, and the
            wording keeps it that way — confirming which addresses have

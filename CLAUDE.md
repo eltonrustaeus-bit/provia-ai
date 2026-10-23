@@ -24,6 +24,8 @@ Vercel serverless exam platform for Swedish students. No framework, no build ste
 - Read file before modifying — never edit blind
 - Match CJS/ESM style of file being edited (see .claude/COMMON_MISTAKES.md)
 - No speculative features, no over-engineering
+- Before a substantive ExGen task, run `npm run xeliov:context -- --task "<short task>"`, inspect `git status`, `docs/codex/08_CURRENT_STATUS.md`, the relevant source and the exact diff. Treat the packet as an index, not proof.
+- At close, hand off changed files, exact tests, evidence level (offline/staging/production), blockers and next step. Add only concise, source-checked reusable findings to `docs/codex/16_LEARNING_LEDGER.md`; never store credentials, private reasoning, raw conversations or unreviewed agent claims.
 - **Kör om sviten EFTER commit när ett test läser git-metadata.**
   `tests/frontend/sitemap-lastmod.test.mjs` jämför `<lastmod>` i `sitemap.xml`
   mot `git log`-datumet för varje HTML-sida. Körs sviten före committen är

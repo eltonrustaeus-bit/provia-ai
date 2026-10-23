@@ -15,10 +15,12 @@ const graphAnswers = require("./_graph.js");
 const gradeTasks = require("./_grade-task.js");
 const examCompletion = require("./_exam-completion.cjs");
 const examIssuance = require("./_exam-issuance.cjs");
-const { getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
+const { getSupabaseUrl, getSupabaseServerKey, getSupabaseAdminHeaders, createSupabaseServerClient } = require("./_supabase-server-key.cjs");
 const { logMockExamUsage } = require("./_ai-usage.cjs");
+const { budgetedOpenAIFetch, settleAiSpend } = require("./_ai-usage.cjs");
 const { sanitizeHistory } = require("./_student-history.cjs");
 const materialInput = require("./_material.cjs");
+const { randomUUID } = require("crypto");
 
 function json(res, status, obj) {
   res.statusCode = status;
@@ -39,6 +41,36 @@ function asEnum(x, allowed, fallback) {
   return allowed.includes(x) ? x : fallback;
 }
 
+async function acquirePostExamReviewLease(userId) {
+  const leaseId = randomUUID();
+  const outcome = await examIssuance.acquirePerAnswerLease(userId, leaseId);
+  if (outcome !== "acquired") return { outcome, leaseId: null };
+
+  // Recheck under the lease: a new issuance cannot pass its matching DB trigger
+  // while a post-exam answer is being prepared and returned.
+  const activeCount = await examIssuance.activeExamCount(userId);
+  const latestState = activeCount === 0 ? await examIssuance.latestExamState(userId) : null;
+  if (activeCount === 0 && (latestState === "none" || latestState === "completed")) {
+    return { outcome: "acquired", leaseId };
+  }
+
+  const released = await examIssuance.releasePerAnswerLease(userId, leaseId);
+  if (released !== "released") return { outcome: null, leaseId: null };
+  if (activeCount === null) return { outcome: null, leaseId: null };
+  if (activeCount > 0) return { outcome: "exam_active", leaseId: null };
+  if (latestState === null) return { outcome: null, leaseId: null };
+  return { outcome: "ungraded_exam", leaseId: null };
+}
+
+function answerLeaseFailure(outcome, graphPractice = false) {
+  if (outcome === "exam_active") return { status: 409, error: "EXAM_ACTIVE" };
+  if (outcome === "busy") return { status: 409, error: "PER_REQUEST_IN_PROGRESS" };
+  if (outcome === "ungraded_exam") return graphPractice
+    ? { status: 403, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" }
+    : { status: 409, error: "EXAM_NOT_ACTIVE" };
+  return { status: 503, error: "EXAM_STATE_UNAVAILABLE" };
+}
+
 function clamp(n, min, max) {
   const x = Number(n);
   if (!Number.isFinite(x)) return min;
@@ -48,6 +80,15 @@ function clamp(n, min, max) {
 function clampAwardedPoints(rawPoints, trustedMaxPoints) {
   const maxPoints = Number(trustedMaxPoints);
   return clamp(rawPoints || 0, 0, Number.isFinite(maxPoints) ? Math.max(0, maxPoints) : 0);
+}
+
+function normalizeGradeFeedback(feedback, points, maxPoints, lang) {
+  if (maxPoints > 0 && points === maxPoints) {
+    return lang === "sv"
+      ? `Poäng: ${points}/${maxPoints}. Ditt svar uppfyller bedömningskriterierna för full poäng.`
+      : `Score: ${points}/${maxPoints}. Your answer meets the grading criteria for full credit.`;
+  }
+  return String(feedback || "");
 }
 
 function validateNonMcGradeOutput(graded, expectedItems) {
@@ -154,7 +195,7 @@ function extractOutputText(data) {
   return typeof out === "string" ? out : null;
 }
 
-function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload) {
+function buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, learningPayload) {
   const pct = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0;
   const conceptTags = [...new Set(
     per.map(q => q.concept_tag).filter(c => c && c !== "Okänt" && c !== "Unknown")
@@ -163,7 +204,7 @@ function buildMockPayload(userId, course, per, total, maxTotal, attemptId, finge
     per.flatMap(q => q.error_tags || []).filter(Boolean)
   )].slice(0, 20);
   return {
-    user_id: userId, submission_id: attemptId, answer_fingerprint: fingerprint,
+    user_id: userId, submission_id: attemptId, answer_fingerprint: fingerprint, claim_id: claimId,
     course: (course || "").slice(0, 100), percent: pct, num_questions: per.length,
     concept_tags: conceptTags, error_tags: errorTags,
     result_payload: { total_points: total, max_points: maxTotal, per_question: per },
@@ -241,10 +282,21 @@ async function buildLearningPayload(level, course, attemptRows, learnerLoopEnabl
 
 // Feature-flag evaluation uses one cached server-side Supabase client.
 let _sb = null;
+const GRADE_HANDLER_BUDGET_MS = 60_000;
+const GRADE_PERSISTENCE_RESERVE_MS = 30_000;
+const GRADE_PROVIDER_MAX_MS = 45_000;
+const GRADE_PROVIDER_MIN_MS = 4_000;
+const GRADE_FLAG_LOOKUP_TIMEOUT_MS = 1_000;
+
+function gradingProviderTimeoutMs(requestStartedAt, now = Date.now()) {
+  const available = GRADE_HANDLER_BUDGET_MS - (now - requestStartedAt) - GRADE_PERSISTENCE_RESERVE_MS;
+  return Math.min(GRADE_PROVIDER_MAX_MS, available);
+}
+
 async function supabaseClient() {
   if (_sb) return _sb;
-  if (!process.env.SUPABASE_URL || !getSupabaseServerKey()) return null;
-  _sb = createSupabaseServerClient(process.env.SUPABASE_URL, { auth: { autoRefreshToken: false, persistSession: false } });
+  if (!getSupabaseUrl() || !getSupabaseServerKey()) return null;
+  _sb = createSupabaseServerClient(getSupabaseUrl(), { auth: { autoRefreshToken: false, persistSession: false } });
   return _sb;
 }
 
@@ -253,7 +305,8 @@ async function snapshotLearnerLoopFlag(userId) {
     const sb = await supabaseClient();
     if (!sb) return false;
     const { flagsEnabled } = await perFlags();
-    return Boolean(await flagsEnabled(sb, ["per_learner_loop_enabled"], userId));
+    return Boolean(await flagsEnabled(sb, ["per_learner_loop_enabled"], userId,
+      AbortSignal.timeout(GRADE_FLAG_LOOKUP_TIMEOUT_MS)));
   } catch { return false; }
 }
 
@@ -266,13 +319,13 @@ async function saveMockResult(payload) {
   return examIssuance.persistExamResult(payload);
 }
 
-async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, fingerprint, level, attemptRows }) {
+async function persistGradedSubmission({ userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, level, attemptRows }) {
   const state = await examIssuance.examState(userId, attemptId);
   if (!state) return "state_error";
   if (state !== "grading") return state === "completed" ? "duplicate" : "inactive";
   const learnerLoopEnabled = await snapshotLearnerLoopFlag(userId);
   const learningPayload = await buildLearningPayload(level, course, attemptRows, learnerLoopEnabled);
-  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, learningPayload));
+  const saved = await saveMockResult(buildMockPayload(userId, course, per, total, maxTotal, attemptId, fingerprint, claimId, learningPayload));
   if (saved === "duplicate") return "duplicate";
   if (["missing", "abandoned", "expired"].includes(saved)) return "inactive";
   if (saved !== "saved") return saved;
@@ -288,7 +341,7 @@ async function requireAuth(req) {
   if (!token) return null;
   try {
     const r = await fetch(
-      process.env.SUPABASE_URL + "/auth/v1/user",
+      getSupabaseUrl() + "/auth/v1/user",
       {
         headers: {
           ...getSupabaseAdminHeaders(),
@@ -304,6 +357,7 @@ async function requireAuth(req) {
 }
 
 module.exports = async function handler(req, res) {
+  const requestStartedAt = Date.now();
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return json(res, 405, { ok: false, error: "Use POST" });
@@ -439,57 +493,89 @@ module.exports = async function handler(req, res) {
     let claimed = null;
     async function fail(status, payload) {
       if (claimed) {
-        const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint);
+        const released = await examIssuance.releaseExamGrading(user.id, claimed.id, claimed.fingerprint, claimed.claimId);
         claimed = null;
         if (released === "completed") return json(res, 503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
+        if (released === "fenced") return json(res, 409, { ok: false, error: "EXAM_GRADING_SUPERSEDED" });
         if (released !== "released") return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
       }
       return json(res, status, payload);
+    }
+
+    function failProvider(stage, category, error, message, upstreamStatus) {
+      const requestId = randomUUID();
+      const diagnostic = { event: "exam_grade_provider_failure", requestId, stage, category };
+      if (Number.isInteger(upstreamStatus)) diagnostic.upstreamStatus = upstreamStatus;
+      console.warn(JSON.stringify(diagnostic));
+      return fail(502, { ok: false, error, requestId, message });
     }
 
     if (!practiceCompletion) {
       const submissionId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const fingerprint = examCompletion.answerFingerprint(user.id, course, submittedQuestions, answerMap);
       if (!submissionId || !fingerprint) return json(res, 400, { ok: false, error: "EXAM_ANSWERS_INVALID" });
-      const claim = await examIssuance.claimExamGrading(user.id, submissionId, fingerprint);
+      const claimId = randomUUID();
+      const claim = await examIssuance.claimExamGrading(user.id, submissionId, fingerprint, claimId);
       if (!claim) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
       if (claim === "pending") return json(res, 409, { ok: false, error: "EXAM_GRADING_IN_PROGRESS" });
-      if (claim === "stale") return json(res, 409, { ok: false, error: "EXAM_GRADING_INTERRUPTED" });
       if (claim === "conflict") return json(res, 409, { ok: false, error: "EXAM_ANSWERS_CONFLICT" });
+      if (claim === "invalid") return json(res, 400, { ok: false, error: "EXAM_ANSWERS_INVALID" });
       if (claim === "completed") {
-        const activeCount = await examIssuance.activeExamCount(user.id);
-        if (activeCount === null) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-        if (activeCount > 0) return json(res, 409, { ok: false, error: "EXAM_ACTIVE" });
-        const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
-        if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
-        if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
-        const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
-        if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
-          return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+        const lease = await acquirePostExamReviewLease(user.id);
+        if (lease.outcome !== "acquired") {
+          const failure = answerLeaseFailure(lease.outcome);
+          return json(res, failure.status, { ok: false, error: failure.error });
         }
-        await examIssuance.replayLearningJob(user.id, submissionId);
-        return json(res, 200, {
-          ok: true, recovered: true, result: recovered.result,
-          exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
-          persistence: { mock_result_saved: true },
-        });
+        try {
+          const recoveryClient = await supabaseClient();
+          if (!recoveryClient) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          const { data: savedResult, error: savedResultError } = await recoveryClient.from("mock_results")
+            .select("verified_at")
+            .eq("user_id", user.id)
+            .eq("submission_id", submissionId)
+            .maybeSingle();
+          if (savedResultError) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (!savedResult?.verified_at) return json(res, 403, { ok: false, error: "EXAM_RESULT_NOT_VERIFIED" });
+          const recovered = await examIssuance.recoverExamResult(user.id, submissionId, fingerprint);
+          if (!recovered) return json(res, 503, { ok: false, error: "EXAM_STATE_UNAVAILABLE" });
+          if (recovered.status === "expired") return json(res, 410, { ok: false, error: "EXAM_RESULT_EXPIRED" });
+          const resultIds = recovered.result.per_question.map((item) => String(item?.id || ""));
+          if (resultIds.length !== questions.length || resultIds.some((id, index) => id !== questions[index].id)) {
+            return json(res, 503, { ok: false, error: "EXAM_RESULT_INVALID" });
+          }
+          await examIssuance.replayLearningJob(user.id, submissionId);
+          return json(res, 200, {
+            ok: true, recovered: true, result: recovered.result,
+            exam_proof: examCompletion.issueCompletion(user.id, course, submittedQuestions),
+            persistence: { mock_result_saved: true },
+          });
+        } finally {
+          await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
+        }
       }
       if (claim !== "claimed") return json(res, 409, { ok: false, error: "EXAM_NOT_ACTIVE" });
-      claimed = { id: submissionId, fingerprint };
+      claimed = { id: submissionId, fingerprint, claimId };
     }
 
+    let postExamLeaseId = null;
     try {
     const quotaClient = await supabaseClient();
     if (!quotaClient) return fail(503, { ok: false, error: "Grading is temporarily unavailable" });
     if (practiceCompletion) {
+      const lease = await acquirePostExamReviewLease(user.id);
+      if (lease.outcome !== "acquired") {
+        const failure = answerLeaseFailure(lease.outcome, true);
+        return fail(failure.status, { ok: false, error: failure.error });
+      }
+      postExamLeaseId = lease.leaseId;
       try {
         const { data, error } = await quotaClient.from("mock_results")
-          .select("submission_id,num_questions")
+          .select("submission_id,num_questions,verified_at")
           .eq("user_id", user.id)
           .eq("submission_id", practiceCompletion.submissionId)
           .maybeSingle();
         if (error) return fail(503, { ok: false, error: "Graded exam could not be checked" });
-        if (data?.num_questions !== p.examProof.questions.length) {
+        if (data?.num_questions !== p.examProof.questions.length || !data?.verified_at) {
           return fail(403, { ok: false, error: "GRAPH_PRACTICE_REQUIRES_GRADED_EXAM" });
         }
       } catch {
@@ -682,7 +768,7 @@ module.exports = async function handler(req, res) {
       const attemptRows = withAttemptAnswers(per, answerMap, questions);
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, claimId: claimed.claimId, level, attemptRows,
       });
       if (persistence === "duplicate") {
         return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
@@ -725,6 +811,7 @@ module.exports = async function handler(req, res) {
       "2) Poäng: points måste vara tal inom [0..max_points]. max_points måste matcha uppgiften. " +
       "Om items[].scoring_rubric finns: bedöm VARJE del i scoring_rubric.parts för sig och summera — nämn i feedback vilka delar som gavs poäng. " +
       "Kräv ALDRIG mer än vad scoring_rubric.full_score_requirements uttryckligen listar för full poäng.\n" +
+      "Feedback får inte påstå att något saknas om det inte uttryckligen krävs av scoring_rubric. Om svaret får full poäng, säg inte att något mer behövs för full poäng.\n" +
       "3) Feedback (kort och precis):\n" +
       "   - Börja med 1 rad: 'Poäng: X/Y.'\n" +
       "   - Sedan 2–5 korta punkter: (a) vad som var korrekt, (b) vad som saknas/fel, (c) exakt vad som krävs för full poäng.\n" +
@@ -796,6 +883,7 @@ module.exports = async function handler(req, res) {
       "2) Scoring: points must be within [0..max_points]. max_points must match the item. " +
       "If items[].scoring_rubric exists: assess each part in scoring_rubric.parts separately and sum — mention in feedback which parts received points. " +
       "Never require more than what scoring_rubric.full_score_requirements explicitly lists for full score.\n" +
+      "Feedback must not claim something is missing unless scoring_rubric explicitly requires it. If full credit is awarded, do not say anything else is needed for full credit.\n" +
       "3) Feedback:\n" +
       "   - Start with: 'Score: X/Y.'\n" +
       "   - 2–5 bullets: correct parts, missing/incorrect, what is required for full score.\n" +
@@ -824,25 +912,42 @@ module.exports = async function handler(req, res) {
       };
 
       let r;
+      const providerTimeoutMs = gradingProviderTimeoutMs(requestStartedAt);
+      if (providerTimeoutMs < GRADE_PROVIDER_MIN_MS) {
+        return failProvider("provider_budget", "insufficient_time_for_safe_persistence", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras säkert inom tidsgränsen. Försök igen." : "Grading could not safely finish within the time limit. Please try again.");
+      }
       const gradingStartedAt = Date.now();
       try {
-        r = await fetch("https://api.openai.com/v1/responses", {
+        r = await budgetedOpenAIFetch("https://api.openai.com/v1/responses", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(45_000)
-        });
+          signal: AbortSignal.timeout(providerTimeoutMs)
+        }, { userId: user.id });
       } catch {
-        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return failProvider("request", "transport_error", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
       }
 
-      const raw = await r.text();
+      let raw;
+      try {
+        raw = await r.text();
+      } catch {
+        return failProvider("response_body", "read_error", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
+      }
+      if (!r.ok) return failProvider("response", "upstream_http_error", "grading_provider_unavailable",
+        lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.", r.status);
+
       let data;
       try {
         data = JSON.parse(raw);
       } catch {
-        return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+        return failProvider("response_body", "invalid_json", "grading_provider_unavailable",
+          lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again.");
       }
+      if (data?.usage) await settleAiSpend(r.aiSpendReservation, data.usage);
       await logMockExamUsage({
         userId: user.id,
         requestId: claimed?.id,
@@ -851,22 +956,23 @@ module.exports = async function handler(req, res) {
         usage: data?.usage,
         latencyMs: Date.now() - gradingStartedAt,
       });
-      if (!r.ok) return fail(502, { ok: false, error: "grading_provider_unavailable", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
-
       const outputText = extractOutputText(data);
       if (!outputText) {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return failProvider("response_output", "missing_text", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
       }
 
       let graded;
       try {
         graded = JSON.parse(outputText);
       } catch {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again." });
+        return failProvider("response_output", "invalid_json", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav inget användbart resultat. Försök igen." : "Grading returned no usable result. Please try again.");
       }
 
       if (!validateNonMcGradeOutput(graded, nonMcPack)) {
-        return fail(502, { ok: false, error: "grading_response_invalid", message: lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again." });
+        return failProvider("response_output", "contract_failed", "grading_response_invalid",
+          lang === "sv" ? "Rättningen gav ett ofullständigt resultat. Försök igen." : "Grading returned an incomplete result. Please try again.");
       }
 
       const byId = new Map();
@@ -898,7 +1004,7 @@ module.exports = async function handler(req, res) {
           id: String(got.id),
           points: pts,
           max_points: mp,
-          feedback: String(got.feedback || ""),
+          feedback: normalizeGradeFeedback(got.feedback, pts, mp, lang),
           // The signed grading task is the source of truth when it carries an
           // answer key; a grader-model response must not replace that key.
           model_answer: String(item.model_answer || got.model_answer || item.rubric || ""),
@@ -915,7 +1021,7 @@ module.exports = async function handler(req, res) {
       const attemptId = examCompletion.submissionId(user.id, course, submittedQuestions);
 
       const persistence = await persistGradedSubmission({
-        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, level, attemptRows,
+        userId: user.id, course, per, total, maxTotal, attemptId, fingerprint: claimed.fingerprint, claimId: claimed.claimId, level, attemptRows,
       });
       if (persistence === "duplicate") {
         return fail(503, { ok: false, error: "EXAM_RESULT_RECOVERY_REQUIRED" });
@@ -936,12 +1042,22 @@ module.exports = async function handler(req, res) {
           per_question: per
         }
       });
-    } catch {
+    } catch (error) {
+      console.warn(JSON.stringify({
+        event: "exam_grade_internal_failure",
+        category: ["TypeError", "ReferenceError", "SyntaxError", "RangeError", "AbortError"].includes(error?.name)
+          ? error.name.toLowerCase()
+          : "internal_error",
+      }));
       return fail(500, { ok: false, error: "grading_failed", message: lang === "sv" ? "Rättningen kunde inte slutföras. Försök igen." : "Grading could not be completed. Please try again." });
+    } finally {
+      if (postExamLeaseId) await examIssuance.releasePerAnswerLease(user.id, postExamLeaseId);
     }
   });
 };
 
 module.exports.clampAwardedPoints = clampAwardedPoints;
+module.exports.normalizeGradeFeedback = normalizeGradeFeedback;
 module.exports.validateNonMcGradeOutput = validateNonMcGradeOutput;
 module.exports.normalizeChoice = normalizeChoice;
+module.exports.gradingProviderTimeoutMs = gradingProviderTimeoutMs;
