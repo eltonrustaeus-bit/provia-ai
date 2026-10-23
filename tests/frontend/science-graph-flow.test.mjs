@@ -121,10 +121,21 @@ globalThis.fetch = async (input, init = {}) => {
       return new Response(`data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(completed)}\n\ndata: [DONE]\n\n`);
     }
     const schemaName = request.text?.format?.name;
-    if (schemaName === "exam_verifier_schema") return outputResponse({ results: providerQuestions.map((q) => ({
+    if (schemaName === "exam_verifier_schema") {
+      const review = JSON.parse(request.input[1].content);
+      return outputResponse({ results: review.questions.map((q) => ({
       id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
-      source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [], issues: [], required_changes: [],
-    })) });
+      source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [],
+      source_support: { question: true, answer: true, rubric: true,
+        rubric_parts: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => true) : [],
+        accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => true) : [],
+        evidence_quotes: [review.source_material.match(/^\s*(?:\S+\s+){0,7}\S+/u)?.[0].trim() || ""],
+        question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+        rubric_part_evidence: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => [0]) : [],
+        accepted_answer_evidence: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => [0]) : [] },
+      issues: [], required_changes: [],
+      })) });
+    }
     if (schemaName === "exam_solver_schema") return outputResponse({ results: providerQuestions.map((q) => ({
       id: q.id, option_verdicts: [], index: -1, confidence: 1, reason: "Syntetisk grafkontroll.",
     })) });

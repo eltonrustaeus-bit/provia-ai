@@ -6,6 +6,7 @@
 // boolean, so generate-exam.js and its logs can see WHY something failed.
 
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
+const { filterSourceReferences } = require("./_source-references.cjs");
 
 function buildVerifierSchema(questionCount) {
   return {
@@ -28,7 +29,7 @@ function buildVerifierSchema(questionCount) {
             required: [
               "id", "approved", "factual_accuracy", "ambiguity_score",
               "difficulty_match", "source_alignment", "scoring_quality",
-              "language_quality", "language_match", "option_quality", "issues", "required_changes"
+              "language_quality", "language_match", "option_quality", "source_support", "issues", "required_changes"
             ],
             properties: {
               id: { type: "string" },
@@ -41,6 +42,24 @@ function buildVerifierSchema(questionCount) {
               language_quality: { type: "number", minimum: 0, maximum: 1 },
               language_match: { type: "boolean" },
               option_quality: { type: "array", items: { type: "boolean" }, maxItems: MAX_MC_OPTIONS },
+              source_support: {
+                type: "object",
+                additionalProperties: false,
+                required: ["question", "answer", "rubric", "rubric_parts", "accepted_answers", "evidence_quotes", "question_evidence", "answer_evidence", "rubric_evidence", "rubric_part_evidence", "accepted_answer_evidence"],
+                properties: {
+                  question: { type: "boolean" },
+                  answer: { type: "boolean" },
+                  rubric: { type: "boolean" },
+                  rubric_parts: { type: "array", items: { type: "boolean" }, maxItems: 20 },
+                  accepted_answers: { type: "array", items: { type: "boolean" }, maxItems: 20 },
+                  evidence_quotes: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+                  question_evidence: { type: "array", items: { type: "integer", minimum: 0, maximum: 4 }, minItems: 1, maxItems: 5 },
+                  answer_evidence: { type: "array", items: { type: "integer", minimum: 0, maximum: 4 }, minItems: 1, maxItems: 5 },
+                  rubric_evidence: { type: "array", items: { type: "integer", minimum: 0, maximum: 4 }, minItems: 1, maxItems: 5 },
+                  rubric_part_evidence: { type: "array", items: { type: "array", items: { type: "integer", minimum: 0, maximum: 4 }, minItems: 1, maxItems: 5 }, maxItems: 20 },
+                  accepted_answer_evidence: { type: "array", items: { type: "array", items: { type: "integer", minimum: 0, maximum: 4 }, minItems: 1, maxItems: 5 }, maxItems: 20 }
+                }
+              },
               issues: { type: "array", items: { type: "string" }, maxItems: 10 },
               required_changes: { type: "array", items: { type: "string" }, maxItems: 10 }
             }
@@ -123,6 +142,9 @@ function reviewInputWithinLimits(input) {
     if (typeof question.question === "string" && question.question.length > 3000) return false;
     if (typeof question.model_answer === "string" && question.model_answer.length > 6000) return false;
     if (typeof question.rubric === "string" && question.rubric.length > 3000) return false;
+    if (question.accepted_answers !== undefined &&
+        (!Array.isArray(question.accepted_answers) || question.accepted_answers.length > 20 ||
+          question.accepted_answers.some((answer) => typeof answer !== "string" || answer.length > 1000))) return false;
     if (Array.isArray(question.options) && (question.options.length > MAX_MC_OPTIONS || question.options.some(option => typeof option === "string" && option.length > 1000))) return false;
     if (Array.isArray(question.source_references) && (question.source_references.length > 5 || question.source_references.some(reference => typeof reference === "string" && reference.length > 1000))) return false;
     if (question.scoring_rubric !== undefined && JSON.stringify(question.scoring_rubric).length > 6000) return false;
@@ -154,6 +176,7 @@ function decideApproval(r, thresholds) {
   if (!Array.isArray(r.required_changes) || r.required_changes.length > 0) return false;
   if (r.option_quality_contract_ok !== true ||
       (Array.isArray(r.option_quality) && r.option_quality.some((quality) => quality !== true))) return false;
+  if (r.source_support_contract_ok !== true) return false;
   if (r.language_match !== true) return false;
   const scores = [
     r.factual_accuracy,
@@ -242,6 +265,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Sätt approved=false och ange required_changes om exempelsvaret är fel, motsägelsefullt, otillräckligt för utlovade poäng eller kräver något som frågan inte efterfrågar. " +
       "Flera giltiga kortsvar är tillåtna när frågan är tydligt avgränsad och bedömningsmatrisen accepterar dem. " +
       "Använd source_material som begränsat faktaunderlag för source_alignment; om stödet saknas eller är oklart, sänk source_alignment och godkänn inte ett obestyrkt sakpåstående. " +
+      "För source_support: pröva separat om frågans krav, hela model_answer inklusive exempel, och alla poänggivande krav i rubric och scoring_rubric stöds av source_material eller en enkel härledning ur det. rubric_parts ska ha ett värde per scoring_rubric.parts i samma ordning, accepted_answers ett värde per godtaget alternativ; tomma listor om indata saknar dem. Markera false om någon väsentlig del saknar stöd, även om den är allmänt sann. Citerade ord som bara nämner ämnet räcker inte. evidence_quotes ska vara 1–5 ordagranna, sammanhängande utdrag ur source_material; hitta inte på citat. Ange för question_evidence, answer_evidence och rubric_evidence index in i evidence_quotes som faktiskt stöder just den delen. rubric_part_evidence och accepted_answer_evidence ska ha en indexlista per motsvarande del i samma ordning. Tomma ytterlistor när motsvarande indata saknas. Återanvänd inte ett irrelevant citat. Om stöd saknas, ange närmaste verkliga utdrag men markera berört fält false. Exempel: en källa som bara säger att alleler är genvarianter stöder inte en fråga om dominant/recessiv nedärvning. " +
       "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Avvisa en kandidat som upprepar eller nära parafraserar samma lärandemål; comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
       "Sätt approved=false om NÅGOT av följande gäller: faktafel, en flervalsfråga med fler än ett rimligt svar eller flera försvarbara tolkningar, ett giltigt kortsvar som bedömningsmatrisen inte accepterar, en hittad-på term/kategori/paragraf, " +
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
@@ -259,6 +283,7 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Set approved=false and explain required_changes if the exemplar is wrong, contradictory, insufficient for the promised points, or requires more than the question asks. " +
       "Multiple valid short answers are acceptable when the question is clearly scoped and the grading rubric accepts them. " +
       "Use source_material as bounded factual evidence for source_alignment; if support is missing or unclear, lower source_alignment and do not approve unsupported claims. " +
+      "For source_support, judge separately whether the question's demands, the entire model_answer including examples, and every graded requirement in rubric and scoring_rubric are supported by source_material or a simple derivation from it. rubric_parts must have one verdict per scoring_rubric.parts entry in order, accepted_answers one per alternative; empty lists when input has none. Mark false if any substantive part lacks support, even when it is generally true. Merely mentioning the topic is not evidence. evidence_quotes must be 1–5 exact contiguous excerpts from source_material; do not invent quotes. In question_evidence, answer_evidence and rubric_evidence give indices into evidence_quotes that actually support that surface. rubric_part_evidence and accepted_answer_evidence need one index list per corresponding item in order; empty outer arrays when no corresponding input. Do not reuse an irrelevant quote. If support is absent, quote the closest real excerpt but mark the unsupported field false. For example, a source saying only that alleles are gene variants does not support a dominant/recessive inheritance question. " +
       "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Reject a candidate that repeats or near-paraphrases the same learning objective; comparison_questions are context only and must not receive results. " +
       "Set approved=false if ANY of the following apply: factual errors, a multiple-choice question with more than one reasonable answer or defensible interpretation, a valid short answer excluded by its grading rubric, a fabricated " +
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
@@ -317,6 +342,7 @@ async function verifyQuestions(questions, opts) {
     points: q.points,
     cognitive_level: q.cognitive_level,
     model_answer: q.model_answer,
+    accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers : [],
     rubric: q.rubric,
     scoring_rubric: q.scoring_rubric,
     source_references: q.source_references,
@@ -393,12 +419,37 @@ async function verifyQuestions(questions, opts) {
       const optionQualityContractOk = Array.isArray(res.option_quality) &&
         res.option_quality.length === expectedOptions &&
         res.option_quality.every((quality) => typeof quality === "boolean");
+      const support = res.source_support;
+      const quotes = support?.evidence_quotes;
+      const expectedQuestion = questionById.get(res.id);
+      const expectedRubricParts = Array.isArray(expectedQuestion?.scoring_rubric?.parts)
+        ? expectedQuestion.scoring_rubric.parts.length : 0;
+      const expectedAcceptedAnswers = expectedQuestion.accepted_answers.length;
+      const validEvidenceIndices = (indices) => Array.isArray(indices) && indices.length >= 1 &&
+        indices.length <= 5 && indices.every((index) => Number.isInteger(index) && index >= 0 && index < quotes?.length);
+      const sourceSupportContractOk = support?.question === true && support?.answer === true &&
+        support?.rubric === true &&
+        Array.isArray(support?.rubric_parts) && support.rubric_parts.length === expectedRubricParts &&
+        support.rubric_parts.every((verdict) => verdict === true) &&
+        Array.isArray(support?.accepted_answers) && support.accepted_answers.length === expectedAcceptedAnswers &&
+        support.accepted_answers.every((verdict) => verdict === true) &&
+        Array.isArray(quotes) && quotes.length >= 1 && quotes.length <= 5 &&
+        quotes.every((quote) => typeof quote === "string" && quote.trim().length >= 1 && quote.length <= 500) &&
+        filterSourceReferences(reviewInput.source_material, quotes).length === quotes.length &&
+        validEvidenceIndices(support.question_evidence) && validEvidenceIndices(support.answer_evidence) &&
+        validEvidenceIndices(support.rubric_evidence) &&
+        Array.isArray(support.rubric_part_evidence) && support.rubric_part_evidence.length === expectedRubricParts &&
+        support.rubric_part_evidence.every(validEvidenceIndices) &&
+        Array.isArray(support.accepted_answer_evidence) && support.accepted_answer_evidence.length === expectedAcceptedAnswers &&
+        support.accepted_answer_evidence.every(validEvidenceIndices);
       const failureCategories = res.approved === true && Array.isArray(res.required_changes) && res.required_changes.length === 0
         ? []
         : classifyReviewFindings(res.required_changes);
+      if (!sourceSupportContractOk && !failureCategories.includes("source_support")) failureCategories.push("source_support");
       perQuestion.set(res.id, {
         ...res,
         option_quality_contract_ok: optionQualityContractOk,
+        source_support_contract_ok: sourceSupportContractOk,
         failure_categories: failureCategories,
       });
     }

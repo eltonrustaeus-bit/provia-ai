@@ -856,6 +856,13 @@ globalThis.fetch = async (input, init = {}) => {
         return {
         id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
+        source_support: { question: true, answer: true, rubric: true,
+          rubric_parts: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => true) : [],
+          accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => true) : [],
+          evidence_quotes: [reviewInput.source_material.match(/^\s*(?:\S+\s+){0,7}\S+/u)?.[0].trim() || ""],
+          question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+          rubric_part_evidence: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => [0]) : [],
+          accepted_answer_evidence: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => [0]) : [] },
         language_quality: 1, language_match: q.id !== verifierLanguageMismatchId, option_quality: Array.isArray(q.options)
           ? q.options.map((_, index) => !(optionRejected && index === 2))
           : [],

@@ -1,5 +1,35 @@
 # 08 Current Status
 
+## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
+
+- [x] Preview på `5dc2470` skapade ett syntetiskt Biologi 1-prov med 12/12
+  frågor från ett tredelat material. Sanerad pipeline-status rapporterade att
+  alla tre avsnitt refererades; frågorna omfattade fotosyntes, cellandning och
+  genetik. Alla tolv frågor och facit lästes i appen efter ett serververifierat
+  resultat. Ett tidigare 12-frågeprov rättades också live till 22/23 poäng och
+  resultatet återhämtades utan nytt modellanrop. Det äldre syntetiska prov som
+  blockerade resultatvisning avbröts separat efter uttryckligt godkännande.
+- [!] Kvalitetsgranskningen hittade ett nytt blockerande fynd trots 12/12:
+  genetikfrågorna om dominant/recessiv nedärvning och DNA:s struktur, samt
+  delar av facit och poängkraven, gick längre än det syntetiska underlaget.
+  Att ett källcitat finns och granskaren ger hög `source_alignment` bevisar
+  inte att hela frågan och exempelsvaret stöds. Detta prov är inte pilotbevis.
+- [x] Lokalt kräver den oberoende granskaren nu strukturerade verdict för
+  frågans krav, hela exempelsvaret, rubriken, varje poängdel och varje
+  accepterat alternativ. Varje del måste peka på sina egna källutdrag och
+  servern kontrollerar att utdragen finns i materialet. Frågan stoppas om
+  en del saknar stöd, pekar på ett ogiltigt utdrag eller saknar verdict.
+  Endast en fast `source_support`-kod når reparationsfeedbacken; råa citat
+  förs inte vidare dit. Befintliga poäng- och kvalitetsgrindar består.
+- [!] Ändringen är ännu inte liveverifierad. Offline-mockar visar att
+  underkända delar stoppas, inte att modellen alltid upptäcker dem. Ett nytt
+  syntetiskt stagingprov på exakt denna kodrevision behövs inom godkänd
+  kostnadsram. `main` och Production lämnas orörda.
+
+**PILOT NOT READY.** Källstödet i frågorna och facit är fortsatt en blockerare
+tills den skärpta granskningen prövats live och de kvarvarande pilotgrindarna
+är uppfyllda.
+
 ## Skolpilotens prov- och P.E.R.-grind — feature-Preview, 2026-10-23
 
 - [x] Målkoden committades som `cefde2e` och pushades endast till

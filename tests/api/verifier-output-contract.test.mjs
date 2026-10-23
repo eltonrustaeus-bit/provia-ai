@@ -6,6 +6,13 @@ const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApprova
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, language_match: true, option_quality: [] });
+const sourceSupport = (quote, parts = 0, answers = 0) => ({
+  question: true, answer: true, rubric: true,
+  rubric_parts: Array(parts).fill(true), accepted_answers: Array(answers).fill(true),
+  evidence_quotes: [quote], question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+  rubric_part_evidence: Array.from({ length: parts }, () => [0]),
+  accepted_answer_evidence: Array.from({ length: answers }, () => [0]),
+});
 
 async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById) {
   const originalFetch = globalThis.fetch;
@@ -70,9 +77,9 @@ assert.match(buildVerifierPrompt("sv"), /avvisa tydliga grammatikfel.*'den vikti
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
 assert.match(buildVerifierPrompt("sv"), /inga enordsalternativ matchar källtexten.*avvisa inte enbart/i);
 const outlierHintReview = await runWithResults(
-  [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], issues: [], required_changes: [] }],
+  [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
-  "", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"] },
+  "Stockholm är Sveriges huvudstad.", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"] },
 );
 const outlierHintPayload = JSON.parse(outlierHintReview.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"],
@@ -207,13 +214,70 @@ const validOpenQuestion = { ...openQuestion, model_answer: "x = 2", rubric: "En 
 const validOpenResponse = await runWithResults([{
   id: validOpenQuestion.id, approved: true, factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
-  language_match: true, option_quality: [], issues: [], required_changes: [],
+  language_match: true, option_quality: [], source_support: sourceSupport("Ekvationer: 2x = 4", 1), issues: [], required_changes: [],
 }], [validOpenQuestion], "Ekvationer: 2x = 4.");
 const validOpenReview = validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id);
 assert.equal(validOpenReview.option_quality_contract_ok, true,
   "an empty option list is a complete quality review for a short-answer item");
 assert.equal(decideApproval(validOpenReview), true,
   "a valid reviewed short-answer question still passes the deterministic gate");
+assert.equal(validOpenReview.source_support_contract_ok, true,
+  "literal source evidence is checked before a positive source verdict is trusted");
+for (const field of ["question", "answer", "rubric"]) {
+  const unsupported = await runWithResults([{
+    ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+    source_support: { ...sourceSupport("Ekvationer: 2x = 4", 1), [field]: false },
+  }], [validOpenQuestion], "Ekvationer: 2x = 4.");
+  const verdict = unsupported.outcome.perQuestion.get(validOpenQuestion.id);
+  assert.equal(decideApproval(verdict), false, `${field} without source support cannot pass`);
+  assert.ok(verdict.failure_categories.includes("source_support"), "repair gets a bounded source-support signal");
+}
+for (const evidence_quotes of [[], ["fabricated source evidence"], ["Ekvationer: 2x = 4", "fabricated source evidence"]]) {
+  const unverified = await runWithResults([{
+    ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+    source_support: { ...sourceSupport("Ekvationer: 2x = 4", 1), evidence_quotes },
+  }], [validOpenQuestion], "Ekvationer: 2x = 4.");
+  assert.equal(decideApproval(unverified.outcome.perQuestion.get(validOpenQuestion.id)), false,
+    "missing or invented evidence cannot certify an otherwise high-scoring review");
+}
+const acceptedAnswerReview = await runWithResults([{
+  ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+  source_support: sourceSupport("Ekvationer: 2x = 4", 1, 1),
+}], [{ ...validOpenQuestion, accepted_answers: ["x = 2"] }], "Ekvationer: 2x = 4.");
+assert.deepEqual(JSON.parse(acceptedAnswerReview.requestBody.input[1].content).questions[0].accepted_answers, ["x = 2"],
+  "the reviewer sees accepted answers before judging source support");
+assert.equal(decideApproval(acceptedAnswerReview.outcome.perQuestion.get(validOpenQuestion.id)), true);
+const shortMathSource = await runWithResults([{
+  ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+  source_support: sourceSupport("y=2x+1"),
+}], [{ id: validOpenQuestion.id, type: "short_answer", question: "Ange lutningen i y=2x+1." }], "y=2x+1");
+assert.equal(decideApproval(shortMathSource.outcome.perQuestion.get(validOpenQuestion.id)), true,
+  "a complete short formula can serve as literal evidence without an arbitrary character minimum");
+const unsupportedBiology = await runWithResults([{
+  ...validOpenReview,
+  source_support: { ...sourceSupport("Alleler är olika varianter av en gen"),
+    question: false, answer: false, rubric: false },
+}], [{ id: validOpenQuestion.id, type: "short_answer",
+  question: "Vad är skillnaden mellan en dominant och en recessiv allel?",
+  model_answer: "En dominant allel uttrycks alltid; en recessiv bara i dubbel uppsättning.",
+  rubric: "Förklara dominant och recessiv nedärvning." }],
+"Alleler är olika varianter av en gen.");
+assert.equal(decideApproval(unsupportedBiology.outcome.perQuestion.get(validOpenQuestion.id)), false,
+  "a topical allele quote cannot override an explicit unsupported-claim verdict");
+for (const source_support of [
+  { ...validOpenReview.source_support, rubric_parts: [] },
+  { ...validOpenReview.source_support, rubric_parts: [false] },
+  { ...validOpenReview.source_support, accepted_answers: [false] },
+  { ...validOpenReview.source_support, question_evidence: [1] },
+  { ...validOpenReview.source_support, answer_evidence: [] },
+  { ...validOpenReview.source_support, rubric_part_evidence: [] },
+]) {
+  const check = await runWithResults([{ ...validOpenReview, source_support }],
+    [{ ...validOpenQuestion, accepted_answers: source_support.accepted_answers.length ? ["x = 2"] : [] }],
+    "Ekvationer: 2x = 4.");
+  assert.equal(decideApproval(check.outcome.perQuestion.get(validOpenQuestion.id)), false,
+    "missing or unsupported rubric parts and alternatives fail closed");
+}
 assert.equal(decideApproval({ ...validOpenReview, language_match: false }), false,
   "a fluent question in the wrong selected language fails closed despite high language-quality scores");
 const { language_match: _omittedLanguage, ...missingLanguageMatch } = validOpenReview;
@@ -229,8 +293,8 @@ const needsRevision = {
   issues: ["Exempelsvaret löser inte ekvationen."], required_changes: ["Byt exempelsvaret till x = 2."],
 };
 const openResponse = await runWithResults([needsRevision], [openQuestion], "Ekvationer: 2x = 4.");
-assert.deepEqual(openResponse.outcome.perQuestion.get("open-1").failure_categories, ["answer_alignment"],
-  "the review outcome exposes only bounded diagnostic categories for rejected content");
+assert.deepEqual(openResponse.outcome.perQuestion.get("open-1").failure_categories, ["answer_alignment", "source_support"],
+  "an absent source verdict is included as a bounded repair signal");
 const transmitted = JSON.parse(openResponse.requestBody.input.find((item) => item.role === "user").content);
 assert.equal(transmitted.source_material, "Ekvationer: 2x = 4.");
 assert.equal(transmitted.questions[0].model_answer, "x = 3", "the reviewer receives the generated exemplar it must independently check");

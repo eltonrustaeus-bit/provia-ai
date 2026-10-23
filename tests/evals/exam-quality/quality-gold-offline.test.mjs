@@ -48,6 +48,7 @@ const approvedReview = {
   required_changes: [],
   option_quality: [],
   option_quality_contract_ok: true,
+  source_support_contract_ok: true,
   language_match: true,
   factual_accuracy: 1,
   ambiguity_score: 0,
