@@ -37,18 +37,26 @@
   har sänkts. Oberoende read-only review fann inga blockerare och bekräftade
   att ändringen svarar mot den dominerande observerade avvisningsorsaken.
   Syntax, prompt-, budget-, pipeline-, HTTP- och Postgres/PGlite-tester passerade
-  lokalt; detta bekräftar inte live modellutbyte eller förbättrad yield.
-- [!] Stagingbudgeten lästes read-only kl. 19:33 UTC: tak `$5.000000`, spenderat
-  `$1.258479`, reserverat `$0.263628`, kvar `$3.477893` (budgetrad senast
-  uppdaterad 19:30 UTC). Den enda nya modellenkörningen bokfördes till ungefär
-  `$0.045318`; ingen andra modellkörning har gjorts. En ren, inloggad Previewflik
-  användes. Annan sparad provsession lämnades orörd.
+- [x] Promptfixen pushades som `91e4714bd632eb5459aa4edef61cd1fdd8ec3d6d`
+  endast till feature-branchen. Preview `dpl_44avLTTqEWQqVRiWRb5EBE13EPZV`
+  blev READY på exakt den SHA:n, och branch-scopade stagingvariabler verifierades
+  utan att läsa deras värden.
+- [x] Ett andra syntetiskt Biologi 1-prov med 799 tecken begärde 12 kortsvars-
+  frågor. Samma Preview levererade och utfärdade exakt 12/12 godkända frågor;
+  Supabase-jobbet slutade `succeeded`, `progress_current=12`, utan felkod.
+  Telemetrin visar att sista omgången verifierade två kandidater och godkände
+  båda. I tidigare omgångar förekom fortfarande avslag för källstöd, tydlighet,
+  svarslinje och poängsättning. Inget provsvar skickades in.
+- [!] Stagingbudgeten lästes read-only kl. 19:43 UTC: tak `$5.000000`, spenderat
+  `$1.379071`, reserverat `$0.263628`, kvar `$3.357301`. Jämfört med före det
+  andra syntetiska försöket ökade spend med `$0.120592`, inom den godkända
+  ytterligare gränsen på `$2`. Annan sparad provsession lämnades orörd.
 - [!] Äldre syntetiskt prov från 23 okt kl. 16:12 UTC var redan markerat
   avbrutet vid read-only-kontroll; ingen separat resultatpost fanns för det.
 
-**PILOT NOT READY.** Granska promptändringen oberoende, push endast till
-feature-branchen, invänta READY Preview och kör därefter ett nytt syntetiskt
-test inom den godkända kostnadsramen. Ingen produktion eller `main`.
+**PILOT NOT READY.** Ett syntetiskt 12-frågeprov passerade live efter promptfixen,
+men upprepade körningar över flera kurser, användbarhet/P.E.R. och övriga
+skolpilotkrav återstår. Ingen produktion eller `main` har ändrats.
 
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 

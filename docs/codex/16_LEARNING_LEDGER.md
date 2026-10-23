@@ -529,17 +529,22 @@ AI-reported until independently reviewed.
   live model call followed the observed auth failure.
 
 ### 2026-10-23 — Repeat extractive answer constraints in repair prompts
-- Status: VERIFIED (prompt/test evidence; live impact unverified)
-- Evidence: staging Preview telemetry for a synthetic 12-question Biology 1
-  exam showed one accepted question, with `source_answer_not_extractable` the
-  dominant rejection; independent read-only review of the prompt change found
-  no blocker.
+- Status: VERIFIED (one live staging run; broader yield unverified)
+- Evidence: independent read-only review found no blocker; the deployed feature
+  Preview `dpl_44avLTTqEWQqVRiWRb5EBE13EPZV` ran a synthetic Biology 1 request
+  for 12 short-answer questions and issued all 12 after the prompt change.
+  The prior prompt produced only 1/12 for a separate synthetic Biology 1 run.
+  Supabase recorded the new job as `succeeded`, progress 12/12. No answers were
+  submitted. Staging spend increased by `$0.120592` and remained within the
+  previously approved additional `$2` cap.
 - Finding: A rule present in the base generation prompt may not reliably carry
   through a later repair call. Repeat the precise constraint in the repair
   prompt: factual short-answer keys must contain only complete contiguous
   sentences copied verbatim from the source, without prefixes, labels,
   explanations, or paraphrases. Preserve the derived-answer exception for
   mathematics and retain every existing structural and quality gate.
-- Limitation: The prompt update has not yet been deployed or tested against a
-  live model. One low-yield run identifies the leading observed rejection
-  reason, not proof that prompt wording alone explains all rejected candidates.
+- Limitation: This is one successful 12-question run, not a statistically
+  reliable yield estimate or proof of consistent performance across subjects.
+  Earlier repair batches still showed reviewer failures for source support,
+  clarity, answer alignment, and scoring quality. All existing gates remained
+  active. Repeated tests with different synthetic source material are needed.
