@@ -2,6 +2,27 @@
 
 ## Källstöd i 12-frågeprov — pågående feature-arbete, 2026-10-23
 
+- [x] Feature-Preview för `b676c8f` skapade ett nytt syntetiskt Biologi 1-prov
+  med 12/12 godkända frågor från tre källavsnitt. Det färdiga provet lämnades
+  in med tolv tomsvar för att visa alla fullpoängssvar; ett serververifierat
+  resultat på 0/24 visades. Inga riktiga elevsvar användes.
+- [!] Även detta prov har blockerande kvalitetsfynd: fråga 6 och 8 prövar
+  nästan samma sak om koldioxid i fotosyntesen, liksom fråga 10 och 11 om
+  glukos/stärkelse. Facit till bland annat fråga 1, 3, 8 och 12 innehåller
+  påståenden eller preciseringar som saknas i det syntetiska underlaget.
+  Källcitatet täcker alltså inte alltid hela svaret trots den nya
+  fältnivågranskningen. 12/12 är framsteg för leveransantalet, inte bevis
+  för pedagogisk pilotkvalitet.
+- [x] Lokalt efter livefyndet: generatorn instrueras att hålla varje
+  poängkrav och facitpåstående inom materialet; granskaren instrueras att
+  kontrollera facit sats för sats och rapportera explicit `duplicate_of`
+  för frågor med samma lärandemål och svarsmål. Servern stoppar rapporterade
+  dubbletter. Offline-kontraktstester passerar, men effekten på livekvalitet
+  och leveransantal är ännu inte uppmätt.
+- [!] En separat lokal telemetrijustering ger batchade AI-kostnadsrader
+  samma kolumner. Den kan förklara tidigare `PGRST102`-fel i staging men är
+  ännu inte liveverifierad. Den hårda stagingbudgeten är separat och kvar.
+
 - [x] Preview på `5dc2470` skapade ett syntetiskt Biologi 1-prov med 12/12
   frågor från ett tredelat material. Sanerad pipeline-status rapporterade att
   alla tre avsnitt refererades; frågorna omfattade fotosyntes, cellandning och
@@ -21,10 +42,10 @@
   en del saknar stöd, pekar på ett ogiltigt utdrag eller saknar verdict.
   Endast en fast `source_support`-kod når reparationsfeedbacken; råa citat
   förs inte vidare dit. Befintliga poäng- och kvalitetsgrindar består.
-- [!] Ändringen är ännu inte liveverifierad. Offline-mockar visar att
-  underkända delar stoppas, inte att modellen alltid upptäcker dem. Ett nytt
-  syntetiskt stagingprov på exakt denna kodrevision behövs inom godkänd
-  kostnadsram. `main` och Production lämnas orörda.
+- [!] Fältnivågranskningen är liveprövad men visade sig otillräcklig:
+  modellen missade vissa obestyrkta tillägg. De efterföljande lokala
+  förbättringarna behöver ett nytt syntetiskt stagingprov på exakt nästa
+  kodrevision inom godkänd kostnadsram. `main` och Production lämnas orörda.
 
 **PILOT NOT READY.** Källstödet i frågorna och facit är fortsatt en blockerare
 tills den skärpta granskningen prövats live och de kvarvarande pilotgrindarna

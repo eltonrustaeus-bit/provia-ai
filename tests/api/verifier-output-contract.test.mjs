@@ -28,7 +28,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     return Response.json({
       model: "measured-review-model",
       usage: { input_tokens: 31, output_tokens: 7 },
-      output: [{ content: [{ type: "output_text", text: JSON.stringify({ results }) }] }],
+      output: [{ content: [{ type: "output_text", text: JSON.stringify({ results: results.map((entry) => ({ duplicate_of: "", ...entry })) }) }] }],
     });
   };
   try {
@@ -64,6 +64,8 @@ const submittedReviewSchema = valid.requestBody.text.format.schema.properties.re
 assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
 assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
 assert.ok(submittedReviewSchema.items.required.includes("language_match"), "review schema requires an explicit selected-language verdict");
+assert.ok(submittedReviewSchema.items.required.includes("duplicate_of"),
+  "review schema requires an explicit same-learning-objective verdict");
 assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
   "schema inspection without a question count remains backward compatible");
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
@@ -76,6 +78,10 @@ assert.match(buildVerifierPrompt("sv"), /avvisa tydliga grammatikfel.*'den vikti
   "the independent reviewer must reject obvious Swedish agreement errors rather than merely score them");
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
 assert.match(buildVerifierPrompt("sv"), /inga enordsalternativ matchar källtexten.*avvisa inte enbart/i);
+assert.match(buildVerifierPrompt("sv"), /ett enda obestyrkt tillägg gör hela answer=false/i,
+  "the reviewer must reject an otherwise correct exemplar with one unsupported clause");
+assert.match(buildVerifierPrompt("en"), /one unsupported addition makes the entire answer=false/i);
+assert.match(buildVerifierPrompt("sv"), /duplicate_of till id för en tidigare kandidat eller redan godkänd fråga/i);
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
@@ -86,6 +92,26 @@ assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_opt
   "internal style warnings reach the independent reviewer without becoming a verdict");
 assert.equal(decideApproval(outlierHintReview.outcome.perQuestion.get("q1")), true,
   "the heuristic warning alone does not reject a valid single-word answer");
+const duplicateReview = await runWithResults([{
+  ...outlierHintReview.outcome.perQuestion.get("q1"), duplicate_of: "earlier-q",
+}], [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
+"Stockholm är Sveriges huvudstad.", undefined, undefined,
+[{ id: "earlier-q", type: "mc", question: "Vad heter Sveriges huvudstad?" }], "sv");
+assert.equal(decideApproval(duplicateReview.outcome.perQuestion.get("q1")), false,
+  "an otherwise approved near-duplicate cannot be issued");
+assert.ok(duplicateReview.outcome.perQuestion.get("q1").failure_categories.includes("repeated_learning_objective"));
+for (const invalidDuplicate of [null, 7, "q1", "foreign-q"]) {
+  const invalid = await runWithResults([{
+    ...outlierHintReview.outcome.perQuestion.get("q1"), duplicate_of: invalidDuplicate,
+  }], [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
+  "Stockholm är Sveriges huvudstad.", undefined, undefined,
+  [{ id: "earlier-q", type: "mc", question: "Vad heter Sveriges huvudstad?" }], "sv");
+  const verdict = invalid.outcome.perQuestion.get("q1");
+  assert.equal(verdict.duplicate_of_contract_ok, false);
+  assert.equal(decideApproval(verdict), false);
+  assert.ok(!verdict.failure_categories.includes("repeated_learning_objective"),
+    "malformed references must not be reported as confirmed duplicate questions");
+}
 const wrongLanguageReview = await runWithResults([{
   ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,

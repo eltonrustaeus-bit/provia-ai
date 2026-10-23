@@ -29,7 +29,7 @@ function buildVerifierSchema(questionCount) {
             required: [
               "id", "approved", "factual_accuracy", "ambiguity_score",
               "difficulty_match", "source_alignment", "scoring_quality",
-              "language_quality", "language_match", "option_quality", "source_support", "issues", "required_changes"
+              "language_quality", "language_match", "option_quality", "source_support", "duplicate_of", "issues", "required_changes"
             ],
             properties: {
               id: { type: "string" },
@@ -42,6 +42,7 @@ function buildVerifierSchema(questionCount) {
               language_quality: { type: "number", minimum: 0, maximum: 1 },
               language_match: { type: "boolean" },
               option_quality: { type: "array", items: { type: "boolean" }, maxItems: MAX_MC_OPTIONS },
+              duplicate_of: { type: "string" },
               source_support: {
                 type: "object",
                 additionalProperties: false,
@@ -173,6 +174,7 @@ function decideApproval(r, thresholds) {
   const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
   if (!r || typeof r !== "object") return false;
   if (r.approved !== true) return false;
+  if (r.duplicate_of !== "" || r.duplicate_of_contract_ok !== true) return false;
   if (!Array.isArray(r.required_changes) || r.required_changes.length > 0) return false;
   if (r.option_quality_contract_ok !== true ||
       (Array.isArray(r.option_quality) && r.option_quality.some((quality) => quality !== true))) return false;
@@ -265,8 +267,8 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Sätt approved=false och ange required_changes om exempelsvaret är fel, motsägelsefullt, otillräckligt för utlovade poäng eller kräver något som frågan inte efterfrågar. " +
       "Flera giltiga kortsvar är tillåtna när frågan är tydligt avgränsad och bedömningsmatrisen accepterar dem. " +
       "Använd source_material som begränsat faktaunderlag för source_alignment; om stödet saknas eller är oklart, sänk source_alignment och godkänn inte ett obestyrkt sakpåstående. " +
-      "För source_support: pröva separat om frågans krav, hela model_answer inklusive exempel, och alla poänggivande krav i rubric och scoring_rubric stöds av source_material eller en enkel härledning ur det. rubric_parts ska ha ett värde per scoring_rubric.parts i samma ordning, accepted_answers ett värde per godtaget alternativ; tomma listor om indata saknar dem. Markera false om någon väsentlig del saknar stöd, även om den är allmänt sann. Citerade ord som bara nämner ämnet räcker inte. evidence_quotes ska vara 1–5 ordagranna, sammanhängande utdrag ur source_material; hitta inte på citat. Ange för question_evidence, answer_evidence och rubric_evidence index in i evidence_quotes som faktiskt stöder just den delen. rubric_part_evidence och accepted_answer_evidence ska ha en indexlista per motsvarande del i samma ordning. Tomma ytterlistor när motsvarande indata saknas. Återanvänd inte ett irrelevant citat. Om stöd saknas, ange närmaste verkliga utdrag men markera berört fält false. Exempel: en källa som bara säger att alleler är genvarianter stöder inte en fråga om dominant/recessiv nedärvning. " +
-      "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Avvisa en kandidat som upprepar eller nära parafraserar samma lärandemål; comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
+      "För source_support: dela upp model_answer i enskilda faktapåståenden och orsakssamband. Pröva varje sats, exempel, precisering och slutsats mot source_material innan du sätter answer=true; ett enda obestyrkt tillägg gör hela answer=false, även om resten av svaret är korrekt. En allmänt känd biologisk detalj är inte en enkel härledning ur ett närliggande källcitat. Pröva separat frågans krav och varje poänggivande krav i rubric och scoring_rubric. rubric_parts ska ha ett värde per scoring_rubric.parts i samma ordning, accepted_answers ett värde per godtaget alternativ; tomma listor om indata saknar dem. Markera false om någon väsentlig del saknar stöd, även om den är allmänt sann. Citerade ord som bara nämner ämnet räcker inte. evidence_quotes ska vara 1–5 ordagranna, sammanhängande utdrag ur source_material; hitta inte på citat. Ange för question_evidence, answer_evidence och rubric_evidence index in i evidence_quotes som faktiskt stöder just den delen. rubric_part_evidence och accepted_answer_evidence ska ha en indexlista per motsvarande del i samma ordning. Tomma ytterlistor när motsvarande indata saknas. Återanvänd inte ett irrelevant citat. Om stöd saknas, ange närmaste verkliga utdrag men markera berört fält false. Exempel: en källa som bara säger att meios bildar könsceller med halva kromosomantalet stöder inte påståendet att fyra könsceller bildas. " +
+      "En ordagrant förekommande källhänvisning räcker inte om källtexten motsäger eller inte stöder påståendet. Jämför kandidaterna sinsemellan och, när comparison_questions finns, med de redan godkända frågorna. Sätt duplicate_of till id för en tidigare kandidat eller redan godkänd fråga som prövar samma lärandemål med i huvudsak samma fullpoängssvar, även om frågeorden skiljer sig; annars tom sträng. Avvisa dubbletten med approved=false. Blanda inte ihop frågor med samma ämne men olika svarsmål. comparison_questions är endast jämförelseunderlag och ska inte få egna resultat. " +
       "Sätt approved=false om NÅGOT av följande gäller: faktafel, en flervalsfråga med fler än ett rimligt svar eller flera försvarbara tolkningar, ett giltigt kortsvar som bedömningsmatrisen inte accepterar, en hittad-på term/kategori/paragraf, " +
       "distraktorer som är orimliga eller avslöjar rätt svar genom formulering, poäng som inte matchar frågans omfattning, " +
       "eller en svårighetsgrad som inte matchar den valda E/C/A-nivån och uppgiftens faktiska krav. cognitive_level är en separat beskrivning av tänkandet och får inte ensam avgöra nivån. " +
@@ -283,8 +285,8 @@ function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel) {
       "Set approved=false and explain required_changes if the exemplar is wrong, contradictory, insufficient for the promised points, or requires more than the question asks. " +
       "Multiple valid short answers are acceptable when the question is clearly scoped and the grading rubric accepts them. " +
       "Use source_material as bounded factual evidence for source_alignment; if support is missing or unclear, lower source_alignment and do not approve unsupported claims. " +
-      "For source_support, judge separately whether the question's demands, the entire model_answer including examples, and every graded requirement in rubric and scoring_rubric are supported by source_material or a simple derivation from it. rubric_parts must have one verdict per scoring_rubric.parts entry in order, accepted_answers one per alternative; empty lists when input has none. Mark false if any substantive part lacks support, even when it is generally true. Merely mentioning the topic is not evidence. evidence_quotes must be 1–5 exact contiguous excerpts from source_material; do not invent quotes. In question_evidence, answer_evidence and rubric_evidence give indices into evidence_quotes that actually support that surface. rubric_part_evidence and accepted_answer_evidence need one index list per corresponding item in order; empty outer arrays when no corresponding input. Do not reuse an irrelevant quote. If support is absent, quote the closest real excerpt but mark the unsupported field false. For example, a source saying only that alleles are gene variants does not support a dominant/recessive inheritance question. " +
-      "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Reject a candidate that repeats or near-paraphrases the same learning objective; comparison_questions are context only and must not receive results. " +
+      "For source_support, split model_answer into individual factual claims and causal links. Check every clause, example, qualification, and conclusion against source_material before setting answer=true; one unsupported addition makes the entire answer=false even when the rest is correct. A generally known biology detail is not a simple derivation from a nearby source quote. Judge the question's demands and every graded requirement in rubric and scoring_rubric separately. rubric_parts must have one verdict per scoring_rubric.parts entry in order, accepted_answers one per alternative; empty lists when input has none. Mark false if any substantive part lacks support, even when it is generally true. Merely mentioning the topic is not evidence. evidence_quotes must be 1–5 exact contiguous excerpts from source_material; do not invent quotes. In question_evidence, answer_evidence and rubric_evidence give indices into evidence_quotes that actually support that surface. rubric_part_evidence and accepted_answer_evidence need one index list per corresponding item in order; empty outer arrays when no corresponding input. Do not reuse an irrelevant quote. If support is absent, quote the closest real excerpt but mark the unsupported field false. For example, a source saying only that meios forms sex cells with half the chromosomes does not support a claim that four sex cells form. " +
+      "An exact source quote is not enough when the source contradicts or does not support the claim. Compare candidate questions with each other and, when comparison_questions is present, with those previously approved questions. Set duplicate_of to the ID of an earlier candidate or previously approved question that tests the same learning objective with substantially the same full-score answer, even if the wording differs; otherwise use an empty string. Reject the duplicate with approved=false. Do not merge questions on the same topic with different answer targets. comparison_questions are context only and must not receive results. " +
       "Set approved=false if ANY of the following apply: factual errors, a multiple-choice question with more than one reasonable answer or defensible interpretation, a valid short answer excluded by its grading rubric, a fabricated " +
       "term/category/citation, distractors that are absurd or give away the answer through phrasing, points that don't " +
       "match the question's scope, or a difficulty that doesn't match the selected E/C/A target and actual task demand. cognitive_level describes the type of thinking separately and must not determine the target level by itself. " +
@@ -408,6 +410,8 @@ async function verifyQuestions(questions, opts) {
     }
     const perQuestion = new Map();
     const questionById = new Map(items.map((item) => [item.id, item]));
+    const questionIndexById = new Map(items.map((item, index) => [item.id, index]));
+    const comparisonIds = new Set((reviewInput.comparison_questions || []).map((item) => item.id));
     for (const res of parsed.results) {
       if (!res || typeof res !== "object" || typeof res.id !== "string" || !expectedIds.has(res.id) || perQuestion.has(res.id)) {
         failed.failureReason = "invalid_result_id";
@@ -422,6 +426,10 @@ async function verifyQuestions(questions, opts) {
       const support = res.source_support;
       const quotes = support?.evidence_quotes;
       const expectedQuestion = questionById.get(res.id);
+      const duplicateOfContractOk = typeof res.duplicate_of === "string" &&
+        (res.duplicate_of === "" || comparisonIds.has(res.duplicate_of) ||
+          (questionIndexById.has(res.duplicate_of) &&
+            questionIndexById.get(res.duplicate_of) < questionIndexById.get(res.id)));
       const expectedRubricParts = Array.isArray(expectedQuestion?.scoring_rubric?.parts)
         ? expectedQuestion.scoring_rubric.parts.length : 0;
       const expectedAcceptedAnswers = expectedQuestion.accepted_answers.length;
@@ -445,10 +453,18 @@ async function verifyQuestions(questions, opts) {
       const failureCategories = res.approved === true && Array.isArray(res.required_changes) && res.required_changes.length === 0
         ? []
         : classifyReviewFindings(res.required_changes);
+      if (!duplicateOfContractOk && !failureCategories.includes("reviewer_other")) {
+        failureCategories.push("reviewer_other");
+      }
+      if (duplicateOfContractOk && res.duplicate_of.length > 0 &&
+          !failureCategories.includes("repeated_learning_objective")) {
+        failureCategories.push("repeated_learning_objective");
+      }
       if (!sourceSupportContractOk && !failureCategories.includes("source_support")) failureCategories.push("source_support");
       perQuestion.set(res.id, {
         ...res,
         option_quality_contract_ok: optionQualityContractOk,
+        duplicate_of_contract_ok: duplicateOfContractOk,
         source_support_contract_ok: sourceSupportContractOk,
         failure_categories: failureCategories,
       });

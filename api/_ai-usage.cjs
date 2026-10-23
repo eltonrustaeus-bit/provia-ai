@@ -203,9 +203,12 @@ function usageEvent({ userId, requestId, tier, feature = "mock_exam", step, mode
     pipeline_step: step,
     provider: "openai",
     model: String(model).slice(0, 120),
-    ...(tokens || { input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, embedding_tokens: embeddingTokens }),
+    input_tokens: tokens?.input_tokens ?? 0,
+    cached_input_tokens: tokens?.cached_input_tokens ?? 0,
+    output_tokens: tokens?.output_tokens ?? 0,
+    embedding_tokens: embeddingTokens ?? 0,
     latency_ms: Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0,
-    ...(typeof verificationPassed === "boolean" ? { verification_passed: verificationPassed } : {}),
+    verification_passed: typeof verificationPassed === "boolean" ? verificationPassed : null,
   };
 }
 

@@ -29,8 +29,8 @@ test("provider tokens are measured, while missing or incoherent usage is omitted
   assert.equal(usageEvent({ ...sample, step: "unknown" }), null);
   assert.equal(usageEvent({ ...sample, verificationPassed: true }).verification_passed, true);
   assert.equal(usageEvent({ ...sample, verificationPassed: false }).verification_passed, false);
-  assert.equal(usageEvent({ ...sample, verificationPassed: null }).verification_passed, undefined);
-  assert.equal(usageEvent({ ...sample, verificationPassed: "passed" }).verification_passed, undefined);
+  assert.equal(usageEvent({ ...sample, verificationPassed: null }).verification_passed, null);
+  assert.equal(usageEvent({ ...sample, verificationPassed: "passed" }).verification_passed, null);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", step: "validate" }).feature, "per_chat");
   assert.equal(usageEvent({ ...sample, feature: "per_landing", userId: null }).user_id, null);
   assert.equal(usageEvent({ ...sample, feature: "per_chat", userId: null }), null);
@@ -94,6 +94,11 @@ test("batch insert contains only whitelisted metrics and uses the server key", a
   assert.equal(rows[2].user_id, null);
   assert.equal(rows[2].embedding_tokens, 18);
   assert.equal(rows[2].input_tokens, 0);
+  assert.equal(rows[0].embedding_tokens, 0);
+  assert.equal(rows[0].verification_passed, null);
+  assert.deepEqual(rows.map((row) => Object.keys(row).sort()),
+    Array.from({ length: rows.length }, () => Object.keys(rows[0]).sort()),
+    "mixed generation, grading and embedding events have identical bulk-insert columns");
 });
 
 test("telemetry failure is fail-open and cannot fabricate a zero-cost row", async () => {

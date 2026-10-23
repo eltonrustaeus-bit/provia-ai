@@ -168,6 +168,7 @@ globalThis.fetch = async (input, init = {}) => {
             rubric_part_evidence: Array.isArray(question.scoring_rubric?.parts) ? question.scoring_rubric.parts.map(() => [0]) : [],
             accepted_answer_evidence: Array.isArray(question.accepted_answers) ? question.accepted_answers.map(() => [0]) : [] },
           language_match: true, option_quality: question.options.map(() => true),
+          duplicate_of: "",
           issues: question.id === rejectedId ? [failureCode] : [],
           required_changes: question.id === rejectedId ? [failureNote] : [],
         })) });
@@ -1187,7 +1188,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
           `the actual ${requested}-question path marks each fully approved ${step} batch as passed`);
       }
       assert.ok(mockedUsageEvents.filter(event => event.pipeline_step === "generate")
-        .every(event => !Object.hasOwn(event, "verification_passed")),
+        .every(event => event.verification_passed === null),
       "generation usage events do not masquerade as quality-review outcomes");
       assert.doesNotMatch(JSON.stringify(mockedUsageEvents), /Beräkna|Addition|2\+3=5|3\+3=6|4\+3=7/,
         "usage telemetry excludes question text and study material");

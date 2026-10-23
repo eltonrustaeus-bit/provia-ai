@@ -169,6 +169,8 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
+assert.match(biologyPrompt.systemPrompt, /Varje sakpåstående, exempel och krav i model_answer.*måste stödjas av materialet/i,
+  "the generator keeps the full answer and scoring contract within the source");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
@@ -191,6 +193,8 @@ assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear a
   "English short-answer generation follows the same bounded-task rule");
 assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
   "English scoring criteria cannot silently require unrequested work");
+assert.match(englishPrompt.systemPrompt, /Every factual claim, example, and requirement in model_answer.*must be supported by the material/i,
+  "English generation has the same source-bound answer rule");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
@@ -863,6 +867,7 @@ globalThis.fetch = async (input, init = {}) => {
           question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
           rubric_part_evidence: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => [0]) : [],
           accepted_answer_evidence: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => [0]) : [] },
+        duplicate_of: "",
         language_quality: 1, language_match: q.id !== verifierLanguageMismatchId, option_quality: Array.isArray(q.options)
           ? q.options.map((_, index) => !(optionRejected && index === 2))
           : [],

@@ -126,6 +126,7 @@ globalThis.fetch = async (input, init = {}) => {
       return outputResponse({ results: review.questions.map((q) => ({
       id: q.id, approved: true, factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
       source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [],
+      duplicate_of: "",
       source_support: { question: true, answer: true, rubric: true,
         rubric_parts: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => true) : [],
         accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => true) : [],
