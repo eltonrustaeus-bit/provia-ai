@@ -1907,10 +1907,14 @@ spärrad tills databasschemat är versionssynkat och verifierat.
 - [!] Alla provider-/granskarresultat är syntetiska mocks. Detta testar den
   integrerade timeout-/salvage-kontrollvägen, inte verklig modellyield,
   hostad RLS/ACL eller staging.
-- [!] Endast `tests/api/exam-pipeline-offline.test.mjs` och denna statusfil är
-  lokalt ändrade efter `683d841`; `supabase/.temp/cli-latest` är en separat
-  befintlig användarändring och har lämnats orörd. Ingen ny push/deploy/merge
-  gjordes i denna fortsättning.
+- [x] Status- och teständringarna committades som `00cace9` och pushades till
+  feature-branchen. PR #123 pekar på den commiten; dess Vercel Preview byggs.
+  `supabase/.temp/cli-latest` är en separat befintlig användarändring och har
+  lämnats orörd.
+- [!] GitHub PR #123 är fortfarande draft. Produktionskontrollen visar att
+  `mock_exam_generation_pipeline_jobs`, `mock_exam_generation_requests` och
+  pipeline-/kvots-RPC:erna saknas. Merge till `main`/Production görs därför
+  inte innan separat, godkänd schemahantering och verifiering.
 
 **PILOT NOT READY.** Kvar är färsk stagingmigrations-/budgetkontroll,
 versionssynkad stagingverifiering och därefter säker produktionsschema-plan
