@@ -1579,6 +1579,7 @@ let currentExam=null;
 let currentExamProof=null;
 let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
+let gradeSubmissionBlocked=false;
 window.__getPerStudyMaterial=function(){
   if(currentExam&&!currentExamProof)return "";
   return String(pastedTextEl()?.value||"").trim().slice(0,6000);
@@ -1590,7 +1591,7 @@ function setBusy(isBusy,label){
   if(ms&&label)ms.textContent=label;
   const dot=$("sDotMain");if(dot)dot.classList.toggle("ok",!isBusy);
   ["generateExamBtn","clearBtn","ocrBtn"].forEach(id=>{const el=$(id);if(el)el.disabled=isBusy;});
-  const g=$("gradeBtn");if(g)g.disabled=isBusy||!currentExam;
+  const g=$("gradeBtn");if(g)g.disabled=isBusy||!currentExam||gradeSubmissionBlocked;
 }
 
 function showGradingOverlay(){
@@ -1990,6 +1991,7 @@ function renderExam(exam){
   const t=T[LANG];
   currentExamProof=null;
   currentExamAnswers=null;
+  gradeSubmissionBlocked=false;
   let graphToolUnavailable=false;
   const rawQs=Array.isArray(exam.questions)?exam.questions:[];
   const qs=rawQs.filter(isRenderableQuestion);
@@ -2752,6 +2754,13 @@ try{
   // funnits i den dolda wizardens DOM. Utan argument läses de som förut.
   async function runGrade(answersOverride){
     if(isGrading)return {ok:false,error:"Rättning pågår redan."};
+    if(gradeSubmissionBlocked){
+      const message=LANG==="sv"
+        ?"Det här provet kan inte lämnas in igen. Kontrollera provhistoriken eller skapa ett nytt prov av ditt material."
+        :"This exam cannot be submitted again. Check your exam history or create a new exam from your material.";
+      setStatus(message,"bad");showToast(message,"bad");
+      return {ok:false,error:message};
+    }
     hideDebug();const t=T[LANG];
     if(!currentExam||!Array.isArray(currentExam.questions)||currentExam.questions.length===0){setStatus(t.genFirst,"bad");return {ok:false,error:t.genFirst};}
     if(!currentExam.exam_manifest){
@@ -2813,6 +2822,9 @@ try{
         const recoveryRequired = res?.data?.error === "EXAM_RESULT_RECOVERY_REQUIRED";
         const resultExpired = res?.data?.error === "EXAM_RESULT_EXPIRED";
         const anotherExamActive = res?.data?.error === "EXAM_ACTIVE";
+        if(alreadyGraded||inactiveExam||answerConflict||gradingInterrupted||resultExpired){
+          gradeSubmissionBlocked=true;
+        }
         const msg = alreadyGraded
           ? (LANG==="sv"?"Det här provet har redan rättats. Inget nytt resultat visades. Kontrollera provhistoriken eller kontakta support om det saknas.":"This exam has already been graded. No new result was shown. Check your history or contact support if it is missing.")
           : gradingPending
@@ -3206,6 +3218,7 @@ try{
       currentExam = exam;
       currentExamProof = null;
       currentExamAnswers = null;
+      gradeSubmissionBlocked = false;
       const g = $("gradeBtn"); if (g) g.disabled = false;
       return true;
     },

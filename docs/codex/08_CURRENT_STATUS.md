@@ -1,5 +1,33 @@
 # 08 Current Status
 
+## Terminal rättningsstatus, kostnad och fortsatt stagingverifiering — 2026-10-25
+
+- [x] Användaren höjde den totala godkända AI-kostnadsgränsen till `$5`.
+  Stagingens egen budgetrad lämnades oförändrad: cap `$3.379071`, spenderat
+  `$1.989743`, reserverat `$0.263628`, effektiv marginal cirka `$1.125700`.
+  Ingen budget, kvot eller roll ändrades.
+- [x] Den enda återanvända Preview-fliken visade ett redan ifyllt 12/12-prov.
+  Ett avslutsförsök gick kort till rättningsläge och återgick till provvyn.
+  Staging hade 20 issuance-poster, 12 med verifierat resultat, 0 aktiva
+  ograderade och 0 rättningar utan resultat. Vyns sista fråga/svar matchade
+  inte någon sparad resultatrad. Inga nya `ai_usage_events` registrerades.
+  Vyn bedöms därför som en gammal klientvy, inte en ny liveverifiering.
+- [x] Rättningsmotorn spärrar nu upprepade inlämningar efter terminala svar
+  (`EXAM_NOT_ACTIVE`, redan rättat, svarskonflikt, avbruten rättning eller
+  utgånget resultat). Spärren gäller även P.E.R:s direkta `grade(answers)`-väg.
+  Provets lokala innehåll lämnas kvar; ny provrendering/återupptagning återställer
+  spärren. Tillfälliga nätverks- och modellfel förblir återförsökbara.
+- [x] Ny riktad regression `tests/frontend/terminal-grade-state.test.mjs`
+  passerade; den kontrollerar att terminal standard-/P.E.R-inlämning inte gör
+  ett nytt API-anrop och att ett tillfälligt providerfel kan återförsökas.
+  Hela `tests/frontend/exam-flow.regression.mjs` passerade **192/192**.
+  `git diff --check` passerade. Oberoende granskning fann ingen blockerare.
+- [!] Ingen ny modellförfrågan, ny generering, produktionsändring eller merge
+  gjordes. Aktuell flik kan inte användas som bevis för lyckad ny rättning.
+  Före ett nytt liveprov ska den gamla vyns identitet/återhämtning lösas; kör
+  därefter högst ett komplett syntetiskt flöde inom stagingens kvarvarande
+  interna spärr, utan att skapa parallella prov.
+
 ## Enfliksregel och aktuell Preview-status — 2026-10-25
 
 - [x] Arbetet återanvänder en befintlig Preview-session. Inga nya
