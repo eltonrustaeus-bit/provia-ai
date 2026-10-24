@@ -1,5 +1,75 @@
 # 08 Current Status
 
+## Uppföljning utan extra liveförbrukning — 2026-10-24 21:04 UTC
+
+- [x] Behöll en och samma befintliga Preview-flik. Inga nya flikar, provstarter,
+  stagingkonton eller modellförfrågningar skapades i denna fortsättning.
+- [x] Regressionstest reproducerade ett återupptaget felträningsprov där ett
+  gammalt, obestyrkt fokus-anspråk kunde ta sista platsen utan att täcka rätt
+  källunderlag. Pipeline täcker nu bara tidigare fokus som stöds av frågans
+  källa. Regressionen och angränsande 3/6/12-tester passerar.
+- [x] När fler godkända kandidater än platser finns rankas nya lärandemål före
+  redan representerade mål. Detta är urval, inte en ny avvisningsregel: inga
+  frågor underkänns av breddheuristiken och godkänd övning kan fylla provet när
+  bättre källstödda alternativ saknas.
+- [x] Oberoende granskning fann inga blockerande fynd eller försvagade grindar.
+  Granskaren noterar att lärandemålsbredd rangordnas före materialsektionernas
+  täckning när kandidater konkurrerar om platser.
+- [x] Offline-sviten för pipeline, HTTP, Postgres-emulering, källtäckning och
+  felträning passerade **77/77**. Inga OpenAI-anrop gjordes. Tidigare riktade
+  P.E.R.-regressioner passerade **4/4**.
+- [!] Ändringarna i denna fortsättning är lokala och ocommittade; de har inte
+  byggts i en ny Preview eller liveverifierats. Det redan synliga påbörjade
+  provet och dess session lämnades orörda.
+
+**PILOT NOT READY.** Nästa säkra verifikation är en enda stagingkörning på
+Previewn efter att ett befintligt konto utan aktivt prov valts och den aktuella
+stagingbudgeten bekräftats. Håll samma Preview-flik; skapa inte prov i flera
+flikar eller starta om en pågående körning.
+
+## Senaste session- och kvotkontroll — 2026-10-24 20:50 UTC
+
+- [x] Aktuell kodrevision är `6582f96ad34c7f233f738c5bf483411deca97ec0` på
+  `codex/exgen-school-pilot-integration-20261024`; fjärrens godkända
+  feature-branch pekar på samma commit. Matchande Vercel Preview är `READY`.
+- [x] Den befintliga branch-aliasen i sidbrowsern visar den autentiserade
+  ExGen-appen. UI:t erbjuder att fortsätta ett tidigare påbörjat prov. Ingen
+  knapp trycktes; provet identifierades inte närmare och lämnades orört.
+- [x] Ingen ny flik, provstart eller modellförfrågan gjordes. Samma Preview-flik
+  behölls för fortsatt arbete.
+- [x] Read-only aggregerad stagingbudget kontrollerades kl. 20:50 UTC:
+  cap `$3.379071`, spenderat `$1.737989`, reserverat `$0.263628`, aktiverad;
+  tillgängligt `$1.377454`. Radens senaste uppdatering är 20:22 UTC. Detta är
+  appens stagingbudget, inte en OpenAI-faktura.
+- [x] `node --test tests/api/exam-generation-pipeline-postgres.test.mjs`
+  passerade **25/25**. Den kombinerade offlinekörningen av pipeline-, HTTP- och
+  PGlite-tester avslutades med exit code 0 och innehöll 3/6/12-, retry-,
+  assembly- och kvotreaperfallen.
+- [x] Två oberoende skrivskyddade reviewers fann ingen blockerande race för
+  redan skapade aktiva jobb och ingen blockerare i idempotens/provstatus.
+  Reaper skyddar aktiva jobb; completion låser jobbet och committar kvot och
+  utfärdande transaktionellt. PGlite-testerna är dock sekventiella och bevisar
+  inte konkurrens mellan verkliga PostgreSQL-sessioner.
+- [!] En separat, smal testlucka finns före pipeline-jobbskapandet: reaper
+  kontrollerar aktiva pipelinejobb, inte en ännu ej skapad jobbrad. En paus över
+  två minuter kan i teorin återbetala reservationen. I den konfigurerade vägen
+  är API:ets `maxDuration` 60 s, parent-leasen 90 s och reapertröskeln 2 min;
+  scenariot ligger alltså utanför normal exekvering och har inte reproducerats.
+  Ingen kodändring gjordes för hypotesen.
+- [!] Read-only stagingmigrationskontroll visar `20261024140557` och
+  `20261024151433`, men saknar den lokala retentionjusteringen
+  `20261024165536`. Den senare kan stänga gamla privata pipelinejobb; den
+  tillämpades inte för att bevara stagingdata och den ändrar inte nya jobbens
+  genererings-/assembly-RPC-kontrakt.
+- [x] Fem riktade P.E.R.- och felträningsfiler avslutades lokalt med exit code 0.
+  Alla körningar var offline och gjorde inga modellförfrågningar.
+
+**PILOT NOT READY.** Behåll det redan påbörjade provet. Inget nytt liveprov görs
+i denna session: den enda synliga sessionen har ett påbörjat prov och budgeten
+har `$1.377454` tillgängligt, medan ett tryggt kostnadsestimat för nytt
+end-to-end-flöde inte är verifierat. `main`, Production, Supabase-schema,
+konton, roller och kvoter har inte ändrats.
+
 # Fortsatt skolpilotfix — fokusord, källbredd och felträning — 2026-10-24
 
 - [x] Färsk Vercel-runtime-logg för den versionssynkade Previewn bekräftar att
@@ -74,16 +144,22 @@ budget och staging-schema före det enda godkända syntetiska testflödet. Det �
 - [x] Relevanta API-/pipeline-/verifierar-/Postgres-emuleringstester passerade;
   syntaxkontroll och diffkontroll passerade. P.E.R.-regressionerna för vanlig
   hjälp, aktivt prov och rättat resultat passerade 3/3. Inga modeller anropades.
-- [!] Ändringarna är lokala och ännu inte committade/pushade. Ingen ny Preview
-  eller stagingmodellkörning har verifierat den slutliga ändringen. Senast
-  tidigare budgetläsning visade `$1.377454` tillgängligt under Preview-cap, men
-  den är inte färsk och får inte användas som anropsgodkännande utan ny läsning.
+- [x] Ändringarna är committade som `6582f96ad34c7f233f738c5bf483411deca97ec0`
+  och pushade till `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_H6TXc96SnQZNqKEoQrwZeFbHkQ3b` blev `READY` på exakt den committen.
+  Branch-aliasen öppnades i samma befintliga flik; ingen ny flik eller prov
+  skapades.
+- [!] Ingen ny stagingmodellkörning har verifierat den slutliga ändringen.
+  Previewn visar inloggningsgrinden. Senast tidigare budgetläsning visade
+  `$1.377454` tillgängligt under Preview-cap, men den är inte färsk och får inte
+  användas som anropsgodkännande utan ny läsning.
 
-**PILOT NOT READY.** Källbindning och tomsvarsfelet är åtgärdade och offline-
-granskade. Nästa steg är att slutföra status-/diffkontroll, skapa en enda Preview
-på den befintliga branchen, navigera samma flik till branch-aliasen, logga in en
-gång och verifiera konto/budget/schema före ett syntetiskt flöde. Ingen
-Production-, `main`-, kontovals- eller kvotåtgärd har gjorts.
+**PILOT NOT READY.** Källbindning och tomsvarsfelet är åtgärdade, offline-
+testade och deployade till en READY staging-Preview. Nästa steg är en enda
+inloggning på branch-aliasen i samma flik, följt av kontroll att kontot saknar
+aktivt prov och färsk budget-/schema-verifiering före det enda godkända
+syntetiska flödet. Ingen Production-, `main`-, kontovals- eller kvotåtgärd har
+gjorts.
 
 ## Ny stagingkörning och förbättringar för provbredd — 2026-10-24
 

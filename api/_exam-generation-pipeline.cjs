@@ -32,6 +32,13 @@ function noSemanticDuplicate(questions, candidate) {
     String(question.id) === String(candidate.id) || assessment.isDuplicateQuestion(question, candidate));
 }
 
+function questionBreadthKey(question) {
+  const value = question?.learning_objective || question?.concept_tag;
+  return typeof value === "string"
+    ? value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+    : "";
+}
+
 function batchQuestionId(job, question) {
   return "q-" + crypto.createHash("sha256")
     .update(JSON.stringify([job.id, job.lease_token, String(question.id)]))
@@ -249,18 +256,33 @@ async function advance(job, { deadlineAt = null } = {}) {
   let overLimitCandidates = 0;
   let focusMismatchCandidates = 0;
   const coveredTrainingFocusIds = new Set(acceptedBefore.flatMap((question) =>
-    Array.isArray(question?.training_focus_matches) ? question.training_focus_matches : []));
+    supportedTrainingFocusMatches(
+      question, question?.training_focus_matches, job.payload.trainingFocus,
+    )));
   const sourceCounts = sourceTarget?.counts || [];
   const rankedQuestions = generated.body.questions.map((question, index) => ({ question, index,
     sourceIndices: coverage.questionSectionIndices(question, sections) }));
   const eligibleCount = rankedQuestions.filter(({ question }) => question.validation_status === "verified" &&
     (!targets || question.type === batchType) && noSemanticDuplicate(existing, question)).length;
-  if (sections.length && eligibleCount > slots) rankedQuestions.sort((left, right) => {
+  if (eligibleCount > slots) {
+    const representedBreadth = new Set(existing.map(questionBreadthKey).filter(Boolean));
+    const breadthCounts = new Map();
+    for (const { question } of rankedQuestions) {
+      const key = questionBreadthKey(question);
+      if (key) breadthCounts.set(key, (breadthCounts.get(key) || 0) + 1);
+    }
+    const addsBreadth = (entry) => {
+      const key = questionBreadthKey(entry.question);
+      return key && !representedBreadth.has(key) ? 1 : 0;
+    };
+    const breadthAvailability = (entry) => breadthCounts.get(questionBreadthKey(entry.question)) || Infinity;
     const newSections = (entry) => entry.sourceIndices.filter((index) => sourceCounts[index] === 0).length;
     const lowestCount = (entry) => entry.sourceIndices.length
       ? Math.min(...entry.sourceIndices.map((index) => sourceCounts[index])) : Infinity;
-    return newSections(right) - newSections(left) || lowestCount(left) - lowestCount(right) || left.index - right.index;
-  });
+    rankedQuestions.sort((left, right) => addsBreadth(right) - addsBreadth(left) ||
+      breadthAvailability(left) - breadthAvailability(right) ||
+      newSections(right) - newSections(left) || lowestCount(left) - lowestCount(right) || left.index - right.index);
+  }
   for (const { question } of rankedQuestions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
     const candidateFocusMatches = supportedTrainingFocusMatches(
