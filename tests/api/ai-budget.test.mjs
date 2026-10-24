@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
-  PILOT_USER_ID, PILOT_BUDGET_USD, isBudgetedPilot, normalizeBudgetBody,
+  PILOT_USER_ID, PILOT_BUDGET_USD, isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody,
   estimateWorstCaseUsd, actualCostUsd, reserveAiSpend, settleAiSpend, budgetedOpenAIFetch,
 } = require("../../api/_ai-usage.cjs");
 
@@ -18,6 +18,10 @@ test("budget is enabled only for the named staging account and staging project",
   assert.equal(isBudgetedPilot("another-user", stagingEnv), false);
   assert.equal(isBudgetedPilot(PILOT_USER_ID, { ...stagingEnv, SUPABASE_URL: "https://production.supabase.co" }), false);
   assert.equal(PILOT_BUDGET_USD, 5);
+  assert.equal(pilotBudgetCapUsd(stagingEnv), 5);
+  assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "3.379071" }), 3.379071);
+  assert.equal(pilotBudgetCapUsd({ ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "5.000001" }), null,
+    "an override cannot raise the established hard cap");
 });
 
 test("requests are capped and unknown models fail closed for the budgeted account", () => {
@@ -53,6 +57,23 @@ test("staging budget reservation fails closed and settlement uses the same serve
 
   assert.equal(await settleAiSpend(reservation, { input_tokens: 100, output_tokens: 20 }, { env: stagingEnv, fetchImpl }), true);
   assert.equal(requests[1].url, `${stagingEnv.SUPABASE_URL}/rest/v1/rpc/settle_ai_spend`);
+});
+
+test("staging budget reservation and settlement use the branch-scoped lower cap", async () => {
+  const requests = [];
+  const env = { ...stagingEnv, EXGEN_PILOT_BUDGET_CAP_USD: "3.379071" };
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, init });
+    return Response.json({ ok: true });
+  };
+  const reservation = await reserveAiSpend({
+    userId: PILOT_USER_ID, model: "gpt-6-luna",
+    body: { model: "gpt-6-luna", input: "synthetic prompt" },
+  }, { env, fetchImpl });
+  assert.equal(reservation.ok, true);
+  assert.equal(JSON.parse(requests[0].init.body).p_cap_usd, 3.379071);
+  assert.equal(await settleAiSpend(reservation, { input_tokens: 100, output_tokens: 20 }, { env, fetchImpl }), true);
+  assert.equal(JSON.parse(requests[1].init.body).p_cap_usd, 3.379071);
 });
 
 test("spend settlement retries once with the same idempotent reservation after a transient failure", async () => {

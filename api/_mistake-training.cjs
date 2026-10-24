@@ -59,6 +59,14 @@ function normalizeTrainingSources(value) {
   return result;
 }
 
+function priorQuestionKey(value) {
+  return typeof value === "string"
+    ? value.toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/\u2212/g, "-")
+      .replace(/[^\p{L}\p{N}+\-=×÷*/<>≤≥^%∈∉≠≡≈≃≅∼∝→←↔⇒⇔√∛∑∏∫∂∇∞∪∩⊂⊆⊄⊃⊇∧∨¬∣∤]+/gu, " ").trim()
+      .replace(/\s*([+\-=×÷*/<>≤≥^%∈∉≠≡≈≃≅∼∝→←↔⇒⇔√∛∑∏∫∂∇∞∪∩⊂⊆⊄⊃⊇∧∨¬∣∤])\s*/gu, "$1")
+    : "";
+}
+
 function normalizePriorQuestions(value) {
   if (!Array.isArray(value)) return [];
   const result = [];
@@ -66,8 +74,7 @@ function normalizePriorQuestions(value) {
   for (const item of value.slice(0, MAX_TRAINING_ITEMS)) {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const question = safeText(item.question, 1200);
-    const normalized = question.toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/\u2212/g, "-")
-      .replace(/[^\p{L}\p{N}+\-=×÷*/<>≤≥^%]+/gu, " ").trim();
+    const normalized = priorQuestionKey(question);
     if (!question || !normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     result.push({
@@ -91,4 +98,4 @@ function composeReviewComparisons(priorQuestions, currentQuestions, limit = MAX_
   return [...prior, ...current];
 }
 
-module.exports = { normalizeTrainingFocus, normalizePriorQuestions, normalizeTrainingSources, composeReviewComparisons };
+module.exports = { normalizeTrainingFocus, normalizePriorQuestions, normalizePriorQuestionKey: priorQuestionKey, normalizeTrainingSources, composeReviewComparisons };

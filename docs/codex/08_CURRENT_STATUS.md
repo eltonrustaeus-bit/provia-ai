@@ -1,5 +1,42 @@
 # 08 Current Status
 
+## Skolpilotens felträning, P.E.R. och testbudget — 2026-10-24
+
+- [x] Åtgärdade två verifierade relevansfel. En tydligt formulerad vanlig P.E.R.-
+  fråga får inte längre blockeras av exakt eller semantisk överlappning med en
+  gammal `page=prov`-fråga när servern bekräftar att inget prov finns. Explicit
+  facit-/uppgiftsreferens och aktivt/osäkert provläge förblir spärrade.
+- [x] Felträningshistorik delar nu samma operatorbevarande normalisering mellan
+  källresolver och jämförelsekontext. Regressioner bevarar skillnader som `+`/
+  `-`, `∈`/`∉`, `≠`/`≡`, `∣`/`∤`, och slår ihop ekvivalenta mellanslagsvarianter.
+  Ägar-, kurs-, signerad rättning-, svarsfingerprint- och felkontroller är
+  oförändrade.
+- [x] Stagingens AI-budgetvakt kan nu använda en branch-scopead cap som bara får
+  sänka det befintliga hårda taket på 5 USD. Både reservation och avräkning
+  skickar samma verifierade cap; saknad eller ogiltig cap failar stängt.
+- [x] En oberoende P.E.R.-granskare verifierade att aktivt/okänt provläge och
+  facitintention fortfarande stoppas före modell/kvot. En oberoende
+  källgranskare verifierade att felträningsproven förblir ägar- och
+  rättningsbundna. En oberoende säkerhetsgranskare bekräftade att databasens
+  cap måste matcha exakt; den synkas först efter att rätt Preview är `READY`.
+- [x] Riktad samlad offline-svit passerade 158/158, inklusive 3/6/12-fråge-
+  pipeline, retry/timeout/idempotens/kvot, P.E.R.-läge och källgrundning. Syntax-
+  och diffkontroller passerade. Dessa resultat är lokala och inte livebevis.
+- [x] `EXGEN_PILOT_BUDGET_CAP_USD=3.379071` lades till endast som Preview-variabel
+  för `codex/exgen-generation-quality-2026-10-20`; beloppet motsvarar då
+  verifierad spend 1.379071 USD + den godkända ytterligare gränsen 2 USD. Värdet
+  är inte en hemlighet. Databasraden är ännu inte uppdaterad; dess cap är fortsatt
+  5 USD tills ny Preview är redo, så budgeterade anrop failar stängt under
+  övergången.
+- [!] Senaste read-only stagingvärden: cap 5.000000 USD, spent 1.379071 USD,
+  reserved 0.263628 USD; raden uppdaterades 2026-10-23 19:43 UTC. Ett nytt AI-
+  anrop har inte gjorts. Syntetiskt liveprov inväntar commit/Preview och exakt
+  synkning av databas-cap. Produktion, `main`, roller och kvoter är orörda.
+
+**PILOT NOT READY.** Lokala relevansfixar är granskade och testade; branch-
+Preview, budgetcapens databassynkning och därefter avgränsad liveverifiering
+återstår.
+
 ## Skolpilot-uppföljning — träningskontext och övergivna jobb, 2026-10-24
 
 - [x] Bekräftad orsak till irrelevanta prov från tidigare misstag: `app.html`

@@ -25,6 +25,14 @@ function isBudgetedPilot(userId, env = process.env) {
   catch { return false; }
 }
 
+function pilotBudgetCapUsd(env = process.env) {
+  if (!Object.hasOwn(env, "EXGEN_PILOT_BUDGET_CAP_USD")) return PILOT_BUDGET_USD;
+  const capUsd = Number(env.EXGEN_PILOT_BUDGET_CAP_USD);
+  return Number.isFinite(capUsd) && capUsd > 0 && capUsd <= PILOT_BUDGET_USD
+    ? Math.round(capUsd * 1_000_000) / 1_000_000
+    : null;
+}
+
 function normalizeBudgetBody(body, { embedding = false } = {}) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const normalized = { ...body };
@@ -96,15 +104,16 @@ async function callBudgetRpc(name, args, { env = process.env, fetchImpl = global
 async function reserveAiSpend({ userId, model, body, embedding = false }, options = {}) {
   const env = options.env || process.env;
   if (!isBudgetedPilot(userId, env)) return { ok: true, enforced: false };
+  const capUsd = pilotBudgetCapUsd(env);
   const normalizedBody = normalizeBudgetBody(body, { embedding });
   const reserveUsd = estimateWorstCaseUsd(normalizedBody, model, { embedding });
-  if (!normalizedBody || reserveUsd === null || reserveUsd <= 0 || reserveUsd > PILOT_BUDGET_USD) {
+  if (!normalizedBody || reserveUsd === null || reserveUsd <= 0 || capUsd === null || reserveUsd > capUsd) {
     return { ok: false, reason: "unsupported_model_or_request" };
   }
   const reservationId = randomUUID();
   const result = await callBudgetRpc("reserve_ai_spend", {
     p_user_id: userId, p_reservation_id: reservationId, p_reserved_usd: reserveUsd,
-    p_cap_usd: PILOT_BUDGET_USD,
+    p_cap_usd: capUsd,
   }, options);
   if (!result.ok) return { ok: false, reason: result.reason || "budget_exhausted" };
   return { ok: true, enforced: true, userId, reservationId, model, reserveUsd, body: normalizedBody, embedding };
@@ -120,7 +129,7 @@ async function settleAiSpend(reservation, usage, options = {}) {
   if (actualUsd === null) return false;
   const args = {
     p_user_id: reservation.userId, p_reservation_id: reservation.reservationId,
-    p_actual_usd: actualUsd, p_cap_usd: PILOT_BUDGET_USD,
+    p_actual_usd: actualUsd, p_cap_usd: pilotBudgetCapUsd(options.env || process.env),
   };
   let result = await callBudgetRpc("settle_ai_spend", args, options);
   // Settlement is idempotent by reservation ID, including a lost success response.
@@ -256,6 +265,6 @@ const logMockExamUsage = logAiUsage;
 module.exports = {
   measuredTokens, measuredEmbeddingTokens, qualityGatePassed, usageEvent, logAiUsage, logMockExamUsage, safeFailureDetails,
   PILOT_STAGING_REF, PILOT_USER_ID, PILOT_BUDGET_USD, RATES_PER_MILLION,
-  isBudgetedPilot, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
+  isBudgetedPilot, pilotBudgetCapUsd, normalizeBudgetBody, estimateWorstCaseUsd, actualCostUsd,
   reserveAiSpend, settleAiSpend, budgetedOpenAIFetch, budgetFailureStatus,
 };

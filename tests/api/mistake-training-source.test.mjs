@@ -325,6 +325,53 @@ test("selected signed mistake questions stay first in duplicate context when sou
   assert.equal(resolved.priorQuestions[1].question, "selected uppgift 20: tolka en linjär funktion");
 });
 
+test("source history keeps questions that differ by a mathematical operator", async () => {
+  const historyQuestions = [
+    "Lös ekvationen x + 1 = 2",
+    "Lös ekvationen x - 1 = 2",
+    "Avgör om x ∈ A",
+    "Avgör om x ∉ A",
+    "Avgör om x ≠ 0",
+    "Avgör om x ≡ 0",
+    "Avgör om 6 ∣ 12",
+    "Avgör om 6 ∤ 12",
+  ].map((question, index) => {
+    const base = {
+      id: `operator-${index + 1}`, type: "short", points: 2, question, options: [],
+      model_answer: index === 0 ? "x = 1" : "Svar enligt villkoret",
+      concept_tag: "Ekvationer", learning_objective: "Lösa linjära ekvationer",
+    };
+    return { ...base, grade_task: gradeTasks.sealQuestion(base, undefined, contextHash) };
+  });
+  const operatorSubmissionId = completion.submissionId(userId, course, historyQuestions);
+  const answers = historyQuestions.map((question) => ({ id: question.id, answer: "osäker" }));
+  const receipt = completion.issueCompletion(userId, course, historyQuestions);
+  const proof = completion.verifyCompletion({
+    receipt, course, material, questions: historyQuestions, answers, selectedQuestionId: "operator-1",
+  }, userId);
+  const sourceRow = {
+    user_id: userId, submission_id: operatorSubmissionId, course, material,
+    exam: { questions: historyQuestions, submission_receipt: receipt }, answers,
+  };
+  const grade = {
+    submission_id: operatorSubmissionId, verified_at: "2026-10-24T10:00:00Z",
+    num_questions: historyQuestions.length, answer_fingerprint: proof.answerFingerprint,
+    result_payload: { per_question: historyQuestions.map((question, index) => ({
+      id: question.id, points: index === 0 ? 0 : 2, max_points: 2,
+      error_tags: index === 0 ? ["calculation_error"] : [],
+    })) },
+    result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+  };
+  const resolved = await resolveMistakeTrainingSource({
+    userId, requestedCourse: course,
+    sourceReferences: [{ submissionId: operatorSubmissionId, questionIds: ["operator-1"] }],
+    trainingFocus: [{ sourceQuestionId: "operator-1", sourceSubmissionId: operatorSubmissionId }],
+    loadOwnedExam: async () => sourceRow,
+    hasVerifiedGrade: async () => grade,
+  });
+  assert.deepEqual(resolved.priorQuestions.map((item) => item.question), historyQuestions.map((item) => item.question));
+});
+
 test("a saved answer edit cannot masquerade as the answer set that was graded", async () => {
   const changedRow = {
     ...row,

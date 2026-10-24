@@ -730,7 +730,7 @@ async function gateActiveExam(req, res, body, user) {
     && body.landingMode !== true && !Array.isArray(body.scores)
     && body.question == null && body.correct == null;
 
-  function referencesExamQuestion({ allowTopicOverlap = false } = {}) {
+  function referencesExamQuestion({ allowTopicOverlap = false, ignoreQuestionMatch = false } = {}) {
     const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
     const explicitAnswerIntent = /\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|(?:vad|what) (?:är|is) (?:facit|svaret|the answer|lösningen)(?: på (?:uppgiften|frågan|provet))?|(?:svaret|the answer) på (?:uppgiften|frågan|provet)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)
       || /\b(?:förklara|visa|ge|beskriv|explain|show|give)\s+(?:mig\s+)?(?:hela\s+)?(?:lösningen|svaret|facit|the solution|the answer)\b/i.test(query)
@@ -740,6 +740,7 @@ async function gateActiveExam(req, res, body, user) {
     const requestsTaskSolution = /\b(?:lös(?:a|er|ning|ningen)?|solve|work out|answer|besvara|svara på|räkn(?:a|ar|ade|at)?|räkna ut|beräkn(?:a|ar|ade|at)?|calculate|compute|facit|svaret|the answer|the solution|förklara|explain|visa|show|walk me through)\b/i.test(query);
     if (explicitAnswerIntent || (concreteTaskReference && (requestsTaskSolution || isClearlyGeneralQuestion()))) return true;
     if (examContextDeclared && /\b(den här|det här|denna fråga|den frågan|detta|dessa|här|this|that|it|those)\b/i.test(query)) return true;
+    if (ignoreQuestionMatch) return false;
     const targets = [
       context?.currentQuestion?.text,
       context?.currentQuestion?.question,
@@ -808,8 +809,12 @@ async function gateActiveExam(req, res, body, user) {
 
   function allowSafeStudyChat(serverState) {
     const clearlyGeneral = isClearlyGeneralQuestion();
-    if (!ordinaryStudyChat || referencesExamQuestion({ allowTopicOverlap: clearlyGeneral })) return false;
     const staleProvView = String(context?.page || "").trim().toLowerCase() === "prov";
+    const staleViewWithoutIssuance = serverState === "none" && staleProvView;
+    if (!ordinaryStudyChat || referencesExamQuestion({
+      allowTopicOverlap: clearlyGeneral && !staleViewWithoutIssuance,
+      ignoreQuestionMatch: clearlyGeneral && staleViewWithoutIssuance,
+    })) return false;
     // With no server issuance, unrelated general help is safe; safeContext
     // below strips a stale question from the old prov view. Unbound or unknown
     // exam context remains gated, as do expired/unverified issuances.

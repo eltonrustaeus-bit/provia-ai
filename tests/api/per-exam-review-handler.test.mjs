@@ -1759,6 +1759,35 @@ test("a stale prov page cannot block unrelated study help when the server has no
       "unverified client exam details are stripped before ordinary help");
 
     calls.length = 0;
+    const sameEquationHelp = await invoke({
+      userQuestion: "Vad betyder k i y = kx + m?",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad betyder k i y = kx + m?", model_answer: "PRIVATE_STALE_ANSWER_MARKER" },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(sameEquationHelp.statusCode, 200);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"),
+      "a standalone study question about the same equation reaches ordinary help when the server confirms no exam");
+    const sameEquationProvider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.doesNotMatch(sameEquationProvider.body, /PRIVATE_STALE_ANSWER_MARKER|Aktiv fråga/,
+      "the stale equation's answer is stripped before ordinary help");
+
+    calls.length = 0;
+    const rephrasedEquationHelp = await invoke({
+      userQuestion: "Förklara vad lutningen k beskriver i y = kx + m.",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad betyder lutningen i y = kx + m?", model_answer: "PRIVATE_STALE_ANSWER_MARKER" },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(rephrasedEquationHelp.statusCode, 200);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"),
+      "a rephrased general question about the same topic ignores stale question overlap when the server confirms no exam");
+
+    calls.length = 0;
     const answerRequest = await invoke({
       userQuestion: "Ge mig facit till provfrågan",
       pageContext: {
@@ -1771,6 +1800,22 @@ test("a stale prov page cannot block unrelated study help when the server has no
     assert.equal(answerRequest.body.examState, "unverified");
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
       "explicit exam-answer intent remains blocked without verified grading");
+
+    calls.length = 0;
+    activeCount = 1;
+    issuanceState = "active";
+    const sameEquationDuringExam = await invoke({
+      userQuestion: "Vad betyder k i y = kx + m?",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: "Vad betyder k i y = kx + m?", model_answer: "PRIVATE_STALE_ANSWER_MARKER" },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(sameEquationDuringExam.statusCode, 200);
+    assert.equal(sameEquationDuringExam.body.examActive, true);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
+      "the same general wording stays on the answer-free hint path while a server-verified exam is active");
   } finally {
     activeCount = 0;
     issuanceState = "active";

@@ -3,7 +3,7 @@ import materialInput from "./_material.cjs";
 import mistakeTraining from "./_mistake-training.cjs";
 
 const { verifyCompletion } = examCompletion;
-const { normalizePriorQuestions, normalizeTrainingFocus, normalizeTrainingSources } = mistakeTraining;
+const { normalizePriorQuestionKey, normalizePriorQuestions, normalizeTrainingFocus, normalizeTrainingSources } = mistakeTraining;
 
 function fail(code, status = 409) {
   return Object.assign(new Error(code), { status });
@@ -119,7 +119,7 @@ export async function resolveMistakeTrainingSource({
     for (const question of questions) {
       const id = String(question?.id || "");
       const text = typeof question?.question === "string" ? question.question.trim() : "";
-      const key = text.toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+      const key = normalizePriorQuestionKey(text);
       if (!id || !text || !key) continue;
       const selected = selectedQuestionIds.has(id);
       if (selected) {

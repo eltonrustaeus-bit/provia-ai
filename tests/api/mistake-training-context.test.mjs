@@ -39,6 +39,11 @@ assert.deepEqual(priorQuestions, [
   { id: "prior-3", concept_tag: "", question: "Lös x - 1 = 2" },
   { id: "prior-4", concept_tag: "", question: "Förklara näringskedjan" },
 ], "comparison context removes client IDs and answer keys, deduplicates prose variants, and preserves distinct math operators");
+assert.equal(training.normalizePriorQuestions([
+  { question: "Lös x+1=2" },
+  { question: "Lös x + 1 = 2" },
+  { question: "Lös x - 1 = 2" },
+]).length, 2, "spacing variants deduplicate while different mathematical operators remain distinct");
 const largeFocus = training.normalizeTrainingFocus(Array.from({ length: 100 }, (_, index) => ({ skill: `skill-${index}` })));
 const largePriorQuestions = training.normalizePriorQuestions(Array.from({ length: 100 }, (_, index) => ({ question: `Question ${index} ${"x".repeat(1600)}` })));
 assert.ok(Buffer.byteLength(JSON.stringify(largeFocus), "utf8") <= 64 * 1024);
