@@ -1539,10 +1539,21 @@ function finalizeMsg(div, text) {
           var mayUseMistakeContext = pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
             && pageCtx.examState?.phase !== 'exam';
           if (mayUseMistakeContext) {
-            recentMistakes = lsMistakes.slice(-10).reverse().map(function(m) {
+            var activeCourse = String(pageCtx.course || '').trim();
+            var normalizeCourse = function(value) {
+              return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('sv');
+            };
+            // Browser mistake history can contain several subjects. Never let
+            // another course's errors steer P.E.R; without a known course the
+            // safest useful context is no local mistake history at all.
+            var courseMistakes = activeCourse ? lsMistakes.filter(function(m) {
+              var mistakeCourse = m && (m.course || m.category);
+              return normalizeCourse(mistakeCourse) === normalizeCourse(activeCourse);
+            }) : [];
+            recentMistakes = courseMistakes.slice(-10).reverse().map(function(m) {
               return {
                 question: String(m.question || '').slice(0, 200),
-                category: String(m.course || m.category || '').slice(0, 60),
+                category: activeCourse.slice(0, 60),
                 concept: String(m.concept_tag || '').slice(0, 80),
                 errorTags: Array.isArray(m.error_tags) ? m.error_tags.slice(0, 4).map(function(tag) { return String(tag).slice(0, 40); }) : [],
                 studentAnswer: String(m.user_answer || '').slice(0, 160),
@@ -1550,7 +1561,7 @@ function finalizeMsg(div, text) {
               };
             });
             var conceptFreq = {};
-            lsMistakes.forEach(function(m) {
+            courseMistakes.forEach(function(m) {
               var concept = String(m && m.concept_tag || '').trim();
               if (concept && !/^(okänt|okant|unknown)$/i.test(concept)) conceptFreq[concept] = (conceptFreq[concept] || 0) + 1;
             });

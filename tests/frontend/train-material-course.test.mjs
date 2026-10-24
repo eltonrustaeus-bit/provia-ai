@@ -39,6 +39,21 @@ try {
     const wrongQuestion = window.buildMistakeTrainingContext(mistakes, ["exam:a:0"], "Matematik 2b", new Map([
       ["exam:a:0", { examId: "exam-a", submissionId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", course: "Matematik 2b", material: "source", questions: [{ id: "q1", question: "Different question" }] }],
     ]));
+    const unsavedSource = window.buildMistakeTrainingContext(mistakes, ["exam:a:0"], "Matematik 2b", new Map([
+      ["exam:a:0", { examId: "exam-a", submissionId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", course: "Matematik 2b", material: "local pending source", accountSaved: false, questions: [{ id: "q1", question: "Lös 2x = 8" }] }],
+    ]));
+    const wrongQuestionOperator = window.buildMistakeTrainingContext([
+      { mistake_key: "math:plus", source_exam_id: "exam-math", id: "q-plus", course: "Matematik 2b", question: "Lös x + 1 = 2" },
+    ], ["math:plus"], "Matematik 2b", new Map([
+      ["math:plus", { examId: "exam-math", submissionId: "e".repeat(32), course: "Matematik 2b", material: "Algebra", questions: [{ id: "q-plus", question: "Lös x - 1 = 2" }] }],
+    ]));
+    const operatorPrior = window.buildMistakeTrainingContext([
+      { mistake_key: "math:plus", source_exam_id: "exam-math", id: "q-plus", course: "Matematik 2b", question: "Lös x + 1 = 2" },
+    ], ["math:plus"], "Matematik 2b", new Map([
+      ["math:plus", { examId: "exam-math", submissionId: "f".repeat(32), course: "Matematik 2b", material: "Algebra", questions: [
+        { id: "q-plus", question: "Lös x + 1 = 2" }, { id: "q-minus", question: "Lös x - 1 = 2" },
+      ] }],
+    ]));
     const mixedCourse = window.buildMistakeTrainingContext(mistakes.slice(0, 3), null, "", sources);
     const unscoped = window.buildMistakeTrainingContext(mistakes, ["exam:old:0"], "Matematik 2b", sources);
     const manyMistakes = Array.from({ length: 20 }, (_, index) => ({
@@ -50,7 +65,7 @@ try {
       questions: [{ id: mistake.id, question: mistake.question }, { id: `extra-${index}`, question: `Supplemental ${index}` }],
     }]));
     const capped = window.buildMistakeTrainingContext(manyMistakes, null, "Matematik 2b", manySources);
-    return { selected, all, noSource, wrongExam, wrongQuestion, mixedCourse, unscoped, capped };
+    return { selected, all, noSource, wrongExam, wrongQuestion, unsavedSource, wrongQuestionOperator, operatorPrior, mixedCourse, unscoped, capped };
   });
 
   assert.equal(result.selected.ok, true);
@@ -67,6 +82,11 @@ try {
   assert.equal(result.noSource.error, "source_missing");
   assert.equal(result.wrongExam.error, "source_mismatch");
   assert.equal(result.wrongQuestion.error, "source_mismatch");
+  assert.equal(result.unsavedSource.error, "source_unsaved");
+  assert.equal(result.wrongQuestionOperator.error, "source_mismatch",
+    "a changed plus/minus operator must not pass source-question matching");
+  assert.deepEqual(result.operatorPrior.priorQuestions.map(item => item.question), ["Lös x + 1 = 2", "Lös x - 1 = 2"],
+    "prior-question deduplication preserves mathematically distinct operator forms");
   assert.equal(result.mixedCourse.error, "source_mismatch");
   assert.equal(result.unscoped.error, "missing_course",
     "legacy mistakes without a saved course/source cannot inherit an unrelated course");

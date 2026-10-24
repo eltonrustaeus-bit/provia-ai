@@ -66,7 +66,8 @@ function normalizePriorQuestions(value) {
   for (const item of value.slice(0, MAX_TRAINING_ITEMS)) {
     if (!item || typeof item !== "object" || Array.isArray(item)) continue;
     const question = safeText(item.question, 1200);
-    const normalized = question.toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalized = question.toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/\u2212/g, "-")
+      .replace(/[^\p{L}\p{N}+\-=×÷*/<>≤≥^%]+/gu, " ").trim();
     if (!question || !normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     result.push({

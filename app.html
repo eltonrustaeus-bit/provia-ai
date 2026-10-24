@@ -1295,7 +1295,7 @@ function mergeMistakesFromExamRows(rows){
       if(item.unanswered!==true&&q&&typeof q.question==="string"&&q.question.trim()&&got!==null&&mx!==null&&mx>0&&got>=0&&got<=mx&&got<mx){
         const mistakeKey=`exam:${batchId}:${questionIndex}`;
         const sourceQuestions=(Array.isArray(exam?.questions)?exam.questions:[]).map(question=>({id:idOf(question?.id),concept_tag:String(question?.concept_tag||question?.topic||""),question:String(question?.question||"")})).filter(question=>question.id&&question.question.trim());
-        mistakeSourceByKey.set(mistakeKey,{examId:String(r.id||r.local_id||batchId),submissionId:String(r.submission_id||submissionIdFromProof(exam?.submission_receipt)||""),course:String(r.course||""),material:typeof r.material==="string"?r.material:"",questions:sourceQuestions});
+        mistakeSourceByKey.set(mistakeKey,{examId:String(r.id||r.local_id||batchId),submissionId:String(r.submission_id||submissionIdFromProof(exam?.submission_receipt)||""),course:String(r.course||""),material:typeof r.material==="string"?r.material:"",accountSaved:!r.local_only,questions:sourceQuestions});
         out.push({mistake_key:mistakeKey,source_exam_id:String(r.id||r.local_id||""),ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(q.learning_objective||""),points:got,max_points:mx});}
     });
   });
@@ -1763,12 +1763,13 @@ function buildMistakeTrainingContext(mistakes,selectedKeys,courseOverride,source
   for(const mistake of filtered){
     const key=String(mistake?.mistake_key||"");
     const source=sourcesByKey?.get?.(key);
+    if(source?.accountSaved===false)return {ok:false,error:"source_unsaved"};
     if(!source||!String(source.material||"").trim())return {ok:false,error:"source_missing"};
     if(!/^[a-f0-9]{32}$/i.test(String(source.submissionId||"")))return {ok:false,error:"source_missing"};
     if(source.examId&&mistake.source_exam_id&&String(source.examId)!==String(mistake.source_exam_id))return {ok:false,error:"source_mismatch"};
     if(courseKey(source.course)!==courseKey(mistake.course))return {ok:false,error:"source_mismatch"};
     const sourceQuestion=(source.questions||[]).find(item=>String(item.id||"")===String(mistake.id||""));
-    const normalizeQuestion=value=>String(value||"").toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+    const normalizeQuestion=value=>String(value||"").toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/\u2212/g,"-").replace(/[^\p{L}\p{N}+\-=×÷*/<>≤≥^%]+/gu," ").trim();
     if(!sourceQuestion||normalizeQuestion(sourceQuestion.question)!==normalizeQuestion(mistake.question))return {ok:false,error:"source_mismatch"};
     const sourceKey=String(source.submissionId).toLowerCase();
     if(!sources.has(sourceKey))sources.set(sourceKey,{submissionId:sourceKey,material:String(source.material),questions:Array.isArray(source.questions)?source.questions:[],questionIds:[]});
@@ -1859,6 +1860,7 @@ function runTrainModeIfRequested(){
       too_many:LANG==="sv"?"Välj högst 20 misstag åt gången så att varje fråga kan kopplas till sitt ursprung.":"Choose up to 20 mistakes at a time so each item can be tied to its source.",
       missing_course:LANG==="sv"?"Ett valt misstag saknar sparad kurs. Välj ett annat misstag eller rätta ett nytt prov med kurs sparad.":"A selected mistake has no saved course. Choose another mistake or grade a new exam with its course saved.",
       source_missing:LANG==="sv"?"Ursprungsmaterialet till ett valt misstag saknas. Rätta ett nytt prov med materialet sparat, eller välj ett annat misstag.":"The original study material for a selected mistake is missing. Grade a new exam with its material saved, or choose another mistake.",
+      source_unsaved:LANG==="sv"?"Ursprungsprovet är ännu inte sparat i kontot, så servern kan inte verifiera misstagen. Anslut till internet och spara provet i din historik innan du startar träningen.":"The source exam is not saved to your account yet, so the server cannot verify these mistakes. Connect to the internet and save the exam to your history before starting practice.",
       source_mismatch:LANG==="sv"?"Kopplingen mellan misstaget och ursprungsprovet kunde inte verifieras. Gå tillbaka och välj misstaget igen.":"The link between the mistake and its source exam could not be verified. Return and select the mistake again.",
       source_too_long:LANG==="sv"?"Källmaterialet blir för långt när dessa prov kombineras. Välj färre misstag från färre prov.":"The source material is too long when these exams are combined. Choose fewer mistakes from fewer exams.",
     };
@@ -2881,7 +2883,7 @@ try{
       const sourceQuestions=(currentExam.questions||[]).map(question=>({id:String(question?.id??""),concept_tag:String(question?.concept_tag||question?.topic||""),question:String(question?.question||"")})).filter(question=>question.id&&question.question.trim());
       (result.per_question||[]).forEach((item,questionIndex)=>{
         const got=Number(item.points||0),m=Number(item.max_points||0);
-        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{},mistakeKey=`exam:${localId}:${questionIndex}`;mistakeSourceByKey.set(mistakeKey,{examId:localId,submissionId,course:attempt.course,material:pastedText,questions:sourceQuestions});mistakes.push({mistake_key:mistakeKey,source_exam_id:localId,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(item.learning_objective||q.learning_objective||""),points:got,max_points:m});}
+        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{},mistakeKey=`exam:${localId}:${questionIndex}`;mistakeSourceByKey.set(mistakeKey,{examId:localId,submissionId,course:attempt.course,material:pastedText,accountSaved:!accountSaveFailed,questions:sourceQuestions});mistakes.push({mistake_key:mistakeKey,source_exam_id:localId,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(item.learning_objective||q.learning_objective||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
       try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}

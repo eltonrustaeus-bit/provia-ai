@@ -12,6 +12,8 @@ const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/202
 const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
 const repeatedObjectiveFeedbackRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback_ROLLBACK.sql", import.meta.url), "utf8");
 const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
+const activePipelineQuotaReaperMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper.sql", import.meta.url), "utf8");
+const activePipelineQuotaReaperRollback = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper_ROLLBACK.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
@@ -47,6 +49,7 @@ async function makeDb() {
   await db.exec(feedbackMigration);
   await db.exec(repeatedObjectiveFeedbackMigration);
   await db.exec(queuedAssemblyFinalizationMigration);
+  await db.exec(activePipelineQuotaReaperMigration);
   return db;
 }
 
@@ -354,7 +357,8 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
             'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
             'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
             'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
-            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)',
+            'public.reap_stale_mock_exam_quota_reservations(uuid)'
           ]) as rpc(signature)) as service_pipeline_rpcs,
         (select bool_and(not has_function_privilege('anon',signature::regprocedure,'execute')
           and not has_function_privilege('authenticated',signature::regprocedure,'execute'))
@@ -368,7 +372,8 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
             'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
             'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
             'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
-            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)',
+            'public.reap_stale_mock_exam_quota_reservations(uuid)'
           ]) as rpc(signature)) as user_pipeline_rpcs_denied`)).rows[0];
       assert.deepEqual(acl, {
         rls: true,
@@ -895,6 +900,22 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
         "the successful issued partial consumes its single reservation without a refund race");
     });
 
+    await t.test("quota reaper leaves an active non-deliverable job for the fenced terminal path", async () => {
+      const owner="31313131-3131-4131-8131-313131313131", id="27272727-2727-4727-8727-272727272727", k="28282828-2828-4828-8828-282828282828", a="29292929-2929-4929-8929-292929292929", q="30303030-3030-4030-8030-303030303030";
+      await db.query("insert into auth.users(id) values($1)",[owner]);
+      await addParent(db,{userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      await addJob(db,{id,userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q,state:"queued",stage:"generate",requested:6,progress:1,deadline:"clock_timestamp()-interval '1 second'"});
+
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[owner])).rows[0].n,0,
+        "the reaper must not refund based on a potentially stale progress snapshot while a job is active");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"reserved");
+
+      assert.equal((await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r.status,"expired");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded",
+        "the fenced terminal path settles and refunds the exact reservation");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1",[owner])).rows[0].mock_quota_count,0);
+    });
+
     await t.test("expired queued assembly still fails closed below the partial floor or mixed-format requirement", async () => {
       const makeUuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
       for (const [index,options] of [
@@ -931,6 +952,29 @@ test("rollback refuses before changing the quota reaper while private jobs remai
     await assert.rejects(db.exec(rollback), /Pipeline rollback refused/);
     const body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
     assert.match(body, /mock_exam_generation_pipeline_jobs/);
+  } finally {
+    await db.close();
+  }
+});
+
+test("quota reaper rollback refuses while jobs remain active", async () => {
+  const db = await makeDb();
+  try {
+    await addParent(db);
+    await addJob(db, { state: "running", leaseToken: token });
+    await assert.rejects(db.exec(activePipelineQuotaReaperRollback), /quota reaper rollback refused/i);
+    let body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
+    assert.match(body, /and j\.state in \('queued', 'running'\)/,
+      "a refused rollback leaves the active-job protection installed");
+
+    await db.query(`update public.mock_exam_generation_pipeline_jobs
+      set state='failed', stage='terminal', payload='{}'::jsonb, accepted_questions='[]'::jsonb,
+          lease_token=null, lease_expires_at=null, error_code='TEST_TERMINAL'
+      where id=$1`, [jobId]);
+    await db.exec(activePipelineQuotaReaperRollback);
+    body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
+    assert.match(body, /j\.progress_current >= greatest/,
+      "once no active jobs remain, rollback restores the prior bounded-partial policy");
   } finally {
     await db.close();
   }

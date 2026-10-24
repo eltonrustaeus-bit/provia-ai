@@ -530,14 +530,57 @@ if (!(await page.locator("#perPanel").isVisible())) await page.click("#perBubble
 await page.waitForTimeout(200);
 await page.locator("#perInput").waitFor({ state: "visible", timeout: 3000 });
 await page.fill("#perInput", "Hjälp mig förstå lutningen i en linjär funktion.");
+await page.evaluate(() => {
+  document.getElementById("course").value = "Biologi 1";
+  localStorage.setItem("proviaai_mistakes", JSON.stringify([
+    { course: "Matematik 2b", question: "Lös andragradsekvationen", concept_tag: "andragradsekvationer", user_answer: "x=1" },
+    { course: "Biologi  1", question: "Förklara cellandning", concept_tag: "cellandning", user_answer: "i cellen" },
+    { course: "Matematik 2b", question: "Beräkna derivatan", concept_tag: "derivata", user_answer: "2x" },
+  ]));
+  window.setPerContext({ page: "app", course: "Biologi 1" });
+});
+lastExplain = null;
+const activeCourseExplain = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
 await page.click("#perSendBtn");
-await page.waitForTimeout(200);
+const activeCourseResponse = await activeCourseExplain;
+ok("P.E.R:s kursanpassade fråga skickas och får svar", activeCourseResponse.ok()
+  && lastExplain?.userQuestion === "Hjälp mig förstå lutningen i en linjär funktion.", JSON.stringify(lastExplain?.userQuestion));
 ok("vanlig P.E.R-fråga skickas utan gammal provstatus", lastExplain?.pageContext?.page === "app"
   && !lastExplain.pageContext.currentQuestion && !lastExplain.pageContext.examState,
   JSON.stringify(lastExplain?.pageContext));
 ok("vanlig P.E.R-fråga efter Nytt ämne skickas utan gammalt provmaterial",
   !lastExplain?.pageContext?.studyMaterial && !JSON.stringify(lastExplain?.pageContext || {}).includes("Cellandning sker i mitokondrien"),
   JSON.stringify(lastExplain?.pageContext || {}));
+ok("P.E.R får bara misstag från den aktiva kursen",
+  lastExplain?.recentMistakes?.length === 1 && lastExplain.recentMistakes[0].category === "Biologi 1"
+    && lastExplain.recentMistakes[0].concept === "cellandning",
+  JSON.stringify(lastExplain?.recentMistakes));
+ok("P.E.R:s svaghetsområden är begränsade till den aktiva kursen",
+  JSON.stringify(lastExplain?.weakAreas) === JSON.stringify(["cellandning"]),
+  JSON.stringify(lastExplain?.weakAreas));
+
+await page.evaluate(() => {
+  document.getElementById("course").value = "";
+  window.__originalPerStudyContext = window.__getPerStudyContext;
+  window.__getPerStudyContext = () => ({});
+  window.setPerContext({ page: "app" });
+});
+lastExplain = null;
+const noCourseExplain = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
+await page.fill("#perInput", "Kan du hjälpa mig att plugga?");
+await page.click("#perSendBtn");
+const noCourseResponse = await noCourseExplain;
+ok("P.E.R-fråga utan vald kurs behandlas normalt", noCourseResponse.ok()
+  && lastExplain?.userQuestion === "Kan du hjälpa mig att plugga?", JSON.stringify(lastExplain?.userQuestion));
+ok("P.E.R skickar inte kursbundna misstag när aktiv kurs saknas",
+  lastExplain?.recentMistakes?.length === 0 && lastExplain?.weakAreas?.length === 0,
+  JSON.stringify({ recentMistakes: lastExplain?.recentMistakes, weakAreas: lastExplain?.weakAreas }));
+await page.evaluate(() => {
+  window.__getPerStudyContext = window.__originalPerStudyContext;
+  delete window.__originalPerStudyContext;
+});
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid

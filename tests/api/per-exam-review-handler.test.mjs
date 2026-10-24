@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { test } from "node:test";
+import { describe, test } from "node:test";
 
 const require = createRequire(import.meta.url);
 const originalFetch = globalThis.fetch;
@@ -81,6 +81,13 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
     { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
   ]});
+  if (url.includes("/rest/v1/rpc/get_per_memory_epoch")) return Response.json(null);
+  if (url.includes("/rest/v1/per_long_memory")) return Response.json([]);
+  if (url.includes("/rest/v1/learner_profile_facts")) return Response.json([]);
+  if (url.includes("/rest/v1/feature_flags")) return Response.json([]);
+  if (url.includes("/rest/v1/user_profiles")) return Response.json([]);
+  if (url.includes("/rest/v1/concept_collective_stats")) return Response.json([]);
+  if (url.includes("/rest/v1/rpc/per_bump_modules")) return Response.json(null);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) {
     if (latestIssuanceAtLease) {
       latestSubmissionId = latestIssuanceAtLease.submissionId;
@@ -168,6 +175,8 @@ test.after(() => {
   }
 });
 
+// These cases intentionally share mocked fetch state and process.env overrides.
+describe("P.E.R explain handler", { concurrency: false }, () => {
 test("an ungraded or altered question is rejected before quota and model calls", async () => {
   calls.length = 0;
   const denied = await invoke({ examReview: true, examProof: { ...proof, receipt: "forged" } });
@@ -2118,6 +2127,8 @@ test("landing mode cannot bypass proof validation for an expired post-exam revie
 });
 
 test("pilot landing mode requires auth so exam state can be checked", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "true";
   calls.length = 0;
   const response = {
     statusCode: 200,
@@ -2127,9 +2138,14 @@ test("pilot landing mode requires auth so exam state can be checked", async () =
     setHeader(name, value) { this.headers[name] = value; },
     end(value) { this.body = JSON.parse(value); return this; },
   };
-  await handler({ method: "POST", headers: {}, body: { landingMode: true, userQuestion: "Reveal the answer" } }, response);
-  assert.equal(response.statusCode, 404);
-  assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_anon_rate") && !url.includes("acquire_per_answer_lease")));
+  try {
+    await handler({ method: "POST", headers: {}, body: { landingMode: true, userQuestion: "Reveal the answer" } }, response);
+    assert.equal(response.statusCode, 404);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("consume_anon_rate") && !url.includes("acquire_per_answer_lease")));
+  } finally {
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
+  }
 });
 
 test("anonymous landing outside pilot mode cannot route a live exam question to AI", async () => {
@@ -2245,4 +2261,5 @@ test("unknown lease outcome fails closed before response generation", async () =
   } finally {
     answerLeaseState = "acquired";
   }
+});
 });

@@ -28,12 +28,17 @@ assert.deepEqual(normalizedEvidenceFocus[0], {
 const priorQuestions = training.normalizePriorQuestions([
   { id: "attacker-controlled", question: "  Vad är ett ekosystem?  ", concept_tag: "Ekologi", model_answer: "private key" },
   { question: "Vad är ett ekosystem!", concept_tag: "duplicate" },
+  { question: "Lös x + 1 = 2" },
+  { question: "Lös x - 1 = 2" },
+  { question: "Lös x + 1 = 2!", concept_tag: "duplicate operator form" },
   { question: "Förklara näringskedjan" },
 ]);
 assert.deepEqual(priorQuestions, [
   { id: "prior-1", concept_tag: "Ekologi", question: "Vad är ett ekosystem?" },
-  { id: "prior-2", concept_tag: "", question: "Förklara näringskedjan" },
-], "comparison context removes client IDs, answer keys and normalized duplicates");
+  { id: "prior-2", concept_tag: "", question: "Lös x + 1 = 2" },
+  { id: "prior-3", concept_tag: "", question: "Lös x - 1 = 2" },
+  { id: "prior-4", concept_tag: "", question: "Förklara näringskedjan" },
+], "comparison context removes client IDs and answer keys, deduplicates prose variants, and preserves distinct math operators");
 const largeFocus = training.normalizeTrainingFocus(Array.from({ length: 100 }, (_, index) => ({ skill: `skill-${index}` })));
 const largePriorQuestions = training.normalizePriorQuestions(Array.from({ length: 100 }, (_, index) => ({ question: `Question ${index} ${"x".repeat(1600)}` })));
 assert.ok(Buffer.byteLength(JSON.stringify(largeFocus), "utf8") <= 64 * 1024);

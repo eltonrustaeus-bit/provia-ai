@@ -1,5 +1,57 @@
 # 08 Current Status
 
+## Current pilot validation — 2026-10-24
+
+- [x] Local mistake context sent to P.E.R. is now scoped to the exact active
+  course (Unicode-normalized, whitespace-collapsed, case-insensitive). When
+  the active course is unknown, browser-held mistake history and weak areas are
+  omitted. The outgoing mistake category uses the active course spelling.
+- [x] Browser regression captures the actual `/api/explain` request/response,
+  checks the question text, verifies mixed Biologi/Matematik local history does
+  not cross courses, and verifies no-course requests carry no mistake context.
+  `tests/frontend/per-exam-context.test.mjs` passed 85/85.
+- [x] Shared P.E.R handler tests run serially because their fetch mocks and
+  environment overrides are process-global; passed 58/58. `sitemap.xml` now
+  matches the actual `app.html` Git modification date. Sitemap regression,
+  syntax checks and `git diff --check` passed.
+- [x] Mistake training now refuses a locally queued exam that has not synced to
+  the account, with a specific message telling the learner to reconnect and
+  save it before training. This avoids presenting an unusable source as if the
+  server could verify it. Question normalization now preserves mathematical
+  operators (`+` versus `-`) in both browser source matching and API history;
+  regressions cover source mismatch and duplicate filtering.
+- [x] Independent security review found a quota-reaper race against active
+  pipeline work. A new migration keeps reservations for all queued/running
+  jobs until their fenced terminal path settles them. Its guarded rollback
+  refuses while jobs remain active. PGlite regressions cover exact refund,
+  ACL preservation and rollback refusal; the independent reviewer found no
+  direct ACL/settlement defect, but hosted retention-cron health and real
+  PostgreSQL concurrency remain unverified.
+- [x] Focused tests after these changes passed: mistake-training API/browser
+  context tests and pipeline PostgreSQL/PGlite file (25/25).
+- [x] After the source-gating, operator-normalization and quota-reaper changes,
+  the full sequential offline command
+  `node --test --test-concurrency=1 --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js' | rg -v '^tests/live/')`
+  completed successfully across all 199 discovered test files. After the
+  additional ACL and guarded-rollback assertions, the focused pipeline
+  PostgreSQL/PGlite file passed 25/25. These tests are offline evidence, not
+  hosted or live-model proof.
+- [x] Read-only staging recheck on 2026-10-24: `exgen-pilot-staging` is
+  `ACTIVE_HEALTHY`; retention cron `exgen-mock-exam-pipeline-retention` is
+  active on `*/15 * * * *`. Its AI budget is enabled with $5 cap, $1.379071
+  spent, $0.263628 reserved, and $3.357301 remaining. Staging migration
+  `20261024151433_protect_active_pipeline_quota_reaper` was applied and its
+  function was read back: active-job protection is present; `service_role` can
+  execute and `anon`/`authenticated` cannot.
+- [!] The goal branch has no Preview yet. The Vercel branch-scoped staging
+  variables are on `codex/exgen-generation-quality-2026-10-20`; the current goal
+  HEAD descends directly from that branch's remote HEAD `139cffb`. A
+  fast-forward to the staging-configured branch is available after committing
+  this work; no secrets need to move. The existing READY Preview is still the
+  older `139cffb` build. No live AI request, push, merge to `main` or Production
+  change was performed.
+- [!] Code changes remain local and uncommitted.
+
 ## Same-tab recovery after interrupted generation — 2026-10-24
 
 - [x] Added a tab-scoped recovery snapshot for in-flight non-graph exam requests.
@@ -30,7 +82,8 @@
   commit `c50369e`; the latest existing READY Preview is older commit `139cffb`
   on `codex/exgen-generation-quality-2026-10-20`. No deployment was found for
   the current branch `codex/exgen-school-pilot-goal-20261023`. Staging
-  `exgen-pilot-staging` is `ACTIVE_HEALTHY` at migration `20261023080909`.
+  `exgen-pilot-staging` is `ACTIVE_HEALTHY`; its read-back migration history
+  includes `20261024140557`.
 - [!] No push, deploy, database write, paid model call, merge, or production
   change was made. Current local changes remain uncommitted.
 
@@ -71,11 +124,14 @@
 - [x] Read-only hosted recheck: Production remains READY on `main` at
   `c50369e`; the goal branch has no Vercel deployment. The latest existing
   READY Preview is older commit `139cffb` on the separate generation-quality
-  branch. Staging remains `ACTIVE_HEALTHY` at migration `20261023080909`.
+  branch. Staging remains `ACTIVE_HEALTHY`; its migration history includes
+  `20261024151433`.
 
-**PILOT NOT READY.** Next: receive the independent security/idempotency review,
-add or run a browser-level recovery check, then seek separate authorization for
-a branch Preview and synthetic staging tests. Keep the READY Production build
+**PILOT NOT READY.** Next: resolve the Preview branch's missing staging
+environment safely, then run the browser-level recovery check and the approved
+synthetic staging generation/P.E.R. tests on that exact deployment. The current
+branch is not connected to staging variables, so do not claim hosted readiness
+or move secrets without separately authorized handling. Keep Production
 untouched while those checks run.
 
 ## Felträningsreplay och payload-gräns — 2026-10-24
