@@ -2317,3 +2317,40 @@ releaseordning måste granskas och godkännas separat före merge.
 **PILOT NOT READY.** Nästa steg efter slutgranskning är feature-Preview av
 verifierad kod och sedan stagingmigration/liveprov endast efter bekräftad
 stagingauktorisation, aktuell kostnadsavläsning och versionssynkad deployment.
+
+## Kvotstädare och återupptagbar assembly — 2026-10-24
+
+- [x] Read-only kontroll av `20261024140557` och efterföljande
+  `20261024151433`: den första reaper-versionen kunde fatta beslut från en
+  gammal progress-snapshot. Den senare ersätter villkoret och skyddar en
+  reservation så länge tillhörande jobb är `queued` eller `running`, oavsett
+  deadline, progress eller assembly-stage. Därför hittades ingen kvarstående
+  kvotrace i den installerade SQL-logiken.
+- [x] Oberoende SQL-/kvotgranskning kom till samma slutsats. Terminala
+  completion-, failure- och retentionvägar låser jobbet och reglerar dess
+  reservation inom samma transaktion; cleanup använder `FOR UPDATE SKIP
+  LOCKED`. Detta är källgranskning, inte ett bevis från två samtidiga
+  PostgreSQL-sessioner.
+- [x] `node --test tests/api/exam-generation-pipeline-postgres.test.mjs`
+  passerade **25/25**. Det inkluderar expired eligible partial, aktiva
+  icke-deliverbara jobb, atomisk konsumtion vid issuance samt exakt återbetalning
+  vid terminal failure. PGlite-fallet är sekventiellt och reproducerar inte en
+  verklig konkurrerande session.
+- [x] Färskare än föregående status men inte realtid: stagingbudgetraden visar
+  cap `$5.000000`, spenderat `$1.379071`, reserverat `$0.263628`, aktiverad,
+  `updated_at=2026-10-23 19:43:02 UTC`. Eftersom värdet nu är äldre än ett dygn
+  och liveanrop har en separat `$2`-gräns kördes inget modelltest.
+- [x] Stagingmigrationslistan slutar vid
+  `20261024151433_protect_active_pipeline_quota_reaper`. Den lokala senare
+  recovery-window-cleanup-migreringen `20261024165536` saknas där. Den ändrar
+  inte den verifierade reaper-predicate men stagingens retentionbeteende är
+  därför inte helt versionssynkat; migreringen tillämpades inte.
+- [!] Sammanräknade Supabase-loggar för 2026-10-23 innehöll 452
+  `postgres_logs`-rader, men ingen sanerad, specifik korrelation mellan ett
+  provförsök och eventuell reaperhändelse har verifierats. Råa loggar eller
+  användartext används inte som bevis.
+
+**PILOT NOT READY.** Kvotreaper-felet är inte reproducerat i aktuell SQL och
+skyddet finns i staging. Kvar före stark liveverifiering: ett reproducerbart
+två-sessionstest eller motsvarande hostad stagingevidens, färsk budgetkontroll,
+versionssynkad Preview/Auth-origin och det godkända syntetiska end-to-end-testet.
