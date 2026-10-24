@@ -1,9 +1,11 @@
 # 08 Current Status
 
-## En inloggad Preview, färdig offline-verifiering — 2026-10-24 21:38 UTC
+## En Preview-session och ett helt slutfört stagingprov — 2026-10-24 21:50 UTC
 
-- [x] Återanvänder samma befintliga Preview-domän och stagingkonto. Inga nya
-  flikar, konton, inloggningar eller modellförfrågningar skapades här.
+- [x] Behöll samma Preview-alias och flik genom commit `f2e52f4`, READY-
+  deployment `dpl_BxAnsgsXWHC7Ekjm5GWXZUDhDyjW` och inloggning. Ingen ny flik
+  eller nytt konto behövdes. En kort auth-gate vid sidstart försvann efter den
+  befintliga sessionens initiering.
 - [x] Uppdaterade P.E.R:s skyddade frågedetektering för vanliga formuleringar
   som ber om bekräftelse på ett svar. Vanliga studiefrågor fungerar fortsatt;
   verifierade provgränser ändras inte.
@@ -17,16 +19,29 @@
 - [x] Riktad offline-svit för pipeline, HTTP, PGlite, källtäckning, felträning,
   P.E.R och klientkontext passerade **147/147**. Separat PGlite-svit passerade
   **28/28**; syntax- och diffkontroller passerade.
-- [!] Kod och migration är lokala och ännu inte committade/pushade. Ingen
-  migration applicerades i staging; ingen AI-förfrågan gjordes. Inget pågående
-  prov finns i den återanvända sessionen enligt den tidigare UI-kontrollen.
+- [x] Ett enda syntetiskt Biologi 1-prov med 12 begärda kortsvarsfrågor
+  genererades, besvarades och rättades i samma session. Appen utfärdade 12/12;
+  sparat resultat blev 10/12 (83%). Inget omförsök eller andra prov skapades.
+- [!] Stagingkörningen visade ett kvalitetsfel trots 12/12: tre nära-dubblettpar
+  om mitokondrier, cellmembran och enzymers funktion samt en klumpigt formulerad
+  cellfråga. De flesta frågorna var källgrundade, men detta räcker inte som
+  kvalitetsbevis för pilot. Rättningen gav även delpoäng/0 poäng på två svar som
+  i huvudsak uttryckte det förväntade begreppet.
+- [x] Stagingbudget efter testet: cap `$3.379071`, spent `$1.850432`, reserved
+  `$0.263628`, available `$1.265011`; rad uppdaterad `2026-10-24 21:49 UTC`.
+  Förändringen under den enda genereringen och rättningen var cirka `$0.112`.
+- [!] Den nya constraint-/reaper-migrationen `20261024212500` är committad men
+  inte applicerad i staging. Ingen produktionsdatabas, `main` eller Production
+  ändrades.
 - [x] Oberoende granskning av slutlig diff fann inga blockerare. Granskaren
   bekräftade att legacy-rad-testet stoppar vid brott mot båda gränserna utan
   partiella constraints. PGlite bevisar inte hosted PostgreSQL-racebeteende.
 
-**PILOT NOT READY.** Nästa steg är granskarsvar, en feature-Preview på samma
-inloggade alias och färsk kontroll av AI-budgeten. Högst ett syntetiskt
-stagingprov; slutför det innan sessionen lämnas. Ingen production/main-ändring.
+**PILOT NOT READY.** Nästa steg är att lägga till offline-regressioner som
+avslöjar dessa semantiska dubbletter och för snäv rättningsbedömning, förbättra
+urval/rättning utan att sänka kvalitetsgrindarna och låta oberoende granskare
+kontrollera diffen. Gör inte ett nytt betalt liveprov förrän den ändringen är
+redo och budgeten lästs om. Ingen production/main-ändring.
 
 ## Uppföljning utan extra liveförbrukning — 2026-10-24 21:04 UTC
 
