@@ -26,6 +26,10 @@ function normalizeTrainingFocus(value) {
       ...(safeText(item.studentAnswer, 1200) ? { studentAnswer: safeText(item.studentAnswer, 1200) } : {}),
       ...(safeText(item.gradingFeedback, 1000) ? { gradingFeedback: safeText(item.gradingFeedback, 1000) } : {}),
       ...(safeText(item.expectedAnswer, 1000) ? { expectedAnswer: safeText(item.expectedAnswer, 1000) } : {}),
+      ...(Array.isArray(item.sourceEvidence) ? {
+        sourceEvidence: item.sourceEvidence.slice(0, 3)
+          .map((evidence) => safeText(evidence, 500)).filter(Boolean),
+      } : {}),
       errorTags: Array.isArray(item.errorTags)
         ? item.errorTags.slice(0, 4).map((tag) => safeText(tag, 40)).filter((tag) => /^[a-z0-9_-]+$/i.test(tag))
         : [],

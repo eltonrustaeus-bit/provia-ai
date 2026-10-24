@@ -1137,6 +1137,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuesti
     ...(item.studentAnswer ? { studentAnswer: item.studentAnswer } : {}),
     ...(item.gradingFeedback ? { gradingFeedback: item.gradingFeedback } : {}),
     ...(item.expectedAnswer ? { expectedAnswer: item.expectedAnswer } : {}),
+    ...(item.sourceEvidence?.length ? { sourceEvidence: item.sourceEvidence } : {}),
     ...(item.errorTags.length ? { errorTags: item.errorTags } : {}),
   })).filter((item) => item.concept || item.skill || item.errorTags?.length);
   const requiredTrainingFocus = normalizedTrainingFocus.filter((item, index) =>

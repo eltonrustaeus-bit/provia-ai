@@ -105,6 +105,7 @@ test("mistake training derives source material and prior questions from a signed
     concept: "Linjär funktion", skill: "Tolka grafens parametrar", errorTags: ["method_missing", "calculation_error"],
     sourceQuestion: "Vad beskriver k?", studentAnswer: "osäker",
     gradingFeedback: "Du identifierade inte vad lutningen visar.", expectedAnswer: "k anger lutningen.",
+    sourceEvidence: ["Lutningen beskriver förändringen"],
   }], "the server derives the specific missed response and grading evidence from the signed, graded source");
   const legacy = await resolve({ loadOwnedExam: async () => ({ ...row, submission_id: null }) });
   assert.equal(legacy.pastedText, material, "legacy rows remain usable only when their signed receipt proves the exact source");
@@ -185,6 +186,56 @@ test("mistakes from individually valid but different courses cannot be combined"
   }), (error) => error.message === "MISTAKE_SOURCE_MISMATCH");
 });
 
+test("same-course mistake foci retain citations from their own source material", async () => {
+  const sourceSpecs = [
+    { id: "photosynthesis-q", material: "Fotosyntesen använder ljus, vatten och koldioxid för att bilda glukos.",
+      question: "Vilka ämnen behövs i fotosyntesen?", answer: "Ljus, vatten och koldioxid.",
+      quote: "Fotosyntesen använder ljus, vatten och koldioxid" },
+    { id: "linear-q", material: "En linjär funktion kan skrivas y = kx + m. Lutningen beskriver förändringen.",
+      question: "Vad beskriver k i y = kx + m?", answer: "Lutningen.", quote: "Lutningen beskriver förändringen" },
+  ];
+  const resolvedSources = sourceSpecs.map((spec) => {
+    const sourceContext = gradeTasks.hashContext(spec.material, course, userId);
+    const base = {
+      id: spec.id, type: "short", points: 1, question: spec.question, options: [],
+      model_answer: spec.answer, concept_tag: spec.id, learning_objective: spec.question,
+      source_references: [spec.quote],
+    };
+    const sourceQuestions = [{ ...base, grade_task: gradeTasks.sealQuestion(base, undefined, sourceContext) }];
+    const sourceSubmissionId = completion.submissionId(userId, course, sourceQuestions);
+    const answers = [{ id: spec.id, answer: "Jag är osäker." }];
+    const receipt = completion.issueCompletion(userId, course, sourceQuestions);
+    const proof = completion.verifyCompletion({
+      receipt, course, material: spec.material, questions: sourceQuestions, answers,
+      selectedQuestionId: spec.id,
+    }, userId);
+    return {
+      spec,
+      reference: { submissionId: sourceSubmissionId, questionIds: [spec.id] },
+      focus: { sourceSubmissionId: sourceSubmissionId, sourceQuestionId: spec.id },
+      row: { user_id: userId, submission_id: sourceSubmissionId, course, material: spec.material,
+        exam: { questions: sourceQuestions, submission_receipt: receipt }, answers },
+      grade: { submission_id: sourceSubmissionId, verified_at: new Date().toISOString(), num_questions: 1,
+        answer_fingerprint: proof.answerFingerprint,
+        result_payload: { per_question: [{ id: spec.id, points: 0, max_points: 1,
+          feedback: "Öva den specifika färdigheten.", model_answer: spec.answer }] },
+        result_expires_at: new Date(Date.now() + 60_000).toISOString() },
+    };
+  });
+  const rows = new Map(resolvedSources.map((source) => [source.reference.submissionId, source]));
+  const resolved = await resolveMistakeTrainingSource({
+    userId, requestedCourse: course,
+    sourceReferences: resolvedSources.map((source) => source.reference),
+    trainingFocus: resolvedSources.map((source) => source.focus),
+    loadOwnedExam: async ({ submissionId: id }) => rows.get(id)?.row,
+    hasVerifiedGrade: async ({ submissionId: id }) => rows.get(id)?.grade,
+  });
+  assert.deepEqual(resolved.trainingFocus.map((focus) => focus.sourceEvidence),
+    sourceSpecs.map((spec) => [spec.quote]));
+  assert.ok(!resolved.trainingFocus[0].sourceEvidence.some((quote) => quote.includes("Lutningen")));
+  assert.ok(!resolved.trainingFocus[1].sourceEvidence.some((quote) => quote.includes("Fotosyntesen")));
+});
+
 test("mistake training fails closed for an unowned row, missing verified grade, or wrong graded question count", async () => {
   await assert.rejects(resolve({ loadOwnedExam: async () => ({ ...row, user_id: "another-student" }) }),
     (error) => error.message === "MISTAKE_SOURCE_UNAVAILABLE");
@@ -195,6 +246,23 @@ test("mistake training fails closed for an unowned row, missing verified grade, 
     result_payload: resultPayload, result_expires_at: new Date(Date.now() + 60_000).toISOString(),
   }) }),
     (error) => error.message === "MISTAKE_SOURCE_NOT_GRADED");
+});
+
+test("a blank signed answer is not a trainable mistake even if old grading metadata omits unanswered", async () => {
+  const answers = row.answers.map((answer) => answer.id === "q1" ? { ...answer, answer: "  \n" } : answer);
+  const proof = completion.verifyCompletion({
+    receipt: row.exam.submission_receipt, course, material, questions, answers, selectedQuestionId: "q1",
+  }, userId);
+  await assert.rejects(resolve({
+    loadOwnedExam: async () => ({ ...row, answers }),
+    hasVerifiedGrade: async () => ({
+      submission_id: submissionId, verified_at: new Date().toISOString(), num_questions: questions.length,
+      answer_fingerprint: proof.answerFingerprint, result_payload: { per_question: [{
+        id: "q1", points: 0, max_points: 2, feedback: "Inget svar registrerades.", model_answer: "k anger lutningen.",
+      }] },
+      result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    }),
+  }), (error) => error.message === "MISTAKE_SOURCE_NOT_MISTAKE");
 });
 
 test("client-supplied source changes, another course, and cross-source focus are rejected", async () => {
@@ -212,10 +280,13 @@ test("editable client focus cannot replace signed source concepts or skills", as
   const resolved = await resolve({ trainingFocus: [{
     sourceQuestionId: "q1", sourceSubmissionId: submissionId,
     concept: "Fotosyntes", skill: "Klorofyll", errorTags: ["wrong_course"],
+    sourceEvidence: ["Fotosyntesen sker i kloroplasterna."],
   }] });
   assert.equal(resolved.trainingFocus[0].concept, "Linjär funktion");
   assert.equal(resolved.trainingFocus[0].skill, "Tolka grafens parametrar");
   assert.deepEqual(resolved.trainingFocus[0].errorTags, ["method_missing", "calculation_error"]);
+  assert.ok(!resolved.trainingFocus[0].sourceEvidence.some((quote) => quote.includes("Fotosyntesen")),
+    "client-supplied evidence cannot replace source material proven by the signed graded exam");
 });
 
 test("server-reconstructed source evidence is bounded before it enters the pipeline payload", async () => {

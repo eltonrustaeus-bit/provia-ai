@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const generation = require("./generate-exam.js");
 const operations = require("./_exam-generation-operations.cjs");
 const assessment = require("./_assessment");
+const { filterSourceReferences } = require("./_source-references.cjs");
 const MAX_COMPARISON_CONTEXT_BYTES = 8 * 1024;
 const REQUEST_ID_UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const REQUEST_ID_PATTERN = new RegExp(`^${REQUEST_ID_UUID}$`, "i");
@@ -109,10 +110,25 @@ function trainingFocusIds(job) {
 
 function uncoveredTrainingFocusIds(job, questions) {
   const required = trainingFocusIds(job);
+  const focuses = Array.isArray(job?.payload?.trainingFocus) ? job.payload.trainingFocus : [];
   const covered = new Set((Array.isArray(questions) ? questions : [])
-    .flatMap((question) => Array.isArray(question?.training_focus_matches) ? question.training_focus_matches : [])
-    .filter((id) => typeof id === "string"));
+    .flatMap((question) => supportedTrainingFocusMatches(
+      question, question?.training_focus_matches, focuses,
+    )));
   return required.filter((id) => !covered.has(id));
+}
+
+function supportedTrainingFocusMatches(question, matches, trainingFocus) {
+  const references = Array.isArray(question?.source_references) ? question.source_references : [];
+  const focuses = Array.isArray(trainingFocus) ? trainingFocus : [];
+  return (Array.isArray(matches) ? matches : []).filter((focusId) => {
+    const focus = focuses.find((item, index) =>
+      (item?.focusId || `focus-${index + 1}`) === focusId);
+    if (!focus) return false;
+    if (!Object.hasOwn(focus, "sourceEvidence")) return true;
+    if (!Array.isArray(focus.sourceEvidence) || focus.sourceEvidence.length === 0) return false;
+    return focus.sourceEvidence.some((evidence) => filterSourceReferences(evidence, references).length > 0);
+  });
 }
 
 function mergeRepairFeedback(previous, current) {
@@ -247,9 +263,9 @@ async function advance(job, { deadlineAt = null } = {}) {
   });
   for (const { question } of rankedQuestions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
-    const candidateFocusMatches = Array.isArray(question.training_focus_matches)
-      ? question.training_focus_matches
-      : [];
+    const candidateFocusMatches = supportedTrainingFocusMatches(
+      question, question.training_focus_matches, job.payload.trainingFocus,
+    );
     const newlyCoveredFocusIds = uncoveredBefore.filter((id) =>
       !coveredTrainingFocusIds.has(id) && candidateFocusMatches.includes(id));
     if (newlyCoveredFocusIds.length === 0 && uncoveredBefore.some((id) => !coveredTrainingFocusIds.has(id))) {
@@ -260,7 +276,11 @@ async function advance(job, { deadlineAt = null } = {}) {
     if (acceptedOfType >= typeLimit || accepted.length >= job.requested_count) { overLimitCandidates++; continue; }
     // Model IDs are local to each reviewed batch. Namespace them only after all
     // checks; semantic duplicate detection still compares the question content.
-    const candidate = { ...question, id: batchQuestionId(job, question) };
+    const candidate = {
+      ...question,
+      training_focus_matches: candidateFocusMatches,
+      id: batchQuestionId(job, question),
+    };
     if (accepted.some((prior) => prior.id === candidate.id)) {
       batchIdCollisions++; duplicateCandidates++; continue;
     }
@@ -382,4 +402,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, uncoveredTrainingFocusIds, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, uncoveredTrainingFocusIds, supportedTrainingFocusMatches, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

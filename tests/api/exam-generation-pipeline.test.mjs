@@ -18,6 +18,32 @@ const original = {
   completePipelineJob: operations.completePipelineJob,
 };
 
+test("a prior-mistake match must cite evidence from that focus source when available", () => {
+  const trainingFocus = [
+    { focusId: "focus-1", sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+    { focusId: "focus-2", sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
+  ];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], trainingFocus), ["focus-1"]);
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-1", "focus-2"], trainingFocus), ["focus-2"],
+  "a source citation from another same-course section cannot cover a focus with its own evidence");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1", "focus-2"],
+  "legacy accepted foci without sourceEvidence preserve their prior coverage behavior");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2", sourceEvidence: [] }]), ["focus-1"],
+  "a newly resolved focus with unavailable evidence fails closed rather than using the legacy bypass");
+  assert.deepEqual(pipeline.uncoveredTrainingFocusIds({ payload: { trainingFocus } }, [{
+    source_references: ["Grafens lutning beskriver förändringen."],
+    training_focus_matches: ["focus-1", "focus-2"],
+  }]), ["focus-2"], "persisted model claims cannot cover a different source focus");
+});
+
 test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounded batches", async (t) => {
   for (const requested of [3, 6, 12]) {
     await t.test(`${requested} questions`, async () => {
@@ -194,7 +220,8 @@ test("mistake-training cannot replace an approved question at the same count whe
       qType: "short", numQuestions: 3,
       trainingFocus: [
         { focusId: "focus-1", concept: "Ekvationer", skill: "Isolera variabeln" },
-        { focusId: "focus-2", concept: "Grafer", skill: "Tolka lutning" },
+        { focusId: "focus-2", concept: "Grafer", skill: "Tolka lutning",
+          sourceEvidence: ["Grafens lutning beskriver förändringen."] },
       ],
     },
     accepted_questions: [1, 2, 3].map((n) => ({
@@ -228,6 +255,7 @@ test("mistake-training cannot replace an approved question at the same count whe
     requiredFocusIds = payload.trainingFocusRequiredIds;
     return { status: 200, body: { ok: true, questions: [{
       id: "new-graph-skill", type: "short", question: "Tolka lutningen från två punkter.",
+      source_references: ["Fotosyntesen sker i kloroplasterna."],
       training_focus_matches: ["focus-2"], validation_status: "verified",
     }] } };
   };
@@ -261,7 +289,8 @@ test("mistake-training covers every selected focus before reaching assembly for 
         stage: "generate", requested_count: requested,
         payload: {
           qType: "short", numQuestions: requested,
-          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`, skill: `Färdighet ${focusId}` })),
+          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`,
+            skill: `Färdighet ${focusId}`, sourceEvidence: [`Källbelägg ${focusId} styr dess färdighet.`] })),
           priorQuestions: [{ id: "old", question: "Lös ekvationen 2x + 4 = 10.", concept_tag: "Ekvationslösning" }],
         },
         accepted_questions: [], progress_current: 0,
@@ -285,10 +314,12 @@ test("mistake-training covers every selected focus before reaching assembly for 
         ok: true,
         questions: Array.from({ length: Math.min(2, payload.numQuestions) }, () => {
           sequence++;
+          const focusId = focusIds[(sequence - 1) % focusIds.length];
           return {
             id: `training-${sequence}`, type: "short",
             question: `Utred unik deluppgift ${sequence} med metod ${String.fromCharCode(96 + sequence)} och exempel ${sequence * 17}.`,
-            training_focus_matches: [focusIds[(sequence - 1) % focusIds.length]],
+            source_references: [`Källbelägg ${focusId} styr dess färdighet.`],
+            training_focus_matches: focusIds,
             validation_status: "verified",
           };
         }),
@@ -304,6 +335,8 @@ test("mistake-training covers every selected focus before reaching assembly for 
         assert.equal(job.progress_current, requested);
         assert.deepEqual(pipeline.uncoveredTrainingFocusIds(job, job.accepted_questions), []);
         assert.deepEqual(new Set(job.accepted_questions.flatMap((question) => question.training_focus_matches)), new Set(focusIds));
+        assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.length === 1),
+          "the pipeline persists only source-supported focus IDs, not the model's overclaimed set");
       } finally {
         generation.generateVerifiedBatch = prior.generateVerifiedBatch;
         operations.renewPipelineLease = prior.renewPipelineLease;
@@ -314,7 +347,7 @@ test("mistake-training covers every selected focus before reaching assembly for 
   }
 });
 
-test("an assemble transition caused by retry/deadline cannot issue a mistake exam with uncovered focus", async () => {
+test("assembly rechecks stored focus matches against their source before issuing", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000019",
     user_id: "11111111-1111-4111-8111-111111111111",
@@ -322,11 +355,12 @@ test("an assemble transition caused by retry/deadline cannot issue a mistake exa
     stage: "assemble",
     requested_count: 3,
     payload: { trainingFocus: [
-      { focusId: "focus-1", concept: "Ekvationer" },
-      { focusId: "focus-2", concept: "Grafer" },
+      { focusId: "focus-1", concept: "Ekvationer", sourceEvidence: ["Ekvationens båda led ska balanseras."] },
+      { focusId: "focus-2", concept: "Grafer", sourceEvidence: ["Lutningen visar förändring per x-enhet."] },
     ] },
     accepted_questions: [1, 2, 3].map((n) => ({
-      id: `old-${n}`, training_focus_matches: ["focus-1"], validation_status: "verified",
+      id: `old-${n}`, source_references: ["Ekvationens båda led ska balanseras."],
+      training_focus_matches: ["focus-1", "focus-2"], validation_status: "verified",
     })),
   };
   const prior = {

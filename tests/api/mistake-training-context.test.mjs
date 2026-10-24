@@ -24,6 +24,11 @@ assert.deepEqual(normalizedEvidenceFocus[0], {
   skill: "Isolera variabeln", sourceQuestion: "Lös 2x = 8", studentAnswer: "x = 8",
   gradingFeedback: "Dela båda leden med 2.", expectedAnswer: "x = 4", errorTags: [],
 }, "only bounded server-shaped evidence fields are retained for the reviewer");
+const normalizedSourceEvidence = training.normalizeTrainingFocus([{
+  focusId: "focus-1", concept: "Linjär funktion", sourceEvidence: ["  y = kx + m.  ", "x".repeat(501), "third", "ignored"],
+}]);
+assert.deepEqual(normalizedSourceEvidence[0].sourceEvidence, ["y = kx + m.", "x".repeat(500), "third"],
+  "focus-specific citations are normalized and bounded");
 
 const priorQuestions = training.normalizePriorQuestions([
   { id: "attacker-controlled", question: "  Vad är ett ekosystem?  ", concept_tag: "Ekologi", model_answer: "private key" },

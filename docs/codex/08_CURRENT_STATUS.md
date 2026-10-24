@@ -26,20 +26,64 @@
 - [x] Offline-verifiering på slutlig kod: generering/pipeline/kvot/återhämtning
   **80/80**, P.E.R. **56/56**, felträning/källkontext/stream/frontend **44/44**.
   Syntaxkontroll och `git diff --check` passerade.
-- [!] Stagingbudget, read-only `2026-10-24 20:25 UTC`: hårt cap `$3.379071`,
-  spenderat `$1.737989`, reserverat `$0.263628`, tillgängligt `$1.377454`.
+- [!] Senast verifierade stagingbudget, read-only (databasrad uppdaterad
+  `2026-10-24 20:22 UTC`): hårt cap `$3.379071`, spenderat `$1.737989`,
+  reserverat `$0.263628`, tillgängligt `$1.377454`.
   Detta är bokföring i staging, inte en OpenAI-faktura. Inget nytt AI-anrop
   gjordes efter budgetläsningen.
-- [!] Ändringen är ännu lokal och ocommittad. Den behöver commit/push till den
-  redan godkända feature-branchen, ny READY Preview och därefter kontroll av
-  exakt branch/stagingkoppling. Ett syntetiskt liveprov inom aktuell budget
-  återstår. `main`, Production, produktionsdatabasen, konton, roller, kvoter och
-  hemligheter har inte ändrats.
+- [x] Ändringen committades som `a5732275169f12bd414aea9285e23d86fa26a4d8`
+  och pushades till `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_2TSwT2GTCE6zQHEtt562AAYrMaqu` blev `READY` på exakt denna commit; dess
+  branch-alias öppnades i sidbrowsern och visade den inloggade appen.
+- [!] Ingen ny modellkörning gjordes efter ändringen. Den tidigare
+  godkända 12-frågekörningen slutade 0/12 före fixen. Användaren har nu godkänt
+  ett nytt syntetiskt test inom taket. Den tidigare 9/12-körningen bevaras och
+  lämnas orörd. En redan öppen flik med en deployment-specifik Preview-URL
+  återanvändes. Vercel verifierade att den stabila branch-aliasen pekar på
+  `a573227`; fliken navigerades inte till den aliasen. Efter omladdning på den
+  specifika URL:en visades inloggningsgrinden igen. Inga nya flikar eller prov
+  skapades. Nästa Preview ska öppnas via branch-aliasen i samma flik.
+  `main`, Production, produktionsdatabasen, konton, roller, kvoter och hemligheter
+  har inte ändrats.
 
 **PILOT NOT READY.** Den senaste livekörningen visar att appen säkert stoppar
 ett 0/12-resultat, men inte att den kan leverera 12 kvalitetsgodkända frågor.
-Nästa steg är Preview på slutlig kod och en ny budget-/schema-/sessionskontroll
-före ett enda syntetiskt stagingtest. Tidigare osvarade 9/12-prov har bevarats.
+Efter färdig offline-granskning och slutlig Preview behövs en enda staginginloggning
+på samma alias, verifiering att kontot saknar aktivt prov samt färsk kontroll av
+budget och staging-schema före det enda godkända syntetiska testflödet. Det äldre
+9/12-provet ska bevaras.
+
+## Felträning knuten till källan — lokal uppföljning, 2026-10-24
+
+- [x] Verifierad källkontext från ett rättat prov knyts nu per fokus-ID till högst
+  tre serverhärledda, ordagranna källutdrag (högst 500 tecken vardera). En
+  kandidats påstådda fokusmatch godtas i pipelinen endast när dess redan
+  validerade `source_references` stöder samma utdrag. Obestyrkta fokus-ID:n
+  sparas inte och räknas inte som täckta. Äldre köjobb utan fältet behåller
+  kompatibilitet; nytt fokus med uttryckligen tom evidens failar stängt.
+- [x] Tomma eller blankstegssvar avvisas som felträning även när ett gammalt
+  betygsresultat saknar `unanswered: true`.
+- [x] Oberoende källgranskare hittade och verifierade de två ovanstående
+  riskerna. Efterföljande granskning fann inga blockerare. Riktade offlineprov
+  passerade för två olika källor i samma kurs, felaktiga/överdrivna fokus-ID:n,
+  äldre källfält, tom evidens samt 3/6/12-frågepipelinen.
+- [x] Oberoende säkerhetsgranskning fann ingen blockerare eller försvagad
+  ägar-, auth-, kvot- eller kvalitetsgrind. En icke-blockerande lucka kvarstår:
+  inget separat PGlite-test laddar om ett checkpointat jobb med en obestyrkt
+  lagrad fokusmatch; återkontrollen i koden och vanliga persistensprov finns.
+- [x] Relevanta API-/pipeline-/verifierar-/Postgres-emuleringstester passerade;
+  syntaxkontroll och diffkontroll passerade. P.E.R.-regressionerna för vanlig
+  hjälp, aktivt prov och rättat resultat passerade 3/3. Inga modeller anropades.
+- [!] Ändringarna är lokala och ännu inte committade/pushade. Ingen ny Preview
+  eller stagingmodellkörning har verifierat den slutliga ändringen. Senast
+  tidigare budgetläsning visade `$1.377454` tillgängligt under Preview-cap, men
+  den är inte färsk och får inte användas som anropsgodkännande utan ny läsning.
+
+**PILOT NOT READY.** Källbindning och tomsvarsfelet är åtgärdade och offline-
+granskade. Nästa steg är att slutföra status-/diffkontroll, skapa en enda Preview
+på den befintliga branchen, navigera samma flik till branch-aliasen, logga in en
+gång och verifiera konto/budget/schema före ett syntetiskt flöde. Ingen
+Production-, `main`-, kontovals- eller kvotåtgärd har gjorts.
 
 ## Ny stagingkörning och förbättringar för provbredd — 2026-10-24
 

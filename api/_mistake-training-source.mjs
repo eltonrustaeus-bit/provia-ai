@@ -1,9 +1,11 @@
 import examCompletion from "./_exam-completion.cjs";
 import materialInput from "./_material.cjs";
 import mistakeTraining from "./_mistake-training.cjs";
+import sourceReferenceTools from "./_source-references.cjs";
 
 const { verifyCompletion } = examCompletion;
 const { normalizePriorQuestionKey, normalizePriorQuestions, normalizeTrainingFocus, normalizeTrainingSources } = mistakeTraining;
+const { deriveSourceExcerpt, filterSourceReferences } = sourceReferenceTools;
 
 function fail(code, status = 409) {
   return Object.assign(new Error(code), { status });
@@ -77,8 +79,10 @@ export async function resolveMistakeTrainingSource({
       }, userId);
       if (!verified || verified.submissionId !== reference.submissionId ||
           verified.answerFingerprint !== verifiedGrade.answer_fingerprint) throw fail("MISTAKE_SOURCE_MISMATCH");
+      const submittedAnswer = verified.answerMap.get(questionId);
       const scored = verifiedGrade.result_payload.per_question.filter((item) => String(item?.id || "") === questionId);
-      if (scored.length !== 1 || scored[0].unanswered === true ||
+      if (typeof submittedAnswer !== "string" || !submittedAnswer.trim() ||
+          scored.length !== 1 || scored[0].unanswered === true ||
           !Number.isFinite(Number(scored[0].points)) || !Number.isFinite(Number(scored[0].max_points)) ||
           Number(scored[0].max_points) <= 0 || Number(scored[0].points) < 0 ||
           Number(scored[0].points) >= Number(scored[0].max_points)) {
@@ -92,6 +96,10 @@ export async function resolveMistakeTrainingSource({
       const question = verifiedQuestions.get(item.sourceQuestionId);
       const scored = verifiedScores.get(item.sourceQuestionId);
       if (!question || !scored) throw fail("MISTAKE_SOURCE_MISMATCH");
+      const expectedAnswer = String(scored.model_answer || question.model_answer || "");
+      const citedEvidence = filterSourceReferences(material.text, question.source_references).slice(0, 3);
+      const sourceEvidence = citedEvidence.length ? citedEvidence :
+        deriveSourceExcerpt(material.text, [question.question, expectedAnswer, scored.feedback || ""]);
       verifiedFocus.push({
         focusId: `focus-${verifiedFocus.length + 1}`,
         sourceQuestionId: item.sourceQuestionId,
@@ -101,7 +109,8 @@ export async function resolveMistakeTrainingSource({
         sourceQuestion: String(question.question || "").slice(0, 1200),
         studentAnswer: String(verifiedAnswers.get(item.sourceQuestionId) || "").slice(0, 1200),
         gradingFeedback: typeof scored.feedback === "string" ? scored.feedback.slice(0, 1000) : "",
-        expectedAnswer: String(scored.model_answer || question.model_answer || "").slice(0, 1000),
+        expectedAnswer: expectedAnswer.slice(0, 1000),
+        sourceEvidence,
         errorTags: Array.isArray(scored.error_tags)
           ? scored.error_tags.slice(0, 4)
             .filter((tag) => typeof tag === "string" && /^[a-z0-9_-]{1,40}$/i.test(tag))
