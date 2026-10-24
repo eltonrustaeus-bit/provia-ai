@@ -1781,7 +1781,7 @@ test("a verified completed exam allows unrelated study help without forwarding s
   }
 });
 
-test("completed stale prov view drops unbound course, material, history, and mistake context", async () => {
+test("completed stale exam context drops unbound course, material, history, and mistake context", async () => {
   const previous = { activeCount, issuanceState, latestSubmissionId, providerAnswer };
   try {
     activeCount = 0;
@@ -1790,33 +1790,36 @@ test("completed stale prov view drops unbound course, material, history, and mis
     providerAnswer = "Fotosyntesen omvandlar ljusenergi till kemisk energi.";
     calls.length = 0;
 
-    const response = await invoke({
-      userQuestion: "Explain photosynthesis",
-      topic: "STALE_TOPIC_MARKER",
-      context: "STALE_CONTEXT_MARKER",
-      history: [{ role: "assistant", content: "STALE_HISTORY_MARKER" }],
-      weakAreas: ["STALE_WEAK_AREA_MARKER"],
-      recentMistakes: [{ question: "STALE_MISTAKE_MARKER", studentAnswer: "STALE_ANSWER_MARKER" }],
-      clarifyReply: "STALE_CLARIFY_MARKER",
-      pageContext: {
-        page: "prov",
-        course: "Matematik 1b",
-        level: "STALE_LEVEL_MARKER",
-        studyMaterial: "STALE_MATERIAL_MARKER",
-        weakAreas: ["STALE_PAGE_WEAK_AREA_MARKER"],
-        targets: ["STALE_TARGET_MARKER"],
-        currentQuestion: { text: "STALE_QUESTION_MARKER" },
-        examState: { phase: "finished", submissionId: latestSubmissionId },
-      },
-    }, "POST", "application/json");
+    for (const page of ["prov", "app"]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Explain photosynthesis",
+        topic: "STALE_TOPIC_MARKER",
+        context: "STALE_CONTEXT_MARKER",
+        history: [{ role: "assistant", content: "STALE_HISTORY_MARKER" }],
+        weakAreas: ["STALE_WEAK_AREA_MARKER"],
+        recentMistakes: [{ question: "STALE_MISTAKE_MARKER", studentAnswer: "STALE_ANSWER_MARKER" }],
+        clarifyReply: "STALE_CLARIFY_MARKER",
+        pageContext: {
+          page,
+          course: "Matematik 1b",
+          level: "STALE_LEVEL_MARKER",
+          studyMaterial: "STALE_MATERIAL_MARKER",
+          weakAreas: ["STALE_PAGE_WEAK_AREA_MARKER"],
+          targets: ["STALE_TARGET_MARKER"],
+          currentQuestion: { text: "STALE_QUESTION_MARKER" },
+          examState: { phase: "finished", submissionId: latestSubmissionId },
+        },
+      }, "POST", "application/json");
 
-    assert.equal(response.statusCode, 200);
-    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
-    assert.ok(provider, "ordinary study help remains available after a completed exam");
-    assert.match(provider.body, /Explain photosynthesis/);
-    assert.doesNotMatch(provider.body,
-      /STALE_(?:TOPIC|CONTEXT|HISTORY|WEAK_AREA|MISTAKE|ANSWER|CLARIFY|LEVEL|MATERIAL|PAGE_WEAK_AREA|TARGET|QUESTION)_MARKER|Matematik 1b/);
-    assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
+      assert.equal(response.statusCode, 200, page);
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.ok(provider, `ordinary study help remains available from ${page}`);
+      assert.match(provider.body, /Explain photosynthesis/);
+      assert.doesNotMatch(provider.body,
+        /STALE_(?:TOPIC|CONTEXT|HISTORY|WEAK_AREA|MISTAKE|ANSWER|CLARIFY|LEVEL|MATERIAL|PAGE_WEAK_AREA|TARGET|QUESTION)_MARKER|Matematik 1b/);
+      assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
+    }
   } finally {
     activeCount = previous.activeCount;
     issuanceState = previous.issuanceState;

@@ -190,6 +190,85 @@ for (const [first, duplicate] of observedBiologyPairs) {
     gate.questions.map((question) => question.id).join() === first.id &&
       gate.dropped.some((item) => item.id === duplicate.id && item.issues.includes("duplicate_question")));
 }
+const liveRibosomePair = [
+  { ...biologyQuestion("ribosome-function", "Vilken funktion har ribosomer i cellen?",
+    "Ribosomer bygger proteiner med information från RNA.", "Ribosomer"),
+    learning_objective: "Beskriv ribosomernas funktion." },
+  { ...biologyQuestion("ribosome-rna", "Vad gör ribosomerna med RNA?",
+    "Ribosomer bygger proteiner med information från RNA.", "Ribosomer"),
+    learning_objective: "Beskriv ribosomernas funktion." },
+];
+const liveRibosomeGate = A.gateExam({ questions: liveRibosomePair }, { profile: "natural_sciences" });
+check("drops live ribosome paraphrase with the same concept, objective, and answer",
+  liveRibosomeGate.questions.length === 1 && liveRibosomeGate.questions[0].id === "ribosome-function");
+const livePhotosynthesisGate = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-under", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-in", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Fotosyntesen använder ljusenergi för att bygga druvsocker av koldioxid och vatten; syre bildas samtidigt.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("drops live photosynthesis paraphrase with the same concept and learning objective",
+  livePhotosynthesisGate.questions.length === 1 && livePhotosynthesisGate.questions[0].id === "photosynthesis-under");
+const distinctStemObjectives = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-location", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Kloroplasterna är platsen där fotosyntesen sker.", "Fotosyntes"),
+    learning_objective: "Beskriv var fotosyntesen sker." },
+  { ...biologyQuestion("photosynthesis-light", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll fångar ljusenergi.", "Fotosyntes"),
+    learning_objective: "Förklara hur ljusenergi fångas." },
+] }, { profile: "natural_sciences" });
+check("keeps near-identical stems when their learning objectives differ",
+  distinctStemObjectives.questions.length === 2);
+const distinctObjectiveVerbs = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-describe", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-explain", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Förklara fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps near-identical stems when the learning-action verbs differ",
+  distinctObjectiveVerbs.questions.length === 2);
+const reversedProcessAnswers = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-reactants", "Vilka ämnen används som ingångsämnen i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten för att bilda glukos och syre.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-products", "Vilka ämnen bildas som produkter i fotosyntesen?",
+    "Fotosyntesen använder glukos och syre för att bilda koldioxid och vatten.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps reactant and product questions when the answer terms reverse roles",
+  reversedProcessAnswers.questions.length === 2);
+const addedAnswerConcept = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-answer-short", "Vad sker i fotosyntesen?",
+    "Växter använder ljusenergi för att bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-answer-expanded", "Hur sker fotosyntesen i växter?",
+    "Växter använder ljusenergi för att bilda druvsocker och syre.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps same-objective answers when one adds a distinct answer concept",
+  addedAnswerConcept.questions.length === 2);
+const answerNegationDiffers = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-positive", "Vad sker i fotosyntesen?",
+    "Växter använder ljusenergi för att bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-negative", "Hur sker fotosyntesen i växter?",
+    "Växter använder ljusenergi för att ej bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps same-objective answers when they differ by a negation",
+  answerNegationDiffers.questions.length === 2);
+const missingObjectivePhotosynthesisGate = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-under-unused", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-in-unused", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Fotosyntesen använder ljusenergi för att bygga druvsocker av koldioxid och vatten; syre bildas samtidigt.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("does not collapse similar stems when the learning objective is missing",
+  missingObjectivePhotosynthesisGate.questions.length === 2);
 const distinctMitochondriaTargets = A.gateExam({ questions: [
   biologyQuestion("mitochondria-general-function", "Vad är mitokondriernas huvudsakliga uppgift i celler?",
     "Mitokondrierna sköter huvuddelen av cellandningen och bildar ATP.", "Mitokondrier"),

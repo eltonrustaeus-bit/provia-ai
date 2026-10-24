@@ -675,6 +675,10 @@ function semanticQuestionTokenSequence(question) {
     .map(({ token }) => token);
 }
 
+function exactComparisonTokens(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+}
+
 function commutativeComparisonSignature(question) {
   const match = String(question?.question || "").normalize("NFKC")
     .match(/^\s*(?:jämför|compare)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s+(?:och|and)\s+([\p{L}\p{N}-]+(?:\s+[\p{L}\p{N}-]+){0,2})\s*[?.!]*\s*$/iu);
@@ -756,6 +760,31 @@ function repeatsHighConfidenceAnswerTarget(left, right) {
   return Boolean(concept && concept === semanticConceptTag(right) &&
     leftTopic && rightTopic && sameProcessTopic &&
     (sharedProcessIntent || leftTopic === rightTopic));
+}
+
+function repeatsNearIdenticalQuestionStem(left, right) {
+  if (!left?.concept_tag || semanticConceptTag(left) !== semanticConceptTag(right) ||
+      String(left?.type || "") !== String(right?.type || "")) return false;
+  const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
+  if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftTokens = semanticQuestionTokens(left);
+  const rightTokens = semanticQuestionTokens(right);
+  if (leftTokens.size < 4 || rightTokens.size < 4) return false;
+  const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union > 0 && shared / union >= 0.85;
+}
+
+function repeatsSameObjectiveAndAnswer(left, right) {
+  if (!left?.concept_tag || semanticConceptTag(left) !== semanticConceptTag(right) ||
+      String(left?.type || "") !== String(right?.type || "")) return false;
+  const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
+  if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftAnswer = exactComparisonTokens(left?.model_answer).join(" ");
+  const rightAnswer = exactComparisonTokens(right?.model_answer).join(" ");
+  return leftAnswer.split(" ").filter(Boolean).length >= 4 && leftAnswer === rightAnswer;
 }
 
 function questionIntents(question) {
@@ -1068,6 +1097,7 @@ function isDuplicateQuestion(left, right) {
   // close repeated full-score answer as the same target, while requiring a
   // substantial token floor so short shared answers (for example "ATP") do
   // not collapse distinct questions.
+  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right)) return true;
   if (repeatsHighConfidenceAnswerTarget(left, right)) return true;
 
   const signature = questionDedupeSignature(left);

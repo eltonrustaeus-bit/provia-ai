@@ -1,5 +1,58 @@
 # 08 Current Status
 
+## Senaste livebevis och nästa kvalitetsfix — 2026-10-25
+
+Den här posten är nyaste kontrollen och ersätter äldre påståenden nedan om att
+ingen ny modellförfrågan/liveverifiering har gjorts. Äldre poster behålls som
+historiska checkpoints.
+
+- [x] Återanvände den befintliga inloggade Preview-fliken och slutförde ett enda
+  syntetiskt Biologi 1-prov: 12 frågor genererades, alla 12 besvarades och
+  rättades. Inga extra flikar, parallella prov eller ytterligare genereringar
+  startades. Resultatet blev 11/12 (92 %).
+- [x] Livefrågornas sparade, syntetiska metadata visar två konkreta
+  redundansfall: Q2/Q10 delar koncept `Ribosomer`, lärandemål och fullpoängssvar
+  men hade olika ämnesetiketter; Q5/Q8 hade samma fotosyntesbegrepp och nästan
+  identisk frågestam men olika underetiketter. Q3 kallade fotosyntes
+  ”energiåtervinning”, en missvisande term.
+- [!] Q8 gav 0/1 trots att svaret uttryckligen beskrev ljusenergi som omvandlad
+  till kemisk energi och angav druvsocker/syre. Detta ser inkonsekvent ut, men
+  korrekt/felaktigt poängutfall är inte slutligt fastställt utan den signerade
+  fullständiga rubricen; gör ingen generell slutsats från en fråga.
+- [x] Lokal assessment-fix fångar nu de observerade ribosom- och
+  fotosyntesparafraserna. Nästan identisk frågestam kräver samma koncept och
+  exakt samma icke-tomma lärandemål; samma mål och svar jämförs med exakt samma
+  normaliserade ord i samma ordning. Regressioner säkerställer att olika
+  lärandeverb, ”ej”, extra svarsbegrepp, omvända processroller och saknade mål
+  inte kollapsas.
+  Naturvetenskaplig verifierare instrueras även att granska processpremiss och
+  terminologi, inklusive att fotosyntes inte är ”energiåtervinning”.
+- [x] Lokal P.E.R.-fix rensar gammal provkontext även när klienten felaktigt
+  anger `page=app`; regressionen täcker både `prov` och `app`. Aktivt provs
+  facitfria skydd ändrades inte.
+- [x] Verifiering efter senaste justeringen: assessment + subject overlay-filer
+  passerade; pipeline/HTTP/verifier/salvage **32/32**; `node --check` för de
+  tre ändrade API-filerna och `git diff --check` passerade. P.E.R-handler hade
+  passerat **59/59** efter kontextsaneringen; P.E.R-kod har inte ändrats sedan.
+- [x] Färsk stagingbudget efter en generering och en rättning: cap
+  `$3.379071`, spent `$2.090394`, reserved `$0.263628`, intern marginal cirka
+  `$1.025049` (rad `2026-10-24 23:35:16 UTC`). Användarens totala
+  auktoriseringsgräns är nu `$5`; stagingens interna cap lämnades orörd.
+- [x] Oberoende slutgranskning av den senaste dubblettregeln fann ingen
+  blockerande falskpositiv. Kvarvarande dokumenterad avvägning: omformulerade
+  eller omordnade facit kan undgå hård dubblettmatchning när övriga signaler
+  inte räcker; detta är avsiktligt säkrare än att kasta svar med omvända roller.
+- [!] Kodändringarna i den här posten är lokala på
+  `codex/exgen-school-pilot-integration-20261024`, ovanpå `ca1584f`; ännu inte
+  committade, pushade eller verifierade i en ny Preview. Main/Production och
+  produktionsdatabasen är orörda. Högst ett nytt liveprov ska köras efter
+  granskad commit, exakta READY-Previewn och färsk budgetkontroll.
+
+**PILOT NOT READY.** Nästa steg: committa/pusha granskad kod till feature-branch,
+verifiera exakt READY-Preview och stagingkoppling, sedan högst ett syntetiskt
+liveprov inom både användarens $5-tak och stagingens separata interna budget.
+Slutför och rätta provet i samma flik. Produktionsgrindar är ännu inte uppfyllda.
+
 ## Terminal rättningsstatus, kostnad och fortsatt stagingverifiering — 2026-10-25
 
 - [x] Användaren höjde den totala godkända AI-kostnadsgränsen till `$5`.

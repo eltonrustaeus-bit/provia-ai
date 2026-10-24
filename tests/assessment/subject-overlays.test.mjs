@@ -476,6 +476,12 @@ check("maths hint names the correct_index/explanation mismatch explicitly", (() 
   return p.includes("correct_index") && p.includes("model_answer");
 })());
 
+check("science verifier checks false premises and process terminology", (() => {
+  const sv = V.buildVerifierPrompt("sv", "natural_sciences");
+  const en = V.buildVerifierPrompt("en", "natural_sciences");
+  return sv.includes("kalla den inte energiåtervinning") && en.includes("do not call it energy recovery");
+})());
+
 check("law hint text is unchanged from before this change", (() => {
   const p = V.buildVerifierPrompt("sv", "law");
   return p.includes("brottsrubriceringar, lagrum och straffskalor är verkliga");
