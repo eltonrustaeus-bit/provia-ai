@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
 import { createRequire } from "node:module";
@@ -47,6 +48,7 @@ function responseRecorder() {
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
     setHeader(name, value) { this.headers[name] = value; },
+    end(body) { this.body = JSON.parse(body); },
   };
 }
 
@@ -106,6 +108,156 @@ test("CommonJS route dispatches a valid pipeline start through the explicit ESM 
     assert.equal(response.body.state, "queued");
     assert.equal(insertedJob.requested_count, 12);
     assert.equal(insertedJob.progress_current, 0);
+    assert.equal(insertedJob.request_hash, createHash("sha256").update(JSON.stringify({
+      lang: "sv",
+      level: "C",
+      course: "Matematik 2b",
+      qType: "short",
+      numQuestions: 12,
+      pastedText: "Syntetiskt material om linjära och kvadratiska funktioner, nollställen, symmetrilinje och skärningspunkter.",
+      focusTerms: [],
+    })).digest("hex"), "ordinary in-flight jobs retain the prior server request hash across an app upgrade");
+  } finally {
+    generationHandler.loadCentralRules = previous.loadCentralRules;
+    generationHandler.loadUserRole = previous.loadUserRole;
+    generationHandler.consumeMockExamQuota = previous.consumeMockExamQuota;
+    operations.claimGeneration = previous.claimGeneration;
+  }
+});
+
+test("completed mistake-training replay does not depend on an unexpired grading source", async () => {
+  const previous = {
+    loadCentralRules: generationHandler.loadCentralRules,
+    loadUserRole: generationHandler.loadUserRole,
+    consumeMockExamQuota: generationHandler.consumeMockExamQuota,
+    claimGeneration: operations.claimGeneration,
+  };
+  let claimedHash;
+  let quotaCalls = 0;
+  let databaseReads = 0;
+  const replay = { ok: true, requestId: "synthetic-replay", questions: [{ id: "q-new" }] };
+  mockFetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    databaseReads++;
+    throw new Error(`Unexpected database read during replay: ${url.pathname}`);
+  };
+  generationHandler.loadCentralRules = async () => ({
+    normalizeRole: (role) => role,
+    getFeatureLimit: () => ({ cap: 2, period: "week" }),
+    currentPeriodKey: () => "2026-W43",
+    getEntitlementSnapshot: () => ({}),
+  });
+  generationHandler.loadUserRole = async () => "gratis";
+  generationHandler.consumeMockExamQuota = async () => { quotaCalls++; return { ok: true, count: 1 }; };
+  operations.claimGeneration = async (input) => {
+    claimedHash = input.payloadHash;
+    return { status: "replay", response: replay };
+  };
+  try {
+    const response = responseRecorder();
+    await generationHandler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-test-token" },
+      body: {
+        course: "Matematik 2b",
+        qType: "short",
+        numQuestions: 3,
+        sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"] }],
+        trainingFocus: [{
+          sourceSubmissionId: "a".repeat(32), sourceQuestionId: "q1",
+          concept: "Linjär funktion", skill: "Tolka lutning",
+        }],
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      },
+      url: "/api/generate-exam?pipeline=start",
+    }, response);
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, replay);
+    assert.equal(databaseReads, 0, "a finished response replays before source-grade expiry can block it");
+    assert.equal(quotaCalls, 0, "replay does not consume quota again");
+    assert.equal(claimedHash, createHash("sha256").update(JSON.stringify({
+      lang: "sv",
+      level: "C",
+      course: "Matematik 2b",
+      qType: "short",
+      numQuestions: 3,
+      pastedText: "",
+      focusTerms: [],
+      trainingRequestVersion: 1,
+      trainingFocus: [{
+        sourceQuestionId: "q1", sourceSubmissionId: "a".repeat(32),
+        concept: "Linjär funktion", skill: "Tolka lutning", errorTags: [],
+      }],
+      priorQuestions: [],
+      sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"] }],
+    })).digest("hex"), "new mistake-training request identity is stable before server-side source resolution");
+  } finally {
+    generationHandler.loadCentralRules = previous.loadCentralRules;
+    generationHandler.loadUserRole = previous.loadUserRole;
+    generationHandler.consumeMockExamQuota = previous.consumeMockExamQuota;
+    operations.claimGeneration = previous.claimGeneration;
+  }
+});
+
+test("graph mistake training is rejected before quota or model work on direct and pipeline routes", async () => {
+  const previous = {
+    loadCentralRules: generationHandler.loadCentralRules,
+    loadUserRole: generationHandler.loadUserRole,
+    consumeMockExamQuota: generationHandler.consumeMockExamQuota,
+    claimGeneration: operations.claimGeneration,
+  };
+  let quotaCalls = 0;
+  let claimCalls = 0;
+  const unexpected = [];
+  mockFetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.pathname === "/auth/v1/user") return jsonResponse({ id: userId });
+    if (url.pathname === "/rest/v1/profiles") {
+      unexpected.push(`${url.hostname}${url.pathname}`);
+      return jsonResponse([{ role: "gratis" }]);
+    }
+    unexpected.push(`${url.hostname}${url.pathname}`);
+    throw new Error(`Unexpected network request: ${url.pathname}`);
+  };
+  generationHandler.loadCentralRules = async () => ({
+    normalizeRole: (role) => role,
+    getFeatureLimit: () => ({ cap: 3, period: "week" }),
+    currentPeriodKey: () => "2026-W43",
+    getEntitlementSnapshot: () => ({}),
+  });
+  generationHandler.loadUserRole = async () => "gratis";
+  generationHandler.consumeMockExamQuota = async () => { quotaCalls++; return { ok: true, count: 1 }; };
+  operations.claimGeneration = async () => { claimCalls++; return { status: "claimed" }; };
+  try {
+    for (const [url, qType, expectedError] of [
+      ["/api/generate-exam", "graph", "MISTAKE_GRAPH_UNSUPPORTED"],
+      ["/api/generate-exam?pipeline=start", "graph", "MISTAKE_GRAPH_UNSUPPORTED"],
+      ["/api/generate-exam", "short", "MISTAKE_SOURCE_REQUIRES_PIPELINE"],
+    ]) {
+      const response = responseRecorder();
+      const requestBody = {
+        course: "Matematik 1b", qType, numQuestions: qType === "graph" ? 1 : 3,
+        pastedText: "Syntetiskt verifierat källmaterial för grafträning.",
+        sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"] }],
+        trainingFocus: [{ sourceSubmissionId: "a".repeat(32), sourceQuestionId: "q1", concept: "Lutning", skill: "Rita graf" }],
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      };
+      await generationHandler({
+        method: "POST",
+        headers: { authorization: "Bearer synthetic-test-token" },
+        body: requestBody,
+        async *[Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify(requestBody)); },
+        url,
+      }, response);
+      assert.equal(response.statusCode, 409, `${url} must reject unsupported source routing`);
+      assert.equal(response.body.error, expectedError);
+    }
+    assert.equal(quotaCalls, 0, "unsupported source routing does not consume quota");
+    assert.equal(claimCalls, 0, "unsupported source routing does not create an idempotency claim");
+    assert.ok(unexpected.every((path) => path === "pipeline-test.supabase.co/rest/v1/profiles"),
+      "only the pre-existing role lookup runs; no job/quota/source data or model request follows");
   } finally {
     generationHandler.loadCentralRules = previous.loadCentralRules;
     generationHandler.loadUserRole = previous.loadUserRole;

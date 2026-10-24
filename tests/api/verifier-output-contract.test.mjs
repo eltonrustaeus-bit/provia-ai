@@ -14,7 +14,7 @@ const sourceSupport = (quote, parts = 0, answers = 0) => ({
   accepted_answer_evidence: Array.from({ length: answers }, () => [0]),
 });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -32,7 +32,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -68,10 +68,16 @@ assert.ok(submittedReviewSchema.items.required.includes("duplicate_of"),
   "review schema requires an explicit same-learning-objective verdict");
 assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
   "schema inspection without a question count remains backward compatible");
+assert.ok(!submittedReviewSchema.items.required.includes("training_focus_alignment"),
+  "ordinary exams retain their existing review contract");
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+assert.match(buildVerifierPrompt("sv"), /samma lärandemål på ett redundant sätt.*brett ämne.*skilda färdigheter/i,
+  "the reviewer rejects redundant objectives without rejecting distinct skills in the same broad subject");
+assert.match(buildVerifierPrompt("en"), /redundantly assesses the same learning objective.*broad subject.*distinct skills/i,
+  "the English reviewer keeps the same controlled duplicate rule");
 assert.match(buildVerifierPrompt("sv"), /frågestammen för idiomatisk, grammatiskt korrekt svenska.*'linjens ekvation', inte 'linjären'/i,
   "the independent reviewer explicitly checks Swedish inflection in question stems");
 assert.match(buildVerifierPrompt("sv"), /avvisa tydliga grammatikfel.*'den viktigt'.*ge inte högt language_quality/i,
@@ -327,6 +333,8 @@ assert.equal(transmitted.questions[0].model_answer, "x = 3", "the reviewer recei
 assert.equal(transmitted.questions[0].rubric, "En poäng för x = 2.");
 assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_rubric);
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
+assert.match(buildVerifierPrompt("sv"), /Sätt approved=false.*exempelsvaret är felaktigt, motsägelsefullt, otillräckligt för utlovade poäng/i,
+  "the Swedish verifier must retain the explicit incorrect/insufficient exemplar rejection rule");
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
 assert.match(buildVerifierPrompt("sv"), /ordagrant förekommande källhänvisning räcker inte/i);
 assert.match(buildVerifierPrompt("sv"), /ett giltigt kortsvar som bedömningsmatrisen inte accepterar/i);
@@ -345,6 +353,89 @@ assert.match(buildVerifierPrompt("en"), /Compare candidate questions with each o
 assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och returnera exakt ett resultat/i);
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
+
+const focus = [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: ["calculation_error"],
+  sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
+  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }];
+const focusedResult = {
+  ...result("q-focus", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  language_match: true, option_quality: [], issues: [], required_changes: [],
+  duplicate_of: "", source_support: sourceSupport("Linjär funktion: y = 2x + 3."),
+  training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: ["focus-1"],
+};
+const focusedReview = await runWithResults([focusedResult], [question("q-focus")], "Linjär funktion: y = 2x + 3.", undefined, "C", undefined, "sv", undefined, focus);
+const focusSchema = focusedReview.requestBody.text.format.schema.properties.results.items;
+const focusPayload = JSON.parse(focusedReview.requestBody.input.find((item) => item.role === "user").content);
+assert.ok(focusSchema.required.includes("training_focus_alignment"), "mistake-training requires an explicit alignment verdict");
+assert.ok(focusSchema.required.includes("training_focus_matches"), "mistake-training requires explicit focus IDs");
+assert.ok(focusSchema.required.includes("training_focus_skill_matches"), "mistake-training requires a separate verdict for specific failed skills");
+assert.ok(focusSchema.required.includes("training_focus_error_matches"), "mistake-training requires a separate verdict for the specific error evidence");
+assert.equal(focusSchema.properties.training_focus_matches.minItems, 0,
+  "an explicit no-match review is representable so the server can reject only that candidate");
+assert.deepEqual(focusPayload.training_focus, [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: ["calculation_error"],
+  source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
+  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
+  "reviewer receives the bounded source question, verified answer, and grading evidence without source identities");
+assert.match(focusedReview.requestBody.input[0].content, /skill.*training_focus_skill_matches.*brett concept.*aldrig ersätta skill/i);
+assert.match(focusedReview.requestBody.input[0].content, /Generiska error_tags.*får aldrig ensamma räcka/i);
+assert.match(focusedReview.requestBody.input[0].content, /source_question, student_answer och grading_feedback.*training_focus_error_matches/i);
+assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: false }), false,
+  "a source-grounded question that misses the documented mistake cannot pass training review");
+assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: true }), true,
+  "a focused question can pass only when the existing quality checks also pass");
+const genericOnlyReview = await runWithResults([{
+  ...focusedResult, training_focus_alignment: true, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(genericOnlyReview.outcome.callOk, true);
+assert.equal(decideApproval(genericOnlyReview.outcome.perQuestion.get("q-focus")), false,
+  "a generic error label without a specific concept/skill match cannot pass training review");
+const broadConceptOnlyReview = await runWithResults([{
+  ...focusedResult, training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: [], training_focus_error_matches: ["focus-1"],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(broadConceptOnlyReview.outcome.callOk, true);
+assert.deepEqual(broadConceptOnlyReview.outcome.perQuestion.get("q-focus").training_focus_matches, [],
+  "a broad concept match cannot claim coverage of a focus with a more specific documented failed skill");
+assert.equal(decideApproval(broadConceptOnlyReview.outcome.perQuestion.get("q-focus")), false,
+  "a question that only overlaps the broad topic is withheld from mistake training");
+const skillWithoutErrorMatch = await runWithResults([{
+  ...focusedResult, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: [],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.deepEqual(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus").training_focus_matches, [],
+  "a broad skill match without explicit alignment to the verified missed component cannot pass");
+assert.equal(decideApproval(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus")), false);
+const explicitNoMatch = await runWithResults([{
+  ...focusedResult, approved: false, training_focus_alignment: false, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
+  required_changes: ["Öva en dokumenterad färdighet."],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(explicitNoMatch.outcome.callOk, true,
+  "the structured reviewer can return a valid explicit no-match decision");
+assert.equal(decideApproval(explicitNoMatch.outcome.perQuestion.get("q-focus")), false,
+  "an explicit no-match remains rejected by deterministic approval");
+const inventedFocusReview = await runWithResults([{
+  ...focusedResult, training_focus_matches: ["focus-999"],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(inventedFocusReview.outcome.callOk, false, "an invented focus ID invalidates the independent review response");
+assert.equal(inventedFocusReview.outcome.failureReason, "invalid_training_focus_matches");
+const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingFocusVerdict.outcome.callOk, false, "missing focus verdict fails the complete review closed");
+assert.equal(missingFocusVerdict.outcome.failureReason, "missing_training_focus_alignment");
+const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingSkillVerdict.outcome.callOk, false, "missing specific-skill verdict fails the complete review closed");
+assert.equal(missingSkillVerdict.outcome.failureReason, "missing_training_focus_skill_matches");
+const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingErrorVerdict.outcome.callOk, false, "missing specific-error verdict fails the complete review closed");
+assert.equal(missingErrorVerdict.outcome.failureReason, "missing_training_focus_error_matches");
+const sanitizedFocus = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined,
+  [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: [], sourceSubmissionId: "private-id",
+    sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
+    gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }]);
+assert.equal(sanitizedFocus.outcome.callOk, true, "server focus records can be safely reduced for review");
+assert.deepEqual(JSON.parse(sanitizedFocus.requestBody.input.find((item) => item.role === "user").content).training_focus,
+  [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: [],
+    source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
+    grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
+  "source identities are excluded from the provider review payload");
 assert.equal(decideApproval({ ...validOpenReview, source_alignment: 0.59 }), false,
   "an exact source quote cannot override a below-threshold source-alignment decision");
 assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");

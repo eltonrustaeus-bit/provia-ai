@@ -797,6 +797,8 @@ const LS_UI_OPEN = "proviaai_ui_open";
 const LS_CUSTOM_COURSES = "proviaai_custom_courses";
 const LS_ROLE = "proviaai_role";
 const LS_PENDING_EXAMS_PREFIX = "proviaai_pending_exams:";
+const mistakeSourceByKey = new Map();
+let pendingMistakeTraining = null;
 
 // ── QUOTA CONSTANTS PER ROLL ──────────────────────────────────────────
 // Gratis: 3 prov per vecka (måndag–söndag i svensk tid) — måste matcha api/_provia-rules.js
@@ -976,15 +978,53 @@ async function getGenerationAuthSnapshot() {
   }
 }
 
+async function refreshGenerationAuthSnapshot(expectedUserId) {
+  if (!db || typeof expectedUserId !== "string") return null;
+  try {
+    const { data, error } = await db.auth.refreshSession();
+    const session = data?.session;
+    const token = session?.access_token;
+    if (error || typeof token !== "string" || !token) return null;
+    const { data: userData, error: userError } = await db.auth.getUser(token);
+    const userId = userData?.user?.id;
+    if (userError || userId !== expectedUserId || (session.user?.id && session.user.id !== userId)) return null;
+    return { userId, token };
+  } catch {
+    return null;
+  }
+}
+
+async function getGenerationOwnerStatus(expectedUserId) {
+  if (typeof expectedUserId !== "string" || !expectedUserId || !db) return "unavailable";
+  if (verifiedUserId !== expectedUserId) return verifiedUserId ? "different" : "unavailable";
+  try {
+    const { data, error } = await db.auth.getSession();
+    if (error) return "unavailable";
+    const session = data?.session;
+    if (!session) return "unavailable";
+    if (session.user?.id && session.user.id !== expectedUserId) return "different";
+    if (typeof session.access_token !== "string" || !session.access_token) return "unavailable";
+    const { data: userData, error: userError } = await db.auth.getUser(session.access_token);
+    const userId = userData?.user?.id;
+    if (userError || typeof userId !== "string" || !userId) return "unavailable";
+    return userId === expectedUserId ? "same" : "different";
+  } catch {
+    return "unavailable";
+  }
+}
+async function isGenerationOwnerCurrent(expectedUserId) {
+  return await getGenerationOwnerStatus(expectedUserId) === "same";
+}
+
 async function readQuotaCount() {
   const uid = (await getUserId()) || "guest";
   const key = quotaStorageKey(currentRole, uid);
   return Number(localStorage.getItem(key) || 0);
 }
 
-async function bumpQuotaCount() {
-  const uid = (await getUserId()) || "guest";
-  const key = quotaStorageKey(currentRole, uid);
+async function bumpQuotaCount(uid, role) {
+  if (typeof uid !== "string" || !uid || typeof role !== "string" || !role) return;
+  const key = quotaStorageKey(role, uid);
   const cur = Number(localStorage.getItem(key) || 0);
   localStorage.setItem(key, String(cur + 1));
 }
@@ -1231,6 +1271,7 @@ async function getPendingAccountSaves(){
 
 function mergeMistakesFromExamRows(rows){
   const out=[];
+  mistakeSourceByKey.clear();
   const idOf=value=>typeof value==="string"?(value.trim()?value:""):typeof value==="number"&&Number.isFinite(value)?String(value):"";
   const scoreOf=value=>{
     if(typeof value==="number")return Number.isFinite(value)?value:null;
@@ -1252,7 +1293,10 @@ function mergeMistakesFromExamRows(rows){
       if(!item||typeof item!=="object")return;
       const got=scoreOf(item.points),mx=scoreOf(item.max_points),qid=idOf(item.id),q=qid?qById.get(qid):null;
       if(item.unanswered!==true&&q&&typeof q.question==="string"&&q.question.trim()&&got!==null&&mx!==null&&mx>0&&got>=0&&got<=mx&&got<mx){
-        out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:mx});}
+        const mistakeKey=`exam:${batchId}:${questionIndex}`;
+        const sourceQuestions=(Array.isArray(exam?.questions)?exam.questions:[]).map(question=>({id:idOf(question?.id),concept_tag:String(question?.concept_tag||question?.topic||""),question:String(question?.question||"")})).filter(question=>question.id&&question.question.trim());
+        mistakeSourceByKey.set(mistakeKey,{examId:String(r.id||r.local_id||batchId),submissionId:String(r.submission_id||submissionIdFromProof(exam?.submission_receipt)||""),course:String(r.course||""),material:typeof r.material==="string"?r.material:"",accountSaved:!r.local_only,questions:sourceQuestions});
+        out.push({mistake_key:mistakeKey,source_exam_id:String(r.id||r.local_id||""),ts:createdTs||Date.now(),course:r.course||"",level:r.level||"C",qType:q.type||(r.qtype||"mix"),id:qid,question:String(q.question||""),user_answer:String(aById.get(qid)||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(q.learning_objective||""),points:got,max_points:mx});}
     });
   });
   while(out.length>200)out.shift(); return out;
@@ -1534,7 +1578,7 @@ let currentExamProof=null;
 let currentExamAnswers=null;
 let isGrading=false; // guard: blocks duplicate concurrent grading requests
 window.__getPerStudyMaterial=function(){
-  if(currentExam)return "";
+  if(currentExam&&!currentExamProof)return "";
   return String(pastedTextEl()?.value||"").trim().slice(0,6000);
 };
 
@@ -1702,26 +1746,65 @@ function handleAuthGateLogin(){
 // overlay. shared.js's dialog owns both flows now, including the reset
 // path these two never had.
 
-function buildTrainingMaterialFromMistakes(mistakes,selectedKeys,courseOverride){
+function buildMistakeTrainingContext(mistakes,selectedKeys,courseOverride,sourcesByKey=mistakeSourceByKey){
   const course=String(courseOverride==null?courseEl()?.value||"":courseOverride).trim();
   const courseKey=value=>String(value||"").trim().replace(/\s+/g," ").toLowerCase();
   const selectedCourse=courseKey(course);
   const src=Array.isArray(mistakes)?mistakes:[],keySet=selectedKeys===null?null:new Set((Array.isArray(selectedKeys)?selectedKeys:[]).map(String));
-  const filtered=src.filter((m,index)=>{
+  const selected=src.filter((m,index)=>{
     const fallbackKey=`legacy:${Number(m?.ts||0)}:${m?.course||''}:${m?.id||''}:${m?.question||''}:${index}`;
     if(keySet&&!keySet.has(String(m?.mistake_key||fallbackKey)))return false;
-    return !selectedCourse||courseKey(m.course)===selectedCourse;
-  }),recent=filtered.slice(-30).reverse();
-  if(!recent.length)return "";
-  const hSv=`TRÄNING PÅ DINA MISSTAG\n${course?`Kurs: ${course}\n`:""}Instruktion: Skapa prov som bara testar dessa svaga delar.\n\n`;
-  const hEn=`TRAINING FROM YOUR MISTAKES\n${course?`Course: ${course}\n`:""}Instruction: Generate exams that focus only on these weak areas.\n\n`;
-  const blocks=recent.map((m,i)=>{
-    const q=String(m.question||"").trim(),fb=String(m.feedback||"").trim(),model=String(m.model_answer||"").trim(),tag=`${m.points}/${m.max_points}`;
-    if(LANG==="sv")return`MISSTAG ${i+1} (${tag})\nFråga: ${q}\nVarför poäng tappades: ${fb||"—"}\nModellsvar (full poäng): ${model||"—"}\n`;
-    return`MISTAKE ${i+1} (${tag})\nQuestion: ${q}\nWhy points were lost: ${fb||"—"}\nFull-score model answer: ${model||"—"}\n`;
-  }).join("\n---\n\n");
-  return(LANG==="sv"?hSv:hEn)+blocks;
+    return true;
+  });
+  const selectedCourses=[...new Set(selected.map(m=>courseKey(m?.course)).filter(Boolean))];
+  if(selected.some(m=>!courseKey(m?.course)))return {ok:false,error:"missing_course"};
+  if(selectedCourse&&selectedCourses.some(value=>value!==selectedCourse))return {ok:false,error:"source_mismatch"};
+  if(!selectedCourse&&selectedCourses.length>1)return {ok:false,error:"source_mismatch"};
+  const resolvedCourse=course||(selectedCourses[0]||"");
+  const filtered=selected.filter(m=>!resolvedCourse||courseKey(m.course)===courseKey(resolvedCourse));
+  if(!filtered.length)return {ok:false,error:"empty_selection"};
+  if(filtered.length>20)return {ok:false,error:"too_many"};
+  const sources=new Map(),focus=[],selectedQuestions=[],supplementalQuestions=[],priorKeys=new Set();
+  for(const mistake of filtered){
+    const key=String(mistake?.mistake_key||"");
+    const source=sourcesByKey?.get?.(key);
+    if(source?.accountSaved===false)return {ok:false,error:"source_unsaved"};
+    if(!source||!String(source.material||"").trim())return {ok:false,error:"source_missing"};
+    if(!/^[a-f0-9]{32}$/i.test(String(source.submissionId||"")))return {ok:false,error:"source_missing"};
+    if(source.examId&&mistake.source_exam_id&&String(source.examId)!==String(mistake.source_exam_id))return {ok:false,error:"source_mismatch"};
+    if(courseKey(source.course)!==courseKey(mistake.course))return {ok:false,error:"source_mismatch"};
+    const sourceQuestion=(source.questions||[]).find(item=>String(item.id||"")===String(mistake.id||""));
+    const normalizeQuestion=value=>String(value||"").toLocaleLowerCase("sv-SE").normalize("NFKC").replace(/\u2212/g,"-").replace(/[^\p{L}\p{N}+\-=×÷*/<>≤≥^%]+/gu," ").trim();
+    if(!sourceQuestion||normalizeQuestion(sourceQuestion.question)!==normalizeQuestion(mistake.question))return {ok:false,error:"source_mismatch"};
+    const sourceKey=String(source.submissionId).toLowerCase();
+    if(!sources.has(sourceKey))sources.set(sourceKey,{submissionId:sourceKey,material:String(source.material),questions:Array.isArray(source.questions)?source.questions:[],questionIds:[]});
+    const skill=String(mistake.learning_objective||mistake.topic||mistake.subtopic||"").trim();
+    const tags=Array.isArray(mistake.error_tags)?mistake.error_tags.filter(tag=>typeof tag==="string"&&/^[a-z0-9_-]{1,40}$/i.test(tag)).slice(0,4):[];
+    focus.push({sourceQuestionId:String(sourceQuestion.id),sourceSubmissionId:sourceKey,concept:String(mistake.concept_tag||sourceQuestion.concept_tag||"").trim(),skill,errorTags:tags});
+    if(!sources.get(sourceKey).questionIds.includes(String(sourceQuestion.id)))sources.get(sourceKey).questionIds.push(String(sourceQuestion.id));
+    const question=String(sourceQuestion.question||"").trim();
+    const normalized=normalizeQuestion(question);
+    if(question&&normalized&&!priorKeys.has(normalized)){
+      priorKeys.add(normalized);
+      selectedQuestions.push({question,concept_tag:String(sourceQuestion.concept_tag||"").trim()});
+    }
+    for(const item of source.questions){
+      const otherQuestion=String(item?.question||"").trim();
+      const otherNormalized=normalizeQuestion(otherQuestion);
+      if(!otherQuestion||!otherNormalized||priorKeys.has(otherNormalized))continue;
+      priorKeys.add(otherNormalized);
+      supplementalQuestions.push({question:otherQuestion,concept_tag:String(item?.concept_tag||"").trim()});
+    }
+  }
+  const priorQuestions=[...selectedQuestions,...supplementalQuestions].slice(0,20);
+  const sourceMaterial=[...sources.values()].map(value=>value.material.trim()).filter(Boolean).join("\n\n---\n\n");
+  if(!sourceMaterial)return {ok:false,error:"source_missing"};
+  if(Array.from(sourceMaterial).length>MATERIAL_CHAR_LIMIT)return {ok:false,error:"source_too_long"};
+  const sourceReferences=[...sources.values()].map(({submissionId,questionIds})=>({submissionId,questionIds}));
+  return {ok:true,course:resolvedCourse,sourceMaterial,trainingFocus:focus,priorQuestions,sourceReferences};
 }
+window.buildMistakeTrainingContext=buildMistakeTrainingContext;
+window.clearMistakeTrainingContext=()=>{pendingMistakeTraining=null;};
 
 // Ingången från felbanken: förbättring.html skickar hit med #train.
 //
@@ -1750,24 +1833,63 @@ function runTrainModeIfRequested(){
   // Use the same course for the material header and the generation request;
   // the hidden wizard field may still contain a previous course.
   const course=String(mode==="all"?"":pick&&Object.prototype.hasOwnProperty.call(pick,"course")?pick.course||"":courseEl()?.value||"").trim();
-  const mat=buildTrainingMaterialFromMistakes(mistakes,mode==="all"?null:pickedKeys,course);
-  if(!mat){
-    const msg=LANG==="sv"?"De valda misstagen finns inte kvar. Gå tillbaka och markera dem igen.":"Those selected mistakes are no longer available. Go back and select them again.";
+  const selectedSet=mode==="all"?null:new Set(pickedKeys);
+  const selectedCourses=[...new Set(mistakes.filter((m,index)=>{
+    const fallbackKey=`legacy:${Number(m?.ts||0)}:${m?.course||''}:${m?.id||''}:${m?.question||''}:${index}`;
+    return !selectedSet||selectedSet.has(String(m?.mistake_key||fallbackKey));
+  }).map(m=>String(m?.course||"").trim().replace(/\s+/g," ").toLowerCase()).filter(Boolean))];
+  const selectedMistakes=mistakes.filter((m,index)=>{
+    const fallbackKey=`legacy:${Number(m?.ts||0)}:${m?.course||''}:${m?.id||''}:${m?.question||''}:${index}`;
+    return !selectedSet||selectedSet.has(String(m?.mistake_key||fallbackKey));
+  });
+  if(selectedMistakes.some(m=>!String(m?.course||"").trim())){
+    const msg=LANG==="sv"?"Några valda misstag saknar sparad kurs och kan därför ge irrelevanta frågor. Välj misstag där kursen visas, eller rätta provet igen så att kursen sparas.":"Some selected mistakes have no saved course and could produce irrelevant questions. Choose mistakes that show a course, or grade the exam again so its course is saved.";
+    if(window.showToast)window.showToast(msg,"bad",7000);
+    return;
+  }
+  if(!course&&selectedCourses.length>1){
+    const msg=LANG==="sv"?"Träna en kurs i taget. Filtrera felbanken till en kurs och välj misstagen igen.":"Practise one course at a time. Filter the mistake bank to one course and select the mistakes again.";
     if(window.showToast)window.showToast(msg,"bad",5000);
     return;
   }
-  if(pastedTextEl())pastedTextEl().value=mat;
-  try{localStorage.setItem(LS_MATERIAL,mat);}catch{}
+  const trainingCourse=course||selectedCourses[0]||"";
+  if(trainingCourse&&selectedCourses.some(value=>value!==trainingCourse.replace(/\s+/g," ").toLowerCase())){
+    const msg=LANG==="sv"?"De markerade misstagen kommer från olika kurser. Välj en kurs och markera om misstagen.":"The selected mistakes are from different courses. Choose one course and select the mistakes again.";
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
+  const training=buildMistakeTrainingContext(mistakes,mode==="all"?null:pickedKeys,trainingCourse);
+  if(!training?.ok){
+    const messages={
+      empty_selection:LANG==="sv"?"Markera minst ett misstag innan du startar träningen.":"Select at least one mistake before starting practice.",
+      too_many:LANG==="sv"?"Välj högst 20 misstag åt gången så att varje fråga kan kopplas till sitt ursprung.":"Choose up to 20 mistakes at a time so each item can be tied to its source.",
+      missing_course:LANG==="sv"?"Ett valt misstag saknar sparad kurs. Välj ett annat misstag eller rätta ett nytt prov med kurs sparad.":"A selected mistake has no saved course. Choose another mistake or grade a new exam with its course saved.",
+      source_missing:LANG==="sv"?"Ursprungsmaterialet till ett valt misstag saknas. Rätta ett nytt prov med materialet sparat, eller välj ett annat misstag.":"The original study material for a selected mistake is missing. Grade a new exam with its material saved, or choose another mistake.",
+      source_unsaved:LANG==="sv"?"Ursprungsprovet är ännu inte sparat i kontot, så servern kan inte verifiera misstagen. Anslut till internet och spara provet i din historik innan du startar träningen.":"The source exam is not saved to your account yet, so the server cannot verify these mistakes. Connect to the internet and save the exam to your history before starting practice.",
+      source_mismatch:LANG==="sv"?"Kopplingen mellan misstaget och ursprungsprovet kunde inte verifieras. Gå tillbaka och välj misstaget igen.":"The link between the mistake and its source exam could not be verified. Return and select the mistake again.",
+      source_too_long:LANG==="sv"?"Källmaterialet blir för långt när dessa prov kombineras. Välj färre misstag från färre prov.":"The source material is too long when these exams are combined. Choose fewer mistakes from fewer exams.",
+    };
+    const msg=messages[training?.error]||(LANG==="sv"?"De valda misstagen finns inte kvar. Gå tillbaka och markera dem igen.":"Those selected mistakes are no longer available. Go back and select them again.");
+    if(window.showToast)window.showToast(msg,"bad",5000);
+    return;
+  }
+  pendingMistakeTraining={course:training.course,sourceMaterial:training.sourceMaterial,trainingFocus:training.trainingFocus,priorQuestions:training.priorQuestions,sourceReferences:training.sourceReferences};
+  if(pastedTextEl())pastedTextEl().value=training.sourceMaterial;
+  try{localStorage.setItem(LS_MATERIAL,training.sourceMaterial);}catch{}
   if(qTypeEl())qTypeEl().value="mix";
-  if(numQuestionsEl())numQuestionsEl().value="3";
+  let trainingQuestionCount=3;
+  if(numQuestionsEl()){
+    const currentCount=Number.parseInt(numQuestionsEl().value,10)||3;
+    trainingQuestionCount=Math.min(20,Math.max(3,currentCount,training.trainingFocus.length));
+    numQuestionsEl().value=String(trainingQuestionCount);
+  }
 
-  // Kursen tas från felbankens eget val när det finns; annars får flödet gissa
-  // utifrån historiken.
+  // Course scope must come from the selected mistakes, never unrelated history.
   // js/exam-flow.js definierar __xfPrefill först i boot(), som väntar in den
   // här filens motorbrygga. Ordningen är alltså inte given — polla kort.
   let n=0;
   const iv=setInterval(()=>{
-    if(typeof window.__xfPrefill==="function"){clearInterval(iv);window.__xfPrefill(mat,course);}
+    if(typeof window.__xfPrefill==="function"){clearInterval(iv);window.__xfPrefill(training.sourceMaterial,training.course,trainingQuestionCount);}
     else if(++n>100)clearInterval(iv);   // 5 s
   },50);
 }
@@ -2169,53 +2291,64 @@ try{
   // exakt samma väg via window.ExGenEngine längst ned i den här filen. Båda
   // returnerar ett resultatobjekt i stället för att bara måla i DOM:en; den
   // gamla wizarden bryr sig inte om returvärdet.
-  async function runResumableGeneration(payload,onProgress,token,userId){
+  async function runResumableGeneration(payload,onProgress,token,expectedUserId,onStarted){
     const startedAt=Date.now();
     let activeToken=token;
-    async function refreshPipelineToken(rejectedToken){
-      if(!db||!userId)return null;
-      const verifyToken=async(candidate)=>{
-        if(typeof candidate!=="string"||!candidate||candidate===rejectedToken)return null;
-        try{
-          const verified=await db.auth.getUser(candidate);
-          return !verified.error&&verified.data?.user?.id===userId?candidate:null;
-        }catch{return null;}
-      };
-      try{
-        const current=await db.auth.getSession();
-        const session=current.data?.session;
-        if(!current.error&&session?.user?.id===userId){
-          const currentToken=await verifyToken(session.access_token);
-          if(currentToken)return currentToken;
+    const postWithSessionRecovery=async(path,body,options={})=>{
+      let result=await postJson(path,body,{...options,token:activeToken});
+      if(result.status===401&&typeof expectedUserId==="string"){
+        const fresh=await refreshGenerationAuthSnapshot(expectedUserId);
+        if(fresh?.userId===expectedUserId&&fresh.token&&fresh.token!==activeToken){
+          const ownerStatus=await getGenerationOwnerStatus(expectedUserId);
+          if(ownerStatus!=="same"){
+            return{ok:false,status:ownerStatus==="different"?401:503,raw:"",data:{error:ownerStatus==="different"?"account_changed":"AUTH_VERIFICATION_UNAVAILABLE"},timedOut:false,networkError:false};
+          }
+          activeToken=fresh.token;
+          result=await postJson(path,body,{...options,token:activeToken});
         }
-        const refreshed=await db.auth.refreshSession();
-        const refreshedSession=refreshed.data?.session;
-        if(refreshed.error||refreshedSession?.user?.id!==userId)return null;
-        return await verifyToken(refreshedSession.access_token);
-      }catch{return null;}
+      }
+      return result;
+    };
+    const getWithSessionRecovery=async(path,options={})=>{
+      let result=await getJson(path,{...options,token:activeToken});
+      if(result.status===401&&typeof expectedUserId==="string"){
+        const fresh=await refreshGenerationAuthSnapshot(expectedUserId);
+        if(fresh?.userId===expectedUserId&&fresh.token&&fresh.token!==activeToken){
+          const ownerStatus=await getGenerationOwnerStatus(expectedUserId);
+          if(ownerStatus!=="same"){
+            return{ok:false,status:ownerStatus==="different"?401:503,raw:"",data:{error:ownerStatus==="different"?"account_changed":"AUTH_VERIFICATION_UNAVAILABLE"},timedOut:false,networkError:false};
+          }
+          activeToken=fresh.token;
+          result=await getJson(path,{...options,token:activeToken});
+        }
+      }
+      return result;
+    };
+    let started=await postWithSessionRecovery("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
+    const hasDefinitiveStartFailure=()=>started.status===503&&[
+      "AUTH_VERIFICATION_UNAVAILABLE",
+      "EXAM_SIGNING_NOT_CONFIGURED",
+      "AI_GENERATION_NOT_CONFIGURED",
+      "generation_request_state_unavailable",
+      "mock_quota_unavailable",
+      "generation_storage_unavailable",
+    ].includes(started.data?.error);
+    for(let attempt=0;attempt<3&&(started.status===0||started.status>=500||started.timedOut||started.networkError||
+      (started.status===409&&started.data?.error==="GENERATION_IN_PROGRESS"));attempt++){
+      if(hasDefinitiveStartFailure())break;
+      await new Promise(resolve=>setTimeout(resolve,600*(attempt+1)));
+      started=await postWithSessionRecovery("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
     }
-    async function postPipelineJson(path,body,options={}){
-      const requestOptions={...options,token:activeToken};
-      const response=await postJson(path,body,requestOptions);
-      if(response.status!==401)return response;
-      const refreshedToken=await refreshPipelineToken(activeToken);
-      if(!refreshedToken)return response;
-      activeToken=refreshedToken;
-      return postJson(path,body,{...options,token:activeToken});
+    if(!hasDefinitiveStartFailure()&&(started.status===0||started.status>=500||started.timedOut||started.networkError||
+      (started.status===409&&started.data?.error==="GENERATION_IN_PROGRESS"))){
+      return{ok:false,status:202,raw:"",data:{ok:false,error:"generation_in_progress",requested:payload.numQuestions},timedOut:false,networkError:false};
     }
-    async function getPipelineJson(path,options={}){
-      const requestOptions={...options,token:activeToken};
-      const response=await getJson(path,requestOptions);
-      if(response.status!==401)return response;
-      const refreshedToken=await refreshPipelineToken(activeToken);
-      if(!refreshedToken)return response;
-      activeToken=refreshedToken;
-      return getJson(path,{...options,token:activeToken});
-    }
-    const started=await postPipelineJson("/api/generate-exam?pipeline=start",payload,{timeoutMs:12000});
     if(started.status===200&&started.data?.ok&&started.data?.exam)return started;
     if(started.status!==202||!started.data?.operationId)return started;
     const operationId=started.data.operationId;
+    if(typeof onStarted==="function"){
+      try{await onStarted(operationId);}catch{}
+    }
     let consecutiveNetworkFailures=0;
     let consecutivePreflightMisses=0;
     let consecutiveWorkingPolls=0;
@@ -2236,7 +2369,7 @@ try{
     };
     updateProgress(started.data);
     while(Date.now()-startedAt<14*60*1000){
-      const step=await postPipelineJson("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000});
+      const step=await postWithSessionRecovery("/api/generate-exam?pipeline=advance",{operationId},{timeoutMs:62000});
       if(step.status===200&&step.data?.ok&&step.data?.exam)return step;
       if(step.status===202&&step.data?.ok){
         consecutiveNetworkFailures=0;
@@ -2264,7 +2397,7 @@ try{
       if(step.status===0||step.status>=500||step.timedOut||step.networkError){
         consecutiveNetworkFailures++;
         consecutiveWorkingPolls=0;
-        const current=await getPipelineJson(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
+        const current=await getWithSessionRecovery(`/api/generate-exam?pipeline=status&operationId=${encodeURIComponent(operationId)}`,{timeoutMs:10000});
         if(current.status===200&&current.data?.ok&&current.data?.exam)return current;
         if(current.data?.error==="incomplete_exam")return current;
         if(current.status===401||current.data?.error==="AUTH_VERIFICATION_UNAVAILABLE")return current;
@@ -2293,19 +2426,41 @@ try{
 
     const qType=savedPayload?.qType||qTypeEl()?.value||"mix";
     if(!["mix","mc","short","graph"].includes(qType)){setStatus("Ogiltig frågetyp.","bad");return {ok:false,error:"Ogiltig frågetyp."};}
+    const course=(savedPayload?String(savedPayload.course||"").trim():(courseEl()?.value||"").trim());
+    let trainingFocus=[],priorQuestions=[];
+    if(pendingMistakeTraining&&!savedPayload){
+      if(qType==="graph"){
+        const message=LANG==="sv"?"Grafprov från felbanken stöds inte ännu. Välj blandat, flerval eller kortsvar så att varje fråga kan kopplas till verifierat ursprungsmaterial.":"Graph exams from the mistake bank are not supported yet. Choose mixed, multiple choice, or short answer so each question can be tied to verified source material.";
+        setStatus(message,"bad");return {ok:false,error:message,errorCode:"MISTAKE_GRAPH_UNSUPPORTED"};
+      }
+      const sameCourse=String(pendingMistakeTraining.course||"").trim().replace(/\s+/g," ").toLowerCase()===course.replace(/\s+/g," ").toLowerCase();
+      if(pendingMistakeTraining.sourceMaterial!==pastedText||!sameCourse){
+        const message=LANG==="sv"?"Träningsunderlaget ändrades efter att misstagen valdes. Gå tillbaka till felbanken och starta träningen igen så att källan fortfarande stämmer.":"The training source changed after the mistakes were selected. Return to the mistake bank and start practice again so the source remains verified.";
+        setStatus(message,"bad");return {ok:false,error:message};
+      }
+      trainingFocus=Array.isArray(pendingMistakeTraining.trainingFocus)?pendingMistakeTraining.trainingFocus:[];
+      priorQuestions=Array.isArray(pendingMistakeTraining.priorQuestions)?pendingMistakeTraining.priorQuestions:[];
+    }
+    if(savedPayload){
+      trainingFocus=Array.isArray(savedPayload.trainingFocus)?savedPayload.trainingFocus:[];
+      priorQuestions=Array.isArray(savedPayload.priorQuestions)?savedPayload.priorQuestions:[];
+    }
     const payload={
       lang:savedPayload?.lang||LANG,
       level:savedPayload?.level||levelEl()?.value||"C",
-      course:savedPayload?String(savedPayload.course||"").trim():(courseEl()?.value||"").trim(),
-      qType,pastedText,
+      course,qType,pastedText,
       numQuestions:savedPayload?.numQuestions??(qType==="graph"?1:Number(numQuestionsEl()?.value||3)),
       focusTerms:savedPayload&&Array.isArray(savedPayload.focusTerms)?savedPayload.focusTerms.slice():selectedExamFocusTerms,
+      trainingFocus,
+      priorQuestions,
+      sourceReferences:savedPayload?.sourceReferences||pendingMistakeTraining?.sourceReferences||[],
     };
     const authSnapshot=await getGenerationAuthSnapshot();
     if(!authSnapshot){
       const message=LANG==="sv"?"Din inloggning kunde inte bekräftas. Logga in igen innan du skapar prov.":"Your sign-in could not be verified. Sign in again before creating an exam.";
       setStatus(message,"bad");return {ok:false,error:message};
     }
+    const generationRole=currentRole;
     let idempotencyKey;
     try {
       idempotencyKey=resumeRequest
@@ -2324,24 +2479,44 @@ try{
       setStatus(message,"bad");return {ok:false,error:message};
     }
     payload.idempotencyKey=idempotencyKey;
-    try {
-      await window.ExGenGenerationRequest.savePendingInput(authSnapshot.userId,payload,idempotencyKey);
-    } catch {
+    let recoverySaved=false;
+    try{recoverySaved=await window.ExGenGenerationRequest?.savePendingGeneration?.(authSnapshot.userId,payload,idempotencyKey,null)===true;}catch{}
+    if(!recoverySaved){
       const message=LANG==="sv"
-        ?"Provunderlaget kunde inte sparas säkert för återupptagning i den här fliken. Kontrollera webbläsarens lagring och försök igen; inget prov startades."
-        :"The exam input could not be saved for safe recovery in this tab. Check browser storage and retry; no exam was started.";
-      setStatus(message,"bad");return {ok:false,error:message};
+        ?"Provet kunde inte startas säkert eftersom återupptagningen inte kunde sparas i den här fliken. Kontrollera webbläsarens lagringsutrymme och försök igen."
+        :"The exam could not start safely because this tab could not save recovery data. Check browser storage and try again.";
+      setStatus(message,"bad");return {ok:false,error:message,errorCode:"recovery_storage_unavailable"};
     }
     showSkeleton(Math.min(Number(numQuestionsEl()?.value||3),6));
     const examSec=document.querySelector("#exam");if(examSec){examSec.classList.remove("collapsed");examSec.scrollIntoView({behavior:"smooth",block:"start"});}
     setBusy(true,t.genWorking);setStatus(`${t.genWorking} (${payload.qType}, ${payload.numQuestions})`,"");
-    const res=payload.qType==="graph"
-      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
-      :await runResumableGeneration(payload,onProgress,authSnapshot.token,authSnapshot.userId);
     const clearGenerationPlaceholder=()=>{
       const body=examBodyEl();
       if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
     };
+    const discardForAccountChange=()=>{
+      try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+      setBusy(false);clearGenerationPlaceholder();hideDebug();
+      const message=LANG==="sv"?"Kontot ändrades medan provet skapades. Svaret kastades och inget prov öppnades.":"The account changed while the exam was being created. The response was discarded and no exam was opened.";
+      setStatus(message,"warn");
+      return{ok:false,error:message,errorCode:"account_changed"};
+    };
+    const deferForAuthVerification=()=>{
+      setBusy(false);clearGenerationPlaceholder();hideDebug();
+      const message=LANG==="sv"
+        ?"Inloggningen kunde inte verifieras just nu. Provet visas inte, men samma begäran är sparad i den här fliken. Kontrollera att du använder samma konto och försök igen; ett nytt prov startas inte."
+        :"Your sign-in could not be verified just now. The exam is hidden, but this request is saved in this tab. Confirm you are using the same account and retry; a new exam will not be started.";
+      setStatus(message,"warn");
+      return{ok:false,error:message,errorCode:"auth_verification_unavailable"};
+    };
+    const res=payload.qType==="graph"
+      ?await postJson("/api/generate-exam",payload,{timeoutMs:62000,token:authSnapshot.token})
+      :await runResumableGeneration(payload,onProgress,authSnapshot.token,authSnapshot.userId,async operationId=>{
+        await window.ExGenGenerationRequest?.savePendingGeneration?.(authSnapshot.userId,payload,idempotencyKey,operationId);
+      });
+    const responseOwnerStatus=await getGenerationOwnerStatus(authSnapshot.userId);
+    if(responseOwnerStatus==="different")return discardForAccountChange();
+    if(responseOwnerStatus!=="same")return deferForAuthVerification();
     const requestReference=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(res.data?.requestId||"")
       ? (LANG==="sv"?`Referens: ${res.data.requestId}`:`Reference: ${res.data.requestId}`)
       : "";
@@ -2354,13 +2529,16 @@ try{
       return {ok:false,error:message,timedOut:res.timedOut,networkError:res.networkError};
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
-      try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
-      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.count));
+      try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+      if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(generationRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
       return {ok:false,error:msg,quota:true};
     }
     if(!res.ok||!res.data||!res.data.ok){
+      if(!(res.status===202||res.status===401||res.data?.error==="generation_in_progress"||res.status>=500)){
+        try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+      }
       setBusy(false);
       clearGenerationPlaceholder();
       if(res.status===503&&res.data?.error==="AUTH_VERIFICATION_UNAVAILABLE"){
@@ -2425,6 +2603,20 @@ try{
         const message=materialTooLongMessage();setStatus(message,"bad");hideDebug();
         return {ok:false,error:message};
       }
+      if(["MISTAKE_SOURCE_UNAVAILABLE","MISTAKE_SOURCE_NOT_GRADED","MISTAKE_SOURCE_EXPIRED","MISTAKE_SOURCE_MISMATCH","MISTAKE_SOURCE_TOO_LONG","MISTAKE_SOURCE_REQUIRES_PIPELINE","MISTAKE_GRAPH_UNSUPPORTED","MISTAKE_TRAINING_FOCUS_UNAVAILABLE","MISTAKE_FOCUS_COUNT_EXCEEDS_QUESTION_COUNT"].includes(res.data?.error)){
+        const message=LANG==="sv"
+          ?res.data.error==="MISTAKE_FOCUS_COUNT_EXCEEDS_QUESTION_COUNT"?"Du har valt fler olika misstag än antal frågor. Öka antalet frågor eller välj färre misstag så att varje valt fokus kan få en egen verifierad fråga. Ingen kvot användes.":res.data.error==="MISTAKE_TRAINING_FOCUS_UNAVAILABLE"?"Ett valt misstag saknar ett verifierbart begrepp eller en färdighet att träna. Rätta ett nytt prov med tydligare frågeunderlag eller välj ett annat misstag. Ingen kvot användes.":res.data.error==="MISTAKE_GRAPH_UNSUPPORTED"?"Grafprov från felbanken stöds inte ännu. Välj blandat, flerval eller kortsvar så att varje fråga kan kopplas till verifierat ursprungsmaterial.":res.data.error==="MISTAKE_SOURCE_REQUIRES_PIPELINE"?"Felträning måste gå genom den verifierade källvägen. Starta om träningen från felbanken.":res.data.error==="MISTAKE_SOURCE_TOO_LONG"?"Källmaterialet från de valda proven är för omfattande. Välj färre misstag eller prov.":res.data.error==="MISTAKE_SOURCE_EXPIRED"?"Den detaljerade rättningen för ett valt misstag har gått ut. Välj ett nyare, rättat prov för att träna på verifierade misstag. Ingen kvot användes.":"ExGen kunde inte verifiera ett sparat och rättat ursprungsprov för alla valda misstag. Spara och rätta provet på kontot, eller välj misstag från ett verifierbart prov. Ingen kvot användes."
+          :res.data.error==="MISTAKE_FOCUS_COUNT_EXCEEDS_QUESTION_COUNT"?"You selected more distinct mistakes than requested questions. Increase the question count or choose fewer mistakes so every selected focus can receive its own verified question. No quota was used.":res.data.error==="MISTAKE_TRAINING_FOCUS_UNAVAILABLE"?"A selected mistake has no verifiable concept or skill to practise. Grade a new exam with clearer question context or choose another mistake. No quota was used.":res.data.error==="MISTAKE_GRAPH_UNSUPPORTED"?"Graph exams from the mistake bank are not supported yet. Choose mixed, multiple choice, or short answer so each question can be tied to verified source material.":res.data.error==="MISTAKE_SOURCE_REQUIRES_PIPELINE"?"Mistake training must use the verified source path. Restart training from the mistake bank.":res.data.error==="MISTAKE_SOURCE_TOO_LONG"?"The source material from the selected exams is too large. Choose fewer mistakes or exams.":res.data.error==="MISTAKE_SOURCE_EXPIRED"?"Detailed grading for one selected mistake has expired. Choose a more recent graded exam to practise verified mistakes. No quota was used.":"ExGen could not verify a saved and graded source exam for every selected mistake. Save and grade the exam on this account, or choose mistakes from a verifiable exam. No quota was used.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error};
+      }
+      if(res.data?.error==="MISTAKE_SOURCE_NOT_MISTAKE"){
+        const message=LANG==="sv"
+          ?"Serverns rättning bekräftar inte att en vald fråga blev fel, eller så har den detaljerade rättningen gått ut. Välj en markerad fel-fråga från ett nyss rättat prov. Ingen kvot användes."
+          :"The server grading does not confirm that a selected question was incorrect, or the detailed grade has expired. Choose a marked incorrect question from a recently graded exam. No quota was used.";
+        setStatus(message,"bad");hideDebug();
+        return {ok:false,error:message,errorCode:res.data.error};
+      }
       if(res.data?.error==="GRAPH_GENERATION_REJECTED"||res.data?.error==="GRAPH_MATERIAL_UNSUPPORTED"){
         try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
         const message=res.data.message||(LANG==="sv"
@@ -2436,8 +2628,12 @@ try{
         return {ok:false,error:message};
       }
       if(["quality_review_unavailable","incomplete_exam","independent_check_unavailable"].includes(res.data?.error)){
-        if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{}
-        const message=res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.";
+        const message=LANG==="sv"
+          ? (res.data.message||"Kvalitetskontrollen kunde inte slutföras. Inget prov lämnades ut; försök igen.")
+          : (res.data?.error==="incomplete_exam"
+            ? "ExGen could not create a complete exam that passed review. No exam was issued; try again with more relevant material or fewer questions."
+            : "ExGen could not complete the required quality checks. No exam was issued; please try again.");
+        if(res.data.error==="incomplete_exam")try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
         const hasSafeCounts=res.data?.error==="incomplete_exam"
           && Number.isInteger(res.data.received)&&Number.isInteger(res.data.requested)
           && res.data.received>=0&&res.data.requested>0&&res.data.received<res.data.requested;
@@ -2475,21 +2671,51 @@ try{
     }
     if(res.data.meta&&res.data.meta.entitlements)applyServerEntitlements(res.data.meta.entitlements);
 
+    if(Array.isArray(res.data.exam?.questions)&&res.data.exam.questions.length>payload.numQuestions){
+      try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+      if(res.data.meta?.quota?.enforced&&typeof res.data.meta.quota.count==="number"){
+        localStorage.setItem(quotaStorageKey(generationRole,authSnapshot.userId),String(res.data.meta.quota.count));
+        await refreshQuotaUi();
+      }
+      const message=LANG==="sv"
+        ?`Servern returnerade ${res.data.exam.questions.length} frågor när ${payload.numQuestions} begärdes. Inget prov öppnades; försök igen.`
+        :`The server returned ${res.data.exam.questions.length} questions when ${payload.numQuestions} were requested. No exam was opened; please try again.`;
+      const body=examBodyEl();
+      if(body?.querySelector(".skelBox")){body.replaceChildren();const meta=examMetaEl();if(meta)meta.textContent=t.noExam;}
+      setBusy(false);setStatus(message,"bad");hideDebug();
+      return {ok:false,error:message,errorCode:"generation_question_count_invalid"};
+    }
+
     // Servern är auktoritativ när persisted quota är aktiv; localStorage används bara för UI-visning/fallback.
-    if(res.data.meta&&res.data.meta.quota&&res.data.meta.quota.enforced&&typeof res.data.meta.quota.count==="number"){
-      localStorage.setItem(quotaStorageKey(currentRole, authSnapshot.userId), String(res.data.meta.quota.count));
+    const quotaKey=quotaStorageKey(generationRole,authSnapshot.userId);
+    const localQuotaBefore=localStorage.getItem(quotaKey);
+    const quotaIsServerEnforced=Boolean(res.data.meta&&res.data.meta.quota&&res.data.meta.quota.enforced&&typeof res.data.meta.quota.count==="number");
+    if(quotaIsServerEnforced){
+      localStorage.setItem(quotaKey, String(res.data.meta.quota.count));
     }else{
-      await bumpQuotaCount();
+      await bumpQuotaCount(authSnapshot.userId,generationRole);
     }
     await refreshQuotaUi();
+
+    const displayOwnerStatus=await getGenerationOwnerStatus(authSnapshot.userId);
+    if(displayOwnerStatus==="different")return discardForAccountChange();
+    if(displayOwnerStatus!=="same"){
+      if(!quotaIsServerEnforced){
+        try{
+          if(localQuotaBefore===null)localStorage.removeItem(quotaKey);
+          else localStorage.setItem(quotaKey,localQuotaBefore);
+        }catch{}
+      }
+      return deferForAuthVerification();
+    }
 
     try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
     if(!renderExam(res.data.exam)){setBusy(false);return {ok:false,error:"Provet kunde inte visas säkert. Försök igen."};}
     let resumeKeyCleared=true;
-    let pendingInputCleared=true;
+    let recoveryCleared=true;
     try { await window.ExGenGenerationRequest.clear(idempotencyKey); }
     catch { resumeKeyCleared=false; }
-    if(resumeKeyCleared){try{window.ExGenGenerationRequest.clearPendingInput(idempotencyKey);}catch{pendingInputCleared=false;}}
+    try{recoveryCleared=window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey)===true;}catch{recoveryCleared=false;}
     const generationMeta=res.data.meta||{};
     const questionCount=res.data.exam?.questions?.length||0;
     const requestedCount=payload.numQuestions;
@@ -2500,11 +2726,11 @@ try{
     const cleanupWarning=!resumeKeyCleared?(LANG==="sv"
       ?" Provet skapades, men återupptagningsnyckeln kunde inte rensas. Ett nytt försök med samma material och inställningar kan visa samma prov."
       :" The exam was created, but its resume key could not be cleared. A new attempt with the same material and settings may show the same exam.")
-      :!pendingInputCleared?(LANG==="sv"
-        ?" Provet skapades, men lokalt sparat material kunde inte bekräftas rensat. Rensa webbplatsens lagring innan du delar enheten."
-        :" The exam was created, but locally saved material could not be confirmed erased. Clear this site's storage before sharing the device."):"";
+      :!recoveryCleared?(LANG==="sv"
+        ?" Provet skapades, men tillfälligt återupptagningsmaterial kunde inte rensas. Ladda om sidan innan du delar enheten."
+        :" The exam was created, but temporary recovery material could not be cleared. Reload the page before sharing the device."):"";
     const visibleCompletionMessage=completionMessage+cleanupWarning;
-    const cleanupOk=resumeKeyCleared&&pendingInputCleared;
+    const cleanupOk=resumeKeyCleared&&recoveryCleared;
     setBusy(false);setStatus(visibleCompletionMessage,cleanupOk?"ok":"warn");showToast(visibleCompletionMessage,cleanupOk?"ok":"warn");setWizardStep(2);
     if(partialExam){const guide=$("examGuide");if(guide)guide.textContent=completionMessage;}
 
@@ -2688,9 +2914,10 @@ try{
       // fel frågetext och fel elevsvar för var och en av dem.
       const qById=new Map((currentExam.questions||[]).map((q,idx)=>[String(q.id??(idx+1)),q]));
       const aById=new Map(answers.map(a=>[String(a.id),a.answer]));
+      const sourceQuestions=(currentExam.questions||[]).map(question=>({id:String(question?.id??""),concept_tag:String(question?.concept_tag||question?.topic||""),question:String(question?.question||"")})).filter(question=>question.id&&question.question.trim());
       (result.per_question||[]).forEach((item,questionIndex)=>{
         const got=Number(item.points||0),m=Number(item.max_points||0);
-        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{};mistakes.push({mistake_key:`exam:${localId}:${questionIndex}`,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),points:got,max_points:m});}
+        if(item.unanswered!==true&&m>0&&got<m){const q=qById.get(String(item.id))||{},mistakeKey=`exam:${localId}:${questionIndex}`;mistakeSourceByKey.set(mistakeKey,{examId:localId,submissionId,course:attempt.course,material:pastedText,accountSaved:!accountSaveFailed,questions:sourceQuestions});mistakes.push({mistake_key:mistakeKey,source_exam_id:localId,ts,course:attempt.course,level:attempt.level,qType:q.type||(qTypeEl()?.value||"mix"),id:String(item.id),question:String(q.question||""),user_answer:String(aById.get(String(item.id))||""),feedback:String(item.feedback||""),model_answer:String(item.model_answer||""),concept_tag:String(item.concept_tag||q.concept_tag||""),error_tags:Array.isArray(item.error_tags)?item.error_tags.slice(0,5):[],topic:String(q.topic||""),subtopic:String(q.subtopic||""),learning_objective:String(item.learning_objective||q.learning_objective||""),points:got,max_points:m});}
       });
       while(mistakes.length>200)mistakes.shift();lsSet(LS_MISTAKES,mistakes);
       try{localStorage.setItem(LS_MATERIAL,pastedText);}catch{}
@@ -2769,6 +2996,8 @@ try{
     [LS_HISTORY, LS_MISTAKES, LS_LAST, LS_MATERIAL, LS_TRAIN_PICK].forEach(k => {
       try { localStorage.removeItem(k); } catch (_) {}
     });
+    mistakeSourceByKey.clear();
+    pendingMistakeTraining=null;
     currentUnsavedAccountExam=null;
 
     // 3. Reset current session UI
@@ -2796,13 +3025,16 @@ try{
   window.ExGenEngine = {
     ready: true,
     language() { return LANG === "en" ? "en" : "sv"; },
-    setInputs({ course, level, qType, num, material, focusTerms }) {
+    setInputs({ course, level, qType, num, material, focusTerms, trainingFocus, priorQuestions, sourceReferences }) {
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
-      if (numQuestionsEl()) numQuestionsEl().value = String(Math.min(20, Math.max(2, Number(num) || 3)));
+      if (numQuestionsEl()) numQuestionsEl().value = String(qType === "graph" ? 1 : Math.min(20, Math.max(2, Number(num) || 3)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
       selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
+      pendingMistakeTraining = Array.isArray(sourceReferences) && sourceReferences.length
+        ? { course, sourceMaterial: material, trainingFocus, priorQuestions, sourceReferences }
+        : null;
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den
       // gamla vyn, och så att clearAll() inte skriver tillbaka ett gammalt val.
       const search = document.getElementById("courseSearch");
@@ -2813,6 +3045,22 @@ try{
       const authSnapshot=await getGenerationAuthSnapshot();
       if(!authSnapshot)return [];
       return window.ExGenGenerationRequest.getPendingInputs(authSnapshot.userId);
+    },
+    async getPendingGenerations() {
+      const auth=await getGenerationAuthSnapshot();
+      if(!auth||!await isGenerationOwnerCurrent(auth.userId))return [];
+      return window.ExGenGenerationRequest?.getPendingGenerations?.(auth.userId)||[];
+    },
+    async restorePendingGeneration(idempotencyKey) {
+      const auth=await getGenerationAuthSnapshot();
+      if(!auth||!await isGenerationOwnerCurrent(auth.userId))return null;
+      const pending=await window.ExGenGenerationRequest?.getPendingGenerations?.(auth.userId);
+      const record=Array.isArray(pending)?pending.find(item=>item.idempotencyKey===idempotencyKey):null;
+      if(!record||!await isGenerationOwnerCurrent(auth.userId))return null;
+      const payload=record.payload;
+      await window.ExGenGenerationRequest.restoreIdempotencyKey(auth.userId,payload,record.idempotencyKey);
+      this.setInputs({course:payload.course,level:payload.level,qType:payload.qType,num:payload.numQuestions,material:payload.pastedText,focusTerms:payload.focusTerms,trainingFocus:payload.trainingFocus,priorQuestions:payload.priorQuestions,sourceReferences:payload.sourceReferences});
+      return record;
     },
     grade(answers) { return runGrade(answers); },
     async abandonExam() {

@@ -11,6 +11,9 @@ const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrat
 const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
 const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
 const repeatedObjectiveFeedbackRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback_ROLLBACK.sql", import.meta.url), "utf8");
+const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
+const activePipelineQuotaReaperMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper.sql", import.meta.url), "utf8");
+const activePipelineQuotaReaperRollback = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper_ROLLBACK.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
@@ -45,6 +48,8 @@ async function makeDb() {
   await db.exec(preflightReleaseMigration);
   await db.exec(feedbackMigration);
   await db.exec(repeatedObjectiveFeedbackMigration);
+  await db.exec(queuedAssemblyFinalizationMigration);
+  await db.exec(activePipelineQuotaReaperMigration);
   return db;
 }
 
@@ -352,7 +357,8 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
             'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
             'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
             'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
-            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)',
+            'public.reap_stale_mock_exam_quota_reservations(uuid)'
           ]) as rpc(signature)) as service_pipeline_rpcs,
         (select bool_and(not has_function_privilege('anon',signature::regprocedure,'execute')
           and not has_function_privilege('authenticated',signature::regprocedure,'execute'))
@@ -366,7 +372,8 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
             'public.checkpoint_mock_exam_generation_pipeline_job(uuid,uuid,text,text,jsonb,integer)',
             'public.retry_mock_exam_generation_pipeline_step(uuid,uuid,text)',
             'public.release_mock_exam_generation_pipeline_preflight(uuid,uuid)',
-            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)'
+            'public.complete_mock_exam_generation_pipeline_job(uuid,uuid,text,jsonb)',
+            'public.reap_stale_mock_exam_quota_reservations(uuid)'
           ]) as rpc(signature)) as user_pipeline_rpcs_denied`)).rows[0];
       assert.deepEqual(acl, {
         rls: true,
@@ -617,18 +624,27 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       const quotaRequestId = "abababab-abab-4aba-8aba-cccccccccccc";
       const pipelineId = "abababab-abab-4aba-8aba-dddddddddddd";
       const ownerAttempt = "abababab-abab-4aba-8aba-eeeeeeeeeeee";
-      const question = { id: "synthetic-q1", question: "Synthetic question", validation_status: "verified" };
+      const accepted = Array.from({ length: 4 }, (_, index) => ({
+        id: `synthetic-q${index + 1}`, type: "mc", question: "Synthetic question", validation_status: "verified",
+      }));
       await db.query("insert into auth.users(id) values($1)", [ownerId]);
       await addParent(db, { userId: ownerId, idempotencyKey, attemptId: ownerAttempt, quotaRequestId });
       await addJob(db, {
         id: pipelineId, userId: ownerId, idempotencyKey, attemptId: ownerAttempt,
-        quotaRequestId, state: "queued", payload: { pastedText: "synthetic source material", repairFeedback: { reviewFailureCounts: { answer_alignment: 1 }, solverFailureCounts: {}, duplicateCount: 0 } },
-        accepted: [question], progress: 1, deadline: "clock_timestamp()-interval '23 hours 59 minutes 59 seconds'",
+        quotaRequestId, state: "queued", stage: "assemble", requested: 6,
+        payload: { qType: "mc", pastedText: "synthetic source material", repairFeedback: { reviewFailureCounts: { answer_alignment: 1 }, solverFailureCounts: {}, duplicateCount: 0 } },
+        accepted, progress: 4, deadline: "clock_timestamp()-interval '23 hours 59 minutes 59 seconds'",
       });
       const recentCleanup = (await db.query(
         "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
       )).rows[0].count;
       assert.equal(recentCleanup, 0, "cleanup must not run before a job is at least 24 hours past its deadline");
+      assert.equal((await db.query(
+        "select public.reap_stale_mock_exam_quota_reservations($1) as n", [ownerId],
+      )).rows[0].n, 0, "a qualified partial remains reserved while its bounded assembly recovery is available");
+      assert.equal((await db.query(
+        "select status from public.mock_exam_quota_reservations where request_id=$1", [quotaRequestId],
+      )).rows[0].status, "reserved");
       await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()-interval '24 hours 1 second' where id=$1", [pipelineId]);
 
       const cleaned = (await db.query(
@@ -639,7 +655,7 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
           error_code,lease_token,lease_expires_at,progress_current
         from public.mock_exam_generation_pipeline_jobs where id=$1`, [pipelineId])).rows[0], {
         state: "failed", stage: "terminal", payload: {}, accepted_questions: [],
-        error_code: "RETENTION_EXPIRED", lease_token: null, lease_expires_at: null, progress_current: 1,
+        error_code: "RETENTION_EXPIRED", lease_token: null, lease_expires_at: null, progress_current: 4,
       });
       assert.equal((await db.query("select state,quota_request_id from public.mock_exam_generation_requests where user_id=$1 and idempotency_key=$2", [ownerId,idempotencyKey])).rows[0].state,
         "retryable", "an expired job releases only its matching parent attempt");
@@ -843,16 +859,85 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
     });
 
-    await t.test("expired assembly terminalizes instead of restarting the partial route", async () => {
+    await t.test("expired queued assembly receives one bounded finalization window", async () => {
       const id="12121212-1212-4212-8212-121212121212", k="13131313-1313-4313-8313-131313131313", a="14141414-1414-4414-8414-141414141414", q="15151515-1515-4515-8515-151515151515";
       await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
       const approved=Array.from({length:4},(_,i)=>({id:`deadline-${i}`,type:"mc",validation_status:"verified"}));
       await addJob(db,{id,userId:u1,idempotencyKey:k,attemptId:a,quotaRequestId:q,stage:"assemble",requested:6,progress:4,accepted:approved,deadline:"clock_timestamp()-interval '1 second'"});
       const claimed=(await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r;
-      assert.equal(claimed.status,"expired");
-      const row=(await db.query("select state,stage from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0];
-      assert.deepEqual(row,{state:"failed",stage:"terminal"});
+      assert.equal(claimed.status,"claimed");
+      assert.equal(claimed.job.stage,"assemble");
+      assert.equal(claimed.job.progress_current,4);
+      assert.equal(claimed.job.assembly_grace_used,true);
+      assert.ok(Date.parse(claimed.job.deadline_at)>Date.now(),"eligible saved questions get a bounded assembly deadline");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"reserved");
+      await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()-interval '1 second',lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",[id]);
+      assert.equal((await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r.status,"expired",
+        "a second expired assembly cannot receive another grace window");
+      assert.equal((await db.query("select state,stage,assembly_grace_used from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0].assembly_grace_used,true);
       assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+    });
+
+    await t.test("quota reaper preserves an expired eligible partial until assembly can commit", async () => {
+      const id="23232323-2323-4323-8323-232323232323", k="24242424-2424-4424-8424-242424242424", a="25252525-2525-4525-8525-252525252525", q="26262626-2626-4626-8626-262626262626";
+      await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      const accepted=Array.from({length:4},(_,i)=>({id:`late-partial-${i}`,type:"mc",validation_status:"verified"}));
+      await addJob(db,{id,userId:u1,idempotencyKey:k,attemptId:a,quotaRequestId:q,stage:"assemble",requested:6,progress:4,accepted,deadline:"clock_timestamp()-interval '1 second'"});
+      const quotaCountBefore=(await db.query("select mock_quota_count from public.profiles where id=$1",[u1])).rows[0].mock_quota_count;
+
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[u1])).rows[0].n,0);
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"reserved");
+
+      const claimed=(await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r;
+      assert.equal(claimed.status,"claimed");
+      assert.ok(Date.parse(claimed.job.deadline_at)>Date.now());
+      const response={ok:true,exam:{questions:accepted.map(({id,type})=>({id,type}))},meta:{requested:6,partial:true}};
+      const completed=(await db.query("select public.complete_mock_exam_generation_pipeline_job($1,$2,$3,$4::jsonb) as r",
+        [id,claimed.job.lease_token,"cafe".repeat(8),JSON.stringify(response)])).rows[0].r;
+      assert.equal(completed.status,"completed");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"consumed");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1",[u1])).rows[0].mock_quota_count,quotaCountBefore,
+        "the successful issued partial consumes its single reservation without a refund race");
+    });
+
+    await t.test("quota reaper leaves an active non-deliverable job for the fenced terminal path", async () => {
+      const owner="31313131-3131-4131-8131-313131313131", id="27272727-2727-4727-8727-272727272727", k="28282828-2828-4828-8828-282828282828", a="29292929-2929-4929-8929-292929292929", q="30303030-3030-4030-8030-303030303030";
+      await db.query("insert into auth.users(id) values($1)",[owner]);
+      await addParent(db,{userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      await addJob(db,{id,userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q,state:"queued",stage:"generate",requested:6,progress:1,deadline:"clock_timestamp()-interval '1 second'"});
+
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[owner])).rows[0].n,0,
+        "the reaper must not refund based on a potentially stale progress snapshot while a job is active");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"reserved");
+
+      assert.equal((await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r.status,"expired");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded",
+        "the fenced terminal path settles and refunds the exact reservation");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1",[owner])).rows[0].mock_quota_count,0);
+    });
+
+    await t.test("expired queued assembly still fails closed below the partial floor or mixed-format requirement", async () => {
+      const makeUuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`;
+      for (const [index,options] of [
+        {requested:6,progress:3,acceptedCount:3,qType:"mc",includeShort:false},
+        {requested:12,progress:8,acceptedCount:8,qType:"mix",includeShort:false},
+      ].entries()) {
+        const base=1600+index*10,k=makeUuid(base),a=makeUuid(base+1),q=makeUuid(base+2),id=makeUuid(base+3);
+        await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
+        const accepted=Array.from({length:options.acceptedCount},(_,i)=>({
+          id:`expired-assembly-${index}-${i}`,
+          type:options.includeShort&&i===options.acceptedCount-1?"short":"mc",
+          validation_status:"verified",
+        }));
+        await addJob(db,{id,userId:u1,idempotencyKey:k,attemptId:a,quotaRequestId:q,stage:"assemble",
+          requested:options.requested,progress:options.progress,accepted,payload:{qType:options.qType,pastedText:"synthetic source"},
+          deadline:"clock_timestamp()-interval '1 second'"});
+        const result=(await db.query("select public.claim_mock_exam_generation_pipeline_job($1,90) as r",[id])).rows[0].r;
+        assert.equal(result.status,"expired");
+        assert.deepEqual((await db.query("select state,stage,payload,accepted_questions from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0],
+          {state:"failed",stage:"terminal",payload:{},accepted_questions:[]});
+        assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+      }
     });
   } finally {
     await db.close();
@@ -867,6 +952,29 @@ test("rollback refuses before changing the quota reaper while private jobs remai
     await assert.rejects(db.exec(rollback), /Pipeline rollback refused/);
     const body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
     assert.match(body, /mock_exam_generation_pipeline_jobs/);
+  } finally {
+    await db.close();
+  }
+});
+
+test("quota reaper rollback refuses while jobs remain active", async () => {
+  const db = await makeDb();
+  try {
+    await addParent(db);
+    await addJob(db, { state: "running", leaseToken: token });
+    await assert.rejects(db.exec(activePipelineQuotaReaperRollback), /quota reaper rollback refused/i);
+    let body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
+    assert.match(body, /and j\.state in \('queued', 'running'\)/,
+      "a refused rollback leaves the active-job protection installed");
+
+    await db.query(`update public.mock_exam_generation_pipeline_jobs
+      set state='failed', stage='terminal', payload='{}'::jsonb, accepted_questions='[]'::jsonb,
+          lease_token=null, lease_expires_at=null, error_code='TEST_TERMINAL'
+      where id=$1`, [jobId]);
+    await db.exec(activePipelineQuotaReaperRollback);
+    body = (await db.query("select pg_get_functiondef('public.reap_stale_mock_exam_quota_reservations(uuid)'::regprocedure) as body")).rows[0].body;
+    assert.match(body, /j\.progress_current >= greatest/,
+      "once no active jobs remain, rollback restores the prior bounded-partial policy");
   } finally {
     await db.close();
   }

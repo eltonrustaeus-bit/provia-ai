@@ -9,6 +9,8 @@
   var PILOT_PENDING_QUESTION_KEY = "exgen_pilot_pending_per_question";
   var PILOT_REAUTH_REQUIRED_KEY = "exgen_pilot_reauth_required";
   var PENDING_GENERATION_INPUT_KEY = "exgen_pending_generation_input_v1";
+  var GENERATION_REQUEST_KEY = "exgen_generation_request_v1";
+  var GENERATION_RECOVERY_KEY = "exgen_generation_recovery_v1";
   var PRIVATE_KEYS = [
     "proviaai_history",
     "proviaai_mistakes",
@@ -24,7 +26,8 @@
     "proviaai_per_history",
     "proviaai_cleared_ts",
     "proviaai_role",
-    "proviaai_app_access"
+    "proviaai_app_access",
+    GENERATION_REQUEST_KEY
   ];
 
   function removeAndVerify(storage, key) {
@@ -40,6 +43,7 @@
       if (!removeAndVerify(localStorage, key)) cleared = false;
     });
     if (!removeAndVerify(sessionStorage, PENDING_GENERATION_INPUT_KEY)) cleared = false;
+    if (!removeAndVerify(sessionStorage, GENERATION_RECOVERY_KEY)) cleared = false;
     try {
       var teacherInsightKeys = [];
       for (var i = 0; i < localStorage.length; i++) {

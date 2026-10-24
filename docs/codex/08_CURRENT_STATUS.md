@@ -1,5 +1,38 @@
 # 08 Current Status
 
+## Integrerad skolpilot-fix — lokal verifiering, 2026-10-24
+
+- [x] Den lokala, isolerade integrationsarbetskopian sammanför nu den befintliga
+  genererings-/säkerhetskedjan med verifierad felträning från rättade konto-prov.
+  Träningskälla, kurs och felval binds fortsatt till serververifierat, ägarbundet
+  provresultat; kvalitets- och källgrindar har inte sänkts.
+- [x] Kontobyte och utloggning rensar idempotensnyckel och tillfälligt
+  återhämtningsmaterial för provgenerering. Utkast för sparade prov fortsätter
+  vara separerade per användare och bevaras för säker återhämtning.
+- [x] Återupptagningsstatus vid avbruten generering visas i det aktiva
+  provkontraktet med `role=status`; provet öppnas inte och inget falskt
+  komplettresultat visas. Browser-fixturen testar nu den verkliga
+  `start → advance → status`-vägen och serverns terminala `incomplete_exam`.
+- [x] Riktad offline-svit passerade 104/104. Full browserregression passerade
+  188/188. `node --check` och `git diff --check` passerade.
+- [!] En separat kodreview upptäckte att ett tidigare föreslaget start-svarsfel
+  inte matchade produktionspipelinen; den verkningslösa klientändringen togs
+  bort och testfixturen korrigerades till pipeline-kontraktet. Reviewens
+  uppföljning av den slutliga testfixturen är ännu inte mottagen.
+- [!] Arbetet är lokalt och ocommittat i en isolerad integrationsarbetskopia;
+  ingen staging-Preview eller live-AI-generering verifierades i denna kontroll.
+  En stagingrad med gammalt köat jobb utan motsvarande kvotreservation behöver
+  först undersökas read-only. Ingen stagingrättning, migration eller radering
+  utfördes.
+- [!] Produktionen är inte redo för denna integration: tidigare review fann att
+  produktionsschemat saknar `assembly_grace_used`, vilket kodvägen behöver.
+  Produktionsmigrationer, `main` och Production får inte ändras utan separat
+  granskning och godkännande.
+
+**PILOT NOT READY.** Lokal verifiering är grön, men hosted staging-Preview,
+upprepade modellprov över flera kurser, P.E.R.-användbarhet och kvarvarande
+produktions-/pilotkrav återstår. Offline-resultat är inte livebevis.
+
 ## Tokenutgång i återupptagbar provkörning — pågående, 2026-10-23
 
 - [x] Read-only staginglogg för körningen 23 okt kl. 19:01 UTC bekräftade

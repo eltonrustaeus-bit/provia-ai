@@ -24,6 +24,14 @@ let failStreamingAfterDelta = false;
 let cleanEofAfterDelta = false;
 let truncatedStream = false;
 let stopReasonWithoutDone = false;
+let failFirstQuotaCommit = false;
+let quotaCommitCalls = 0;
+let quotaCommitApplied = false;
+let failQuotaCommit = false;
+let waitForClientAbort = false;
+let disconnectBeforeFirstDelta = false;
+let disconnectDuringQuotaCommit = false;
+let responseForDisconnect = null;
 let failResponses = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
@@ -40,7 +48,16 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/rpc/reserve_per_chat_quota")) return Response.json({ ok: true, count: 1 });
-  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
+  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) {
+    quotaCommitCalls += 1;
+    if (disconnectDuringQuotaCommit) responseForDisconnect?.emit("close");
+    if (failQuotaCommit) return Response.json({ ok: false, committed: false });
+    if (failFirstQuotaCommit && quotaCommitCalls === 1) {
+      quotaCommitApplied = true;
+      return Response.json({ error: "synthetic lost commit response" }, { status: 503 });
+    }
+    return Response.json({ ok: true, committed: true, already_committed: quotaCommitApplied });
+  }
   if (url.includes("/rest/v1/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url.includes("/rest/v1/per_long_memory") && url.includes("updated_at")) {
@@ -53,6 +70,17 @@ globalThis.fetch = async (input, init = {}) => {
       : Response.json([]);
   }
   if (url === "https://api.openai.com/v1/chat/completions") {
+    if (waitForClientAbort) {
+      const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
+      const bodyStream = new ReadableStream({
+        start(controller) {
+          if (disconnectBeforeFirstDelta) responseForDisconnect?.emit("close");
+          controller.enqueue(new TextEncoder().encode(partial));
+          init.signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+        },
+      });
+      return new Response(bodyStream, { status: 200 });
+    }
     if (cleanEofAfterDelta) {
       const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
       const bodyStream = new ReadableStream({
@@ -101,6 +129,7 @@ globalThis.fetch = async (input, init = {}) => {
 const { default: handler } = await import("../../api/explain.js?per-usage-stream-test");
 
 function response() {
+  const listeners = new Map();
   return {
     statusCode: 200,
     headers: {},
@@ -108,14 +137,20 @@ function response() {
     status(code) { this.statusCode = code; return this; },
     setHeader(name, value) { this.headers[name] = value; },
     flushHeaders() {},
-    write(value) { this.chunks.push(value); },
-    end(value) { if (value) this.chunks.push(value); this.ended = true; return this; },
+    once(name, callback) { listeners.set(name, callback); return this; },
+    emit(name) { listeners.get(name)?.(); },
+    write(value) {
+      this.chunks.push(value);
+      if (value.includes('"delta"') && this.closeAfterFirstDelta) this.emit("close");
+    },
+    end(value) { if (value) this.chunks.push(value); this.ended = true; this.writableEnded = true; return this; },
     json(value) { this.body = value; this.ended = true; return this; },
   };
 }
 
 async function invoke(accept, body = {}) {
   const res = response();
+  responseForDisconnect = res;
   await handler({
     method: "POST",
     headers: { authorization: "Bearer synthetic-user-token", accept },
@@ -156,6 +191,105 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.equal(usageWrite.body[0].input_tokens, 90);
   assert.equal(usageWrite.body[0].output_tokens, 21);
   assert.doesNotMatch(JSON.stringify(usageWrite.body), /Hur börjar jag|Börja med att hitta/);
+});
+
+test("quota commit retries the same reservation before streaming the first answer delta", async () => {
+  requests.length = 0;
+  failFirstQuotaCommit = true;
+  quotaCommitCalls = 0;
+  quotaCommitApplied = false;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    failFirstQuotaCommit = false;
+  }
+  assert.equal(res.ended, true);
+  assert.match(res.chunks.join(""), /Börja med att hitta ett begrepp/);
+  const commits = requests.filter((request) => request.url.endsWith("/rpc/commit_per_chat_quota"));
+  assert.equal(commits.length, 2);
+  assert.deepEqual(commits[1].body, commits[0].body,
+    "a lost/negative commit response retries the same idempotency key rather than creating another charge");
+});
+
+test("streaming P.E.R emits no model text when quota cannot be committed", async () => {
+  requests.length = 0;
+  failQuotaCommit = true;
+  quotaCommitCalls = 0;
+  let res;
+  try { res = await invoke("text/event-stream"); }
+  finally { failQuotaCommit = false; }
+  const payload = res.chunks.join("");
+  assert.equal(res.ended, true);
+  assert.doesNotMatch(payload, /Börja med att hitta ett begrepp/);
+  assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
+  assert.equal(quotaCommitCalls, 2, "the same commit is retried once before output");
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+});
+
+test("streaming P.E.R aborts model work after a client disconnect", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  const res = response();
+  res.closeAfterFirstDelta = true;
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally { waitForClientAbort = false; }
+  assert.equal(res.ended, undefined);
+  assert.match(res.chunks.join(""), /Börja med en ledtråd/);
+  assert.doesNotMatch(res.chunks.join(""), /P\.E\.R är tillfälligt otillgänglig/);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+});
+
+test("streaming P.E.R refunds quota and discards buffered text when disconnect precedes first delta", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  disconnectBeforeFirstDelta = true;
+  const res = response();
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally {
+    waitForClientAbort = false;
+    disconnectBeforeFirstDelta = false;
+  }
+  assert.equal(res.ended, undefined);
+  assert.equal(res.chunks.length, 0);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+});
+
+test("streaming P.E.R writes no delta if disconnect happens during the quota commit", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  disconnectDuringQuotaCommit = true;
+  const res = response();
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally {
+    waitForClientAbort = false;
+    disconnectDuringQuotaCommit = false;
+  }
+  assert.equal(res.ended, undefined);
+  assert.equal(res.chunks.length, 0);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")),
+    "the committed reservation is terminal and must not be refunded as if still pending");
 });
 
 test("tips mode commits successful quota and refunds provider failures", async () => {
@@ -231,9 +365,9 @@ test("streaming P.E.R ends safely when the provider stream fails after a partial
   assert.match(payload, /Börja med en ledtråd/);
   assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
   assert.doesNotMatch(payload, /synthetic provider stream reset/);
-  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")),
-    "a failed provider stream refunds its reservation");
-  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")),
+    "a partial answer is charged before any text is sent");
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
 });
 
 test("streaming P.E.R does not commit a partial answer after clean EOF without a terminal event", async () => {

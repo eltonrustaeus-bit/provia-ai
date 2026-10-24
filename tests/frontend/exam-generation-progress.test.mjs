@@ -4,16 +4,21 @@ import test from "node:test";
 import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
-const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token,userId)");
+const authStart = html.indexOf("async function refreshGenerationAuthSnapshot(expectedUserId)");
+const authEnd = html.indexOf("\nasync function getGenerationOwnerStatus", authStart);
+const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token,expectedUserId,onStarted)");
 const end = html.indexOf("\n  async function runGenerate(", start);
-assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
+assert.ok(authStart >= 0 && authEnd > authStart && start >= 0 && end > start, "resumable generation and auth refresh helpers exist in the app");
+const authHelpers = html.slice(authStart, authEnd);
 const helper = html.slice(start, end);
 
 async function runWith(context) {
-  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token,userId)})()`, {
+  return vm.runInNewContext(`(async()=>{${authHelpers};${helper};return runResumableGeneration(payload,onProgress,token,userId)})()`, {
     onProgress: undefined,
     token: "synthetic-session-token",
     userId: "account-a",
+    verifiedUserId: "account-a",
+    getGenerationOwnerStatus: async expectedUserId => expectedUserId === "account-a" ? "same" : "different",
     db: null,
     ...context,
   });

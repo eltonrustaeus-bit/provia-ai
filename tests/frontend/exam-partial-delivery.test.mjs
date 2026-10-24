@@ -58,7 +58,7 @@ try {
         await page.evaluate(() => {
           const originalRemoveItem = Storage.prototype.removeItem;
           Storage.prototype.removeItem = function (key) {
-            if (this === sessionStorage && key === "exgen_pending_generation_input_v1") return;
+            if (this === sessionStorage && key === "exgen_generation_recovery_v1") return;
             return originalRemoveItem.call(this, key);
           };
         });
@@ -71,9 +71,9 @@ try {
       assert.equal(await page.locator("#examBody .qBox").count(), approved);
       assert.equal(postedQuestionCount, requested, "the selected requested count reaches the generation API");
       if (requested === 3) {
-        assert.match(await page.locator("#status").textContent(), /lokalt sparat material kunde inte bekräftas rensat/i,
+        assert.match(await page.locator("#status").textContent(), /tillfälligt återupptagningsmaterial kunde inte rensas/i,
           "a successful exam warns about retained plaintext material, not a failed resume key");
-        assert.ok(await page.evaluate(() => sessionStorage.getItem("exgen_pending_generation_input_v1")),
+        assert.ok(await page.evaluate(() => sessionStorage.getItem("exgen_generation_recovery_v1")),
           "the storage-failure fixture retained the pending material");
       }
     } finally {

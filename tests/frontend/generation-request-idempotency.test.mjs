@@ -16,11 +16,23 @@ const localStorage = {
 };
 
 const first = await requestIdentity.getIdempotencyKey("00000000-0000-4000-8000-000000000001", data, { storage: localStorage, crypto: webcrypto, now: 1000 });
+const legacyFingerprintBytes = await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([
+  "00000000-0000-4000-8000-000000000001", data.lang, data.level, data.course, data.qType,
+  data.numQuestions, data.pastedText, data.focusTerms,
+])));
+const legacyFingerprint = Array.from(new Uint8Array(legacyFingerprintBytes), byte => byte.toString(16).padStart(2, "0")).join("");
+assert.equal(JSON.parse(values.get(requestIdentity.STORAGE_KEY)).requests.find(row => row.idempotencyKey === first)?.fingerprint,
+  legacyFingerprint, "ordinary requests retain the prior fingerprint format for in-flight upgrade recovery");
 const same = await requestIdentity.getIdempotencyKey("00000000-0000-4000-8000-000000000001", data, { storage: localStorage, crypto: webcrypto, now: 2000 });
 assert.equal(same, first, "an identical payload for the same account reuses its pending request key");
 
 const changed = await requestIdentity.getIdempotencyKey("00000000-0000-4000-8000-000000000001", { ...data, pastedText: data.pastedText + "\nNy rad." }, { storage: localStorage, crypto: webcrypto, now: 3000 });
 assert.notEqual(changed, first, "a changed payload gets a new request key");
+
+const sourceBound = await requestIdentity.getIdempotencyKey("00000000-0000-4000-8000-000000000001", {
+  ...data, sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"] }],
+}, { storage: localStorage, crypto: webcrypto, now: 3500 });
+assert.notEqual(sourceBound, first, "mistake training source identity participates in the durable idempotency fingerprint");
 
 const otherUser = await requestIdentity.getIdempotencyKey("00000000-0000-4000-8000-000000000002", data, { storage: localStorage, crypto: webcrypto, now: 4000 });
 assert.notEqual(otherUser, changed, "switching accounts never reuses another user's pending key");
@@ -28,13 +40,26 @@ assert.notEqual(otherUser, changed, "switching accounts never reuses another use
 const saved = JSON.parse(values.get(requestIdentity.STORAGE_KEY));
 assert.equal(JSON.stringify(saved).includes(data.pastedText), false, "persistent storage contains request metadata only, not study material");
 assert.equal(JSON.stringify(saved).includes("00000000-0000-4000-8000-000000000001"), false, "persistent request metadata does not store the account ID");
-assert.equal(saved.requests.length, 3, "different pending payloads and accounts do not overwrite each other's recovery keys");
+assert.equal(saved.requests.length, 4, "different pending payloads and accounts do not overwrite each other's recovery keys");
 
 // A fresh module instance represents a reload or another same-origin tab.
 delete require.cache[require.resolve("../../js/generation-request.js")];
 const reloaded = require("../../js/generation-request.js");
 const afterReload = await reloaded.getIdempotencyKey("00000000-0000-4000-8000-000000000001", data, { storage: localStorage, crypto: webcrypto, now: 5000 });
 assert.equal(afterReload, first, "the same account and exact payload retain their resume key across reloads/tabs");
+
+const graphRecoveryPayload = { ...data, qType: "graph", numQuestions: 1 };
+const recoveredGraphKey = "00000000-0000-4000-8000-000000000099";
+assert.equal(await reloaded.restoreIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  recoveredGraphKey, { storage: localStorage, crypto: webcrypto, now: 6000 }), recoveredGraphKey,
+"restoring a same-tab recovery record re-registers its original durable request identity");
+assert.equal(await reloaded.getIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  { storage: localStorage, crypto: webcrypto, now: 7000 }), recoveredGraphKey,
+"a recovered graph request reuses its original key when generation starts");
+await assert.rejects(reloaded.restoreIdempotencyKey("00000000-0000-4000-8000-000000000001", graphRecoveryPayload,
+  "00000000-0000-4000-8000-000000000098", { storage: localStorage, crypto: webcrypto, now: 7000 }),
+error => error.message === "GENERATION_RECOVERY_IDENTITY_CONFLICT",
+"a conflicting key cannot replace an existing request identity");
 
 const originalLocalStorage = globalThis.localStorage;
 const originalSessionStorage = globalThis.sessionStorage;
@@ -111,6 +136,8 @@ assert.equal(JSON.parse(values.get(requestIdentity.STORAGE_KEY)).requests.some(r
 assert.equal(await requestIdentity.clear(otherUser, localStorage), false, "clearing a stale key cannot remove another operation");
 assert.equal(await requestIdentity.clear(first, localStorage), true);
 assert.equal(await requestIdentity.clear(changed, localStorage), true);
+assert.equal(await requestIdentity.clear(sourceBound, localStorage), true);
+assert.equal(await requestIdentity.clear(recoveredGraphKey, localStorage), true);
 assert.equal(await requestIdentity.clear(afterExpiry, expiryStorage), true);
 assert.equal(expiryValues.has(requestIdentity.STORAGE_KEY), false);
 assert.equal(values.has(requestIdentity.STORAGE_KEY), false);
@@ -336,5 +363,139 @@ await assert.rejects(
   /Durable request ID storage unavailable/,
   "generation does not start with an idempotency key that would be lost on reload",
 );
+
+const recoveryValues = new Map();
+const recoveryStorage = {
+  getItem(key) { return recoveryValues.get(key) || null; },
+  setItem(key, value) { recoveryValues.set(key, value); },
+  removeItem(key) { recoveryValues.delete(key); },
+};
+const recoveryUser = "00000000-0000-4000-8000-000000000001";
+const recoveryKey = webcrypto.randomUUID();
+const recoveryOperation = webcrypto.randomUUID();
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, recoveryKey, null, {
+  storage: recoveryStorage, crypto: webcrypto, now: 10000,
+}), true, "a short-lived tab recovery snapshot is saved before the request starts");
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, recoveryKey, recoveryOperation, {
+  storage: recoveryStorage, crypto: webcrypto, now: 11000,
+}), true, "the same snapshot can be updated with its server operation ID");
+const recoveryRaw = recoveryValues.get(requestIdentity.RECOVERY_KEY);
+assert.ok(recoveryRaw.includes(data.pastedText), "raw study material exists only in the short-lived tab session record");
+assert.ok(!recoveryRaw.includes("access_token"), "recovery state never stores an authentication token");
+const recovered = await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: recoveryStorage, crypto: webcrypto, now: 12000,
+});
+assert.equal(recovered.length, 1);
+assert.equal(recovered[0].operationId, recoveryOperation, "the operation ID survives reload without changing request identity");
+assert.deepEqual(recovered[0].payload, {
+  ...data, trainingFocus: [], priorQuestions: [], sourceReferences: [],
+});
+assert.deepEqual(await requestIdentity.getPendingGenerations("00000000-0000-4000-8000-000000000002", {
+  storage: recoveryStorage, crypto: webcrypto, now: 12000,
+}), [], "another account cannot recover this tab's snapshot");
+assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false, "account mismatch clears stale tab recovery data");
+
+let recoveryWriteCount = 0;
+let recoveryRawAfterFailedUpdate = null;
+const operationUpdateFailureStorage = {
+  getItem() { return recoveryRawAfterFailedUpdate; },
+  setItem(_key, value) {
+    recoveryWriteCount++;
+    if (recoveryWriteCount === 1) recoveryRawAfterFailedUpdate = value;
+    else throw new Error("synthetic storage full during operation ID update");
+  },
+  removeItem() { recoveryRawAfterFailedUpdate = null; },
+};
+const operationUpdateFailureKey = webcrypto.randomUUID();
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, operationUpdateFailureKey, null, {
+  storage: operationUpdateFailureStorage, crypto: webcrypto, now: 15000,
+}), true, "the full request is durable before the server starts the job");
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, operationUpdateFailureKey, recoveryOperation, {
+  storage: operationUpdateFailureStorage, crypto: webcrypto, now: 16000,
+}), false, "operation ID update failure is reported to the caller");
+const recoveredWithoutOperationId = await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: operationUpdateFailureStorage, crypto: webcrypto, now: 17000,
+});
+assert.equal(recoveredWithoutOperationId.length, 1,
+  "the earlier idempotent request remains recoverable after the operation-ID update fails");
+assert.equal(recoveredWithoutOperationId[0].idempotencyKey, operationUpdateFailureKey);
+assert.equal(recoveredWithoutOperationId[0].operationId, null,
+  "retry can resolve the existing server operation by the original idempotency key");
+
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, recoveryKey, recoveryOperation, {
+  storage: recoveryStorage, crypto: webcrypto, now: 20000,
+}), true);
+assert.equal((await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: recoveryStorage, crypto: webcrypto, now: 20000 + 19 * 60 * 1000,
+})).length, 1, "recovery survives the server deadline and a short reload/network margin");
+assert.deepEqual(await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: recoveryStorage, crypto: webcrypto, now: 20000 + 20 * 60 * 1000,
+}), [], "recovery material expires after the bounded recovery window");
+assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false, "expired material is removed from tab storage");
+
+await requestIdentity.savePendingGeneration(recoveryUser, data, recoveryKey, recoveryOperation, {
+  storage: recoveryStorage, crypto: webcrypto, now: 30000,
+});
+assert.equal(requestIdentity.clearPendingGeneration(recoveryKey, recoveryStorage), true,
+  "a completed or terminal operation can clear its session recovery record");
+assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false);
+
+const boundedRecoveryCases = [
+  { ...data, trainingFocus: Array(21).fill({ concept: "algebra" }) },
+  { ...data, priorQuestions: Array(21).fill({ question: "Vad är x?" }) },
+  { ...data, sourceReferences: Array(21).fill({ submissionId: "a".repeat(32), questionIds: ["q1"] }) },
+  { ...data, sourceReferences: [{ submissionId: "a".repeat(32), questionIds: Array(21).fill("q1") }] },
+  { ...data, trainingFocus: [{ concept: "algebra", privateExtra: "must not be retained" }] },
+  { ...data, priorQuestions: [{ question: "Vad är x?", privateExtra: "must not be retained" }] },
+  { ...data, sourceReferences: [{ submissionId: "a".repeat(32), questionIds: ["q1"], privateExtra: "must not be retained" }] },
+  { ...data, pastedText: "x".repeat(12001) },
+];
+for (const [index, payload] of boundedRecoveryCases.entries()) {
+  assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, payload, webcrypto.randomUUID(), null, {
+    storage: recoveryStorage, crypto: webcrypto, now: 40000 + index,
+  }), false, "recovery rejects oversized or excessive nested material without truncating it");
+}
+assert.equal(recoveryValues.has(requestIdentity.RECOVERY_KEY), false,
+  "invalid snapshots are not written to tab storage");
+
+const longEvidencePayload = {
+  ...data,
+  trainingFocus: [{
+    sourceQuestionId: "q-long", sourceSubmissionId: "d".repeat(32),
+    concept: "Linjär funktion", skill: "Tolka lutning",
+    sourceQuestion: "Q".repeat(1180), studentAnswer: "A".repeat(700),
+    gradingFeedback: "F".repeat(900), expectedAnswer: "M".repeat(800), errorTags: ["method_missing"],
+  }],
+  priorQuestions: [{ question: "En tidigare fråga" }],
+  sourceReferences: [{ submissionId: "d".repeat(32), questionIds: ["q-long"] }],
+};
+const longEvidenceKey = webcrypto.randomUUID();
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, longEvidencePayload, longEvidenceKey, null, {
+  storage: recoveryStorage, crypto: webcrypto, now: 50000,
+}), true, "session recovery accepts the server's larger bounded source evidence");
+const longEvidenceRecovery = await requestIdentity.getPendingGenerations(recoveryUser, {
+  storage: recoveryStorage, crypto: webcrypto, now: 50001,
+});
+assert.equal(longEvidenceRecovery[0].payload.trainingFocus[0].gradingFeedback.length, 900);
+requestIdentity.clearPendingGeneration(longEvidenceKey, recoveryStorage);
+
+let clock = 100000;
+const scheduledCallbacks = [];
+const timedValues = new Map();
+const timedStorage = {
+  getItem(key) { return timedValues.get(key) || null; },
+  setItem(key, value) { timedValues.set(key, value); },
+  removeItem(key) { timedValues.delete(key); },
+};
+assert.equal(await requestIdentity.savePendingGeneration(recoveryUser, data, webcrypto.randomUUID(), null, {
+  storage: timedStorage, crypto: webcrypto, now: clock, nowFn: () => clock,
+  setTimeout(callback, delay) { scheduledCallbacks.push({ callback, delay }); },
+}), true);
+assert.equal(scheduledCallbacks.length, 1, "the active tab schedules a best-effort expiry cleanup");
+assert.equal(scheduledCallbacks[0].delay, 20 * 60 * 1000);
+clock += 20 * 60 * 1000 + 1;
+scheduledCallbacks.shift().callback();
+assert.equal(timedValues.has(requestIdentity.RECOVERY_KEY), false,
+  "expired recovery material is removed even if no later read occurs");
 
 console.log("generation-request-idempotency: all assertions passed");

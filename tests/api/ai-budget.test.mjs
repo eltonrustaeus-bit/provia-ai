@@ -55,6 +55,29 @@ test("staging budget reservation fails closed and settlement uses the same serve
   assert.equal(requests[1].url, `${stagingEnv.SUPABASE_URL}/rest/v1/rpc/settle_ai_spend`);
 });
 
+test("spend settlement retries once with the same idempotent reservation after a transient failure", async () => {
+  const requests = [];
+  const reservation = {
+    ok: true, enforced: true, userId: PILOT_USER_ID,
+    reservationId: "66666666-6666-4666-8666-666666666666",
+    model: "gpt-6-luna", reserveUsd: 0.01,
+  };
+  const fetchImpl = async (url, init) => {
+    requests.push({ url, body: JSON.parse(init.body) });
+    return requests.length === 1
+      ? new Response("temporary failure", { status: 503 })
+      : Response.json({ ok: true, duplicate: false });
+  };
+
+  assert.equal(await settleAiSpend(reservation, null, {
+    env: stagingEnv, fetchImpl, conservativeFallback: true,
+  }), true);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[1].body, requests[0].body);
+  assert.equal(requests[0].body.p_reservation_id, reservation.reservationId);
+  assert.equal(requests[0].body.p_actual_usd, reservation.reserveUsd);
+});
+
 test("a missing staging budget reservation blocks the model request", async () => {
   const reservation = await reserveAiSpend({
     userId: PILOT_USER_ID,
