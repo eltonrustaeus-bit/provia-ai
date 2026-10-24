@@ -360,7 +360,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
   const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
   const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
-  const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024120000_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
+  const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth; create table auth.users(id uuid primary key);

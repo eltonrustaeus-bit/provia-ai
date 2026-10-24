@@ -92,14 +92,14 @@ export async function loadOwnedTrainingExam({ userId, submissionId }) {
 
 export async function hasVerifiedTrainingGrade({ userId, submissionId }) {
   const query = new URLSearchParams({
-    select: "submission_id,verified_at,num_questions",
+    select: "user_id,submission_id,verified_at,num_questions",
     user_id: `eq.${userId}`,
     submission_id: `eq.${submissionId}`,
     verified_at: "not.is.null",
     limit: "1",
   });
   const issuanceQuery = new URLSearchParams({
-    select: "submission_id,answer_fingerprint,result_payload,result_expires_at",
+    select: "user_id,submission_id,answer_fingerprint,result_payload,result_expires_at",
     user_id: `eq.${userId}`,
     submission_id: `eq.${submissionId}`,
     limit: "1",
@@ -108,8 +108,10 @@ export async function hasVerifiedTrainingGrade({ userId, submissionId }) {
     rest(`/rest/v1/mock_results?${query}`),
     rest(`/rest/v1/exam_issuances?${issuanceQuery}`),
   ]);
-  if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.submission_id !== submissionId || !rows[0]?.verified_at ||
-      !Array.isArray(issuances) || issuances.length !== 1 || issuances[0]?.submission_id !== submissionId) return null;
+  if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.user_id !== userId ||
+      rows[0]?.submission_id !== submissionId || !rows[0]?.verified_at ||
+      !Array.isArray(issuances) || issuances.length !== 1 || issuances[0]?.user_id !== userId ||
+      issuances[0]?.submission_id !== submissionId) return null;
   return { ...rows[0], ...issuances[0] };
 }
 

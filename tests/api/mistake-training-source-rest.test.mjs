@@ -121,3 +121,14 @@ test("verified training grade fails closed when the issuance belongs to another 
 
   assert.equal(await hasVerifiedTrainingGrade({ userId: owner, submissionId }), null);
 });
+
+test("verified training grade fails closed when a matching issuance belongs to another owner", async () => {
+  globalThis.fetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    return url.pathname.endsWith("/mock_results")
+      ? response([{ user_id: owner, submission_id: submissionId, verified_at: "2026-10-24T10:00:00Z", num_questions: 3 }])
+      : response([{ user_id: "22222222-2222-4222-8222-222222222222", submission_id: submissionId, answer_fingerprint: "f".repeat(64) }]);
+  };
+
+  assert.equal(await hasVerifiedTrainingGrade({ userId: owner, submissionId }), null);
+});
