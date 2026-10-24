@@ -809,8 +809,13 @@ async function gateActiveExam(req, res, body, user) {
   function allowSafeStudyChat(serverState) {
     const clearlyGeneral = isClearlyGeneralQuestion();
     if (!ordinaryStudyChat || referencesExamQuestion({ allowTopicOverlap: clearlyGeneral })) return false;
+    const staleProvView = String(context?.page || "").trim().toLowerCase() === "prov";
+    // With no server issuance, unrelated general help is safe; safeContext
+    // below strips a stale question from the old prov view. Unbound or unknown
+    // exam context remains gated, as do expired/unverified issuances.
     if (examContextDeclared && (!clearlyGeneral ||
-        ((context?.currentQuestion || context?.questions) && serverState !== "completed"))) return false;
+        ((context?.currentQuestion || context?.questions) && serverState !== "completed" &&
+          !(serverState === "none" && staleProvView)))) return false;
     const safeContext = { page: "app" };
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
       if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];

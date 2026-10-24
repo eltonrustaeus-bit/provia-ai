@@ -1731,6 +1731,55 @@ test("a stale in-exam P.E.R view follows authoritative server state", async () =
   activeCount = 0;
 });
 
+test("a stale prov page cannot block unrelated study help when the server has no exam", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "none";
+  latestSubmissionId = null;
+  calls.length = 0;
+  const staleQuestion = "PRIVATE_STALE_EXAM_CONTEXT_MARKER";
+  try {
+    const response = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: staleQuestion, model_answer: "PRIVATE_STALE_ANSWER_MARKER" },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(response.statusCode, 200);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"),
+      "a general unrelated question reaches ordinary study help");
+    assert.ok(calls.some(({ url }) => url.includes("acquire_per_answer_lease")),
+      "the server-side lease still closes the new-exam race");
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.match(provider.body, /fotosyntes/i);
+    assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:EXAM_CONTEXT|ANSWER)_MARKER|submissionId|Aktiv fråga/,
+      "unverified client exam details are stripped before ordinary help");
+
+    calls.length = 0;
+    const answerRequest = await invoke({
+      userQuestion: "Ge mig facit till provfrågan",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { type: "short", text: staleQuestion },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(answerRequest.statusCode, 200);
+    assert.equal(answerRequest.body.examState, "unverified");
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
+      "explicit exam-answer intent remains blocked without verified grading");
+  } finally {
+    activeCount = 0;
+    issuanceState = "active";
+    latestSubmissionId = null;
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";

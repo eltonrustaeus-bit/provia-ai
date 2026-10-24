@@ -2282,3 +2282,38 @@ innan PR #123 kan mergas.
 **PILOT NOT READY.** Kvar är versionssynkad stagingmigration och ett nytt
 syntetiskt end-to-end-prov inom färsk kostnadsgräns. Produktionsschema och
 releaseordning måste granskas och godkännas separat före merge.
+
+## P.E.R stale provvy och matteekvivalenta dubbletter — 2026-10-24
+
+- [x] `api/explain.js` hanterar nu kvarlämnad `page=prov` när servern
+  auktoritativt säger att inget prov finns: tydligt generell, orelaterad
+  studiehjälp kan gå vidare efter att gammal fråge-/facitkontext rensats.
+  Uttryckliga facitfrågor, okänd/obunden provstatus och övriga spärrade lägen
+  förblir stängda; serverns atomiska svarslås används fortfarande.
+- [x] `api/_assessment.js` deduplicerar samma normaliserade andragradspolynom
+  när frågorna ber om att lösa ekvationen respektive hitta nollställena/rötterna.
+  Olika ekvationer, andra färdigheter och uttryckligen olika lösningsmetoder
+  (pq-formel/faktorisering/kvadratkomplettering/grafiskt) behålls som skilda.
+- [x] API-regressioner för gammel provvy/facitspärr och matteekvivalens,
+  skillnader i ekvation/färdighet/metod passerade. Den riktade kombinerade
+  API-sviten passerade **109/109**; partial-delivery UI och P.E.R-kontext
+  passerade; bred webbläsarregression passerade **188/188**. Syntaxkontroller
+  och `git diff --check` passerade.
+- [x] Oberoende slutgranskning kördes iterativt och avslutades utan blockerare.
+  Metodnekningar, tillämpning kontra jämförelse, extra jämförelsekriterier och
+  ordningen före generiska dubblettgenvägar granskades. Jämförelseparafraser
+  med olik uppgiftstext behålls avsiktligt som separata; detta kan lämna kvar
+  vissa matematiskt likvärdiga jämförelsefrågor men undviker att tappa extra
+  kriterier.
+- [x] Efter den sista granskningsjusteringen kördes `exam-pipeline-offline`
+  igen; den passerade. Den kombinerade 109-testssviten och 188-kontrollers
+  webbläsarsvit passerade strax före den sista jämförelsespärrens ordningsflytt.
+- [!] Alla dessa tester är offline/mockade; ingen hosted stagingmigration,
+  live-modellanvändning eller produktionsbeteende är verifierat. Den tidigare
+  godkända stagingmigrationsåtgärden saknar bekräftelse i denna session och
+  lämnas därför orörd. Budgeten och `appOrigin` behöver färsk kontroll före
+  senare syntetiska liveprov.
+
+**PILOT NOT READY.** Nästa steg efter slutgranskning är feature-Preview av
+verifierad kod och sedan stagingmigration/liveprov endast efter bekräftad
+stagingauktorisation, aktuell kostnadsavläsning och versionssynkad deployment.

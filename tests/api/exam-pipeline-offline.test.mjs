@@ -638,6 +638,73 @@ assert.deepEqual(calculatedEquationGate.questions.map(({ id }) => id), ["equatio
 assert.deepEqual(calculatedEquationGate.dropped, [{ id: "equation-calculated-rewrite", issues: ["duplicate_question"] }],
   "the deterministic gate drops the 'Beräkna x då' rewrite");
 
+const quadraticSolve = makeEquationQuestion(
+  "quadratic-solve", "Lös andragradsekvationen x² − 5x + 6 = 0.",
+);
+const quadraticZeros = makeEquationQuestion(
+  "quadratic-zeros", "Bestäm nollställena till f(x) = x² − 5x + 6.",
+);
+const quadraticRoots = makeEquationQuestion(
+  "quadratic-roots", "Bestäm rötterna till y = x² − 5x + 6.",
+);
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticZeros), true,
+  "solving a quadratic and finding its zeros are duplicates when they target the same roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticRoots), true,
+  "root wording and plain y= function notation normalize to the same quadratic target");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, makeEquationQuestion(
+  "quadratic-different", "Lös andragradsekvationen x² − 4x + 3 = 0.",
+)), false, "a different quadratic equation remains a distinct question");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 med pq-formeln."),
+  makeEquationQuestion("quadratic-factor", "Förklara metoden för att lösa x² − 5x + 6 = 0 genom faktorisering."),
+), false, "questions that teach different explicit solution methods remain distinct");
+const quadraticWithoutPq = makeEquationQuestion(
+  "quadratic-without-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 utan pq-formeln.",
+);
+const quadraticWithPq = makeEquationQuestion(
+  "quadratic-with-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 med pq-formeln.",
+);
+for (const [id, wording] of [
+  ["quadratic-without-pq-phrase", "utan pq-formeln"],
+  ["quadratic-without-pq-verb", "utan att använda pq-formeln"],
+  ["quadratic-without-pq-english", "without using the pq formula"],
+  ["quadratic-without-pq-do-not", "do not use the pq formula"],
+]) {
+  assert.equal(assessment.isDuplicateQuestion(quadraticWithPq, makeEquationQuestion(
+    id, `Förklara metoden för att lösa x² − 5x + 6 = 0 ${wording}.`,
+  )), false, `negated method instruction remains distinct: ${wording}`);
+}
+const methodGate = assessment.gateExam({ questions: [
+  quadraticWithPq,
+  makeEquationQuestion("quadratic-with-factor", "Förklara metoden för att lösa x² − 5x + 6 = 0 genom faktorisering."),
+  quadraticWithoutPq,
+] }, { profile: "mathematics", secret: signingSecret });
+assert.equal(methodGate.questions.length, 3,
+  "the actual quality gate keeps explicit and negated method variants as separate questions");
+assert.equal(assessment.isDuplicateQuestion(quadraticRoots, makeEquationQuestion(
+  "quadratic-roots-and-slope", "Bestäm rötterna till y = x² − 5x + 6. Bestäm också lutningen.",
+)), false, "a combined roots-and-slope task is not collapsed into a roots-only task");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-apply-methods", "Lös med både pq-formeln och faktorisering: x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-methods", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+), false, "applying two methods and comparing them remain distinct task actions");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-efficiency", "Jämför dem och förklara vilken metod är mest effektiv för x² − 5x + 6 = 0."),
+), false, "a comparison with an added evaluation criterion remains a distinct task");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-steps", "Jämför vilken metod kräver minst antal beräkningssteg för x² − 5x + 6 = 0."),
+), false, "a comparison asking for fewest calculation steps remains distinct");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-reliable", "Jämför vilken metod som är mest tillförlitlig för x² − 5x + 6 = 0."),
+), false, "a comparison asking for reliability remains distinct");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, {
+  ...makeEquationQuestion("quadratic-different-skill", "Bestäm lutningen för y = x² − 5x + 6."),
+  concept_tag: "Lutning",
+}), false, "a different mathematical skill is not collapsed just because it uses the same polynomial");
+
 const semanticDuplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "capacity-definition", question: "Vad är ekosystemets bärförmåga och hur påverkas den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
   { ...questions[0], id: "capacity-paraphrase", question: "Vad är bärförmåga och vilka faktorer kan påverka den?", topic: "Ekologi", concept_tag: "Bärförmåga" },

@@ -821,8 +821,15 @@ function mathQuestionIntent(question) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
-  if (/\b(?:lös\s+(?:ekvationen|ut)|bestäm\s+(?:värdet\s+på\s+)?x\s+i|beräkna\s+(?:värdet\s+på\s+)?x\s+(?:i|då)|hitta\s+x\s+i|solve\s+(?:the\s+)?equation|solve\s+for\s+x|find\s+x\s+in|vilket\s+(?:tal|värde)\s+ger\s+\w+\s+när\s+(?:det|talet|x)\s+multipliceras\s+med|what\s+(?:number|value)\s+(?:gives|produces)\s+\w+\s+when\s+(?:it\s+is\s+)?multiplied\s+by)(?![\p{L}\p{N}_])/u.test(text)) return "solve-equation";
-  if (/nollst(?:ä|a)ll|nollpunkt|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
+  if (/\b(?:l(?:ö|o)s|l(?:ö|o)sa)\b.{0,100}(?:ekvation|andragrad|x\s*\^?\s*2)/u.test(text)) {
+    return "solve-equation";
+  }
+  if (/(?:j(?:ä|a)mför|compare)/u.test(text) &&
+      /x\s*\^?\s*2/u.test(text) && /(?:=|pq-formel|faktoriser|ber(?:ä|a)kningssteg|tillf(?:ö|o)rlitlig)/u.test(text)) {
+    return "zero";
+  }
+  if (/\b(?:lös\s+(?:ekvationen|andragradsekvationen|andragradsekvation|ut)|bestäm\s+(?:värdet\s+på\s+)?x\s+i|beräkna\s+(?:värdet\s+på\s+)?x\s+(?:i|då)|hitta\s+x\s+i|solve\s+(?:the\s+)?equation|solve\s+for\s+x|find\s+x\s+in|vilket\s+(?:tal|värde)\s+ger\s+\w+\s+när\s+(?:det|talet|x)\s+multipliceras\s+med|what\s+(?:number|value)\s+(?:gives|produces)\s+\w+\s+when\s+(?:it\s+is\s+)?multiplied\s+by)(?![\p{L}\p{N}_])/u.test(text)) return "solve-equation";
+  if (/nollst(?:ä|a)ll|nollpunkt|r(?:ö|o)tter|l(?:ö|o)sningarna|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
   if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) return "slope";
   if (/y-sk(?:ä|a)rning|y-axeln|y-axel|vertical intercept/u.test(text)) return "y-intercept";
   if (/derivata|derivative|tangentlutning/u.test(text)) return "derivative";
@@ -875,7 +882,104 @@ function mathQuestionExpression(question) {
   return equations.map((equation) => equation.replace(/\s+/g, "").replace(/(\d)([a-z])/g, "$1*$2")).sort().join("|");
 }
 
+function quadraticZeroSignature(question) {
+  const intent = mathQuestionIntent(question);
+  if (intent !== "solve-equation" && intent !== "zero") return "";
+  const text = String(question?.question || "")
+    .replace(/²/g, "^2")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const functionMatch = text.match(/(?:f|y)\s*\(\s*x\s*\)\s*=\s*([^?.;]+)/u)
+    || text.match(/\by\s*=\s*([^?.;]+)/u);
+  const zeroEquation = text.match(/([0-9x+*/^().\s-]+)\s*=\s*0(?:\D|$)/u);
+  const expression = zeroEquation?.[1] || functionMatch?.[1] || "";
+  if (!expression || !/x\s*\^\s*2/u.test(expression)) return "";
+
+  const compact = expression.replace(/\s+/g, "").replace(/\*/g, "");
+  const terms = compact.match(/[+-]?[^+-]+/gu);
+  if (!terms?.length || terms.join("") !== compact) return "";
+  const coefficients = [0, 0, 0];
+  for (const term of terms) {
+    const match = term.match(/^([+-]?)(?:(\d+(?:\.\d+)?)?)x(?:\^(2))?$|^([+-]?)(\d+(?:\.\d+)?)$/u);
+    if (!match) return "";
+    if (match[0].includes("x")) {
+      const degree = match[3] ? 2 : 1;
+      const magnitude = match[2] ? Number(match[2]) : 1;
+      coefficients[2 - degree] += (match[1] === "-" ? -1 : 1) * magnitude;
+    } else {
+      coefficients[2] += (match[4] === "-" ? -1 : 1) * Number(match[5]);
+    }
+  }
+  if (coefficients[0] === 0) return "";
+  return coefficients.map((coefficient) => String(coefficient / coefficients[0])).join(",");
+}
+
+function quadraticSolutionMethod(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const patterns = [
+    ["pq-formula", /pq-formel|pq\s+formula|abc-formula/gu],
+    ["factorization", /faktoriser|factori[sz]e/gu],
+    ["complete-square", /kvadratkompletter|complete the square/gu],
+    ["graph", /grafiskt|med graf|graphically/gu],
+  ];
+  const methods = [];
+  for (const [name, pattern] of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const preceding = text.slice(Math.max(0, match.index - 24), match.index);
+      const negated = /\b(?:inte|ej|utan|without|not)\b(?:\s+\b(?:att|anv(?:ä|a)nda|use|using|apply|applying|the)\b){0,3}\s*$/u.test(preceding);
+      methods.push(`${negated ? "not-" : ""}${name}`);
+    }
+  }
+  return [...new Set(methods)].sort().join(",");
+}
+
+function quadraticSkillSignature(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const skills = [];
+  if (/nollst(?:ä|a)ll|r(?:ö|o)tter|l(?:ö|o)sningarna|\bl(?:ö|o)s(?:a)?\b/u.test(text)) skills.push("roots");
+  if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) skills.push("slope");
+  if (/derivata|derivative|tangentlutning/u.test(text)) skills.push("derivative");
+  if (/toppunkt|vertex|symmetrilinje|symmetry axis/u.test(text)) skills.push("vertex-or-axis");
+  return [...new Set(skills)].sort().join(",");
+}
+
+function quadraticTaskAction(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const actions = [];
+  if (/j(?:ä|a)mför|j(?:ä|a)mf(?:ö|o)ra|compare|comparing|comparison/u.test(text)) actions.push("compare");
+  if (/f(?:ö|o)rklara|beskriv|explain|describe/u.test(text)) actions.push("explain");
+  if (/effektiv|snabbast|efficient|most\s+efficient/u.test(text)) actions.push("efficiency");
+  if (/motivera|motivering|justify|justification/u.test(text)) actions.push("justify");
+  return actions.join(",") || "solve";
+}
+
+function normalizedQuadraticQuestionText(question) {
+  return String(question?.question || "")
+    .replace(/²/g, "^2")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-")
+    .replace(/[?.;]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isDuplicateQuestion(left, right) {
+  const leftQuadratic = quadraticZeroSignature(left);
+  const rightQuadratic = quadraticZeroSignature(right);
+  if (leftQuadratic && leftQuadratic === rightQuadratic) {
+    const leftAction = quadraticTaskAction(left);
+    const rightAction = quadraticTaskAction(right);
+    if (leftAction.includes("compare") || rightAction.includes("compare")) {
+      return leftAction === rightAction &&
+        normalizedQuadraticQuestionText(left) === normalizedQuadraticQuestionText(right);
+    }
+    return quadraticSolutionMethod(left) === quadraticSolutionMethod(right) &&
+      quadraticSkillSignature(left) === quadraticSkillSignature(right) &&
+      leftAction === rightAction;
+  }
+
   const signature = questionDedupeSignature(left);
   if (signature && signature === questionDedupeSignature(right)) {
     const leftStructure = questionLogicalStructureSequence(left);
