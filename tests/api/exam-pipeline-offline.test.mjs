@@ -149,11 +149,14 @@ const batchWithNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
   comparisonQuestions: [{ id: "approved-1", concept_tag: "Kloroplaster", question: "Var sker fotosyntesen?" }],
+  comparisonAnswerTargets: [{ id: "approved-1", answer_target: "FACIT_SKALL_INTE_NA_GENERATORN" }],
 });
 assert.match(batchWithNoveltyContext.userPrompt, /tidigare prov eller har redan godkänts i detta prov/i,
   "later generation batches are instructed to avoid repeating historical and approved questions");
 assert.match(batchWithNoveltyContext.userPrompt, /Var sker fotosyntesen\?/,
   "the generation prompt receives existing questions only as novelty context");
+assert.doesNotMatch(batchWithNoveltyContext.userPrompt, /FACIT_SKALL_INTE_NA_GENERATORN/,
+  "review-only answer targets never enter the question-generation prompt");
 const crowdedNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 12,
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,

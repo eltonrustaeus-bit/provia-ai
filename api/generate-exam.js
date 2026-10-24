@@ -68,6 +68,18 @@ function safeString(x, maxLen = 200000) {
   return s.length > maxLen ? s.slice(0, maxLen) : s;
 }
 
+function comparisonAnswerTargetsForReview(comparisonQuestions, answerTargets) {
+  const availableIds = new Set((Array.isArray(comparisonQuestions) ? comparisonQuestions : [])
+    .map((question) => question?.id).filter((id) => typeof id === "string" && id));
+  const seen = new Set();
+  return (Array.isArray(answerTargets) ? answerTargets : []).filter((target) => {
+    if (!target || typeof target.id !== "string" || !availableIds.has(target.id) || seen.has(target.id) ||
+        typeof target.answer_target !== "string" || !target.answer_target.trim()) return false;
+    seen.add(target.id);
+    return true;
+  }).slice(0, 20);
+}
+
 function mergeDiagnosticCounts(...groups) {
   const merged = {};
   for (const group of groups) {
@@ -1621,11 +1633,17 @@ module.exports = async function handler(req, res, internalContext = null) {
   const priorQuestions = internalBatch ? mistakeTraining.normalizePriorQuestions(parsed.priorQuestions) : [];
   const comparisonQuestions = internalBatch && Array.isArray(parsed.comparisonQuestions)
     ? parsed.comparisonQuestions.slice(0, 20).map((question, index) => ({
-        id: `approved-${index + 1}`,
+        id: /^approved-[1-9][0-9]{0,1}$/.test(question?.id || "") ? question.id : `approved-${index + 1}`,
         concept_tag: safeString(question?.concept_tag || question?.concept, 100),
         learning_objective: safeString(question?.learning_objective, 140),
         question: safeString(question?.question, 1200),
       })).filter((question) => question.question.trim())
+    : [];
+  const comparisonAnswerTargets = internalBatch && Array.isArray(parsed.comparisonAnswerTargets)
+    ? parsed.comparisonAnswerTargets.slice(0, 20).map((target) => ({
+        id: typeof target?.id === "string" && /^approved-[1-9][0-9]{0,1}$/.test(target.id) ? target.id : "",
+        answer_target: safeString(target?.answer_target, 400).trim(),
+      })).filter((target) => target.id && target.answer_target && comparisonQuestions.some((question) => question.id === target.id))
     : [];
   const targetExcerpt = internalBatch ? safeString(parsed.sourceTarget?.excerpt, 400).trim() : "";
   const sourceTarget = targetExcerpt.length >= 60 && pastedText.replace(/\r\n?/g, "\n").includes(targetExcerpt)
@@ -2155,12 +2173,17 @@ module.exports = async function handler(req, res, internalContext = null) {
       // than their sum — which is what lets a third call fit inside the 60 s
       // function budget at all.
       const verifierTimeoutMs = initialVerifierTimeoutMs(budget.remaining(), internalBatch);
+      const initialReviewComparisons = mistakeTraining.composeReviewComparisons(priorQuestions, comparisonQuestions, 20);
+      const initialReviewAnswerTargets = comparisonAnswerTargetsForReview(
+        initialReviewComparisons, comparisonAnswerTargets,
+      );
       const [v1, s1] = await Promise.all([
         verifier.verifyQuestions(exam.questions, {
           userId: user.id,
           apiKey, model, subjectProfile, lang, material: pastedText, targetLevel: level,
           trainingFocus,
-          comparisonQuestions: mistakeTraining.composeReviewComparisons(priorQuestions, comparisonQuestions, 20),
+          comparisonQuestions: initialReviewComparisons,
+          comparisonAnswerTargets: initialReviewAnswerTargets,
           timeoutMs: verifierTimeoutMs,
           reviewHintsById: gate.flagged
             .flatMap((item) => item.issues
@@ -2344,6 +2367,18 @@ module.exports = async function handler(req, res, internalContext = null) {
                   ? "repair_verification"
                   : "repair_structural_validation";
                 if (candidateQuestions.length > 0) {
+                  const repairComparisonQuestions = mistakeTraining.composeReviewComparisons(
+                    priorQuestions, [...round1ApprovedQuestions, ...comparisonQuestions], 20,
+                  );
+                  const repairComparisonAnswerTargets = comparisonAnswerTargetsForReview(
+                    repairComparisonQuestions,
+                    [
+                      ...comparisonAnswerTargets,
+                      ...round1ApprovedQuestions
+                        .filter((question) => typeof question.model_answer === "string" && question.model_answer.trim())
+                        .map((question) => ({ id: question.id, answer_target: question.model_answer.slice(0, 400) })),
+                    ],
+                  );
                   const [v2, s2] = await Promise.all([
                     verifier.verifyQuestions(candidateQuestions, {
                       userId: user.id,
@@ -2356,9 +2391,8 @@ module.exports = async function handler(req, res, internalContext = null) {
                             || issue === "all_single_word_options_unmatched_source_review")
                           .map((issue) => [item.id, issue]))
                         .reduce((hints, [id, issue]) => hints.set(id, [...(hints.get(id) || []), issue]), new Map()),
-                      comparisonQuestions: mistakeTraining.composeReviewComparisons(
-                        priorQuestions, [...round1ApprovedQuestions, ...comparisonQuestions], 20,
-                      ),
+                      comparisonQuestions: repairComparisonQuestions,
+                      comparisonAnswerTargets: repairComparisonAnswerTargets,
                       timeoutMs: Math.max(1000, Math.min(REGENERATION_REVIEW_TIMEOUT_MS, budget.remaining() - regenerationPostReviewReserveMs(internalBatch))),
                     }),
                     solver.solveQuestions(candidateQuestions, {
@@ -2996,6 +3030,7 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   return { submissionId, response };
 };
 module.exports.normalizeRepairFeedback = normalizeRepairFeedback;
+module.exports.comparisonAnswerTargetsForReview = comparisonAnswerTargetsForReview;
 module.exports.generateVerifiedBatch = async function generateVerifiedBatch({ userId, payload, deadlineAt = null, pipelineJobId = null, pipelineStage = "generate", repairFeedback = null, roleSnapshot = null }) {
   if (!examGenerationOperations.UUID.test(userId || "") || !payload || typeof payload !== "object") {
     throw new TypeError("Invalid internal batch request");

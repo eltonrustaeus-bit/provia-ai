@@ -160,6 +160,7 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
   let noveltyContext;
+  let answerTargetContext;
   let priorContext;
   operations.checkpointPipelineJob = async (input) => {
     job.accepted_questions = input.acceptedQuestions;
@@ -169,6 +170,7 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   };
   generation.generateVerifiedBatch = async ({ payload }) => {
     noveltyContext = payload.comparisonQuestions;
+    answerTargetContext = payload.comparisonAnswerTargets;
     priorContext = payload.priorQuestions;
     return { status: 200, body: { ok: true, questions: [
       { id: "duplicate", type: "short", question: "Beräkna x när x + 2 = 5.", validation_status: "verified" },
@@ -182,9 +184,12 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     assert.equal(job.progress_current, 2, "the duplicate does not fill a requested slot");
     assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", pipeline.batchQuestionId(job, { id: "distinct" })]);
     assert.deepEqual(noveltyContext, [{ id: "approved-1", concept_tag: "Ekvationer", question: "Beräkna x när x + 2 = 5." }]);
+    assert.deepEqual(answerTargetContext, [{ id: "approved-1", answer_target: "x = 3" }],
+      "the accepted answer is passed separately for reviewer deduplication");
     assert.deepEqual(priorContext, [{ id: "client-id-ignored", question: "Vad är ett ekosystem?", concept_tag: "Ekologi" }],
       "historical question context is forwarded separately from current approved questions");
     assert.ok(!JSON.stringify(noveltyContext).includes("x = 3"), "answer keys are not sent as novelty context");
+    assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer keys are not sent as novelty context");
     assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer options are not sent as novelty context");
     assert.equal(diagnosticLogs.length, 1);
     assert.equal(diagnosticLogs[0].duplicateCandidates, 2);
@@ -769,20 +774,35 @@ test("comparison context and maximum escaped material fit the bounded internal r
     model_answer: "must not be copied",
   }));
   const context = pipeline.comparisonQuestionsFor(largeAcceptedSet, 20);
+  const answerTargets = pipeline.comparisonAnswerTargetsFor(largeAcceptedSet, 20);
   assert.ok(Buffer.byteLength(JSON.stringify(context), "utf8") <= pipeline.MAX_COMPARISON_CONTEXT_BYTES);
+  assert.ok(Buffer.byteLength(JSON.stringify(answerTargets), "utf8") <= pipeline.MAX_COMPARISON_CONTEXT_BYTES);
   assert.ok(context.length > 1, "the bounded context retains multiple approved questions");
   assert.ok(context.every((question) => !Object.hasOwn(question, "model_answer")));
+  assert.ok(answerTargets.length > 1 && answerTargets.every((target) => target.answer_target === "must not be copied"));
+  assert.ok(answerTargets.every((target) => /^approved-[1-9][0-9]{0,1}$/.test(target.id)));
   const requestBody = Buffer.from(JSON.stringify({
     lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
     pastedText: "\0".repeat(12000),
     focusTerms: ["begrepp".repeat(20), "funktion".repeat(20)],
     comparisonQuestions: context,
+    comparisonAnswerTargets: answerTargets,
     idempotencyKey: "12345678-1234-4123-8123-123456789012",
   }), "utf8");
   assert.ok(requestBody.byteLength < 128 * 1024, "the full worst-case internal payload remains below 128 KiB");
   const requestStream = async function* () { yield requestBody; };
   assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).pastedText.length, 12000);
   await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
+});
+
+test("review answer targets stay aligned with comparison questions after the 20-item cap", () => {
+  const comparisons = Array.from({ length: 20 }, (_, index) => ({ id: `round-${index + 1}` }));
+  const targets = [
+    { id: "approved-1", answer_target: "Older accepted answer" },
+    { id: "round-1", answer_target: "Current accepted answer" },
+  ];
+  assert.deepEqual(generation.comparisonAnswerTargetsForReview(comparisons, targets), [targets[1]],
+    "answer targets for comparison questions dropped by the limit are filtered before review");
 });
 
 test("long verified mistake evidence fits the internal request envelope without widening public requests", async () => {

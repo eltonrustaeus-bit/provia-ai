@@ -109,6 +109,23 @@ function comparisonQuestionsFor(questions, requested) {
   return comparisons;
 }
 
+function comparisonAnswerTargetsFor(questions, requested) {
+  const targets = [];
+  for (const [index, question] of (Array.isArray(questions) ? questions : []).slice(0, requested).entries()) {
+    const candidate = {
+      id: `approved-${index + 1}`,
+      answer_target: String(question?.model_answer || question?.correct_answer || "").trim().slice(0, 400),
+    };
+    if (!candidate.answer_target) continue;
+    while (candidate.answer_target && Buffer.byteLength(JSON.stringify([...targets, candidate]), "utf8") > MAX_COMPARISON_CONTEXT_BYTES) {
+      candidate.answer_target = Array.from(candidate.answer_target).slice(0, -40).join("");
+    }
+    if (candidate.answer_target.trim()) targets.push(candidate);
+    if (Buffer.byteLength(JSON.stringify(targets), "utf8") >= MAX_COMPARISON_CONTEXT_BYTES) break;
+  }
+  return targets;
+}
+
 function trainingFocusIds(job) {
   return (Array.isArray(job?.payload?.trainingFocus) ? job.payload.trainingFocus : [])
     .slice(0, 20)
@@ -176,6 +193,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   const batchLimit = widenRepairBatch ? 5 : 3;
   const batchCount = Math.min(batchLimit, Math.max(2, slots));
   const comparisonQuestions = comparisonQuestionsFor(existing, job.requested_count);
+  const comparisonAnswerTargets = comparisonAnswerTargetsFor(existing, job.requested_count);
   const coverage = require("./_source-coverage.cjs");
   const hasRequiredTrainingFocus = Array.isArray(job.payload.trainingFocus) && job.payload.trainingFocus.length > 0;
   const sections = hasRequiredTrainingFocus ? [] : coverage.sourceSections(job.payload.pastedText);
@@ -186,6 +204,7 @@ async function advance(job, { deadlineAt = null } = {}) {
     numQuestions: batchCount,
     examQuestionCount: job.requested_count,
     comparisonQuestions,
+    comparisonAnswerTargets,
     sourceTarget: sourceTarget ? { title: sourceTarget.title, excerpt: sourceTarget.excerpt } : null,
     trainingFocusRequiredIds: uncoveredBefore,
     idempotencyKey: crypto.randomUUID(),
@@ -424,4 +443,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, uncoveredTrainingFocusIds, supportedTrainingFocusMatches, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, comparisonAnswerTargetsFor, uncoveredTrainingFocusIds, supportedTrainingFocusMatches, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

@@ -724,7 +724,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
   const hasExamQuestions = Array.isArray(context?.questions) && context.questions.length > 0;
   const chatSubmissionIdentity = hasSubmissionIdentity && body.examReview !== true && !Array.isArray(body.scores);
   const examContextDeclared = hasExamQuestions || chatSubmissionIdentity || (!hasOtherPage &&
-    (hasCurrentQuestion || hasExamPhase));
+    (hasCurrentQuestion || hasExamPhase || page === "prov"));
   const ordinaryStudyChat = typeof body.userQuestion === "string" && body.userQuestion.trim().length > 0
     && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && body.landingMode !== true && !Array.isArray(body.scores)
@@ -831,8 +831,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     }
     const safeContext = { page: "app" };
     const stripStaleExamSource = serverState !== "completed" && (
-      context?.currentQuestion || context?.questions || context?.examState ||
-      (staleProvView && serverState !== "none")
+      context?.currentQuestion || context?.questions || context?.examState || staleProvView
     );
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
       if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;

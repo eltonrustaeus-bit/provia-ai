@@ -696,6 +696,47 @@ function semanticConceptTag(question) {
     .trim();
 }
 
+function answerTargetTopicSignature(question) {
+  return [...semanticQuestionTokens(question)]
+    .filter((token) => !/^(?:ansvar|ansvara|uppgif|syft|funktion|huvud|roll|function|purpose|responsib|role|biolog|biology|process)/u.test(token))
+    .sort()
+    .join(" ");
+}
+
+function repeatsHighConfidenceAnswerTarget(left, right) {
+  const leftAnswer = new Set(semanticQuestionTokenSequence({ question: left?.model_answer || "" }));
+  const rightAnswer = new Set(semanticQuestionTokenSequence({ question: right?.model_answer || "" }));
+  if (leftAnswer.size < 5 || rightAnswer.size < 5) return false;
+  let shared = 0;
+  for (const token of leftAnswer) if (rightAnswer.has(token)) shared++;
+  if (shared < 5 || shared / Math.min(leftAnswer.size, rightAnswer.size) < 0.9) return false;
+  const answerTargetIntents = [
+    ["function", /(?:funktion[\p{L}]*|uppgift[\p{L}]*|ansvar[\p{L}]*|syfte[\p{L}]*|function[\p{L}]*|purpose|responsib[\p{L}]*)/u],
+    ["process_inputs", /(?:använd(?:er|a|s)?|tar\s+upp|tar\s+in|upptar|uses?|takes?\s+in|absorbs?)/u],
+    ["process_outputs", /(?:bild(?:as|ar|ade|ades)|producer[\p{L}]*|frigör[\p{L}]*|avger[\p{L}]*|forms?|produces?|releases?|generates?)/u],
+  ];
+  const leftText = String(left?.question || "").normalize("NFKC").toLowerCase();
+  const rightText = String(right?.question || "").normalize("NFKC").toLowerCase();
+  const hasExtraTargetCue = (text) => /\b(?:vid|under|när|om|efter|före|innan|beroende\s+på|medan|samtidigt\s+som|if|when|after|before|depending\s+on|inklusive|including|påverkan|inverkan|aktiveringsenergi)\b/u.test(text);
+  // A shared answer is not enough to collapse a coordinated question into a
+  // simpler one: the second phrase may add an assessed learning target.
+  const hasCompoundTask = (text) => /\b(?:och|samt|and|as\s+well\s+as)\b/u.test(text);
+  if (hasExtraTargetCue(leftText) || hasExtraTargetCue(rightText) ||
+      hasCompoundTask(leftText) || hasCompoundTask(rightText)) return false;
+  const leftIntents = new Set(answerTargetIntents.filter(([, pattern]) => pattern.test(leftText)).map(([intent]) => intent));
+  const rightIntents = new Set(answerTargetIntents.filter(([, pattern]) => pattern.test(rightText)).map(([intent]) => intent));
+  const sharedIntent = [...leftIntents].some((intent) => rightIntents.has(intent));
+  if (!sharedIntent) return false;
+
+  // Similar answer vocabulary alone cannot establish a duplicate: reverse
+  // processes can use the same terms for different inputs and outputs.
+  // Require the same tagged concept and non-task topic in every case.
+  const concept = semanticConceptTag(left);
+  return Boolean(concept && concept === semanticConceptTag(right) &&
+    answerTargetTopicSignature(left) &&
+    answerTargetTopicSignature(left) === answerTargetTopicSignature(right));
+}
+
 function questionIntents(question) {
   const text = String(question?.question || "").normalize("NFKC").toLowerCase();
   return new Set(QUESTION_INTENT_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([intent]) => intent));
@@ -1000,6 +1041,13 @@ function isDuplicateQuestion(left, right) {
       quadraticSkillSignature(left) === quadraticSkillSignature(right) &&
       leftAction === rightAction;
   }
+  if (leftQuadratic || rightQuadratic) return false;
+
+  // Question-stem overlap misses paraphrased factual questions. Treat a very
+  // close repeated full-score answer as the same target, while requiring a
+  // substantial token floor so short shared answers (for example "ATP") do
+  // not collapse distinct questions.
+  if (repeatsHighConfidenceAnswerTarget(left, right)) return true;
 
   const signature = questionDedupeSignature(left);
   if (signature && signature === questionDedupeSignature(right)) {

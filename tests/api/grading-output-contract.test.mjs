@@ -223,6 +223,10 @@ try {
   assert.equal(graded.status, 200, JSON.stringify({ body: graded.body, persistedPayload, issuanceState }));
   assert.deepEqual(providerInput.items[0].accepted_answers, ["Medborgare väljer sina representanter i fria val."],
     "the grader receives alternative phrasings from the signed grading task");
+  assert.match(providerSystem, /Bedöm innebörden, inte ordlikheten/i,
+    "Swedish grading must credit accurate semantic paraphrases instead of requiring model-answer wording");
+  assert.match(providerSystem, /Behåll däremot varje uttryckligt delkrav i rubric/i,
+    "semantic flexibility must not waive explicit rubric criteria");
   assert.equal(providerSystem.includes("Ett syntetiskt elevsvar."), false,
     "student answer text cannot enter the system prompt");
   assert.equal(providerSystem.includes('"q1"'), false,
@@ -236,6 +240,15 @@ try {
   assert.deepEqual(persistedPayload.per_question.map((item) => item.model_answer), [
     "En kort beskrivning.", "En kort beskrivning.",
   ], "the saved exam result also preserves the signed answer key");
+
+  issuanceState = "active";
+  providerOutput = JSON.stringify({ per_question: expected.map((item) => row(item.id)) });
+  const englishGraded = await invoke({ ...body, lang: "en" });
+  assert.equal(englishGraded.status, 200);
+  assert.match(providerSystem, /Grade meaning, not lexical overlap/i,
+    "English grading must credit accurate semantic paraphrases");
+  assert.match(providerSystem, /Preserve every explicit rubric criterion/i,
+    "English semantic flexibility must not waive explicit rubric criteria");
 
   issuanceState = "active";
   persistedPayload = null;

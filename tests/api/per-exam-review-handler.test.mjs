@@ -2041,6 +2041,39 @@ test("a stale prov page cannot block unrelated study help when the server has no
   }
 });
 
+test("a bare stale prov page strips stale learning context before ordinary study help", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "none";
+  latestSubmissionId = null;
+  calls.length = 0;
+  try {
+    const response = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      pageContext: {
+        page: "prov",
+        course: "PRIVATE_STALE_COURSE_MARKER",
+        studyMaterial: "PRIVATE_STALE_MATERIAL_MARKER",
+        weakAreas: ["PRIVATE_STALE_WEAK_AREA_MARKER"],
+        targets: ["PRIVATE_STALE_TARGET_MARKER"],
+      },
+      topic: "PRIVATE_STALE_TOPIC_MARKER",
+      history: [{ role: "assistant", content: "PRIVATE_STALE_HISTORY_MARKER" }],
+      recentMistakes: [{ question: "PRIVATE_STALE_MISTAKE_MARKER" }],
+      clarifyReply: "PRIVATE_STALE_CLARIFY_MARKER",
+    }, "POST", "application/json");
+    assert.equal(response.statusCode, 200);
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "unrelated study help reaches the ordinary response path");
+    assert.match(provider.body, /fotosyntes/i);
+    assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:COURSE|MATERIAL|WEAK_AREA|TARGET|TOPIC|HISTORY|MISTAKE|CLARIFY)_MARKER/,
+      "a bare stale exam-page label cannot carry old learning context into the prompt");
+  } finally {
+    process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";

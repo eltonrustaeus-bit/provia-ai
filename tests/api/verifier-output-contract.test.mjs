@@ -14,7 +14,7 @@ const sourceSupport = (quote, parts = 0, answers = 0) => ({
   accepted_answer_evidence: Array.from({ length: answers }, () => [0]),
 });
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -32,7 +32,7 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -74,6 +74,8 @@ assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+assert.match(buildVerifierPrompt("sv"), /översättningspräglade, onaturliga formuleringar.*tautologiska frågor/i,
+  "the reviewer rejects awkward translated wording and question-answer tautologies");
 assert.match(buildVerifierPrompt("sv"), /samma lärandemål på ett redundant sätt.*brett ämne.*skilda färdigheter/i,
   "the reviewer rejects redundant objectives without rejecting distinct skills in the same broad subject");
 assert.match(buildVerifierPrompt("en"), /redundantly assesses the same learning objective.*broad subject.*distinct skills/i,
@@ -142,6 +144,7 @@ assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /cognitive_level är 
 assert.doesNotMatch(buildVerifierPrompt("sv"), /svårighetsgrad som inte matchar cognitive_level/i,
   "verifier no longer compares exam difficulty to the unrelated cognitive action label");
 assert.match(buildVerifierPrompt("sv"), /comparison_questions.*(?:context only|jämförelseunderlag)/i);
+assert.match(buildVerifierPrompt("sv"), /comparison_answer_targets innehåller facit enbart för jämförelse.*aldrig som källa/i);
 const comparisonContext = await runWithResults(
   [result("retry-1", true)],
   [question("retry-1")],
@@ -149,6 +152,8 @@ const comparisonContext = await runWithResults(
   undefined,
   undefined,
   [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", learning_objective: "Skilj cellandning från fotosyntes", correct_index: 2, model_answer: "Facit ska inte delas." }],
+  "en", undefined, undefined,
+  [{ id: "approved-1", answer_target: "Cellandningen frigör energi." }],
 );
 const comparisonPayload = JSON.parse(comparisonContext.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(comparisonPayload.comparison_questions, [{
@@ -157,6 +162,19 @@ assert.deepEqual(comparisonPayload.comparison_questions, [{
 }], "repair review receives only approved question identity and wording, not answer keys or rubric");
 assert.deepEqual(comparisonPayload.questions.map(({ id }) => id), ["retry-1"],
   "comparison-only questions do not change the required review result IDs");
+assert.deepEqual(comparisonPayload.comparison_answer_targets, [
+  { id: "approved-1", answer_target: "Cellandningen frigör energi." },
+], "the verifier receives a separate, id-linked answer-target comparison channel");
+assert.equal(comparisonPayload.comparison_questions.some((item) => Object.hasOwn(item, "model_answer")), false,
+  "answer targets never leak into the question novelty context");
+const unrelatedComparisonTarget = await runWithResults(
+  [result("retry-1", true)], [question("retry-1")], "", undefined, undefined,
+  [{ id: "approved-1", question: "Approved stem" }], "en", undefined, undefined,
+  [{ id: "approved-2", answer_target: "not linked to a reviewed question" }],
+);
+assert.equal(unrelatedComparisonTarget.outcome.callOk, false,
+  "an answer target without a matching comparison question fails closed");
+assert.equal(unrelatedComparisonTarget.fetchCalls, 0);
 const oversizedComparison = await runWithResults(
   [result("retry-1", true)],
   [question("retry-1")],

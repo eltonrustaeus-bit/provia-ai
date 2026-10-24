@@ -1,11 +1,59 @@
 # 08 Current Status
 
+## Svarsmålsdubbletter och enfliksregel — 2026-10-25
+
+- [x] Behöll regeln om en återanvänd Preview-flik. Den här ändringen använde
+  enbart offline-tester; inga nya flikar, prov eller modell-anrop skapades.
+- [x] Reproducerade de tre observerade Biologi 1-dubblettparen i
+  `tests/assessment/assessment.test.mjs`. Svarslikhet ensam får inte längre
+  kasta bort frågor: paret måste även ha samma koncept, frågeintention och
+  icke-uppgiftsbärande ämnessignatur. Regressionerna behåller tilläggsmål om
+  temperatur, NADH, aktiveringsenergi/"inklusive" och omvända processer som
+  fotosyntes/cellandning, samtidigt som de tre observerade parafraserna fångas.
+  Matematiska frågor behåller sin uttrycks-/färdighetslogik.
+- [x] Tidigare godkända facit skickas separat till granskaren i
+  `comparison_answer_targets`, inte till frågegeneratorns prompt. ID-koppling,
+  max 20 poster, 400 tecken per facit och total granskningsstorlek valideras;
+  felkopplade poster stoppar före leverantörsanrop.
+- [x] Oberoende granskningsprompt instruerar att upptäcka onaturligt/översatt
+  språk och tautologiska frågor. Rättningsprompten betonar semantisk innebörd
+  och synonymer utan att släppa explicita rubric-kriterier.
+- [x] P.E.R behandlar nu en kvarlämnad `page="prov"`-etikett som inaktuell
+  provkontext när servern inte har ett aktivt prov. Innan vanlig studiehjälp
+  skickas rensas gammalt material, kurs, historik, fel och förtydliganden;
+  en ny regression verifierar att elevens aktuella allmänna fråga ändå går
+  vidare till vanlig hjälp.
+- [x] Riktade offline-sviter passerade: `assessment.test.mjs`,
+  `grading-output-contract.test.mjs`, `verifier-output-contract.test.mjs`,
+  `exam-generation-pipeline.test.mjs` (inklusive 3/6/12) och
+  `exam-pipeline-offline.test.mjs`. `node --check` för ändrade API-filer samt
+  `git diff --check` passerade. Efter den senaste dedupe-regeln passerade
+  `node --test tests/assessment/assessment.test.mjs`. Den kombinerade
+  bedömnings-/P.E.R-sviten passerade tidigare 59/59; P.E.R-filen har inte
+  ändrats sedan dess.
+- [x] Oberoende granskare hittade successivt flera falska dublettfall.
+  Senaste omgranskningen fann ingen kvarvarande konkret blockerare: svarslikhet
+  måste också matcha uppgiftstyp, koncepttagg och exakt ämnessignatur, utan
+  sammansatta eller villkorade extrauppgifter.
+- [!] Inga nya staging-anrop kördes; AI-promptens beteende och rättning är inte
+  liveverifierade. Ändringarna är lokala, inte pushade eller deployade.
+
+**PILOT NOT READY.** Oberoende granskning av den här diffen ska avslutas innan
+den kan pushas till en Preview. Håll fast vid enfliksregeln och använd inte fler
+betalda liveprov utan separat bekräftad budget.
+
 ## En Preview-session och ett helt slutfört stagingprov — 2026-10-24 21:50 UTC
 
 - [x] Behöll samma Preview-alias och flik genom commit `f2e52f4`, READY-
   deployment `dpl_BxAnsgsXWHC7Ekjm5GWXZUDhDyjW` och inloggning. Ingen ny flik
   eller nytt konto behövdes. En kort auth-gate vid sidstart försvann efter den
   befintliga sessionens initiering.
+- [x] Testflödesregel: återanvänd den befintliga stabila branch-aliasen i samma
+  flik; öppna inte deployment-specifika Preview-URL:er för samma kod. Om
+  sessionen upphör, stanna och återuppta först efter en enda ny inloggning i
+  samma flik. Starta inte ett nytt modellprov förrän föregående prov är helt
+  rättat/sparat eller uttryckligen bevarat utan omförsök. Denna uppföljning
+  inspekterade befintlig flik 20 och skapade inga flikar, prov eller AI-anrop.
 - [x] Uppdaterade P.E.R:s skyddade frågedetektering för vanliga formuleringar
   som ber om bekräftelse på ett svar. Vanliga studiefrågor fungerar fortsatt;
   verifierade provgränser ändras inte.
