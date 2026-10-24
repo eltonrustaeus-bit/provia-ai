@@ -42,16 +42,23 @@ historiska checkpoints.
   blockerande falskpositiv. Kvarvarande dokumenterad avvägning: omformulerade
   eller omordnade facit kan undgå hård dubblettmatchning när övriga signaler
   inte räcker; detta är avsiktligt säkrare än att kasta svar med omvända roller.
-- [!] Kodändringarna i den här posten är lokala på
-  `codex/exgen-school-pilot-integration-20261024`, ovanpå `ca1584f`; ännu inte
-  committade, pushade eller verifierade i en ny Preview. Main/Production och
-  produktionsdatabasen är orörda. Högst ett nytt liveprov ska köras efter
-  granskad commit, exakta READY-Previewn och färsk budgetkontroll.
+- [x] Kodändringarna är committade som `a4cee07` och pushade till den
+  godkända branchen `codex/exgen-generation-quality-2026-10-20`. Vercel
+  deployment `dpl_ETh73S5PAcWyDVPKFRrVippFxU1b` är `READY` från exakt commit
+  `a4cee07739df2ae45a28d50f463a7189ffa1b373`; befintlig stabil Preview-alias
+  pekar på den. Main/Production och produktionsdatabasen är orörda.
+- [!] Samma Preview-flik laddades om efter deployen och visade autentiserings-
+  grinden; den tidigare staging-sessionen följde inte med. Inget nytt AI-anrop
+  gjordes efter omladdningen, så budgetraden är fortsatt cap `$3.379071`, spent
+  `$2.090394`, reserved `$0.263628`, remaining cirka `$1.025049`. Ett enda nytt
+  syntetiskt prov kräver att en staging-session återställs i denna befintliga
+  flik; inget parallellt test eller ytterligare flik ska skapas.
 
-**PILOT NOT READY.** Nästa steg: committa/pusha granskad kod till feature-branch,
-verifiera exakt READY-Preview och stagingkoppling, sedan högst ett syntetiskt
-liveprov inom både användarens $5-tak och stagingens separata interna budget.
-Slutför och rätta provet i samma flik. Produktionsgrindar är ännu inte uppfyllda.
+**PILOT NOT READY.** Nästa steg: återställa staginginloggning i den redan
+öppna Preview-fliken. Kontrollera då först att det inte finns ett aktivt prov
+och att intern budget fortfarande täcker ett helt syntetiskt test; generera,
+besvara och rätta högst ett prov i samma flik. Produktionsgrindar är ännu inte
+uppfyllda.
 
 ## Terminal rättningsstatus, kostnad och fortsatt stagingverifiering — 2026-10-25
 
