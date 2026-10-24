@@ -319,6 +319,68 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// The standard material-based exam must not claim to personalize from saved
+// mistakes when it sends no mistake-training source to the generation API.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "ordinary-exam-saved-mistake", "sv", {
+      proviaai_mistakes: [{ course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" }],
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='aim'].on", { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='aim'] .xf-sub")
+      ?.textContent.includes("Träna sparade misstag"), null, { timeout: 5000 });
+    const aimCopy = await page.locator("#xf .xf-screen[data-screen='aim'] .xf-sub").textContent();
+    ok("vanlig provguidning säger inte att sparade misstag viktas in automatiskt",
+      /Träna sparade misstag/.test(aimCopy) && !/viktar jag upp|extra weight/i.test(aimCopy), aimCopy);
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "y = 2x + 1");
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const savedMistakesCopy = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-row")
+      .filter({ hasText: "Sparade misstag" }).textContent();
+    ok("provkontraktet förklarar att misstag tränas separat och materialet styr detta prov",
+      /Träna dem separat/.test(savedMistakesCopy) && /materialet ovan/.test(savedMistakesCopy), savedMistakesCopy);
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    ok("vanlig provbegäran skickar inte klientens felbank till generatorn",
+      lastGeneratePayload?.trainingFocus?.length === 0
+        && lastGeneratePayload?.priorQuestions?.length === 0
+        && lastGeneratePayload?.sourceReferences?.length === 0,
+      JSON.stringify({ trainingFocus: lastGeneratePayload?.trainingFocus?.length,
+        priorQuestions: lastGeneratePayload?.priorQuestions?.length,
+        sourceReferences: lastGeneratePayload?.sourceReferences?.length }));
+    ok("vanligt provflöde med sparade fel saknar sidfel", errs.length === 0, errs.join(" | "));
+  } catch (e) {
+    ok("vanligt provflöde med sparade fel är tydligt och isolerat", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // A click handler receives the PointerEvent as its first argument. The material
 // step accepts an optional user-facing message, so passing the handler directly
 // used to render "[object PointerEvent]" in the alert region.

@@ -1276,7 +1276,7 @@
           tx("Jag siktar brett den här gången och kalibrerar efter ditt resultat.", "I'll cover a broad range and adjust future practice based on your result."));
     } else if (misses > 0) {
       say(tx("Jag siktar på nivå " + S.level + ".", "I'm aiming for level " + S.level + "."),
-          tx("Du har " + misses + " tidigare fel i " + S.course + " — dem viktar jag upp.", "You have " + misses + " earlier mistakes in " + S.course + "; I'll give those extra weight."));
+          tx("Du har " + misses + " sparade misstag i " + S.course + ". Välj Träna sparade misstag om du vill skapa frågor direkt från dem.", "You have " + misses + " saved mistakes in " + S.course + ". Choose Practise saved mistakes to generate questions directly from them."));
     } else {
       say(tx("Jag siktar på nivå " + S.level + ".", "I'm aiming for level " + S.level + "."),
           tx("Baserat på dina senaste prov. Ändra om du vill något annat.", "Based on your recent exams. Change it if you'd prefer something else."));
@@ -1613,7 +1613,7 @@
       S.qType === "mc" ? tx("Flervalsfrågor", "Multiple choice") : S.qType === "short" ? tx("Kortsvar", "Short answer") : S.qType === "graph" ? tx("Interaktiv graf", "Interactive graph") : tx("Blandat flerval och kortsvar", "Mixed multiple choice and short answer")));
     dl.appendChild(row(tx("Tar ungefär", "Estimated time"), "~" + mins + " " + tx("min", "min"), tx("Räknat på din svarstid, inte på lästid", "Based on answer time, not reading time")));
     if (misses > 0) {
-      dl.appendChild(row(tx("Extra vikt", "Extra focus"), misses + " " + tx("tidigare fel", "earlier mistakes"), tx("Från din felbank i " + S.course, "From your mistake bank for " + S.course)));
+      dl.appendChild(row(tx("Sparade misstag", "Saved mistakes"), misses + " " + tx("i felbanken", "in your mistake bank"), tx("Träna dem separat från dina sparade prov; det här provet bygger på materialet ovan.", "Practise these separately from your saved exams; this exam uses the material above.")));
     }
     card.appendChild(dl);
     b.appendChild(card);
