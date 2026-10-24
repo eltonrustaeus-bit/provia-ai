@@ -64,6 +64,7 @@ let issuanceState = "active";
 let latestSubmissionId = null;
 const issuanceStateBySubmission = new Map();
 let latestIssuanceAtLease = null;
+let latestStateUnavailable = false;
 let answerLeaseState = "acquired";
 let providerUnavailable = false;
 let reviewResultUnavailable = false;
@@ -77,7 +78,10 @@ globalThis.fetch = async (input, init = {}) => {
     const payload = JSON.parse(init.body || "{}");
     return Response.json(issuanceStateBySubmission.get(payload.p_submission_id) || issuanceState);
   }
-  if (url.includes("/rest/v1/exam_latest_issuances?")) return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
+  if (url.includes("/rest/v1/exam_latest_issuances?")) {
+    if (latestStateUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
+    return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
+  }
   if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
     { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
   ]});
@@ -712,7 +716,7 @@ test("exam-page context without a verifiable issuance stays safe and terminal me
   }
 });
 
-test("latest ungraded issuance blocks all model chat, even when client context looks unrelated", { timeout: 90_000 }, async () => {
+test("latest ungraded issuance allows unrelated study help but keeps exam answers locked", { timeout: 90_000 }, async () => {
   const priorPilotMode = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
@@ -726,13 +730,10 @@ test("latest ungraded issuance blocks all model chat, even when client context l
       pageContext: { page: "app", course: "Biologi" },
     }, "POST", "application/json");
     assert.equal(ended.statusCode, 200);
-    assert.equal(ended.body.examState, "expired");
-    assert.equal(ended.body.helpCap, 2);
-    assert.equal(ended.body.helpLevelUsed, 2);
-    assert.match(ended.body.answer, /fullständigt svar kräver verifierad rättning/i);
+    assert.equal(ended.body.examState, undefined);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"));
     assert.ok(calls.some(({ url }) => url.includes("/rest/v1/exam_latest_issuances?")));
-    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("per_chat_quota")));
-    assert.ok(calls.every(({ url }) => !url.includes("acquire_per_answer_lease")));
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
 
     calls.length = 0;
     activeCount = 1;
@@ -843,9 +844,9 @@ test("latest ungraded issuance blocks all model chat, even when client context l
     calls.length = 0;
     issuanceState = "abandoned";
     const abandoned = await invoke({
-      userQuestion: "Förklara vad fotosyntes är",
+      userQuestion: "Ge mig facit på fråga 1",
       helpLevel: 3,
-      pageContext: { page: "app" },
+      pageContext: { page: "prov", currentQuestion: { type: "short", text: "Vad beskriver k i y = kx + m?" } },
     }, "POST", "application/json");
     assert.equal(abandoned.statusCode, 200);
     assert.equal(abandoned.body.examState, "abandoned");
@@ -946,6 +947,184 @@ test("an older verified exam cannot bypass a newer unverified or purged issuance
     issuanceState = previous.issuanceState;
     latestSubmissionId = previous.latestSubmissionId;
     issuanceStateBySubmission.delete(olderSubmissionId);
+  }
+});
+
+test("unrelated P.E.R study chat works after an inactive ungraded exam without exposing its context", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId, providerAnswer };
+  const completedSubmissionId = proof.receipt.split(".")[1];
+  try {
+    activeCount = 0;
+    providerAnswer = "Koldioxid tillför kolet och vattnet bidrar med väte och elektroner när växten bygger glukos.";
+
+    for (const state of ["abandoned", "expired", "missing"]) {
+      latestSubmissionId = state === "missing" ? "d".repeat(32) : completedSubmissionId;
+      issuanceState = state;
+      calls.length = 0;
+      const context = {
+        page: "prov",
+        course: "Matematik 1b",
+        studyMaterial: "PRIVATE_EXAM_MATERIAL_MARKER",
+        currentQuestion: { type: "short", text: "PRIVATE_EXAM_QUESTION_MARKER", answer: "PRIVATE_EXAM_ANSWER_MARKER" },
+        examState: { phase: "exam", submissionId: latestSubmissionId },
+      };
+      const response = await invoke({
+        userQuestion: "Hjälp mig förstå varför vatten och koldioxid behövs i fotosyntesen. Jag pluggar Biologi 1.",
+        pageContext: context,
+      }, "POST", "application/json");
+
+      assert.equal(response.statusCode, 200, state);
+      assert.match(response.body.answer, /Koldioxid tillför kolet/i, state);
+      assert.equal(response.body.examState, undefined, state);
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.ok(provider, `ordinary study help reaches the model after ${state}`);
+      assert.doesNotMatch(provider.body, /PRIVATE_EXAM_(?:MATERIAL|QUESTION|ANSWER)_MARKER|Matematik 1b/);
+      assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")), state);
+      assert.ok(calls.some(({ url }) => url.includes("/rpc/release_per_answer_lease")), state);
+
+      calls.length = 0;
+      const directAnswer = await invoke({
+        userQuestion: "Ge mig facit på fråga 1",
+        pageContext: context,
+      }, "POST", "application/json");
+      assert.equal(directAnswer.statusCode, 200, state);
+      assert.equal(directAnswer.body.examState, state, state);
+      assert.match(directAnswer.body.answer, /fullständigt svar kräver verifierad rättning/i, state);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+        !url.includes("reserve_per_chat_quota") && !url.includes("acquire_per_answer_lease")), state);
+    }
+
+    issuanceState = "grading";
+    latestSubmissionId = completedSubmissionId;
+    calls.length = 0;
+    const duringGrading = await invoke({ userQuestion: "Hjälp mig förstå fotosyntes." }, "POST", "application/json");
+    assert.equal(duringGrading.body.helpCap, 0);
+    assert.match(duringGrading.body.answer, /håller på att rättas/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    providerAnswer = previous.providerAnswer;
+  }
+});
+
+test("general study help with an unbound stale exam label follows inactive server state", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId, providerAnswer };
+  try {
+    activeCount = 0;
+    issuanceState = "expired";
+    latestSubmissionId = proof.receipt.split(".")[1];
+    providerAnswer = "Fotosyntesen använder ljusenergi för att bygga energirika ämnen av koldioxid och vatten.";
+    calls.length = 0;
+
+    const response = await invoke({
+      userQuestion: "Hjälp mig förstå fotosyntesen.",
+      topic: "STALE_EXAM_TOPIC_MARKER",
+      context: "STALE_EXAM_CONTEXT_MARKER",
+      history: [{ role: "assistant", content: "STALE_EXAM_HISTORY_ANSWER_MARKER" }],
+      weakAreas: ["STALE_EXAM_WEAK_AREA_MARKER"],
+      recentMistakes: [{ question: "STALE_EXAM_MISTAKE_MARKER", studentAnswer: "STALE_EXAM_MISTAKE_ANSWER_MARKER" }],
+      clarifyReply: "STALE_EXAM_CLARIFY_ANSWER_MARKER",
+      pageContext: {
+        page: "app",
+        course: "Biologi 1",
+        studyMaterial: "STALE_EXAM_SOURCE_MARKER",
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body.answer, /Fotosyntesen använder ljusenergi/i);
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "a stale client phase cannot override an inactive server state for general help");
+    assert.doesNotMatch(provider.body, /STALE_EXAM_(?:SOURCE|TOPIC|CONTEXT|HISTORY_ANSWER|WEAK_AREA|MISTAKE(?:_ANSWER)?|CLARIFY_ANSWER)_MARKER|\"phase\":\"exam\"/);
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
+
+    calls.length = 0;
+    for (const userQuestion of [
+      "Hjälp mig förstå varför svaret 42 är rätt vid 6×7.",
+      "Kan du förklara varför 42 är rätt vid 6×7?",
+      "I wrote 42, was that right?",
+      "Förklara hormonet som sänker blodsockret.",
+    ]) {
+      calls.length = 0;
+      const asksToValidateExamAnswer = await invoke({
+        userQuestion,
+        pageContext: {
+          page: "prov",
+          currentQuestion: { text: "Vilket hormon sänker blodsockret?" },
+          examState: { phase: "exam" },
+        },
+      }, "POST", "application/json");
+      assert.equal(asksToValidateExamAnswer.body.examState, "expired", userQuestion);
+      assert.match(asksToValidateExamAnswer.body.answer, /fullständigt svar kräver verifierad rättning/i, userQuestion);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") &&
+        !url.includes("acquire_per_answer_lease")), userQuestion);
+    }
+
+    providerAnswer = "Hormoner påverkar blodsockret genom att reglera hur kroppen tar upp och frigör glukos.";
+    calls.length = 0;
+    const broadTopicHelp = await invoke({
+      userQuestion: "Kan du förklara sambandet mellan hormoner och blodsockret?",
+      pageContext: {
+        page: "prov",
+        currentQuestion: { text: "Vilket hormon sänker blodsockret?" },
+        examState: { phase: "exam" },
+      },
+    }, "POST", "application/json");
+    assert.equal(broadTopicHelp.statusCode, 200);
+    assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"),
+      "a broader study question sharing only two topic words remains available");
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    providerAnswer = previous.providerAnswer;
+  }
+});
+
+test("a new active issuance at the lease recheck still blocks otherwise general study help", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId, answerLeaseState };
+  try {
+    activeCount = 0;
+    issuanceState = "abandoned";
+    latestSubmissionId = proof.receipt.split(".")[1];
+    latestIssuanceAtLease = { submissionId: "e".repeat(32), state: "active" };
+    answerLeaseState = "acquired";
+    calls.length = 0;
+
+    const response = await invoke({
+      userQuestion: "Hjälp mig förstå fotosyntesen.",
+      pageContext: { page: "app" },
+    }, "POST", "application/json");
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.examActive, true);
+    assert.equal(response.body.helpLevelUsed, 0);
+    assert.match(response.body.answer, /Identifiera vilket begrepp eller samband frågan prövar/i);
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/acquire_per_answer_lease")));
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/release_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+
+    issuanceState = "abandoned";
+    latestSubmissionId = proof.receipt.split(".")[1];
+    latestIssuanceAtLease = { submissionId: "f".repeat(32), state: "unknown" };
+    calls.length = 0;
+    const unavailableDuringLeaseRead = await invoke({
+      userQuestion: "Hjälp mig förstå fotosyntesen.",
+      pageContext: { page: "app" },
+    }, "POST", "application/json");
+    assert.equal(unavailableDuringLeaseRead.statusCode, 503);
+    assert.equal(unavailableDuringLeaseRead.body.error, "EXAM_STATE_UNAVAILABLE");
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/release_per_answer_lease")));
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    answerLeaseState = previous.answerLeaseState;
+    latestIssuanceAtLease = null;
   }
 });
 
@@ -1744,9 +1923,15 @@ test("a stale prov page cannot block unrelated study help when the server has no
       userQuestion: "Vad betyder fotosyntes?",
       pageContext: {
         page: "prov",
+        course: "Biologi 1",
+        studyMaterial: "PRIVATE_STALE_MATERIAL_MARKER",
         currentQuestion: { type: "short", text: staleQuestion, model_answer: "PRIVATE_STALE_ANSWER_MARKER" },
         examState: { phase: "exam" },
       },
+      history: [{ role: "assistant", content: "PRIVATE_STALE_HISTORY_ANSWER_MARKER" }],
+      weakAreas: ["PRIVATE_STALE_WEAK_AREA_MARKER"],
+      recentMistakes: [{ question: "PRIVATE_STALE_MISTAKE_MARKER" }],
+      clarifyReply: "PRIVATE_STALE_CLARIFY_MARKER",
     }, "POST", "application/json");
     assert.equal(response.statusCode, 200);
     assert.ok(calls.some(({ url }) => url === "https://api.openai.com/v1/responses"),
@@ -1755,7 +1940,7 @@ test("a stale prov page cannot block unrelated study help when the server has no
       "the server-side lease still closes the new-exam race");
     const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
     assert.match(provider.body, /fotosyntes/i);
-    assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:EXAM_CONTEXT|ANSWER)_MARKER|submissionId|Aktiv fråga/,
+    assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:EXAM_CONTEXT|ANSWER|MATERIAL|HISTORY_ANSWER|WEAK_AREA|MISTAKE|CLARIFY)_MARKER|submissionId|Aktiv fråga|Biologi 1/,
       "unverified client exam details are stripped before ordinary help");
 
     calls.length = 0;
@@ -1862,6 +2047,7 @@ test("unknown exam state denies each answer-bearing route before model work", as
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = null;
   const modes = [
+    { userQuestion: "Hjälp mig förstå fotosyntesen.", pageContext: { page: "app" } },
     { userQuestion: "What is the answer?" },
     { tipsMode: true, question: "Q", model_answer: "A" },
     { legalMode: true, userQuestion: "Explain this" },
@@ -1878,8 +2064,21 @@ test("unknown exam state denies each answer-bearing route before model work", as
       assert.equal(response.body.error, "EXAM_STATE_UNAVAILABLE");
       assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
     }
+
+    activeCount = 0;
+    latestStateUnavailable = true;
+    calls.length = 0;
+    const unknownLatestState = await invoke({
+      userQuestion: "Hjälp mig förstå fotosyntesen.",
+      pageContext: { page: "app" },
+    }, "POST", "application/json");
+    assert.equal(unknownLatestState.statusCode, 503);
+    assert.equal(unknownLatestState.body.error, "EXAM_STATE_UNAVAILABLE");
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota") &&
+      !url.includes("acquire_per_answer_lease")));
   } finally {
     activeCount = 0;
+    latestStateUnavailable = false;
     process.env.EXGEN_PILOT_MODE = prior;
   }
 });

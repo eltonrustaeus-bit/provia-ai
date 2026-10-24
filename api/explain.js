@@ -711,7 +711,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
   });
 }
 
-async function gateActiveExam(req, res, body, user) {
+async function gateActiveExam(req, res, body, user, perAnswerLease) {
   const context = body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)
     ? body.pageContext
     : null;
@@ -730,15 +730,17 @@ async function gateActiveExam(req, res, body, user) {
     && body.landingMode !== true && !Array.isArray(body.scores)
     && body.question == null && body.correct == null;
 
-  function referencesExamQuestion({ allowTopicOverlap = false, ignoreQuestionMatch = false } = {}) {
+  function referencesExamQuestion({ allowTopicOverlap = false, ignoreQuestionMatch = false, minimumSharedWords = 4 } = {}) {
     const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
     const explicitAnswerIntent = /\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|(?:vad|what) (?:är|is) (?:facit|svaret|the answer|lösningen)(?: på (?:uppgiften|frågan|provet))?|(?:svaret|the answer) på (?:uppgiften|frågan|provet)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)
       || /\b(?:förklara|visa|ge|beskriv|explain|show|give)\s+(?:mig\s+)?(?:hela\s+)?(?:lösningen|svaret|facit|the solution|the answer)\b/i.test(query)
       || /\b(?:lösningen|svaret|facit|the solution|the answer)\s+(?:på|till|för|to|for)\s+(?:uppgift(?:en)?|fråga(?:n)?|provet|problem|question|task)(?:\s*#?\d+)?\b/i.test(query);
+    const answerEvaluationIntent = /\bvarför\s+(?:(?:är|var|blev)\s+)?(?:svaret|mitt svar|det svaret)\b.{0,80}\b(?:rätt|korrekt)\b|\b(?:svaret|mitt svar|jag fick)\s+\d+(?:[,.]\d+)?\s+(?:är|var)\s+(?:rätt|korrekt)\b|\b(?:jag|vi)\s+(?:skrev|svarade|valde|angav|fick)\b.{0,80}\b(?:rätt|korrekt)\b|\bvarför\s+\d+(?:[,.]\d+)?\s+(?:är|var)\s+(?:rätt|korrekt)\b/i.test(query)
+      || /\bwhy\s+(?:(?:is|was)\s+)?(?:my|the|this)\s+answer\b.{0,80}\b(?:right|correct)\b|\b(?:my|the)\s+answer\s+\d+(?:[,.]\d+)?\s+(?:is|was)\s+(?:right|correct)\b|\b(?:i|we)\s+(?:wrote|answered|put|chose|selected|got)\b.{0,80}\b(?:right|correct)\b|\bwhy\s+\d+(?:[,.]\d+)?\s+(?:is|was)\s+(?:right|correct)\b/i.test(query);
     const concreteTaskReference = /\b(?:uppgift|fråga|provfråga|exercise|question|task|problem)\b/i.test(query)
       || /\b(?:this|that|the) (?:question|task|exercise|problem)\b/i.test(query);
     const requestsTaskSolution = /\b(?:lös(?:a|er|ning|ningen)?|solve|work out|answer|besvara|svara på|räkn(?:a|ar|ade|at)?|räkna ut|beräkn(?:a|ar|ade|at)?|calculate|compute|facit|svaret|the answer|the solution|förklara|explain|visa|show|walk me through)\b/i.test(query);
-    if (explicitAnswerIntent || (concreteTaskReference && (requestsTaskSolution || isClearlyGeneralQuestion()))) return true;
+    if (explicitAnswerIntent || answerEvaluationIntent || (concreteTaskReference && (requestsTaskSolution || isClearlyGeneralQuestion()))) return true;
     if (examContextDeclared && /\b(den här|det här|denna fråga|den frågan|detta|dessa|här|this|that|it|those)\b/i.test(query)) return true;
     if (ignoreQuestionMatch) return false;
     const targets = [
@@ -784,7 +786,7 @@ async function gateActiveExam(req, res, body, user) {
         const sharedWords = new Set(targetWords.filter((word) => !ignored.has(word) && queryWords.has(stem(word))).map(stem));
         const targetEquations = findEquations(target)
           .map(normalizeEquation);
-        if (sharedWords.size >= 4 || targetEquations.some((equation) => queryEquations.has(equation))) return true;
+        if (sharedWords.size >= minimumSharedWords || targetEquations.some((equation) => queryEquations.has(equation))) return true;
       }
       return false;
     }
@@ -804,7 +806,9 @@ async function gateActiveExam(req, res, body, user) {
     // "hjälp mig att tänka" remain on the answer-free exam-help path.
     const namedTopic = /^(?:kan du )?(?:hjälpa mig (?:att )?(?:förstå|med)|hjälp mig (?:att )?(?:förstå|med)|kan du (?:förklara|berätta om|gå igenom)|berätta om|gå igenom)\s+[\p{L}\p{N}]/iu
       .test(query);
-    return direct || namedTopic;
+    const contextualHelp = /\b(?:hjälp mig\s+(?:att\s+)?(?:förstå|med)|kan du\s+(?:förklara|berätta om|gå igenom)|förklara)\s+(?!den här|det här|denna|fråga|uppgift|provet)[\p{L}\p{N}]/iu
+      .test(query);
+    return direct || namedTopic || contextualHelp;
   }
 
   function allowSafeStudyChat(serverState) {
@@ -814,21 +818,40 @@ async function gateActiveExam(req, res, body, user) {
     if (!ordinaryStudyChat || referencesExamQuestion({
       allowTopicOverlap: clearlyGeneral && !staleViewWithoutIssuance,
       ignoreQuestionMatch: clearlyGeneral && staleViewWithoutIssuance,
+      minimumSharedWords: serverState === "completed" ? 4 : 3,
     })) return false;
-    // With no server issuance, unrelated general help is safe; safeContext
-    // below strips a stale question from the old prov view. Unbound or unknown
-    // exam context remains gated, as do expired/unverified issuances.
-    if (examContextDeclared && (!clearlyGeneral ||
-        ((context?.currentQuestion || context?.questions) && serverState !== "completed" &&
-          !(serverState === "none" && staleProvView)))) return false;
+    // Inactive or unverified exam context must not strand unrelated study help.
+    // Exam-specific requests were rejected above; all exam payload fields are
+    // stripped before this request can reach the model.
+    if (examContextDeclared && (!clearlyGeneral || (serverState === "none" && !staleProvView))) return false;
+    if (["active", "grading"].includes(serverState)) return false;
+    if (perAnswerLease && ["abandoned", "expired", "missing"].includes(serverState)) {
+      perAnswerLease.allowIncompleteGeneralChat = true;
+    }
     const safeContext = { page: "app" };
+    const stripStaleExamSource = serverState !== "completed" && (
+      context?.currentQuestion || context?.questions || context?.examState ||
+      (staleProvView && serverState !== "none")
+    );
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
+      if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;
+      if (stripStaleExamSource && staleProvView && key === "course") continue;
       if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];
     }
     body.pageContext = safeContext;
-    const selectedTopic = String(context?.course || context?.topic || body.topic || "").trim();
+    const selectedTopic = String(safeContext.course || (stripStaleExamSource ? "" : context?.topic || body.topic) || "").trim();
     body.topic = ["app", "prov", "resultat", "exam", "exam-result"].includes(selectedTopic.toLowerCase()) ? "" : selectedTopic;
     delete body.context;
+    if (["abandoned", "expired", "missing"].includes(serverState) ||
+        (serverState === "none" && staleProvView)) {
+      // Old client chat can contain the unfinished exam question or its answer;
+      // continue from the student's current prompt instead of replaying it.
+      body.history = [];
+      body.recentMistakes = [];
+      body.weakAreas = [];
+      body.clarifyReply = "";
+      body.topic = safeContext.course || "";
+    }
     return true;
   }
 
@@ -883,12 +906,15 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
+      if (allowSafeStudyChat(latestState)) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
     if (state !== "completed") {
       // A known issuance without a server-verified grade remains answer-gated,
       // even if the client moved away from the exam page or dropped its context.
+      // Clearly unrelated study help is still allowed through the sanitized path.
+      if (allowSafeStudyChat(state)) return false;
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
@@ -923,6 +949,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
+      if (allowSafeStudyChat(latestState)) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
@@ -963,20 +990,22 @@ async function acquirePerAnswerLease(user, lease) {
   // status check and lease acquisition.
   const latestState = await examIssuance.latestExamState(user.id);
   if (latestState === "none" || latestState === "completed") return "acquired";
+  if (lease.allowIncompleteGeneralChat && ["abandoned", "expired", "missing"].includes(latestState)) return "acquired";
+  lease.blockedState = latestState;
   await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
   lease.userId = null;
   lease.leaseId = null;
   return latestState === null ? null : "ungraded_exam";
 }
 
-function rejectLeaseOutcome(req, res, body, outcome, { history = false } = {}) {
+function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = null } = {}) {
   if (outcome === "exam_active") {
     if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
     sendActiveExamGuidance(req, res, body);
     return true;
   }
   if (outcome === "ungraded_exam") {
-    sendActiveExamGuidance(req, res, body, "abandoned");
+    sendActiveExamGuidance(req, res, body, lease?.blockedState || "abandoned");
     return true;
   }
   if (outcome === "busy") return res.status(409).json({ error: "PER_REQUEST_IN_PROGRESS" });
@@ -997,7 +1026,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       return res.status(409).json({ error: "PER_HISTORY_LOCKED" });
     }
     const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true });
+    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true, lease: perAnswerLease });
     const messages = await loadPerHistory(user.id);
     return res.json({ ok: true, history: messages });
   }
@@ -1030,9 +1059,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     let landingUser = null;
     if (req.headers?.authorization) {
       landingUser = await requireAuth(req, res);
-      if (!landingUser || await gateActiveExam(req, res, body, landingUser)) return;
+      if (!landingUser || await gateActiveExam(req, res, body, landingUser, perAnswerLease)) return;
       const leaseOutcome = await acquirePerAnswerLease(landingUser, perAnswerLease);
-      if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+      if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome, { lease: perAnswerLease });
     }
     const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
     if (!question) return res.status(400).json({ error: 'No question' });
@@ -1118,9 +1147,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     && !Array.isArray(body.scores)
     && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
-  if (await gateActiveExam(req, res, body, user)) return;
+  if (await gateActiveExam(req, res, body, user, perAnswerLease)) return;
   const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome, { lease: perAnswerLease });
 
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
   if (body.tipsMode === true) return handleTipsMode(req, res, body, user);
@@ -1691,7 +1720,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 }
 
 export default async function handler(req, res) {
-  const perAnswerLease = { userId: null, leaseId: null };
+  const perAnswerLease = { userId: null, leaseId: null, allowIncompleteGeneralChat: false };
   try {
     return await handleExplainRequest(req, res, perAnswerLease);
   } finally {

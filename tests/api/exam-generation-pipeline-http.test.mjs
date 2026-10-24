@@ -305,8 +305,10 @@ test("advance reserves time after model work for durable checkpoint and response
   assert.ok(pipelineGenerationDeadlineAt(startedAt) - (startedAt + 7_000)
     >= generation.minimumExamPreflightBudgetMs("mc", true),
   "the batch deadline still clears the internal generation-and-review preflight after seven seconds of setup");
-  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 20_000).toISOString()), startedAt + 20_000,
-    "a worker must not spend model time after the persisted operation deadline");
+  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 20_000).toISOString()), startedAt + 8_000,
+    "near-deadline jobs reserve 12 seconds for usage settlement and durable checkpointing");
+  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 10_000).toISOString()), startedAt - 2_000,
+    "a job with no safe finalization window must not start a new model batch");
   assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, "invalid"), startedAt + 45_000,
     "an invalid stored deadline cannot extend the handler's hard deadline");
 });

@@ -14,7 +14,8 @@ export function pipelineGenerationDeadlineAt(startedAt) {
 
 export function clampPipelineGenerationDeadline(routeDeadlineAt, jobDeadlineAt) {
   const jobDeadline = Date.parse(jobDeadlineAt);
-  return Number.isFinite(jobDeadline) ? Math.min(routeDeadlineAt, jobDeadline) : routeDeadlineAt;
+  const jobWorkDeadline = jobDeadline - PIPELINE_FINALIZATION_RESERVE_MS;
+  return Number.isFinite(jobDeadline) ? Math.min(routeDeadlineAt, jobWorkDeadline) : routeDeadlineAt;
 }
 
 function respond(res, status, body) { res.status(status).json(body); }

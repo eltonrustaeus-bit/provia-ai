@@ -2446,3 +2446,119 @@ ofullständigt är kandidatunderkännande i oberoende granskning/lösarkontroll,
 inte ett falskt komplettresultat. Ny promptstyrning och dubblettnormalisering
 är offline-verifierade men behöver pushad Preview och separat, godkänd
 syntetisk liveverifiering innan modellförbättring kan bekräftas.
+
+## Separat livekontroll av P.E.R. och bevarat delprov — 2026-10-24
+
+- [x] Ny deployment `dpl_35gXL2AxsrfyB7oGbxStYDBB6L64` är `READY` på commit
+  `6986b3491a67fa8a608550ed14f579355af54cb4`; branch-aliasen pekar på denna
+  Preview. Branch-scopade Preview-variabler verifierades endast till namn,
+  aldrig till värden.
+- [x] I det befintliga syntetiska stagingprovet står 9/12 fortfarande
+  obesvarade. Inga svar skickades in, provet avbröts inte och dess state är
+  bevarat enligt användarens uttryckliga val.
+- [x] Aktivt provläge: P.E.R. gav facitfria ledtrådar och metodstöd; direkt
+  svar var låst tills verifierad inlämning. Startvyns allmänna hjälpsvar var
+  däremot generiskt. Detta verifierar svarsspärren i just denna UI-session,
+  inte ämnesrelevans eller modellkvalitet.
+- [x] Read-only stagingkontroll fann tre bekräftade Auth-konton totalt. Ingen
+  annan aktiv staginginloggning kunde säkert identifieras. En separat
+  utloggad Preview-session är öppen för att användaren ska logga in med ett
+  annat befintligt konto; inga konton, lösenord, roller eller kvoter ändrades.
+- [!] Senast verifierad hård budget: cap `$3.379071`, spent `$1.616745`,
+  reserved `$0.263628`, kvar efter reservation `$1.498698`. Detta ryms inom
+  godkända maximala `$2`, men måste läsas om före ny modellkörning.
+- [!] Live 12-frågeprov på den nya koden, vanlig P.E.R. med modellens
+  ämnesgrundning och P.E.R. efter verifierad rättning återstår. Budget- och
+  kontogränser lämnas oförändrade.
+
+**PILOT NOT READY.** Nästa säkra steg är att användaren loggar in på den
+separata Previewn med ett annat befintligt stagingkonto. Bevara det nuvarande
+9/12-provet; kör därefter högst ett syntetiskt liveprov efter ny kontroll av
+deployment, stagingkoppling och budget.
+
+## Källspårning av P.E.R:s generiska svar — 2026-10-24
+
+- [x] Kodspårningen bekräftar två olika beteenden. Utan giltig session skickar
+  `shared.js` `landingMode`; utanför skolpilot svarar `api/explain.js` med den
+  fasta publika guiden i `_per-public-guide.cjs` och anropar inte studiemodellen.
+  I skolpilot sparas frågan lokalt och UI:t ber användaren logga in.
+- [x] Med session går vanlig studiehjälp via teach-läget. `getPageContext()`
+  skickar vald kurs och, när den finns i den aktiva studieytan, materialet;
+  `_per-context.js` begränsar och paketerar detta, och `_per-core.js` placerar
+  det i prompten som källdata. Befintliga test bekräftar att material når
+  modellen escaped, medan saknad grafdata inte hittas på.
+- [x] Källan för felträning kräver verifierat, ägarbundet och rättat prov samt
+  matchande kurs/fråga; klientändringar av källan avvisas. Källtesterna täcker
+  även operatorer i mattefrågor och felaktig kursblandning.
+- [x] Riktade regressionssviter passerade **92/92**:
+  `node --test tests/api/per-exam-review-handler.test.mjs tests/api/per-usage-stream.test.mjs tests/api/mistake-training-source.test.mjs tests/api/mistake-training-context.test.mjs tests/api/mistake-training-source-rest.test.mjs`.
+  Testerna är offline/mockade och bevisar inte live-modellens relevans.
+- [x] Prov-/återhämtningssviten passerade **54/54**:
+  `node --test tests/api/exam-generation-pipeline.test.mjs tests/api/exam-generation-pipeline-postgres.test.mjs tests/api/exam-generation-pipeline-http.test.mjs tests/frontend/exam-partial-delivery.test.mjs tests/frontend/mistake-selection-identity.test.mjs tests/frontend/per-felbank-collision.test.mjs`.
+  Den täcker bland annat exakt 3/6/12-frågeackumulering, fokustäckning i
+  felträning, assembly-/kvotgränser och synlig delprovsstatus. Även dessa tester
+  är lokala/offline.
+- [x] `node --check` passerade för `api/explain.js`, `api/_per-core.js`,
+  `api/_per-context.js`, `api/_exam-generation-pipeline.cjs`,
+  `api/generate-exam.js` och `shared.js`; `git diff --check` passerade.
+- [!] I staging-Preview `dpl_35gXL2AxsrfyB7oGbxStYDBB6L64` visas fortfarande
+  inloggningsrutan. Den exakta Previewn öppnades på nytt i synlig webbläsarflik
+  och inloggningsformuläret visas; ingen autentiserad startsida har verifierats.
+  Ingen live-AI-körning utfördes. Senast kända budget är inte färsk nog för ett
+  nytt anrop.
+- [!] Ingen ny kodändring gjordes. Oberoende agentutrymme saknades under denna
+  fortsättning; befintliga tidigare reviews finns dokumenterade ovan.
+
+**PILOT NOT READY.** Nästa steg: verifiera att separat staging-Preview visar
+autentiserad startsida; därefter färsk kontroll av deployment, stagingbudget och
+konto utan aktivt prov innan någon syntetisk liveverifiering.
+
+## Preview-inloggning verifierad — 2026-10-24
+
+- [x] Fortsättningskontroll i synlig sidbrowser: Preview
+  `https://provia-8i6mh5nrf-eltons-projects-4adfb1a3.vercel.app/app.html`
+  visar den autentiserade ExGen-startvyn (`Skapa prov`), inte inloggningsgrinden.
+- [x] Vercel bekräftar att deployment `dpl_35gXL2AxsrfyB7oGbxStYDBB6L64`
+  är `READY` på commit `6986b3491a67fa8a608550ed14f579355af54cb4` i
+  `codex/exgen-generation-quality-2026-10-20`.
+- [!] Detta verifierar endast den aktuella webbläsarsessionens inloggning; det
+  verifierar inte att övriga sessioner är inloggade eller att P.E.R./prov-AI
+  fungerar live. Inget AI-anrop gjordes och inget prov ändrades.
+
+**PILOT NOT READY.** Previewn kan nu användas i den öppna, autentiserade
+sessionen. Före syntetiska liveanrop ska stagingbudgeten läsas färskt och
+testkontot kontrolleras utan att röra befintliga öppna prov.
+
+## P.E.R fail-closed recovery och pipeline deadline-reserve — 2026-10-24
+
+- [x] Vanlig P.E.R-studiehjälp fungerar nu även om servern hittar ett gammalt
+  avbrutet/utgånget prov, men bara efter att tillståndet verifierats igen vid
+  leasespärren. Aktivt, graderande eller okänt tillstånd fortsätter att fallera
+  stängt. Gamla provfrågor, material, historik, misstag och osäkra klientfält
+  tas bort från fallback-prompten.
+- [x] Oberoende P.E.R-review fann och testerna täcker nu en omskriven fråga som
+  kunde se ut som allmän förklaring. Tre gemensamma innehållsord från en
+  oavslutad fråga håller den bakom provgrinden; en bredare ämnesfråga med två
+  gemensamma ord fortsätter att fungera. Aktiva prov använder fortsatt
+  facitfria ledtrådar.
+- [x] Pipeline-batcher lämnar nu 12 sekunders finaliseringsmarginal även mot
+  jobbets sparade deadline, så en redan godkänd batch inte förloras före
+  kvotavräkning/checkpoint. Ett jobb utan arbetsmarginal startar inte en ny
+  modellbatch.
+- [x] Offline-sviter passerade: P.E.R **56/56**;
+  provgenerering/HTTP/PGlite **51/51**; material, felträning och P.E.R stream
+  **39/39**. Syntaxkontroll för ändrade JS-filer och `git diff --check`
+  passerade. Oberoende P.E.R-review fann ingen blockerande kvarvarande fråga
+  i sin avgränsade granskning; pipeline-review fann ingen blockerare.
+- [!] Ingen live-AI-körning gjordes. De ändrade filerna är fortfarande
+  ocommittade. Inget ändrades i Supabase, Vercel Production, `main`, kvoter,
+  konton eller hemligheter. Det befintliga syntetiska 9/12-provet är orört.
+- [!] Staging-Previewn för de nya ändringarna och den färska kostnadsbudgeten
+  behöver verifieras före syntetisk livekontroll. Offline-resultat bekräftar
+  kodvägarna, inte modellrelevans eller att Previewn använder staging.
+
+**PILOT NOT READY.** Nästa steg är att committa och pusha endast dessa
+granskade ändringar till den godkända feature-branchen, verifiera exakt READY
+Preview/stagingkoppling och därefter invänta inloggning på Previewn med ett
+separat stagingkonto innan eventuellt syntetiskt AI-test inom färskt verifierad
+budget.
