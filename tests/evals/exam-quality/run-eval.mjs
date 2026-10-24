@@ -44,6 +44,8 @@ const V = require(join(root, "api", "_verifier.js"));
 const S = require(join(root, "api", "_solver.js"));
 const G = require(join(root, "api", "generate-exam.js"));
 const { decideFirstPass } = require(join(here, "eval-delivery.cjs"));
+const { hasCompleteUsage, summarizeRuns, summarizeCosts } = require(join(here, "eval-accounting.cjs"));
+const { buildGateOptions, buildNormalizationOptions, buildVerifierOptions } = require(join(here, "eval-contract.cjs"));
 
 const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
@@ -63,7 +65,7 @@ const JUDGE_CONFIDENCE_FLOOR = 0.8;
 // how every earlier run in this repo was produced. Default on, mirroring
 // production once this ships.
 const SOLVER_ENABLED = process.env.SOLVER !== "off";
-const SOLVER_MODEL = process.env.SOLVER_MODEL || "";
+const SOLVER_MODEL = process.env.SOLVER_MODEL || process.env.OPENAI_SOLVER_MODEL || "";
 
 const selected = process.env.FIXTURES
   ? FIXTURES.filter(f => process.env.FIXTURES.split(",").map(s => s.trim()).includes(f.id))
@@ -90,12 +92,6 @@ const PRICING = {
   "o3-mini": { in: 1.10, out: 4.40 },
   "o4-mini": { in: 1.10, out: 4.40 },
 };
-const priceOf = (model, usage) => {
-  const p = PRICING[model];
-  if (!p) return { usd: 0, priced: false };
-  return { usd: (usage.in / 1e6) * p.in + (usage.out / 1e6) * p.out, priced: true };
-};
-
 const emptyUsage = () => ({ in: 0, out: 0, reasoning: 0 });
 const addUsage = (a, b) => { a.in += b.in; a.out += b.out; a.reasoning += b.reasoning; };
 function readUsage(data) {
@@ -157,16 +153,16 @@ async function callResponses({ model, system, user, format, timeoutMs = 180_000 
     timeoutMs
   );
   if (!r) {
-    return { ok: false, latencyMs, usage: emptyUsage(), retries, error: `transport: ${transportError}` };
+    return { ok: false, latencyMs, model, usage: emptyUsage(), usageMeasured: false, retries, error: `transport: ${transportError}` };
   }
   const raw = await r.text();
   let data = null;
   try { data = JSON.parse(raw); } catch { /* handled below */ }
   if (!r.ok || !data) {
-    return { ok: false, latencyMs, usage: emptyUsage(), error: `HTTP ${r.status}: ${raw.slice(0, 300)}` };
+    return { ok: false, latencyMs, model: data?.model || model, usage: readUsage(data), usageMeasured: hasCompleteUsage(data?.usage), retries, error: `HTTP ${r.status}: ${raw.slice(0, 300)}` };
   }
   const text = extractOutputText(data);
-  if (!text) return { ok: false, latencyMs, usage: readUsage(data), error: "no output_text" };
+  if (!text) return { ok: false, latencyMs, model: data?.model || model, usage: readUsage(data), usageMeasured: hasCompleteUsage(data?.usage), retries, error: "no output_text" };
   let parsed = null;
   let parseError = null;
   try { parsed = JSON.parse(text); } catch (e) { parseError = String(e); }
@@ -175,7 +171,7 @@ async function callResponses({ model, system, user, format, timeoutMs = 180_000 
   // which is what api/generate-exam.js does since the deadline work. Without
   // this the eval reported a hard failure where production would have shipped a
   // shortened exam, understating how robust the endpoint actually is.
-  return { ok: parsed !== null, latencyMs, usage: readUsage(data), parsed, text, parseError,
+  return { ok: parsed !== null, latencyMs, model: data?.model || model, usage: readUsage(data), usageMeasured: hasCompleteUsage(data?.usage), retries, parsed, text, parseError,
            error: parseError ? `unparseable JSON: ${parseError}` : null };
 }
 
@@ -221,7 +217,7 @@ const JUDGE_SYSTEM =
 
 async function judgeQuestions(questions, material) {
   const mcs = questions.filter(q => q.type === "mc" && Array.isArray(q.options) && q.options.length >= 2);
-  if (!mcs.length) return { ok: true, verdicts: new Map(), usage: emptyUsage(), latencyMs: 0, judged: 0 };
+  if (!mcs.length) return { ok: true, verdicts: new Map(), model: JUDGE_MODEL, usage: emptyUsage(), usageMeasured: true, retries: 0, latencyMs: 0, judged: 0 };
   const payload = mcs.map(q => ({ id: String(q.id), question: q.question, options: q.options }));
   const res = await callResponses({
     model: JUDGE_MODEL,
@@ -229,10 +225,10 @@ async function judgeQuestions(questions, material) {
     user: `Material:\n${material}\n\nFrågor:\n${JSON.stringify(payload)}`,
     format: judgeSchema(mcs.length),
   });
-  if (!res.ok) return { ok: false, verdicts: new Map(), usage: res.usage, latencyMs: res.latencyMs, judged: 0, error: res.error };
+  if (!res.ok) return { ok: false, verdicts: new Map(), model: res.model, usage: res.usage, usageMeasured: res.usageMeasured, retries: res.retries, latencyMs: res.latencyMs, judged: 0, error: res.error };
   const verdicts = new Map();
   for (const r of (res.parsed.results || [])) verdicts.set(String(r.id), r);
-  return { ok: true, verdicts, usage: res.usage, latencyMs: res.latencyMs, judged: mcs.length };
+  return { ok: true, verdicts, model: res.model, usage: res.usage, usageMeasured: res.usageMeasured, retries: res.retries, latencyMs: res.latencyMs, judged: mcs.length };
 }
 
 // ── One generation → gate → verify → judge cycle ────────────────────────────
@@ -248,7 +244,9 @@ async function runOnce(fixture, runIndex) {
     disagreements: [],
     latency: { generateMs: 0, verifyMs: 0, judgeMs: 0 },
     usage: { generator: emptyUsage(), verifier: emptyUsage(), solver: emptyUsage(), judge: emptyUsage() },
-    usageMeasured: { verifier: false, solver: false },
+    models: { generator: GEN_MODEL, verifier: null, solver: null, judge: JUDGE_MODEL },
+    usageMeasured: { generator: false, verifier: false, solver: false, judge: false },
+    costCertain: { generator: true, verifier: true, solver: true, judge: true },
     errors: [],
   };
 
@@ -270,6 +268,9 @@ async function runOnce(fixture, runIndex) {
   });
   rec.latency.generateMs = gen.latencyMs;
   rec.usage.generator = gen.usage;
+  rec.usageMeasured.generator = gen.usageMeasured;
+  rec.costCertain.generator = gen.retries === 0;
+  rec.models.generator = gen.model || GEN_MODEL;
   if (!gen.text) { rec.errors.push(`generate: ${gen.error || "no output"}`); return rec; }
 
   // Same parser production uses, so a ragged response is measured the way a
@@ -279,9 +280,24 @@ async function runOnce(fixture, runIndex) {
   rec.truncated = salvage.truncated;
   if (!exam) { rec.errors.push(`generate: nothing salvageable (${gen.error || "truncated"})`); return rec; }
   if (salvage.truncated) rec.errors.push("räddat partiellt svar (produktionen hade levererat förkortat prov)");
-  rec.generated = Array.isArray(exam.questions) ? exam.questions.length : 0;
+  rec.rawGenerated = Array.isArray(exam.questions) ? exam.questions.length : 0;
+  const normalized = G.normalizeGeneratedExam(exam, buildNormalizationOptions({
+    material: fixture.material,
+    lang: "sv",
+    numQuestions: NUM_QUESTIONS,
+    truncated: salvage.truncated,
+  }));
+  if (normalized.failure) {
+    rec.errors.push(`normalize: ${normalized.failure.payload.error || "production normalization rejected output"}`);
+    return rec;
+  }
+  const normalizedExam = normalized.exam;
+  rec.generated = normalizedExam.questions.length;
 
-  const gate = A.gateExam(exam, { profile, secret: "eval-secret" });
+  const gate = A.gateExam(normalizedExam, {
+    ...buildGateOptions({ profile, material: fixture.material, qType: "mc", lang: "sv" }),
+    secret: "eval-secret",
+  });
   rec.afterGate = gate.questions.length;
   rec.structurallyDropped = gate.dropped;
   rec.flagged = gate.flagged;
@@ -298,7 +314,10 @@ async function runOnce(fixture, runIndex) {
   // solver's own latency.
   const [v, sv] = await Promise.all([
     V.verifyQuestions(gate.questions, {
-      apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", targetLevel: fixture.level,
+      ...buildVerifierOptions({
+        apiKey: API_KEY, model: GEN_MODEL, profile, lang: "sv", targetLevel: fixture.level,
+        material: fixture.material,
+      }),
     }),
     SOLVER_ENABLED
       ? S.solveQuestions(gate.questions, { apiKey: API_KEY, model: GEN_MODEL, subjectProfile: profile, lang: "sv", material: fixture.material })
@@ -307,8 +326,10 @@ async function runOnce(fixture, runIndex) {
   rec.latency.verifyMs = Date.now() - tVerify;
   rec.usage.verifier = readUsage({ usage: v.usage });
   rec.usage.solver = readUsage({ usage: sv.usage });
-  rec.usageMeasured.verifier = Boolean(v.usage);
-  rec.usageMeasured.solver = Boolean(sv.usage);
+  rec.usageMeasured.verifier = hasCompleteUsage(v.usage);
+  rec.usageMeasured.solver = hasCompleteUsage(sv.usage);
+  rec.models.verifier = v.model || VERIFIER_MODEL;
+  rec.models.solver = sv.model || (SOLVER_MODEL || GEN_MODEL);
   rec.solverCallOk = sv.callOk;
   rec.solverModel = sv.model;
   if (prevSolverEnv === undefined) delete process.env.OPENAI_SOLVER_MODEL;
@@ -352,6 +373,9 @@ async function runOnce(fixture, runIndex) {
   const j = await judgeQuestions(approved, fixture.material);
   rec.latency.judgeMs = j.latencyMs;
   rec.usage.judge = j.usage;
+  rec.usageMeasured.judge = j.usageMeasured;
+  rec.costCertain.judge = j.retries === 0;
+  rec.models.judge = j.model || JUDGE_MODEL;
   rec.judgeCallOk = j.ok;
   rec.judged = j.judged;
   if (!j.ok) { rec.errors.push(`judge: ${j.error}`); return rec; }
@@ -402,6 +426,13 @@ async function pool(items, limit, fn) {
 
 const pct = (n, d) => (d > 0 ? (100 * n / d) : 0);
 const fmtPct = (n, d) => `${pct(n, d).toFixed(1)}%`;
+const perExam = (usd, exams) => usd === null || !exams ? null : usd / exams;
+const formatTotal = (usd, exams) => usd === null
+  ? "okänt (saknad mätning eller pris)"
+  : `$${usd.toFixed(4)} totalt = $${perExam(usd, exams).toFixed(4)}/prov`;
+const formatCost = (stage, exams) => stage.usd === null
+  ? `okänt (modell ${stage.model || "saknas"}, usage ${stage.measured ? "mätt" : "saknas"})`
+  : `$${stage.usd.toFixed(4)} totalt = $${perExam(stage.usd, exams).toFixed(4)}/prov`;
 function percentile(values, p) {
   if (!values.length) return 0;
   const s = [...values].sort((a, b) => a - b);
@@ -413,7 +444,7 @@ async function main() {
   for (const f of selected) for (let r = 1; r <= RUNS; r++) jobs.push({ f, r });
 
   console.log(`Exam-quality eval`);
-  console.log(`  generator : ${GEN_MODEL}${PRICING[GEN_MODEL] ? "" : "  (unpriced — cost will read 0)"}`);
+  console.log(`  generator : ${GEN_MODEL}${PRICING[GEN_MODEL] ? "" : "  (pris saknas — total blir okänd)"}`);
   console.log(`  verifier  : ${VERIFIER_MODEL}${VERIFIER_MODEL === GEN_MODEL ? "  (same as generator — today's production)" : ""}`);
   console.log(`  judge     : ${JUDGE_MODEL}`);
   console.log(`  solver    : ${SOLVER_ENABLED ? (SOLVER_MODEL || GEN_MODEL) : "AV"}`);
@@ -439,7 +470,8 @@ async function main() {
         lowConfidenceDisagreements: 0, disagreements: [],
         latency: { generateMs: 0, verifyMs: 0, judgeMs: 0 },
         usage: { generator: emptyUsage(), verifier: emptyUsage(), solver: emptyUsage(), judge: emptyUsage() },
-        usageMeasured: { verifier: false, solver: false },
+        models: { generator: GEN_MODEL, verifier: VERIFIER_MODEL, solver: SOLVER_MODEL || GEN_MODEL, judge: JUDGE_MODEL },
+        usageMeasured: { generator: false, verifier: false, solver: false, judge: false },
         errors: [`crashed: ${String(e)}`],
       };
     }
@@ -482,7 +514,17 @@ async function main() {
     addUsage(solverUsage, r.usage.solver);
     addUsage(judgeUsage, r.usage.judge);
   }
-  const genCost = priceOf(GEN_MODEL, genUsage);
+  const costs = summarizeCosts({
+    generator: summarizeRuns(records, "generator", PRICING),
+    verifier: summarizeRuns(records, "verifier", PRICING),
+    solver: summarizeRuns(records, "solver", PRICING, { applicable: SOLVER_ENABLED }),
+    judge: summarizeRuns(records, "judge", PRICING),
+  });
+  const productionCost = summarizeCosts({
+    generator: costs.stages.generator,
+    verifier: costs.stages.verifier,
+    solver: costs.stages.solver,
+  });
 
   const flagCounts = {};
   const dropCounts = {};
@@ -531,11 +573,16 @@ async function main() {
     console.log(`  ** VARNING: p95 över produktionens 45 s timeout i generate-exam.js **`);
   }
   console.log(`  Generatortokens           in ${genUsage.in}  ut ${genUsage.out}  (varav resonemang ${genUsage.reasoning})`);
-  console.log(`  Generatorkostnad          ${genCost.priced ? `$${genCost.usd.toFixed(4)} för ${totals.exams} prov  =  $${(genCost.usd / totals.exams).toFixed(4)}/prov` : "okänt pris för modellen"}  (historisk prislista, ej total)`);
+  console.log(`  Generator, estimerat      ${formatCost(costs.stages.generator, totals.exams)}`);
   console.log(`  Granskartokens            in ${verifierUsage.in}  ut ${verifierUsage.out}  (${sum(r => Number(r.usageMeasured.verifier))}/${totals.exams} uppmätta)`);
+  console.log(`  Granskare, estimerat      ${formatCost(costs.stages.verifier, totals.exams)}`);
   console.log(`  Lösartokens               in ${solverUsage.in}  ut ${solverUsage.out}  (${sum(r => Number(r.usageMeasured.solver))}/${totals.exams} uppmätta)`);
-  console.log(`  Domarens tokens           in ${judgeUsage.in}  ut ${judgeUsage.out}  (mätkostnad, ej produktionskostnad)`);
-  console.log(`  Not: prislistan är inte verifierad för aktuella modeller och summan ovan omfattar bara generatorn.`);
+  console.log(`  Lösare, estimerat         ${SOLVER_ENABLED ? formatCost(costs.stages.solver, totals.exams) : "avstängd"}`);
+  console.log(`  Domarens tokens           in ${judgeUsage.in}  ut ${judgeUsage.out}  (utvärderingskostnad)`);
+  console.log(`  Domare, estimerat         ${formatCost(costs.stages.judge, totals.exams)}  (ej produktionskostnad)`);
+  console.log(`  Produktionssteg, första passet ${formatTotal(productionCost.totalUsd, totals.exams)}  (exkl. reparationer)`);
+  console.log(`  Eval totalt               ${formatTotal(costs.totalUsd, totals.exams)}  (inkl. domare)`);
+  console.log(`  Not: kostnaderna är estimat från prislistan i evalen; okänd modell eller saknad usage ger "okänt", aldrig $0.`);
 
   console.log(`\n  Per ämne:`);
   for (const p of perFixture) {
@@ -564,7 +611,11 @@ async function main() {
     config: { GEN_MODEL, VERIFIER_MODEL, JUDGE_MODEL, RUNS, NUM_QUESTIONS, fixtures: selected.map(f => f.id), judgeConfidenceFloor: JUDGE_CONFIDENCE_FLOOR, solverEnabled: SOLVER_ENABLED, deliveryScope: "initial_review_no_repair" },
     wallMs, totals, perFixture, dropCounts, flagCounts,
     usage: { generator: genUsage, verifier: verifierUsage, solver: solverUsage, judge: judgeUsage },
-    cost: { generatorUsd: genCost.priced ? genCost.usd : null },
+    cost: {
+      productionStages: { scope: "first_pass_excludes_repair_batches", totalUsd: productionCost.totalUsd, perExamUsd: perExam(productionCost.totalUsd, totals.exams), stages: productionCost.stages },
+      evaluation: { totalUsd: costs.totalUsd, perExamUsd: perExam(costs.totalUsd, totals.exams), stages: costs.stages },
+      priceListCheckedAt: "2026-08-01",
+    },
     latency: { generateP50Ms: percentile(genLatencies, 0.5), generateP95Ms: percentile(genLatencies, 0.95) },
     records,
   }, null, 2));

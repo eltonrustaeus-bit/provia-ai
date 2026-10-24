@@ -108,13 +108,18 @@ async function settlePerChatQuota(userId, quota, commit) {
   if (!quota?.requestId || !quota?.periodKey) return true;
   try {
     const rpc = commit ? "commit_per_chat_quota" : "refund_per_chat_quota";
-    const { data, error } = await supabase.rpc(rpc, {
+    const args = {
       p_user_id: userId,
       p_period_key: quota.periodKey,
       p_request_id: quota.requestId,
-    });
-    if (error || !data || typeof data.ok !== "boolean") return false;
-    return data.ok;
+    };
+    let result = await supabase.rpc(rpc, args);
+    if (commit && (result.error || !result.data || result.data.ok !== true)) {
+      // The RPC is idempotent by request ID, so a lost response can be retried safely.
+      result = await supabase.rpc(rpc, args);
+    }
+    if (result.error || !result.data || typeof result.data.ok !== "boolean") return false;
+    return result.data.ok;
   } catch {
     return false;
   }
@@ -555,13 +560,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Compare the options one at a time with your material. Note what supports or rules out each claim, then make your own choice.",
       ],
       line: [
-        "First identify what each axis represents. What relationship is the question asking you to show?",
-        "Choose two convenient x-values in the grid and work out their y-values. Keep your calculations separate from the drawing.",
+        "Read the axis labels and the relationship in the question. What information do you need before drawing anything?",
+        "Choose two points you can check from the relationship. How will you verify each point against the labels?",
         "Check that both points fit the relationship and that the line's direction matches your reasoning. What could you verify before submitting?",
       ],
       scatter: [
         "Check what each axis represents and which column belongs on each axis. What does one row become on the graph?",
-        "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.",
+        "Use one row at a time and compare its headings and units with the graph labels before placing a point.",
         "Compare the first and last observations, then describe the pattern you see. Do not assume every point lies on a line.",
       ],
       genericGraph: [
@@ -582,13 +587,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Jämför alternativen ett i taget med materialet. Notera vad som stöder eller talar emot varje påstående och välj sedan själv.",
       ],
       line: [
-        "Börja med att se vad axlarna visar. Vilket samband ber frågan dig att visa?",
-        "Välj två enkla x-värden i rutnätet och räkna fram deras y-värden. Håll beräkningarna åtskilda från själva ritandet.",
+        "Läs axelrubrikerna och sambandet i frågan. Vilken information behöver du innan du ritar något?",
+        "Välj två punkter som går att kontrollera med sambandet. Hur kan du pröva varje punkt mot axelrubrikerna?",
         "Kontrollera att båda punkterna passar sambandet och att linjens riktning stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
       ],
       scatter: [
         "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
-        "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
+        "Använd en rad i taget och jämför rubriker och enheter med grafens etiketter innan du placerar en punkt.",
         "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
       ],
       genericGraph: [
@@ -674,9 +679,9 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Use the relationship between the change in y and the change in x, then check your signs and units. Keep your calculation in your own work.",
       ]
       : [
-        "Slope describes how much y changes when x changes. What two quantities would you compare to describe that change?",
-        "Find the change in y and the change in x between two points. Which change belongs in the numerator, and which in the denominator?",
-        "The method is change in y divided by change in x. Keep the subtraction order consistent; what does that tell you about the direction of the line?",
+        "Think about what changes between two points. What information does the question give you to describe that change?",
+        "Write down the coordinate changes separately. What relationship between them would match the line?",
+        "Compare the two changes in a consistent order, then check the relationship with another pair. What does it tell you about the line?",
       ]
     : hasDraft
       ? [
@@ -685,9 +690,9 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
         "Använd sambandet mellan förändringen i y och förändringen i x och kontrollera tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
       ]
       : [
-        "Lutning beskriver hur mycket y förändras när x förändras. Vilka två storheter behöver du jämföra för att beskriva den förändringen?",
-        "Ta reda på förändringen i y och förändringen i x mellan två punkter. Vilken förändring ska stå i täljaren och vilken i nämnaren?",
-        "Metoden är förändring i y delat med förändring i x. Håll subtraktionsordningen konsekvent. Vad säger det om linjens riktning?",
+        "Tänk på vad som förändras mellan två punkter. Vilken information i frågan hjälper dig att beskriva förändringen?",
+        "Skriv koordinatförändringarna var för sig. Vilket samband mellan dem passar med linjen?",
+        "Jämför de två förändringarna i samma ordning och kontrollera sambandet med ett annat punktpar. Vad säger det om linjen?",
       ];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   const statusNote = issuanceState === "active" ? "" : issuanceState === "unverified"
@@ -713,23 +718,29 @@ async function gateActiveExam(req, res, body, user) {
     ? body.pageContext
     : null;
   const page = String(context?.page || "").trim().toLowerCase();
-  const examPage = ["prov", "resultat", "exam", "exam-result"].includes(page);
-  const hasOtherPage = Boolean(page && !examPage);
+  const hasOtherPage = Boolean(page && !["prov", "resultat", "exam", "exam-result"].includes(page));
   const hasCurrentQuestion = context?.currentQuestion && typeof context.currentQuestion === "object";
   const hasExamPhase = typeof context?.examState?.phase === "string" && context.examState.phase.trim().length > 0;
   const hasSubmissionIdentity = typeof context?.examState?.submissionId === "string"
     && /^[a-f0-9]{32}$/.test(context.examState.submissionId);
   const hasExamQuestions = Array.isArray(context?.questions) && context.questions.length > 0;
-  const examContextDeclared = examPage || (!hasOtherPage &&
-    (hasCurrentQuestion || hasExamPhase || hasSubmissionIdentity || hasExamQuestions));
+  const chatSubmissionIdentity = hasSubmissionIdentity && body.examReview !== true && !Array.isArray(body.scores);
+  const examContextDeclared = hasExamQuestions || chatSubmissionIdentity || (!hasOtherPage &&
+    (hasCurrentQuestion || hasExamPhase));
   const ordinaryStudyChat = typeof body.userQuestion === "string" && body.userQuestion.trim().length > 0
     && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && body.landingMode !== true && !Array.isArray(body.scores)
     && body.question == null && body.correct == null;
 
-  function referencesExamQuestion() {
+  function referencesExamQuestion({ allowTopicOverlap = false } = {}) {
     const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
-    if (/\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)) return true;
+    const explicitAnswerIntent = /\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|(?:vad|what) (?:är|is) (?:facit|svaret|the answer|lösningen)(?: på (?:uppgiften|frågan|provet))?|(?:svaret|the answer) på (?:uppgiften|frågan|provet)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)
+      || /\b(?:förklara|visa|ge|beskriv|explain|show|give)\s+(?:mig\s+)?(?:hela\s+)?(?:lösningen|svaret|facit|the solution|the answer)\b/i.test(query)
+      || /\b(?:lösningen|svaret|facit|the solution|the answer)\s+(?:på|till|för|to|for)\s+(?:uppgift(?:en)?|fråga(?:n)?|provet|problem|question|task)(?:\s*#?\d+)?\b/i.test(query);
+    const concreteTaskReference = /\b(?:uppgift|fråga|provfråga|exercise|question|task|problem)\b/i.test(query)
+      || /\b(?:this|that|the) (?:question|task|exercise|problem)\b/i.test(query);
+    const requestsTaskSolution = /\b(?:lös(?:a|er|ning|ningen)?|solve|work out|answer|besvara|svara på|räkn(?:a|ar|ade|at)?|räkna ut|beräkn(?:a|ar|ade|at)?|calculate|compute|facit|svaret|the answer|the solution|förklara|explain|visa|show|walk me through)\b/i.test(query);
+    if (explicitAnswerIntent || (concreteTaskReference && (requestsTaskSolution || isClearlyGeneralQuestion()))) return true;
     if (examContextDeclared && /\b(den här|det här|denna fråga|den frågan|detta|dessa|här|this|that|it|those)\b/i.test(query)) return true;
     const targets = [
       context?.currentQuestion?.text,
@@ -743,11 +754,41 @@ async function gateActiveExam(req, res, body, user) {
       ]) : []),
     ]
       .filter((value) => typeof value === "string");
+    const normalizeQuestion = (value) => value.toLocaleLowerCase("sv-SE").normalize("NFKC")
+      .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalizedQuery = normalizeQuestion(query);
+    if (targets.some((target) => normalizeQuestion(target) === normalizedQuery)) return true;
     if (!targets.length) return false;
-    const ignored = new Set("vad betyder beskriv förklara varför hur kan jag mitt din med från till detta den det som och eller är var was what does explain how why with from that this question about which tell me please help solve find use give answer the a an is of in on for it".split(" "));
+    const ignored = new Set("vad betyder beskriv förklara varför hur kan jag mitt din med från till mellan detta den det som och eller är var was what does explain how why with from that this question about which tell me please help solve find use give answer the a an is of in on for it".split(" "));
     const stem = (word) => word.replace(/(?:arna|erna|ande|en|et|ar|er|or|s)$/u, (suffix) =>
       word.length - suffix.length >= 4 ? "" : suffix);
     const queryWords = new Set((query.normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || []).map(stem));
+    // After verified completion, allow broad concept questions that naturally
+    // share a couple of terms with the old question. Explicit task references
+    // were handled above; reserve this heuristic for strong textual overlap.
+    if (allowTopicOverlap) {
+      const normalizeEquation = (value) => value.toLowerCase()
+        .replace(/²/g, "^2").replace(/³/g, "^3")
+        .replace(/[·⋅∙×]/g, "*").replace(/−/g, "-").replace(/\s+/g, "")
+        .replace(/(\d+(?:[.,]\d+)?)\*([a-z])/g, "$1$2")
+        .replace(/([a-z])\*([a-z])/g, "$1$2")
+        .replace(/[.,;:!?]+$/g, "");
+      const equationAtom = String.raw`(?:\d+(?:[.,]\d+)?\s*[a-z](?:[a-z])?(?:\s*\^\s*[+-]?\d+)?|[a-z](?:[a-z])?(?:\s*\^\s*[+-]?\d+)?|\d+(?:[.,]\d+)?|\([^()]{1,60}\))`;
+      const equationSide = String.raw`(?:[+-]\s*)?${equationAtom}(?:\s*[+*/-]\s*${equationAtom})*`;
+      const equationPattern = new RegExp(String.raw`(?<![\p{L}\p{N}_])(${equationSide})\s*=\s*(${equationSide})(?![\p{L}\p{N}_])`, "giu");
+      const findEquations = (value) => String(value).replace(/²/g, "^2").replace(/³/g, "^3")
+        .replace(/[·⋅∙×]/g, "*").replace(/−/g, "-").match(equationPattern) || [];
+      const queryEquations = new Set(findEquations(query)
+        .map(normalizeEquation));
+      for (const target of targets) {
+        const targetWords = target.toLocaleLowerCase("sv-SE").normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || [];
+        const sharedWords = new Set(targetWords.filter((word) => !ignored.has(word) && queryWords.has(stem(word))).map(stem));
+        const targetEquations = findEquations(target)
+          .map(normalizeEquation);
+        if (sharedWords.size >= 4 || targetEquations.some((equation) => queryEquations.has(equation))) return true;
+      }
+      return false;
+    }
     for (const target of targets) {
       const targetWords = target.toLocaleLowerCase("sv-SE").normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || [];
       if (targetWords.some((word) => !ignored.has(word) && queryWords.has(stem(word)))) return true;
@@ -757,30 +798,28 @@ async function gateActiveExam(req, res, body, user) {
 
   function isClearlyGeneralQuestion() {
     const query = String(body.userQuestion || "").trim();
-    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)\b/i
+    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|vad ska jag (?:göra nu|öva(?: mer)? på|fokusera på)|vad borde jag (?:öva(?: mer)? på|träna(?: mer)? på|fokusera på)|vad behöver jag (?:öva(?: mer)? på|träna(?: mer)? på)|ge (?:mig )?ett exempel|visa (?:mig )?ett exempel|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|what should i (?:study|practice|work on) next|what should I focus on|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)(?=$|[^\p{L}\p{N}_])/iu
       .test(query);
     // Natural standalone help requests need not use a textbook-style opening.
     // Require an explicit subject after the request so vague prompts such as
     // "hjälp mig att tänka" remain on the answer-free exam-help path.
     const namedTopic = /^(?:kan du )?(?:hjälpa mig (?:att )?(?:förstå|med)|hjälp mig (?:att )?(?:förstå|med)|kan du (?:förklara|berätta om|gå igenom)|berätta om|gå igenom)\s+[\p{L}\p{N}]/iu
       .test(query);
-    return direct || (hasSubmissionIdentity && namedTopic);
+    return direct || namedTopic;
   }
 
-  function allowRestrictedStudyChat({ pendingExam = true } = {}) {
-    if (!ordinaryStudyChat || referencesExamQuestion()) return false;
-    if (examContextDeclared && !isClearlyGeneralQuestion()) return false;
-    // This server-owned marker only limits ordinary study chat. Exam-related
-    // questions and specialized answer routes remain behind their own gates.
-    body._perExamStudyOnly = true;
-    if (pendingExam) body._perPendingExamStudy = true;
-    if (context) {
-      body.pageContext = { ...context };
-      delete body.pageContext.currentQuestion;
-      delete body.pageContext.questions;
-      delete body.pageContext.examState;
-      if (examPage) delete body.pageContext.page;
+  function allowSafeStudyChat() {
+    const clearlyGeneral = isClearlyGeneralQuestion();
+    if (!ordinaryStudyChat || referencesExamQuestion({ allowTopicOverlap: clearlyGeneral })) return false;
+    if (examContextDeclared && !clearlyGeneral) return false;
+    const safeContext = { page: "app" };
+    for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
+      if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];
     }
+    body.pageContext = safeContext;
+    const selectedTopic = String(context?.course || context?.topic || body.topic || "").trim();
+    body.topic = ["app", "prov", "resultat", "exam", "exam-result"].includes(selectedTopic.toLowerCase()) ? "" : selectedTopic;
+    delete body.context;
     return true;
   }
 
@@ -817,7 +856,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (state === "active" || state === "grading") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
@@ -827,7 +865,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (activeCount > 0) {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body);
       return true;
     }
@@ -837,7 +874,6 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
@@ -848,7 +884,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat({ pendingExam: false })) return false;
+      if (allowSafeStudyChat()) return false;
       // A verified result can be reviewed through the signed completion flow;
       // a plain chat request on the exam view still does not get the answer.
       sendActiveExamGuidance(req, res, body, state);
@@ -858,6 +894,7 @@ async function gateActiveExam(req, res, body, user) {
       body.pageContext = { ...context };
       delete body.pageContext.examState;
       delete body.pageContext.currentQuestion;
+      delete body.pageContext.questions;
     }
     return false;
   }
@@ -877,12 +914,11 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, latestState);
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat()) return false;
+      if ((latestState === "completed" || latestState === "none") && allowSafeStudyChat()) return false;
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
@@ -891,12 +927,12 @@ async function gateActiveExam(req, res, body, user) {
       // display context, not trusted inputs to the general study-help prompt.
       body.pageContext = { ...context };
       delete body.pageContext.currentQuestion;
+      delete body.pageContext.questions;
       delete body.pageContext.examState;
       if (["prov", "resultat"].includes(body.pageContext.page)) delete body.pageContext.page;
     }
     return false;
   }
-  if (allowRestrictedStudyChat()) return false;
   sendActiveExamGuidance(req, res, body);
   return true;
 }
@@ -1168,6 +1204,12 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const recentMistakes = rawMistakes.slice(0, 10).map(m => ({
       question: sanitize(String(m.question || ''), 200),
       category: sanitize(String(m.category || m.course || ''), 60),
+      concept: sanitize(String(m.concept || m.concept_tag || ''), 80),
+      errorTags: Array.isArray(m.errorTags || m.error_tags)
+        ? (m.errorTags || m.error_tags).slice(0, 4).map(tag => sanitize(String(tag || ''), 40))
+        : [],
+      studentAnswer: sanitize(String(m.studentAnswer || m.user_answer || ''), 160),
+      feedback: sanitize(String(m.feedback || ''), 160),
     }));
 
     const contextPack = buildPERContextPack({
@@ -1374,6 +1416,16 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       let streamFinished = false;
       let streamTruncated = false;
       let streamBudgetReservation = null;
+      let quotaCommitted = false;
+      let quotaCommitFailed = false;
+      let clientDisconnected = false;
+      const clientAbort = new AbortController();
+      res.once?.("close", () => {
+        if (!res.writableEnded) {
+          clientDisconnected = true;
+          clientAbort.abort();
+        }
+      });
       const streamStartedAt = Date.now();
       try {
         const stream = await callAIStream(msgs, {
@@ -1381,6 +1433,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           timeout: 55_000,
           includeUsage: true,
           userId: user.id,
+          signal: clientAbort.signal,
         });
         streamBudgetReservation = stream?.aiSpendReservation || null;
         const reader = stream.getReader();
@@ -1388,6 +1441,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         let buf = '';
         while (true) {
           const { done, value } = await reader.read();
+          if (clientDisconnected) {
+            if (!done) await reader.cancel().catch(() => {});
+            break;
+          }
           if (done) break;
           buf += decoder.decode(value, { stream: true });
           const lines = buf.split('\n');
@@ -1399,28 +1456,55 @@ async function handleExplainRequest(req, res, perAnswerLease) {
               streamFinished = true;
               continue;
             }
-            try {
-              const ev = JSON.parse(raw);
-              if (ev.usage) {
-                streamUsage = ev.usage;
-                streamModel = ev.model || null;
+            let ev;
+            try { ev = JSON.parse(raw); } catch (_) { continue; }
+            if (ev.usage) {
+              streamUsage = ev.usage;
+              streamModel = ev.model || null;
+            }
+            const finishReason = ev.choices?.[0]?.finish_reason;
+            if (finishReason === 'stop') streamFinished = true;
+            else if (finishReason) streamTruncated = true;
+            const delta = ev.choices?.[0]?.delta?.content;
+            if (delta) {
+              if (!quotaCommitted) {
+                quotaCommitted = await settlePerChatQuota(user.id, quota, true);
+                if (!quotaCommitted) {
+                  quotaCommitFailed = true;
+                  break;
+                }
               }
-              const finishReason = ev.choices?.[0]?.finish_reason;
-              if (finishReason === 'stop') streamFinished = true;
-              else if (finishReason) streamTruncated = true;
-              const delta = ev.choices?.[0]?.delta?.content;
-              if (delta) { fullText += delta; res.write(`data: ${JSON.stringify({ delta })}\n\n`); }
-            } catch (_) {}
+              if (clientDisconnected) break;
+              fullText += delta;
+              res.write(`data: ${JSON.stringify({ delta })}\n\n`);
+            }
+          }
+          if (quotaCommitFailed) {
+            await reader.cancel().catch(() => {});
+            throw new Error("P.E.R quota could not be committed before streaming output");
+          }
+          if (clientDisconnected) {
+            await reader.cancel().catch(() => {});
+            break;
           }
         }
       } catch {
-        await settlePerChatQuota(user.id, quota, false);
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
+        if (clientDisconnected) return;
         res.write(`data: ${JSON.stringify({ error: 'P.E.R är tillfälligt otillgänglig. Försök igen senare.' })}\n\n`);
         return res.end();
       }
 
+      if (clientDisconnected) {
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
+        return;
+      }
+
       if (!streamFinished || streamTruncated) {
-        await settlePerChatQuota(user.id, quota, false);
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
         res.write(`data: ${JSON.stringify({ error: 'Svaret avbröts innan det blev klart. Frågan finns kvar; försök igen.' })}\n\n`);
         return res.end();
       }
@@ -1430,19 +1514,20 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         model: streamModel || process.env.OPENAI_MODEL_PER || process.env.OPENAI_MODEL || "gpt-4o-mini",
         usage: streamUsage, latencyMs: Date.now() - streamStartedAt,
       }, { timeoutMs: 750 });
-      await settleAiSpend(streamBudgetReservation, streamUsage);
+      await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
       if (!fullText) {
         await usageWrite;
-        await settlePerChatQuota(user.id, quota, false);
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
         res.write(`data: ${JSON.stringify({ error: 'No response' })}\n\n`);
         return res.end();
       }
 
-      if (!(await settlePerChatQuota(user.id, quota, true))) {
+      if (!quotaCommitted && !(await settlePerChatQuota(user.id, quota, true))) {
         await usageWrite;
         res.write(`data: ${JSON.stringify({ error: 'P.E.R-kvoten kunde inte sparas. Försök igen.' })}\n\n`);
         return res.end();
       }
+      quotaCommitted = true;
 
       const newHistory = [
         ...history,

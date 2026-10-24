@@ -198,6 +198,25 @@
     return isEnglish() ? en : sv;
   }
 
+  function questionCountNote(got, requested) {
+    if (!Number.isFinite(got) || !Number.isFinite(requested) || got >= requested) return "";
+    return tx("Du bad om " + requested + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
+      "You requested " + requested + " questions. " + got + " " + (got === 1 ? "question passed quality review and is included" : "questions passed quality review and are included") + " in this exam.");
+  }
+
+  function questionProgressLabel(index, delivered) {
+    var requested = Number(S.num);
+    var position = index + 1;
+    var english = isEnglish();
+    var label = (english ? "Question " : "Fråga ") + position + " / " + delivered;
+    if (Number.isInteger(requested) && delivered < requested) {
+      label += english
+        ? " · " + delivered + " of " + requested + " requested"
+        : " · " + delivered + " av " + requested + " begärda";
+    }
+    return label;
+  }
+
   function updateReviewActionLabels() {
     Array.prototype.forEach.call(document.querySelectorAll("#xf .xf-review-action"), function (button) {
       button.textContent = isEnglish() ? button.dataset.labelEn : button.dataset.labelSv;
@@ -508,6 +527,15 @@
     submitting: false   // spärr mot dubbel inlämning
   };
 
+  window.__getPerStudyContext = function () {
+    var examIsActive = Boolean(S.exam && S.draftPhase === "active");
+    return {
+      course: String(S.course || "").trim().slice(0, 120),
+      level: String(S.level || "").trim().slice(0, 30),
+      studyMaterial: examIsActive ? "" : String(S.material || "").trim().slice(0, 6000),
+    };
+  };
+
   var UI = {};          // cache av noder
   var examReturnFocus = null;
   var examInertState = null;
@@ -733,6 +761,50 @@
     // Ett halvfärdigt prov ska aldrig gå förlorat för att mobilen låste sig
     // eller täckningen försvann på bussen.
     var draft = readDraft();
+    if (window.ExGenEngine && window.ExGenEngine.getPendingGenerations) {
+      Promise.resolve(window.ExGenEngine.getPendingGenerations()).then(function (pending) {
+        if (renderVersion !== startVersion || !act.isConnected || !Array.isArray(pending) || !pending.length) return;
+        var note = el("p", "xf-sub", tx(
+          "Ett pågående prov kan återupptas i den här fliken i högst 20 minuter. Materialet sparas bara tillfälligt i flikens sessionsminne.",
+          "A pending exam can be resumed in this tab for up to 20 minutes. Material is kept temporarily in this tab's session storage."
+        ));
+        note.setAttribute("role", "status");
+        act.appendChild(note);
+        pending.slice().sort(function (a, b) { return b.createdAt - a.createdAt; }).forEach(function (record) {
+          var resume = el("button", "xf-btn ghost", tx(
+            "Återuppta " + record.payload.course + " · " + record.payload.numQuestions + " frågor",
+            "Resume " + record.payload.course + " · " + record.payload.numQuestions + " questions"
+          ));
+          resume.type = "button";
+          resume.addEventListener("click", async function () {
+            resume.disabled = true;
+            resume.textContent = tx("Återställer provvalen…", "Restoring exam settings…");
+            try {
+              var restored = await window.ExGenEngine.restorePendingGeneration(record.idempotencyKey);
+              if (!restored || renderVersion !== startVersion) {
+                resume.disabled = false;
+                resume.textContent = tx("Begäran kunde inte återställas", "Could not restore request");
+                return;
+              }
+              var payload = restored.payload;
+              S.course = payload.course;
+              S.level = payload.level;
+              S.qType = payload.qType;
+              S.num = payload.numQuestions;
+              S.nonGraphNum = payload.numQuestions;
+              S.material = payload.pastedText;
+              S.focusTerms = Array.isArray(payload.focusTerms) ? payload.focusTerms.slice() : [];
+              S.draftOwnerId = uid();
+              stepContract();
+            } catch (_) {
+              resume.disabled = false;
+              resume.textContent = tx("Begäran kunde inte återställas", "Could not restore request");
+            }
+          });
+          act.appendChild(resume);
+        });
+      }).catch(function () {});
+    }
     if (draft && draft.exam && draft.exam.exam_manifest && window.PER && window.PER.setExamHistoryMasked) {
       window.PER.setExamHistoryMasked(true);
     }
@@ -787,6 +859,8 @@
               S.material = draft.material || "";
               S.startedAt = Number(draft.startedAt) || Date.now();
               S.exam = draft.exam;
+              S.questionCountNote = draft.questionCountNote
+                ? questionCountNote(draft.exam.questions.length, S.num) : "";
               S.answers = questionState(draft.answers);
               S.helped = questionState(draft.helped);
               S.idx = clamp(Number(draft.idx) || 0, 0, draft.exam.questions.length - 1);
@@ -831,6 +905,8 @@
         S.material = draft.material || "";
         if (legacyDraft || back.dataset.expired === "true") { stepMaterial(); return; }
         S.exam = draft.exam;
+        S.questionCountNote = draft.questionCountNote
+          ? questionCountNote(draft.exam.questions.length, S.num) : "";
         S.draftPhase = draft.phase === "result-recovery" ? "result-recovery" : "active";
         S.answers = questionState(draft.answers);
         S.helped = questionState(draft.helped);
@@ -1560,8 +1636,15 @@
     act.appendChild(perButton);
     b.appendChild(act);
 
-    b.appendChild(el("div", "xf-note",
-      tx("AI skapar frågor med ditt material som underlag, men kan missa detaljer. Kontrollera att de passar kursen medan du arbetar igenom provet.", "AI creates questions using your material as a reference, but may miss details. Check that they fit your course as you work through the exam.")));
+    var generationNote = tx(
+      "AI skapar frågor med ditt material som underlag, men kan missa detaljer. Kontrollera att de passar kursen medan du arbetar igenom provet.",
+      "AI creates questions using your material as a reference, but may miss details. Check that they fit your course as you work through the exam."
+    );
+    generationNote += " " + tx(
+      "Om sidan laddas om kan samma provbegäran återupptas i den här fliken; materialet sparas tillfälligt i flikens sessionsminne i högst 15 minuter.",
+      "If the page reloads, the same exam request can be resumed in this tab; material is kept temporarily in this tab's session storage for up to 20 minutes."
+    );
+    b.appendChild(el("div", "xf-note", generationNote));
 
     screen("contract");
   }
@@ -1637,6 +1720,14 @@
         say(tx("Provkvoten är slut.", "Exam quota reached."), quotaMessage);
         return;
       }
+      if (r?.ok && Array.isArray(r.exam?.questions) && r.exam.questions.length > S.num) {
+        err.textContent = tx(
+          "Svaret innehöll fler frågor än du bad om. Inget prov öppnades. Försök igen.",
+          "The response contained more questions than requested. No exam was opened. Please try again.",
+        );
+        say(tx("Provet kunde inte valideras.", "The exam could not be validated."), err.textContent);
+        return;
+      }
       if (!r || !r.ok || !r.exam || !Array.isArray(r.exam.questions) || !r.exam.questions.length) {
         err.textContent = (r && r.error) || tx("Provet kunde inte byggas. Försök igen.", "The exam could not be created. Please try again.");
         var retryHint = r && r.errorCode === "incomplete_exam"
@@ -1649,10 +1740,7 @@
       S.exam = normalizeIds(r.exam);
       S.draftPhase = "active";
       var got = S.exam.questions.length;
-      S.questionCountNote = got < S.num
-        ? tx("Du bad om " + S.num + " frågor. " + got + " " + (got === 1 ? "fråga klarade" : "frågor klarade") + " kvalitetskontrollen och ingår i provet.",
-            "You requested " + S.num + " questions. " + got + " " + (got === 1 ? "question passed quality review and is included" : "questions passed quality review and are included") + " in this exam.")
-        : "";
+      S.questionCountNote = questionCountNote(got, S.num);
       S.answers = questionState();
       S.helped = questionState();
       S.idx = 0;
@@ -1948,7 +2036,7 @@
     var qs = (S.exam && S.exam.questions) || [];
     var english = Boolean(window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === "en");
     UI.dots.setAttribute("aria-label", english ? "Exam question navigation" : "Provfrågor");
-    if (UI.count) UI.count.textContent = (english ? "Question " : "Fråga ") + (S.idx + 1) + " / " + qs.length;
+    if (UI.count) UI.count.textContent = questionProgressLabel(S.idx, qs.length);
     if (UI.prev) UI.prev.textContent = english ? "Previous" : "Föregående";
     if (UI.next) UI.next.textContent = S.exam && S.idx === qs.length - 1
       ? (english ? "Submit" : "Lämna in")
@@ -2116,7 +2204,7 @@
       UI.dots.children[focusedDotIndex].focus({ preventScroll: true });
     }
 
-    UI.count.textContent = tx("Fråga ", "Question ") + (i + 1) + " / " + qs.length;
+    UI.count.textContent = questionProgressLabel(i, qs.length);
 
     var sheet = el("div", "xf-sheet");
 
@@ -2128,7 +2216,7 @@
       var dismissQualityNote = el("button", null, "✕");
       dismissQualityNote.type = "button";
       dismissQualityNote.setAttribute("aria-label", tx("Stäng meddelandet", "Dismiss message"));
-      dismissQualityNote.addEventListener("click", function () { S.questionCountNote = ""; renderQuestion(); });
+      dismissQualityNote.addEventListener("click", function () { S.questionCountNote = ""; saveDraft(); renderQuestion(); });
       qualityNote.appendChild(qualityText);
       qualityNote.appendChild(dismissQualityNote);
       sheet.appendChild(qualityNote);
@@ -2858,6 +2946,7 @@
     var fresh = el("button", "xf-btn quiet", tx("Nytt ämne", "New topic"));
     fresh.type = "button";
     fresh.addEventListener("click", function () {
+      if (typeof window.clearMistakeTrainingContext === "function") window.clearMistakeTrainingContext();
       S.exam = null; S.answers = questionState(); S.helped = questionState(); S.material = "";
       S.draftPhase = "active";
       S.submitting = false;
@@ -2887,7 +2976,7 @@
       phase: S.draftPhase === "result-recovery" ? "result-recovery" : "active",
       startedAt: S.startedAt,
       course: S.course, level: S.level, qType: S.qType, num: S.num, nonGraphNum: S.nonGraphNum,
-      material: S.material, exam: S.exam,
+      material: S.material, exam: S.exam, questionCountNote: S.questionCountNote,
       answers: S.answers, helped: S.helped, idx: S.idx
     };
 
@@ -3210,17 +3299,19 @@
        stället. Flödet går normalt direkt till kontraktet — kurs och material
        är redan kända. Om det sammanslagna materialet överskrider gränsen går
        eleven tillbaka till materialsteget för att korta ner det. */
-    window.__xfPrefill = function (material, course) {
+    window.__xfPrefill = function (material, course, questionCount) {
       var mat = String(material || "").trim();
-      if (!mat) return false;
+      var selectedCourse = String(course || "").trim();
+      if (!mat || !selectedCourse) return false;
       S.material = mat;
-      S.focusTerms = null;
-      if (course) S.course = String(course).trim();
-      if (!S.course) S.course = dna().courses[0] || "Repetition";
+      // The wrapper contains labels such as "Begrepp" and "Modellsvar".
+      // They are not course concepts and must not become automatic priorities.
+      S.focusTerms = [];
+      S.course = selectedCourse;
       var d = dna();
       S.level = d.level;
       S.qType = "mix";
-      S.num = clamp(d.num, 2, 20);
+      S.num = clamp(Number(questionCount) || 3, 2, 20);
       S.nonGraphNum = S.num;
       if (Array.from(mat).length > MATERIAL_MAX) {
         stepMaterial(tx("Träningsmaterialet är längre än gränsen. Korta ner texten innan du fortsätter.", "The practice material exceeds the limit. Shorten it before continuing."));

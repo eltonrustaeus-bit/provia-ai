@@ -67,6 +67,17 @@ await seed(page);
 
 await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+
+// Allmän studiehjälp ska börja på en användbar förklaringsnivå; ledtråd först
+// gäller när eleven faktiskt står vid en aktiv provfråga.
+await page.waitForSelector("#perBubble", { timeout: 8000 });
+await page.click("#perBubble");
+await page.waitForSelector("#perInput");
+await page.fill("#perInput", "Vad betyder derivata?");
+await page.click("#perSendBtn");
+await page.waitForTimeout(800);
+ok("L0 allmän studiehjälp startar på nivå 1", last()?.helpLevel === 1, JSON.stringify(last()?.helpLevel));
+
 await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
 await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 3c");
 await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);

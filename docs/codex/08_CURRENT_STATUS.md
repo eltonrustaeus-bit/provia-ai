@@ -1,5 +1,180 @@
 # 08 Current Status
 
+## Same-tab recovery after interrupted generation — 2026-10-24
+
+- [x] Added a tab-scoped recovery snapshot for in-flight non-graph exam requests.
+  It stores the request payload only in `sessionStorage` for at most 15 minutes,
+  verifies the current account against the request fingerprint, stores no auth
+  token, bounds nested arrays and total payload to 192 KiB, and allows only known
+  fields in nested records. Expiry is enforced on read and also gets a
+  best-effort active-tab cleanup timer; browser suspension may delay the timer.
+- [x] The generation screen now offers an explicit resume action after reload.
+  It restores the exact course, level, count, material, focus, and mistake-source
+  references, then reuses the existing idempotency key so the server does not
+  reserve quota or create a second exam for the same request. The contract screen
+  discloses the temporary tab-storage behavior.
+- [x] Offline verification: `generation-request-idempotency` assertions passed;
+  resumable generation client tests passed 17/17; pipeline, HTTP, source and
+  verifier suites passed 33/33; partial-delivery check passed; P.E.R. context
+  passed 80/80 and ladder passed 29/29; broad Playwright
+  `tests/frontend/exam-flow.regression.mjs` passed 194/194 after a layout fix.
+  Syntax checks and `git diff --check` passed.
+- [!] The broad browser suite verifies the surrounding app and generation
+  progress, but it does not yet click the newly added recovery button or prove
+  its sessionStorage-to-same-key round trip through a page reload.
+- [!] Independent P.E.R. review found no blocker and confirmed answer gates;
+  it also notes that model-answer quality is not established by mocks. The
+  independent security/idempotency follow-up found no blocker after bounds and
+  allowlisting; cleanup remains best-effort if the browser suspends the tab.
+- [x] Read-only hosted status on 2026-10-24: Production is READY at `main`
+  commit `c50369e`; the latest existing READY Preview is older commit `139cffb`
+  on `codex/exgen-generation-quality-2026-10-20`. No deployment was found for
+  the current branch `codex/exgen-school-pilot-goal-20261023`. Staging
+  `exgen-pilot-staging` is `ACTIVE_HEALTHY` at migration `20261023080909`.
+- [!] No push, deploy, database write, paid model call, merge, or production
+  change was made. Current local changes remain uncommitted.
+
+## Generation recovery and mistake-evidence follow-up — 2026-10-24
+
+- [x] Temporary `generation_status_unavailable` responses no longer count as
+  definitive start failures. The browser retains the original idempotent
+  request for retry/resume rather than deleting its recovery snapshot.
+- [x] Partial exams keep a requested-versus-delivered count in the persistent
+  question counter, even after the explanatory warning is dismissed and after
+  reloading/resuming. The warning itself remains dismissible.
+- [x] Verified mistake evidence now retains bounded source question, student
+  answer, grading feedback and expected answer text instead of truncating each
+  to a few hundred characters. The aggregate training-focus envelope remains
+  capped; if evidence cannot be preserved, the server rejects rather than
+  silently omitting selected focus. Verified stored course spelling is used.
+- [x] The expected answer for mistake training now comes from the verified
+  grading payload when the issued client exam intentionally omitted its answer
+  key. Signed source material remains the factual source and is still required.
+- [x] P.E.R. escapes user-controlled course, level, mode and weak-area fields,
+  omits unknown page labels instead of copying them into the system prompt, and
+  keeps the live course/level ahead of stale legacy page context.
+- [x] Internal request-size regression proves the 12-focus evidence request is
+  above the public 64 KiB cap but below the existing internal 128 KiB cap; no
+  internal body-limit increase was needed.
+- [x] Latest offline verification: API generation and mistake-source/context
+  tests passed 36/36; mistake-source and prompt-context focused checks passed
+  14/14; client recovery, partial delivery and storage tests passed 20/20, with
+  an additional idempotency-helper failure-path assertion passing;
+  broad `exam-flow.regression` passed 195/195; P.E.R. manifest passed 28/28;
+  focused P.E.R. review, streaming, answer-gate and help-ladder tests passed
+  78/78. Syntax checks and `git diff --check` passed.
+- [!] One remaining question is whether post-grade general coaching should use
+  a score. The client-supplied value is not treated as verified; pass a score
+  only if it can be derived from the server-saved, verified result.
+- [!] No current Preview/staging model request, push, merge, production change
+  or database write was performed. Hosted behavior remains unverified.
+- [x] Read-only hosted recheck: Production remains READY on `main` at
+  `c50369e`; the goal branch has no Vercel deployment. The latest existing
+  READY Preview is older commit `139cffb` on the separate generation-quality
+  branch. Staging remains `ACTIVE_HEALTHY` at migration `20261023080909`.
+
+**PILOT NOT READY.** Next: receive the independent security/idempotency review,
+add or run a browser-level recovery check, then seek separate authorization for
+a branch Preview and synthetic staging tests. Keep the READY Production build
+untouched while those checks run.
+
+## Felträningsreplay och payload-gräns — 2026-10-24
+
+- [x] Nya felträningsjobb hashar nu den normaliserade, källreferensbundna
+  begäran innan servern läser den tidsbegränsade rättningskällan. Samma färdiga
+  begäran kan därför spelas upp utan ny källa, modellkörning eller kvotdrag.
+  Vanliga provbegärans hash är oförändrad. En kompatibilitetsväg hanterar
+  äldre hashade jobb när källan fortfarande kan verifieras.
+- [x] Verifierade felträningsfokus normaliseras även efter serverns rekonstruktion
+  innan de sparas i pipeline-payloaden. Om någon vald fokuspost skulle falla
+  bort stoppas begäran i stället för att tyst fortsätta med en ofullständig lista.
+- [x] Ny regressionssvit för replay, källbindning och storleksgräns passerade
+  20/20. Samlad API-/P.E.R.- och frontendsvit passerade 134/134; den kördes
+  före den sista extra storlekstestregressionen, som sedan passerade i den
+  riktade 20-testsviten. Syntaxkontroller och `git diff --check` passerade.
+- [!] Äldre jobb vars rättningskälla hunnit gå ut före den nya hashversionen
+  kan fortfarande inte alltid spelas upp. Inga schemaändringar gjordes för att
+  ändra deras historiska identitet. Omladdning utan att användaren återskapar
+  exakt material och felval är inte fullt automatiserad.
+- [!] Allt arbete är fortsatt lokalt och ocommittat. Ingen Preview/staging-
+  verifiering, modellkörning, push, merge eller produktionsändring gjordes.
+
+## Generation and P.E.R regression follow-up — 2026-10-24
+
+- [x] Fixed a P.E.R history recovery race: a newer failed refresh no longer
+  invalidates an older successful response. Account changes, exam masking and
+  server memory clearing still invalidate in-flight responses; an older
+  response also cannot overwrite a newer successful response.
+- [x] `tests/frontend/per-exam-context.test.mjs` passed 80/80, including both
+  overlapping-refresh orderings and the existing active-exam history mask.
+  The targeted generation-error mode passed 74/74.
+- [x] A fresh full `tests/frontend/exam-flow.regression.mjs` rerun completed
+  with 192/192 after about 2.5 minutes. An earlier attempt was stopped while
+  still running and is not counted as a pass.
+- [x] Mistake-training now raises the default question count to fit the number
+  of selected distinct training foci, while preserving any higher count the
+  learner already selected. The count is passed into the real `__xfPrefill`
+  state and remains visible in the contract and outgoing API request. This
+  avoids an avoidable preflight rejection; the server still rejects excess
+  focus counts before quota reservation. The browser regression verifies 4
+  focuses request 4 questions by default and that a selected count of 8 reaches
+  the actual generation request. Independent exam-quality review confirmed the
+  P1 is closed with no quality-gate relaxation.
+- [x] Additional current-diff checks passed: P.E.R help ladder 29/29,
+  server-verified mistake sources 10/10, generation pipeline HTTP 2/2,
+  generation progress/recovery 16/16, pipeline quality/counts 19/19 and the
+  frontend P.E.R context-pack test exited 0. These are offline/mock tests.
+- [x] Corrected the browser error fixtures to model the actual resumable flow:
+  accepted `start`, then `advance`/`status`, including an interrupted advance.
+  The test now reads the wizard's real error/status regions and uses a valid
+  synthetic Supabase refresh response for the 401 retry case.
+- [x] Full `tests/frontend/exam-flow.regression.mjs` passed 192/192. The
+  targeted generation-error mode passed 74/74. A focused 16-file API,
+  frontend and eval suite exited 0; relevant syntax checks and
+  `git diff --check` passed.
+- [x] `shared.js` now treats the live study-context provider as authoritative
+  even when it intentionally returns empty material, preventing the legacy
+  fallback from reusing a previous topic after "Nytt ämne". The P.E.R context
+  suite passed 76/76.
+- [!] Current local changes remain uncommitted and are not the latest Preview.
+  Read-only Vercel state rechecked 2026-10-24: Production is READY at `c50369e`;
+  the latest feature Preview is READY at `139cffb` on
+  `codex/exgen-generation-quality-2026-10-20`. Neither contains this worktree's
+  dirty diff (HEAD `c50369e`). Staging `yhcinqejsocpmmetazpz` is at migration
+  `20261023080909`; no staging request was made in this pass.
+- [!] No authenticated live model request, staging-backed run, push, merge,
+  production deploy, or database write was performed. Offline tests do not
+  establish hosted behavior.
+
+## Mistake-training and P.E.R grounding review — 2026-10-24
+
+- [x] Root-cause review found interacting issues rather than one confirmed
+  outage: mistake-training questions could overrepresent one selected error
+  focus; P.E.R could lose study material on a verified result view; stale
+  hidden course state could override the learner's current course; and active
+  graph/slope hints could reveal more method detail than intended. Verified
+  mistake source records are still derived server-side from the learner's
+  owned, signed and graded exam and its original material.
+- [x] Pipeline tracks aggregate coverage of selected mistake foci and requires
+  every accepted question to be independently marked against an uncovered
+  focus. It no longer substitutes a new question while preserving the same
+  accepted count; assembly requires requested count and complete focus coverage.
+  Model prompts receive opaque focus IDs and learning details, never source
+  submission/question IDs.
+- [x] P.E.R retains study-material context only on the verified result-study
+  view, while active-exam answer gates remain server-authoritative. Current
+  course/level context takes precedence over stale compatibility inputs, and
+  active graph/slope hints are answer-free and more Socratic.
+- [x] Targeted offline suites passed 94/94 across focus prompts, verifier,
+  mistake-source validation, resumable pipeline/HTTP, P.E.R exam review and
+  frontend context. Syntax checks and `git diff --check` passed. Independent
+  read-only review found no remaining blocker in the reviewed patch.
+- [!] No authenticated Preview, staging database, live model request, or
+  production behavior was checked in this pass. Work remains local and
+  uncommitted; no push, merge, deployment, or database change was made.
+
+**PILOT NOT LIVE-VERIFIED.** These changes have offline evidence only.
+
 ## UI-skydd för ofullständiga prov — 2026-10-23
 
 - [x] Appen avgör nu delprov genom att jämföra faktiskt antal returnerade
@@ -1975,3 +2150,340 @@ innan PR #123 kan mergas.
 **PILOT NOT READY.** Kvar är versionssynkad stagingmigration och ett nytt
 syntetiskt end-to-end-prov inom färsk kostnadsgräns. Produktionsschema och
 releaseordning måste granskas och godkännas separat före merge.
+
+## Felträning källbunden i offlineflödet — 2026-10-23
+
+- [x] Felträning använder nu sparat ursprungsmaterial från samma elevägda
+  provrad som det valda misstaget. Kurs, prov-ID, fråge-ID och normaliserad
+  frågetext måste stämma; saknad eller blandad källa stoppar träningen i stället
+  för att göra ett irrelevansbenäget prov.
+- [x] Tidigare misstagsfokus skickas separat från faktamaterialet. Frågorna från
+  de valda proven skickas separat som jämförelseunderlag; valda frågor får
+  prioritet före kompletterande frågor inom gränsen. Generator, oberoende
+  granskare och pipeline-deduplicering får samma jämförelsedata. Kvalitetsgrindar
+  sänktes inte.
+- [x] Riktade API-, PGlite/HTTP- och browserregressioner passerade: 25/25 för
+  generering/källbunden felträning, 59/59 för P.E.R.-kontext, facitspärr och
+  hjälptrappa, 2/2 för gammal felkälla/promptkontrakt och en separat HTTP-
+  idempotens/pipeline-omkörning passerade 2/2.
+  Syntaxkontroller och `git diff --check` passerade. Oberoende review fann först
+  att jämförelsegränsen kunde tappa ett senare valt misstag; prioritering och en
+  20-valstest åtgärdade det. Slutreview fann inga kvarstående blockerare i den
+  avgränsade diffen.
+- [!] Detta bevisar lokal/offline logik, inte att servern själv hämtar och
+  verifierar varje källrad, verklig modellkvalitet eller hosted stagingbeteende.
+  Ingen betald AI-körning eller live-Previewtest utfördes i denna ändring.
+- [!] Ändringarna är lokala och opushade. Ingen `main`-merge, produktionsdeploy,
+  Supabase-ändring, kontoförändring eller kvotändring utfördes. Stabil appversion
+  förblir opåverkad medan ändringen granskas i Preview.
+
+**PILOT NOT READY.** Nästa fas är en verifierad separat Preview och syntetiskt
+end-to-end-test inom färsk, godkänd kostnadsgräns. Före pilot behöver även
+granskas om källkopplingen ska flyttas från klientens RLS-laddade provrader till
+serverhämtning med ägarskapskontroll, samt ge eleven en tydligare återväg när
+äldre källmaterial saknas.
+
+## Serververifierad felträningskälla — 2026-10-23
+
+- [x] Träningsstarten skickar nu bara inlämnings-ID och valda fråge-ID:n som
+  källreferens. Servern hämtar elevens sparade provrad med ägarskapsfilter;
+  äldre rader utan separat `submission_id` kan endast lösas via signerad kvittens.
+- [x] Källmaterial och hela frågehistoriken läses från samma signerade prov.
+  Kvittens, kurs, provmaterial, frågeuppsättning och elevens svar kontrolleras
+  mot ägarbunden completion proof; svarsfingeravtrycket måste matcha
+  `exam_issuances`, och `mock_results` måste visa verifierad rättning med rätt
+  frågeantal. Fokusbegrepp härleds från signerad fråga, inte redigerbara
+  klienttaggar. Källfel stoppas före kvot och modelljobb.
+- [x] Källreferenser ingår i idempotensfingeravtrycket för felträning. Vanliga
+  provbegäranden behåller det tidigare fingeravtrycket för att inte bryta äldre
+  väntande återupptagningar. Felbanken visar nu ett begripligt fel när en gammal
+  eller osparad källa inte kan verifieras.
+- [x] Riktad samlad regression passerade 84/84, inklusive pipeline-/P.E.R.-
+  gränser, serverkällkontroller, 3/6/12-pipeline och idempotens; separat
+  grafprov → rättning → felbank → träningsprov-browserflöde passerade också.
+  Syntax- och diffkontroll passerade.
+- [!] Detta är offline-/mockverifiering, inte live Preview eller faktisk
+  modellrelevans. Hosted schema-/RPC-tillgänglighet och användbarhet i vanlig
+  app är ännu inte livebekräftade. Ändringen är lokal/opushad; ingen staging,
+  produktion, `main`, hemlighet, kvot eller konto har ändrats.
+
+**PILOT NOT READY.** Nästa steg: read-only oberoende granskning av den nya
+serverkällkontrollen, därefter godkänd separat Preview och syntetiskt
+end-to-end-test inom verifierad stagingbudget. Håll stabil Production orörd
+tills Preview ger godkänd evidens och releasebeslut tas separat.
+
+## Säkerhetsgranskning av misstagsval — 2026-10-23
+
+- [x] Oberoende granskning hittade att en signerad och rättad provfråga ändå
+  kunde väljas som “misstag” utan kontroll av poängen, samt att vanliga
+  provstarter accepterade obekräftad klienthistorik. Båda är åtgärdade:
+  servern kontrollerar att den exakta valda frågan fick mindre än full poäng i
+  verifierat resultat; utan källreferenser ignoreras klientens träningsfokus
+  och jämförelsefrågor.
+- [x] Detaljerad frågerättning i `exam_issuances.result_payload` är tidsbegränsad
+  till sju dagar. Felträning på äldre källor stoppas därför säkert med en
+  vägledning att välja ett nyligen rättat prov; varaktig serververifierad
+  misstagsdata skulle kräva ett separat granskat schema-/retentionsbeslut.
+- [x] Efter blockerarfynd passerade den fokuserade sviten 11/11 (pipeline HTTP,
+  källresolver, fokusnormalisering, browserkällflöde och idempotens). Inga live-
+  anrop eller externa ändringar gjordes.
+- [x] Slutlig bredare riktad regression passerade 86/86, inklusive den kompletta
+  grafprov → rättning → felbank → träningsprov-browserkedjan. Oberoende
+  säkerhetsgranskare återgranskade korrigeringarna och bekräftade att båda
+  blockerarfynden är stängda; PostgREST-legacyfrågan och livebeteende återstår.
+- [!] Preview-/stagingflöde och faktisk modellrelevans är ännu inte
+  liveverifierade.
+
+**PILOT NOT READY.** Be om oberoende omgranskning av de två blockerarfynden,
+kör sedan godkänd Preview/stagingverifiering. Ingen Production- eller
+`main`-ändring har gjorts.
+
+## Lokal PostgREST- och P.E.R.-gränskontroll — 2026-10-24
+
+- [x] Legacyuppslagets `loadOwnedTrainingExam` är nu exporterat som namngiven
+  testseam. Ny HTTP-gränsregression kontrollerar JSON-kvittots PostgREST-filter,
+  ägarfilter, `submission_id IS NULL`, gränsen på två träffar, unik legacyträff,
+  tvetydig träff som avvisas samt att moderna submission-ID:n inte går via
+  fallback. Det är en lokal fetch-stub, inte en körning mot en PostgREST-server.
+- [x] Browserfixturen för felbanksidentitet har nu syntetiska submission-ID:n
+  och kvittenser. Den äldre fixturen saknade källbevis och timeoutade därför
+  korrekt när den nya fail-closed-källkontrollen avvisade träningen.
+- [x] P.E.R:s senaste felbankstext etiketteras nu uttryckligen som elevdata,
+  escapas och omsluts i `<student_recent_mistakes>`. Prompt- och API-regressioner
+  bekräftar att manipulerad taggtext förblir data och att endast den betrodda
+  wrappern stängs. Innehållet finns kvar för relevant studiehjälp.
+- [x] Read-only granskare: legacyfiltret och tvetydighetskontrollen saknar
+  blockerande kodfynd; den serverbaserade PostgREST-parsningen återstår att
+  verifiera. P.E.R.-granskaren bekräftade att promptgränsfyndet är stängt;
+  modellens beteende mot adversarialtext är inte livebevisat.
+- [x] Samlad fokuserad offlinekörning passerade **109/109** tester över
+  provpipeline 3/6/12, återhämtning, källstöd, P.E.R.-scope/kvot, idempotens och
+  browserflöden. Syntaxkontroll och `git diff --check` passerade.
+- [x] Read-only extern status: Supabase `exgen-pilot-staging` är
+  `ACTIVE_HEALTHY`; senaste listade migration är
+  `20261023080909_add_repeated_learning_objective_checkpoint_feedback`.
+  Senaste Vercel Preview på featuregrenen är `READY` för commit
+  `139cffb7039386d181defa2d12c0e58d6df35f5c`; den innehåller inte denna lokala
+  arbetskopia. Ingen inloggning, AI-förfrågan, migration eller miljöändring
+  utfördes.
+- [!] Lokala ändringar är fortsatt ocommittade/opushade. PostgREST-server,
+  appens aktuella Preview, faktisk modellrelevans och verklig användarsession
+  är inte verifierade. Stabil Production lämnas orörd.
+
+**PILOT NOT READY.** Nästa grind är en separat godkänd Preview för exakt denna
+arbetsrevision och därefter ett syntetiskt end-to-end-prov inom verifierad
+budget. Ingen produktion, `main`, databas eller kvot har ändrats.
+
+## Lokal analys av irrelevanta felträningsprov och P.E.R. — 2026-10-24
+
+- [x] Granskningen fann att generatorns jämförelseprompt kunde fyllas av 20
+  äldre frågor innan aktuellt godkända uppgifter lades till. Reparationsprompten
+  och dess verifierare kunde också tappa godkända frågor från föregående batch.
+  Jämförelselistorna prioriterar nu aktuellt godkända frågor och begränsar äldre
+  historik till det återstående utrymmet. Kvalitetskrav sänks inte.
+- [x] Felträningsverifieraren kräver nu ett uttryckligt serverstyrt
+  relevansbesked för varje fråga mot elevens verifierade misstag. Den använder
+  fortfarande bara signerad, ägarbunden provkälla och serverrättade fel-taggar;
+  elevens misstag är fokusdata, inte faktakälla. Äldre än sju dagar saknas
+  fortfarande detaljerad verifierad rättning och stoppas fail-closed med en
+  särskild felkod så appens vägledning kan visas. Svenska verifierarinstruktioner
+  behåller uttryckligen regeln att avvisa felaktiga eller otillräckliga svar.
+- [x] P.E.R:s efter-provet-spärr jämför nu koefficientekvationer även när eleven
+  skriver om multiplikation eller följer ekvationen med vanlig instruktionstext.
+  Testet kontrollerar att frågan stoppas före OpenAI och kvotreservation.
+- [x] Varningen för ett delprov sparas nu i utkastet och återkommer efter
+  omladdning på det språk som appen använder efter återkomst. Den visar antal
+  levererade/godkända frågor, inte ett komplett prov.
+- [x] Riktade offline/mocktester passerade efter ändringarna: genererings-
+  jämförelser och reparation, verifierarkontrakt, källkontroller,
+  3/6/12-delprov och progressåterhämtning (30/30 i senaste sammansatta körning),
+  samt P.E.R:s ekvationsregression (1/1). Den fulla P.E.R.-handlersviten hade
+  även passerat 57/57 före den sista avgränsade regexregressionen. Syntax- och
+  `git diff --check` passerade.
+- [!] Fortfarande olöst: aktiva prov blockerar vanlig P.E.R.-chatt även om
+  frågan gäller annat ämne; återupptagning efter omladdning kan sakna det
+  ursprungliga materialet; direkta grafprov följer inte samma återupptagbara
+  pipeline; svar som överskrider begärt antal behöver ett separat fail-closed
+  UI-test. Detaljerad felrättning kan inte användas efter sju dagar.
+- [!] Ingen aktuell Preview, staging-AI-generering eller Production-beteende
+  verifierades i denna arbetsrunda. Ändringarna är lokala och ej pushade; ingen
+  migration, kvot, roll, hemlighet, `main` eller Production har ändrats.
+
+**PILOT NOT READY.** Nästa steg är en avgränsad end-to-end-recovery-granskning
+av omladdning, grafvägen och överskridet frågeantal, följd av uttryckligen
+godkänd separat Preview och syntetiskt stagingprov. Håll vanliga appen och
+Production orörda tills rätt revision har testats och ett separat releasebeslut
+fattats.
+
+## Verifiering efter releasegrind — 2026-10-24
+
+- [x] Den gemensamma UI-vägen stoppar ett svar där `questions.length >
+  requested` före rendering. Testet verifierar att överskott 4/3 öppnar noll
+  frågor, inte ökar lokal fallback-kvot och återaktiverar genereringsknappen.
+  Om servern skickar en auktoritativ kvot räknas den fortfarande in.
+- [x] Browserregression passerade för delprov 2/3, 4/6, 8/12 och överskott 4/3.
+  Sammansatt API-/P.E.R.-svit passerade 70/70; browserfilen passerade 1/1.
+  JS-syntaxkontroller och `git diff --check` passerade. HTML-koden parsades
+  genom Playwright-browserflödet, inte `node --check`.
+- [x] Färsk read-only extern kontroll: Vercel Production är `READY` på
+  `c50369e` (`dpl_2o9CDQQ3LLZc35aJRypLb5vKLibh`); Production Supabase är
+  `ACTIVE_HEALTHY`. Staging är `ACTIVE_HEALTHY` och dess migrationslista når
+  `20261023080909_add_repeated_learning_objective_checkpoint_feedback`.
+  Senaste feature-Preview är `READY` på äldre commit `139cffb`; den innehåller
+  inte den här lokala arbetskopian.
+- [!] Arbetsgrenen är `codex/exgen-school-pilot-goal-20261023`, baserad på
+  `c50369e`, och arbetskopian har 46 ändrade/nya statusposter. Dessa bevaras;
+  inga ändringar pushades, committades eller mergades. Ingen AI-kostnad,
+  stagingwrite, migration, konto-, kvot- eller produktionsändring gjordes.
+- [!] Omladdning mitt i en generering kan fortfarande kräva att eleven återger
+  exakt samma material och inställningar; grafgenerering använder fortfarande
+  den direkta vägen. En lyckad syntetisk modellkörning på denna revision saknas;
+  senaste browser-Preview är inte uppdaterad från den lokala arbetskopian.
+
+**PILOT NOT READY.** Stabila produktionsversionen var fortsatt tillgänglig och
+oförändrad i denna körning. Nästa grind: separat godkänd push till en
+stagingkopplad feature-Preview, kontroll av återupptagning/grafväg och ett
+syntetiskt end-to-end-test inom färskt verifierad kostnadsgräns. Ingen merge
+till `main` eller produktionssättning utan separat uttryckligt godkännande.
+
+## Uppföljning av P.E.R-ekvationsspärr — 2026-10-24
+
+- [x] Efter-provet-spärren kanoniserar nu implik multiplikation (`kx` och
+  `k·x`), Unicode-exponenter (`x²`) och parentesuttryck före jämförelse.
+  Relevanta facitförfrågningar stoppas före modell/kvot, medan allmän
+  begreppsförklaring fortfarande tillåts.
+- [x] P.E.R-handlerns testmock fångar nu SSE-svar i stället för att krascha på
+  saknad `flushHeaders`; detta gör att en oavsiktligt tillåten modellväg syns
+  som ett tydligt testfel.
+- [x] De två riktade regressionsfallen passerade: 2/2.
+- [!] En bred femfils körning före sista regexjusteringen gav 65/67. Båda
+  flaggade fallen analyserades: den första blottlade den verkliga missade
+  multiplikationsformen, den andra innehöll en fråga som inte hörde till
+  testets källuppgift och togs bort. De specifika fallen passerade efteråt;
+  hela breddkörningen har inte upprepats efter slutjusteringen.
+- [!] Detta är endast lokal offline/mockverifiering. Ingen ny Preview,
+  stagingmodellkörning eller Production-beteende har verifierats.
+
+**PILOT NOT READY.** Kvarvarande viktigaste återställningsluckor är att
+genereringsmaterial/inställningar inte återställs automatiskt efter omladdning
+och att grafgenerering fortfarande använder direktvägen. Nästa steg är att
+lägga till en ägarbunden, kortlivad same-tab återstart för genereringsinput,
+testa grafvägens idempotens och sedan begära en separat staging-Previewgrind.
+
+## Träffsäker felträning och P.E.R efter rättning — 2026-10-24
+
+- [x] Felträning kräver nu ett verifierat begrepp eller en färdighet från
+  ursprungsfrågan. En generell feltyp som `calculation_error` räcker inte ensam.
+  Oberoende granskning måste returnera en känd lokal fokusreferens per fråga;
+  okända eller saknade referenser underkänner granskningen. Inget kvalitetskrav
+  sänktes.
+- [x] Efter verifierad rättning räcker inte längre två överlappande ord för att
+  blockera en allmän P.E.R-fråga. Testet för "Vad är skillnaden mellan derivata
+  och integral?" passerar, medan uttryckliga provfrågor och ekvationsomskrivningar
+  fortfarande går genom facitspärren.
+- [x] Samlad lokal offline-regression passerade: 76/76 över P.E.R, felträning,
+  verifierarens utdata, genereringsåterhämtning och elevens träningsflöde.
+  Syntaxkontroller och `git diff --check` passerade.
+- [!] Första regressionen avslöjade att svenska ordet "mellan" räknades som ett
+  ämnesord och gav falskt stopp; stoppordslistan justerades och både exakt test
+  och samlad körning passerade därefter.
+- [!] Ingen AI-livekörning, staging-Preview, push, merge eller produktionsändring
+  utfördes. Den lokala arbetskopian är fortsatt ocommittad och senaste Preview
+  ligger på äldre kod.
+
+**PILOT NOT READY.** Nästa kodgrind är gemensam request-hash mellan gamla och
+återupptagbara vägen, tydligt avslag för grafprov på pipeline-endpointen och
+same-tab återupptagning av material/val. Därefter krävs separat godkänd Preview
+och syntetisk stagingverifiering.
+
+## Källträffsäkerhet och P.E.R.-routing — 2026-10-24
+
+- [x] Felträningsprovens oberoende granskare returnerar nu separata beslut för
+  brett begrepp och exakt dokumenterad färdighet. Om ursprungsfelet anger en
+  färdighet måste varje utfärdad träningsfråga matcha den; ämneslikhet eller
+  `calculation_error` räcker inte. Saknat/ogiltigt beslut stänger grinden.
+- [x] Vanliga P.E.R-frågor efter serververifierad rättning som "Vad ska jag göra
+  nu?" och "Vad borde jag öva mer på?" går till studievägledning med kurs,
+  underlag och svaga områden. Orsaken till den senare felslussningen var att
+  JavaScripts `\\b` inte behandlar svenska `å/ä/ö` som ordtecken; frasroutingen
+  använder nu Unicode-medveten ordgräns. Aktiva och obekräftade provflöden är
+  fortsatt svarsspärrade.
+- [x] Ett sent provsvar från konto A avvisas efter kontobyte och kan varken
+  visas eller skriva över konto B:s sparade material. Browserregressionen
+  passerade 193/193.
+- [x] Efter ändringarna passerade verifierarkontraktet och provpipeline/API-
+  tester 22/22, inklusive återupptagning, reparation och exakt 3/6/12
+  kvalitetsgranskade frågor. P.E.R-handlern passerade 57/57. Syntaxkontroller
+  och `git diff --check` passerade.
+- [!] Dessa är lokala/offline-mocktester. Ingen ny staging-Preview eller
+  modellgenerering kördes och verklig relevans/svarstid är därför inte
+  bekräftad. Klientens 14-minutersväntan lämnar upp till sista minuten av
+  serverjobbets 15-minutersfrist till manuell återupptagning med samma material
+  och inställningar; UI visar godkänt antal och ingen ny kvotreservation utlovas.
+- [!] Ingen push, merge, deploy, databas-, konto-, kvot- eller
+  produktionsändring gjordes. Befintliga ändringar i arbetskopian bevaras.
+
+**PILOT NOT READY.** Nästa steg är oberoende slutgranskning av ändringarna,
+sedan separat godkänd staging-Preview och syntetiskt 3/6/12-test med sanerad
+telemetri. Behåll nuvarande Production stabil och opåverkad tills Previewn
+bevisat hela elevflödet och ett separat releasebeslut fattats.
+
+## Grafåterupptagning och request-identitet — 2026-10-24
+
+- [x] Webbläsarregressionen avslöjade att en återställd grafbegäran skickades
+  med en ny idempotensnyckel: sessionens återställningspost innehöll rätt nyckel,
+  men den separata beständiga request-nyckellistan saknade den. Återställningen
+  binder nu nyckeln till exakt verifierad användare och payload innan provstart;
+  en konflikt avvisas utan att skriva över någon befintlig identitet.
+- [x] Tillfälliga HTTP 5xx-svar behåller sessionsåterställningen. Terminala fel
+  fortsätter att rensa den, och kvotavslag följer sin separata explicita väg.
+- [x] Offline/browser-regression för grafprov: återställ efter sidomladdning,
+  få tillfälligt 503, behåll återställningsposten och återförsök med samma
+  idempotensnyckel. `graph-exam-flow` passerade.
+- [x] `generation-request-idempotency` passerade, inklusive återregistrering,
+  identiskt återbruk och avvisning av motstridig nyckel. `exam-generation-pipeline`
+  passerade 24/24, inklusive felträning med full fokus för 3/6/12 frågor.
+  `exam-pipeline-offline`, `exam-partial-delivery` (20/20) och
+  `per-context-pack` (16/16) passerade. Hela `per-exam-review-handler`-sviten
+  passerade 57/57, inklusive vanligt studiesamtal, aktivt prov och verifierad
+  efterrättning. Syntaxkontroller och `git diff --check` passerade.
+- [x] Oberoende säkerhets-/idempotensgranskning fann inga blockerare i
+  återställning, 5xx-hantering eller grafprovets kvalitetsväg. Granskaren
+  noterade att webbläsartestet borde jämföra båda försökens nycklar; testet
+  kompletterades så att båda måste matcha den sparade nyckeln.
+- [!] Endast lokal/offline verifiering: ingen Preview eller AI-modell kördes,
+  så faktisk relevans, svarstid och stagingkoppling är inte verifierade.
+  Befintlig arbetskopia innehåller även andra ocommittade ändringar som bevaras.
+  Ingen push, deploy, merge eller databasåtgärd gjordes.
+
+**PILOT NOT READY.** Kodens recovery-regression är åtgärdad lokalt. Kvar är
+oberoende review samt en separat godkänd Preview och syntetisk stagingkontroll
+av provgenerering och P.E.R; Production förblir orörd.
+
+## Återhämtning efter authfel och köad assembly — 2026-10-24
+
+- [x] Oberoende uppföljning hittade tre risker: oklar 401 kunde rensa den
+  sparade återupptagningsbegäran, ett utloggningsrace kunde sakna positiv
+  ägarbekräftelse före resultatvisning, och en utgången assembly kunde få fler
+  än ett nytt 30-sekundersfönster.
+- [x] Oklar 401 behåller nu begäran; resultat visas endast när appens verifierade
+  konto fortfarande matchar provets ägare. Bekräftat kontobyte fortsätter att
+  stoppa visning och återförsök.
+- [x] Ny stagingmigration lägger till `assembly_grace_used`: ett kvalificerat
+  sparat delprov får högst ett begränsat assembly-fönster. Delprov under golvet
+  och blandprov utan båda frågetyperna avvisas fortsatt och återbetalas.
+- [x] Offlineverifiering passerade: API/DB/klientpaket 81/81 och riktad
+  browser-regression 80/80; `git diff --check` och relevanta JS-syntaxkontroller
+  passerade. Testerna omfattar 3/6/12 frågor, timeout, retry, replay, kvot,
+  felträningens signerade källor och engångs assembly-grace.
+- [x] Oberoende slutgranskning stängde de tre fynden utan kvarvarande blockerare
+  i dessa flöden. Den hittade även att en ny körning måste nollställa gammal
+  assembly-markör; startpayloaden gör nu det explicit och HTTP-testet verifierar
+  en terminal omstart från `true` till `false`. Slutgranskaren bekräftade att
+  testluckan är stängd och fann ingen blockerare i den justeringen.
+- [!] Migrationen är endast lokal och inte tillämpad. Ingen Preview,
+  modellgenerering, push, merge eller Production-/Supabase-åtgärd har gjorts.
+
+**PILOT NOT READY.** Nästa grind: slutför oberoende review, kontrollera migration
+mot staging lokalt/testmässigt, och begär separat godkännande för Preview samt
+syntetisk stagingverifiering. Stabil Production är orörd.

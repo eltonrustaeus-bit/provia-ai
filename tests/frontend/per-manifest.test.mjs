@@ -92,6 +92,17 @@ ok("T6b userScore bevaras", Math.abs((t6.userScore ?? 0) - 0.62) < 1e-9, String(
 ok("T6c weakAreas bevaras", Array.isArray(t6.weakAreas) && t6.weakAreas[0] === "Biologi › Cellandning");
 ok("T6d currentQuestion når fram", t6.currentQuestion?.number === 1);
 
+const currentCourseWins = await page.evaluate(() => {
+  window.__getPerStudyContext = () => ({ course: "Biologi 1", level: "B" });
+  window.setPerContext({ course: "Matematik 2b", level: "C" });
+  const context = window.__perTestCtx();
+  delete window.__getPerStudyContext;
+  return context;
+});
+ok("aktuell kurs och nivå går före äldre sidkontext",
+  currentCourseWins.course === "Biologi 1" && currentCourseWins.level === "B",
+  JSON.stringify({ course: currentCourseWins.course, level: currentCourseWins.level }));
+
 // ── T7: null nollställer ──────────────────────────────────────────────────
 const t7 = await page.evaluate(() => { window.PER.describe(null); return window.__perTestCtx(); });
 ok("T7 manifestet nollställs", !t7.currentQuestion && !t7.targets);

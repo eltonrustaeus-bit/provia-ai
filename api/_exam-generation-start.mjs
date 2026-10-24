@@ -3,6 +3,8 @@ import { requireAuth } from "./_auth.js";
 import generation from "./generate-exam.js";
 import operations from "./_exam-generation-operations.cjs";
 import materialInput from "./_material.cjs";
+import mistakeTraining from "./_mistake-training.cjs";
+import { resolveMistakeTrainingSource } from "./_mistake-training-source.mjs";
 import supabaseServer from "./_supabase-server-key.cjs";
 
 const { getSupabaseUrl, getSupabaseAdminHeaders } = supabaseServer;
@@ -38,30 +40,107 @@ async function rest(path, init = {}) {
   return data;
 }
 
-function normalizedRequest(body) {
+export function normalizedRequest(body) {
   const lang = body.lang === "en" ? "en" : "sv";
   const level = ["E", "C", "A"].includes(body.level) ? body.level : "C";
+  const trainingMode = Array.isArray(body.sourceReferences);
+  if (trainingMode && body.qType === "graph") {
+    throw Object.assign(new Error("MISTAKE_GRAPH_UNSUPPORTED"), { status: 409 });
+  }
   const qType = ["mix", "mixed", "mc", "short"].includes(body.qType) ? body.qType : "mix";
   const course = typeof body.course === "string" ? body.course.slice(0, 200) : "";
-  const material = materialInput.validateMaterial(body.pastedText);
+  const material = trainingMode ? { ok: true, text: "" } : materialInput.validateMaterial(body.pastedText);
   if (!material.ok) throw Object.assign(new Error(material.reason === "too_long" ? "MATERIAL_TOO_LONG" : "MATERIAL_REQUIRED"), { status: 400 });
   const numQuestions = Math.min(20, Math.max(2, Number.parseInt(body.numQuestions, 10) || 3));
   const pastedText = material.text;
   const focusTerms = generation.normalizeSelectedFocusTerms(body.focusTerms, pastedText);
+  const trainingFocus = trainingMode ? mistakeTraining.normalizeTrainingFocus(body.trainingFocus) : [];
+  const priorQuestions = trainingMode ? mistakeTraining.normalizePriorQuestions(body.priorQuestions) : [];
+  const sourceReferences = trainingMode ? mistakeTraining.normalizeTrainingSources(body.sourceReferences) : [];
+  if (trainingMode && trainingFocus.length > numQuestions) {
+    throw Object.assign(new Error("MISTAKE_FOCUS_COUNT_EXCEEDS_QUESTION_COUNT"), { status: 400 });
+  }
+  if (trainingMode && (!sourceReferences.length || sourceReferences.length !== body.sourceReferences.length)) {
+    throw Object.assign(new Error("MISTAKE_SOURCE_UNAVAILABLE"), { status: 409 });
+  }
   const idempotencyKey = typeof body.idempotencyKey === "string" ? body.idempotencyKey : "";
   if (!operations.UUID.test(idempotencyKey)) throw Object.assign(new Error("GENERATION_REQUEST_ID_REQUIRED"), { status: 400 });
-  return { lang, level, course, qType, numQuestions, pastedText, focusTerms, idempotencyKey };
+  return { lang, level, course, qType, numQuestions, pastedText, focusTerms, trainingFocus, priorQuestions, sourceReferences, trainingMode, idempotencyKey };
+}
+
+export async function loadOwnedTrainingExam({ userId, submissionId }) {
+  const query = new URLSearchParams({
+    select: "user_id,submission_id,course,material,exam,answers",
+    user_id: `eq.${userId}`,
+    submission_id: `eq.${submissionId}`,
+    limit: "2",
+  });
+  const rows = await rest(`/rest/v1/user_exams?${query}`);
+  if (Array.isArray(rows) && rows.length === 1) return rows[0];
+  if (Array.isArray(rows) && rows.length > 1) return null;
+
+  const legacyQuery = new URLSearchParams({
+    select: "user_id,submission_id,course,material,exam,answers",
+    user_id: `eq.${userId}`,
+    submission_id: "is.null",
+    "exam->>submission_receipt": `like.v2.${submissionId}.%`,
+    limit: "2",
+  });
+  const legacyRows = await rest(`/rest/v1/user_exams?${legacyQuery}`);
+  return Array.isArray(legacyRows) && legacyRows.length === 1 ? legacyRows[0] : null;
+}
+
+export async function hasVerifiedTrainingGrade({ userId, submissionId }) {
+  const query = new URLSearchParams({
+    select: "submission_id,verified_at,num_questions",
+    user_id: `eq.${userId}`,
+    submission_id: `eq.${submissionId}`,
+    verified_at: "not.is.null",
+    limit: "1",
+  });
+  const issuanceQuery = new URLSearchParams({
+    select: "submission_id,answer_fingerprint,result_payload,result_expires_at",
+    user_id: `eq.${userId}`,
+    submission_id: `eq.${submissionId}`,
+    limit: "1",
+  });
+  const [rows, issuances] = await Promise.all([
+    rest(`/rest/v1/mock_results?${query}`),
+    rest(`/rest/v1/exam_issuances?${issuanceQuery}`),
+  ]);
+  if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.submission_id !== submissionId || !rows[0]?.verified_at ||
+      !Array.isArray(issuances) || issuances.length !== 1 || issuances[0]?.submission_id !== submissionId) return null;
+  return { ...rows[0], ...issuances[0] };
 }
 
 async function findJob(userId, idempotencyKey) {
   const query = new URLSearchParams({
-    select: "id,state,stage,requested_count,progress_current,error_code,updated_at,request_hash,deadline_at,accepted_questions",
+    select: "id,state,stage,requested_count,progress_current,error_code,updated_at,request_hash,deadline_at,accepted_questions,assembly_grace_used",
     user_id: `eq.${userId}`,
     idempotency_key: `eq.${idempotencyKey}`,
     limit: "1",
   });
   const rows = await rest(`/rest/v1/mock_exam_generation_pipeline_jobs?${query}`);
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+function hashRequestPayload(payload, { legacyTraining = false } = {}) {
+  const hashPayload = {
+    lang: payload.lang,
+    level: payload.level,
+    course: payload.course,
+    qType: payload.qType,
+    numQuestions: payload.numQuestions,
+    pastedText: payload.pastedText,
+    focusTerms: payload.focusTerms,
+  };
+  if (payload.trainingMode) {
+    if (!legacyTraining) hashPayload.trainingRequestVersion = 1;
+    hashPayload.trainingFocus = payload.trainingFocus;
+    hashPayload.priorQuestions = payload.priorQuestions;
+    hashPayload.sourceReferences = payload.sourceReferences;
+  }
+  return crypto.createHash("sha256").update(JSON.stringify(hashPayload)).digest("hex");
 }
 
 async function start(req, res, user) {
@@ -77,15 +156,24 @@ async function start(req, res, user) {
     return respond(res, error.status || 400, { ok: false, error: error.message || "INVALID_REQUEST" });
   }
   const { idempotencyKey, ...payload } = request;
-  const requestHash = crypto.createHash("sha256").update(JSON.stringify({
-    lang: payload.lang,
-    level: payload.level,
-    course: payload.course,
-    qType: payload.qType,
-    numQuestions: payload.numQuestions,
-    pastedText: payload.pastedText,
-    focusTerms: payload.focusTerms,
-  })).digest("hex");
+  const resolveTrainingSource = async () => {
+    const verified = await resolveMistakeTrainingSource({
+      userId: user.id,
+      requestedCourse: payload.course,
+      sourceReferences: payload.sourceReferences,
+      trainingFocus: payload.trainingFocus,
+      loadOwnedExam: loadOwnedTrainingExam,
+      hasVerifiedGrade: hasVerifiedTrainingGrade,
+    });
+    Object.assign(payload, verified);
+    payload.focusTerms = generation.normalizeSelectedFocusTerms([], payload.pastedText);
+  };
+  const trainingSourceError = (error) => {
+    const code = ["MISTAKE_SOURCE_UNAVAILABLE", "MISTAKE_SOURCE_NOT_GRADED", "MISTAKE_SOURCE_EXPIRED", "MISTAKE_SOURCE_NOT_MISTAKE", "MISTAKE_SOURCE_MISMATCH", "MISTAKE_SOURCE_TOO_LONG", "MISTAKE_TRAINING_FOCUS_UNAVAILABLE"].includes(error?.message)
+      ? error.message
+      : "MISTAKE_SOURCE_UNAVAILABLE";
+    return respond(res, error?.status || 503, { ok: false, error: code });
+  };
   const [rules, rawRole] = await Promise.all([
     generation.loadCentralRules(),
     generation.loadUserRole(user.id),
@@ -95,11 +183,22 @@ async function start(req, res, user) {
   const quotaPeriod = rules.currentPeriodKey(mockLimit.period);
   const attemptId = crypto.randomUUID();
   const quotaRequestId = crypto.randomUUID();
-  const claim = await operations.claimGeneration({
+  let requestHash = hashRequestPayload(payload);
+  let claim = await operations.claimGeneration({
     userId: user.id, idempotencyKey, payloadHash: requestHash,
     attemptId, quotaRequestId, quotaPeriod,
     quotaEnforced: mockLimit.cap !== Infinity,
   });
+  if (claim?.status === "payload_conflict" && payload.trainingMode) {
+    try { await resolveTrainingSource(); }
+    catch { return respond(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" }); }
+    requestHash = hashRequestPayload(payload, { legacyTraining: true });
+    claim = await operations.claimGeneration({
+      userId: user.id, idempotencyKey, payloadHash: requestHash,
+      attemptId, quotaRequestId, quotaPeriod,
+      quotaEnforced: mockLimit.cap !== Infinity,
+    });
+  }
   if (!claim) return respond(res, 503, { ok: false, error: "generation_request_state_unavailable" });
   if (claim.status === "replay") return respond(res, 200, claim.response);
   if (claim.status === "payload_conflict") return respond(res, 409, { ok: false, error: "GENERATION_REQUEST_PAYLOAD_CONFLICT" });
@@ -111,6 +210,14 @@ async function start(req, res, user) {
         ? respond(res, 202, { ok: true, operationId: existing.id, state: existing.state, stage: existing.stage, requested: existing.requested_count, approved: existing.progress_current })
         : respond(res, 409, { ok: false, error: "GENERATION_IN_PROGRESS", retryable: true });
     } catch { return respond(res, 503, { ok: false, error: "generation_status_unavailable" }); }
+  }
+
+  if (payload.trainingMode && !payload.pastedText) {
+    try { await resolveTrainingSource(); }
+    catch (error) {
+      await operations.failGeneration({ userId: user.id, idempotencyKey, payloadHash: requestHash, attemptId });
+      return trainingSourceError(error);
+    }
   }
 
   let quota;
@@ -145,6 +252,7 @@ async function start(req, res, user) {
     quotaPeriod,
     quota,
     entitlements: rules.getEntitlementSnapshot(role),
+    generationRole: role,
     requestHash,
   };
   try {
@@ -167,6 +275,7 @@ async function start(req, res, user) {
         stage_attempts: 0,
         lease_token: null,
         lease_expires_at: null,
+        assembly_grace_used: reuseActive ? Boolean(previousJob.assembly_grace_used) : false,
         deadline_at: reuseActive ? previousJob.deadline_at : new Date(Date.now() + PIPELINE_DEADLINE_MS).toISOString(),
         error_code: null,
       }),

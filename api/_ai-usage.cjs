@@ -118,10 +118,13 @@ async function settleAiSpend(reservation, usage, options = {}) {
     actualUsd = reservation.reserveUsd;
   }
   if (actualUsd === null) return false;
-  const result = await callBudgetRpc("settle_ai_spend", {
+  const args = {
     p_user_id: reservation.userId, p_reservation_id: reservation.reservationId,
     p_actual_usd: actualUsd, p_cap_usd: PILOT_BUDGET_USD,
-  }, options);
+  };
+  let result = await callBudgetRpc("settle_ai_spend", args, options);
+  // Settlement is idempotent by reservation ID, including a lost success response.
+  if (!result.ok) result = await callBudgetRpc("settle_ai_spend", args, options);
   return result.ok === true;
 }
 

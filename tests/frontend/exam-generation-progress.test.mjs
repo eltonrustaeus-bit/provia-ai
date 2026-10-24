@@ -4,20 +4,192 @@ import test from "node:test";
 import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../../app.html", import.meta.url), "utf8");
-const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token)");
+const start = html.indexOf("async function runResumableGeneration(payload,onProgress,token,expectedUserId,onStarted)");
 const end = html.indexOf("\n  async function runGenerate(onProgress)", start);
 assert.ok(start >= 0 && end > start, "resumable generation helper exists in the app");
 const helper = html.slice(start, end);
 
 async function runWith(context) {
-  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token)})()`, {
+  return vm.runInNewContext(`(async()=>{${helper};return runResumableGeneration(payload,onProgress,token,expectedUserId,onStarted)})()`, {
     onProgress: undefined,
+    onStarted: undefined,
     token: "synthetic-session-token",
+    expectedUserId: null,
+    verifiedUserId: context?.expectedUserId || null,
+    getGenerationOwnerStatus: async (userId) => userId && userId === (context?.expectedUserId || null) ? "same" : "unavailable",
+    isGenerationOwnerCurrent: async () => true,
     ...context,
   });
 }
 
 test("client reports a resumable job instead of a generic timeout or network failure", async (t) => {
+  await t.test("lost start response recovers the same idempotent operation", async () => {
+    const exam = { questions: [{ id: "q1" }, { id: "q2" }, { id: "q3" }] };
+    const startKeys = [];
+    const savedOperations = [];
+    let starts = 0;
+    const result = await runWith({
+      payload: { numQuestions: 3, idempotencyKey: "same-request-key" },
+      onStarted: async (operationId) => { savedOperations.push(operationId); },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async (path, body) => {
+        if (path.endsWith("pipeline=start")) {
+          startKeys.push(body.idempotencyKey);
+          starts++;
+          return starts === 1
+            ? { status: 0, networkError: true, timedOut: true }
+            : { status: 202, data: { ok: true, operationId: "same-operation", requested: 3, approved: 0 } };
+        }
+        return { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status lookup not expected"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(starts, 2);
+    assert.deepEqual(startKeys, ["same-request-key", "same-request-key"]);
+    assert.deepEqual(savedOperations, ["same-operation"], "the operation ID is persisted before the first advance call");
+    assert.equal(result.status, 200);
+    assert.equal(result.data.exam.questions.length, 3);
+  });
+
+  await t.test("definitive start configuration errors are not mislabeled as a running exam", async () => {
+    for (const error of [
+      "AUTH_VERIFICATION_UNAVAILABLE",
+      "EXAM_SIGNING_NOT_CONFIGURED",
+      "AI_GENERATION_NOT_CONFIGURED",
+      "generation_request_state_unavailable",
+      "mock_quota_unavailable",
+      "generation_storage_unavailable",
+    ]) {
+      let starts = 0;
+      const result = await runWith({
+        payload: { numQuestions: 12, idempotencyKey: "same-request-key" },
+        LANG: "sv",
+        Date: { now: () => 0 },
+        setStatus: () => {},
+        postJson: async () => {
+          starts++;
+          return { status: 503, data: { ok: false, error } };
+        },
+        getJson: async () => { throw new Error("no operation exists to recover"); },
+        setTimeout: (fn) => fn(),
+      });
+
+      assert.equal(starts, 1, error);
+      assert.equal(result.status, 503, error);
+      assert.equal(result.data.error, error);
+    }
+  });
+
+  await t.test("temporary generation status lookup failures remain retryable and resumable", async () => {
+    let starts = 0;
+    const result = await runWith({
+      payload: { numQuestions: 12, idempotencyKey: "same-request-key" },
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      postJson: async () => {
+        starts++;
+        return { status: 503, data: { ok: false, error: "generation_status_unavailable" } };
+      },
+      getJson: async () => { throw new Error("there is no operation ID yet"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(starts, 4, "a transient database/job lookup failure is retried instead of classified as definitive");
+    assert.equal(result.status, 202, "the unresolved request is retained as potentially in progress");
+    assert.equal(result.data.error, "generation_in_progress");
+    assert.equal(result.data.requested, 12);
+    assert.equal(result.data.operationId, undefined, "no operation ID is invented when the lookup is unavailable");
+  });
+
+  await t.test("401 refresh retries a step only for the original account", async () => {
+    const tokens = [];
+    let advanceCalls = 0;
+    const exam = { questions: [{ id: "q1" }, { id: "q2" }, { id: "q3" }] };
+    const result = await runWith({
+      payload: { numQuestions: 3, idempotencyKey: "same-request-key" },
+      token: "expired-token",
+      expectedUserId: "user-a",
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      refreshGenerationAuthSnapshot: async () => ({ userId: "user-a", token: "fresh-token" }),
+      postJson: async (path, _body, options) => {
+        tokens.push(options.token);
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-a", requested: 3, approved: 0 } };
+        }
+        advanceCalls++;
+        return advanceCalls === 1
+          ? { status: 401, data: { error: "Unauthorized" } }
+          : { status: 200, data: { ok: true, exam, meta: { partial: false, requested: 3 } } };
+      },
+      getJson: async () => { throw new Error("status lookup not expected"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(tokens, ["expired-token", "expired-token", "fresh-token"]);
+    assert.equal(advanceCalls, 2);
+  });
+
+  await t.test("account switch blocks token refresh and does not replay the operation", async () => {
+    let advanceCalls = 0;
+    const result = await runWith({
+      payload: { numQuestions: 3, idempotencyKey: "same-request-key" },
+      token: "expired-token",
+      expectedUserId: "user-a",
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      refreshGenerationAuthSnapshot: async () => ({ userId: "user-b", token: "other-account-token" }),
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-a", requested: 3, approved: 0 } };
+        }
+        advanceCalls++;
+        return { status: 401, data: { error: "Unauthorized" } };
+      },
+      getJson: async () => { throw new Error("status lookup not expected"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(result.status, 401);
+    assert.equal(advanceCalls, 1);
+  });
+
+  await t.test("account switch during refresh verification blocks the retry", async () => {
+    let advanceCalls = 0;
+    const result = await runWith({
+      payload: { numQuestions: 3, idempotencyKey: "same-request-key" },
+      token: "expired-token",
+      expectedUserId: "user-a",
+      LANG: "sv",
+      Date: { now: () => 0 },
+      setStatus: () => {},
+      refreshGenerationAuthSnapshot: async () => ({ userId: "user-a", token: "fresh-token" }),
+      getGenerationOwnerStatus: async () => "different",
+      isGenerationOwnerCurrent: async () => false,
+      postJson: async (path) => {
+        if (path.endsWith("pipeline=start")) {
+          return { status: 202, data: { ok: true, operationId: "operation-a", requested: 3, approved: 0 } };
+        }
+        advanceCalls++;
+        return { status: 401, data: { error: "Unauthorized" } };
+      },
+      getJson: async () => { throw new Error("status lookup not expected"); },
+      setTimeout: (fn) => fn(),
+    });
+
+    assert.equal(advanceCalls, 1, "the refreshed token is not used after current ownership changes");
+    assert.equal(result.status, 401);
+    assert.equal(result.data.error, "account_changed");
+  });
+
   await t.test("one session token is reused for start, advance and status recovery", async () => {
     const authTokens = [];
     const exam = { questions: [{ id: "q1" }] };

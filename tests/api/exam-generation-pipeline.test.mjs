@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const generation = require("../../api/generate-exam.js");
 const operations = require("../../api/_exam-generation-operations.cjs");
 const pipeline = require("../../api/_exam-generation-pipeline.cjs");
+const mistakeTraining = require("../../api/_mistake-training.cjs");
 
 const original = {
   generateVerifiedBatch: generation.generateVerifiedBatch,
@@ -30,7 +31,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
         stage: "generate",
         requested_count: requested,
-        payload: { qType: "mc", numQuestions: requested },
+        payload: { qType: "mc", numQuestions: requested, generationRole: "premium" },
         accepted_questions: [],
         progress_current: 0,
       };
@@ -38,6 +39,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       const batchSizes = [];
       const comparisonIdsByBatch = [];
       const pipelineJobIds = [];
+      const roleSnapshots = [];
       const sharedDeadlineAt = Date.now() + 50_000;
       const forwardedDeadlines = [];
       operations.renewGenerationLease = async () => true;
@@ -48,11 +50,14 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         job.stage = input.nextStage;
         return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
       };
-      generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId }) => {
+      generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId, roleSnapshot }) => {
         forwardedDeadlines.push(deadlineAt);
         batchSizes.push(payload.numQuestions);
         comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
         pipelineJobIds.push(pipelineJobId);
+        roleSnapshots.push(roleSnapshot);
+        assert.equal(Object.hasOwn(payload, "generationRole"), false,
+          "the server role snapshot is not forwarded in the model request payload");
         const questions = Array.from({ length: Math.min(payload.numQuestions, 2) }, () => {
           sequence += 1;
           return {
@@ -81,6 +86,8 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         "all generated batches share the outer request deadline instead of each starting a fresh budget");
       assert.ok(pipelineJobIds.length > 1 && pipelineJobIds.every((value) => value === job.id),
         "every generated batch carries the parent pipeline job ID for private usage correlation");
+      assert.ok(roleSnapshots.length > 1 && roleSnapshots.every((value) => value === "premium"),
+        "every resumed batch receives the role snapshot through private internal context");
       assert.deepEqual(comparisonIdsByBatch[0], [], "the initial batch has no prior approved questions to exclude");
       assert.deepEqual(comparisonIdsByBatch[1], ["approved-1", "approved-2"],
         "later batches receive only already-approved question references for novelty checks");
@@ -101,7 +108,10 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
     stage: "generate",
     requested_count: 3,
-    payload: { qType: "short", numQuestions: 3 },
+    payload: {
+      qType: "short", numQuestions: 3,
+      priorQuestions: [{ id: "client-id-ignored", question: "Vad är ett ekosystem?", concept_tag: "Ekologi" }],
+    },
     accepted_questions: [{
       id: "approved-source", type: "short", question: "Beräkna x när x + 2 = 5.",
       concept_tag: "Ekvationer", model_answer: "x = 3", options: ["answer key"], validation_status: "verified",
@@ -120,6 +130,7 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
   let noveltyContext;
+  let priorContext;
   operations.checkpointPipelineJob = async (input) => {
     job.accepted_questions = input.acceptedQuestions;
     job.progress_current = input.progressCurrent;
@@ -128,8 +139,10 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   };
   generation.generateVerifiedBatch = async ({ payload }) => {
     noveltyContext = payload.comparisonQuestions;
+    priorContext = payload.priorQuestions;
     return { status: 200, body: { ok: true, questions: [
       { id: "duplicate", type: "short", question: "Beräkna x när x + 2 = 5.", validation_status: "verified" },
+      { id: "historical-duplicate", type: "short", question: "Vad är ett ekosystem?", validation_status: "verified" },
       { id: "distinct", type: "short", question: "Bestäm nollställena till f(x)=x²-4.", validation_status: "verified" },
     ] } };
   };
@@ -139,11 +152,13 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     assert.equal(job.progress_current, 2, "the duplicate does not fill a requested slot");
     assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", pipeline.batchQuestionId(job, { id: "distinct" })]);
     assert.deepEqual(noveltyContext, [{ id: "approved-1", concept_tag: "Ekvationer", question: "Beräkna x när x + 2 = 5." }]);
+    assert.deepEqual(priorContext, [{ id: "client-id-ignored", question: "Vad är ett ekosystem?", concept_tag: "Ekologi" }],
+      "historical question context is forwarded separately from current approved questions");
     assert.ok(!JSON.stringify(noveltyContext).includes("x = 3"), "answer keys are not sent as novelty context");
     assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer options are not sent as novelty context");
     assert.equal(diagnosticLogs.length, 1);
-    assert.equal(diagnosticLogs[0].duplicateCandidates, 1);
-    assert.equal(diagnosticLogs[0].semanticDuplicateCandidates, 1);
+    assert.equal(diagnosticLogs[0].duplicateCandidates, 2);
+    assert.equal(diagnosticLogs[0].semanticDuplicateCandidates, 2);
     assert.equal(diagnosticLogs[0].batchIdCollisions, 0);
     assert.equal(diagnosticLogs[0].acceptedAfter, 2);
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x när x + 2 = 5."),
@@ -157,6 +172,176 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     operations.renewPipelineLease = prior.renewPipelineLease;
     operations.renewGenerationLease = prior.renewGenerationLease;
     operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("mistake-training cannot replace an approved question at the same count when a focus is uncovered", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000018",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Isolera variabeln" },
+        { focusId: "focus-2", concept: "Grafer", skill: "Tolka lutning" },
+      ],
+    },
+    accepted_questions: [1, 2, 3].map((n) => ({
+      id: `old-${n}`, type: "short", question: `Öva ekvation ${n}`,
+      training_focus_matches: ["focus-1"], validation_status: "verified",
+    })),
+    progress_current: 3,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let requiredFocusIds;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    if (input.progressCurrent === job.progress_current) {
+      assert.deepEqual(input.acceptedQuestions, job.accepted_questions,
+        "the persisted checkpoint contract requires same-count retries to keep the accepted set unchanged");
+      assert.equal(input.nextStage, "repair");
+      return { status: "retry_queued" };
+    }
+    job.accepted_questions = input.acceptedQuestions;
+    job.progress_current = input.progressCurrent;
+    job.stage = input.nextStage;
+    return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    requiredFocusIds = payload.trainingFocusRequiredIds;
+    return { status: 200, body: { ok: true, questions: [{
+      id: "new-graph-skill", type: "short", question: "Tolka lutningen från två punkter.",
+      training_focus_matches: ["focus-2"], validation_status: "verified",
+    }] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.deepEqual(requiredFocusIds, ["focus-2"]);
+    assert.equal(job.accepted_questions.length, 3);
+    assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.includes("focus-1")));
+    assert.equal(job.stage, "repair");
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("mistake-training covers every selected focus before reaching assembly for 3, 6 and 12 questions", async (t) => {
+  for (const requested of [3, 6, 12]) {
+    await t.test(`${requested} questions`, async () => {
+      const focusIds = ["focus-1", "focus-2", "focus-3"];
+      const job = {
+        id: `00000000-0000-4000-8000-${String(requested + 40).padStart(12, "0")}`,
+        user_id: "11111111-1111-4111-8111-111111111111",
+        idempotency_key: "22222222-2222-4222-8222-222222222222",
+        request_hash: "a".repeat(64), attempt_id: "33333333-3333-4333-8333-333333333333",
+        lease_token: "44444444-4444-4444-8444-444444444444",
+        deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        stage: "generate", requested_count: requested,
+        payload: {
+          qType: "short", numQuestions: requested,
+          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`, skill: `Färdighet ${focusId}` })),
+          priorQuestions: [{ id: "old", question: "Lös ekvationen 2x + 4 = 10.", concept_tag: "Ekvationslösning" }],
+        },
+        accepted_questions: [], progress_current: 0,
+      };
+      const prior = {
+        generateVerifiedBatch: generation.generateVerifiedBatch,
+        renewPipelineLease: operations.renewPipelineLease,
+        renewGenerationLease: operations.renewGenerationLease,
+        checkpointPipelineJob: operations.checkpointPipelineJob,
+      };
+      let sequence = 0;
+      operations.renewPipelineLease = async () => true;
+      operations.renewGenerationLease = async () => true;
+      operations.checkpointPipelineJob = async (input) => {
+        job.accepted_questions = input.acceptedQuestions;
+        job.progress_current = input.progressCurrent;
+        job.stage = input.nextStage;
+        return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
+      };
+      generation.generateVerifiedBatch = async ({ payload }) => ({ status: 200, body: {
+        ok: true,
+        questions: Array.from({ length: Math.min(2, payload.numQuestions) }, () => {
+          sequence++;
+          return {
+            id: `training-${sequence}`, type: "short",
+            question: `Utred unik deluppgift ${sequence} med metod ${String.fromCharCode(96 + sequence)} och exempel ${sequence * 17}.`,
+            training_focus_matches: [focusIds[(sequence - 1) % focusIds.length]],
+            validation_status: "verified",
+          };
+        }),
+      } });
+      try {
+        let advances = 0;
+        while (job.stage !== "assemble") {
+          assert.ok(advances < 12, "bounded repair batches must reach assembly");
+          await pipeline.advance(job);
+          advances++;
+        }
+        assert.equal(job.accepted_questions.length, requested);
+        assert.equal(job.progress_current, requested);
+        assert.deepEqual(pipeline.uncoveredTrainingFocusIds(job, job.accepted_questions), []);
+        assert.deepEqual(new Set(job.accepted_questions.flatMap((question) => question.training_focus_matches)), new Set(focusIds));
+      } finally {
+        generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+        operations.renewPipelineLease = prior.renewPipelineLease;
+        operations.renewGenerationLease = prior.renewGenerationLease;
+        operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+      }
+    });
+  }
+});
+
+test("an assemble transition caused by retry/deadline cannot issue a mistake exam with uncovered focus", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000019",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    stage: "assemble",
+    requested_count: 3,
+    payload: { trainingFocus: [
+      { focusId: "focus-1", concept: "Ekvationer" },
+      { focusId: "focus-2", concept: "Grafer" },
+    ] },
+    accepted_questions: [1, 2, 3].map((n) => ({
+      id: `old-${n}`, training_focus_matches: ["focus-1"], validation_status: "verified",
+    })),
+  };
+  const prior = {
+    finalizeVerifiedExam: generation.finalizeVerifiedExam,
+    retryPipelineStep: operations.retryPipelineStep,
+  };
+  let finalizeCalls = 0;
+  let retryInput;
+  generation.finalizeVerifiedExam = async () => { finalizeCalls++; throw new Error("must not finalize"); };
+  operations.retryPipelineStep = async (input) => { retryInput = input; return "retry_limit"; };
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(finalizeCalls, 0);
+    assert.equal(retryInput.errorCode, "TRAINING_FOCUS_INCOMPLETE");
+    assert.equal(result.status, "retry_limit");
+    assert.equal(result.error, "TRAINING_FOCUS_INCOMPLETE");
+  } finally {
+    generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
+    operations.retryPipelineStep = prior.retryPipelineStep;
   }
 });
 
@@ -431,6 +616,31 @@ test("comparison context and maximum escaped material fit the bounded internal r
   assert.ok(requestBody.byteLength < 128 * 1024, "the full worst-case internal payload remains below 128 KiB");
   const requestStream = async function* () { yield requestBody; };
   assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).pastedText.length, 12000);
+  await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
+});
+
+test("long verified mistake evidence fits the internal request envelope without widening public requests", async () => {
+  const trainingFocus = mistakeTraining.normalizeTrainingFocus(Array.from({ length: 12 }, (_, index) => ({
+    focusId: `focus-${index + 1}`,
+    sourceQuestionId: `question-${index + 1}`,
+    sourceSubmissionId: "a".repeat(32),
+    concept: "Begrepp",
+    skill: "Färdighet",
+    sourceQuestion: "Q".repeat(1200),
+    studentAnswer: "A".repeat(1200),
+    gradingFeedback: "F".repeat(1000),
+    expectedAnswer: "M".repeat(1000),
+    errorTags: ["method_missing"],
+  })));
+  assert.equal(trainingFocus.length, 12, "all selected mistake focuses retain enough bounded evidence");
+  const body = Buffer.from(JSON.stringify({
+    pastedText: "\0".repeat(12000),
+    trainingFocus,
+    comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({ question: `Earlier question ${index}` })),
+  }), "utf8");
+  assert.ok(body.byteLength > 64 * 1024 && body.byteLength < 128 * 1024);
+  const requestStream = async function* () { yield body; };
+  assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).trainingFocus.length, 12);
   await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
 });
 

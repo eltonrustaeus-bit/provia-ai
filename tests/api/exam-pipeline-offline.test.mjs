@@ -137,10 +137,43 @@ const batchWithNoveltyContext = generateExam.buildExamPrompts({
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
   comparisonQuestions: [{ id: "approved-1", concept_tag: "Kloroplaster", question: "Var sker fotosyntesen?" }],
 });
-assert.match(batchWithNoveltyContext.userPrompt, /redan godkända i samma prov/i,
-  "later generation batches are instructed to avoid repeating approved questions");
+assert.match(batchWithNoveltyContext.userPrompt, /tidigare prov eller har redan godkänts i detta prov/i,
+  "later generation batches are instructed to avoid repeating historical and approved questions");
 assert.match(batchWithNoveltyContext.userPrompt, /Var sker fotosyntesen\?/,
   "the generation prompt receives existing questions only as novelty context");
+const crowdedNoveltyContext = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 12,
+  pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
+  priorQuestions: Array.from({ length: 20 }, (_, index) => ({
+    concept_tag: `Historiskt begrepp ${index + 1}`, question: `Historisk fråga ${index + 1}`,
+  })),
+  comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({
+    concept_tag: `Aktuellt begrepp ${index + 1}`, question: `Aktuell godkänd fråga ${index + 1}`,
+  })),
+});
+assert.match(crowdedNoveltyContext.userPrompt, /Aktuell godkänd fråga 12/,
+  "all current approved questions remain visible to generation when historical context is full");
+assert.doesNotMatch(crowdedNoveltyContext.userPrompt, /Historisk fråga 9/,
+  "historical questions are trimmed to make room for the full current batch");
+const crowdedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 12, candidateCount: 2, qType: "short",
+  existingQuestions: [
+    { concept_tag: "Aktuellt begrepp A", question: "Rundans godkända fråga A" },
+    { concept_tag: "Aktuellt begrepp B", question: "Rundans godkända fråga B" },
+  ],
+  priorQuestions: Array.from({ length: 20 }, (_, index) => ({ question: `Historisk fråga ${index + 1}` })),
+  comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({ question: `Aktuell godkänd fråga ${index + 1}` })),
+});
+assert.match(crowdedRepair.input.at(-1).content, /Aktuell godkänd fråga 12/,
+  "repair generation receives earlier approved questions, not only draft stems");
+assert.match(crowdedRepair.input.at(-1).content, /Rundans godkända fråga B/,
+  "repair generation also receives questions approved in the current review round");
+assert.doesNotMatch(crowdedRepair.input.at(-1).content, /Historisk fråga 7/,
+  "repair comparison context reserves 14 of 20 slots for current approved questions");
 const internalPayloadWithEscapedSource = Buffer.from(JSON.stringify({
   pastedText: "\0".repeat(12000),
   comparisonQuestions: [{ question: "Approved question ".repeat(350) }],
@@ -461,6 +494,54 @@ assert.deepEqual(duplicateGate.dropped, [
   { id: "zero-paraphrase", issues: ["duplicate_question"] },
   { id: "zero-semantic-paraphrase", issues: ["duplicate_question"] },
 ]);
+
+const makeEquationQuestion = (id, question) => ({
+  ...questions[0], id, type: "short", options: [], correct_index: -1,
+  concept_tag: "Ekvationslösning", question, model_answer: "x = 3",
+  estimated_answer_length: "one_sentence",
+  scoring_rubric: { parts: [{ description: "Lösningen x = 3", points: 1 }], full_score_requirements: "x = 3", partial_credit_notes: "" },
+});
+const equationQuestion = makeEquationQuestion("equation-explicit", "Lös ekvationen 2x + 4 = 10.");
+const rewrittenEquationQuestion = makeEquationQuestion(
+  "equation-instruction-rewrite", "Bestäm värdet på x i 2x + 4 = 10.",
+);
+const calculatedEquationQuestion = makeEquationQuestion(
+  "equation-calculated-rewrite", "Beräkna x då 2x + 4 = 10.",
+);
+const verbalEquationQuestion = makeEquationQuestion(
+  "equation-verbal", "Vilket tal ger 10 när det multipliceras med två och sedan ökas med fyra?",
+);
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, rewrittenEquationQuestion), true,
+  "the same equation remains a duplicate when only the Swedish instruction is rephrased");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, calculatedEquationQuestion), true,
+  "the same equation remains a duplicate when phrased as 'Beräkna x då'");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, makeEquationQuestion(
+  "equation-different-expression", "Beräkna x då 3x + 4 = 10.",
+)), false, "different equations are not collapsed by the solve-equation intent");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, {
+  ...makeEquationQuestion("equation-different-skill", "Bestäm lutningen för linjen y = 2x + 4."),
+  concept_tag: "Lutning",
+}), false, "a different skill is not collapsed even when the same equation is involved");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, verbalEquationQuestion), true,
+  "an equivalent verbal equation is recognized even when it shares few surface tokens");
+const equivalentEquationGate = assessment.gateExam({ questions: [equationQuestion, verbalEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(equivalentEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(equivalentEquationGate.dropped, [{ id: "equation-verbal", issues: ["duplicate_question"] }],
+  "the deterministic gate withholds an equivalent verbal equation even if an independent reviewer approves it");
+const rewrittenEquationGate = assessment.gateExam({ questions: [equationQuestion, rewrittenEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(rewrittenEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(rewrittenEquationGate.dropped, [{ id: "equation-instruction-rewrite", issues: ["duplicate_question"] }],
+  "the gate drops an instruction-only equation rewrite without relying on model review");
+const calculatedEquationGate = assessment.gateExam({ questions: [equationQuestion, calculatedEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(calculatedEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(calculatedEquationGate.dropped, [{ id: "equation-calculated-rewrite", issues: ["duplicate_question"] }],
+  "the deterministic gate drops the 'Beräkna x då' rewrite");
 
 const semanticDuplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "capacity-definition", question: "Vad är ekosystemets bärförmåga och hur påverkas den?", topic: "Ekologi", concept_tag: "Bärförmåga" },

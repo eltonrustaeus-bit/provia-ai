@@ -35,12 +35,22 @@ let lastExplain = null;
 let examStateUnavailable = false;
 let activeExamCount = 0;
 let historyAllowed = true;
+let holdHistoryResponse = false;
+let releaseHeldHistoryResponse = null;
+let historyResponseHeldResolve = null;
+const historyResponseHeld = new Promise(resolve => { historyResponseHeldResolve = resolve; });
+const historyRaceBehaviors = [];
+let releaseRaceHistoryResponse = null;
+let historyRaceFailureResolve = null;
+const historyRaceFailure = new Promise(resolve => { historyRaceFailureResolve = resolve; });
 const activeExamCountCalls = [];
 const legacyStatusCalls = [];
 const SAVED_PER_HISTORY = [
   { role: "user", content: "Explain my old practice result." },
   { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42." },
 ];
+const STALE_PER_HISTORY = [{ role: "assistant", content: "STALE_HISTORY_RESPONSE" }];
+const NEWEST_PER_HISTORY = [{ role: "assistant", content: "NEWEST_HISTORY_RESPONSE" }];
 const R = report("per-exam-context");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
@@ -54,7 +64,7 @@ await mockApis(page, {
   extra: [
     ["**/api/generate-exam?pipeline=start", r => {
       historyAllowed = false;
-      r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+      r.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { partial: true, requested: 6, quota: { enforced: false } } } });
     }],
     ["**/api/abandon-exam**", r => {
       activeExamCountCalls.push({ method: r.request().method(), url: r.request().url() });
@@ -69,8 +79,34 @@ await mockApis(page, {
           : { ok: true, active_count: activeExamCount } });
       }
     }],
-    ["**/api/explain", r => {
+    ["**/api/explain", async r => {
       if (r.request().method() === "GET") {
+        const raceBehavior = historyRaceBehaviors.shift();
+        if (raceBehavior === "defer" || raceBehavior === "defer-stale") {
+          const history = raceBehavior === "defer-stale" ? STALE_PER_HISTORY : SAVED_PER_HISTORY;
+          await new Promise(resolve => {
+            releaseRaceHistoryResponse = () => r.fulfill({ json: { ok: true, history } }).then(resolve);
+          });
+          return;
+        }
+        if (raceBehavior === "newer") {
+          await r.fulfill({ json: { ok: true, history: NEWEST_PER_HISTORY } });
+          return;
+        }
+        if (raceBehavior === "fail") {
+          await r.fulfill({ status: 503, json: { error: "TEMPORARY_HISTORY_FAILURE" } });
+          historyRaceFailureResolve?.();
+          historyRaceFailureResolve = null;
+          return;
+        }
+        if (holdHistoryResponse) {
+          await new Promise(resolve => {
+            historyResponseHeldResolve?.();
+            historyResponseHeldResolve = null;
+            releaseHeldHistoryResponse = () => r.fulfill({ json: { ok: true, history: SAVED_PER_HISTORY } }).then(resolve);
+          });
+          return;
+        }
         if (historyAllowed) r.fulfill({ json: { ok: true, history: SAVED_PER_HISTORY } });
         else r.fulfill({ status: 409, json: { error: "PER_HISTORY_LOCKED" } });
         return;
@@ -86,27 +122,78 @@ await seed(page);
 await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
 await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null, null, { timeout: 5000 });
+await page.evaluate(() => window.PER.setExamHistoryMasked(true));
+historyRaceBehaviors.push("defer", "fail");
+const racingHistoryRefreshes = page.evaluate(() => Promise.all([
+  window.PER.refreshHistoryIfVerified(),
+  window.PER.refreshHistoryIfVerified(),
+]));
+await historyRaceFailure;
+ok("a failed newer P.E.R. history refresh does not invalidate an older successful refresh",
+  typeof releaseRaceHistoryResponse === "function");
+await releaseRaceHistoryResponse();
+const raceRefreshResults = await racingHistoryRefreshes;
+const recoveredRaceHistory = await page.evaluate(() => ({
+  stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
+  mask: localStorage.getItem("proviaai_per_exam_history_masked"),
+}));
+ok("successful P.E.R. history survives an overlapping transient refresh failure",
+  raceRefreshResults[0]?.length === SAVED_PER_HISTORY.length
+    && raceRefreshResults[1] === false
+    && recoveredRaceHistory.stored.some(msg => msg.content.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"))
+    && recoveredRaceHistory.mask === null,
+  JSON.stringify({ raceRefreshResults, recoveredRaceHistory }));
+await page.evaluate(() => window.PER.setExamHistoryMasked(true));
+historyRaceBehaviors.push("defer-stale", "newer");
+const outOfOrderHistoryRefreshes = page.evaluate(() => Promise.all([
+  window.PER.refreshHistoryIfVerified(),
+  window.PER.refreshHistoryIfVerified(),
+]));
+await page.waitForFunction(() => document.getElementById("perMessages")?.innerText.includes("NEWEST_HISTORY_RESPONSE"));
+ok("newer P.E.R. history applies while an older refresh is pending", typeof releaseRaceHistoryResponse === "function");
+await releaseRaceHistoryResponse();
+const outOfOrderResults = await outOfOrderHistoryRefreshes;
+const historyAfterOutOfOrder = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"));
+ok("a late older P.E.R. response cannot overwrite newer verified history",
+  outOfOrderResults[1]?.[0]?.content === "NEWEST_HISTORY_RESPONSE"
+    && outOfOrderResults[0] === false
+    && historyAfterOutOfOrder[0]?.content === "NEWEST_HISTORY_RESPONSE",
+  JSON.stringify({ outOfOrderResults, historyAfterOutOfOrder }));
 await page.evaluate(history => {
   localStorage.setItem("proviaai_per_history", JSON.stringify(history));
   window.PER.setExamHistoryMasked(true);
   window.PER.setExamHistoryMasked(false);
 }, SAVED_PER_HISTORY);
+holdHistoryResponse = true;
+await page.evaluate(() => {
+  window.dispatchEvent(new StorageEvent("storage", {
+    key: "proviaai_per_exam_history_masked", oldValue: "1", newValue: null,
+  }));
+});
+await historyResponseHeld;
+ok("a history refresh is in flight before the next exam begins", typeof releaseHeldHistoryResponse === "function");
 await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await page.waitForTimeout(200);
 await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
 await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await page.waitForTimeout(200);
+await page.getByRole("button", { name: "Ändra" }).last().click();
+await page.locator('#xf .xf-screen[data-screen="aim"].on:visible .xf-chips[aria-label="Antal"] .xf-chip:visible').filter({ hasText: /^6$/ }).last().click();
 await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await page.waitForTimeout(200);
 await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre.");
 await page.waitForTimeout(150);
 await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary"); await page.waitForTimeout(200);
-await page.evaluate(() => { document.querySelector("#pastedText").value = "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre."; });
+await page.locator("#course").evaluate(node => { node.value = "Matematik 2b"; });
 const preExamContext = await page.evaluate(() => {
   window.PER.describe({ page: "app" });
   return window.__perTestCtx();
 });
 ok("P.E.R får aktuellt studiematerial före provstart", /Cellandning sker i mitokondrien/.test(preExamContext.studyMaterial || ""));
+ok("P.E.R får elevens valda kurs i sidkontexten", preExamContext.course === "Biologi 1", JSON.stringify(preExamContext.course));
 await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
 await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
 await page.waitForTimeout(300);
+if (releaseHeldHistoryResponse) await releaseHeldHistoryResponse();
+holdHistoryResponse = false;
+await page.waitForTimeout(100);
 const historyDuringExam = await page.evaluate(() => ({
   visible: document.getElementById("perMessages")?.innerText || "",
   stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
@@ -116,6 +203,9 @@ ok("P.E.R hides cached full solutions after an exam opens", !historyDuringExam.v
   && /dolt|hidden/i.test(historyDuringExam.visible));
 ok("hiding exam history preserves the original local transcript", JSON.stringify(historyDuringExam.stored) === JSON.stringify(SAVED_PER_HISTORY), JSON.stringify(historyDuringExam.stored));
 ok("active exam history mask persists for same-browser navigation", historyDuringExam.mask === "1");
+ok("a delayed verified history response cannot unmask history after exam start",
+  !historyDuringExam.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER") && historyDuringExam.mask === "1",
+  JSON.stringify(historyDuringExam));
 
 await page.evaluate(() => {
   const key = "exgen_flow_draft_u1";
@@ -175,6 +265,8 @@ await page.fill("#perInput", "hjälp mig med frågan");
 await page.click("#perSendBtn");
 await page.waitForTimeout(900);
 ok("T4a explain anropades", !!lastExplain);
+ok("T4a2 P.E.R skickar ämnet, inte sidnamnet 'app', som topic", lastExplain?.topic === "Biologi 1", JSON.stringify(lastExplain?.topic));
+ok("T4a3 kursen ligger kvar i P.E.R:s sidkontext", lastExplain?.pageContext?.course === "Biologi 1", JSON.stringify(lastExplain?.pageContext?.course));
 ok("T4a1 active exam requests do not include prior P.E.R transcripts", Array.isArray(lastExplain?.history) && lastExplain.history.length === 0,
   JSON.stringify(lastExplain?.history));
 ok("T4a2 active exam requests do not include study material", !lastExplain?.pageContext?.studyMaterial,
@@ -431,6 +523,9 @@ const newTopicContext = await page.evaluate(() => window.__perTestCtx());
 ok("Nytt ämne rensar föregående provkontext", newTopicContext.page === "app"
   && !newTopicContext.currentQuestion && !newTopicContext.examState && !newTopicContext.targets,
   JSON.stringify(newTopicContext));
+ok("Nytt ämne lämnar inget material från det föregående provet till P.E.R",
+  !newTopicContext.studyMaterial && !/Cellandning sker i mitokondrien/.test(JSON.stringify(newTopicContext)),
+  JSON.stringify(newTopicContext));
 if (!(await page.locator("#perPanel").isVisible())) await page.click("#perBubble");
 await page.waitForTimeout(200);
 await page.locator("#perInput").waitFor({ state: "visible", timeout: 3000 });
@@ -440,6 +535,9 @@ await page.waitForTimeout(200);
 ok("vanlig P.E.R-fråga skickas utan gammal provstatus", lastExplain?.pageContext?.page === "app"
   && !lastExplain.pageContext.currentQuestion && !lastExplain.pageContext.examState,
   JSON.stringify(lastExplain?.pageContext));
+ok("vanlig P.E.R-fråga efter Nytt ämne skickas utan gammalt provmaterial",
+  !lastExplain?.pageContext?.studyMaterial && !JSON.stringify(lastExplain?.pageContext || {}).includes("Cellandning sker i mitokondrien"),
+  JSON.stringify(lastExplain?.pageContext || {}));
 
 // ── T10: debouncad publish() återuppväcker inte manifestet (Fynd A) ───────
 // T9 bevisar closeExam() för flervalsfrågor — de publicerar synkront vid

@@ -11,8 +11,9 @@ try {
     { requested: 3, approved: 2, meta: { partial: false, requested: 3 } },
     { requested: 6, approved: 4, meta: null },
     { requested: 12, approved: 8, meta: { partial: true, requested: 12 } },
+    { requested: 3, approved: 4, meta: null, rejectOverdelivery: true },
   ];
-  for (const { requested, approved, meta } of scenarios) {
+  for (const { requested, approved, meta, rejectOverdelivery } of scenarios) {
     let postedQuestionCount = null;
     const partialExam = {
       title: "Syntetiskt biologi-prov",
@@ -39,6 +40,9 @@ try {
           if (meta) response.meta = { ...meta, quota: { enforced: false } };
           return route.fulfill({ json: response });
         }],
+        ["**/api/abandon-exam**", route => route.fulfill({ json: {
+          ok: true, exam_state: "active", submission_id: "a".repeat(32),
+        } })],
       ] },
       settle: 0,
     });
@@ -56,17 +60,64 @@ try {
       await page.waitForSelector('#xf .xf-screen[data-screen="contract"].on', { timeout: 5000 });
       await page.click('#xf .xf-screen[data-screen="contract"] .xf-btn.primary');
 
+      if (rejectOverdelivery) {
+        await page.waitForTimeout(500);
+        const flowText = await page.locator("#xf").innerText();
+        assert.match(flowText, /Servern returnerade 4 frågor när 3 begärdes/i, flowText);
+        assert.equal(await page.locator("#examBody .qBox").count(), 0,
+          "over-delivery fails closed without opening any question");
+        assert.equal(await page.locator("#generateExamBtn").isEnabled(), true,
+          "the generation controls are re-enabled after over-delivery rejection");
+        const quota = await page.evaluate((userId) => Object.entries(localStorage)
+          .filter(([key]) => key.startsWith(`proviaai_quota_${userId}_`)), `partial-delivery-user-${requested}`);
+        assert.deepEqual(quota, [], "rejected over-delivery does not consume local fallback quota");
+        continue;
+      }
+
       await page.waitForFunction((count) => document.querySelectorAll("#examBody .qBox").length === count, approved, { timeout: 5000 });
       assert.match(await page.locator("#examGuide").textContent(), new RegExp(`${approved} av ${requested} begärda frågor`));
       assert.match(await page.locator("#floatingGradeHint").textContent(), new RegExp(`Besvara de ${approved} godkända frågorna`));
       assert.equal(await page.locator("#examBody .qBox").count(), approved);
       assert.equal(postedQuestionCount, requested, "the selected requested count reaches the generation API");
+      if (requested === 12) {
+        const draft = await page.evaluate((userId) => JSON.parse(localStorage.getItem(`exgen_flow_draft_${userId}`) || "null"), `partial-delivery-user-${requested}`);
+        assert.match(draft?.questionCountNote || "", /8 frågor klarade/,
+          "the saved draft retains the requested-versus-approved warning");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector('#xf .xf-screen[data-screen="start"].on', { timeout: 8000 });
+        await page.click('#xf .xf-screen[data-screen="start"] .xf-btn.ghost');
+        await page.waitForSelector("#xf .xf-question-quality-note", { timeout: 5000 });
+        assert.match(await page.locator("#xf .xf-question-quality-note").textContent(), /8 frågor klarade/,
+          "the partial warning remains visible after resuming the exam");
+        const closeNotice = page.locator('#xf .xf-question-quality-note button[aria-label="Stäng meddelandet"]');
+        await closeNotice.click();
+        assert.equal(await page.locator("#xf .xf-question-quality-note").count(), 0,
+          "the learner can dismiss the detailed partial notice");
+        assert.match(await page.locator("#xf .xf-exam-top > span").first().textContent(), /Fråga 1 \/ 8.*8 av 12 begärda/,
+          "the exam counter keeps requested-versus-issued counts after dismissal");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await page.waitForSelector('#xf .xf-screen[data-screen="start"].on', { timeout: 8000 });
+        await page.click('#xf .xf-screen[data-screen="start"] .xf-btn.ghost');
+        await page.waitForSelector("#xf .xf-exam-top", { timeout: 5000 });
+        assert.equal(await page.locator("#xf .xf-question-quality-note").count(), 0,
+          "a dismissed notice stays dismissed across reload");
+        assert.match(await page.locator("#xf .xf-exam-top > span").first().textContent(), /Fråga 1 \/ 8.*8 av 12 begärda/,
+          "requested-versus-issued counts remain visible after reload");
+        await page.setViewportSize({ width: 320, height: 740 });
+        const countGeometry = await page.locator("#xf .xf-exam-top > span").first().evaluate((node) => ({
+          right: node.getBoundingClientRect().right,
+          viewport: window.innerWidth,
+          scroll: document.documentElement.scrollWidth,
+        }));
+        assert.ok(countGeometry.right <= countGeometry.viewport && countGeometry.scroll <= countGeometry.viewport,
+          `the persistent partial count fits a narrow phone viewport: ${JSON.stringify(countGeometry)}`);
+      }
     } finally {
       await ctx.close();
       ctx = null;
     }
   }
-  console.log("partial-delivery browser checks passed for 2/3, 4/6 and 8/12; UI labels each approved count and renders only approved questions");
+  console.log("browser checks passed for partial 2/3, 4/6, 8/12 and fail-closed overdelivery 4/3");
 } finally {
   if (ctx) await ctx.close();
   await browser.close();

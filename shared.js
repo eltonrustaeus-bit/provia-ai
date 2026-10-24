@@ -132,6 +132,9 @@
 
   var _examHistoryMasked = true;
   var _serverVerifiedPerHistoryRelease = false;
+  var _perHistoryRequestGeneration = 0;
+  var _perHistoryInvalidationGeneration = 0;
+  var _perHistoryAppliedRequestGeneration = 0;
   try {
     if (localStorage.getItem(PER_EXAM_HISTORY_MASK_KEY) === '1') _examHistoryMasked = true;
   } catch (_) {}
@@ -142,6 +145,8 @@
       return pilotSessionUserId(session) || null;
     } catch (_) { return null; }
   }
+
+  var _perHistoryAccountId = currentPilotAccountId();
 
   function pilotSessionUserId(session) {
     if (session && session.user && session.user.id) return String(session.user.id);
@@ -240,7 +245,7 @@
      om på noll: annars bär fråga 2 med sig fråga 1:s "ge mig svaret" och eleven
      får facit på en fråga hen aldrig bett om hjälp med. */
   var PER_STEP_LABELS = [null, 'Förklara begreppet', 'Visa metoden', 'Ge mig svaret'];
-  var _perHelpLevel = 0;
+  var _perHelpLevel = 1;
   var _perHelpCap = null;
   var _perFocusKey = null;
   var _perAskInFlight = '';
@@ -315,7 +320,8 @@
     var key = perFocusKey();
     if (key === _perFocusKey) return;
     _perFocusKey = key;
-    _perHelpLevel = 0;
+    var context = getPageContext();
+    _perHelpLevel = context.currentQuestion || context.examState && context.examState.phase === 'exam' ? 0 : 1;
     _perHelpCap = null;
     /* En redan ritad rad bär förra frågans tak. Att låta den ligga kvar är
        värre än att inte rita någon alls — den påstår något om en fråga som
@@ -380,6 +386,15 @@
       else if (path === '/' || path.includes('index')) page = 'startsida';
 
       var ctx = { page: page };
+      var flowContext = typeof window.__getPerStudyContext === 'function' ? window.__getPerStudyContext() : null;
+      var courseInput = document.getElementById('course');
+      var levelInput = document.getElementById('level');
+      /* Live wizard state reflects a course the student just changed; hidden
+         compatibility inputs can still contain the previous exam. */
+      var selectedCourse = String(flowContext?.course || '').trim() || courseInput && String(courseInput.value || '').trim() || '';
+      var selectedLevel = String(flowContext?.level || '').trim() || levelInput && String(levelInput.value || '').trim() || '';
+      if (selectedCourse) ctx.course = String(selectedCourse).trim().slice(0, 120);
+      if (selectedLevel) ctx.level = String(selectedLevel).trim().slice(0, 30);
 
       /* Äldre fält som ännu inte flyttat in i manifestet. setPerContext skriver
          fortfarande hit, så sidor som inte migrerats tappar ingenting.
@@ -396,8 +411,8 @@
         if (Array.isArray(pc.questions)) ctx.questions = pc.questions;
         if (typeof pc.userScore === 'number') ctx.userScore = pc.userScore;
         if (Array.isArray(pc.weakAreas)) ctx.weakAreas = pc.weakAreas;
-        if (pc.course) ctx.course = pc.course;
-        if (pc.level) ctx.level = pc.level;
+        if (pc.course && !selectedCourse) ctx.course = pc.course;
+        if (pc.level && !selectedLevel) ctx.level = pc.level;
         if (pc.mode) ctx.mode = pc.mode;
       }
 
@@ -428,9 +443,14 @@
 
       /* P.E.R. may use the material currently being prepared in ordinary
          study mode. Never attach it to an exam/result context. */
-      if (ctx.page === 'app' && !ctx.currentQuestion && !ctx.examState
+      var verifiedResultView = ctx.examState && ctx.examState.phase === 'result';
+      if ((ctx.page === 'app' || verifiedResultView) && !ctx.currentQuestion
+          && (!ctx.examState || verifiedResultView)
           && typeof window.__getPerStudyMaterial === 'function') {
-        var studyMaterial = String(window.__getPerStudyMaterial() || '').trim().slice(0, 6000);
+        var liveMaterial = typeof window.__getPerStudyContext === 'function'
+          ? flowContext?.studyMaterial
+          : window.__getPerStudyMaterial();
+        var studyMaterial = String(liveMaterial || '').trim().slice(0, 6000);
         if (studyMaterial) ctx.studyMaterial = studyMaterial;
       }
 
@@ -501,7 +521,7 @@
         return 'Vill du gå igenom dina misstag? Jag kan förklara vad som hände.';
       }
       if (path.includes('app')) {
-        return 'Fastnat på något i provet? Fråga på.';
+        return 'Vad vill du förstå? Fråga P.E.R.';
       }
     } catch (_) {}
     return 'Vad kan jag hjälpa dig med?';
@@ -546,7 +566,10 @@
   function setExamHistoryMasked(masked, persist) {
     var next = Boolean(masked);
     if (!next && !_serverVerifiedPerHistoryRelease) return;
-    if (next) _serverVerifiedPerHistoryRelease = false;
+    if (next) {
+      _serverVerifiedPerHistoryRelease = false;
+      _perHistoryInvalidationGeneration++;
+    }
     var shouldPersist = arguments.length < 2 || Boolean(persist);
     if (next === _examHistoryMasked && !next) return;
     var msgs = document.getElementById('perMessages');
@@ -594,6 +617,9 @@
     try {
       var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
       var token = session && session.access_token;
+      var accountId = pilotSessionUserId(session) || null;
+      var requestGeneration = ++_perHistoryRequestGeneration;
+      var invalidationGeneration = _perHistoryInvalidationGeneration;
       if (session && session.expires_at
         && Number(session.expires_at) - 60 <= Date.now() / 1000) return null;
       if (!token) return null;
@@ -603,11 +629,15 @@
       if (!response.ok) return false;
       var data = await response.json();
       if (!data || !Array.isArray(data.history)) return false;
+      if (invalidationGeneration !== _perHistoryInvalidationGeneration
+        || requestGeneration < _perHistoryAppliedRequestGeneration
+        || accountId !== currentPilotAccountId()) return false;
       var history = data.history.filter(function (msg) {
         return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
       }).slice(-PER_MAX_HIST);
       _serverVerifiedPerHistoryRelease = true;
       _examHistoryMasked = false;
+      _perHistoryAppliedRequestGeneration = requestGeneration;
       try {
         localStorage.setItem(PER_HIST_KEY, JSON.stringify(history));
         localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
@@ -628,6 +658,16 @@
   }
 
   window.addEventListener('storage', function (event) {
+    if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) {
+      var session = null;
+      try { session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+      var nextAccountId = pilotSessionUserId(session) || null;
+      if (nextAccountId !== _perHistoryAccountId) {
+        _perHistoryAccountId = nextAccountId;
+        setExamHistoryMasked(true);
+        refreshPerHistoryIfVerified();
+      }
+    }
     if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
       if (event.newValue === '1') setExamHistoryMasked(true);
       else if (event.newValue === null) refreshPerHistoryIfVerified();
@@ -973,6 +1013,7 @@
     function register(fn) { _getToken = fn; }
 
     function clearAfterServerMemoryClear() {
+      _perHistoryInvalidationGeneration++;
       if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
       try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
       if (EXGEN_RUNTIME.environment === 'pilot') {
@@ -1453,7 +1494,10 @@ function finalizeMsg(div, text) {
         if (!requestStillOwned()) return;
         if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
-        var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'ExGen';
+        var pageTopic = (pageCtx && (pageCtx.course || pageCtx.topic))
+          ? (pageCtx.course || pageCtx.topic)
+          : (pageCtx && pageCtx.page && !['app', 'prov', 'resultat', 'exam', 'exam-result'].includes(pageCtx.page)
+            ? pageCtx.page : '');
         var isLandingMode = !token; // Public guide only; study help requires an account.
 
         if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {
@@ -1489,20 +1533,29 @@ function finalizeMsg(div, text) {
           updateLandingBar();
         }
 
-        var recentMistakes = [];
+        var recentMistakes = [], weakAreas = [];
         try {
           var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
-          recentMistakes = lsMistakes.slice(-10).map(function(m) {
-            return { question: String(m.question || '').slice(0, 200), category: String(m.course || m.category || '').slice(0, 60) };
-          });
-        } catch (_) {}
-
-        var weakAreas = [];
-        try {
-          var lsHist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
-          var courseFreq = {};
-          lsHist.forEach(function(e) { if (e.course) courseFreq[e.course] = (courseFreq[e.course] || 0) + 1; });
-          weakAreas = Object.keys(courseFreq).sort(function(a,b) { return courseFreq[b]-courseFreq[a]; }).slice(0,5);
+          var mayUseMistakeContext = pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
+            && pageCtx.examState?.phase !== 'exam';
+          if (mayUseMistakeContext) {
+            recentMistakes = lsMistakes.slice(-10).reverse().map(function(m) {
+              return {
+                question: String(m.question || '').slice(0, 200),
+                category: String(m.course || m.category || '').slice(0, 60),
+                concept: String(m.concept_tag || '').slice(0, 80),
+                errorTags: Array.isArray(m.error_tags) ? m.error_tags.slice(0, 4).map(function(tag) { return String(tag).slice(0, 40); }) : [],
+                studentAnswer: String(m.user_answer || '').slice(0, 160),
+                feedback: String(m.feedback || '').slice(0, 160)
+              };
+            });
+            var conceptFreq = {};
+            lsMistakes.forEach(function(m) {
+              var concept = String(m && m.concept_tag || '').trim();
+              if (concept && !/^(okänt|okant|unknown)$/i.test(concept)) conceptFreq[concept] = (conceptFreq[concept] || 0) + 1;
+            });
+            weakAreas = Object.keys(conceptFreq).sort(function(a,b) { return conceptFreq[b]-conceptFreq[a] || a.localeCompare(b); }).slice(0,5);
+          }
         } catch (_) {}
 
         var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply };

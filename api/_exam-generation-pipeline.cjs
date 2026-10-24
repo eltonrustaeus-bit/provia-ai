@@ -100,6 +100,20 @@ function comparisonQuestionsFor(questions, requested) {
   return comparisons;
 }
 
+function trainingFocusIds(job) {
+  return (Array.isArray(job?.payload?.trainingFocus) ? job.payload.trainingFocus : [])
+    .slice(0, 20)
+    .map((focus, index) => /^focus-[1-9][0-9]{0,1}$/.test(focus?.focusId || "") ? focus.focusId : `focus-${index + 1}`);
+}
+
+function uncoveredTrainingFocusIds(job, questions) {
+  const required = trainingFocusIds(job);
+  const covered = new Set((Array.isArray(questions) ? questions : [])
+    .flatMap((question) => Array.isArray(question?.training_focus_matches) ? question.training_focus_matches : [])
+    .filter((id) => typeof id === "string"));
+  return required.filter((id) => !covered.has(id));
+}
+
 function mergeRepairFeedback(previous, current) {
   const prior = generation.normalizeRepairFeedback(previous);
   const latest = generation.normalizeRepairFeedback(current);
@@ -124,7 +138,10 @@ async function advance(job, { deadlineAt = null } = {}) {
     return retryOutcome(retry, job, "INVALID_STAGE");
   }
 
-  const existing = Array.isArray(job.accepted_questions) ? job.accepted_questions : [];
+  const acceptedBefore = Array.isArray(job.accepted_questions) ? job.accepted_questions : [];
+  const existing = acceptedBefore;
+  const uncoveredBefore = uncoveredTrainingFocusIds(job, acceptedBefore);
+  const priorQuestions = Array.isArray(job.payload.priorQuestions) ? job.payload.priorQuestions : [];
   const targets = questionTargets(job);
   const batchType = targets ? nextBatchType(existing, targets, job.requested_count) : job.payload.qType;
   const slots = missingForType(existing, batchType || "", targets, job.requested_count);
@@ -140,12 +157,14 @@ async function advance(job, { deadlineAt = null } = {}) {
     qType: batchType || job.payload.qType,
     numQuestions: batchCount,
     comparisonQuestions,
+    trainingFocusRequiredIds: uncoveredBefore,
     idempotencyKey: crypto.randomUUID(),
   };
   delete payload.attemptId;
   delete payload.quotaPeriod;
   delete payload.quota;
   delete payload.entitlements;
+  delete payload.generationRole;
   delete payload.requestHash;
   delete payload.repairFeedback;
 
@@ -160,6 +179,7 @@ async function advance(job, { deadlineAt = null } = {}) {
     pipelineJobId: job.id,
     pipelineStage: job.stage,
     repairFeedback: job.payload.repairFeedback,
+    roleSnapshot: job.payload.generationRole,
   }); }
   catch { generated = null; }
   if (!generated || generated.status !== 200 || generated.body?.ok !== true || !Array.isArray(generated.body.questions)) {
@@ -204,8 +224,20 @@ async function advance(job, { deadlineAt = null } = {}) {
   let batchIdCollisions = 0;
   let semanticDuplicateCandidates = 0;
   let overLimitCandidates = 0;
+  let focusMismatchCandidates = 0;
+  const coveredTrainingFocusIds = new Set(acceptedBefore.flatMap((question) =>
+    Array.isArray(question?.training_focus_matches) ? question.training_focus_matches : []));
   for (const question of generated.body.questions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
+    const candidateFocusMatches = Array.isArray(question.training_focus_matches)
+      ? question.training_focus_matches
+      : [];
+    const newlyCoveredFocusIds = uncoveredBefore.filter((id) =>
+      !coveredTrainingFocusIds.has(id) && candidateFocusMatches.includes(id));
+    if (newlyCoveredFocusIds.length === 0 && uncoveredBefore.some((id) => !coveredTrainingFocusIds.has(id))) {
+      focusMismatchCandidates++;
+      continue;
+    }
     if (targets && question.type !== batchType) { wrongTypeCandidates++; continue; }
     if (acceptedOfType >= typeLimit || accepted.length >= job.requested_count) { overLimitCandidates++; continue; }
     // Model IDs are local to each reviewed batch. Namespace them only after all
@@ -214,12 +246,14 @@ async function advance(job, { deadlineAt = null } = {}) {
     if (accepted.some((prior) => prior.id === candidate.id)) {
       batchIdCollisions++; duplicateCandidates++; continue;
     }
-    if (!noSemanticDuplicate(accepted, candidate)) {
+    if (!noSemanticDuplicate([...accepted, ...priorQuestions], candidate)) {
       semanticDuplicateCandidates++; duplicateCandidates++; continue;
     }
     accepted.push(candidate);
     acceptedOfType += 1;
+    for (const id of candidateFocusMatches) coveredTrainingFocusIds.add(id);
   }
+  const uncoveredAfter = uncoveredTrainingFocusIds(job, accepted);
   const diagnosticCount = (value) => Number.isInteger(value) && value >= 0 ? Math.min(value, 100) : null;
   const diagnosticCategories = (value) => Object.fromEntries(Object.entries(
     value && typeof value === "object" && !Array.isArray(value) ? value : {},
@@ -258,20 +292,22 @@ async function advance(job, { deadlineAt = null } = {}) {
     batchIdCollisions,
     semanticDuplicateCandidates,
     overLimitCandidates,
+    focusMismatchCandidates,
+    uncoveredTrainingFocusCount: uncoveredAfter.length,
     acceptedAfter: accepted.length,
     latencyMs: Date.now() - generationStartedAt,
   }));
 
-  const complete = accepted.length >= job.requested_count;
+  const complete = accepted.length >= job.requested_count && uncoveredAfter.length === 0;
   const nearDeadline = Date.parse(job.deadline_at) - Date.now() < 75_000;
   const minimum = generation.minimumDeliverableQuestionCount(job.requested_count);
-  const partialReady = nearDeadline && accepted.length >= minimum &&
+  const partialReady = nearDeadline && uncoveredAfter.length === 0 && accepted.length >= minimum &&
     (!targets || (accepted.some((question) => question.type === "mc") && accepted.some((question) => question.type === "short")));
   const checkpoint = await operations.checkpointPipelineJob({
     jobId: job.id,
     leaseToken: job.lease_token,
     expectedStage: job.stage,
-    nextStage: accepted.length > existing.length && (complete || partialReady) ? "assemble" : "repair",
+    nextStage: accepted.length > acceptedBefore.length && (complete || partialReady) ? "assemble" : "repair",
     acceptedQuestions: accepted,
     progressCurrent: accepted.length,
     repairFeedback: mergeRepairFeedback(job.payload.repairFeedback, {
@@ -287,6 +323,15 @@ async function advance(job, { deadlineAt = null } = {}) {
 }
 
 async function assemble(job) {
+  const uncoveredFocusIds = uncoveredTrainingFocusIds(job, job.accepted_questions);
+  if (uncoveredFocusIds.length) {
+    const retry = await operations.retryPipelineStep({
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      errorCode: "TRAINING_FOCUS_INCOMPLETE",
+    });
+    return retryOutcome(retry, job, "TRAINING_FOCUS_INCOMPLETE");
+  }
   let finalized;
   try {
     finalized = await generation.finalizeVerifiedExam({
@@ -314,4 +359,4 @@ async function assemble(job) {
   return { status: "completed", response: completed.response };
 }
 
-module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };
+module.exports = { advance, batchQuestionId, nextBatchType, missingForType, noSemanticDuplicate, comparisonQuestionsFor, uncoveredTrainingFocusIds, mergeRepairFeedback, safeRequestId, safeRepairFailureStage, safeRepairOutcomeStage, MAX_COMPARISON_CONTEXT_BYTES };

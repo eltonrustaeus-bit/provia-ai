@@ -11,8 +11,8 @@ const {
 
 assert.equal(minimumExamPreflightBudgetMs("mix"), 51_000,
   "ordinary exams reserve the 15-second generation and 30-second review windows plus concurrent preflight work");
-assert.equal(minimumExamPreflightBudgetMs("mix", true), 39_000,
-  "small resumable batches use a shorter bounded review window while keeping generation and preflight reserves");
+assert.equal(minimumExamPreflightBudgetMs("mix", true), 38_000,
+  "resumable batches reserve the already-held quota and the adaptive-focus timeout without reducing generation or review minimums");
 assert.equal(minimumExamPreflightBudgetMs("graph"), 0,
   "supported graph tasks keep their dedicated single-question path");
 assert.equal(minimumExamGenerationReviewBudgetMs(), 45_000,

@@ -13,6 +13,9 @@ so no account, quota or deploy is needed and any model combination can be
 compared in one sitting. Auth, quota and persistence are therefore out of scope
 here; the live smoke tests cover those.
 
+The eval passes each fixture's source material into both the structural source
+gate and the independent verifier, matching the relevant production inputs.
+
 ## Running
 
 Free, offline, no API key — always run this first:
@@ -100,14 +103,21 @@ Reasoning models can be slower; a timeout can prevent an exam from being
 delivered. The runner prints a warning when p95 crosses its configured
 threshold.
 
-**Token use and cost**, from the price table in `run-eval.mjs` (checked against
-<https://developers.openai.com/api/docs/pricing> on 2026-08-01). Reasoning
-tokens are reported separately, since they bill as output and are the reason a
-reasoning model costs more than a naive input/output estimate suggests.
-The verifier and solver now return provider usage and the runner reports their
-tokens separately, including how many calls had measured usage. The price table
-is historical, and the displayed cost is still the generator's only. Do not
-read it as current pricing or a total production cost.
+**Token use and estimated cost**, from the historical price table in
+`run-eval.mjs` (last checked against
+<https://developers.openai.com/api/docs/pricing> on 2026-08-01). Generator,
+verifier, solver and independent judge are reported separately. The first-pass
+production-stage estimate includes generator + verifier + solver, but excludes
+any production repair/regeneration batches that this eval does not simulate.
+The eval total also includes the judge, which is not part of production. If a
+generator call needed a retry after an unobserved response, its cost and total
+production-stage cost are unknown; if the judge needed such a retry, the eval
+total is unknown. This avoids presenting a likely underestimate as complete.
+If a model is unpriced or a stage's provider usage is missing, that total is
+reported as unknown, never as zero.
+Reasoning tokens are shown separately but are already included in provider
+output-token billing. These are historical-price estimates, not current
+pricing or a billing statement; verify rates before making a model decision.
 
 ## First finding: subject routing was wrong before any model was swapped
 

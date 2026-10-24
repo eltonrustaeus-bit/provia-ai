@@ -4,7 +4,7 @@ import { chromium } from "playwright";
 
 const server = await serve(ROOT, { indexFile: "app.html" });
 const browser = await chromium.launch({ headless: true });
-let generateBody = null, trainingGenerateBody = null, gradeBody = null, trainingGradeBody = null, retryBody = null, explainBody = null, graphRetryAttempts = 0;
+let generateBody = null, graphRecoverySnapshot = null, trainingGenerateBody = null, gradeBody = null, trainingGradeBody = null, retryBody = null, explainBody = null, graphRetryAttempts = 0;
 let rejectFirstGraphGeneration = true;
 let failAccountSave = true, accountSaveAttempts = 0;
 let releaseDeferredGraphRetry = null;
@@ -26,6 +26,10 @@ try {
     }],
     ["**/api/generate-exam", async (route) => {
       const body = route.request().postDataJSON();
+      graphRecoverySnapshot = await page.evaluate(async () => {
+        const pending = await window.ExGenGenerationRequest.getPendingGenerations("u1");
+        return pending.find((record) => record.payload.qType === "graph") || null;
+      });
       if (rejectFirstGraphGeneration) {
         rejectFirstGraphGeneration = false;
         await route.fulfill({ status: 500, json: {
@@ -38,7 +42,7 @@ try {
       await route.fulfill({ json: { ok: true, exam: { title: "Matteprov", level: "C", exam_manifest: "synthetic-graph-manifest", questions: [{
         id: "graph-1", type: "graph", points: 2,
         question: "Rita grafen till y = 2x + 1. Markera två tydliga punkter. Poäng ges för rätt lutning och skärning med y-axeln.",
-        grade_task: "opaque-test-task", options: [], topic: "Linjär funktion"
+        grade_task: "opaque-test-task", options: [], topic: "Linjär funktion", concept_tag: "Lutning", learning_objective: "Rita en linjär funktion"
       }] }, meta: { quota: { enforced: false } } } });
     }],
     ["**/api/grade", async (route) => {
@@ -81,7 +85,7 @@ try {
       }
       gradeBody = body;
       await route.fulfill({ json: { ok: true, exam_proof: graphProof, result: { total_points: 1, max_points: 2, per_question: [{
-        id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.",
+        id: "graph-1", points: 1, max_points: 2, feedback: "Rätt y-skärning. Kontrollera lutningen.", concept_tag: "Lutning", error_tags: ["graph_line_incorrect"],
         model_answer: "Grafen till y = 2x + 1 går genom (0, 1) och (2, 5)."
       }] } } });
     }],
@@ -205,6 +209,10 @@ try {
     "the submitted material is preserved for retry");
   await page.getByRole("button", { name: "Skapa provet" }).click();
   await page.waitForSelector(".xf-exam.on .xf-graph-unavailable");
+  assert.equal(graphRecoverySnapshot?.payload?.qType, "graph", "graph requests are snapshotted before the direct generation call");
+  assert.match(graphRecoverySnapshot?.payload?.pastedText || "", /y = 2x \+ 1/, "graph recovery retains the exact source material");
+  assert.equal(graphRecoverySnapshot?.idempotencyKey, generateBody?.idempotencyKey, "graph recovery and the server request share the same idempotency key");
+  assert.deepEqual(await page.evaluate(() => window.ExGenGenerationRequest.getPendingGenerations("u1")), [], "successful graph issuance clears the same-tab recovery record");
   const graphLoadError = page.locator(".xf-graph-unavailable [role=alert]");
   assert.match(await graphLoadError.innerText(), /kunde inte laddas/i);
   assert.equal(await graphLoadError.count(), 1, "graph loading failure is announced to assistive technology");
@@ -311,7 +319,7 @@ try {
   assert.equal(perResultContext.page, "resultat");
   assert.equal(perResultContext.course, "Matematik 1b");
   assert.equal(perResultContext.userScore, 0.5);
-  assert.deepEqual(perResultContext.weakAreas, ["Linjär funktion"]);
+  assert.deepEqual(perResultContext.weakAreas, ["Lutning"], "P.E.R receives the graded concept, not a broad course label");
   assert.equal(perResultContext.currentQuestion, undefined, "result handoff excludes the student's submitted answer");
   await page.locator("#perInput").waitFor({ state: "visible", timeout: 10_000 });
   await page.locator("#perInput").fill("Vad ska jag träna på?");
@@ -445,6 +453,10 @@ try {
   const storedMistakes = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"));
   assert.ok(storedMistakes.some((item) => item.id === "graph-1" && item.course === "Matematik 1b"),
     `the actual graph result is stored as a course-scoped weak item: ${JSON.stringify(storedMistakes)}`);
+  const savedGraphMistake = storedMistakes.findLast((item) => item.id === "graph-1");
+  assert.equal(savedGraphMistake.concept_tag, "Lutning", `the graded concept is preserved for mistake training and P.E.R: ${JSON.stringify(storedMistakes)}`);
+  assert.deepEqual(savedGraphMistake.error_tags, ["graph_line_incorrect"], "the grader's actual error classification is preserved");
+  assert.equal(savedGraphMistake.learning_objective, "Rita en linjär funktion");
   await page.goto(`${server.url}/app.html#train`, { waitUntil: "networkidle" });
   await page.waitForTimeout(800);
   const trainingStartup = await page.evaluate(() => ({
@@ -453,19 +465,35 @@ try {
     mistakes: localStorage.getItem("proviaai_mistakes"),
     material: localStorage.getItem("proviaai_last_material"),
     contractOn: document.querySelector("#xf .xf-screen[data-screen='contract']")?.classList.contains("on"),
+    training: window.buildMistakeTrainingContext(
+      JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]"),
+      JSON.parse(localStorage.getItem("proviaai_train_pick") || "{}").keys || null,
+      JSON.parse(localStorage.getItem("proviaai_train_pick") || "{}").course || "",
+    ),
   }));
-  assert.ok(/TRÄNING PÅ DINA MISSTAG/.test(trainingStartup.material || ""), JSON.stringify(trainingStartup));
+  assert.ok(/Linjens lutning visar hur mycket y förändras/.test(trainingStartup.material || ""), JSON.stringify(trainingStartup));
+  assert.equal(trainingStartup.training.ok, true, JSON.stringify(trainingStartup.training));
   await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on");
   const trainingMaterial = await page.evaluate(() => localStorage.getItem("proviaai_last_material") || "");
-  assert.match(trainingMaterial, /TRÄNING PÅ DINA MISSTAG/);
-  assert.match(trainingMaterial, /Kurs: Matematik 1b/);
-  assert.match(trainingMaterial, /Rita grafen till y = 2x \+ 1/);
-  assert.match(trainingMaterial, /Rätt y-skärning\. Kontrollera lutningen\./);
+  assert.match(trainingMaterial, /Linjens lutning visar hur mycket y förändras/,
+    "mistake training puts the original saved source in the material field");
+  assert.doesNotMatch(trainingMaterial, /Rita grafen till y = 2x \+ 1|Rätt y-skärning|Begrepp: Lutning|graph_line_incorrect/,
+    "old question, grading feedback and error tags are not mixed into factual source material");
   await page.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
   await page.locator("#xf .xf-q-text", { hasText: "Vad beskriver lutningen i en rät linje?" }).waitFor();
   assert.equal(trainingGenerateBody?.course, "Matematik 1b");
   assert.equal(trainingGenerateBody?.qType, "mix");
-  assert.match(trainingGenerateBody?.pastedText || "", /Rita grafen till y = 2x \+ 1/);
+  assert.equal(trainingGenerateBody?.numQuestions, 3, "mistake training starts with a focused, evidence-sized set");
+  assert.deepEqual(trainingGenerateBody?.focusTerms, [], "wrapper labels are not promoted to course concepts");
+  assert.match(trainingGenerateBody?.pastedText || "", /Linjens lutning visar hur mycket y förändras/);
+  assert.deepEqual(trainingGenerateBody?.trainingFocus, [{
+    sourceQuestionId: "graph-1", sourceSubmissionId: "a".repeat(32),
+    concept: "Lutning", skill: "Rita en linjär funktion", errorTags: ["graph_line_incorrect"],
+  }]);
+  assert.deepEqual(trainingGenerateBody?.sourceReferences, [{ submissionId: "a".repeat(32), questionIds: ["graph-1"] }],
+    "mistake training points to the exact signed graded exam, not client-provided source text");
+  assert.ok(trainingGenerateBody?.priorQuestions?.some(item => /Rita grafen till y = 2x \+ 1/.test(item.question)),
+    "the old exam question is sent separately as comparison context");
   await page.locator("#xf .xf-mc-opt").first().click();
   await page.waitForTimeout(350);
   assert.equal(await page.locator(".xf-exam.on").count(), 1, "last multiple-choice answer must not submit the exam");
@@ -474,6 +502,63 @@ try {
   assert.equal(trainingGradeBody?.course, "Matematik 1b");
   assert.equal(trainingGradeBody?.questions?.[0]?.grade_task, "opaque-practice-task");
   assert.deepEqual(trainingGradeBody?.answers, [{ id: "practice-1", answer: "A" }]);
+
+  const recoveryPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  let recoveredGraphRequest = null;
+  let recoveredGraphAttempts = 0;
+  const recoveredGraphKeys = [];
+  await mockApis(recoveryPage, { profiles: { id: "u1", approved: true, role: "premium" }, extra: [
+    ["**/api/generate-exam", async (route) => {
+      recoveredGraphAttempts++;
+      recoveredGraphRequest = route.request().postDataJSON();
+      recoveredGraphKeys.push(recoveredGraphRequest?.idempotencyKey);
+      if (recoveredGraphAttempts === 1) {
+        await route.fulfill({ status: 503, json: { ok: false, error: "generation_request_state_unavailable" } });
+        return;
+      }
+      await route.fulfill({ json: { ok: true, exam: {
+        title: "Återupptaget grafprov", level: "C", exam_manifest: `v2.${"c".repeat(32)}.syntheticRecoveryProof`,
+        questions: [{ id: "recovered-graph", type: "graph", points: 2,
+          question: "Rita y = 2x + 1.", options: [], correct_index: -1, topic: "Linjär funktion",
+          concept_tag: "Lutning", learning_objective: "Rita en linjär funktion",
+          graph_spec: { kind: "line", slope: 2, intercept: 1, points: [], x_label: "", y_label: "" },
+          graph_ui: { mode: "line" }, grade_task: "opaque-recovery-task" }],
+      }, meta: { quota: { enforced: false } } } });
+    }],
+    ["**/js/graph-answer.js**", (route) => route.abort()],
+  ] });
+  await seed(recoveryPage);
+  await recoveryPage.goto(`${server.url}/app.html`, { waitUntil: "networkidle" });
+  await recoveryPage.waitForSelector("#xf .xf-screen[data-screen='start'].on");
+  const graphRecoveryKey = crypto.randomUUID();
+  const graphRecoveryPayload = {
+    lang: "sv", level: "C", course: "Matematik 1b", qType: "graph", numQuestions: 1,
+    pastedText: "Linjens lutning visas av y = 2x + 1.", focusTerms: [],
+    trainingFocus: [], priorQuestions: [], sourceReferences: [],
+  };
+  assert.equal(await recoveryPage.evaluate(async ({ payload, key }) =>
+    window.ExGenGenerationRequest.savePendingGeneration("u1", payload, key, null),
+  { payload: graphRecoveryPayload, key: graphRecoveryKey }), true, "a graph task can be stored in same-tab recovery");
+  await recoveryPage.reload({ waitUntil: "networkidle" });
+  await recoveryPage.waitForSelector("#xf .xf-screen[data-screen='start'].on");
+  const resumeGraph = recoveryPage.getByRole("button", { name: /Återuppta Matematik 1b.*1 frågor/ });
+  await resumeGraph.waitFor();
+  await resumeGraph.click();
+  await recoveryPage.waitForSelector("#xf .xf-screen[data-screen='contract'].on");
+  await recoveryPage.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").click();
+  await recoveryPage.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent.includes("Provstarten kunde inte säkras"));
+  assert.equal((await recoveryPage.evaluate(() => window.ExGenGenerationRequest.getPendingGenerations("u1"))).length, 1,
+    "a temporary 503 keeps same-tab recovery available");
+  await recoveryPage.getByRole("button", { name: "Skapa provet" }).click();
+  await recoveryPage.waitForSelector(".xf-exam.on .xf-graph-unavailable");
+  assert.equal(recoveredGraphRequest?.qType, "graph", "restored graph generation keeps its original question type");
+  assert.equal(recoveredGraphRequest?.numQuestions, 1, "restored graph generation keeps its one-task count");
+  assert.equal(recoveredGraphRequest?.pastedText, graphRecoveryPayload.pastedText, "restored graph generation keeps exact source material");
+  assert.equal(recoveredGraphRequest?.idempotencyKey, graphRecoveryKey, "restored graph generation reuses its original idempotency key");
+  assert.equal(recoveredGraphAttempts, 2, "retry after a temporary 503 replays the same recovered graph request");
+  assert.deepEqual(recoveredGraphKeys, [graphRecoveryKey, graphRecoveryKey], "both the initial request and retry use the original idempotency key");
+  assert.deepEqual(await recoveryPage.evaluate(() => window.ExGenGenerationRequest.getPendingGenerations("u1")), [], "successful graph replay clears its recovery snapshot");
+  await recoveryPage.close();
 
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log("graph-exam-flow: graph grading -> P.E.R response -> mistake-focused training exam and grading passed");

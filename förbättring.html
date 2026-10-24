@@ -655,17 +655,24 @@
       if(!token) return null;
 
       const avg5=avgPct(scoredHistory(h).slice(-5));
-      const courseFreq={};
-      m.slice(-30).forEach(x=>{const c=String(x.course||'').trim();if(c)courseFreq[c]=(courseFreq[c]||0)+1;});
+      const courseFreq={},conceptFreq={};
+      m.slice(-30).forEach(x=>{
+        const c=String(x.course||'').trim(),concept=conceptOf(x);
+        if(c)courseFreq[c]=(courseFreq[c]||0)+1;
+        if(concept)conceptFreq[concept]=(conceptFreq[concept]||0)+1;
+      });
       const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
-      const weakAreas=Object.keys(courseFreq).sort((a,b)=>courseFreq[b]-courseFreq[a]).slice(0,5);
-      const recentQ=m.slice(-5).map(x=>String(x.question||'').slice(0,80)).filter(Boolean).join(' | ');
+      const weakAreas=Object.keys(conceptFreq).sort((a,b)=>conceptFreq[b]-conceptFreq[a]||a.localeCompare(b)).slice(0,5);
+      const recentQ=m.slice(-5).map(x=>{
+        const concept=conceptOf(x),errors=errorTagsOf(x).slice(0,2).join(', '),feedback=String(x.feedback||'').slice(0,80);
+        return [concept,errors,feedback].filter(Boolean).join(' — ');
+      }).filter(Boolean).join(' | ');
 
       const context=[
         `${h.length} prov gjorda.`,
         avg5===null?'Resultatsnitt saknas eftersom prov saknar poängunderlag.':`Snitt av prov med poängunderlag, senaste 5: ${avg5}%.`,
-        topCourses?`Mest misstag i: ${topCourses}.`:'',
-        recentQ?`Senaste misstag: ${recentQ}.`:''
+        topCourses?`Kurser med flest registrerade misstag (inte betygssnitt): ${topCourses}.`:'',
+        recentQ?`Senaste dokumenterade begrepp och fel: ${recentQ}.`:''
       ].filter(Boolean).join(' ');
 
       const r=await fetch('/api/explain',{

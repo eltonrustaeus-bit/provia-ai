@@ -302,6 +302,112 @@ async function toExam(page, reuseStart = false) {
   } finally { releaseFinal(); await ctx.close(); }
 }
 
+// A late successful response must not write one account's material or exam
+// into shared browser state after the verified owner has changed.
+{
+  const { ctx, page, errs } = await mk();
+  let releaseAdvance;
+  let signalAdvance;
+  const heldAdvance = new Promise(resolve => { releaseAdvance = resolve; });
+  const advanceSeen = new Promise(resolve => { signalAdvance = resolve; });
+  try {
+    await signIn(page, "generation-owner-a", "sv", { proviaai_last_material: "KEEP_ACCOUNT_B_MATERIAL" });
+    await page.route("**/api/generate-exam*", async route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("pipeline") === "start") {
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId: "44444444-4444-4444-8444-444444444444", requested: 3, approved: 0,
+        } });
+      }
+      if (url.searchParams.get("pipeline") === "advance") {
+        signalAdvance();
+        await heldAdvance;
+        const exam = JSON.parse(JSON.stringify(EXAM));
+        exam.questions[0].question = "PRIVATE_OLD_ACCOUNT_EXAM_MARKER";
+        return route.fulfill({ json: { ok: true, exam, meta: { quota: { enforced: false } } } });
+      }
+      return route.fulfill({ status: 500, json: { ok: false, error: "unexpected_generation_route" } });
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.ExGenEngine?.ready === true);
+    const pending = page.evaluate(() => {
+      localStorage.setItem("proviaai_last_material", "KEEP_ACCOUNT_B_MATERIAL");
+      window.ExGenEngine.setInputs({ course: "Biologi 1", level: "C", qType: "mix", num: 3,
+        material: "PRIVATE_OLD_ACCOUNT_MATERIAL", focusTerms: [] });
+      return window.ExGenEngine.generate();
+    });
+    await advanceSeen;
+    await page.evaluate(() => window.eval("verifiedUserId = 'generation-owner-b'"));
+    releaseAdvance();
+    const result = await pending;
+    const state = await page.evaluate(() => ({
+      material: localStorage.getItem("proviaai_last_material"),
+      leakedQuestion: document.body.innerText.includes("PRIVATE_OLD_ACCOUNT_EXAM_MARKER"),
+    }));
+    ok("sent genereringssvar efter kontoavbyte renderas eller sparas inte",
+      result?.errorCode === "account_changed" && state.material === "KEEP_ACCOUNT_B_MATERIAL"
+        && !state.leakedQuestion && errs.length === 0,
+      JSON.stringify({ result, state, errors: errs }));
+  } finally {
+    releaseAdvance();
+    await ctx.close();
+  }
+}
+
+// A session can change after the response-owner check but while the fallback
+// quota UI is being updated. The local count must remain attributed to the
+// request owner, and the discarded response must release the busy UI.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "generation-quota-owner-a");
+    await page.route("**/api/generate-exam*", route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("pipeline") === "start") {
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId: "55555555-5555-4555-8555-555555555555", requested: 3, approved: 0,
+        } });
+      }
+      if (url.searchParams.get("pipeline") === "advance") {
+        return route.fulfill({ json: { ok: true, exam: JSON.parse(JSON.stringify(EXAM)), meta: { quota: { enforced: false } } } });
+      }
+      return route.fulfill({ status: 500, json: { ok: false, error: "unexpected_generation_route" } });
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.ExGenEngine?.ready === true);
+    await page.evaluate(() => window.eval(`
+      const originalBumpQuotaCount = bumpQuotaCount;
+      const ownerAKey = quotaStorageKey("premium", "generation-quota-owner-a");
+      const ownerBKey = quotaStorageKey("premium", "generation-quota-owner-b");
+      localStorage.setItem(ownerAKey, "0");
+      localStorage.setItem(ownerBKey, "7");
+      bumpQuotaCount = async (uid, role) => {
+        verifiedUserId = "generation-quota-owner-b";
+        getUserId = async () => "generation-quota-owner-b";
+        return originalBumpQuotaCount(uid, role);
+      };
+    `));
+    const result = await page.evaluate(() => {
+      window.ExGenEngine.setInputs({ course: "Biologi 1", level: "C", qType: "mix", num: 3,
+        material: "Syntetiskt material för kontoägartest.", focusTerms: [] });
+      return window.ExGenEngine.generate();
+    });
+    const state = await page.evaluate(() => ({
+      ownerA: Number(localStorage.getItem(quotaStorageKey("premium", "generation-quota-owner-a")) || 0),
+      ownerB: Number(localStorage.getItem(quotaStorageKey("premium", "generation-quota-owner-b")) || 0),
+      skeleton: Boolean(document.querySelector("#examBody .skelBox")),
+      busy: document.querySelector("#generateExamBtn")?.disabled === true,
+      leakedExam: document.body.innerText.includes("Fråga A — var sker citronsyracykeln?"),
+    }));
+    ok("kvot fallback efter kontoavbyte räknas på provets ursprungskonto och UI låses upp",
+      result?.errorCode === "account_changed" && state.ownerA === 1 && state.ownerB === 7
+        && !state.skeleton && !state.busy && !state.leakedExam && errs.length === 0,
+      JSON.stringify({ result, state, errors: errs }));
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function waitForScreenEntrance(page) {
   await page.waitForFunction(() => {
     const inner = document.querySelector("#xf .xf-screen.on > .xf-inner");
@@ -630,6 +736,7 @@ async function toMaterial(page) {
 }
 
 if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
+if (!process.env.EXAM_FLOW_ONLY_GENERATION_ERRORS) {
 // The visual progress line also exposes the current wizard step to assistive technology.
 {
   const { ctx, page } = await mk();
@@ -733,9 +840,12 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   }
 }
 
+}
+
 // Provider/generation failures are announced from the active review screen.
 {
   const { ctx, page } = await mk();
+  let generationErrorStage = "setup";
   try {
     await signIn(page, "generation-error-a11y");
     await toMaterial(page);
@@ -743,34 +853,36 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
-    const requestId = "12345678-1234-4234-8234-123456789abc";
-    const technicalFailureMessage = "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.";
     await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance", message: technicalFailureMessage },
+      status: 503, json: { ok: false, error: "generation_worker_unavailable" },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Steg: provstart/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    await page.waitForFunction(() => /Referens: 12345678-1234-4234-8234-123456789abc/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
+    generationErrorStage = "transient start failure";
+    await page.waitForFunction(() => /inte färdigt ännu/.test(document.querySelector("#status")?.textContent || ""), null, { timeout: 5000 });
+    const errorA11y = await page.locator("#status")
       .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
-    ok("genereringsfel visar en säker korrelationsreferens i ett sammanhållet larm",
-      errorA11y.role === "alert" && errorA11y.atomic === "true",
+    ok("okänt jobbstatusfel visas i en tillgänglig statusregion",
+      errorA11y.role === null && await page.locator("#status").getAttribute("aria-live") === "polite",
       JSON.stringify(errorA11y));
-    ok("genereringsfel visar bara en tillåten, begriplig serverfas",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes("Steg: provstart") && !text.includes("exam_issuance")));
-    ok("genereringsfel visar en användbar förklaring i stället för ett generiskt återförsök",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
+    ok("okänt jobbstatusfel ber eleven återuppta samma jobb utan dubbelt kvotdrag",
+      await page.locator("#status").textContent().then(text =>
+        /0 av 3/.test(text) && /återuppta samma jobb utan ett nytt kvotdrag/.test(text)));
     const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
     let qualityReceived = 0;
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: qualityReceived, requested: 3 },
-    }));
+    await page.route("**/api/generate-exam*", route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("pipeline") === "start") {
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId: "22345678-1234-4234-8234-123456789abc", state: "queued", requested: 3, approved: 0,
+        } });
+      }
+      return route.fulfill({
+        status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: qualityReceived, requested: 3 },
+      });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+    generationErrorStage = "terminal incomplete 0/3";
+    await page.waitForFunction(() => document.querySelector("#status")
       ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
     const zeroCountStillOnContract = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => node.classList.contains("on"));
     const zeroCountExamState = await page.locator("#examBody").evaluate(node => ({ text: node.textContent.trim(), skeleton: Boolean(node.querySelector(".skelBox")) }));
@@ -783,51 +895,255 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
         zeroCountControls.gradeDisabled && zeroCountControls.floatingBarHidden,
       JSON.stringify({ zeroCountStillOnContract, zeroCountExamState, zeroCountControls }));
     ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+      await page.locator("#status").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
     qualityReceived = 1;
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
+    generationErrorStage = "terminal incomplete 1/3";
+    await page.waitForFunction(() => document.querySelector("#status")
       ?.textContent?.includes("1 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
     ok("delvis godkända men otillräckliga frågor visar korrekt 1 av 3-count",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
+      await page.locator("#status").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
     await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     }));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")
-      ?.textContent === "Provkvoten är slut.", null, { timeout: 5000 });
+    generationErrorStage = "quota rejection";
+    await page.waitForFunction(() => /Provkvoten är slut/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-say")?.textContent || ""), null, { timeout: 10000 });
     const quotaNotice = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-sub").textContent();
-    const quotaError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    const quotaError = await page.locator("#status").textContent();
     ok("kvotstopp får ett eget besked och återställningstid i stället för ett generiskt genereringsfel",
-      /veckan|måndag/i.test(quotaNotice) && !quotaNotice.includes("färre frågor") && !quotaError.trim(),
+      /Provkvoten är slut/.test(await page.locator("#xf .xf-screen[data-screen='contract'] .xf-say").textContent())
+        && /veckan|måndag/i.test(quotaNotice + " " + quotaError)
+        && !/färre frågor|ofullständigt prov/i.test(quotaNotice + " " + quotaError),
       JSON.stringify({ quotaNotice, quotaError }));
-    await page.route("**/api/generate-exam*", route => route.abort("failed"));
+    await page.route("**/api/generate-exam*", route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("pipeline") === "start") {
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId: "32345678-1234-4234-8234-123456789abc", state: "queued", requested: 3, approved: 0,
+        } });
+      }
+      if (url.searchParams.get("pipeline") === "status") {
+        return route.fulfill({ status: 200, json: {
+          ok: true, operationId: "32345678-1234-4234-8234-123456789abc", state: "queued", requested: 3, approved: 0,
+        } });
+      }
+      return route.abort("failed");
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Anslutningen bröts/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    ok("nätverksfel skiljs från serverfel och eleven kan försöka igen",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
-    const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 401, json: { ok: false, error: "Unauthorized" },
+    generationErrorStage = "aborted advance recovery";
+    await page.waitForFunction(() => /inte färdigt ännu/.test(document.querySelector("#status")?.textContent || ""), null, { timeout: 15000 });
+    ok("avbrutet fortsättningsanrop återupptar samma jobb utan nytt kvotdrag",
+      await page.locator("#status").textContent().then(text =>
+        /0 av 3/.test(text) && /återuppta samma jobb utan ett nytt kvotdrag/.test(text)));
+  } catch (e) {
+    const visible = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => ({
+      screen: node?.className,
+      error: node?.querySelector(".xf-err")?.textContent || "",
+      say: node?.querySelector(".xf-say")?.textContent || "",
+      status: document.querySelector("#status")?.textContent || "",
+    })).catch(() => ({}));
+    ok("genereringsfel annonseras för hjälpmedel", false,
+      `${generationErrorStage}: ${e.message}; ${JSON.stringify(visible)}`);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// A resumable job must not start when the exact recovery request cannot be
+// stored locally; otherwise a reload could strand a charged/in-flight exam.
+{
+  const { ctx, page } = await mk();
+  let generationCalls = 0;
+  try {
+    await signIn(page, "generation-recovery-storage-failure");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Cellandning sker i mitokondrierna och frigör energi från glukos.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.evaluate(() => {
+      window.ExGenGenerationRequest.savePendingGeneration = async () => false;
+    });
+    await page.route("**/api/generate-exam*", route => {
+      generationCalls++;
+      return route.fulfill({ status: 500, json: { ok: false, error: "unexpected_call" } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => /återupptagningen inte kunde sparas/.test(
+      document.querySelector("#status")?.textContent || ""), null, { timeout: 5000 });
+    ok("provstart stoppas om återupptagningen inte kan sparas",
+      generationCalls === 0 && !await page.locator("#xf .xf-screen[data-screen='contract'] .xf-btn.primary").isDisabled());
+  } catch (e) {
+    ok("provstart stoppas om återupptagningen inte kan sparas", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Terminal quality failures must respect the learner's selected language.
+{
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "generation-error-en", "en");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "A linear function y = 2x + 1 describes the relation between x and y.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const incomplete = { ok: false, error: "incomplete_exam", message: "Svenskt serverfel får inte visas.", received: 2, requested: 6 };
+    await page.route("**/api/generate-exam*", route => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("pipeline") === "start") {
+        return route.fulfill({ status: 202, json: {
+          ok: true, operationId: "12345678-1234-4234-8234-123456789abc", state: "queued", requested: 6, approved: 0,
+        } });
+      }
+      return route.fulfill({ status: 502, json: incomplete });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForFunction(() => document.querySelector("#status")
+      ?.textContent?.includes("2 of 6 questions passed review"), null, { timeout: 5000 });
+    const error = await page.locator("#status").textContent();
+    ok("terminalt ofullständigt prov visas på engelska med korrekt antal",
+      /could not create a complete exam/i.test(error) && /2 of 6 questions passed review/i.test(error)
+        && !error.includes("Svenskt serverfel"), error);
+  } catch (e) {
+    ok("engelskt ofullständigt provfel annonseras korrekt", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+// Authentication errors are tested in a fresh browser context.
+{
+  const { ctx, page } = await mk();
+  let authGenerationCalls = 0;
+  try {
+    await signIn(page, "generation-error-auth");
+    await toMaterial(page);
+    const material = "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y.";
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", material);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.route("**/auth/v1/token*", route => route.fulfill({
+      status: 200,
+      headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS", "access-control-allow-headers": "authorization, apikey, content-type, x-client-info" },
+      json: {
+        access_token: "renewed.synthetic.token", token_type: "bearer", expires_in: 3600, refresh_token: "renewed-refresh",
+        user: { id: "generation-error-auth", email: "generation-error-auth@t.se" },
+      },
     }));
+    await page.route("**/api/generate-exam*", route => {
+      authGenerationCalls++;
+      return route.fulfill({ status: 401, json: { ok: false, error: "Unauthorized" } });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(message => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes(message), authMessage, { timeout: 5000 });
-    const authError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
+    const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
+    await page.waitForFunction(message => document.querySelector("#status")
+      ?.textContent?.includes(message), authMessage, { timeout: 10000 });
+    const authError = await page.locator("#status").textContent();
     ok("authfel blir begripligt och döljer rå Unauthorized-text",
       authError.includes(authMessage) && !authError.includes("Unauthorized"));
     ok("authfel behåller elevens material för återhämtning",
       await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
-        .then(value => value.includes("Linjär funktion y = 2x + 1")));
+        .then(value => value.includes(material)));
+    const pendingAfterAuthFailure = await page.evaluate(async accountId =>
+      window.ExGenGenerationRequest.getPendingGenerations(accountId), "generation-error-auth");
+    ok("oklar 401 behåller samma återupptagningsbegäran",
+      pendingAfterAuthFailure.length === 1 && authGenerationCalls >= 1);
   } catch (e) {
-    ok("genereringsfel annonseras för hjälpmedel", false, e.message);
+    const visible = await page.locator("#xf .xf-screen[data-screen='contract']").evaluate(node => ({
+      screen: node?.className,
+      error: node?.querySelector(".xf-err")?.textContent || "",
+      say: node?.querySelector(".xf-say")?.textContent || "",
+      status: document.querySelector("#status")?.textContent || "",
+    })).catch(() => ({}));
+    ok("authfel annonseras utan att materialet försvinner", false,
+      `${e.message}; calls=${authGenerationCalls}; visible=${JSON.stringify(visible)}`);
   } finally {
     await ctx.close();
   }
+}
+
+// A temporary user-verification failure must hide the response but retain the
+// exact idempotent request so the learner can safely recover after a reload.
+{
+  const { ctx, page } = await mk();
+  const uid = "generation-owner-verification-retry";
+  let authFailureArmed = false;
+  let generationCalls = 0;
+  const idempotencyKeys = [];
+  try {
+    await signIn(page, uid);
+    await toMaterial(page);
+    const material = "Cellandning sker i mitokondrierna och frigör energi från glukos.";
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", material);
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.route("**/auth/v1/user**", route => {
+      if (!authFailureArmed) return route.fallback();
+      authFailureArmed = false;
+      return route.fulfill({
+        status: 503,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+          "access-control-allow-headers": "authorization, apikey, content-type, x-client-info",
+        },
+        json: { message: "temporary auth verification failure" },
+      });
+    });
+    await page.route("**/api/generate-exam*", route => {
+      generationCalls++;
+      const payload = JSON.parse(route.request().postData() || "{}");
+      idempotencyKeys.push(payload.idempotencyKey);
+      if (generationCalls === 1) authFailureArmed = true;
+      return route.fulfill({ json: {
+        ok: true,
+        exam: JSON.parse(JSON.stringify(EXAM)),
+        meta: { requested: payload.numQuestions, partial: false, quota: { enforced: true, count: 1 } },
+      } });
+    });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    const unavailableMessage = "Inloggningen kunde inte verifieras just nu. Provet visas inte, men samma begäran är sparad i den här fliken. Kontrollera att du använder samma konto och försök igen; ett nytt prov startas inte.";
+    await page.waitForFunction(message => document.querySelector("#status")?.textContent?.includes(message),
+      unavailableMessage, { timeout: 10000 });
+    const savedBeforeReload = await page.evaluate(async accountId =>
+      window.ExGenGenerationRequest.getPendingGenerations(accountId), uid);
+    ok("tillfälligt authfel döljer provsvaret men behåller återupptagningsbegäran",
+      generationCalls === 1 && savedBeforeReload.length === 1 &&
+      await page.locator(".xf-exam.on").count() === 0);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    const resumeButton = page.getByRole("button", { name: /Återuppta .*3 frågor/ });
+    await resumeButton.waitFor({ timeout: 5000 });
+    await resumeButton.click();
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    const savedAfterSuccess = await page.evaluate(async accountId =>
+      window.ExGenGenerationRequest.getPendingGenerations(accountId), uid);
+    ok("omladdning återupptar samma provnyckel utan dubblett och rensar efter visning",
+      generationCalls === 2 && idempotencyKeys[0] && idempotencyKeys[0] === idempotencyKeys[1]
+      && savedAfterSuccess.length === 0);
+  } catch (e) {
+    ok("tillfälligt authfel bevarar samma återupptagningsbegäran", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+if (process.env.EXAM_FLOW_ONLY_GENERATION_ERRORS) {
+  await browser.close();
+  await srv.close();
+  fail.forEach(f => console.log("  FEL  " + f));
+  console.log(`\n${pass.length} godkända, ${fail.length} fel`);
+  process.exit(fail.length ? 1 : 0);
 }
 
 // ── T1f: a fresh local save cannot revive an expired server issuance ──────
@@ -1329,7 +1645,7 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
   await ctx.close();
 }
 
-// ── T6: träningsläget #train ───────────────────────────────────────────────
+// ── T6: #train avvisar lokala misstag utan verifierad originalkälla ────────
 {
   const { ctx, page, errs } = await mk();
   await signIn(page, "u1");
@@ -1358,11 +1674,14 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
     return {
       screen: on?.dataset?.screen,
       body: (on?.querySelector(".xf-body")?.textContent || "").slice(0, 200),
-      engineMaterial: (document.getElementById("pastedText")?.value || "").length
+      engineMaterial: (document.getElementById("pastedText")?.value || "").length,
+      notice: document.querySelector("#toastRoot .toast.bad")?.textContent || ""
     };
   });
-  ok("T6a #train landar på provkontraktet", st.screen === "contract", "hamnade på " + st.screen);
-  ok("T6b motorns materialfält är fyllt", st.engineMaterial > 50, st.engineMaterial + " tecken");
+  ok("T6a #train stoppar misstag utan verifierat ursprungsprov", st.screen === "start"
+    && /ursprungsmaterialet/i.test(st.notice), JSON.stringify(st));
+  ok("T6b #train skapar inte underlag från gamla svar eller facit", st.engineMaterial === 0,
+    st.engineMaterial + " tecken");
   ok("T6c inga konsolfel", errs.length === 0, errs.join(" | "));
   await page.screenshot({ path: SHOT + "/t6-train.png" });
   await ctx.close();

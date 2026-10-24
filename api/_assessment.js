@@ -783,10 +783,45 @@ function mathQuestionIntent(question) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
+  if (/\b(?:lös\s+(?:ekvationen|ut)|bestäm\s+(?:värdet\s+på\s+)?x\s+i|beräkna\s+(?:värdet\s+på\s+)?x\s+(?:i|då)|hitta\s+x\s+i|solve\s+(?:the\s+)?equation|solve\s+for\s+x|find\s+x\s+in|vilket\s+(?:tal|värde)\s+ger\s+\w+\s+när\s+(?:det|talet|x)\s+multipliceras\s+med|what\s+(?:number|value)\s+(?:gives|produces)\s+\w+\s+when\s+(?:it\s+is\s+)?multiplied\s+by)(?![\p{L}\p{N}_])/u.test(text)) return "solve-equation";
   if (/nollst(?:ä|a)ll|nollpunkt|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
   if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) return "slope";
   if (/y-sk(?:ä|a)rning|y-axeln|y-axel|vertical intercept/u.test(text)) return "y-intercept";
   if (/derivata|derivative|tangentlutning/u.test(text)) return "derivative";
+  return "";
+}
+
+function verbalEquation(question) {
+  const text = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const patterns = [
+    /\b(?:vilket|vad\s+för)\s+(?:tal|värde)\s+(?:ger|motsvarar|blir)\s+([\p{L}\d.]+)\s+när\s+(?:det|talet|x)\s+multipliceras\s+med\s+([\p{L}\d.]+)(?:\s+och\s+sedan\s+(?:ökar|ökas|adderas)\s+med\s+([\p{L}\d.]+))?/u,
+    /\bwhat\s+(?:number|value)\s+(?:gives|produces|equals)\s+([\p{L}\d.]+)\s+when\s+(?:it\s+is\s+)?multiplied\s+by\s+([\p{L}\d.]+)(?:\s+and\s+then\s+(?:increased|raised|augmented)\s+by\s+([\p{L}\d.]+))?/u,
+  ];
+  const numberWords = new Map([
+    ["noll", "0"], ["zero", "0"], ["ett", "1"], ["en", "1"], ["one", "1"],
+    ["två", "2"], ["tva", "2"], ["two", "2"], ["tre", "3"], ["three", "3"],
+    ["fyra", "4"], ["four", "4"], ["fem", "5"], ["five", "5"],
+    ["sex", "6"], ["six", "6"], ["sju", "7"], ["seven", "7"],
+    ["åtta", "8"], ["atta", "8"], ["eight", "8"], ["nio", "9"], ["nine", "9"],
+    ["tio", "10"], ["ten", "10"],
+  ]);
+  const number = (value) => {
+    if (/^\d+(?:\.\d+)?$/.test(value)) return String(Number(value));
+    return numberWords.get(value) || null;
+  };
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const [target, factor, offset = "0"] = match.slice(1);
+    const targetValue = number(target);
+    const factorValue = number(factor);
+    const offsetValue = number(offset);
+    if (targetValue === null || factorValue === null || offsetValue === null) return "";
+    return `${factorValue}*x${Number(offsetValue) < 0 ? offsetValue : `+${offsetValue}`}=${targetValue}`;
+  }
   return "";
 }
 
@@ -795,8 +830,11 @@ function mathQuestionExpression(question) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
-  const equations = text.match(/[a-z]\s*=\s*[-+]?\d*\.?\d*\s*[a-z](?:\s*[-+]\s*\d*\.?\d+)?/gu) || [];
-  return equations.map((equation) => equation.replace(/\s+/g, "")).sort().join("|");
+  const verbal = verbalEquation(question);
+  if (verbal) return verbal;
+  const linearTerm = "(?:[-+]?\\s*\\d*\\.?\\d*\\s*[a-z](?:\\s*[-+]\\s*\\d*\\.?\\d+)?|[-+]?\\s*\\d+(?:\\.\\d+)?)";
+  const equations = text.match(new RegExp(`${linearTerm}\\s*=\\s*${linearTerm}`, "gu")) || [];
+  return equations.map((equation) => equation.replace(/\s+/g, "").replace(/(\d)([a-z])/g, "$1*$2")).sort().join("|");
 }
 
 function isDuplicateQuestion(left, right) {
