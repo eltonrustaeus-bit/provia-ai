@@ -712,6 +712,7 @@ function repeatsHighConfidenceAnswerTarget(left, right) {
   if (shared < 5 || shared / Math.min(leftAnswer.size, rightAnswer.size) < 0.9) return false;
   const answerTargetIntents = [
     ["function", /(?:funktion[\p{L}]*|uppgift[\p{L}]*|ansvar[\p{L}]*|syfte[\p{L}]*|function[\p{L}]*|purpose|responsib[\p{L}]*)/u],
+    ["process", /(?:process[\p{L}]*|steg[\p{L}]*|processes)/u],
     ["process_inputs", /(?:använd(?:er|a|s)?|tar\s+upp|tar\s+in|upptar|uses?|takes?\s+in|absorbs?)/u],
     ["process_outputs", /(?:bild(?:as|ar|ade|ades)|producer[\p{L}]*|frigör[\p{L}]*|avger[\p{L}]*|forms?|produces?|releases?|generates?)/u],
   ];
@@ -730,11 +731,31 @@ function repeatsHighConfidenceAnswerTarget(left, right) {
 
   // Similar answer vocabulary alone cannot establish a duplicate: reverse
   // processes can use the same terms for different inputs and outputs.
-  // Require the same tagged concept and non-task topic in every case.
+  // Require the same tagged concept and non-task topic. For explicitly
+  // process-focused paraphrases, the shared process intent and near-identical
+  // full-score answer are stronger than wording differences in the stem, but
+  // only when both questions agree on whether they ask about inputs or outputs.
   const concept = semanticConceptTag(left);
+  const processDirections = (intents) => ["process_inputs", "process_outputs"]
+    .filter((intent) => intents.has(intent)).sort().join(",");
+  if (leftIntents.has("process") && rightIntents.has("process") &&
+      processDirections(leftIntents) !== processDirections(rightIntents)) return false;
+  const sharedProcessIntent = leftIntents.has("process") && rightIntents.has("process") &&
+    processDirections(leftIntents) === processDirections(rightIntents);
+  const leftTopic = answerTargetTopicSignature(left);
+  const rightTopic = answerTargetTopicSignature(right);
+  const leftQuestionText = String(left?.question || "").normalize("NFKC").toLowerCase();
+  const rightQuestionText = String(right?.question || "").normalize("NFKC").toLowerCase();
+  const chloroplastPhotosynthesisAlias = concept.includes("fotosyntes") && (
+    (/\bkloroplast[\p{L}]*\b/u.test(leftQuestionText) && /\bfotosyntes[\p{L}]*\b/u.test(rightQuestionText)) ||
+    (/\bfotosyntes[\p{L}]*\b/u.test(leftQuestionText) && /\bkloroplast[\p{L}]*\b/u.test(rightQuestionText))
+  );
+  const sameProcessTopic = leftTopic === rightTopic || (
+    chloroplastPhotosynthesisAlias
+  );
   return Boolean(concept && concept === semanticConceptTag(right) &&
-    answerTargetTopicSignature(left) &&
-    answerTargetTopicSignature(left) === answerTargetTopicSignature(right));
+    leftTopic && rightTopic && sameProcessTopic &&
+    (sharedProcessIntent || leftTopic === rightTopic));
 }
 
 function questionIntents(question) {

@@ -830,20 +830,19 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
       perAnswerLease.allowIncompleteGeneralChat = true;
     }
     const safeContext = { page: "app" };
-    const stripStaleExamSource = serverState !== "completed" && (
-      context?.currentQuestion || context?.questions || context?.examState || staleProvView
-    );
+    const stripStaleExamSource = staleProvView || (serverState !== "completed" && (
+      context?.currentQuestion || context?.questions || context?.examState
+    ));
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
       if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;
-      if (stripStaleExamSource && staleProvView && key === "course") continue;
+      if (stripStaleExamSource && staleProvView && ["course", "level"].includes(key)) continue;
       if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];
     }
     body.pageContext = safeContext;
     const selectedTopic = String(safeContext.course || (stripStaleExamSource ? "" : context?.topic || body.topic) || "").trim();
     body.topic = ["app", "prov", "resultat", "exam", "exam-result"].includes(selectedTopic.toLowerCase()) ? "" : selectedTopic;
     delete body.context;
-    if (["abandoned", "expired", "missing"].includes(serverState) ||
-        (serverState === "none" && staleProvView)) {
+    if (staleProvView || ["abandoned", "expired", "missing"].includes(serverState)) {
       // Old client chat can contain the unfinished exam question or its answer;
       // continue from the student's current prompt instead of replaying it.
       body.history = [];

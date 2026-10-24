@@ -239,6 +239,40 @@ const distinctPhotosynthesisTargets = A.gateExam({ questions: [
     "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
 ] }, { profile: "natural_sciences" });
 check("keeps input and product questions distinct despite a shared source-backed answer", distinctPhotosynthesisTargets.questions.length === 2);
+const repeatedPhotosynthesisProcess = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-location-process", "Vilken process sker i kloroplaster enligt materialet?",
+    "Fotosyntesen sker i kloroplasterna och omvandlar koldioxid och vatten till glukos och syre med hjälp av ljusenergi.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-process", "Vad är fotosyntesens process enligt materialet?",
+    "Fotosyntesen sker i kloroplasterna och omvandlar koldioxid och vatten till glukos och syre med hjälp av ljusenergi.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("drops paraphrased questions that assess the same photosynthesis process",
+  repeatedPhotosynthesisProcess.questions.length === 1 &&
+    repeatedPhotosynthesisProcess.dropped.some((item) => item.id === "photosynthesis-process" &&
+      item.issues.includes("duplicate_question")));
+const directionalPhotosynthesisQuestions = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-process-input", "Vilken process använder växten koldioxid?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-process-output", "Vilken process avger syre?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("keeps input and output questions distinct when both mention a process",
+  directionalPhotosynthesisQuestions.questions.length === 2);
+const distinctProcessesUnderBroadTag = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-carbon-input", "Vilken process använder koldioxid i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Cellens energiprocesser"),
+  biologyQuestion("respiration-glucose-input", "Vilken process använder glukos i cellandningen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Cellens energiprocesser"),
+] }, { profile: "natural_sciences" });
+check("keeps distinct same-direction processes under a broad shared concept tag",
+  distinctProcessesUnderBroadTag.questions.length === 2);
+const distinctProcessesUnderMixedTag = A.gateExam({ questions: [
+  biologyQuestion("mixed-tag-photosynthesis", "Vilken process använder koldioxid i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes och cellandning"),
+  biologyQuestion("mixed-tag-respiration", "Vilken process använder glukos i cellandningen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes och cellandning"),
+] }, { profile: "natural_sciences" });
+check("keeps different same-direction processes under a mixed photosynthesis tag",
+  distinctProcessesUnderMixedTag.questions.length === 2);
 const reversedBioProcesses = A.gateExam({ questions: [
   biologyQuestion("photosynthesis-products", "Vilka produkter bildas i fotosyntesen?",
     "Glukos och syre bildas av koldioxid och vatten.", "Fotosyntes"),

@@ -1,5 +1,53 @@
 # 08 Current Status
 
+## P.E.R. efter rättat prov — 2026-10-25
+
+- [x] Oberoende granskning fann att vanlig hjälp från en kvarhängande `prov`-
+  sida efter ett rättat prov kunde få gammal klientkurs, studiematerial,
+  historik och felbank. Servern verifierade att ett prov var rättat, men inte
+  att dessa kvarvarande klientfält hörde till det provet.
+- [x] Vanlig P.E.R.-hjälp från en stale provvy sanerar nu dessa fält även när
+  senaste serverstatus är `completed`. Den nya frågan går fortfarande till
+  vanlig studiehjälp; aktivt provs ledtrådsskydd och verifierad efterrättning
+  använder oförändrade kodvägar.
+- [x] Regressionstest kontrollerar att gamla kurs-/material-/historik-/felbank-
+  markörer inte når modellgränssnittet och att vanlig hjälp fortsätter fungera.
+  Oberoende granskning fann inga blockerare; riktade P.E.R.-tester passerade.
+- [!] Ändringen är lokal och offline-verifierad. Ingen ny Preview, staging-
+  migrering eller modellkörning gjordes i denna uppföljning.
+
+## Slutfört enfliks-test och processdubblett — 2026-10-25
+
+- [x] Återanvände den redan inloggade stabila Preview-fliken; inga nya flikar,
+  konton eller prov startades. Det enda nya syntetiska Biologi 1-provet
+  slutfördes och rättades i samma session.
+- [x] Previewn utfärdade och sparade alla **12/12** begärda frågor. Rättningen
+  sparade resultatet **11/12 (92 %)**. De flesta svaren fick full poäng och
+  resultatvyn visade täckta begrepp och nästa träningsområde.
+- [!] Liveutfallet blottlade ändå redundans: två enzymfrågor, två
+  fotosyntesfrågor och överlapp mellan cellandning/mitokondrier. En bred fråga
+  om cellens funktioner gav 0/1 eftersom rubriken förväntade specifika roller
+  för cellmembran och cytoplasma. 12/12 antal är alltså inte ensamt ett
+  kvalitetsmått.
+- [x] Oberoende, skrivskyddad granskning reproducerade en möjlig falskpositiv:
+  om två processfrågor delar ämne och facit kan de felaktigt slås ihop.
+  Processparafraser kräver nu samma in-/utdatainriktning och samma
+  ämnessignatur; enda specialfallet är den snäva kloroplast/fotosyntes-
+  parafrasen med samma ämnestagg och facit.
+- [x] Lade till offline-regressioner som fångar två parafraser av samma
+  fotosyntesprocess, behåller separata frågor om indata/utdata och bevarar
+  olika processer under breda och blandade ämnestaggar. Riktade assessment-, 3/6/12
+  pipeline- och offline-pipeline-tester passerade; syntax- och diffkontroller
+  passerade.
+- [!] Dedupe-fixen och regressionerna är lokala efter den verifierade Preview-
+  körningen. De har inte pushats eller deployats. Inget andra liveprov kördes;
+  den nya regeln är därför offline-verifierad men inte livebevisad.
+- [!] Denna uppföljning lämnade 9/12-gränsen, andra konton och reservationer
+  orörda. Skrivskyddad stagingkontroll efter rättningen: cap `$3.379071`,
+  spent `$1.989743`, reserved `$0.263628`, kvar under cap `$1.125700`; raden
+  var uppdaterad `2026-10-24 22:27:08 UTC`. Inga nya AI-anrop gjordes utöver
+  det enda godkända provets generering och rättning.
+
 ## Svarsmålsdubbletter och enfliksregel — 2026-10-25
 
 - [x] Behöll regeln om en återanvänd Preview-flik. Den här ändringen använde
