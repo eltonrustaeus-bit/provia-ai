@@ -629,7 +629,7 @@ const SEMANTIC_DUPLICATE_FILLER = new Set([
 ]);
 const SEMANTIC_SHORT_TOKENS = new Set(["or", "no", "if", "vs", "x", "y", "z", "n", "m", "b", "c", "i", "j"]);
 const QUESTION_INTENT_PATTERNS = [
-  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
+  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|represent\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
   ["definition", /\b(?:vad\s+(?:menas|avses|innebär|är)|definiera|what\s+is|define|meaning)\b/u],
   ["importance", /\b(?:varför|viktig|viktigt|betydelse|why|important|importance)\b/u],
   ["effect", /\b(?:påverka\w*|faktor\w*|orsak\w*|affect\w*|factor\w*|cause\w*)\b/u],
@@ -660,6 +660,9 @@ function semanticQuestionTokenSequence(question) {
     const token = sourceToken.toLowerCase();
     const isUppercaseVariable = /^[A-ZÅÄÖ]$/u.test(sourceToken);
     const verbStem = token.replace(/(?:ar|as)$/u, "a");
+    if (/^represent(?:erar|era|erade|erat|s|ed|ing)?$/u.test(token)) {
+      return { token: "beskriv", isUppercaseVariable };
+    }
     return {
       token: verbStem.length > 5
         ? verbStem.replace(/(?:ens|ets|erna|arna|orna|en|et|ar|er|or|s|t|r)$/u, "")

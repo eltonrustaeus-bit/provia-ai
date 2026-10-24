@@ -225,6 +225,28 @@ const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
 });
+const mathTwelvePrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "mix", numQuestions: 12,
+  pastedText: "Syntetiskt material om funktioner, nollställen och exponentialmodeller.", isMath: true,
+});
+assert.match(mathTwelvePrompt.userPrompt, /9 räkne- eller problemlösningsuppgifter, 2 tillämpnings-\/resonemangsuppgifter och högst 1 begrepps-\/definitionsfråga/i,
+  "a 12-question mathematics request states concrete balance targets in the user prompt");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi", qType: "short", numQuestions: 12,
+  pastedText: "Syntetiskt biologimaterial.", isMath: false,
+}).userPrompt, /MATTEPROVETS BALANS/,
+"the mathematics mix instruction stays out of non-mathematics generation");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "graph", numQuestions: 12,
+  pastedText: "y=2x+1", isMath: true,
+}).userPrompt, /MATTEPROVETS BALANS/,
+"graph-only requests are not distorted by the mixed mathematics category target");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "mix", numQuestions: 12,
+  pastedText: "Material om funktioner och nollställen.", isMath: true,
+  trainingFocus: [{ concept: "nollställen", skill: "lösning" }],
+}).userPrompt, /MATTEPROVETS BALANS/,
+"general mathematics balance does not compete with verified mistake-training focus");
 assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom flera tydliga matematiska steg.*inte genom öppna uppmaningar/i,
   "A-level mathematics uses bounded multi-step work rather than open-ended wording");
 assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
@@ -725,6 +747,18 @@ assert.deepEqual(semanticDuplicateGate.questions.map((question) => question.id),
 assert.deepEqual(semanticDuplicateGate.dropped, [
   { id: "capacity-explanation-paraphrase", issues: ["duplicate_question"] },
   { id: "biodiversity-paraphrase", issues: ["duplicate_question"] },
+]);
+
+const linearZeroConceptGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "linear-zeros-represent", question: "Vad representerar nollställena i en linjär funktion?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[0], id: "linear-zeros-describe", question: "Vad beskriver nollställena i en linjär funktion?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[0], id: "linear-zero-calculate", question: "Beräkna nollstället till y = 2x + 4.", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+] }, { profile: "mathematics", secret: signingSecret });
+assert.deepEqual(linearZeroConceptGate.questions.map((question) => question.id), [
+  "linear-zeros-represent", "linear-zero-calculate",
+], "represent/describe paraphrases are deduped while a calculation on a specified line remains distinct");
+assert.deepEqual(linearZeroConceptGate.dropped, [
+  { id: "linear-zeros-describe", issues: ["duplicate_question"] },
 ]);
 
 const respirationSiblingGate = assessment.gateExam({ questions: [

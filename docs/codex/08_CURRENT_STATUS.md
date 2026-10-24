@@ -2391,3 +2391,45 @@ stagingauktorisation, aktuell kostnadsavläsning och versionssynkad deployment.
 skyddet finns i staging. Kvar före stark liveverifiering: ett reproducerbart
 två-sessionstest eller motsvarande hostad stagingevidens, färsk budgetkontroll,
 versionssynkad Preview/Auth-origin och det godkända syntetiska end-to-end-testet.
+
+## Live 12-frågeprov och mattebredd — 2026-10-24
+
+- [x] På Preview `dpl_HFV1vM54dy6S8oeXkHn2FZdabhYR` / commit `c63f04c`
+  genomfördes det godkända syntetiska Matematik 2b-provet. Jobbet nådde terminalt
+  tillstånd med **9/12** godkända frågor. Appen visade `9 AV 12 BEGÄRDA` och
+  märkte resultatet uttryckligen som delprov; inget ofullständigt prov visades
+  som komplett.
+- [x] Sanerad runtime-telemetri visar initialt 3 godkända frågor och därefter
+  reparation 3→6→7→9. Kvarvarande kandidater stoppades främst av
+  `source_support`, `option_quality_failed`, faktagranskarens avslag och
+  lösarkontroll (`solver_disagrees_on_key` / `solver_multiple_correct_options`).
+  En reparationsbegäran misslyckades med `independent_check_unavailable`.
+  Kvalitetsgrindarna fungerade; denna körning bevisar inte att 12/12 kan nås.
+- [x] Granskning av de nio visade frågorna fann upprepning av samma linjära
+  nollställesbegrepp med formuleringarna “representerar” och “beskriver”. Det
+  stöds av den exakta visade frågetexten; orsaken i klassificeraren var att
+  `representerar` inte normaliserades till samma förklaringsintent.
+- [x] Lokalt, ännu ej deployat: `api/_assessment.js` normaliserar nu den
+  observerade parafrasen men behåller en beräkningsfråga som separat uppgift.
+  `api/generate-exam.js` ger vanliga matteprov konkreta ungefärliga mål för
+  problemlösning/tillämpning/begrepp (12 frågor: 9/2/1); instruktionen används
+  inte för grafprov eller prov med verifierat felträningsfokus. Inga grindar,
+  kvoter eller authflöden har ändrats.
+- [x] Oberoende granskning fann ingen blockerare. Efter granskning tillkom ett
+  test som hindrar generell mattebalans från att konkurrera med felträningsfokus.
+  Riktad svit för pipeline, HTTP, offlinegenerering och recovery passerade
+  **35/35**; syntaxkontroll och `git diff --check` passerade.
+- [!] Efter stagingkörningen lästes budgetraden som cap `$3.379071`, spenderat
+  `$1.503307`, reserverat `$0.263628`, aktiverad. Före körningen var spenderat
+  `$1.379071`; ökningen i redovisad spend var `$0.124236`. Ingen ytterligare
+  modellkörning är verifierad efter den lokala prompt-/dubblettändringen.
+- [!] De tre kod-/testfilerna är lokala, ocommittade ändringar på branchen
+  `codex/exgen-school-pilot-integration-20261024`; Previewn motsvarar därför
+  inte de nya ändringarna. `main`, Vercel Production och produktionsdatabasen
+  är orörda.
+
+**PILOT NOT READY.** Den rapporterade roten till att ett 12-frågeprov blev
+ofullständigt är kandidatunderkännande i oberoende granskning/lösarkontroll,
+inte ett falskt komplettresultat. Ny promptstyrning och dubblettnormalisering
+är offline-verifierade men behöver pushad Preview och separat, godkänd
+syntetisk liveverifiering innan modellförbättring kan bekräftas.

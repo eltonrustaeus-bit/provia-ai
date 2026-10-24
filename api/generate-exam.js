@@ -1188,6 +1188,19 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
             : "Make ALL questions graph tasks of type graph. Use only explicit straight-line equations y=kx+b found in the material. Set graph_spec.kind='line', set slope and intercept to match that exact equation, points=[], x_label='', y_label='', options=[], correct_index=-1 and two points. Do not use any other graph or curve type."
         : "Make a mix of 'mc' and 'short' (about half/half).";
 
+  const hasMistakeTrainingFocus = Array.isArray(trainingFocus) && trainingFocus.length > 0;
+  const mathMixInstruction = isMath && qType !== "graph" && !hasMistakeTrainingFocus
+    ? (() => {
+      const problemSolvingCount = Math.max(1, Math.round(numQuestions * 0.75));
+      const applicationCount = Math.max(0, Math.round(numQuestions * 0.17));
+      const conceptCount = Math.max(0, numQuestions - problemSolvingCount - applicationCount);
+      const conceptLabelSv = conceptCount === 1 ? "begrepps-/definitionsfråga" : "begrepps-/definitionsfrågor";
+      return lang === "sv"
+        ? `MATTEPROVETS BALANS: Fördela de ${numQuestions} frågorna ungefär så här: ${problemSolvingCount} räkne- eller problemlösningsuppgifter, ${applicationCount} tillämpnings-/resonemangsuppgifter och högst ${conceptCount} ${conceptLabelSv}. För ett 12-frågeprov innebär det 9 problemlösningar, 2 tillämpningar/resonemang och högst 1 begreppsfråga. Räkna inte om samma färdighet med nya ord eller värden som bredd. Välj andra tydligt materialstödda färdigheter när sådana finns. Hitta inte på data eller fakta för att fylla en kategori; låt hellre en kandidat underkännas än att fylla provet med generiska definitioner.`
+        : `MATH EXAM BALANCE: Distribute the ${numQuestions} questions approximately as follows: ${problemSolvingCount} calculation/problem-solving tasks, ${applicationCount} application/reasoning tasks, and no more than ${conceptCount} concept/definition questions. For a 12-question exam, this means 9 problem-solving tasks, 2 application/reasoning tasks, and at most 1 concept question. Do not count the same skill reworded or with new values as breadth. Choose other clearly source-supported skills where available. Do not invent data or facts to fill a category; let a candidate fail rather than filling the exam with generic definitions.`;
+    })()
+    : "";
+
   /* Fokusinstruktionen står FÖRE materialet, inte efter. Materialet är det
      längsta blocket i hela prompten, och en instruktion som hamnar efter det
      drunknar. Före det läses den som en förutsättning för uppgiften.
@@ -1202,6 +1215,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     `Frågetyp-val: ${qType}.`,
     mixRuleSv,
     `Antal frågor: ${numQuestions}.`,
+    mathMixInstruction,
     focusInstruction,
     learnerFocusInstruction,
     mistakeFocusInstruction,
@@ -1219,6 +1233,7 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
     `Question type selection: ${qType}.`,
     mixRuleEn,
     `Number of questions: ${numQuestions}.`,
+    mathMixInstruction,
     focusInstruction,
     learnerFocusInstruction,
     mistakeFocusInstruction,
