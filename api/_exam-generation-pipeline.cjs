@@ -154,8 +154,8 @@ async function advance(job, { deadlineAt = null } = {}) {
   const batchCount = Math.min(batchLimit, Math.max(2, slots));
   const comparisonQuestions = comparisonQuestionsFor(existing, job.requested_count);
   const coverage = require("./_source-coverage.cjs");
-  const sections = Array.isArray(job.payload.focusTerms) && job.payload.focusTerms.length
-    ? [] : coverage.sourceSections(job.payload.pastedText);
+  const hasRequiredTrainingFocus = Array.isArray(job.payload.trainingFocus) && job.payload.trainingFocus.length > 0;
+  const sections = hasRequiredTrainingFocus ? [] : coverage.sourceSections(job.payload.pastedText);
   const sourceTarget = coverage.nextSourceSection(sections, existing, Number(job.stage_attempts) - 1);
   const payload = {
     ...job.payload,

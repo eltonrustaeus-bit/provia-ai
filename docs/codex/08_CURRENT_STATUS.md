@@ -1,5 +1,46 @@
 # 08 Current Status
 
+# Fortsatt skolpilotfix — fokusord, källbredd och felträning — 2026-10-24
+
+- [x] Färsk Vercel-runtime-logg för den versionssynkade Previewn bekräftar att
+  det syntetiska Matematik 2b-provet begärde 12 men slutade på 0/12. Kandidater
+  genererades och nådde verifierare/lösare, men godkändes inte: loggade orsaker
+  omfattade `source_support`, `option_quality_failed`, `difficulty_mismatch`,
+  `low_source_alignment` och solver-avvikelser. UI:t lämnade inte ut något prov.
+- [x] Kodgranskning fann ett separat, bekräftat källbreddsfel: när vanliga
+  materialprov skickade elevens valda `focusTerms` stängde pipelinen av
+  rubrikbaserad källstyrning (`sourceSectionCount=0`). Rubriker analyseras nu
+  även med fokusord; fokusorden skickas vidare oförändrade. Det förklarar inte
+  ensamt modellens verifieringsunderkännanden och är inte beskrivet som deras
+  bevisade grundorsak.
+- [x] Generell källavsnittsstyrning stängs av när jobbet har obligatoriska
+  `trainingFocus`. Felträning instrueras då inte samtidigt att prioritera ett
+  allmänt materialavsnitt; serverns krav på matchning av verifierade misstag
+  och verifieringsstatus är oförändrade. En regression bevisar att en
+  irrelevant, i övrigt verifierad kandidat avvisas och att ouppfyllda
+  felmoment håller jobbet i `repair`.
+- [x] Oberoende skrivskyddad granskning fann inga blockerande problem i ändringen
+  eller försvagade kvalitetsgrindar. Granskaren noterade att regressionerna
+  mockar verifierade kandidater och inte bevisar den riktiga modellpromptens
+  kvalitet.
+- [x] Offline-verifiering på slutlig kod: generering/pipeline/kvot/återhämtning
+  **80/80**, P.E.R. **56/56**, felträning/källkontext/stream/frontend **44/44**.
+  Syntaxkontroll och `git diff --check` passerade.
+- [!] Stagingbudget, read-only `2026-10-24 20:25 UTC`: hårt cap `$3.379071`,
+  spenderat `$1.737989`, reserverat `$0.263628`, tillgängligt `$1.377454`.
+  Detta är bokföring i staging, inte en OpenAI-faktura. Inget nytt AI-anrop
+  gjordes efter budgetläsningen.
+- [!] Ändringen är ännu lokal och ocommittad. Den behöver commit/push till den
+  redan godkända feature-branchen, ny READY Preview och därefter kontroll av
+  exakt branch/stagingkoppling. Ett syntetiskt liveprov inom aktuell budget
+  återstår. `main`, Production, produktionsdatabasen, konton, roller, kvoter och
+  hemligheter har inte ändrats.
+
+**PILOT NOT READY.** Den senaste livekörningen visar att appen säkert stoppar
+ett 0/12-resultat, men inte att den kan leverera 12 kvalitetsgodkända frågor.
+Nästa steg är Preview på slutlig kod och en ny budget-/schema-/sessionskontroll
+före ett enda syntetiskt stagingtest. Tidigare osvarade 9/12-prov har bevarats.
+
 ## Ny stagingkörning och förbättringar för provbredd — 2026-10-24
 
 - [x] Den inloggade staging-Previewn på commit `3006e1e5c2e4c12ccea02843c87f4cabaa5375f9` tog emot ett syntetiskt Matematik 2b-prov: nivå C, blandat, 12 begärda. Jobbet avslutades korrekt som **9/12**; UI:t visade endast de nio godkända och sade uttryckligen att tre saknades. Inga svar skickades in.

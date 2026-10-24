@@ -126,7 +126,7 @@ test("a resumed 12-question pipeline steers the next verified batch to uncovered
     lease_token: "44444444-4444-4444-8444-444444444444",
     deadline_at: new Date(Date.now() + 300_000).toISOString(),
     stage: "repair", stage_attempts: 1, requested_count: 12,
-    payload: { qType: "short", numQuestions: 12, pastedText: source },
+    payload: { qType: "short", numQuestions: 12, pastedText: source, focusTerms: ["fotosyntes", "cellandning"] },
     accepted_questions: Array.from({ length: 11 }, (_, index) => ({ id: `prior-${index}`, type: "short", question: `Distinct verified task ${index}`,
       source_references: ["Växter använder ljus, vatten och koldioxid för att bilda glukos."],
       validation_status: "verified" })),
@@ -137,6 +137,8 @@ test("a resumed 12-question pipeline steers the next verified batch to uncovered
   try {
     generation.generateVerifiedBatch = async ({ payload }) => {
       target = payload.sourceTarget;
+      assert.deepEqual(payload.focusTerms, ["fotosyntes", "cellandning"],
+        "source-section steering does not discard the learner's selected focus terms");
       return { status: 200, body: { ok: true, questions: [
         { id: "q2a", type: "short", question: "Vilken process använder växter för att skapa glukos?",
           validation_status: "verified", source_references: ["Växter använder ljus, vatten och koldioxid för att bilda glukos."] },
@@ -162,6 +164,52 @@ test("a resumed 12-question pipeline steers the next verified batch to uncovered
     assert.deepEqual(checkpoint.acceptedQuestions.slice(-2).map((question) => question.question), [
       "Vilken process använder växter för att skapa glukos?", "Vad frigörs vid cellandning?",
     ], "candidate order is preserved when both verified questions fit");
+  } finally {
+    generation.generateVerifiedBatch = originalGenerate;
+    operations.checkpointPipelineJob = originalCheckpoint;
+  }
+});
+
+test("mistake training prioritizes verified misses over general source-section steering", async () => {
+  const originalGenerate = generation.generateVerifiedBatch;
+  const originalCheckpoint = operations.checkpointPipelineJob;
+  const job = {
+    id: "00000000-0000-4000-8000-000000000412",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 300_000).toISOString(),
+    stage: "generate", stage_attempts: 1, requested_count: 2,
+    payload: {
+      qType: "short", numQuestions: 2, pastedText: source,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Fotosyntes", skill: "Ange reaktanterna" },
+        { focusId: "focus-2", concept: "Cellandning", skill: "Förklara energifrigörelse" },
+      ],
+    },
+    accepted_questions: [], progress_current: 0,
+  };
+  let checkpoint;
+  try {
+    generation.generateVerifiedBatch = async ({ payload }) => {
+      assert.equal(payload.sourceTarget, null,
+        "general section steering must not compete with the selected mistake objective");
+      assert.deepEqual(payload.trainingFocusRequiredIds, ["focus-1", "focus-2"]);
+      return { status: 200, body: { ok: true, questions: [
+        { id: "unrelated", type: "short", question: "Vad innehåller DNA?", validation_status: "verified" },
+        { id: "focused", type: "short", question: "Vilka ämnen används vid fotosyntes?",
+          validation_status: "verified", training_focus_matches: ["focus-1"] },
+      ] } };
+    };
+    operations.checkpointPipelineJob = async (input) => {
+      checkpoint = input;
+      return { status: "checkpointed", stage: input.nextStage };
+    };
+    const result = await pipeline.advance(job);
+    assert.equal(result.approved, 1);
+    assert.equal(checkpoint.nextStage, "repair", "an uncovered selected mistake keeps the job in repair");
+    assert.deepEqual(checkpoint.acceptedQuestions.map((question) => question.question), [
+      "Vilka ämnen används vid fotosyntes?",
+    ], "a verified but unrelated question cannot enter mistake training");
   } finally {
     generation.generateVerifiedBatch = originalGenerate;
     operations.checkpointPipelineJob = originalCheckpoint;
