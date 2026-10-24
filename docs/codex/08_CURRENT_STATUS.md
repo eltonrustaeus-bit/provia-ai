@@ -19,9 +19,18 @@
 - [x] Oberoende säkerhets-/kvotgranskning fann ingen blockerare i migrationen.
   Begränsning: PGlite testar inte faktisk samtidighet mellan PostgreSQL-sessioner;
   låssäkerheten är granskad statiskt och kan stärkas med hosted concurrencytest.
-- [!] Dessa två uppföljningsändringar är fortfarande lokala och ocommittade.
-  Den nya retentionmigrationen är inte tillämpad i staging. Ingen ny Preview
-  eller live-AI-körning har verifierats efter ändringarna.
+- [x] Uppföljningsändringarna är committade som `a53ff9c` och pushade endast
+  till `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_FLG7ZQBUoTxcZYUAZ6JLqPJYp96U` blev `READY` på exakt denna commit;
+  den skyddade appvägen svarade 200 och runtime konfigurationen pekar på
+  stagingprojektet `yhcinqejsocpmmetazpz`.
+- [!] Den nya retentionmigrationen är ännu inte tillämpad i staging; separat
+  bekräftelse inväntas. Ingen syntetisk live-AI-körning har gjorts. Den öppna
+  stagingwebbläsarsessionen har ett aktivt prov vars ägare/ursprung inte kan
+  fastställas säkert, så det har inte lämnats in, avbrutits eller ändrats.
+- [!] `appOrigin` för lösenordsåterställning pekar fortfarande på en äldre
+  Preview-alias. Den lämnades orörd; auth-recovery i denna Preview är därför
+  inte verifierad.
 - [x] Det godkända tomma Vercel-projektet `provia-ai-school-pilot-clean` gav 404
   vid kontroll av exakt projekt-ID; projektet saknas redan, så inget raderades.
 
