@@ -3025,16 +3025,21 @@ try{
   window.ExGenEngine = {
     ready: true,
     language() { return LANG === "en" ? "en" : "sv"; },
-    setInputs({ course, level, qType, num, material, focusTerms, trainingFocus, priorQuestions, sourceReferences }) {
+    setInputs(inputs) {
+      const { course, level, qType, num, material, focusTerms, trainingFocus, priorQuestions, sourceReferences } = inputs || {};
       if (courseEl()) courseEl().value = String(course || "").trim();
       if (levelEl()) levelEl().value = ["E","C","A"].includes(level) ? level : "C";
       if (qTypeEl()) qTypeEl().value = ["mix","mc","short","graph"].includes(qType) ? qType : "mix";
       if (numQuestionsEl()) numQuestionsEl().value = String(qType === "graph" ? 1 : Math.min(20, Math.max(2, Number(num) || 3)));
       if (pastedTextEl()) pastedTextEl().value = String(material || "");
       selectedExamFocusTerms = Array.isArray(focusTerms) ? focusTerms.slice(0, 6) : [];
-      pendingMistakeTraining = Array.isArray(sourceReferences) && sourceReferences.length
-        ? { course, sourceMaterial: material, trainingFocus, priorQuestions, sourceReferences }
-        : null;
+      const includesTrainingContext = inputs && ["trainingFocus", "priorQuestions", "sourceReferences"]
+        .some((key) => Object.prototype.hasOwnProperty.call(inputs, key));
+      if (includesTrainingContext) {
+        pendingMistakeTraining = Array.isArray(sourceReferences) && sourceReferences.length
+          ? { course, sourceMaterial: material, trainingFocus, priorQuestions, sourceReferences }
+          : null;
+      }
       // Kurspickern speglas så att "Ämne/Kurs" stämmer om någon öppnar den
       // gamla vyn, och så att clearAll() inte skriver tillbaka ett gammalt val.
       const search = document.getElementById("courseSearch");

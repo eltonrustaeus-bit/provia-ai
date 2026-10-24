@@ -1,5 +1,34 @@
 # 08 Current Status
 
+## Skolpilot-uppföljning — träningskontext och övergivna jobb, 2026-10-24
+
+- [x] Bekräftad orsak till irrelevanta prov från tidigare misstag: `app.html`
+  skickade nytt provmaterial via `setInputs()` utan träningsmetadata precis före
+  `generate()`. Motorn tolkade saknade fält som att träningen skulle rensas,
+  trots att föregående steg hade verifierat och lagt till kursens felområden.
+  Ändringen bevarar endast kontext när fälten utelämnas; uttryckligt tomma
+  värden och Nytt ämne rensar fortfarande träningsläget.
+- [x] Regressionstesterna täcker nu hela kedjan från rättat prov och P.E.R till
+  felbaserat träningsprov, inklusive att kurs och valda fel når den riktiga
+  generatorbegäran. Alla berörda offline-tester passerade 150/150.
+- [x] En separat retentionmigration kortar städgränsen för privata, utgångna
+  pipelinejobb från 24 timmar till 20 minuter efter jobbets deadline. Den
+  behåller radlåsning, lease-fencing, exakt kvotåterbetalning och payload-rensning.
+  PGlite verifierade gränsen före/efter cutoff, återbetalning och idempotent
+  upprepad städning; pipeline-/Postgres-fixturen passerade 25/25.
+- [x] Oberoende säkerhets-/kvotgranskning fann ingen blockerare i migrationen.
+  Begränsning: PGlite testar inte faktisk samtidighet mellan PostgreSQL-sessioner;
+  låssäkerheten är granskad statiskt och kan stärkas med hosted concurrencytest.
+- [!] Dessa två uppföljningsändringar är fortfarande lokala och ocommittade.
+  Den nya retentionmigrationen är inte tillämpad i staging. Ingen ny Preview
+  eller live-AI-körning har verifierats efter ändringarna.
+- [x] Det godkända tomma Vercel-projektet `provia-ai-school-pilot-clean` gav 404
+  vid kontroll av exakt projekt-ID; projektet saknas redan, så inget raderades.
+
+**PILOT NOT READY.** Lokal regressionssvit är grön; stagingmigration, ny
+Preview och säker syntetisk liveverifiering återstår. Ingen produktionsdatabas,
+`main`, hemlighet, användarkonto eller kvot har ändrats.
+
 ## Integrerad skolpilot-fix — lokal verifiering, 2026-10-24
 
 - [x] Den lokala, isolerade integrationsarbetskopian sammanför nu den befintliga

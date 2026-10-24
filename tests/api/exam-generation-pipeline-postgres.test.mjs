@@ -14,6 +14,7 @@ const repeatedObjectiveFeedbackRollback = fs.readFileSync(new URL("../../supabas
 const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
 const activePipelineQuotaReaperMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper.sql", import.meta.url), "utf8");
 const activePipelineQuotaReaperRollback = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper_ROLLBACK.sql", import.meta.url), "utf8");
+const recoveryWindowRetentionMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024165536_release_abandoned_exam_pipeline_after_recovery_window.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
@@ -50,6 +51,7 @@ async function makeDb() {
   await db.exec(repeatedObjectiveFeedbackMigration);
   await db.exec(queuedAssemblyFinalizationMigration);
   await db.exec(activePipelineQuotaReaperMigration);
+  await db.exec(recoveryWindowRetentionMigration);
   return db;
 }
 
@@ -633,19 +635,19 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
         id: pipelineId, userId: ownerId, idempotencyKey, attemptId: ownerAttempt,
         quotaRequestId, state: "queued", stage: "assemble", requested: 6,
         payload: { qType: "mc", pastedText: "synthetic source material", repairFeedback: { reviewFailureCounts: { answer_alignment: 1 }, solverFailureCounts: {}, duplicateCount: 0 } },
-        accepted, progress: 4, deadline: "clock_timestamp()-interval '23 hours 59 minutes 59 seconds'",
+        accepted, progress: 4, deadline: "clock_timestamp()-interval '19 minutes 59 seconds'",
       });
       const recentCleanup = (await db.query(
         "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
       )).rows[0].count;
-      assert.equal(recentCleanup, 0, "cleanup must not run before a job is at least 24 hours past its deadline");
+      assert.equal(recentCleanup, 0, "cleanup must preserve the complete 20-minute recovery window");
       assert.equal((await db.query(
         "select public.reap_stale_mock_exam_quota_reservations($1) as n", [ownerId],
       )).rows[0].n, 0, "a qualified partial remains reserved while its bounded assembly recovery is available");
       assert.equal((await db.query(
         "select status from public.mock_exam_quota_reservations where request_id=$1", [quotaRequestId],
       )).rows[0].status, "reserved");
-      await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()-interval '24 hours 1 second' where id=$1", [pipelineId]);
+      await db.query("update public.mock_exam_generation_pipeline_jobs set deadline_at=clock_timestamp()-interval '20 minutes 1 second' where id=$1", [pipelineId]);
 
       const cleaned = (await db.query(
         "select public.cleanup_expired_mock_exam_generation_pipeline_jobs() as count",
