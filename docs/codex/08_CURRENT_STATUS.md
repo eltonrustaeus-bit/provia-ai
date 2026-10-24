@@ -1,6 +1,67 @@
 # 08 Current Status
 
-## P.E.R. efter rättat prov — 2026-10-25
+## Enfliksregel och aktuell Preview-status — 2026-10-25
+
+- [x] Arbetet återanvänder en befintlig Preview-session. Inga nya
+  browserflikar, inloggningsrundor eller prov har skapats i den här
+  uppföljningen. Ett syntetiskt liveprov ska genereras, besvaras och rättas i
+  samma session; avbryt inte efter generering och skapa inte parallella prov.
+- [x] Dedupe-fixen och P.E.R.-saneringen är committade i `c9e04aa`. Den lokala
+  checkout-branchen är `codex/exgen-school-pilot-integration-20261024`; samma
+  SHA finns på den godkända fjärrbranchen
+  `origin/codex/exgen-generation-quality-2026-10-20` och i Vercel Preview
+  `READY` från just den fjärrbranchen.
+  Den befintliga branch-aliasen är
+  `https://provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [x] Den befintliga Preview-sessionen visade autentiserad ExGen-startsida efter
+  omladdning. Ingen ny inloggning behövdes i den här kontrollen.
+- [x] Exakt READY-deployment och branch-scopade Preview-variabler verifierades
+  igen: deployment `dpl_GRbkaEMrt361TFLTCMJjU2zbeejC` kör `c9e04aa` från
+  `codex/exgen-generation-quality-2026-10-20`. Variabelnamn och scope kunde
+  läsas utan att dekryptera några värden.
+- [x] Supabase staging `yhcinqejsocpmmetazpz` saknade två lokala migrationer.
+  Efter förhandskontroll (20 befintliga jobb, 0 aktiva, inga checkpointar över
+  begärt antal) tillämpades endast stagingmigrationerna
+  `release_abandoned_exam_pipeline_after_recovery_window` och
+  `tighten_pipeline_integrity_bounds`. Supabase registrerade dem som
+  `20261024225011` respektive `20261024225017`; motsvarande repo-filer heter
+  `20261024165536_...` och `20261024212500_...`. De två integritetsvillkoren finns;
+  quota-reapern skyddar en aktiv parent-lease innan pipeline-jobbet skapats.
+  Postkontrollen fann fortsatt 20 jobb och 0 aktiva; budgetraden var oförändrad.
+- [x] Staging-ACL-kontroll bekräftade att anon inte kan anropa status-RPC:n,
+  authenticated kan anropa den endast via ägarbunden `auth.uid()`-kontroll.
+  Security Advisor visar övriga projektvarningar (bland annat RLS-tabeller utan
+  policies och SECURITY DEFINER-funktioner); de granskade pipelinefunktionerna
+  är avsiktligt server- eller ägarbegränsade och inga nya behörigheter gavs här.
+- [x] Den hostade retention-schemaläggningen verifierades skrivskyddat:
+  `exgen-mock-exam-pipeline-retention` är aktiv med `*/15 * * * *` och kör den
+  förväntade cleanup-funktionen mot stagingdatabasen.
+- [x] Lokal riktad svit efter verifiering av kod passerade **135/135**:
+  pipeline/Postgres, 3/6/12-gränser, reservation/lease, källgrundning,
+  dubbletter, felträning, verifierarkontrakt och P.E.R.-lägen. En oberoende
+  granskning rapporterade separat **52/52** källgrundnings-/pipeline-tester.
+  HTTP-/återställnings- och kvotgränssnittssviten passerade dessutom **24/24**.
+- [x] De fem nya rollbackspärrarna passerar **5/5** PGlite-tester;
+  `node scripts/check-migration-files.mjs` passerar med 53 migrationer och
+  50 rollbackfiler. Spärrarna vägrar osäker rollback i stället för att ta bort
+  reservationer eller återöppna provpipelinefel.
+- [x] Riktade offline-tester och syntaxkontroller för ändringarna passerade;
+  oberoende P.E.R.- och provgenereringsgranskningar fann inga blockerare.
+  Dessa verifierar kodens deterministiska regler, inte live-modellens svar.
+- [!] Ingen ny modellförfrågan gjordes. Senast lästa stagingbudget visade
+  spenderat `$1.989743` och reserverat `$0.263628` mot den användargodkända
+  gränsen `$2`; kvarvarande godkänd marginal kan därför inte säkert täcka ett
+  nytt test. Ingen budget, kvot, roll eller konto ändras för att kringgå detta.
+- [!] **PILOT NOT READY.** P.E.R.- och den senaste ändringens live-modellbeteende
+  är inte verifierade. Main/Production har inte ändrats. Ett framtida
+  stagingtest kräver först en färsk budgetkontroll som visar tillräcklig
+  marginal och ett befintligt konto utan pågående prov; kör då ett enda prov
+  och slutför generering, elevsvar och rättning i samma flik. Oberoende
+  säkerhetsgranskning fann ingen blockerare för ett bounded försök, men verklig
+  konkurrens mellan PostgreSQL-sessioner återstår att verifiera före bredare
+  pilottrafik.
+
+## P.E.R. efter rättat prov — 2026-10-25 (checkpoint före c9e04aa-push)
 
 - [x] Oberoende granskning fann att vanlig hjälp från en kvarhängande `prov`-
   sida efter ett rättat prov kunde få gammal klientkurs, studiematerial,
@@ -13,8 +74,10 @@
 - [x] Regressionstest kontrollerar att gamla kurs-/material-/historik-/felbank-
   markörer inte når modellgränssnittet och att vanlig hjälp fortsätter fungera.
   Oberoende granskning fann inga blockerare; riktade P.E.R.-tester passerade.
-- [!] Ändringen är lokal och offline-verifierad. Ingen ny Preview, staging-
-  migrering eller modellkörning gjordes i denna uppföljning.
+- [x] Vid detta checkpoint var ändringen ännu lokal. Den kom senare med i
+  `c9e04aa`, pushades till feature-branchen och verifierades på READY Preview;
+  se aktuell sammanfattning ovan. Live-modellbeteendet är fortfarande
+  overifierat.
 
 ## Slutfört enfliks-test och processdubblett — 2026-10-25
 
@@ -39,9 +102,9 @@
   olika processer under breda och blandade ämnestaggar. Riktade assessment-, 3/6/12
   pipeline- och offline-pipeline-tester passerade; syntax- och diffkontroller
   passerade.
-- [!] Dedupe-fixen och regressionerna är lokala efter den verifierade Preview-
-  körningen. De har inte pushats eller deployats. Inget andra liveprov kördes;
-  den nya regeln är därför offline-verifierad men inte livebevisad.
+- [x] Dedupe-fixen och regressionerna kom senare med i `c9e04aa` och finns på READY Preview.
+  Inget andra liveprov kördes; den nya regeln är därför offline-verifierad men
+  inte livebevisad.
 - [!] Denna uppföljning lämnade 9/12-gränsen, andra konton och reservationer
   orörda. Skrivskyddad stagingkontroll efter rättningen: cap `$3.379071`,
   spent `$1.989743`, reserved `$0.263628`, kvar under cap `$1.125700`; raden
@@ -84,11 +147,12 @@
   måste också matcha uppgiftstyp, koncepttagg och exakt ämnessignatur, utan
   sammansatta eller villkorade extrauppgifter.
 - [!] Inga nya staging-anrop kördes; AI-promptens beteende och rättning är inte
-  liveverifierade. Ändringarna är lokala, inte pushade eller deployade.
+  liveverifierade. Ändringarna kom senare med i `c9e04aa` och en READY Preview;
+  produktens livekvalitet är fortfarande oprövad.
 
-**PILOT NOT READY.** Oberoende granskning av den här diffen ska avslutas innan
-den kan pushas till en Preview. Håll fast vid enfliksregeln och använd inte fler
-betalda liveprov utan separat bekräftad budget.
+**PILOT NOT READY.** Kodgranskningen är klar och ändringen ligger på feature-
+Previewn, men AI-beteendet har inte verifierats live. Håll fast vid enfliksregeln
+och använd inte fler betalda liveprov utan bekräftad återstående budget.
 
 ## En Preview-session och ett helt slutfört stagingprov — 2026-10-24 21:50 UTC
 
@@ -195,19 +259,17 @@ flikar eller starta om en pågående körning.
   är API:ets `maxDuration` 60 s, parent-leasen 90 s och reapertröskeln 2 min;
   scenariot ligger alltså utanför normal exekvering och har inte reproducerats.
   Ingen kodändring gjordes för hypotesen.
-- [!] Read-only stagingmigrationskontroll visar `20261024140557` och
-  `20261024151433`, men saknar den lokala retentionjusteringen
-  `20261024165536`. Den senare kan stänga gamla privata pipelinejobb; den
-  tillämpades inte för att bevara stagingdata och den ändrar inte nya jobbens
-  genererings-/assembly-RPC-kontrakt.
+- [!] Historisk kontroll kl. 20:50 visade `20261024140557` och
+  `20261024151433`, men saknade senare migrationer. Migrationsgapet är nu
+  åtgärdat på staging efter preflight; se aktuell sammanfattning ovan. Ingen
+  Production-schemaändring gjordes.
 - [x] Fem riktade P.E.R.- och felträningsfiler avslutades lokalt med exit code 0.
   Alla körningar var offline och gjorde inga modellförfrågningar.
 
-**PILOT NOT READY.** Behåll det redan påbörjade provet. Inget nytt liveprov görs
-i denna session: den enda synliga sessionen har ett påbörjat prov och budgeten
-har `$1.377454` tillgängligt, medan ett tryggt kostnadsestimat för nytt
-end-to-end-flöde inte är verifierat. `main`, Production, Supabase-schema,
-konton, roller och kvoter har inte ändrats.
+**PILOT NOT READY.** Detta är en historisk checkpoint från kl. 20:50. Det
+synliga påbörjade provet lämnades orört; staging-schema uppdaterades senare
+enbart enligt aktuell sammanfattning ovan. `main`, Production, konton, roller
+och kvoter har inte ändrats.
 
 # Fortsatt skolpilotfix — fokusord, källbredd och felträning — 2026-10-24
 
