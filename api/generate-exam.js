@@ -1571,7 +1571,7 @@ module.exports = async function handler(req, res, internalContext = null) {
     return json(res, 400, { ok: false, error: "Invalid JSON" });
   }
 
-  if (!internalBatch && Array.isArray(parsed.sourceReferences)) {
+  if (!internalBatch && Array.isArray(parsed.sourceReferences) && parsed.sourceReferences.length > 0) {
     return json(res, 409, {
       ok: false,
       error: parsed.qType === "graph" ? "MISTAKE_GRAPH_UNSUPPORTED" : "MISTAKE_SOURCE_REQUIRES_PIPELINE",

@@ -43,6 +43,23 @@ const trainingFocus = [{
   concept: "Linjär funktion", skill: "Tolka lutning", errorTags: ["concept_error"],
 }];
 
+test("empty source references keep a normal material exam out of mistake-training mode", () => {
+  const body = {
+    lang: "sv", level: "C", course, qType: "mix", numQuestions: 12, pastedText: material,
+    trainingFocus: [], priorQuestions: [], sourceReferences: [],
+    idempotencyKey: "12345678-1234-4234-8234-123456789abc",
+  };
+  const request = normalizedRequest(body);
+  assert.equal(request.trainingMode, false);
+  assert.equal(request.pastedText, material);
+  assert.deepEqual(request.trainingFocus, []);
+  assert.deepEqual(request.priorQuestions, []);
+  assert.deepEqual(request.sourceReferences, []);
+
+  const trainingRequest = normalizedRequest({ ...body, sourceReferences });
+  assert.equal(trainingRequest.trainingMode, true, "a real source reference still requires verified mistake-training checks");
+});
+
 test("mistake training rejects more distinct foci than requested questions before quota work", () => {
   const submission = "a".repeat(32);
   const body = {

@@ -254,6 +254,22 @@ test("graph mistake training is rejected before quota or model work on direct an
       assert.equal(response.statusCode, 409, `${url} must reject unsupported source routing`);
       assert.equal(response.body.error, expectedError);
     }
+    const standardGraphResponse = responseRecorder();
+    const standardGraphBody = {
+      course: "Matematik 2b", qType: "graph", numQuestions: 1,
+      pastedText: "", sourceReferences: [], trainingFocus: [], priorQuestions: [],
+      idempotencyKey: "22222222-2222-4222-8222-222222222223",
+    };
+    await generationHandler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-test-token" },
+      body: standardGraphBody,
+      async *[Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify(standardGraphBody)); },
+      url: "/api/generate-exam",
+    }, standardGraphResponse);
+    assert.equal(standardGraphResponse.statusCode, 400,
+      "an empty source-reference array is a normal graph request and proceeds to ordinary material validation");
+    assert.equal(standardGraphResponse.body.error, "Missing pastedText");
     assert.equal(quotaCalls, 0, "unsupported source routing does not consume quota");
     assert.equal(claimCalls, 0, "unsupported source routing does not create an idempotency claim");
     assert.ok(unexpected.every((path) => path === "pipeline-test.supabase.co/rest/v1/profiles"),

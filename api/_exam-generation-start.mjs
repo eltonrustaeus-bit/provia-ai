@@ -43,7 +43,7 @@ async function rest(path, init = {}) {
 export function normalizedRequest(body) {
   const lang = body.lang === "en" ? "en" : "sv";
   const level = ["E", "C", "A"].includes(body.level) ? body.level : "C";
-  const trainingMode = Array.isArray(body.sourceReferences);
+  const trainingMode = Array.isArray(body.sourceReferences) && body.sourceReferences.length > 0;
   if (trainingMode && body.qType === "graph") {
     throw Object.assign(new Error("MISTAKE_GRAPH_UNSUPPORTED"), { status: 409 });
   }
