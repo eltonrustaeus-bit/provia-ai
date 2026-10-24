@@ -2481,9 +2481,46 @@ av provgenerering och P.E.R; Production förblir orörd.
   assembly-markör; startpayloaden gör nu det explicit och HTTP-testet verifierar
   en terminal omstart från `true` till `false`. Slutgranskaren bekräftade att
   testluckan är stängd och fann ingen blockerare i den justeringen.
-- [!] Migrationen är endast lokal och inte tillämpad. Ingen Preview,
-  modellgenerering, push, merge eller Production-/Supabase-åtgärd har gjorts.
+- [x] Migrationen tillämpades endast i staging och verifierades därefter i
+  migrationshistorik och schema. Ingen Production-/Supabase-åtgärd gjordes.
 
-**PILOT NOT READY.** Nästa grind: slutför oberoende review, kontrollera migration
-mot staging lokalt/testmässigt, och begär separat godkännande för Preview samt
-syntetisk stagingverifiering. Stabil Production är orörd.
+**PILOT NOT READY.** Nästa grind: slutför oberoende review, skapa en Preview
+med stagingkopplingen och kör syntetisk stagingverifiering. Stabil Production
+är orörd.
+
+## Slutgrind för kontrollerad skolpilot — 2026-10-24
+
+- [x] Kvotrace bekräftades: en utgången men leveransbar del i `assemble` kunde
+  återbetalas före nästa claim och därefter misslyckas vid kvotcommit. Reapern
+  bevarar nu reservationen tills det begränsade assembly-fönstret använts eller
+  24-timmars retentionen stänger det. Kvalificering och återbetalning stänger
+  fortsatt under golvet och för felaktig blandad frågetyp.
+- [x] P.E.R:s lokala misstagskontext kallas nu obekräftad och kan vara gammal
+  eller felaktig; prompten förbjuder att presentera den som verifierat faktum.
+  Serverbaserad felträning hämtar fortsatt källmaterial från ägt, signerat och
+  verifierat rättat prov.
+- [x] REST-regressionen kontrollerar att både ägarskapat verifierat resultat
+  och matchande provutfärdande krävs för felträning.
+- [x] Full seriell offline-svit `node --test --test-concurrency=1
+  --test-reporter=dot $(rg --files tests -g '*.test.mjs' -g '*.test.js')`
+  avslutades med exit 0. Riktade PGlite-, feltränings- och P.E.R-tester,
+  syntaxkontroller och `git diff --check` passerade också.
+- [x] Endast staging fick migrationen `finalize_queued_pipeline_assembly`.
+  Supabase bekräftar migrationsposten och `assembly_grace_used boolean NOT
+  NULL DEFAULT false`.
+- [x] Det oavsiktligt skapade, tomma Vercel-projektet
+  `provia-ai-school-pilot-clean` är borttaget och ger nu 404. Projektet
+  `provia-ai` är inte påverkat.
+- [!] Koden är committad lokalt som `13fc763`, men inte pushad. Stagingvariabler
+  finns på den befintliga `codex/exgen-generation-quality-2026-10-20`, inte på
+  goal-branchen. En rak lokal rebase gav semantiska konflikter i kärnfilerna;
+  rebasen avbröts utan att förlora committen. Ingen hemlighetsscope ändrades.
+- [!] Ingen Preview eller modellgenerering kördes. Budgetläsningen visade
+  $5.00 tak och $1.379071 spenderat plus $0.263628 reserverat; kvarvarande
+  utrymme är inom den tidigare godkända $2-gränsen, men det ersätter inte en
+  stagingkopplad Preview.
+
+**PILOT NOT READY.** Nästa säkra steg är att integrera committen med den
+stagingkopplade feature-historiken genom en granskad konfliktlösning, köra om
+de påverkade testerna och först därefter pusha/skapa Preview. Ändra inte
+Vercel-hemligheternas branch-scope och håll Production orörd.
