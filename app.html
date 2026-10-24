@@ -1317,6 +1317,8 @@ async function loadExamsFromAccountToLocal(notifyHistoryUpdate=true){
       &&(typeof maxRaw==="number"||typeof maxRaw==="string")&&!(typeof maxRaw==="string"&&maxRaw.trim()==="")
       &&Number.isFinite(total)&&Number.isFinite(maximum)&&maximum>0&&total>=0&&total<=maximum;
     return{ts:Date.parse(r.created_at)||Date.now(),course:r.course||"",level:r.level||"C",qType:r.qtype||"mix",
+      numQuestions:Number(r.exam?.requested_question_count)||r.exam?.questions?.length||3,
+      partialDelivery:r.exam?.partial_delivery===true,
       total_points:hasScore?total:null,max_points:hasScore?maximum:null,percent:hasScore?Math.round((total/maximum)*100):null,accountSaved:!r.local_only};
   });
   lsSet(LS_HISTORY,history);
@@ -2887,10 +2889,12 @@ try{
       /* Mastery skrivs av api/grade.js; resultatet visas först efter ägarkontroll. */
       const ts=Date.now(),max=Number(result.max_points||0),total=Number(result.total_points||0),percent=max>0?Math.round((total/max)*100):0;
       const courseName=(courseEl()?.value||"").trim();
-      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:qTypeEl()?.value||"mix",numQuestions:Number(numQuestionsEl()?.value||3),total_points:total,max_points:max,percent};
+      const requestedQuestionCount=Number(currentExam.requested_question_count)||currentExam.questions.length;
+      const partialDelivery=currentExam.questions.length<requestedQuestionCount;
+      const attempt={ts,course:courseName,level:levelEl()?.value||"C",qType:payload.qType||qTypeEl()?.value||"mix",numQuestions:requestedQuestionCount,total_points:total,max_points:max,percent,partialDelivery};
       const userId=gradingOwnerId;
       const localId=newLocalExamId();
-      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
+      const accountRecord={local_id:localId,user_id:userId,submission_id:submissionId,course:courseName||null,level:attempt.level,qtype:attempt.qType,material:pastedText,exam:{title:currentExam.title||"",level:currentExam.level||(levelEl()?.value||"C"),questions:currentExam.questions||[],requested_question_count:requestedQuestionCount,partial_delivery:partialDelivery,training_batch_id:localId,submission_receipt:examProof},answers,result,created_at:new Date(ts).toISOString()};
       let accountSaveFailed=!db||!userId,localCopySaved=false;
       if(userId){
         localCopySaved=queuePendingExam(accountRecord);

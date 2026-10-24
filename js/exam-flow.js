@@ -1801,6 +1801,8 @@
       S.exam = normalizeIds(r.exam);
       S.draftPhase = "active";
       var got = S.exam.questions.length;
+      S.exam.requested_question_count = S.num;
+      S.exam.partial_delivery = got < S.num;
       S.questionCountNote = questionCountNote(got, S.num);
       S.answers = questionState();
       S.helped = questionState();
@@ -2831,6 +2833,15 @@
       scores.appendChild(s2);
     }
     b.appendChild(scores);
+
+    var requestedCount = Number(S.exam && S.exam.requested_question_count) || Number(S.num) || qs.length;
+    var partialNoteText = questionCountNote(qs.length, requestedCount);
+    if (partialNoteText) {
+      var partialNote = el("div", "xf-question-quality-note");
+      partialNote.setAttribute("role", "status");
+      partialNote.appendChild(el("p", null, partialNoteText));
+      b.appendChild(partialNote);
+    }
 
     if (persistence && persistence.accountSaveFailed) {
       var saveWarning = el("div", "xf-err xf-save-warning");

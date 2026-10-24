@@ -821,11 +821,17 @@ function semanticDuplicateQuestion(left, right) {
 
 function mathQuestionIntent(question) {
   const text = `${question?.concept_tag || ""} ${question?.question || ""}`
+    .replace(/²/g, "^2")
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
   if (/\b(?:l(?:ö|o)s|l(?:ö|o)sa)\b.{0,100}(?:ekvation|andragrad|x\s*\^?\s*2)/u.test(text)) {
     return "solve-equation";
+  }
+  if (/x\s*\^\s*2/u.test(text) &&
+      /(?:[<>]=?\s*0|[≥≤]\s*0|\b(?:positiv|negativ)\w*|icke[-\s]?(?:positiv|negativ)\w*|non[-\s]?(?:positive|negative)\w*)/u.test(text) &&
+      /(?:[a-z]\s*\(\s*x\s*\)\s*=|\by\s*=)/u.test(text)) {
+    return "zero";
   }
   if (/(?:j(?:ä|a)mför|compare)/u.test(text) &&
       /x\s*\^?\s*2/u.test(text) && /(?:=|pq-formel|faktoriser|ber(?:ä|a)kningssteg|tillf(?:ö|o)rlitlig)/u.test(text)) {
@@ -893,10 +899,11 @@ function quadraticZeroSignature(question) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
-  const functionMatch = text.match(/(?:f|y)\s*\(\s*x\s*\)\s*=\s*([^?.;]+)/u)
+  const functionMatch = text.match(/(?:[a-z]|y)\s*\(\s*x\s*\)\s*=\s*([^?.;]+)/u)
     || text.match(/\by\s*=\s*([^?.;]+)/u);
   const zeroEquation = text.match(/([0-9x+*/^().\s-]+)\s*=\s*0(?:\D|$)/u);
-  const expression = zeroEquation?.[1] || functionMatch?.[1] || "";
+  const expression = (zeroEquation?.[1] || functionMatch?.[1] || "")
+    .split(/(?:<=|>=|<|>|\b(?:icke[-\s]?(?:positiv|negativ)|non[-\s]?(?:positive|negative)|positiv|negativ)\w*)/u)[0];
   if (!expression || !/x\s*\^\s*2/u.test(expression)) return "";
 
   const compact = expression.replace(/\s+/g, "").replace(/\*/g, "");
@@ -941,6 +948,16 @@ function quadraticSkillSignature(question) {
   const text = String(question?.question || "").normalize("NFKC").toLowerCase();
   const skills = [];
   if (/nollst(?:ä|a)ll|r(?:ö|o)tter|l(?:ö|o)sningarna|\bl(?:ö|o)s(?:a)?\b/u.test(text)) skills.push("roots");
+  if (/(?:>=\s*0|≥\s*0|större\s+än\s+(?:eller\s+)?lika\s+med\s+0|greater\s+than\s+or\s+equal\s+to\s+0|icke[-\s]?negativ\w*|non[-\s]?negative\w*|positiv\w*\s+eller\s+noll)/u.test(text)) {
+    skills.push("positive-region-inclusive");
+  } else if (/(?:>\s*0|större\s+än\s+0|greater\s+than\s+0|\bpositiv\w*)/u.test(text)) {
+    skills.push("positive-region-strict");
+  }
+  if (/(?:<=\s*0|≤\s*0|mindre\s+än\s+(?:eller\s+)?lika\s+med\s+0|less\s+than\s+or\s+equal\s+to\s+0|icke[-\s]?positiv\w*|non[-\s]?positive\w*|negativ\w*\s+eller\s+noll)/u.test(text)) {
+    skills.push("negative-region-inclusive");
+  } else if (/(?:<\s*0|mindre\s+än\s+0|less\s+than\s+0|\bnegativ\w*)/u.test(text)) {
+    skills.push("negative-region-strict");
+  }
   if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) skills.push("slope");
   if (/derivata|derivative|tangentlutning/u.test(text)) skills.push("derivative");
   if (/toppunkt|vertex|symmetrilinje|symmetry axis/u.test(text)) skills.push("vertex-or-axis");
@@ -971,6 +988,7 @@ function normalizedQuadraticQuestionText(question) {
 function isDuplicateQuestion(left, right) {
   const leftQuadratic = quadraticZeroSignature(left);
   const rightQuadratic = quadraticZeroSignature(right);
+  if (leftQuadratic && rightQuadratic && leftQuadratic !== rightQuadratic) return false;
   if (leftQuadratic && leftQuadratic === rightQuadratic) {
     const leftAction = quadraticTaskAction(left);
     const rightAction = quadraticTaskAction(right);

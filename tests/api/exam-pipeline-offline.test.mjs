@@ -224,6 +224,8 @@ assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt 
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
+  examQuestionCount: 12,
+  comparisonQuestions: [{ concept_tag: "Nollställen", question: "Bestäm nollställena till f(x)=x^2-4x+3." }],
 });
 const mathTwelvePrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Matematik 2b", qType: "mix", numQuestions: 12,
@@ -251,6 +253,10 @@ assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom fler
   "A-level mathematics uses bounded multi-step work rather than open-ended wording");
 assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
   "each mathematical short answer has one checkable answer target");
+assert.match(mathPrompt.userPrompt, /Hela provet omfattar 12 frågor.*batch på 3 frågor; balansmålen gäller hela provet, inte batchen/i,
+  "a resumed generation batch receives coherent targets for the whole exam rather than its local batch size");
+assert.match(mathPrompt.userPrompt, /Redan godkända frågor i jämförelseunderlaget ska inte räknas som ny bredd/i,
+  "approved question context guides skill coverage as well as wording novelty");
 assert.match(mathPrompt.systemPrompt, /frågan uttryckligen be eleven visa eller förklara lösningsmetoden om metodpoäng ska ges/i,
   "method points require the question to explicitly request working");
 assert.match(mathPrompt.systemPrompt, /Om frågan bara ber om ett slutsvar ska matrisen bara bedöma slutsvaret/i,
@@ -669,10 +675,49 @@ const quadraticZeros = makeEquationQuestion(
 const quadraticRoots = makeEquationQuestion(
   "quadratic-roots", "Bestäm rötterna till y = x² − 5x + 6.",
 );
+const quadraticPNotation = makeEquationQuestion(
+  "quadratic-p-notation", "Bestäm nollställena för funktionen p(x)=x^2-6x+5. Vad är nollställen?",
+);
+const quadraticPNotationChoice = makeEquationQuestion(
+  "quadratic-p-notation-choice", "Vilket av följande värden av x ger nollställe för funktionen p(x)=x^2-6x+5?",
+);
+const quadraticPositiveInterval = makeEquationQuestion(
+  "quadratic-positive-interval", "För vilka x gäller p(x)=x²−5x+6 > 0?",
+);
+const quadraticPositiveIntervalParaphrase = makeEquationQuestion(
+  "quadratic-positive-interval-paraphrase", "När är funktionen p(x)=x^2-5x+6 positiv?",
+);
+const quadraticNegativeInterval = makeEquationQuestion(
+  "quadratic-negative-interval", "För vilka x gäller p(x)=x^2-5x+6 < 0?",
+);
+const quadraticPositiveInclusive = makeEquationQuestion(
+  "quadratic-positive-inclusive", "För vilka x gäller p(x)=x^2-5x+6 >= 0?",
+);
+const quadraticNegativeInclusive = makeEquationQuestion(
+  "quadratic-negative-inclusive", "För vilka x gäller p(x)=x^2-5x+6 <= 0?",
+);
 assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticZeros), true,
   "solving a quadratic and finding its zeros are duplicates when they target the same roots");
 assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticRoots), true,
   "root wording and plain y= function notation normalize to the same quadratic target");
+assert.equal(assessment.isDuplicateQuestion(quadraticPNotation, quadraticPNotationChoice), true,
+  "different question formats using p(x)= notation cannot repeat the same quadratic-root skill");
+assert.equal(assessment.isDuplicateQuestion(quadraticPNotation, makeEquationQuestion(
+  "quadratic-p-evaluation", "Beräkna p(4) för funktionen p(x)=x^2-6x+5.",
+)), false, "evaluating the same polynomial remains a distinct mathematical skill");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticPositiveIntervalParaphrase), true,
+  "the same positive-sign interval is deduplicated across an inequality and wording paraphrase");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticNegativeInterval), false,
+  "positive and negative intervals of the same quadratic remain distinct skills");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticPositiveInclusive), false,
+  "strictly positive and non-negative intervals differ at the roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticNegativeInterval, quadraticNegativeInclusive), false,
+  "strictly negative and non-positive intervals differ at the roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInclusive, quadraticNegativeInclusive), false,
+  "non-negative and non-positive intervals remain distinct skills");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval,
+  makeEquationQuestion("quadratic-positive-inclusive-words", "När är p(x)=x²−5x+6 icke-negativ?")), false,
+"strictly positive and non-negative wordings differ at the roots");
 assert.equal(assessment.isDuplicateQuestion(quadraticSolve, makeEquationQuestion(
   "quadratic-different", "Lös andragradsekvationen x² − 4x + 3 = 0.",
 )), false, "a different quadratic equation remains a distinct question");

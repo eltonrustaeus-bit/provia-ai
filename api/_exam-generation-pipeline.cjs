@@ -161,6 +161,7 @@ async function advance(job, { deadlineAt = null } = {}) {
     ...job.payload,
     qType: batchType || job.payload.qType,
     numQuestions: batchCount,
+    examQuestionCount: job.requested_count,
     comparisonQuestions,
     sourceTarget: sourceTarget ? { title: sourceTarget.title, excerpt: sourceTarget.excerpt } : null,
     trainingFocusRequiredIds: uncoveredBefore,

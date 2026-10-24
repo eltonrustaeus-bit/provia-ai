@@ -973,7 +973,7 @@ async function streamGeneration({ apiKey, payload, budgetMs, userId }) {
   return { ok: true, text, cutShort, usage, model: providerModel, latencyMs: Date.now() - t0 };
 }
 
-function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "", selectedFocusTerms = [], trainingFocus = [], trainingFocusRequiredIds = [], priorQuestions = [], comparisonQuestions = [], sourceTarget = null }) {
+function buildExamPrompts({ lang, level, course, qType, numQuestions, examQuestionCount = numQuestions, pastedText, isMath, graphMode = "line", focusInstruction = "", selectedFocusTerms = [], trainingFocus = [], trainingFocusRequiredIds = [], priorQuestions = [], comparisonQuestions = [], sourceTarget = null }) {
   const systemSvBase =
     "Du skapar ett realistiskt mockprov som en svensk gymnasielärare. " +
     "Du MÅSTE följa JSON-schemat exakt och bara returnera JSON. " +
@@ -1191,13 +1191,14 @@ function buildExamPrompts({ lang, level, course, qType, numQuestions, pastedText
   const hasMistakeTrainingFocus = Array.isArray(trainingFocus) && trainingFocus.length > 0;
   const mathMixInstruction = isMath && qType !== "graph" && !hasMistakeTrainingFocus
     ? (() => {
-      const problemSolvingCount = Math.max(1, Math.round(numQuestions * 0.75));
-      const applicationCount = Math.max(0, Math.round(numQuestions * 0.17));
-      const conceptCount = Math.max(0, numQuestions - problemSolvingCount - applicationCount);
+      const wholeExamCount = Math.max(numQuestions, Math.min(20, Number(examQuestionCount) || numQuestions));
+      const problemSolvingCount = Math.max(1, Math.round(wholeExamCount * 0.75));
+      const applicationCount = Math.max(0, Math.round(wholeExamCount * 0.17));
+      const conceptCount = Math.max(0, wholeExamCount - problemSolvingCount - applicationCount);
       const conceptLabelSv = conceptCount === 1 ? "begrepps-/definitionsfråga" : "begrepps-/definitionsfrågor";
       return lang === "sv"
-        ? `MATTEPROVETS BALANS: Fördela de ${numQuestions} frågorna ungefär så här: ${problemSolvingCount} räkne- eller problemlösningsuppgifter, ${applicationCount} tillämpnings-/resonemangsuppgifter och högst ${conceptCount} ${conceptLabelSv}. För ett 12-frågeprov innebär det 9 problemlösningar, 2 tillämpningar/resonemang och högst 1 begreppsfråga. Räkna inte om samma färdighet med nya ord eller värden som bredd. Välj andra tydligt materialstödda färdigheter när sådana finns. Hitta inte på data eller fakta för att fylla en kategori; låt hellre en kandidat underkännas än att fylla provet med generiska definitioner.`
-        : `MATH EXAM BALANCE: Distribute the ${numQuestions} questions approximately as follows: ${problemSolvingCount} calculation/problem-solving tasks, ${applicationCount} application/reasoning tasks, and no more than ${conceptCount} concept/definition questions. For a 12-question exam, this means 9 problem-solving tasks, 2 application/reasoning tasks, and at most 1 concept question. Do not count the same skill reworded or with new values as breadth. Choose other clearly source-supported skills where available. Do not invent data or facts to fill a category; let a candidate fail rather than filling the exam with generic definitions.`;
+        ? `MATTEPROVETS BALANS: Hela provet omfattar ${wholeExamCount} frågor. Fördela det ungefär så här: ${problemSolvingCount} räkne- eller problemlösningsuppgifter, ${applicationCount} tillämpnings-/resonemangsuppgifter och högst ${conceptCount} ${conceptLabelSv}. Den här begäran skapar en batch på ${numQuestions} frågor; balansmålen gäller hela provet, inte batchen. Redan godkända frågor i jämförelseunderlaget ska inte räknas som ny bredd: prioritera andra tydligt materialstödda färdigheter som ännu inte täcks. Räkna inte om samma färdighet med nya ord eller värden som bredd. Hitta inte på data eller fakta för att fylla en kategori; låt hellre en kandidat underkännas än att fylla provet med generiska definitioner.`
+        : `MATH EXAM BALANCE: The full exam contains ${wholeExamCount} questions. Distribute it approximately as follows: ${problemSolvingCount} calculation/problem-solving tasks, ${applicationCount} application/reasoning tasks, and no more than ${conceptCount} concept/definition questions. This request generates a batch of ${numQuestions}; the balance targets apply to the full exam, not this batch. Do not count already approved questions in the comparison context as new breadth; prioritize other clearly source-supported skills not yet covered. Do not count the same skill reworded or with new values as breadth. Do not invent data or facts to fill a category; let a candidate fail rather than filling the exam with generic definitions.`;
     })()
     : "";
 
@@ -1824,7 +1825,11 @@ module.exports = async function handler(req, res, internalContext = null) {
     const responseFormat = buildMockExamSchema(numQuestions);
 
     const { systemPrompt, userPrompt, questionCountOffset } = buildExamPrompts({
-      lang, level, course, qType, numQuestions, pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, trainingFocus, trainingFocusRequiredIds, priorQuestions, comparisonQuestions, sourceTarget
+      lang, level, course, qType, numQuestions,
+      examQuestionCount: internalBatch
+        ? Math.min(20, Math.max(numQuestions, toInt(parsed.examQuestionCount, numQuestions)))
+        : numQuestions,
+      pastedText, isMath, graphMode: graphMode || "line", focusInstruction, selectedFocusTerms, trainingFocus, trainingFocusRequiredIds, priorQuestions, comparisonQuestions, sourceTarget
     });
 
     let payload = {

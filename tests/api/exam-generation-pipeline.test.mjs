@@ -37,6 +37,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       };
       let sequence = 0;
       const batchSizes = [];
+      const examQuestionCounts = [];
       const comparisonIdsByBatch = [];
       const pipelineJobIds = [];
       const roleSnapshots = [];
@@ -53,6 +54,7 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId, roleSnapshot }) => {
         forwardedDeadlines.push(deadlineAt);
         batchSizes.push(payload.numQuestions);
+        examQuestionCounts.push(payload.examQuestionCount);
         comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
         pipelineJobIds.push(pipelineJobId);
         roleSnapshots.push(roleSnapshot);
@@ -81,6 +83,8 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       assert.equal(job.progress_current, requested);
       assert.equal(job.accepted_questions.length, requested);
       assert.ok(batchSizes.every((size) => size <= 3));
+      assert.ok(examQuestionCounts.length > 1 && examQuestionCounts.every((count) => count === requested),
+        "each generation batch knows the requested whole-exam count, not only its local batch size");
       assert.ok(batchSizes.length > 1, "under-delivered batches must resume until the requested count is reached");
       assert.ok(forwardedDeadlines.length > 1 && forwardedDeadlines.every((value) => value === sharedDeadlineAt),
         "all generated batches share the outer request deadline instead of each starting a fresh budget");

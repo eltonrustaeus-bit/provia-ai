@@ -1,5 +1,18 @@
 # 08 Current Status
 
+## Ny stagingkörning och förbättringar för provbredd — 2026-10-24
+
+- [x] Den inloggade staging-Previewn på commit `3006e1e5c2e4c12ccea02843c87f4cabaa5375f9` tog emot ett syntetiskt Matematik 2b-prov: nivå C, blandat, 12 begärda. Jobbet avslutades korrekt som **9/12**; UI:t visade endast de nio godkända och sade uttryckligen att tre saknades. Inga svar skickades in.
+- [x] Genomgång av de nio visade frågorna fann upprepade rot-/nollställeuppgifter för samma andragradsfunktion och snävare än avsett färdighetsbredd. Detta är direkt observerat i Previewn; vi har inte korrelerad batchtelemetri för att hävda att just dubblettgrinden orsakade de tre saknade platserna.
+- [x] Oberoende kodgranskning fann att `quadraticZeroSignature` inte extraherade `p(x)=…`, trots att den stödde `f(x)`/`y=`, och att dubblettklassning tappade riktningen i `> 0`/`< 0`. Slutgranskningen fann också att strikta `>`/`<`-intervall kunde slås ihop med inklusiva `>=`/`<=`; fix och regressioner lades till, och eftergranskningen fann inga blockerande eller allvarliga kvarstående fynd. Ändringarna lägger till notationstöd och täckning för parafraser, motsatta intervall, strikta/inklusiva gränser och annan färdighet på samma polynom.
+- [x] Oberoende kodgranskning fann att promptens 9/2/1-mattebalans räknades per delbatch, fast den är tänkt för hela provet. Lokal ändring för vidarebefordran av hela provets begärda antal gör instruktionen konsekvent: målen gäller hela provet och godkända frågor är täckningskontext, inte bara ordalydelse att undvika.
+- [x] Oberoende recovery-review fann att 9/12-statusen behölls i det aktiva provet men saknades efter rättning i sparad provpost/resultatvy. Lokala ändringar visar underskottet även efter rättning och sparar begärt antal plus `partial_delivery`; kontohistorik återställer dessa värden. Grade-requesten använder oförändrat signerade frågor och manifest.
+- [x] Riktad API-/pipeline-/recovery-svit passerade **35/35**. Browserkontroller för 2/3, 4/6 och 8/12 passerade; nytt browsertest för 1/3 kontrollerade resultatskärmen, lagrad metadata och att begärt antal/delprov återställs från kontohistorik efter omladdning. `node --check` för ändrade JavaScript-filer och `git diff --check` passerade.
+- [!] Ändringarna i `api/_assessment.js`, `api/_exam-generation-pipeline.cjs`, `api/generate-exam.js`, `app.html`, `js/exam-flow.js` och tre testfiler är lokalt granskade och testade, men ännu inte pushade eller deployade. Ingen Preview på den nya revisionen har skapats.
+- [!] Färsk read-only stagingbudget efter försöket: cap `$3.379071`, spenderat `$1.616745`, reserverat `$0.263628`, uppdaterad `2026-10-24 18:51 UTC`; resterande hård marginal `$1.498698`. Inget nytt AI-anrop efter denna avläsning. Det aktiva syntetiska 9-frågeprovet lämnades osvarat för att bevara testresultatet.
+
+**PILOT NOT READY.** Ny livekörning bekräftar korrekt delprovsmärkning men levererade inte 12/12 och visade redundans. Lokala förbättringar täcker konkret dubblettlucka, helprovsbalans i delbatchar och kvarstående delprovsstatus efter rättning. De måste först godkännas av slutgranskning, pushas till samma feature-branch, bli en korrekt staging-Preview och verifieras inom återstående budget. `main`, Production, produktionsdatabasen, hemligheter, konton och kvoter är orörda.
+
 ## Skolpilotens felträning, P.E.R. och testbudget — 2026-10-24
 
 - [x] Åtgärdade två verifierade relevansfel. En tydligt formulerad vanlig P.E.R.-
