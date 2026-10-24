@@ -1045,6 +1045,9 @@ test("general study help with an unbound stale exam label follows inactive serve
     for (const userQuestion of [
       "Hjälp mig förstå varför svaret 42 är rätt vid 6×7.",
       "Kan du förklara varför 42 är rätt vid 6×7?",
+      "Förklara varför 42 stämmer.",
+      "Explain why 42 checks out.",
+      "Explain why the answer 42 makes sense.",
       "I wrote 42, was that right?",
       "Förklara hormonet som sänker blodsockret.",
     ]) {
@@ -1081,6 +1084,34 @@ test("general study help with an unbound stale exam label follows inactive serve
     issuanceState = previous.issuanceState;
     latestSubmissionId = previous.latestSubmissionId;
     providerAnswer = previous.providerAnswer;
+  }
+});
+
+test("ordinary P.E.R chat only receives recent mistakes for the active course", async () => {
+  const previous = { activeCount, issuanceState, latestSubmissionId };
+  try {
+    activeCount = 0;
+    issuanceState = "none";
+    latestSubmissionId = null;
+    calls.length = 0;
+    const response = await invoke({
+      userQuestion: "Hur kan jag öva bättre på ekvationer?",
+      pageContext: { page: "app", course: "Matematik 2b" },
+      recentMistakes: [
+        { question: "Lös 2x = 8", category: "Matematik 2b", concept: "Ekvationslösning" },
+        { question: "Förklara cellandning", category: "Biologi 1", concept: "Cellandning", studentAnswer: "OTHER_COURSE_ANSWER_MARKER" },
+      ],
+    }, "POST", "application/json");
+
+    assert.equal(response.statusCode, 200);
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "ordinary study help still reaches the model");
+    assert.match(provider.body, /Ekvationslösning/);
+    assert.doesNotMatch(provider.body, /Cellandning|OTHER_COURSE_ANSWER_MARKER/);
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
   }
 });
 

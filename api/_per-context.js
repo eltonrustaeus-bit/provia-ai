@@ -209,7 +209,11 @@ export function buildPERContextPack({
     }
   }
 
-  const mistakes = cleanMistakes(recentMistakes);
+  const normalizedCourse = course.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("sv-SE");
+  const mistakes = normalizedCourse
+    ? cleanMistakes(recentMistakes).filter(item => item.category
+      .normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("sv-SE") === normalizedCourse)
+    : [];
   if (mistakes.length) {
     summaryLines.push(`Senaste misstag: ${mistakes.slice(0, 3).map(m => m.category || m.question).join(", ")}`);
   }

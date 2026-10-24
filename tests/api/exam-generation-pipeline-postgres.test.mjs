@@ -15,13 +15,14 @@ const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supab
 const activePipelineQuotaReaperMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper.sql", import.meta.url), "utf8");
 const activePipelineQuotaReaperRollback = fs.readFileSync(new URL("../../supabase/migrations/20261024151433_protect_active_pipeline_quota_reaper_ROLLBACK.sql", import.meta.url), "utf8");
 const recoveryWindowRetentionMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024165536_release_abandoned_exam_pipeline_after_recovery_window.sql", import.meta.url), "utf8");
+const pipelineIntegrityBoundsMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024212500_tighten_pipeline_integrity_bounds.sql", import.meta.url), "utf8");
 const retentionScheduleMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention.sql", import.meta.url), "utf8");
 const retentionScheduleRollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140300_schedule_mock_exam_pipeline_retention_ROLLBACK.sql", import.meta.url), "utf8");
 const rollback = fs.readFileSync(new URL("../../supabase/migrations/20261022140000_resumable_mock_exam_pipeline_ROLLBACK.sql", import.meta.url), "utf8");
 const idempotencyMigration = fs.readFileSync(new URL("../../supabase/migrations/20261020190719_mock_exam_generation_idempotency.sql", import.meta.url), "utf8");
 const quotaMigration = fs.readFileSync(new URL("../../supabase/migrations/20261012103944_refund_failed_mock_exam_quota.sql", import.meta.url), "utf8");
 
-async function makeDb() {
+async function makeDb({ includeIntegrityMigration = true } = {}) {
   const db = new PGlite();
   await db.exec(`
     create role anon;
@@ -52,6 +53,7 @@ async function makeDb() {
   await db.exec(queuedAssemblyFinalizationMigration);
   await db.exec(activePipelineQuotaReaperMigration);
   await db.exec(recoveryWindowRetentionMigration);
+  if (includeIntegrityMigration) await db.exec(pipelineIntegrityBoundsMigration);
   return db;
 }
 
@@ -63,6 +65,32 @@ const attempt = "33333333-3333-4333-8333-333333333333";
 const quota = "44444444-4444-4444-8444-444444444444";
 const jobId = "55555555-5555-4555-8555-555555555555";
 const token = "66666666-6666-4666-8666-666666666666";
+
+test("pipeline integrity migration refuses pre-existing out-of-range rows without partial DDL", async () => {
+  const db = await makeDb({ includeIntegrityMigration: false });
+  try {
+    const legacyId = "4d4d4d4d-4d4d-4d4d-8d4d-4d4d4d4d4d4d";
+    const legacyKey = "4e4e4e4e-4e4e-4e4e-8e4e-4e4e4e4e4e4e";
+    const legacyAttempt = "4f4f4f4f-4f4f-4f4f-8f4f-4f4f4f4f4f4f";
+    const legacyQuota = "50505050-5050-4050-8050-505050505050";
+    const invalidQuestions = Array.from({ length: 4 }, (_, index) => ({ id: `legacy-q${index + 1}` }));
+    await addParent(db, { idempotencyKey: legacyKey, attemptId: legacyAttempt, quotaRequestId: legacyQuota });
+    await addJob(db, {
+      id: legacyId, idempotencyKey: legacyKey, attemptId: legacyAttempt, quotaRequestId: legacyQuota,
+      requested: 3, progress: 4, accepted: invalidQuestions,
+    });
+
+    await assert.rejects(() => db.exec(pipelineIntegrityBoundsMigration), /mock_exam_pipeline_(progress|candidates)_within_request/);
+    const constraints = (await db.query(`select count(*)::int as count
+      from information_schema.table_constraints
+      where table_schema='public' and table_name='mock_exam_generation_pipeline_jobs'
+        and constraint_name in ('mock_exam_pipeline_progress_within_request','mock_exam_pipeline_candidates_within_request')`)).rows[0].count;
+    assert.equal(constraints, 0, "failed migration leaves neither new constraint partially installed");
+    assert.equal((await db.query("select progress_current from public.mock_exam_generation_pipeline_jobs where id=$1", [legacyId])).rows[0].progress_current, 4);
+  } finally {
+    await db.close();
+  }
+});
 
 async function addParent(db, { userId = u1, idempotencyKey = key, requestHash = hash, attemptId = attempt, quotaRequestId = quota } = {}) {
   await db.query(`insert into public.profiles(id,role,mock_quota_count,mock_quota_period)
@@ -916,6 +944,52 @@ test("private resumable pipeline migration enforces leases, stage transitions, q
       assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded",
         "the fenced terminal path settles and refunds the exact reservation");
       assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1",[owner])).rows[0].mock_quota_count,0);
+    });
+
+    await t.test("quota reaper preserves a live parent reservation before the pipeline row exists", async () => {
+      const owner="41414141-4141-4141-8141-414141414141", k="42424242-4242-4242-8242-424242424242", a="43434343-4343-4343-8343-434343434343", q="44444444-4444-4444-8444-444444444445";
+      await db.query("insert into auth.users(id) values($1)",[owner]);
+      await addParent(db,{userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      await db.query("update public.mock_exam_generation_requests set lease_expires_at=clock_timestamp()+interval '5 minutes' where user_id=$1 and idempotency_key=$2",[owner,k]);
+
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[owner])).rows[0].n,0,
+        "an active parent request protects quota during the reservation-to-job insertion gap");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"reserved");
+
+      await db.query("update public.mock_exam_generation_requests set lease_expires_at=clock_timestamp()-interval '1 second' where user_id=$1 and idempotency_key=$2",[owner,k]);
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[owner])).rows[0].n,1,
+        "an expired parent with no pipeline job remains reclaimable");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+      assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1",[owner])).rows[0].mock_quota_count,0);
+    });
+
+    await t.test("a normal 90-second parent lease expires before the two-minute reservation reaper", async () => {
+      const owner="49494949-4949-4949-8949-494949494949", k="4a4a4a4a-4a4a-4a4a-8a4a-4a4a4a4a4a4a", a="4b4b4b4b-4b4b-4b4b-8b4b-4b4b4b4b4b4b", q="4c4c4c4c-4c4c-4c4c-8c4c-4c4c4c4c4c4c";
+      await db.query("insert into auth.users(id) values($1)",[owner]);
+      await addParent(db,{userId:owner,idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      await db.query(`update public.mock_exam_generation_requests
+        set created_at=clock_timestamp()-interval '121 seconds', lease_expires_at=clock_timestamp()-interval '31 seconds'
+        where user_id=$1 and idempotency_key=$2`,[owner,k]);
+
+      assert.equal((await db.query("select public.reap_stale_mock_exam_quota_reservations($1) as n",[owner])).rows[0].n,1,
+        "a request whose 90-second lease expired before the two-minute threshold can be refunded");
+      assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1",[q])).rows[0].status,"refunded");
+    });
+
+    await t.test("pipeline storage rejects checkpoints larger than the requested question count", async () => {
+      const id="45454545-4545-4545-8545-454545454545", k="46464646-4646-4646-8646-464646464646", a="47474747-4747-4747-8747-474747474747", q="48484848-4848-4848-8848-484848484848";
+      const approved=(n)=>Array.from({length:n},(_,i)=>({id:`bounded-q${i+1}`,type:"mc",validation_status:"verified"}));
+      await addParent(db,{idempotencyKey:k,attemptId:a,quotaRequestId:q});
+      await addJob(db,{id,idempotencyKey:k,attemptId:a,quotaRequestId:q,requested:3,state:"running",leaseToken:token});
+
+      await assert.rejects(() => db.query(`update public.mock_exam_generation_pipeline_jobs
+        set progress_current=4,accepted_questions=$2::jsonb where id=$1`,[id,JSON.stringify(approved(4))]),
+      /mock_exam_pipeline_(progress|candidates)_within_request/);
+      const rejected=(await db.query("select progress_current,jsonb_array_length(accepted_questions)::int as accepted from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0];
+      assert.deepEqual(rejected,{progress_current:0,accepted:0},"a rejected over-count cannot persist a partial checkpoint");
+      await assert.rejects(() => db.query(`select public.checkpoint_mock_exam_generation_pipeline_job($1,$2,'generate','repair',$3::jsonb,4) as r`,
+        [id,token,JSON.stringify(approved(4))]),/mock_exam_pipeline_(progress|candidates)_within_request/);
+      assert.deepEqual((await db.query("select progress_current,jsonb_array_length(accepted_questions)::int as accepted from public.mock_exam_generation_pipeline_jobs where id=$1",[id])).rows[0],rejected);
     });
 
     await t.test("expired queued assembly still fails closed below the partial floor or mixed-format requirement", async () => {

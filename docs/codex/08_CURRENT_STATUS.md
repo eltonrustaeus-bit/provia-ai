@@ -1,5 +1,33 @@
 # 08 Current Status
 
+## En inloggad Preview, färdig offline-verifiering — 2026-10-24 21:38 UTC
+
+- [x] Återanvänder samma befintliga Preview-domän och stagingkonto. Inga nya
+  flikar, konton, inloggningar eller modellförfrågningar skapades här.
+- [x] Uppdaterade P.E.R:s skyddade frågedetektering för vanliga formuleringar
+  som ber om bekräftelse på ett svar. Vanliga studiefrågor fungerar fortsatt;
+  verifierade provgränser ändras inte.
+- [x] Felbankens senaste misstag begränsas på serversidan till den aktiva kursen;
+  om kurs saknas skickas ingen kursbunden felhistorik till modellen.
+- [x] Lade till databaskontroller för att `progress_current` och antalet
+  accepterade frågor aldrig ska överstiga elevens begärda antal. Reapern skyddar
+  också en levande parent-lease innan pipelinejobbraden skapats.
+- [x] Färsk, skrivskyddad staging-preflight på `yhcinqejsocpmmetazpz` fann
+  0 jobb med progress över begärt antal och 0 med för många accepterade frågor.
+- [x] Riktad offline-svit för pipeline, HTTP, PGlite, källtäckning, felträning,
+  P.E.R och klientkontext passerade **147/147**. Separat PGlite-svit passerade
+  **28/28**; syntax- och diffkontroller passerade.
+- [!] Kod och migration är lokala och ännu inte committade/pushade. Ingen
+  migration applicerades i staging; ingen AI-förfrågan gjordes. Inget pågående
+  prov finns i den återanvända sessionen enligt den tidigare UI-kontrollen.
+- [x] Oberoende granskning av slutlig diff fann inga blockerare. Granskaren
+  bekräftade att legacy-rad-testet stoppar vid brott mot båda gränserna utan
+  partiella constraints. PGlite bevisar inte hosted PostgreSQL-racebeteende.
+
+**PILOT NOT READY.** Nästa steg är granskarsvar, en feature-Preview på samma
+inloggade alias och färsk kontroll av AI-budgeten. Högst ett syntetiskt
+stagingprov; slutför det innan sessionen lämnas. Ingen production/main-ändring.
+
 ## Uppföljning utan extra liveförbrukning — 2026-10-24 21:04 UTC
 
 - [x] Behöll en och samma befintliga Preview-flik. Inga nya flikar, provstarter,
