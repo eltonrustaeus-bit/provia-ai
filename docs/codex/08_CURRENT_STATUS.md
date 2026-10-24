@@ -2562,3 +2562,21 @@ granskade ändringar till den godkända feature-branchen, verifiera exakt READY
 Preview/stagingkoppling och därefter invänta inloggning på Previewn med ett
 separat stagingkonto innan eventuellt syntetiskt AI-test inom färskt verifierad
 budget.
+
+## Feature-Preview publicerad — 2026-10-24
+
+- [x] Ändringarna ovan är committade som `eba80345c64c18fd030e5d5988b72c58b42ad5b4`
+  och pushade till `codex/exgen-generation-quality-2026-10-20`.
+- [x] Vercel deployment `dpl_Cjq55BgXv1pxpd1vdYVv3xmGH7td` är `READY` på exakt
+  denna commit. Preview URL:
+  `https://provia-5tyiv6irc-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [x] Vercel API-env-listning svarade 403; read-only CLI-fallback bekräftade
+  att Preview-variabler är branch-scope:ade till den avsedda branchen. Endast
+  namn och krypterad status visades, aldrig värden.
+- [!] Previewn är öppnad i synlig webbläsarflik men visar inloggningsgrinden.
+  Ingen autentiserad session eller live-AI-körning är verifierad i denna nya
+  Preview. Inget Supabase-/produktions-/kontotillstånd har ändrats.
+
+**PILOT NOT READY.** Invanta att användaren loggar in i den öppna Previewn med
+ett separat stagingkonto. Kontrollera därefter budgeten färskt och säkerställ
+att kontot inte äger det bevarade 9/12-provet innan något syntetiskt AI-test.
