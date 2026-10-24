@@ -43,14 +43,22 @@
   `20261024151433_protect_active_pipeline_quota_reaper` was applied and its
   function was read back: active-job protection is present; `service_role` can
   execute and `anon`/`authenticated` cannot.
-- [!] The goal branch has no Preview yet. The Vercel branch-scoped staging
-  variables are on `codex/exgen-generation-quality-2026-10-20`; the current goal
-  HEAD descends directly from that branch's remote HEAD `139cffb`. A
-  fast-forward to the staging-configured branch is available after committing
-  this work; no secrets need to move. The existing READY Preview is still the
-  older `139cffb` build. No live AI request, push, merge to `main` or Production
-  change was performed.
-- [!] Code changes remain local and uncommitted.
+- [!] The goal branch has no Preview yet. Vercel's branch-scoped staging
+  variables are on `codex/exgen-generation-quality-2026-10-20`. Both that
+  branch and the current goal branch descend from `c50369e`, but neither
+  contains the other's follow-up commits. The staging branch has 13 commits
+  not in `main`; this goal branch has 4 commits not on the staging branch.
+  A trial merge conflicted across the exam pipeline, P.E.R., UI and tests; a
+  focused cherry-pick also conflicted and showed that the staging branch lacks
+  the current mistake-training module. Both trials were aborted in temporary
+  state; no user changes were discarded. Do not deploy this branch against
+  generic Preview variables or move staging secrets without explicit approval.
+  Existing READY Preview remains the older `139cffb` build. No live AI request,
+  push, merge to `main` or Production change was performed.
+- [x] Focused code and tests are committed locally as `5c98b9f`; it is not
+  pushed. The current branch is clean. Preview integration remains blocked on
+  reconciling the divergent branch histories while preserving staging-only
+  configuration.
 
 ## Same-tab recovery after interrupted generation — 2026-10-24
 
