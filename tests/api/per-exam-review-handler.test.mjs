@@ -100,6 +100,7 @@ let providerUnavailable = false;
 let reviewResultUnavailable = false;
 let quotaMode = "ok";
 let verifiedCoachRowsByUser = null;
+let perSessionMessages = [{ role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" }];
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   calls.push({ url, body: init.body || "" });
@@ -113,9 +114,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (latestStateUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
     return Response.json(latestSubmissionId ? [{ submission_id: latestSubmissionId }] : []);
   }
-  if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: [
-    { role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" },
-  ]});
+  if (url.includes("/rest/v1/per_sessions")) return Response.json({ messages: perSessionMessages });
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) {
     if (latestIssuanceAtLease) {
       latestSubmissionId = latestIssuanceAtLease.submissionId;
@@ -2637,11 +2636,21 @@ test("a bare stale prov page strips stale learning context before ordinary study
 
 test("homepage study help keeps its page identity but drops stale course and material context", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
+  const priorHistory = perSessionMessages;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 0;
   issuanceState = "none";
   latestSubmissionId = null;
   calls.length = 0;
+  perSessionMessages = [
+    { role: "assistant", content: "SAFE_HOMEPAGE_HISTORY_MARKER", page: "startsida" },
+    { role: "user", content: "PRIVATE_EXAM_HISTORY_MARKER", page: "prov" },
+    { role: "assistant", content: "PRIVATE_RESULT_HISTORY_MARKER", page: "resultat" },
+    { role: "user", content: "PRIVATE_EXAM_ALIAS_HISTORY_MARKER", page: "exam" },
+    { role: "assistant", content: "PRIVATE_EXAM_RESULT_ALIAS_HISTORY_MARKER", page: "exam-result" },
+    { role: "user", content: "PRIVATE_OTHER_PAGE_HISTORY_MARKER", page: "app" },
+    { role: "assistant", content: "PRIVATE_LEGACY_HISTORY_MARKER" },
+  ];
   try {
     for (const page of ["startsida", "start"]) {
       calls.length = 0;
@@ -2658,6 +2667,9 @@ test("homepage study help keeps its page identity but drops stale course and mat
         topic: "PRIVATE_STALE_TOPIC_MARKER",
         recentMistakes: [{ question: "PRIVATE_STALE_MISTAKE_MARKER" }],
         weakAreas: ["PRIVATE_STALE_BODY_WEAK_AREA_MARKER"],
+        history: [
+          { role: "assistant", content: "FORGED_HOME_HISTORY_MARKER", page: "startsida", examBound: false },
+        ],
       }, "POST", "application/json");
       assert.equal(response.statusCode, 200);
       const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
@@ -2665,8 +2677,18 @@ test("homepage study help keeps its page identity but drops stale course and mat
       assert.match(provider.body, /Sida: startsida/);
       assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:COURSE|LEVEL|MATERIAL|WEAK_AREA|TARGET|TOPIC|MISTAKE|BODY_WEAK_AREA)_MARKER/,
         `${page} questions cannot inherit client-supplied learning context without exam markers`);
+      assert.match(provider.body, /SAFE_HOMEPAGE_HISTORY_MARKER/,
+        "safe same-page conversation context preserves ordinary follow-ups");
+      assert.doesNotMatch(provider.body, /PRIVATE_(?:EXAM_HISTORY|RESULT_HISTORY|EXAM_ALIAS_HISTORY|EXAM_RESULT_ALIAS_HISTORY|OTHER_PAGE_HISTORY|LEGACY_HISTORY)_MARKER|FORGED_HOME_HISTORY_MARKER/,
+        "homepage help excludes exam-bound, other-page, legacy and client-forged turns");
+      const modelInput = JSON.parse(provider.body).input;
+      assert.ok(modelInput.every(message => !Object.hasOwn(message, "page") && !Object.hasOwn(message, "examBound")),
+        "internal history provenance is not sent as unsupported provider message fields");
+      assert.equal(calls.some(({ url }) => /\/rest\/v1\/(?:per_long_memory|mock_results|felbank)/.test(url)), false,
+        "homepage help does not load persisted learner profiles or verified exam evidence");
     }
   } finally {
+    perSessionMessages = priorHistory;
     if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = prior;
   }

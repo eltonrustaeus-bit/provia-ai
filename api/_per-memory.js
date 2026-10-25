@@ -243,7 +243,12 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const examData    = await enrichMemoryFromExamData(supabase, userId);
     const hasExamData = examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0
       || examData.felBankWeakConcepts.length > 0;
-    const hasMessages = Array.isArray(recentMessages) && recentMessages.length > 0;
+    const memoryMessages = (Array.isArray(recentMessages) ? recentMessages : []).filter(message => {
+      const page = typeof message?.page === "string" ? message.page : "";
+      return !message?.examBound && !["prov", "resultat", "exam", "exam-result"].includes(page)
+        && ["startsida", "app", "förbättring", "prisplan", "konto"].includes(page);
+    });
+    const hasMessages = memoryMessages.length > 0;
     if (!hasMessages && !hasExamData) return;
 
     const { data } = await supabase
@@ -256,7 +261,7 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const daysSince  = lastUpdate ? (Date.now() - lastUpdate.getTime()) / 86_400_000 : 999;
     if (daysSince < REFRESH_DAYS) return;
 
-    const histText   = (Array.isArray(recentMessages) ? recentMessages : [])
+    const histText   = memoryMessages
       .slice(-30)
       .map(m => `${m.role === "user" ? "Elev" : "P.E.R"}: ${cleanMemoryText(m.content, 160)}`)
       .join("\n")

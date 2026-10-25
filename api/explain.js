@@ -74,6 +74,10 @@ function sanitize(str, maxLen) {
   return typeof str === "string" ? str.slice(0, maxLen) : "";
 }
 
+function isExamBoundPage(page) {
+  return ["prov", "resultat", "exam", "exam-result"].includes(page);
+}
+
 async function consumePerChatQuota(user, roleHint) {
   try {
     let role = roleHint;
@@ -1297,7 +1301,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
   const studyCoachRequest = body.topic === "studiecoach";
   const persistentTeachTurn = !studyCoachRequest && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && !Array.isArray(body.scores)
-    && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
+    && (body.topic || body.userQuestion);
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
   if (await gateActiveExam(req, res, body, user, perAnswerLease)) return;
   const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
@@ -1371,7 +1375,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
   }
 
   // ── TEACH MODE: P.E.R multi-turn chat ──
-  if (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0)) {
+  if (body.topic || body.userQuestion) {
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("role, per_quota_count, per_quota_period")
@@ -1401,11 +1405,22 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        defaultHelpLevel() för varför det inte alltid är 0. */
     const badOmNivå = (typeof body.helpLevel === 'number' && Number.isFinite(body.helpLevel))
       ? Math.min(3, Math.max(0, Math.floor(body.helpLevel))) : null;
-    const rawHist = studyCoachRequest ? [] : Array.isArray(body.history) ? body.history : [];
+    const requestPage = studyCoachRequest ? "förbättring" : describePage(body.pageContext?.page) || "app";
+    const isHomepageRequest = requestPage === "startsida";
+    const rawHist = studyCoachRequest ? [] : await loadPerHistory(user.id);
     const history = rawHist
       .filter(m => m && (m.role === "user" || m.role === "assistant"))
-      .map(m => ({ role: m.role, content: sanitize(String(m.content), 500) }))
+      .map(m => {
+        const page = describePage(m.page) || "legacy";
+        return {
+          role: m.role,
+          content: sanitize(String(m.content), 500),
+          page,
+          examBound: isExamBoundPage(page),
+        };
+      })
       .slice(-8);
+    const historyForPrompt = history.filter(m => m.page === requestPage && !m.examBound);
 
     // Recent mistakes from frontend localStorage (optional — best-effort)
     const rawMistakes = studyCoachRequest ? [] : Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
@@ -1465,9 +1480,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        profileEnabled avgörs server-side. En klient ska inte kunna be om
        personalisering som inte är utrullad. */
     const [{ summary: longMemory, structured: structuredMemory }, liveExamData, profileEnabled] = await Promise.all([
-      studyCoachRequest ? Promise.resolve({ summary: "", structured: {} }) : loadLongMemory(supabase, user.id, perMemoryEpoch),
-      enrichMemoryFromExamData(supabase, user.id, { throwOnError: studyCoachRequest }),
-      studyCoachRequest ? Promise.resolve(false) : flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
+      studyCoachRequest || isHomepageRequest ? Promise.resolve({ summary: "", structured: {} }) : loadLongMemory(supabase, user.id, perMemoryEpoch),
+      isHomepageRequest
+        ? Promise.resolve({ mockWeakConcepts: [], mockRecentScores: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] })
+        : enrichMemoryFromExamData(supabase, user.id, { throwOnError: studyCoachRequest }),
+      studyCoachRequest || isHomepageRequest ? Promise.resolve(false) : flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
 
     // Live DB-fakta vinner alltid över den dagsgamla cachen för skolflödets
@@ -1492,6 +1509,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const coachSnapshot = studyCoachRequest ? buildVerifiedCoachSnapshot(liveExamData, user.id) : null;
     if (studyCoachRequest) {
       learnerContext = coachSnapshot.evidence;
+    } else if (isHomepageRequest) {
+      learnerContext = "";
     } else try {
       const [profile, upRes] = await Promise.all([
         profileEnabled ? loadProfile(supabase, user.id) : Promise.resolve(null),
@@ -1560,7 +1579,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        så signalen bygger på det senaste samtalet och inte på hela elevens
        livstid. Det är en medveten begränsning: en stil som ändrats ska hinna
        märkas, och en enstaka udda session ska inte fastna för alltid. */
-    const style = deriveStyleSignals(history);
+    const style = deriveStyleSignals(historyForPrompt);
 
     const helpCap = helpCapFor(pageContext, { pilotMode: isPilotMode() });
     const requestedLevel = badOmNivå !== null ? badOmNivå : defaultHelpLevel(pageContext);
@@ -1607,7 +1626,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
     const msgs = [
       { role: "system", content: systemContent },
-      ...history,
+      ...historyForPrompt.map(({ role, content }) => ({ role, content })),
       { role: "user", content: userMsg },
     ];
 
@@ -1740,8 +1759,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
       const newHistory = [
         ...history,
-        { role: 'user', content: userMsg },
-        { role: 'assistant', content: fullText },
+        { role: 'user', content: userMsg, page: requestPage, examBound: isExamBoundPage(requestPage) },
+        { role: 'assistant', content: fullText, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
       refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
@@ -1810,8 +1829,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       }
       const newHistory = [
         ...history,
-        { role: "user", content: userMsg },
-        { role: "assistant", content: answer },
+        { role: "user", content: userMsg, page: requestPage, examBound: isExamBoundPage(requestPage) },
+        { role: "assistant", content: answer, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
       refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});

@@ -1,5 +1,45 @@
 # 08 Current Status
 
+# P.E.R three-page checkpoint — 2026-10-25
+
+- [x] Checkpoint `21bf94d7e4af7c29ee655db7336b0588e3034c63` is pushed to
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_7WkebewvQt7F26d3JkHK7R1x2mvA` is `READY` from that exact SHA:
+  `https://provia-foqlgy9zr-eltons-projects-4adfb1a3.vercel.app/`.
+- [x] Homepage routing now uses the shared page canonicalizer, so both
+  `startsida` and legacy `start` retain the homepage identity while dropping
+  stale client course, material, targets, weak areas and mistake context.
+  PER's product/support prompt accepts only whitelisted page identities.
+- [x] Synthetic Playwright smoke followed one session through homepage help,
+  active-exam hint for the current question, and verified-results improvement
+  coach. It passed **1/1**; focused API regressions passed **4/4**;
+  `per-page-targets` passed **50/50**; `per-exam-context` passed **88/88**;
+  prompt/public-guide tests passed **5/5**. Syntax checks and `git diff --check`
+  passed.
+- [x] `app.html` and `förbättring.html` returned HTTP 200 through authenticated
+  `vc curl`. Unauthenticated requests receive the Vercel protection redirect.
+- [!] All application-flow responses in the browser smoke are synthetic mocks.
+  No live OpenAI request was made and no fresh staging budget was checked, so
+  live model quality and a signed active-exam hint remain unverified. The
+  Preview is available, but this does not establish pilot readiness.
+- [x] Independent review confirmed the legacy `start` alias fix and that the
+  active-exam server-state and signed-question-proof gates are unchanged.
+- [x] Follow-up history isolation is implemented locally: only authenticated
+  server-loaded turns tagged for the current non-exam page enter P.E.R prompts.
+  `prov`, `resultat`, `exam` and `exam-result` turns are treated as exam-bound;
+  untagged legacy/client-forged turns and other-page history are excluded.
+  Homepage help also skips learner profile, long-memory and verified exam
+  evidence, while the improvement coach still uses its own verified results.
+  Long-memory refresh accepts only tagged non-exam page history.
+- [x] Full P.E.R handler regression passed **70/70** before the final small
+  route-classification cleanup. After that cleanup, the focused homepage and
+  ordinary-chat handler cases passed **3/3**, and `per-memory-epoch` passed,
+  including provenance assertions. Syntax checks and `git diff --check` passed.
+- [!] These follow-up changes are not yet in a Preview. The earlier Preview
+  listed above contains only checkpoint `21bf94d`; no live model request was
+  made and live response quality remains unverified. `main`, Production,
+  Supabase, accounts, roles and quotas were not changed.
+
 # Senaste P.E.R-verifiering — 2026-10-25
 
 - [x] På `91e914bb360610fc4fc16f3cea2620e884db1812` passerade den fullständiga
