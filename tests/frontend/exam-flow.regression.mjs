@@ -1241,7 +1241,7 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       history: JSON.parse(localStorage.getItem("proviaai_history") || "[]").at(-1),
       saved: JSON.parse(localStorage.getItem("proviaai_last_result") || "null"),
     }));
-    const partialQualityNotes = await page.locator("#xf .xf-question-quality-note").allInnerTexts();
+    const partialQualityNotes = await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").allInnerTexts();
     ok("rättad delprovsskärm visar fortfarande 8 av 12",
       partialQualityNotes.some(note => note.includes("12 frågor") && note.includes("8 frågor klarade")),
       partialQualityNotes.join(" | "));
