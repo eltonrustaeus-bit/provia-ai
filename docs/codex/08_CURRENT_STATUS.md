@@ -3146,6 +3146,43 @@ att kontot inte äger det bevarade 9/12-provet innan något syntetiskt AI-test.
 staginginloggning. Liveverifiering kräver ny kontroll av stagingkoppling och
 kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.
 
+## P.E.R coach och frågespecifika ledtrådar — 2026-10-25
+
+- [x] Startsidesfrågor går fortsatt till vanlig P.E.R-hjälp utan att startsidans
+  namn behandlas som ett ämne eller kräver ett aktivt prov.
+- [x] Förbättringssidans särskilda studiecoach bygger på verifierade resultat
+  för det autentiserade kontot. Klientens historik, lokala misstag, poäng och
+  svaghetslistor ignoreras i denna coachväg. Kursnamn måste lösas mot den
+  statiska utbildningskatalogen; fria fel- och begreppsetiketter skickas inte
+  till modellen. Ett medskickat helpLevel skapar inte längre en infererad
+  profilskrivning i coachläget.
+- [x] Saknas verifierade provresultat instrueras P.E.R att säga det och ge ett
+  neutralt nästa steg, inte hitta på svagheter. Vanlig konversationshjälp är
+  oförändrad.
+- [x] Aktiva prov får proof-verifierade, stegvisa ledtrådar för fotosyntes och
+  mitos/meios. Ledtrådarna hänvisar till materialet, ger inte facit och kräver
+  inget modell- eller kvotanrop. Mitos/meios-steget pekar inte ut vilket
+  förlopp som motsvarar vilken funktion.
+- [x] Riktade API-tester: startsida, coach med resultat från konto A jämfört
+  med overifierade/konto B/klientvärden, avsaknad av coachunderlag,
+  prompt-injektion i fria taggar och kursnamn, helpLevel-sid-effekt, samt de
+  tre nivåerna för fotosyntes och mitos/meios: **4/4**. Utbildningskatalog,
+  P.E.R-scope/identitet, startsidemål **44/44**, provkontext **88/88**,
+  manifest **29/29**, minnesproveniens, JS-syntax och `git diff --check`
+  passerade.
+- [!] Hela `tests/api/per-exam-review-handler.test.mjs` avslutades inte:
+  Node rapporterade en väntande Promise efter 24 fall (23 passerade, inget
+  assertionsfel). Det långsamma vanliga studiehjälpsfallet passerar isolerat.
+  Detta är kvar som testlöpar-/svitbegränsning, inte bevis på att hela filen är
+  grön.
+- [!] Offlineverifiering endast. Ingen ny modellförfrågan, inget nytt staging-
+  prov, ingen ändring av öppet prov, Supabase, konto, kvot, `main` eller
+  Production gjordes.
+
+**PILOT NOT READY.** Nästa steg: slutför oberoende granskning, skapa feature-
+checkpoint och kontrollera att dess Preview blir READY. Liveverifiera endast
+om rätt stagingkonto och kostnadsgräns kan bekräftas utan att röra öppna prov.
+
 ## P.E.R busy-lease felmeddelande — 2026-10-25
 
 - [x] En syntetisk allmän fråga på startsidan nådde den aktuella, inloggade

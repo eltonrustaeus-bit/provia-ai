@@ -2,10 +2,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
-import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
+import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildPERCoachSystemPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import aiUsage from "./_ai-usage.cjs";
 import aiBudget from "./_ai-usage.cjs";
 import publicGuide from "./_per-public-guide.cjs";
+import { resolveCourse } from "./_education.js";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
@@ -528,6 +529,21 @@ function verifiedActiveQuestion(body, user, submissionId) {
   };
 }
 
+function buildVerifiedCoachEvidence(examData = {}) {
+  const lines = [];
+  const scores = Array.isArray(examData.mockRecentScores)
+    ? examData.mockRecentScores.filter(value => Number.isInteger(value) && value >= 0 && value <= 100)
+    : [];
+  // Course names are free text in legacy rows. Resolve to the official catalog
+  // before placing one in a model prompt; generated tags are omitted entirely.
+  const courses = [...new Set((Array.isArray(examData.felBankCourses) ? examData.felBankCourses : [])
+    .map(course => resolveCourse(course)?.name)
+    .filter(Boolean))].slice(0, 5);
+  if (scores.length) lines.push(`Senaste verifierade provresultat i tidsordning: ${scores.join("%, ")}%`);
+  if (courses.length) lines.push(`Kurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: ${JSON.stringify(courses)}`);
+  return lines.length ? lines.join("\n") : "Inga verifierade provresultat finns ännu.";
+}
+
 function sendActiveExamGuidance(req, res, body, issuanceState = "active", trustedQuestion = undefined) {
   const safeHelpStates = ["unverified", "abandoned", "expired", "missing", "completed"];
   if (issuanceState !== "active" && !safeHelpStates.includes(issuanceState)) {
@@ -685,9 +701,52 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
     : 0;
   res.setHeader("Cache-Control", "no-store");
   const ladder = hasDraft ? draftChecks : hints;
-  const sequence = type === "graph"
+  const normalizedQuestion = questionText.toLocaleLowerCase(en ? "en-US" : "sv-SE");
+  let contextualSequence = null;
+  if (/fotosyntes|photosynthesis/.test(normalizedQuestion)) {
+    contextualSequence = hasDraft
+      ? (en ? [
+        "If you have a draft, sort the substances into what the process takes in and what it forms or releases. Which claim in your material can you check first?",
+        "If you have started an answer, check that it distinguishes inputs from products. Which sentence in your material supports each group?",
+        "If you have an answer, compare each part with the process description and revise anything the material does not support.",
+      ] : [
+        "Om du har ett utkast, dela upp ämnena i sådant processen tar in och sådant den bildar eller avger. Vilket påstående i materialet kan du kontrollera först?",
+        "Om du har börjat svara, kontrollera att svaret skiljer mellan sådant som används och sådant som bildas. Vilken mening i materialet stöder respektive grupp?",
+        "Om du har ett svar, jämför varje del med processbeskrivningen och ompröva sådant som saknar stöd i materialet.",
+      ])
+      : (en ? [
+        "Sort what the plant takes in separately from what the process forms or releases. Where in your material can you find evidence for each part?",
+        "Follow the process description from beginning to end. Which substances belong at each stage, and what role does the material give them?",
+        "Make a simple in-through-out list and check every item against your material. Then explain how you distinguish what is used from what is formed.",
+      ] : [
+        "Sortera det växten tar in från det processen bildar eller avger. Var i materialet hittar du belägg för varje del?",
+        "Följ processbeskrivningen från början till slut. Vilka ämnen hör till respektive del, och vilken roll får de i materialet?",
+        "Gör en enkel in-genom-ut-lista och kontrollera varje punkt mot materialet. Förklara sedan skillnaden mellan det som används och det som bildas.",
+      ]);
+  } else if (/\bmitos\b/.test(normalizedQuestion) && /\bmeios\b/.test(normalizedQuestion)) {
+    contextualSequence = hasDraft
+      ? (en ? [
+        "Compare your draft using the same headings for both processes: purpose and outcome. Which part needs evidence from your material?",
+        "Check that each comparison point describes both processes on the same basis. What does your material support for each one?",
+        "Review each row of your comparison against the source and revise any claim that is not supported.",
+      ] : [
+        "Jämför ditt utkast med samma rubriker för båda processerna: syfte och resultat. Vilken del behöver stöd från materialet?",
+        "Kontrollera att varje jämförelsepunkt beskriver båda processerna på samma grund. Vad får stöd i materialet för respektive process?",
+        "Granska varje rad i jämförelsen mot källan och ompröva påståenden som saknar stöd.",
+      ])
+      : (en ? [
+        "Choose one comparison point, such as purpose or outcome. What can you find about each process in your material?",
+        "Find a description of both processes under the same heading. What difference does the source support without relying on memory alone?",
+        "Make a two-column table with purpose and outcome as headings. Fill each cell from your material, then explain the contrast in your own words.",
+      ] : [
+        "Välj en jämförelsepunkt, till exempel syfte eller resultat. Vad hittar du om båda processerna i materialet?",
+        "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
+        "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
+      ]);
+  }
+  const sequence = contextualSequence || (type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
-    : ladder[type];
+    : ladder[type]);
   const slopeQuestion = /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
   const slopeGuidance = en
     ? hasDraft
@@ -1176,7 +1235,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
-  const persistentTeachTurn = body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
+  const studyCoachRequest = body.topic === "studiecoach";
+  const persistentTeachTurn = !studyCoachRequest && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && !Array.isArray(body.scores)
     && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
@@ -1249,10 +1309,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     if (quotaDenied) return quotaDenied;
     quotaRemaining = quota.remaining;
 
-    const topic        = sanitize(body.topic, 150);
+    const topic        = studyCoachRequest ? "" : sanitize(body.topic, 150);
     const userQuestion = sanitize(body.userQuestion, isPilotMode() ? 2000 : 500);
-    const context      = sanitize(body.context, 400);
-    const rawAreas     = Array.isArray(body.weakAreas) ? body.weakAreas : [];
+    const context      = studyCoachRequest ? "" : sanitize(body.context, 400);
+    const rawAreas     = studyCoachRequest ? [] : Array.isArray(body.weakAreas) ? body.weakAreas : [];
     const weakAreas    = rawAreas.slice(0, 10).map(a => sanitize(String(a), 80));
     /* Elevens val på en klargörande fråga. Saneras en gång till i
        buildPERSystemPrompt innan den når prompten — det här är bara längd. */
@@ -1262,14 +1322,14 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        defaultHelpLevel() för varför det inte alltid är 0. */
     const badOmNivå = (typeof body.helpLevel === 'number' && Number.isFinite(body.helpLevel))
       ? Math.min(3, Math.max(0, Math.floor(body.helpLevel))) : null;
-    const rawHist = Array.isArray(body.history) ? body.history : [];
+    const rawHist = studyCoachRequest ? [] : Array.isArray(body.history) ? body.history : [];
     const history = rawHist
       .filter(m => m && (m.role === "user" || m.role === "assistant"))
       .map(m => ({ role: m.role, content: sanitize(String(m.content), 500) }))
       .slice(-8);
 
     // Recent mistakes from frontend localStorage (optional — best-effort)
-    const rawMistakes = Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
+    const rawMistakes = studyCoachRequest ? [] : Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
     const recentMistakes = rawMistakes.slice(0, 10).map(m => ({
       question: sanitize(String(m.question || ''), 200),
       category: sanitize(String(m.category || m.course || ''), 60),
@@ -1282,7 +1342,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     }));
 
     const contextPack = buildPERContextPack({
-      rawPageContext: body.pageContext,
+      rawPageContext: studyCoachRequest ? { page: "förbättring" } : body.pageContext,
       topic,
       context,
       weakAreas,
@@ -1326,9 +1386,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        profileEnabled avgörs server-side. En klient ska inte kunna be om
        personalisering som inte är utrullad. */
     const [{ summary: longMemory, structured: structuredMemory }, liveExamData, profileEnabled] = await Promise.all([
-      loadLongMemory(supabase, user.id, perMemoryEpoch),
+      studyCoachRequest ? Promise.resolve({ summary: "", structured: {} }) : loadLongMemory(supabase, user.id, perMemoryEpoch),
       enrichMemoryFromExamData(supabase, user.id),
-      flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
+      studyCoachRequest ? Promise.resolve(false) : flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
 
     // Live DB-fakta vinner alltid över den dagsgamla cachen för skolflödets
@@ -1350,7 +1410,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     let learnerContext = '';
     let roleInstruction = '';
     let curriculumContext = '';
-    try {
+    if (studyCoachRequest) {
+      learnerContext = buildVerifiedCoachEvidence(liveExamData);
+    } else try {
       const [profile, upRes] = await Promise.all([
         profileEnabled ? loadProfile(supabase, user.id) : Promise.resolve(null),
         supabase.from("user_profiles").select("mastery").eq("id", user.id).maybeSingle(),
@@ -1388,7 +1450,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        Aldrig blockerande — loadCollectiveSignals sväljer varje fel och ger [], så ett
        saknat migrationssteg eller en läsrättighet som inte satts gör P.E.R långsammare
        att förbättra, aldrig trasig. */
-    const collectiveBlock = buildCollectiveBlock(
+    const collectiveBlock = studyCoachRequest ? "" : buildCollectiveBlock(
       await loadCollectiveSignals(supabase, {
         course: pageContext?.course || null,
         topics: mergedWeakAreas,
@@ -1424,31 +1486,32 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const requestedLevel = badOmNivå !== null ? badOmNivå : defaultHelpLevel(pageContext);
     const helpLevel = Math.min(requestedLevel, helpCap);
 
-    const systemContent = buildPERSystemPrompt({
-      userQuestion,
-      collectiveBlock,
-      context: ctxParts.join('\n'),
-      learnerProfile: [learnerContext, curriculumContext, roleInstruction, salesGuardrail].filter(Boolean).join('\n\n'),
-      weakAreas: mergedWeakAreas,
-      role,
-      language: body.lang === 'en' ? 'en' : 'sv',
-      helpLevel,
-      requestedLevel,
-      helpCap,
-      clarifyReply,
-      style,
-      pageContext,
-      intent,
-      mood,
-      feynman,
-      quiz,
-      celebrating,
-      quotaRemaining,
-      recentMistakes: contextPack.recentMistakes,
-      longMemory,
-      studentName,
-
-    });
+    const systemContent = studyCoachRequest
+      ? buildPERCoachSystemPrompt({ verifiedEvidence: learnerContext })
+      : buildPERSystemPrompt({
+        userQuestion,
+        collectiveBlock,
+        context: ctxParts.join('\n'),
+        learnerProfile: [learnerContext, curriculumContext, roleInstruction, salesGuardrail].filter(Boolean).join('\n\n'),
+        weakAreas: mergedWeakAreas,
+        role,
+        language: body.lang === 'en' ? 'en' : 'sv',
+        helpLevel,
+        requestedLevel,
+        helpCap,
+        clarifyReply,
+        style,
+        pageContext,
+        intent,
+        mood,
+        feynman,
+        quiz,
+        celebrating,
+        quotaRemaining,
+        recentMistakes: contextPack.recentMistakes,
+        longMemory,
+        studentName,
+      });
 
     /* Vilka delar av P.E.R. som faktiskt användes i det här svaret.
        Underlaget till hjärnan på per.html. Aggregat: modulnamn, timme, antal —
@@ -1612,7 +1675,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      if (badOmNivå !== null && !studyCoachRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
 
       // Confirm the saved primary answer before optional self-review. The client
       // can then distinguish a completed answer from a delayed correction pass.
@@ -1682,7 +1745,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      if (badOmNivå !== null && !studyCoachRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
       return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel });
     } catch {
       await settlePerChatQuota(user.id, quota, false);
