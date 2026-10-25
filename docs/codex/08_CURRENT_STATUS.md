@@ -4037,6 +4037,11 @@ garanteras för alla frågor; skolpilot behöver fortsatt observerad användning
 - [x] Oberoende read-only-review fann inga blockerare och bekräftade att
   innehållet matchar aktuell produkttext samt att den anonyma vägen slutar före
   den autentiserade AI-rutten.
-- [!] Dessa är offlinekontroller; publicerad preview för den utökade guiden
-  avvaktas. `main`, Production, Supabase, konton, kvoter och hemligheter är
-  orörda.
+- [x] Kodcheckpoint `4d320761d681241ec1a3538e3d5db66520e20b04` är pushad till
+  feature-branchen. Vercel deployment `dpl_31TBddeE9ErFfW6AoP4vRBnTursX` är
+  `READY` från exakt SHA och behåller den befintliga branch-aliasen.
+- [x] Den deployade startsidan öppnades read-only i sidpanelen; P.E.R-ingången,
+  produktinnehållet och skolpilotens väg vidare visas. Ingen guidefråga
+  skickades, så den nya anonyma FAQ-svarsgrenen är fortsatt offlineverifierad,
+  inte live-funktionsprovad.
+- [!] `main`, Production, Supabase, konton, kvoter och hemligheter är orörda.
