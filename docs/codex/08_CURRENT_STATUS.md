@@ -4446,3 +4446,25 @@ och produktionsdatabas orörda tills separat releasebeslut.
 men behöver en enda ny syntetisk körning när en färskt verifierad stagingbudget
 räcker. Den tidigare körningen ska fortsatt redovisas som misslyckad 0/12;
 offlinepass bevisar inte modellens framtida 12/12-resultat.
+
+### Ny stagingpreflight — 2026-10-25
+
+- [x] Aktuell Vercel Preview är READY från branchens dokumentationscheckpoint
+  `9adeb87`; koden är från `acdb5ae`. De 10 nödvändiga stagingvariablernas
+  namn är Preview-scope:ade till `codex/exgen-generation-quality-2026-10-20`;
+  värdena förblev krypterade och olästa.
+- [x] Skrivskyddad stagingbudgetkontroll: en budgetrad, cap `$3.379071`, spent
+  `$2.223469`, reserved `$0.263628`, kvar `$0.891974`, enabled. Detta är en
+  tidsbunden avläsning, inte ett nytt kostnadsgodkännande.
+- [!] Den återanvända inloggade Previewn visar fortsatt det syntetiska
+  genereringsförsökets `0/12`-fel och en icke-tom felbank. Eftersom historiken
+  inte kan verifieras som syntetisk lämnades den orörd och inget nytt AI- eller
+  provanrop gjordes.
+- [x] `main` står kvar på `ad60a683`; Vercel Production READY fortsätter från
+  samma SHA. Ingen staging-/produktionsdatabas, konto, kvot eller hemlighet
+  ändrades.
+
+**Nästa säkra steg:** använd en stagingidentitet vars testdata verifierats som
+syntetisk, eller invänta ett godkänt separat stagingkonto. Kör därefter högst
+ett 12-frågetest efter ny budgetkontroll. Fortsätt inte genom att återanvända
+den befintliga felbanken eller skapa upprepade ofullständiga prov.
