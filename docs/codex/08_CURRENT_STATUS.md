@@ -3,26 +3,37 @@
 # P.E.R three-page checkpoint — 2026-10-25
 
 - [x] Integrated code checkpoint `81319a8687e212795835846f3ea145e23de0320f`
-  is pushed to `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
-  `dpl_7ywsLDodB44PsxZpsmintbEhnVrd` is `READY` from that exact SHA at
-  `https://provia-rcu0n0b0s-eltons-projects-4adfb1a3.vercel.app/`.
-- [x] Authenticated `vc curl` returned **200** for `/`, `/app.html`, and
-  `/f%C3%B6rb%C3%A4ttring.html` on that deployment. Browser inspection of the
-  same Preview shows its pilot login gate; it is currently logged out.
-- [x] Integrated offline regression: the full P.E.R handler suite passed
-  **70/70** before the final route-classification cleanup; afterward the
-  focused homepage/ordinary-chat tests passed **3/3**. The 5-file frontend
-  suite passed **5/5** (including page targets 50/50 and account-switch
-  coverage); `per-usage-stream` passed **17/17**; `per-memory-epoch` passed
-  with the new provenance assertions. Syntax and diff checks passed.
-- [x] Read-only staging budget check at `2026-10-25 03:26 UTC`: cap
-  `$3.379071`, spent `$2.102296`, reserved `$0.263628`, remaining `$1.013147`.
-  No budget or quota was changed.
-- [!] No paid live request has been made. The fresh Preview is at the login
-  gate and no authenticated session is available in this tab. One approved
-  synthetic end-to-end test remains pending login and confirmation that the
-  chosen existing staging account has no open exam to disturb. `main`,
-  Production, Supabase schema/data, roles and secrets remain unchanged.
+  and status checkpoint `b71e630141a1af83c618c2c246f6ac399090a583` are pushed
+  to `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_Foma2M2hftE18gezWJt55Vsht4sa` is `READY` from exact SHA `b71e630...` at
+  `https://provia-mmqi4rbt6-eltons-projects-4adfb1a3.vercel.app/`.
+- [x] The current Preview session was authenticated. One approved synthetic
+  Biologi 1 generation request was run. It safely failed with **0/3 approved**;
+  no exam was issued, no existing exam was touched, and no P.E.R live hint or
+  post-grade response could be tested because no exam was created.
+- [x] Sanitized Vercel telemetry for the request shows this was not an upstream
+  model/transport failure or a simple timeout: generation and repair calls
+  completed. The generation batch returned 8 candidates (4 dropped because
+  source answers were not extractable); all 3 verifier-checked candidates were
+  rejected for source support. Two repair batches each returned 7 candidates;
+  each dropped 2 structurally and the remaining verifier-checked candidate was
+  rejected. Across the request, 5 verifier-checked candidates were rejected;
+  recorded reasons include source alignment/support, factual/answer quality,
+  clarity and difficulty mismatch. No solver check ran because candidates did
+  not pass the reviewer. Telemetry also reports zero source sections tracked;
+  that is a diagnostic lead, not proof that the material was absent.
+- [x] Staging budget read after the request (`2026-10-25 03:35:50 UTC`): cap
+  `$3.379071`, spent `$2.141062`, reserved `$0.263628`, remaining `$0.974381`.
+  No budget, quota, account or role was changed. No further live AI calls are
+  authorized or planned in this verification.
+- [x] Offline verification on final code: full P.E.R handler suite **70/70**;
+  focused homepage/ordinary-chat suite **3/3**; frontend P.E.R suite **5/5**;
+  usage stream **17/17**; memory-provenance, syntax and diff checks passed.
+- [!] Live P.E.R quality on homepage, active exam and improvement page remains
+  unverified. The exam-generation failure is an adjacent blocker; keep quality
+  gates intact and investigate source segmentation/answer extraction and
+  repair targeting before another live test. `main`, Production, Supabase
+  schema/data, roles, secrets and existing exams remain unchanged.
 
 - [x] Checkpoint `21bf94d7e4af7c29ee655db7336b0588e3034c63` is pushed to
   `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
