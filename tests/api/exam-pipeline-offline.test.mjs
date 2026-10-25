@@ -231,6 +231,10 @@ assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt 
   "the extractive instruction preserves derived mathematical answers");
 assert.match(biologyShortPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
   "natural-science short answers receive exact source sentences as candidate answer anchors");
+assert.match(biologyShortPrompt.userPrompt, /Ett ankare får användas igen endast när frågan prövar en annan tydligt avgränsad uppgift eller aspekt/i,
+  "the same source sentence can support distinct questions without weakening source-grounding rules");
+assert.doesNotMatch(biologyShortPrompt.userPrompt, /ännu oanvänt ankare/i,
+  "the prompt no longer imposes a one-question-per-source-sentence ceiling");
 assert.match(biologyShortPrompt.userPrompt, /\["Fotosyntesen sker i kloroplasterna\.","Växten använder ljus, vatten och koldioxid för att bilda glukos och syre\.","Cellandning frigör energi ur glukos\."\]/,
   "answer anchors are literal complete sentences copied from the supplied synthetic material");
 assert.match(biologyShortPrompt.systemPrompt, /Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källmeningarna inte själva uttrycker/i,
@@ -281,6 +285,8 @@ assert.match(biologyRepair.input.at(-1).content, /NATURVETENSKAPLIGA KORTSVAR:.*
   "science-specific source-answer requirements persist through repair attempts");
 assert.match(biologyRepair.input.at(-1).content, /Kopiera dem exakt.*Poängkraven/i,
   "repair instructions continue to direct candidates toward exact, fully supported source answers");
+assert.match(biologyRepair.input.at(-1).content, /En källmening får stödja mer än en reparationsfråga bara när varje uppgift prövar ett annat/i,
+  "repair batches may reuse a source sentence only for a distinct supported task");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,

@@ -4468,3 +4468,28 @@ offlinepass bevisar inte modellens framtida 12/12-resultat.
 syntetisk, eller invänta ett godkänt separat stagingkonto. Kör därefter högst
 ett 12-frågetest efter ny budgetkontroll. Fortsätt inte genom att återanvända
 den befintliga felbanken eller skapa upprepade ofullständiga prov.
+
+### Uppföljning: återanvändning av källankare — 2026-10-25
+
+- [x] Oberoende granskning identifierade att kravet på ett "ännu oanvänt"
+  ankare i första prompten i praktiken begränsade faktakortsvar till högst en
+  fråga per källmening. Prompten tillåter nu samma exakta mening för ett annat
+  tydligt avgränsat, uttryckligen stött svarsmål; parafraser och upprepningar
+  förbjuds fortsatt.
+- [x] Reparationsprompten fick samma avgränsade regel. Strukturell
+  källextraktion, oberoende faktagranskning, poänggranskning, dubblettgrind,
+  A-nivåns krav på underbyggt resonemang och kvotflöde är oförändrade.
+- [x] Offline-regressionerna täcker återanvändning av en exakt mening för två
+  olika svarsmål samt att en granskad dubblett fortsatt nekas.
+- [x] Slutlig riktad svit efter ändringen: 2/2 testscripts; den breda
+  provgenererings-/P.E.R.-sviten före det sista testtillägget passerade 203/203.
+  Oberoende granskare fann inga blockerande fynd i promptändringen.
+- [!] Ändringen är inte live-modellverifierad. Stagingbudgetens senaste
+  skrivskyddade avläsning är fortsatt `$0.891974` kvar. Den återanvända
+  sessionen visar en felbank och ett misslyckat 0/12-försök; eftersom dess
+  historik inte kan verifieras som helt syntetisk lämnades den orörd och inget
+  nytt modell-/provanrop gjordes.
+
+**Nästa steg:** verifiera en ren, enbart syntetisk stagingidentitet innan ett
+enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
+12/12-prestanda.

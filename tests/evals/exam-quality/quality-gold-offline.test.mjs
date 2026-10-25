@@ -29,7 +29,7 @@ const shortQuestion = {
   source_references: ["Fotosyntesen sker i kloroplasterna."],
 };
 
-function normalizeAndGate(question, { material = biologyMaterial, profile = "natural_sciences", qType = "short", graphMode = "line", pointTable = null, isMath = false } = {}) {
+function normalizeAndGate(question, { material = biologyMaterial, profile = "natural_sciences", qType = "short", graphMode = "line", pointTable = null, isMath = false, requireExtractiveAnswers = false } = {}) {
   const normalized = generator.normalizeGeneratedExam({ questions: [structuredClone(question)] }, {
     qType, graphMode, pointTable, isMath, pastedText: material, lang: "sv", numQuestions: 1,
   });
@@ -38,7 +38,7 @@ function normalizeAndGate(question, { material = biologyMaterial, profile = "nat
     normalized,
     gate: assessment.gateExam(normalized.exam, {
       profile, requireSourceReferences: true, sourceMaterial: material, requestedQuestionType: qType,
-      secret: "offline-gold-test-only",
+      secret: "offline-gold-test-only", requireExtractiveAnswers,
     }),
   };
 }
@@ -63,6 +63,50 @@ const approvedReview = {
 const validShort = normalizeAndGate(shortQuestion);
 assert.equal(validShort.gate.questions.length, 1, "grounded short answer survives the production structural gate");
 assert.equal(verifier.decideApproval(approvedReview), true, "a complete positive reviewer verdict can approve the item");
+
+const reusableAnchorMaterial = "Växten använder ljus, vatten och koldioxid för att bilda glukos och syre.";
+const reusedAnchorQuestions = [
+  {
+    ...shortQuestion,
+    id: "bio-reuse-inputs",
+    question: "Vilka ämnen använder växten för att bilda glukos och syre?",
+    model_answer: reusableAnchorMaterial,
+    rubric: "Poäng för att ange ljus, vatten och koldioxid som utgångsämnen.",
+    scoring_rubric: {
+      parts: [{ description: "Ljus, vatten och koldioxid anges", points: 2 }],
+      full_score_requirements: "Samtliga tre anges.",
+      partial_credit_notes: "Delpoäng för korrekta ämnen.",
+    },
+    source_references: [reusableAnchorMaterial],
+  },
+  {
+    ...shortQuestion,
+    id: "bio-reuse-products",
+    question: "Vilka ämnen bildas när växten använder ljus, vatten och koldioxid?",
+    model_answer: reusableAnchorMaterial,
+    rubric: "Poäng för att ange glukos och syre som produkter.",
+    scoring_rubric: {
+      parts: [{ description: "Glukos och syre anges", points: 2 }],
+      full_score_requirements: "Båda produkterna anges.",
+      partial_credit_notes: "Delpoäng för vardera korrekt produkt.",
+    },
+    source_references: [reusableAnchorMaterial],
+  },
+].map((question) => normalizeAndGate(question, {
+  material: reusableAnchorMaterial,
+  requireExtractiveAnswers: true,
+}).gate.questions[0]);
+assert.equal(reusedAnchorQuestions.length, 2,
+  "one exact source sentence may structurally support distinct input and output targets");
+assert.ok(reusedAnchorQuestions.every((question) => question.model_answer === reusableAnchorMaterial),
+  "both tasks retain the exact source answer instead of paraphrasing it");
+const reuseReviews = new Map(reusedAnchorQuestions.map((question) => [question.id, { ...approvedReview, duplicate_of: "" }]));
+assert.ok(reusedAnchorQuestions.every((question) => verifier.decideApproval(reuseReviews.get(question.id))),
+  "each distinct, extractive task can pass its own positive independent-review verdict");
+assert.equal(verifier.decideApproval({
+  ...approvedReview,
+  duplicate_of: "bio-reuse-inputs",
+}), false, "changing only the duplicate verdict still blocks a reused-anchor duplicate");
 
 const topicalButUnsupported = normalizeAndGate({
   ...shortQuestion,
