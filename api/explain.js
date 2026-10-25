@@ -523,7 +523,7 @@ function verifiedActiveQuestion(body, user, submissionId) {
       )) return null;
   return {
     type: question.type,
-    text: String(question.text || "").slice(0, 4000),
+    text: String(question.question ?? question.text ?? "").slice(0, 4000),
     answered: question.answered === true,
     graphMode: question.type === "graph" ? question.graphMode : undefined,
   };
@@ -755,6 +755,19 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Hitta belägg om båda i samma del av materialet. Vilken skillnad stöder de beläggen?",
         "Gör två kolumner med samma jämförelsepunkt, fyll dem från materialet och förklara sedan skillnaden med egna ord.",
       ];
+  } else if (/\b(?:växt(?:en|er|erna|ens)?|plants?)\b/i.test(normalizedQuestion) &&
+      /\b(tar upp|upptag|absorberar|take up|uptake|absorb)\b/i.test(normalizedQuestion) &&
+      /\b(vatten|water)\b/i.test(normalizedQuestion) &&
+      /\b(koldioxid|carbon dioxide|co2)\b|\bco₂(?=\W|$)/i.test(normalizedQuestion)) {
+    contextualSequence = en ? [
+      "Split the question into the two substances. Which words in your material show where each one enters the plant?",
+      "Trace each substance separately through the description. What route into the plant does the source give for each?",
+      "Build two short source-backed steps, one for each substance, then check that you have not mixed up their routes. Which sentence supports each step?",
+    ] : [
+      "Dela upp frågan i de två ämnena. Vilka ord i materialet visar var vart och ett kommer in i växten?",
+      "Följ ämnena var för sig genom beskrivningen. Vilken väg in i växten anger källan för respektive ämne?",
+      "Bygg två korta steg med stöd i materialet, ett för varje ämne. Kontrollera sedan att du inte blandat ihop vägarna. Vilken mening stöder varje steg?",
+    ];
   } else if (causeEffectQuestion && !comparisonQuestion) {
     contextualSequence = en ? [
         "Identify what the question says changes. Where in your material is a possible cause or mechanism described?",

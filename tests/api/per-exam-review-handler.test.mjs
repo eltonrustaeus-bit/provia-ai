@@ -1788,6 +1788,62 @@ test("active photosynthesis guidance follows the verified question without namin
   }
 });
 
+test("active plant-uptake questions get source-grounded guidance without naming the uptake routes", async () => {
+  activeCount = 1;
+  calls.length = 0;
+  try {
+    const answers = [];
+    for (const helpLevel of [0, 1, 2]) {
+      const pageContext = createActiveQuestionContext({
+        id: `active-plant-uptake-${helpLevel}`,
+        type: "short",
+        text: "Beskriv hur växter tar upp vatten och koldioxid.",
+        answered: helpLevel === 1,
+      });
+      const response = await invoke({ helpLevel, pageContext });
+      assert.equal(response.statusCode, 200);
+      assert.match(response.body.answer, /material|källan|beskrivningen/i);
+      assert.match(response.body.answer, /ämne|växten|vägen in|vägarna/i);
+      assert.doesNotMatch(response.body.answer, /rötterna|klyvöppningarna|roots|stomata/i);
+      assert.equal(response.body.helpLevelUsed, helpLevel);
+      answers.push(response.body.answer);
+    }
+    assert.equal(new Set(answers).size, 3, "each level advances the source-based reasoning task");
+
+    const unicodeVariant = await invoke({
+      pageContext: createActiveQuestionContext({
+        id: "active-plant-uptake-unicode", type: "short",
+        text: "Beskriv hur växten tar upp vatten och CO₂.",
+      }),
+    });
+    assert.match(unicodeVariant.body.answer, /Dela upp frågan/i);
+
+    const conflictingFields = createActiveQuestionContext({
+      id: "active-plant-uptake-conflicting", type: "short", text: "Definiera kraft.",
+    });
+    conflictingFields.currentQuestion.question = "Definiera kraft.";
+    conflictingFields.currentQuestion.text = "Beskriv hur växten tar upp vatten och CO₂.";
+    const canonicalTextOnly = await invoke({ pageContext: conflictingFields });
+    assert.equal(canonicalTextOnly.body.answer,
+      "Identifiera vilket begrepp eller samband frågan prövar. Vilken del av ditt material kan hjälpa dig?",
+      "hint selection uses the same canonical text that the proof verifies");
+
+    const tampered = createActiveQuestionContext({
+      id: "active-plant-uptake-tampered", type: "short",
+      text: "PRIVATE_EXAM_ANSWER_MARKER roots stomata",
+    });
+    tampered.currentQuestion.questionProof = "invalid-proof";
+    const fallback = await invoke({ helpLevel: 0, pageContext: tampered });
+    assert.equal(fallback.statusCode, 200);
+    assert.match(fallback.body.answer, /vilket begrepp eller samband/i);
+    assert.doesNotMatch(fallback.body.answer, /PRIVATE_EXAM_ANSWER_MARKER|roots|stomata/i);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") &&
+      !url.includes("reserve_per_chat_quota")), "verified active hints stay deterministic and quota-free");
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("active mitosis/meiosis guidance gives a source-based comparison task without stating the distinction", async () => {
   activeCount = 1;
   calls.length = 0;
