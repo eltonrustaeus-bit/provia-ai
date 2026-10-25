@@ -4002,3 +4002,23 @@ beslut.
 **PILOT NOT READY.** Nästa steg är slutlig diffgranskning, checkpoint på den
 befintliga feature-branchen och kontroll av READY Previewn. Inga fler live-AI-
 anrop behövs för denna coachkortskorrigering.
+
+### Efter checkpoint: Preview-kontroll — 2026-10-25
+
+- [x] Commit `fcbf01db9ff01bee71b62f684919f6f7b2e33ab0` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`; `git ls-remote` bekräftade samma
+  SHA på fjärrbranchen.
+- [x] Vercel deployment `dpl_4963rUbEKEwt8U4WCGatesLRBaDc` är `READY` från
+  exakt commit och använder den befintliga branch-aliasen
+  `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [x] Read-only granskning av den öppna coachvyn på aliasen visade P.E.R:s
+  sammanfattning av de tre senaste resultaten (`92 %, 92 %, 100 %`) tillsammans
+  med senaste `100 %`, trend `+100 p.p.` och fokus `Biologi 1`. Nyckeltalen
+  stämmer med textens trend och fokus. Ingen ny fråga skickades till modellen.
+- [!] Denna synliga coachvy bekräftar sammanhanget och nyckeltalen på Previewn,
+  men är inte en ny modellgenerering eller kontroll av alla möjliga användares
+  historik. Ingen `main`, Production eller databasändring gjordes.
+
+**PILOT NOT READY.** De tre P.E.R-lägena och den aktuella Previewn har kod-,
+test- och liveevidens enligt avsnitten ovan. Allmän svarskvalitet kan inte
+garanteras för alla frågor; skolpilot behöver fortsatt observerad användning.
