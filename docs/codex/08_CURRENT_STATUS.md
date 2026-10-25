@@ -4933,3 +4933,56 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Riktningskontrollen är ett deterministiskt lexikalt skydd, inte semantisk
   entailment. Sammansatta/indirekta formuleringar kan fortfarande kräva
   oberoende modellgranskning. Ingen staging-/live-AI-körning gjordes.
+
+### P.E.R återförsök efter sidbyte — 2026-10-26
+
+- [x] Browserregressionen reproducerade att ett felat efterprovssvar följt av
+  sidbyte kunde lämna Skicka inaktiverad. En tidig retur efter kontextändring
+  hoppade över knappåterställningen trots att frågan låg kvar.
+- [x] Skicka återaktiveras nu i `finally` även vid avbrott eller tidig retur.
+  Efterprovets signerade bevis rensas fortsatt när sidan byts; en ny begäran
+  skickas som vanlig hjälp och utan provbevis, och det nya svaret renderas.
+- [x] Offlinebrowser: `tests/frontend/per-exam-context.test.mjs` passerade
+  **104/104**, inklusive retry efter avslutat fel och efter ett avbrutet
+  in-flight-svar. Sidbyte mellan fel och retry sker först efter att knappens
+  upplåsning bekräftats; det gamla signerade provbeviset skickas inte med.
+  P.E.R `per-page-targets` rapporterade **95/95**; kontextpaket,
+  `per-usage-stream` och `per-context-cap` avslutades utan testfel. Riktade
+  P.E.R API-fall efter kontext-/resultatväxling avslutades med kod 0.
+- [x] Riktade API-regressioner i `tests/api/per-exam-review-handler.test.mjs`
+  passerade **6/6**: allmän startsideshjälp, förbättringscoach, vanlig P.E.R
+  med kursens senaste misstag, resultatsidans verifierade svagheter, aktiv
+  provhjälp och signerad efterprovförklaring.
+- [!] En bred sammanslagen API-körning fastnade över fem minuter i
+  `per-exam-review-handler.test.mjs` utan testtidsgräns och stoppades. Hela den
+  filen är därför inte verifierad i denna körning; de avgränsade scenarierna
+  ovan passerade.
+- [!] Ändringen är endast lokal och offlineverifierad. Ingen ny commit, push,
+  Preview, staging-/live-AI-körning, `main`, Production eller databasåtgärd
+  utfördes efter den separata riktningsfixens Preview-checkpoint.
+
+### Negerad handling i misstagsträning — 2026-10-26
+
+- [x] Reproducerat att frågan "Vilka ämnen använder växten inte vid
+  fotosyntesen?" kunde matcha ett verifierat fokus på vilka ämnen växten
+  använder. Riktningsfiltret såg samma input-verb men jämförde inte negationen.
+- [x] Pipeline-matchningen jämför nu negation nära identifierade handlingsverb
+  innan en verifierarmärkt fokusmatch får räknas. Den hanterar även separerade
+  partikelverb och skiljer objektkontrast från kontrast till en annan handling.
+  Affirmativa kontrollfrågor och input/output-riktningskontrollerna behålls;
+  inga kvalitetsgrindar sänktes.
+- [x] Regressionerna täcker direkt negation, `varken ... eller`, separerat
+  `tar ... inte upp`, objektkontrasterna `inte X utan/men Y`, en kontrast till
+  en annan handling, skilda satser och ett verifieraranspråk på negerad fråga.
+- [x] Oberoende, skrivskyddad granskning utmanade uttryckligen de tre
+  kantfallen: `tar ... inte upp` avvisas, `inte, utan producerar` avvisas och
+  `inte syre utan koldioxid` accepteras. Riktad regression passerade **3/3**;
+  inga blockerare återstår i de granskade fallen.
+- [x] Offline: `check-detection.mjs` klarade alla ämnesfixtures och motexempel.
+  Pipeline, pipeline-HTTP, felträningskälla och quality-gold-sviten passerade
+  **52/52**. Syntaxkontroller för alla ändrade JS-filer och `git diff --check`
+  passerade.
+- [!] Bevisningen är lokal med syntetiska/stubbade modellresultat; den mäter
+  inte verklig semantisk modelltolkning eller staging/livebeteende. Ingen AI-
+  anropskostnad, staging-DB, `main` eller Production ändrades. Preview skapas
+  först efter den godkända feature-pushen.

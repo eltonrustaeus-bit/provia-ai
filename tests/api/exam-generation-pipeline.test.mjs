@@ -81,6 +81,41 @@ test("a prior-mistake match must cite evidence from that focus source when avail
     model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
   ["focus-3"], photosynthesisFocus), ["focus-3"],
   "specific questions that practise the missed objective retain coverage");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten inte vid fotosyntesen?",
+    model_answer: "Syre.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "a negated action cannot cover an affirmative documented mistake focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten varken i ljus eller mörker vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "varken … eller cannot cover an affirmative documented mistake focus");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen tar växten inte upp vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "negation remains attached when a particle verb is separated by the subject");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten, inte syre utan koldioxid och vatten, vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "a contrast correcting the object must not be mistaken for negating the action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten, inte syre men koldioxid och vatten, vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "a contrast with men must not be mistaken for negating the action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten inte, utan producerar vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), [],
+  "a contrast introducing a different action does not erase negation of the training action");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen använder växten vid fotosyntesen? Förklara varför den inte producerar vatten.",
+    model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-3"], photosynthesisFocus), ["focus-3"],
+  "negation of a different output action must not negate the affirmative input target");
+  const photosynthesisProductFocus = [{ focusId: "focus-4", concept: "Fotosyntes",
+    skill: "Identifiera ämnen som bildas", sourceQuestion: "Vilka ämnen bildas vid fotosyntesen?",
+    sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({ question: "Vilka ämnen släpps inte ut vid fotosyntesen?",
+    model_answer: "Inga ämnen.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
+  ["focus-4"], photosynthesisProductFocus), [],
+  "negation inside the compound output action släpps ut cannot cover a positive production focus");
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
     question: "Vilka ämnen bildas vid fotosyntesen?",
     model_answer: "Syre och druvsocker.",
@@ -517,6 +552,74 @@ test("resumed mistake-training does not let an unsupported stored focus claim co
     return { status: 200, body: { ok: true, questions: [{
       id: "new-unsupported", type: "short", question: "Tolka en fristående modell utan grafdata.",
       source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified",
+    }] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.deepEqual(requiredFocusIds, ["focus-2"]);
+    assert.equal(job.accepted_questions.length, 2);
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("resumed mistake-training rejects a negated action despite the verifier's focus claim", async () => {
+  const focus1 = "Ekvationens båda led ska balanseras.";
+  const focus2 = "Fotosyntesen sker i kloroplasterna.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000020",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    stage_attempts: 1,
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera ekvationens båda led",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?", sourceEvidence: [focus1] },
+        { focusId: "focus-2", concept: "Fotosyntes", skill: "Identifiera ämnen växten använder",
+          sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?", sourceEvidence: [focus2] },
+      ],
+    },
+    accepted_questions: [
+      { id: "old-supported", type: "short", question: "Förklara varför ekvationens båda led måste balanseras.",
+        source_references: [focus1], training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "old-overclaim", type: "short", question: "Beskriv ekvationsmetoden.",
+        source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified" },
+    ],
+    progress_current: 2,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let requiredFocusIds;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    assert.deepEqual(input.acceptedQuestions, job.accepted_questions,
+      "a negated question must not consume the missing focus slot despite the verifier claim");
+    assert.equal(input.progressCurrent, 2);
+    assert.equal(input.nextStage, "repair");
+    return { status: "retry_queued" };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    requiredFocusIds = payload.trainingFocusRequiredIds;
+    return { status: 200, body: { ok: true, questions: [{
+      id: "new-negated", type: "short", question: "Vilka ämnen använder växten inte vid fotosyntesen?",
+      model_answer: "Syre.", source_references: [focus2], training_focus_matches: ["focus-2"], validation_status: "verified",
     }] } };
   };
   try {

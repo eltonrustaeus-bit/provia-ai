@@ -2113,9 +2113,9 @@ function finalizeMsg(div, text) {
         clearTimeout(requestTimeout);
         clearTimeout(reviewTimeout);
         if (_perActiveRequest === requestState) _perActiveRequest = null;
+        if (sendBtn) sendBtn.disabled = false;
       }
 
-      if (sendBtn) sendBtn.disabled = false;
       var msgs = document.getElementById('perMessages');
       if (msgs) msgs.scrollTop = msgs.scrollHeight;
     }

@@ -184,6 +184,10 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
 function contradictsTrainingActionDirection(focusText, candidateQuestion) {
   const focusDirections = trainingActionDirections(focusText);
   const candidateDirections = trainingActionDirections(candidateQuestion);
+  const sharedDirections = ["input", "output"].filter((direction) =>
+    focusDirections.has(direction) && candidateDirections.has(direction));
+  if (sharedDirections.some((direction) => hasNegatedTrainingAction(focusText, direction) !==
+      hasNegatedTrainingAction(candidateQuestion, direction))) return true;
   return (focusDirections.has("input") && !focusDirections.has("output") &&
       candidateDirections.has("output") && !candidateDirections.has("input")) ||
     (focusDirections.has("output") && !focusDirections.has("input") &&
@@ -198,9 +202,9 @@ function trainingActionDirections(value) {
       word.startsWith("upptag") || word.startsWith("tillför") || word === "input" ||
       word === "inputs" || word.startsWith("consume") || word.startsWith("take")) ||
       words.some((word, index) => ["ta", "tar", "tog"].includes(word) &&
-        words.slice(index + 1, index + 3).some((next) => ["upp", "in"].includes(next))) ||
+        words.slice(index + 1, index + 5).some((next) => ["upp", "in"].includes(next))) ||
       words.some((word, index) => word.startsWith("tas") &&
-        words.slice(index + 1, index + 3).some((next) => ["upp", "in"].includes(next)))) {
+        words.slice(index + 1, index + 5).some((next) => ["upp", "in"].includes(next)))) {
     directions.add("input");
   }
   if (words.some((word) => word.startsWith("bild") || word.startsWith("producer") ||
@@ -212,6 +216,32 @@ function trainingActionDirections(value) {
     directions.add("output");
   }
   return directions;
+}
+
+function hasNegatedTrainingAction(value, direction) {
+  const negations = new Set(["aldrig", "ej", "inget", "ingen", "inga", "inte", "never", "neither", "no", "not", "varken"]);
+  return String(value || "").split(/[.!?;]+/u).some((clause) => {
+    const words = clause.normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{N}]+/gu) || [];
+    const actionIndices = words.flatMap((_, index) =>
+      trainingActionDirections(words.slice(index, index + 5).join(" ")).has(direction) ? [index] : []);
+    return words.some((word, negationIndex) => {
+      if (!negations.has(word)) return false;
+      return actionIndices.some((actionIndex) => {
+        if (Math.abs(actionIndex - negationIndex) > 2) return false;
+        if (["inte", "not"].includes(word) && ["bara", "only"].includes(words[negationIndex + 1])) return false;
+        if (negationIndex > actionIndex) {
+          const correctionIndex = words.slice(negationIndex + 1, negationIndex + 5).findIndex((part) =>
+            part === "utan" || part === "men" || part === "but");
+          if (correctionIndex > 0) {
+            const correctionWords = words.slice(negationIndex + correctionIndex + 2,
+              negationIndex + correctionIndex + 6);
+            if (!trainingActionDirections(correctionWords.join(" ")).has(direction)) return false;
+          }
+        }
+        return true;
+      });
+    });
+  });
 }
 
 function sharesTrainingEvidence(candidateText, evidence) {

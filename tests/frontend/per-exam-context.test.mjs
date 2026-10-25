@@ -402,6 +402,23 @@ async function assertContextChangeCancelsHint(label, expectedMessage, changeCont
   await page.waitForTimeout(100);
   const late = await page.locator("#perMessages").innerText();
   ok(`${label} context change never renders the late answer`, !late.includes("STALE_QUESTION_RESPONSE"), late);
+  if (label === "page") {
+    await page.fill("#perInput", "Hjälp mig i den aktuella delen");
+    const retry = page.waitForResponse(response => response.url().includes("/api/explain")
+      && response.request().method() === "POST", { timeout: 5000 }).catch(() => null);
+    await page.click("#perSendBtn");
+    const retryResponse = await retry;
+    await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "Svar från P.E.R." }).last().waitFor({ timeout: 5000 });
+    const retryState = await page.evaluate(() => ({
+      input: document.getElementById("perInput")?.value,
+      disabled: document.getElementById("perSendBtn")?.disabled,
+    }));
+    ok("in-flight sidbyte tillåter faktisk retry i den nya kontexten",
+      !!retryResponse && lastExplain?.pageContext?.page === "förbättring" && !lastExplain?.examProof
+        && retryState.input === "" && retryState.disabled === false,
+      JSON.stringify({ response: !!retryResponse, page: lastExplain?.pageContext?.page,
+        hasExamProof: !!lastExplain?.examProof, ...retryState }));
+  }
   await restoreContext();
 }
 
@@ -674,15 +691,25 @@ ok("T9g retry behåller samma signerade efter-rättningsbevis", lastExplain?.exa
 failNextExplainWithUnavailable = true;
 await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
 await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+await page.waitForFunction(() => !document.getElementById("perSendBtn")?.disabled, null, { timeout: 5000 });
 await page.evaluate(() => window.setPerContext({ page: "förbättring", activeSection: "coach" }));
+ok("context-bytefter fel lämnar P.E.R återförsökbar",
+  await page.locator("#perSendBtn").isEnabled());
 lastExplain = null;
 const changedContextRetry = page.waitForResponse(response => response.url().includes("/api/explain")
-  && response.request().method() === "POST");
+  && response.request().method() === "POST", { timeout: 5000 }).catch(() => null);
 await page.click("#perSendBtn");
-await changedContextRetry;
+const changedContextResponse = await changedContextRetry;
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "Svar från P.E.R." }).last().waitFor({ timeout: 5000 });
+const changedContextRetryState = await page.evaluate(() => ({
+  input: document.getElementById("perInput")?.value,
+  disabled: document.getElementById("perSendBtn")?.disabled,
+}));
 ok("sidbyte mellan fel och återförsök rensar det signerade provbeviset",
-  !lastExplain?.examProof && lastExplain?.examReview !== true,
-  JSON.stringify({ page: lastExplain?.pageContext?.page, hasExamProof: !!lastExplain?.examProof }));
+  !!changedContextResponse && !lastExplain?.examProof && lastExplain?.examReview !== true
+    && changedContextRetryState.input === "" && changedContextRetryState.disabled === false,
+  JSON.stringify({ response: !!changedContextResponse, page: lastExplain?.pageContext?.page,
+    hasExamProof: !!lastExplain?.examProof, ...changedContextRetryState }));
 
 await page.evaluate(() => window.setPerContext({ page: "app", examState: { phase: "result" } }));
 failNextExplainWithUnavailable = true;
