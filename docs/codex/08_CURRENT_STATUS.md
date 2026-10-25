@@ -4022,3 +4022,21 @@ anrop behövs för denna coachkortskorrigering.
 **PILOT NOT READY.** De tre P.E.R-lägena och den aktuella Previewn har kod-,
 test- och liveevidens enligt avsnitten ovan. Allmän svarskvalitet kan inte
 garanteras för alla frågor; skolpilot behöver fortsatt observerad användning.
+
+## Publik P.E.R-produktguide — 2026-10-25
+
+- [x] Den utloggade startsidan har fortfarande en fast, rate-limitad guide
+  utan fri ämnes-AI. Den svarar nu mer direkt på vanliga produktfrågor om
+  ExGen, provets rättning, felbanken och planval och vägleder till rätt sida.
+  Priser lämnas dynamiska via prissidan; inga nya prisfakta hårdkodades.
+- [x] Anonyma frågor om skolämnen/prov får fortsatt inte skickas till AI eller
+  lösas av guiden. Rate limit och autentiserad elevhjälp är oförändrade.
+- [x] Offline: `per-public-guide` **2/2**, anonym provfråga spärrad från AI
+  **1/1**, pilotens API-scope och readiness **6/6**, `anon-per` **21/21**;
+  syntax- och diffkontroll passerade.
+- [x] Oberoende read-only-review fann inga blockerare och bekräftade att
+  innehållet matchar aktuell produkttext samt att den anonyma vägen slutar före
+  den autentiserade AI-rutten.
+- [!] Dessa är offlinekontroller; publicerad preview för den utökade guiden
+  avvaktas. `main`, Production, Supabase, konton, kvoter och hemligheter är
+  orörda.
