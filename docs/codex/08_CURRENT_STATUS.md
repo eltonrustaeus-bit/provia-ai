@@ -3868,3 +3868,22 @@ kontrollera coachkortet utan att starta om eller avbryta något öppet prov.
 **PILOT NOT READY.** Nästa steg är att pushdeploya felmappningen och vid behov
 använda det nu säkra statusmeddelandet för att välja rätt åtgärd. Gör inget nytt
 liveförsök förrän statusen och återstående stagingbudget har kontrollerats.
+
+## P.E.R coach: senaste Preview-verifiering — 2026-10-25
+
+- [x] Felmappningscommit `9c863b61f49e6600aa4c026e8ab6eb58bc5f27f8` är
+  pushad till feature-branchen och Preview `dpl_DP1M1YXSPNbFDD7NF5p929qpBevz`
+  är `READY` med branch-aliasen verifierad.
+- [x] På den nya Previewn visades en rekommendation i coachkortet i stället för
+  att rutan blev tom. Svaret var kopplat till verifierade historikfält och
+  coachvyn gick ur laddningstillståndet.
+- [!] Stagingens budgetrad var oförändrad efter kontrollen (`$2.144983`
+  spenderat, `$0.263628` reserverat, `$0.970460` kvar). Därför är det inte
+  verifierat om svaret kom från en redan sparad konto-/evidensbunden cache eller
+  en ny modellgenerering; ingen ny AI-kostnad registrerades i budgetraden.
+- [!] Den säkra felmappningen är deployad men dess statusgrenar har endast
+  offline-testats. Den tidigare generiska livefelorsaken är fortfarande okänd.
+  Aktiv-provsledtråd har inte live-testats på den exakta Previewn.
+
+**PILOT NOT READY.** Den visuella coachleveransen är live-verifierad, men färsk
+modellgenerering, felstatusens liveorsak och aktiv provhjälp återstår.
