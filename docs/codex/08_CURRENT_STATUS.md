@@ -1,5 +1,25 @@
 # 08 Current Status
 
+# P.E.R auth-state synchronization — 2026-10-25
+
+- [x] Root cause: the visitor quota row was calculated once when the widget
+  loaded. Same-tab sign-in and cross-tab session changes could leave stale
+  guest UI visible after authentication.
+- [x] P.E.R now rechecks the local session on login, logout, language change,
+  and cross-tab auth storage events. Near-expiry access tokens stay signed in;
+  expired sessions are hidden from guest UI only after the registered
+  Supabase token provider confirms refresh.
+- [x] Offline coverage: `anon-per` 21/21, `stale-session` 13/13, and
+  `per-page-targets` 65/65. The refresh path is stubbed in the frontend test;
+  provider refresh itself is not claimed as live-verified.
+- [x] Independent review rechecked the refresh-token edge case and cross-tab
+  sign-in/sign-out; no blocker remains.
+- [!] A read-only staging budget check showed 0.972991 USD remaining under the
+  existing lower cap. No AI request was made: another authenticated Preview
+  tab showed an active exam, which was left untouched.
+- [!] This code checkpoint is local pending commit/push and a fresh Vercel
+  Preview. No `main`, Production, or database write was made.
+
 # P.E.R request-aware active-exam hints — 2026-10-25
 
 - [x] Active-exam guidance now recognizes explicit student requests for a

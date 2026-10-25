@@ -1133,7 +1133,42 @@
       setTimeout(hideNudge, 6000);
     }
 
-    function register(fn) { _getToken = fn; }
+    function register(fn) {
+      _getToken = fn;
+      syncLandingBar();
+    }
+
+    var _hasSession = false;
+    var _landingSyncGeneration = 0;
+    function syncLandingBar() {
+      var generation = ++_landingSyncGeneration;
+      _hasSession = false;
+      try {
+        var rawSession = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
+        if (rawSession) {
+          var storedSession = JSON.parse(rawSession);
+          var hasExpiry = storedSession && storedSession.expires_at !== undefined && storedSession.expires_at !== null;
+          var expiresAt = hasExpiry ? Number(storedSession.expires_at) : null;
+          // A near-expiry token still counts; expired tokens need auth refresh confirmation below.
+          _hasSession = !!(storedSession && storedSession.access_token && (
+            !hasExpiry || (Number.isFinite(expiresAt) && expiresAt > Date.now() / 1000)
+          ));
+        }
+      } catch (_) {}
+      var landingBar = document.getElementById('perLandingBar');
+      if (!landingBar) return;
+      if (_hasSession) landingBar.classList.remove('visible');
+      else {
+        updateLandingBar();
+        if (typeof _getToken === 'function') {
+          Promise.resolve().then(function () { return _getToken(); }).then(function (token) {
+            if (generation !== _landingSyncGeneration || !token) return;
+            _hasSession = true;
+            landingBar.classList.remove('visible');
+          }).catch(function () {});
+        }
+      }
+    }
 
     function clearAfterServerMemoryClear() {
       _perHistoryInvalidationGeneration++;
@@ -2565,17 +2600,12 @@ function finalizeMsg(div, text) {
           }
         }).catch(function() {});
 
-      /* Show quota bar for unauthenticated users on all pages */
-      var _hasSession = false;
-      try {
-        var _rawSess = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
-        // Samma giltighetsprövning som getToken(). En utgången session ska visa
-        // gratisraden, inte dölja den — annars ser besökaren inga frågor kvar
-        // samtidigt som de faktiskt har tre.
-        if (_rawSess) { _hasSession = sessionIsLive(JSON.parse(_rawSess)); }
-      } catch (_) {}
-      if (!_hasSession) updateLandingBar();
-      window.addEventListener('exgen:languagechange', function () { if (!_hasSession) updateLandingBar(); });
+      syncLandingBar();
+      window.addEventListener('storage', function (event) {
+        if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) syncLandingBar();
+      });
+      window.addEventListener('exgen:per-session-saved', syncLandingBar);
+      window.addEventListener('exgen:languagechange', syncLandingBar);
 
       /* Landing pages: keep P.E.R available without taking over the first view.
          The old first-visit flow opened the full chat automatically after 3.5s.
