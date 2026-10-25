@@ -278,9 +278,10 @@
      skickade { focus: … }; listan nedan hette currentQuestion. Objektet
      försvann utan felmeddelande och P.E.R svarade om fel fråga mitt i ett prov.
 
-     Fyra tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
+     Fem tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
      försvinna. Instansen var focus; klassen är tyst nyckelkassering. */
-  var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state'];
+  var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state', 'activeSection'];
+  var PER_IMPROVEMENT_SECTIONS = ['hem', 'felbank', 'prov', 'coach', 'rapport'];
   var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase', 'submissionId'];
   var _perManifest = null;
 
@@ -353,7 +354,9 @@
       page: typeof m.page === 'string' ? m.page : '',
       focus: (m.focus && typeof m.focus === 'object') ? m.focus : null,
       targets: perCleanTargets(m.targets),
-      state: st
+      state: st,
+      activeSection: m.page === 'förbättring' && PER_IMPROVEMENT_SECTIONS.indexOf(m.activeSection) !== -1
+        ? m.activeSection : ''
     };
     perResetStepsIfNewFocus();
     if (window.PER && window.PER._resetNudge) window.PER._resetNudge();
@@ -368,6 +371,7 @@
     var activeExam = exam.phase === 'exam';
     return JSON.stringify({
       page: context.page || 'app',
+      activeSection: context.activeSection || '',
       course: context.course || '',
       level: context.level || '',
       studyMaterial: context.studyMaterial || '',
@@ -393,6 +397,9 @@
     if (before.page !== after.page) return english
       ? 'The page changed while P.E.R was working. The reply was cancelled; send your question again on the current page.'
       : 'Sidan ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen på den aktuella sidan.';
+    if (before.activeSection !== after.activeSection) return english
+      ? 'The section changed while P.E.R was working. The reply was cancelled; ask again in the current section.'
+      : 'Sektionen ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen i den aktuella sektionen.';
     if (before.course !== after.course || before.level !== after.level) return english
       ? 'The study subject or level changed while P.E.R was working. The reply was cancelled; send your question again for the current subject.'
       : 'Ämne eller nivå ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen för det aktuella studieområdet.';
@@ -522,6 +529,7 @@
         if (Array.isArray(pc.questions)) ctx.questions = pc.questions;
         if (typeof pc.userScore === 'number') ctx.userScore = pc.userScore;
         if (Array.isArray(pc.weakAreas)) ctx.weakAreas = pc.weakAreas;
+        if (page === 'förbättring' && typeof pc.activeSection === 'string') ctx.activeSection = pc.activeSection;
         if (pc.course && !selectedCourse) ctx.course = pc.course;
         if (pc.level && !selectedLevel) ctx.level = pc.level;
         if (pc.mode) ctx.mode = pc.mode;
@@ -549,6 +557,7 @@
           };
         }
         if (m.state) ctx.examState = m.state;
+        if (ctx.page === 'förbättring' && m.activeSection) ctx.activeSection = m.activeSection;
         if (m.targets.length) {
           ctx.targets = m.targets.map(function (t) {
             return { id: t.id, label: t.label, hint: t.hint };
@@ -620,7 +629,8 @@
       page: ctx.page,
       focus: ctx.currentQuestion || ctx.focus || null,
       targets: ctx.targets || [],
-      state: ctx.examState || null
+      state: ctx.examState || null,
+      activeSection: ctx.activeSection || ''
     });
   };
   window.clearPerContext = function() { window._perPageContext = null; perDescribe(null); };

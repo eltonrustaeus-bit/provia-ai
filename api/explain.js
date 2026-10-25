@@ -16,7 +16,7 @@ import { decidePerRole, buildRoleInstruction } from "./_per-role.js";
 import { buildCurriculumContext } from "./_math-curriculum.js";
 import { buildLearningSignals, getLongMemoryEpoch, loadLongMemory, maybeRefreshLongMemory, savePerSessionHistory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
 import { currentPeriodKey, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
-import { buildPERContextPack, describePage } from "./_per-context.js";
+import { buildPERContextPack, describePage, safeImprovementSectionId } from "./_per-context.js";
 import { flagsEnabled } from "./_flags.js";
 /* buildProfileContext anropas inte härifrån längre — api/_learner-context.js är
    enda stället som sätter ihop elevblocken, och en andra väg in i prompten är
@@ -792,6 +792,21 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
         "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
         "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
       ]);
+  } else if (type !== "graph" && (
+    /\b(beräkna|räkna ut|calculate|compute)\b/i.test(normalizedQuestion) ||
+    (/\b(lös|solve|bestäm|determine)\b/i.test(normalizedQuestion) &&
+      (/[0-9]/.test(normalizedQuestion) ||
+        /\b(ekvation|formel|samband|funktion|värde|uttryck|x|y|equation|formula|relationship|function|value|expression)\b/i.test(normalizedQuestion)))
+  )) {
+    contextualSequence = en ? [
+      "Identify the quantity the question asks for. Which values are given, and what units belong to them?",
+      "Find the relationship or formula in your material that connects the given values to the quantity asked for. Which value can you substitute first?",
+      "Work through one operation at a time, keep the units visible, and check whether your result is reasonable in the original question.",
+    ] : [
+      "Identifiera vilken storhet frågan ber dig ta reda på. Vilka värden är givna, och vilka enheter hör till dem?",
+      "Hitta sambandet eller formeln i materialet som kopplar de givna värdena till det som efterfrågas. Vilket värde kan du sätta in först?",
+      "Räkna ett steg i taget, behåll enheterna synliga och kontrollera om resultatet är rimligt i den ursprungliga frågan.",
+    ];
   } else if (comparisonQuestion && !causeEffectQuestion) {
     contextualSequence = en ? [
         "Choose one shared comparison point. What does your material say about each item under that same point?",
@@ -1006,7 +1021,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
 
   function isClearlyGeneralQuestion() {
     const query = String(body.userQuestion || "").trim();
-    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|vad ska jag (?:göra nu|öva(?: mer)? på|fokusera på)|vad borde jag (?:öva(?: mer)? på|träna(?: mer)? på|fokusera på)|vad behöver jag (?:öva(?: mer)? på|träna(?: mer)? på)|ge (?:mig )?ett exempel|visa (?:mig )?ett exempel|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|what should i (?:study|practice|work on) next|what should I focus on|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)(?=$|[^\p{L}\p{N}_])/iu
+    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|vad ska jag (?:göra nu|öva(?: mer)? på|träna(?: mer)? på|fokusera på)|vad borde jag (?:öva(?: mer)? på|träna(?: mer)? på|fokusera på)|vad behöver jag (?:öva(?: mer)? på|träna(?: mer)? på)|ge (?:mig )?ett exempel|visa (?:mig )?ett exempel|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|what should i (?:study|practice|work on) next|what should I focus on|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)(?=$|[^\p{L}\p{N}_])/iu
       .test(query);
     // Natural standalone help requests need not use a textbook-style opening.
     // Require an explicit subject after the request so vague prompts such as
@@ -1038,7 +1053,13 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     if (perAnswerLease && ["abandoned", "expired", "missing"].includes(serverState)) {
       perAnswerLease.allowIncompleteGeneralChat = true;
     }
-    const safeContext = { page: isHomepage ? "startsida" : "app" };
+    const safePage = isHomepage ? "startsida"
+      : describePage(context?.page) === "förbättring" ? "förbättring" : "app";
+    const safeContext = { page: safePage };
+    if (safePage === "förbättring") {
+      const activeSection = safeImprovementSectionId(context?.activeSection);
+      if (activeSection) safeContext.activeSection = activeSection;
+    }
     const stripStaleExamSource = isHomepage || staleProvView || hasStaleExamPayload;
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
       if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;

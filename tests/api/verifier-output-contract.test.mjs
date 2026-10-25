@@ -314,6 +314,29 @@ const unsupportedBiology = await runWithResults([{
 "Alleler är olika varianter av en gen.");
 assert.equal(decideApproval(unsupportedBiology.outcome.perQuestion.get(validOpenQuestion.id)), false,
   "a topical allele quote cannot override an explicit unsupported-claim verdict");
+
+const topicalButUnsupportedQuestion = {
+  id: "bio-topical-but-unsupported", type: "short_answer",
+  question: "Vilken roll har cellkärnan vid fotosyntesen?",
+  model_answer: "Cellkärnan omvandlar ljus till glukos.",
+  rubric: "Förklara cellkärnans roll.",
+};
+const topicalButUnsupportedReview = await runWithResults([{
+  ...result(topicalButUnsupportedQuestion.id, false),
+  factual_accuracy: 0.2, ambiguity_score: 0, difficulty_match: 1,
+  source_alignment: 0.2, scoring_quality: 0.2, language_quality: 1,
+  language_match: true, option_quality: [], issues: ["source_support"],
+  required_changes: ["Frågan och svaret stöds inte av den angivna källan."],
+  source_support: { ...sourceSupport("Fotosyntesen sker i kloroplasterna."),
+    question: false, answer: false, rubric: false },
+}], [topicalButUnsupportedQuestion], "Fotosyntesen sker i kloroplasterna.");
+const topicalReviewInput = JSON.parse(topicalButUnsupportedReview.requestBody.input.find((item) => item.role === "user").content);
+assert.equal(topicalButUnsupportedReview.outcome.callOk, true,
+  "a structured semantic rejection is parsed as a completed verifier response");
+assert.equal(topicalReviewInput.source_material, "Fotosyntesen sker i kloroplasterna.");
+assert.equal(topicalReviewInput.questions[0].question, topicalButUnsupportedQuestion.question);
+assert.equal(decideApproval(topicalButUnsupportedReview.outcome.perQuestion.get(topicalButUnsupportedQuestion.id)), false,
+  "the full verifier transport and approval contract fail closed for a topical but unsupported question");
 for (const source_support of [
   { ...validOpenReview.source_support, rubric_parts: [] },
   { ...validOpenReview.source_support, rubric_parts: [false] },
@@ -374,7 +397,9 @@ assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), fal
 
 const focus = [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: ["calculation_error"],
   sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
-  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }];
+  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen",
+  sourceEvidence: ["y = 2x + 3 beskriver en linjär funktion."] }];
+const focusMaterial = "y = 2x + 3 beskriver en linjär funktion. Linjär funktion: y = 2x + 3.";
 const focusedResult = {
   ...result("q-focus", true), factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
@@ -382,7 +407,7 @@ const focusedResult = {
   duplicate_of: "", source_support: sourceSupport("Linjär funktion: y = 2x + 3."),
   training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: ["focus-1"],
 };
-const focusedReview = await runWithResults([focusedResult], [question("q-focus")], "Linjär funktion: y = 2x + 3.", undefined, "C", undefined, "sv", undefined, focus);
+const focusedReview = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined, "C", undefined, "sv", undefined, focus);
 const focusSchema = focusedReview.requestBody.text.format.schema.properties.results.items;
 const focusPayload = JSON.parse(focusedReview.requestBody.input.find((item) => item.role === "user").content);
 assert.ok(focusSchema.required.includes("training_focus_alignment"), "mistake-training requires an explicit alignment verdict");
@@ -393,8 +418,9 @@ assert.equal(focusSchema.properties.training_focus_matches.minItems, 0,
   "an explicit no-match review is representable so the server can reject only that candidate");
 assert.deepEqual(focusPayload.training_focus, [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: ["calculation_error"],
   source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
-  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
-  "reviewer receives the bounded source question, verified answer, and grading evidence without source identities");
+  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen",
+  source_evidence: ["y = 2x + 3 beskriver en linjär funktion."] }],
+  "reviewer receives bounded, verified source evidence alongside the documented mistake");
 assert.match(focusedReview.requestBody.input[0].content, /skill.*training_focus_skill_matches.*brett concept.*aldrig ersätta skill/i);
 assert.match(focusedReview.requestBody.input[0].content, /Generiska error_tags.*får aldrig ensamma räcka/i);
 assert.match(focusedReview.requestBody.input[0].content, /source_question, student_answer och grading_feedback.*training_focus_error_matches/i);
@@ -402,15 +428,62 @@ assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"
   "a source-grounded question that misses the documented mistake cannot pass training review");
 assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: true }), true,
   "a focused question can pass only when the existing quality checks also pass");
+const oversizedFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined,
+  undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["A", "B", "C", "D"] }]);
+assert.equal(oversizedFocusEvidence.outcome.callOk, false,
+  "more than three source excerpts is rejected before reviewer dispatch");
+assert.equal(oversizedFocusEvidence.outcome.failureReason, "invalid_review_input");
+assert.equal(oversizedFocusEvidence.fetchCalls, 0);
+const maxLengthFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "x".repeat(500), undefined, undefined,
+  undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["x".repeat(500)] }]);
+assert.equal(maxLengthFocusEvidence.outcome.callOk, true,
+  "an excerpt at the documented 500-character limit is accepted");
+for (const sourceEvidence of [["x".repeat(501)], ["   "], [42]]) {
+  const malformedEvidence = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined, undefined,
+    undefined, "sv", undefined, [{ ...focus[0], sourceEvidence }]);
+  assert.equal(malformedEvidence.outcome.callOk, false,
+    "overlong, blank, or non-text excerpts fail before reviewer dispatch");
+  assert.equal(malformedEvidence.outcome.failureReason, "invalid_review_input");
+  assert.equal(malformedEvidence.fetchCalls, 0);
+}
+const staleFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "Aktuellt källmaterial.", undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["Ett utdrag från ett annat eller äldre material."] }]);
+assert.equal(staleFocusEvidence.outcome.callOk, false,
+  "a focus excerpt not present in the verifier's source material is rejected");
+assert.equal(staleFocusEvidence.outcome.failureReason, "invalid_review_input");
+assert.equal(staleFocusEvidence.fetchCalls, 0,
+  "unverifiable focus evidence is rejected before spending a reviewer call");
+const normalizedFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], focusMaterial, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["y = 2x + 3 beskriver en linja\u0308r\tfunktion."] }]);
+assert.equal(normalizedFocusEvidence.outcome.callOk, true,
+  "equivalent NFKC and whitespace-normalized excerpts remain verifiable");
+const partialWordFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], "funktionslära är relevant.", undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: ["funktion"] }]);
+assert.equal(partialWordFocusEvidence.outcome.callOk, false,
+  "an excerpt that appears only inside a larger word is not treated as source evidence");
+assert.equal(partialWordFocusEvidence.fetchCalls, 0);
+const emojiExcerpt = "🙂".repeat(250);
+const maxUnicodeFocusEvidence = await runWithResults([focusedResult], [question("q-focus")], emojiExcerpt, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: [emojiExcerpt] }]);
+assert.equal(emojiExcerpt.length, 500);
+assert.equal(maxUnicodeFocusEvidence.outcome.callOk, true,
+  "the 500 UTF-16 code-unit excerpt boundary remains accepted for supplementary Unicode");
+const overUnicodeFocusEvidence = "🙂".repeat(251);
+const overUnicodeFocusReview = await runWithResults([focusedResult], [question("q-focus")], overUnicodeFocusEvidence, undefined,
+  undefined, undefined, "sv", undefined, [{ ...focus[0], sourceEvidence: [overUnicodeFocusEvidence] }]);
+assert.equal(overUnicodeFocusEvidence.length, 502);
+assert.equal(overUnicodeFocusReview.outcome.failureReason, "invalid_review_input");
+assert.equal(overUnicodeFocusReview.fetchCalls, 0,
+  "supplementary characters cannot bypass the excerpt's code-unit limit");
 const genericOnlyReview = await runWithResults([{
   ...focusedResult, training_focus_alignment: true, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(genericOnlyReview.outcome.callOk, true);
 assert.equal(decideApproval(genericOnlyReview.outcome.perQuestion.get("q-focus")), false,
   "a generic error label without a specific concept/skill match cannot pass training review");
 const broadConceptOnlyReview = await runWithResults([{
   ...focusedResult, training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: [], training_focus_error_matches: ["focus-1"],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(broadConceptOnlyReview.outcome.callOk, true);
 assert.deepEqual(broadConceptOnlyReview.outcome.perQuestion.get("q-focus").training_focus_matches, [],
   "a broad concept match cannot claim coverage of a focus with a more specific documented failed skill");
@@ -418,30 +491,30 @@ assert.equal(decideApproval(broadConceptOnlyReview.outcome.perQuestion.get("q-fo
   "a question that only overlaps the broad topic is withheld from mistake training");
 const skillWithoutErrorMatch = await runWithResults([{
   ...focusedResult, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: [],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.deepEqual(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus").training_focus_matches, [],
   "a broad skill match without explicit alignment to the verified missed component cannot pass");
 assert.equal(decideApproval(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus")), false);
 const explicitNoMatch = await runWithResults([{
   ...focusedResult, approved: false, training_focus_alignment: false, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
   required_changes: ["Öva en dokumenterad färdighet."],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(explicitNoMatch.outcome.callOk, true,
   "the structured reviewer can return a valid explicit no-match decision");
 assert.equal(decideApproval(explicitNoMatch.outcome.perQuestion.get("q-focus")), false,
   "an explicit no-match remains rejected by deterministic approval");
 const inventedFocusReview = await runWithResults([{
   ...focusedResult, training_focus_matches: ["focus-999"],
-}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+}], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(inventedFocusReview.outcome.callOk, false, "an invented focus ID invalidates the independent review response");
 assert.equal(inventedFocusReview.outcome.failureReason, "invalid_training_focus_matches");
-const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingFocusVerdict.outcome.callOk, false, "missing focus verdict fails the complete review closed");
 assert.equal(missingFocusVerdict.outcome.failureReason, "missing_training_focus_alignment");
-const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingSkillVerdict.outcome.callOk, false, "missing specific-skill verdict fails the complete review closed");
 assert.equal(missingSkillVerdict.outcome.failureReason, "missing_training_focus_skill_matches");
-const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], focusMaterial, undefined, undefined, undefined, "sv", undefined, focus);
 assert.equal(missingErrorVerdict.outcome.callOk, false, "missing specific-error verdict fails the complete review closed");
 assert.equal(missingErrorVerdict.outcome.failureReason, "missing_training_focus_error_matches");
 const sanitizedFocus = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined,

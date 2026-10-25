@@ -681,12 +681,17 @@ await assertPageTopic("/förbättring.html", "förbättring");
   ok("T2c1 svaga områden hämtas inte från lokal historik", t2b.weakAreas === undefined, JSON.stringify(t2b.weakAreas));
   ok("T2d sidan är förbättring", t2b.page === "förbättring", t2b.page);
   ok("T2d1 provhistorik beskrivs inte som aktiv provstatus", t2b.examState === undefined);
+  ok("T2d2 startsidan på förbättringssidan är känd för P.E.R", t2b.activeSection === "hem",
+    String(t2b.activeSection));
 
   await page.evaluate(() => localStorage.setItem("proviaai_per_coach_cache", JSON.stringify({
     ownerId: "another-account", ts: Date.now(), text: "PRIVATE_OTHER_ACCOUNT_COACH_MARKER",
   })));
   await page.click('[data-go="coach"]');
   await page.waitForTimeout(300);
+  ok("T2d3 vald coachsektion följer P.E.R:s sidkontext",
+    await page.evaluate(() => window.__perTestCtx().activeSection) === "coach",
+    String(await page.evaluate(() => window.__perTestCtx().activeSection)));
   ok("T2d2 coachcache från ett annat konto visas inte",
     !(await page.locator("#coachText").textContent()).includes("PRIVATE_OTHER_ACCOUNT_COACH_MARKER"));
 
@@ -829,6 +834,53 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.waitForFunction(question => document.getElementById("perInput")?.value === question, "Draft after expired login");
   ok("the same account can recover its draft after signing back in",
     await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+  await ctx.close();
+}
+
+// A reply started in one section must not be painted after the student moves
+// to another section on the same page.
+{
+  let releaseResponse;
+  let requestStarted;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion === "Vad betyder det här?") {
+        requestStarted(body);
+        await responseGate;
+        await route.fulfill({ json: { answer: "STALE_SECTION_REPLY_MARKER", helpCap: 3 } });
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.evaluate(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.__perSectionRequestAborted = false;
+    window.fetch = (input, init = {}) => {
+      if (String(input).includes("/api/explain") && init.signal) {
+        init.signal.addEventListener("abort", () => { window.__perSectionRequestAborted = true; }, { once: true });
+      }
+      return nativeFetch(input, init);
+    };
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Vad betyder det här?");
+  await page.locator("#perSendBtn").click();
+  const requestBody = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("section-context P.E.R request did not start")), 5000)),
+  ]);
+  ok("P.E.R request carries the current improvement section",
+    requestBody.pageContext?.activeSection === "hem", JSON.stringify(requestBody.pageContext));
+  await page.click('[data-go="coach"]');
+  await page.locator("#perMessages .per-msg.teacher")
+    .filter({ hasText: "Sektionen ändrades medan P.E.R arbetade." }).waitFor({ timeout: 5000 });
+  ok("section switch aborts the in-flight P.E.R fetch", await page.evaluate(() => window.__perSectionRequestAborted));
+  releaseResponse();
+  await page.waitForTimeout(250);
+  ok("a late answer from the previous section is discarded",
+    !(await page.locator("#perMessages").textContent()).includes("STALE_SECTION_REPLY_MARKER"));
   await ctx.close();
 }
 

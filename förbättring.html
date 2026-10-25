@@ -1634,11 +1634,12 @@
       if(!window.setPerContext)return;
       window.setPerContext({
         page:'förbättring',
+        activeSection:flow.current(),
         targets:PER_TARGETS
       });
       /* Exponeras bara för riggen. setPerContext sväljer manifestet och det
          finns ingen väg tillbaka ut. */
-      window.__perManifestForTest={targets:PER_TARGETS};
+      window.__perManifestForTest={activeSection:flow.current(),targets:PER_TARGETS};
     }
     document.addEventListener('DOMContentLoaded',pushPerContext,{once:true});
 

@@ -1,4 +1,15 @@
 const BLOCKED_CONTEXT_REGEX = /\b(ignore previous|ignore all|system prompt|developer message|api key|secret|token|supabase_service_role|stripe_secret|openai_api_key|env(?:ironment)? variables?)\b/i;
+const IMPROVEMENT_SECTIONS = Object.freeze({
+  hem: "översikt",
+  felbank: "felbank",
+  prov: "provhistorik",
+  coach: "studiecoach",
+  rapport: "övningsrapport",
+});
+
+export function safeImprovementSectionId(value) {
+  return typeof value === "string" && Object.hasOwn(IMPROVEMENT_SECTIONS, value) ? value : "";
+}
 
 function cleanText(value, maxLen = 120) {
   if (value === null || value === undefined) return "";
@@ -119,6 +130,17 @@ export function buildPERContextPack({
   if (course) pageContext.course = course;
   if (level) pageContext.level = level;
   if (mode) pageContext.mode = mode;
+
+  // The client sends only a screen id; map it to a fixed label before it can
+  // reach the prompt. Ignore section claims from every other page.
+  if (page === "förbättring" && typeof raw.activeSection === "string") {
+    const sectionId = safeImprovementSectionId(raw.activeSection);
+    const activeSection = sectionId ? IMPROVEMENT_SECTIONS[sectionId] : "";
+    if (activeSection) {
+      pageContext.activeSection = activeSection;
+      summaryLines.push(`Aktiv del av förbättringssidan: ${activeSection}`);
+    }
+  }
 
   const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });
   const resultStudyContext = !currentQuestion && (

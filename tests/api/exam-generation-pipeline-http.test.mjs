@@ -34,6 +34,7 @@ let useActualGeneratorForPipeline = false;
 let mockActualProviderResponses = false;
 let reuseActualProviderIds = false;
 let rejectNextActualVerifierQuestion = false;
+let rejectActualTrainingFocus = false;
 let rejectActualVerifierIndex = 0;
 let nextActualVerifierFailureCode = "low_source_alignment";
 let exhaustInlineRepairBudget = false;
@@ -50,6 +51,7 @@ const actualGenerationCandidateStems = [];
 const actualGenerationDeadlines = [];
 const actualVerifierPayloadLengths = [];
 const actualVerifierQuestionCounts = [];
+const actualTrainingFocusReviewDecisions = [];
 const rejectedActualStems = [];
 const mockedUsageEvents = [];
 const mockedPipelineCheckpoints = [];
@@ -58,12 +60,16 @@ let authenticatedUserId = userId;
 let setupDelays = null;
 let fakeNow = Date.now();
 let lastBatchRemainingMs = null;
+let verifiedMistakeSource = null;
+const actualVerifierTrainingFocus = [];
 const originalFetch = globalThis.fetch;
 const originalDateNow = Date.now;
 const originalSetTimeout = globalThis.setTimeout;
 const originalConsoleInfo = console.info;
 const require = createRequire(import.meta.url);
 const generation = require("../../api/generate-exam.js");
+const gradeTasks = require("../../api/_grade-task.js");
+const examCompletion = require("../../api/_exam-completion.cjs");
 const originalGenerateBatch = generation.generateVerifiedBatch;
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
@@ -142,6 +148,13 @@ globalThis.fetch = async (input, init = {}) => {
         const review = JSON.parse(body.input[1].content);
         actualVerifierPayloadLengths.push(body.input[1].content.length);
         actualVerifierQuestionCounts.push(review.questions.length);
+        if (Array.isArray(review.training_focus) && review.training_focus.length) {
+          actualVerifierTrainingFocus.push(review.training_focus);
+          actualTrainingFocusReviewDecisions.push({
+            alignment: !rejectActualTrainingFocus,
+            matchedIds: rejectActualTrainingFocus ? [] : review.training_focus.map((focus) => focus.id),
+          });
+        }
         const rejectedQuestion = rejectNextActualVerifierQuestion ? review.questions[rejectActualVerifierIndex] : null;
         const rejectedId = rejectedQuestion?.id || null;
         const failureCode = rejectedId ? nextActualVerifierFailureCode : null;
@@ -157,7 +170,7 @@ globalThis.fetch = async (input, init = {}) => {
         }
         if (rejectedId && abortRepairAfterRejection) abortNextActualStream = true;
         return responseBody({ results: review.questions.map((question) => ({
-          id: question.id, approved: question.id !== rejectedId,
+          id: question.id, approved: question.id !== rejectedId && !rejectActualTrainingFocus,
           factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
           source_alignment: question.id === rejectedId ? 0.5 : 1,
           scoring_quality: 1, language_quality: 1,
@@ -170,8 +183,16 @@ globalThis.fetch = async (input, init = {}) => {
             accepted_answer_evidence: Array.isArray(question.accepted_answers) ? question.accepted_answers.map(() => [0]) : [] },
           language_match: true, option_quality: question.options.map(() => true),
           duplicate_of: "",
-          issues: question.id === rejectedId ? [failureCode] : [],
-          required_changes: question.id === rejectedId ? [failureNote] : [],
+          issues: question.id === rejectedId ? [failureCode]
+            : rejectActualTrainingFocus && review.training_focus?.length ? ["training_focus_mismatch"] : [],
+          required_changes: question.id === rejectedId ? [failureNote]
+            : rejectActualTrainingFocus && review.training_focus?.length ? ["Matcha inte elevens specifika dokumenterade fel."] : [],
+          ...(Array.isArray(review.training_focus) && review.training_focus.length ? {
+            training_focus_alignment: !rejectActualTrainingFocus,
+            training_focus_matches: rejectActualTrainingFocus ? [] : review.training_focus.map((focus) => focus.id),
+            training_focus_skill_matches: rejectActualTrainingFocus ? [] : review.training_focus.map((focus) => focus.id),
+            training_focus_error_matches: rejectActualTrainingFocus ? [] : review.training_focus.map((focus) => focus.id),
+          } : {}),
         })) });
       }
       if (stage === "exam_solver_schema") {
@@ -210,6 +231,28 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.pathname === "/auth/v1/user") return ok({ id: authenticatedUserId });
   if (url.pathname === "/rest/v1/profiles") return ok([{ role: "gratis" }]);
   if (url.pathname === "/rest/v1/user_profiles") return ok([]);
+  if (url.pathname === "/rest/v1/user_exams") {
+    const requestedUser = url.searchParams.get("user_id")?.replace(/^eq\./, "");
+    const requestedSubmission = url.searchParams.get("submission_id")?.replace(/^eq\./, "");
+    return ok(verifiedMistakeSource?.userExam?.user_id === requestedUser &&
+      verifiedMistakeSource?.userExam?.submission_id === requestedSubmission
+      ? [verifiedMistakeSource.userExam] : []);
+  }
+  if (url.pathname === "/rest/v1/mock_results") {
+    const requestedUser = url.searchParams.get("user_id")?.replace(/^eq\./, "");
+    const requestedSubmission = url.searchParams.get("submission_id")?.replace(/^eq\./, "");
+    return ok(verifiedMistakeSource?.grade?.user_id === requestedUser &&
+      verifiedMistakeSource?.grade?.submission_id === requestedSubmission &&
+      url.searchParams.get("verified_at") === "not.is.null"
+      ? [verifiedMistakeSource.grade] : []);
+  }
+  if (url.pathname === "/rest/v1/exam_issuances" && init.method !== "POST") {
+    const requestedUser = url.searchParams.get("user_id")?.replace(/^eq\./, "");
+    const requestedSubmission = url.searchParams.get("submission_id")?.replace(/^eq\./, "");
+    return ok(verifiedMistakeSource?.issuance?.user_id === requestedUser &&
+      verifiedMistakeSource?.issuance?.submission_id === requestedSubmission
+      ? [verifiedMistakeSource.issuance] : []);
+  }
   if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs" && init.method === "POST") {
     const row = body;
     lastPipelineJobUpsert = row;
@@ -931,6 +974,197 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       )).rows[0].n, issuanceBaseline + 1,
       `${requested}: replay does not issue a duplicate exam`);
     }
+
+    const trainingCourse = "Aritmetik";
+    const trainingMaterial = source;
+    const trainingQuestionBase = {
+      id: "source-mistake-q1", type: "short", points: 2,
+      question: "Beräkna 2 + 3.", options: [], model_answer: "5",
+      concept_tag: "Addition", learning_objective: "Beräkna summor",
+      source_references: ["Addition: Beräkna summan av två tal."],
+    };
+    const trainingContextHash = gradeTasks.hashContext(trainingMaterial, trainingCourse, userId);
+    const trainingSourceQuestion = {
+      ...trainingQuestionBase,
+      grade_task: gradeTasks.sealQuestion(trainingQuestionBase, undefined, trainingContextHash),
+    };
+    const trainingSourceQuestions = [trainingSourceQuestion];
+    const trainingSubmissionId = examCompletion.submissionId(userId, trainingCourse, trainingSourceQuestions);
+    const trainingReceipt = examCompletion.issueCompletion(userId, trainingCourse, trainingSourceQuestions);
+    const trainingAnswers = [{ id: trainingSourceQuestion.id, answer: "6" }];
+    const trainingProof = examCompletion.verifyCompletion({
+      receipt: trainingReceipt, course: trainingCourse, material: trainingMaterial,
+      questions: trainingSourceQuestions, answers: trainingAnswers,
+      selectedQuestionId: trainingSourceQuestion.id,
+    }, userId);
+    assert.ok(trainingProof, "synthetic source exam has a valid signed completion proof");
+    const trainingResultPayload = { per_question: [{
+      id: trainingSourceQuestion.id, points: 0, max_points: 2,
+      feedback: "Du adderade ett extra steg; kontrollera vilka tal uppgiften faktiskt anger.",
+      model_answer: "5", error_tags: ["calculation_error"],
+    }] };
+    const trainingSourceFixture = {
+      userExam: {
+        user_id: userId, submission_id: trainingSubmissionId, course: trainingCourse,
+        material: trainingMaterial,
+        exam: { questions: trainingSourceQuestions, submission_receipt: trainingReceipt },
+        answers: trainingAnswers,
+      },
+      grade: {
+        user_id: userId, submission_id: trainingSubmissionId,
+        verified_at: "2026-10-25T10:00:00.000Z", num_questions: 1,
+        answer_fingerprint: trainingProof.answerFingerprint,
+        result_payload: trainingResultPayload,
+        result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      },
+      issuance: {
+        user_id: userId, submission_id: trainingSubmissionId,
+        answer_fingerprint: trainingProof.answerFingerprint,
+        result_payload: trainingResultPayload,
+        result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      },
+    };
+    verifiedMistakeSource = trainingSourceFixture;
+    const mistakeTrainingKey = testUuid(12_900);
+    const mistakeTrainingStart = await callStart({
+      lang: "sv", level: "C", course: trainingCourse, qType: "mc", numQuestions: 12,
+      pastedText: "",
+      sourceReferences: [{ submissionId: trainingSubmissionId, questionIds: [trainingSourceQuestion.id] }],
+      trainingFocus: [{ sourceSubmissionId: trainingSubmissionId, sourceQuestionId: trainingSourceQuestion.id }],
+      priorQuestions: [], idempotencyKey: mistakeTrainingKey,
+    });
+    assert.equal(mistakeTrainingStart.statusCode, 202, JSON.stringify(mistakeTrainingStart.body));
+    const mistakeTrainingJob = (await db.query(
+      "select id,quota_request_id,payload from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+      [mistakeTrainingKey],
+    )).rows[0];
+    assert.equal(mistakeTrainingJob.payload.pastedText, trainingMaterial,
+      "the pipeline uses only material loaded from the owned signed exam");
+    assert.deepEqual(mistakeTrainingJob.payload.trainingFocus.map(({ focusId, sourceQuestionId, skill, errorTags, sourceEvidence }) =>
+      ({ focusId, sourceQuestionId, skill, errorTags, sourceEvidence })), [{
+      focusId: "focus-1", sourceQuestionId: trainingSourceQuestion.id,
+      skill: "Beräkna summor", errorTags: ["calculation_error"],
+      sourceEvidence: ["Addition: Beräkna summan av två tal."],
+    }], "the persisted job derives its training target, error and source evidence from the verified grade");
+
+    const mistakeTrainingIssuancesBefore = (await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n;
+    actualVerifierTrainingFocus.length = 0;
+    mockedPipelineCheckpoints.length = 0;
+    mockedProviderStages.length = 0;
+    mockActualProviderResponses = true;
+    useActualGeneratorForPipeline = true;
+    let mistakeTrainingResult = null;
+    const mistakeTrainingAdvanceStatuses = [];
+    try {
+      const operationId = mistakeTrainingJob.id;
+      for (let call = 0; call < 8 && !mistakeTrainingResult; call++) {
+        const response = await callAdvance(operationId);
+        mistakeTrainingAdvanceStatuses.push(response.statusCode);
+        if (response.statusCode === 200) mistakeTrainingResult = response;
+        else assert.equal(response.statusCode, 202, JSON.stringify(response.body));
+      }
+    } finally {
+      mockActualProviderResponses = false;
+      useActualGeneratorForPipeline = false;
+      verifiedMistakeSource = trainingSourceFixture;
+    }
+    assert.ok(mistakeTrainingResult, "verified mistake training completes through authenticated HTTP issuance");
+    assert.equal(mistakeTrainingResult.body.exam.questions.length, 12);
+    assert.equal(mistakeTrainingResult.body.meta.requested, 12);
+    assert.equal(mistakeTrainingResult.body.meta.partial, false);
+    assert.ok(mistakeTrainingAdvanceStatuses.includes(202),
+      "the 12-question mistake exam persists progress and resumes through a later HTTP advance");
+    assert.equal(mistakeTrainingAdvanceStatuses.at(-1), 200);
+    assert.ok(actualVerifierTrainingFocus.length > 0,
+      "the real internal generator sends the server-derived mistake to independent review");
+    assert.ok(actualVerifierTrainingFocus.flat().every((focus) =>
+      focus.source_evidence?.includes("Addition: Beräkna summan av två tal.") &&
+      focus.grading_feedback?.includes("extra steg")),
+    "review input carries exact source evidence and verified grading feedback");
+    const mistakeTrainingCheckpoint = mockedPipelineCheckpoints.at(-1);
+    assert.equal(mistakeTrainingCheckpoint.length, 12);
+    assert.ok(mistakeTrainingCheckpoint.every((question) =>
+      question.validation_status === "verified" && question.training_focus_matches?.includes("focus-1")),
+    "every issued training item is independently verified and explicitly matched to the missed focus");
+    assert.equal(mistakeTrainingResult.body.exam.questions.length,
+      mistakeTrainingCheckpoint.length, "issuance contains exactly the verified training checkpoint");
+    assert.equal((await db.query(
+      "select status from public.mock_exam_quota_reservations where request_id=$1",
+      [mistakeTrainingJob.quota_request_id],
+    )).rows[0].status, "consumed");
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, mistakeTrainingIssuancesBefore + 1,
+    "verified mistake training issues once after the full source-to-review pipeline");
+
+    const rejectedMistakeKey = testUuid(12_901);
+    const rejectedMistakeQuotaBefore = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    const rejectedMistakeStart = await callStart({
+      lang: "sv", level: "C", course: trainingCourse, qType: "mc", numQuestions: 3,
+      pastedText: "",
+      sourceReferences: [{ submissionId: trainingSubmissionId, questionIds: [trainingSourceQuestion.id] }],
+      trainingFocus: [{ sourceSubmissionId: trainingSubmissionId, sourceQuestionId: trainingSourceQuestion.id }],
+      priorQuestions: [], idempotencyKey: rejectedMistakeKey,
+    });
+    assert.equal(rejectedMistakeStart.statusCode, 202, JSON.stringify(rejectedMistakeStart.body));
+    const rejectedMistakeJob = (await db.query(
+      "select id,quota_request_id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+      [rejectedMistakeKey],
+    )).rows[0];
+    const rejectedMistakeIssuancesBefore = (await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n;
+    actualVerifierTrainingFocus.length = 0;
+    actualTrainingFocusReviewDecisions.length = 0;
+    mockedProviderStages.length = 0;
+    mockedPipelineCheckpoints.length = 0;
+    mockActualProviderResponses = true;
+    useActualGeneratorForPipeline = true;
+    rejectActualTrainingFocus = true;
+    let rejectedMistakeResponse = null;
+    try {
+      for (let call = 0; call < 12 && !rejectedMistakeResponse; call++) {
+        const response = await callAdvance(rejectedMistakeJob.id);
+        if (response.statusCode !== 202) rejectedMistakeResponse = response;
+      }
+    } finally {
+      mockActualProviderResponses = false;
+      useActualGeneratorForPipeline = false;
+      rejectActualTrainingFocus = false;
+      verifiedMistakeSource = null;
+    }
+    assert.ok(rejectedMistakeResponse, "a repeated focus mismatch reaches a terminal response");
+    assert.notEqual(rejectedMistakeResponse.statusCode, 200,
+      "a candidate explicitly rejected for the documented mistake cannot become a completed exam");
+    assert.ok(mockedProviderStages.includes("exam_verifier_schema") && actualVerifierTrainingFocus.length > 0,
+      "the negative scenario reaches the actual independent verifier path");
+    assert.ok(actualTrainingFocusReviewDecisions.some((decision) =>
+      decision.alignment === false && decision.matchedIds.length === 0),
+    "the independent verifier explicitly rejects the documented focus match");
+    assert.ok(mockedPipelineCheckpoints.length > 0 && mockedPipelineCheckpoints.every((questions) =>
+      Array.isArray(questions) && questions.length === 0),
+    "no focus-mismatched candidates enter a durable accepted-question checkpoint");
+    assert.deepEqual((await db.query(
+      "select state,stage from public.mock_exam_generation_pipeline_jobs where id=$1",
+      [rejectedMistakeJob.id],
+    )).rows[0], { state: "failed", stage: "terminal" });
+    assert.equal((await db.query(
+      "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
+    )).rows[0].n, rejectedMistakeIssuancesBefore,
+    "rejected mistake-training candidates produce no issuance");
+    assert.equal((await db.query(
+      "select status from public.mock_exam_quota_reservations where request_id=$1",
+      [rejectedMistakeJob.quota_request_id],
+    )).rows[0].status, "refunded",
+    "when no candidate matches, the reserved exam quota is refunded");
+    assert.equal((await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count, rejectedMistakeQuotaBefore,
+    "a failed focus-mismatch attempt consumes no lasting exam quota");
 
     const objectiveQuotaBefore = (await db.query(
       "select mock_quota_count from public.profiles where id=$1", [userId],
@@ -1861,8 +2095,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,30,
-      "full 3/6/12 runs and repairs, mixed partials, retries, deadline and queued-assembly salvages, and timeout recovery issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,31,
+      "full 3/6/12 runs, verified mistake training, repairs, mixed partials, retries, deadline and queued-assembly salvages issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
@@ -2149,6 +2383,9 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     mismatchedActualSolverStem = null;
     actualGenerationCandidateStems.length = 0;
     rejectNextActualVerifierQuestion = false;
+    rejectActualTrainingFocus = false;
+    verifiedMistakeSource = null;
+    actualTrainingFocusReviewDecisions.length = 0;
     mockActualProviderResponses = false;
     useActualGeneratorForPipeline = false;
     setupDelays = null;

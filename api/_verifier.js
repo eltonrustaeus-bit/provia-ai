@@ -201,7 +201,7 @@ function reviewInputWithinLimits(input) {
   const trainingFocus = Array.isArray(input.training_focus) ? input.training_focus : [];
   if (trainingFocus.length > 20) return false;
   for (const focus of trainingFocus) {
-    if (!focus || Object.keys(focus).some((key) => !["id", "concept", "skill", "error_tags", "source_question", "student_answer", "grading_feedback", "expected_answer"].includes(key)) ||
+    if (!focus || Object.keys(focus).some((key) => !["id", "concept", "skill", "error_tags", "source_question", "student_answer", "grading_feedback", "expected_answer", "source_evidence"].includes(key)) ||
         (focus.id !== undefined && (typeof focus.id !== "string" || focus.id.length > 20)) ||
         (focus.concept !== undefined && (typeof focus.concept !== "string" || focus.concept.length > 100)) ||
         (focus.skill !== undefined && (typeof focus.skill !== "string" || focus.skill.length > 160)) ||
@@ -209,7 +209,10 @@ function reviewInputWithinLimits(input) {
         (focus.source_question !== undefined && (typeof focus.source_question !== "string" || focus.source_question.length > 1200)) ||
         (focus.student_answer !== undefined && (typeof focus.student_answer !== "string" || focus.student_answer.length > 1200)) ||
         (focus.grading_feedback !== undefined && (typeof focus.grading_feedback !== "string" || focus.grading_feedback.length > 1000)) ||
-        (focus.expected_answer !== undefined && (typeof focus.expected_answer !== "string" || focus.expected_answer.length > 1000))) return false;
+        (focus.expected_answer !== undefined && (typeof focus.expected_answer !== "string" || focus.expected_answer.length > 1000)) ||
+        (focus.source_evidence !== undefined && (!Array.isArray(focus.source_evidence) || focus.source_evidence.length > 3 ||
+          focus.source_evidence.some((evidence) => typeof evidence !== "string" || !evidence.trim() || evidence.length > 500 ||
+            filterSourceReferences(input.source_material, [evidence]).length !== 1)))) return false;
     size += JSON.stringify(focus).length;
     if (size > REVIEW_PAYLOAD_CHAR_CAP) return false;
   }

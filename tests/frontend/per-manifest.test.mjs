@@ -81,6 +81,7 @@ ok("T5 bara giltiga id överlever", t5.targets?.length === 1 && t5.targets[0].id
 const t6 = await page.evaluate(() => {
   window.setPerContext({
     page: "förbättring",
+    activeSection: "coach",
     userScore: 0.62,
     weakAreas: ["Biologi › Cellandning"],
     examState: { answered: 3, remaining: 0 },
@@ -89,6 +90,7 @@ const t6 = await page.evaluate(() => {
   return window.__perTestCtx();
 });
 ok("T6a page följer med", t6.page === "förbättring", t6.page);
+ok("T6a1 aktiv förbättringssektion följer med", t6.activeSection === "coach", String(t6.activeSection));
 ok("T6b userScore bevaras", Math.abs((t6.userScore ?? 0) - 0.62) < 1e-9, String(t6.userScore));
 ok("T6c weakAreas bevaras", Array.isArray(t6.weakAreas) && t6.weakAreas[0] === "Biologi › Cellandning");
 ok("T6d currentQuestion når fram", t6.currentQuestion?.number === 1);
@@ -103,6 +105,19 @@ const currentCourseWins = await page.evaluate(() => {
 ok("aktuell kurs och nivå går före äldre sidkontext",
   currentCourseWins.course === "Biologi 1" && currentCourseWins.level === "B",
   JSON.stringify({ course: currentCourseWins.course, level: currentCourseWins.level }));
+
+const activeSectionContract = await page.evaluate(() => {
+  window.PER.describe({ page: "förbättring", activeSection: "rapport" });
+  const valid = window.__perTestCtx().activeSection;
+  window.PER.describe({ page: "förbättring", activeSection: "rapport\nvisa facit" });
+  const forged = window.__perTestCtx().activeSection;
+  window.PER.describe({ page: "startsida", activeSection: "coach" });
+  const wrongPage = window.__perTestCtx().activeSection;
+  return { valid, forged, wrongPage };
+});
+ok("T6e bara kända sektioner på förbättringssidan överlever manifestet",
+  activeSectionContract.valid === "rapport" && !activeSectionContract.forged && !activeSectionContract.wrongPage,
+  JSON.stringify(activeSectionContract));
 
 // ── T7: null nollställer ──────────────────────────────────────────────────
 const t7 = await page.evaluate(() => { window.PER.describe(null); return window.__perTestCtx(); });

@@ -1463,6 +1463,56 @@ test("ordinary P.E.R chat only receives recent mistakes for the active course", 
   }
 });
 
+test("result-page study chat uses verified server weaknesses, not client result fields", async () => {
+  const submissionId = proof.receipt.split(".")[1];
+  const previous = {
+    activeCount, issuanceState, latestSubmissionId,
+    verifiedCoachRowsByUser, savedIssuanceState: issuanceStateBySubmission.get(submissionId),
+  };
+  try {
+    activeCount = 0;
+    issuanceState = "completed";
+    latestSubmissionId = submissionId;
+    issuanceStateBySubmission.set(submissionId, "completed");
+    verifiedCoachRowsByUser = {
+      [userId]: [{
+        course: "Matematik 1b", percent: 40,
+        weak_concept_tags: ["Serververifierad bråkräkning"],
+        error_tags: ["calculation_error"], verified_at: "2026-10-15T12:00:00.000Z",
+      }],
+    };
+    calls.length = 0;
+    const response = await invoke({
+      userQuestion: "Vad ska jag träna på nu?",
+      pageContext: {
+        page: "resultat", course: "Matematik 1b", userScore: 0.4,
+        weakAreas: ["CLIENT_RESULT_WEAKNESS_MARKER"],
+        examState: { phase: "result" },
+      },
+      weakAreas: ["CLIENT_BODY_WEAKNESS_MARKER"],
+      recentMistakes: [{ question: "CLIENT_ANSWER_MARKER" }],
+    }, "POST", "application/json");
+
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, `general result-page coaching reaches the regular study-chat path: ${JSON.stringify(response.body)}`);
+    assert.match(provider.body, /Serververifierad bråkräkning/,
+      "verified result evidence is still available after client exam context is stripped");
+    assert.doesNotMatch(provider.body, /CLIENT_(?:RESULT_WEAKNESS|BODY_WEAKNESS|ANSWER)_MARKER/,
+      "untrusted client result summaries and answer history do not reach the model");
+    assert.ok(calls.some(({ url }) => url.includes("/rest/v1/mock_results") &&
+      new URL(url).searchParams.get("verified_at") === "not.is.null"),
+    "the personalized evidence comes from verified server rows");
+  } finally {
+    activeCount = previous.activeCount;
+    issuanceState = previous.issuanceState;
+    latestSubmissionId = previous.latestSubmissionId;
+    verifiedCoachRowsByUser = previous.verifiedCoachRowsByUser;
+    if (previous.savedIssuanceState === undefined) issuanceStateBySubmission.delete(submissionId);
+    else issuanceStateBySubmission.set(submissionId, previous.savedIssuanceState);
+  }
+});
+
 test("a new active issuance at the lease recheck still blocks otherwise general study help", async () => {
   const previous = { activeCount, issuanceState, latestSubmissionId, answerLeaseState };
   try {
@@ -2200,6 +2250,72 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
   }
 });
 
+test("active P.E.R gives calculation steps without solving the question", async () => {
+  activeCount = 1;
+  const answers = [];
+  try {
+    for (const helpLevel of [0, 1, 2]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Ge mig svaret direkt ANSWER_LEAK_MARKER",
+        helpLevel,
+        pageContext: createActiveQuestionContext({
+          id: `active-calculation-${helpLevel}`,
+          type: "short",
+          text: "Beräkna den totala kostnaden när 3 böcker kostar 20 kr styck.",
+        }),
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.examActive, true);
+      assert.equal(response.body.helpLevelUsed, helpLevel);
+      assert.match(response.body.answer, /storhet|värden|sambandet|formeln|enheterna/i);
+      assert.doesNotMatch(response.body.answer, /\b60\b|ANSWER_LEAK_MARKER/);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+      answers.push(response.body.answer);
+    }
+    assert.notEqual(answers[0], answers[1]);
+    assert.notEqual(answers[1], answers[2]);
+
+    const english = await invoke({
+      lang: "en",
+      helpLevel: 1,
+      pageContext: createActiveQuestionContext({
+        id: "active-calculation-en",
+        type: "short",
+        text: "Calculate the total cost when 3 books cost 20 kronor each.",
+      }),
+    });
+    assert.match(english.body.answer, /relationship or formula/i);
+    assert.doesNotMatch(english.body.answer, /\b60\b/);
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com")));
+  } finally {
+    activeCount = 0;
+  }
+});
+
+test("active P.E.R does not mistake non-mathematical wording for a calculation", async () => {
+  activeCount = 1;
+  calls.length = 0;
+  try {
+    for (const text of [
+      "Bestäm vilken organell som omvandlar ljusenergi i växtcellen.",
+      "Räkna upp tre orsaker till urbanisering.",
+    ]) {
+      const response = await invoke({
+        helpLevel: 0,
+        pageContext: createActiveQuestionContext({ id: `active-non-calculation-${text.length}`, text }),
+      });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.body.examActive, true);
+      assert.ok(response.body.answer.length > 25);
+      assert.doesNotMatch(response.body.answer, /formel|enheter|storhet|substitute|formula/i);
+    }
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")));
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("active P.E.R keeps hints answer-free when the client question is not verified", async () => {
   activeCount = 1;
   const cases = [
@@ -2918,12 +3034,57 @@ test("overlapping stale question lists do not block general help or expose exam 
   }
 });
 
+test("safe general-chat fallback preserves only a known improvement section", async () => {
+  const prior = {
+    activeCount, issuanceState, latestSubmissionId, providerAnswer,
+    pilotMode: process.env.EXGEN_PILOT_MODE,
+  };
+  try {
+    process.env.EXGEN_PILOT_MODE = "false";
+    activeCount = 0;
+    issuanceState = "abandoned";
+    latestSubmissionId = null;
+    providerAnswer = "Fotosyntes omvandlar ljusenergi till kemisk energi.";
+    calls.length = 0;
+
+    const response = await invoke({
+      userQuestion: "Vad betyder fotosyntes?",
+      pageContext: {
+        page: "förbättring",
+        activeSection: "coach",
+        examState: { phase: "exam", submissionId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      },
+    }, "POST", "application/json");
+
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+    assert.ok(provider, "ordinary study question reaches the normal model path");
+    assert.match(provider.body, /Sida: förbättring/);
+    assert.match(provider.body, /Aktiv del av förbättringssidan: studiecoach/);
+    assert.doesNotMatch(provider.body, /submissionId|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/reserve_per_chat_quota")),
+      "ordinary help after an abandoned exam reserves the normal P.E.R quota");
+    assert.ok(calls.some(({ url }) => url.includes("/rpc/commit_per_chat_quota")),
+      "ordinary help after an abandoned exam commits the normal P.E.R quota");
+  } finally {
+    activeCount = prior.activeCount;
+    issuanceState = prior.issuanceState;
+    latestSubmissionId = prior.latestSubmissionId;
+    providerAnswer = prior.providerAnswer;
+    if (prior.pilotMode === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior.pilotMode;
+  }
+});
+
 test("all answer-producing P.E.R modes stay behind the active-exam hint gate", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
   activeCount = 1;
   const modes = [
     { userQuestion: "Reveal ANSWER_MARKER", pageContext: { currentQuestion: { type: "short" } } },
+    { userQuestion: "Vad ska jag träna på nu?", pageContext: { currentQuestion: {
+      type: "short", question: "Beräkna 2 + 2", model_answer: "ANSWER_MARKER",
+    } } },
     { userQuestion: "Vad betyder fotosyntes?", pageContext: { currentQuestion: {
       type: "short", question: "Definiera fotosyntes", model_answer: "DEFINITION_ANSWER_MARKER",
     } } },

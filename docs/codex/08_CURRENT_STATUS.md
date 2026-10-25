@@ -206,6 +206,50 @@
 förbättringscoach. Lämna befintliga prov orörda och gör inga betalda anrop
 utöver den verifierade kvarvarande staginggränsen.
 
+# P.E.R kontext på förbättringssidan och kvalitetskontrakt — 2026-10-25
+
+- [x] Förbättringssidan skickar en sektionsnyckel från en fast allowlist
+  (`hem`, `felbank`, `prov`, `coach`, `rapport`). Servern mappar bara kända
+  nycklar till fasta etiketter, och bara på förbättringssidan. Ändring av
+  sektion avbryter en pågående P.E.R-förfrågan.
+- [x] Aktivt prov får fortsatt endast answer-free, fråga-specifika ledtrådar.
+  Beräkningsstegen använder en begränsad avsiktsmatchning så biologins
+  "bestäm organell" och SO:s "räkna upp" inte felaktigt får matematikstöd.
+- [x] Resultatfrågan "Vad ska jag träna på nu?" går genom vanlig studiecoachning
+  efter verifierat resultat. Verifierade svagheter hämtas från servern; klientens
+  resultatsammanfattning och svarhistorik skickas inte vidare som bevis.
+- [x] Offline-regression kopplar ihop produktionsnormalisering och strukturell
+  grind, verifierarens riktiga parser med ett syntetiskt negativt svar,
+  `decideApproval` och `finalizeVerifiedExam`. Kandidaten avvisas före
+  slututfärdande. Detta bevisar kontraktet, inte att en riktig modell alltid
+  upptäcker semantiska fel.
+- [x] Verifiering på aktuell lokal diff: P.E.R API **76/76**; förbättringssidans
+  browserflöde **87/87**; manifest **31/31**; data-minimering **4/4**;
+  genereringspipeline **28/28**; source coverage **6/6**; HTTP-pipeline **2/2**;
+  offline pipeline **1/1**; ämnesrouting och eval-first-pass passerade;
+  verifierarkontrakt och offline quality-gold passerade. `per-context-pack`
+  passerade.
+- [x] Oberoende read-only-granskningar fann inga säkerhets-/kvotgrindar som
+  försvagats. En granskning bekräftade att det nya sammansatta offlinefallet
+  stänger den avgränsade verifierar-till-finaliserar-kontraktsluckan.
+- [x] Det tidigare saknade testberoendet `@electric-sql/pglite@0.5.10` finns nu
+  endast i arbetskopians ignorerade `node_modules`; `package.json` och
+  `package-lock.json` ändrades inte. Fullt HTTP-pipelinetest passerade **2/2**,
+  inklusive 3/6/12-frågeflöden, retry, 503 och tydlig partiell leverans.
+- [!] Aktuell Vercel Production är READY från `main` SHA
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4`. Senaste kontrollerade Preview
+  är READY från feature SHA `590ac554871231469c9f2612ce42a1445cf4cca0`.
+  De aktuella lokala ändringarna är ocommittade och finns inte i någon av dessa
+  deploymentar.
+- [!] Ingen staging-/produktionsdatabas, live-modell, betald AI-förfrågan,
+  push, merge eller deploy utfördes. Verklig modellrelevans och full livekedja
+  är därför ännu inte verifierade.
+
+**MÅLET FORTSÄTTER.** Nästa steg: granska källförankring och felbaserad
+generering mot syntetiska ämnesfall; gör sedan aktuell stagingbudget- och
+Preview-kontroll före en begränsad syntetisk liveverifiering. Ingen lokal
+ändring ska beskrivas som live innan exakt commit och deployment verifierats.
+
 # P.E.R sidhistorik och startsidesminne — 2026-10-25
 
 - [x] Live-stagingkontrollen på den godkända Previewn avslutades säkert med
@@ -4187,3 +4231,148 @@ read-only preflight.
   funktions- och constraint-definitioner. Lokala filnamn och testreferenser
   använder `20261024225011` och `20261024225017`, samma versioner som stagingens
   ledger. SQL-innehållet är oförändrat; ingen migration kördes.
+
+## Sanerad stagingtelemetri för provkvalitet — 2026-10-25
+
+- [x] Read-only aggregate över senaste 14 dagarna, utan användar-ID:n, fråga-
+  eller materialtext: av 12-frågejobb var 14 `succeeded` och 6 `failed`; de
+  sex felen bestod av fyra `STAGE_RETRY_LIMIT`, ett `RETENTION_EXPIRED` och ett
+  `OPERATION_DEADLINE`. För 3-frågejobb var 3 `succeeded` och 1 `failed` med
+  `STAGE_RETRY_LIMIT`.
+- [x] `ai_usage_events`: genereringssteg hade 157 event med 11,9 s medellatens
+  och 26,0 s max; reparation hade 99 event med 13,9 s medellatens och 22,9 s
+  max. Av 158 `verify_compare`-event med booleskt utfall hade 134 minst ett
+  avslag och 24 inga avslag. Det är batchhändelser, inte antal frågor eller
+  prov; de kan inte räknas om till en verifierad frågeacceptansgrad.
+- [!] Aggregate kan inte koppla avslag till enskilda frågor, källutdrag,
+  misstagsmål eller en viss generation. Kostnadsfältet var null i dessa event.
+  Äldre enskild syntetisk körning med `sourceSectionCount=0` och avslag för
+  källstöd är en diagnostisk ledtråd, inte belägg för att alla underlag saknar
+  segmentering eller för en generell grundorsak.
+- [!] Ingen modellförfrågan, kvotändring, databasändring, push eller deploy
+  gjordes. Telemetrin stödjer att både kvalitetsavslag och återförsöks-/deadline-
+  fel bidrar; den räcker inte för att ändra kvalitetsgrindar eller påstå att en
+  viss reparationsändring löser problemet.
+
+**Nästa steg:** behåll avvisningsgrindarna och använd feltypspecifika
+reparationsspår i ett syntetiskt, versionsstyrt gold-set. Utöka aggregerad
+diagnostik endast med integritetssäkra utfallskoder; gör ny liveverifiering
+först efter färsk budget- och Previewkontroll.
+
+## Verifierarens källbelägg vid felträning — 2026-10-25
+
+- [x] Bekräftad kodrotorsak: servern återskapar `sourceEvidence` från elevens
+  signerade, ägda och verifierat rättade prov. `verifyQuestions` mappade sedan
+  dessa citat till `training_focus.source_evidence`, men dess egen
+  `reviewInputWithinLimits`-allowlist avvisade fältet före granskaranropet som
+  `invalid_review_input`. Därmed kunde en källbelagd felträning stoppas innan
+  den oberoende granskaren fick bedöma om kandidaten tränade rätt misstag.
+- [x] Allowlisten accepterar nu endast detta explicita källfält och validerar
+  högst tre icke-tomma strängar om högst 500 tecken vardera. Övriga tillåtna
+  fält, totalgränser, verifierartrösklar och utfärdandegrindar är oförändrade.
+- [x] Gold-regressionen låter en strukturellt giltig och materialgrundad fråga
+  som tränar fel del av en linjär funktion nå den riktiga verifierarparsern.
+  Ett syntetiskt omdöme som saknar specifik felmatchning blockeras av befintlig
+  godkännandegrind. Separata kontrakttester verifierar payloadfältet och
+  avslag på mer än tre, tomma, feltypade eller över 500 tecken långa citat.
+- [x] Riktade offline-tester passerade: quality-gold, verifier-output-contract,
+  mistake-training-context, mistake-training-source **17/17**, riktade
+  3/6/12/misstagspipelinetester **6/6**, HTTP-pipeline **2/2** och
+  `git diff --check`.
+- [!] Detta bekräftar en verklig kodvägsdefekt i verifierarindata, inte att den
+  ensamt förklarar alla irrelevanta frågor eller alla misslyckade prov.
+  Verifierartestet använder syntetiska svar; ingen live-modellkvalitet,
+  stagingförfrågan eller faktisk elevupplevelse har verifierats efter fixen.
+  Lokala ändringar är ocommittade och finns inte i Production `ad60a683` eller
+  senaste kontrollerade Preview `590ac554`.
+
+**Nästa steg:** gör färsk stagingkopplings- och budgetkontroll före högst ett
+syntetiskt felträningsprov, först när autentiserad testdata kan verifieras utan
+att röra befintliga prov. Separera därefter utfallet från offlinebevisen.
+
+## Verifierarens exakta källmedlemskap och slutlig offlinekontroll — 2026-10-25
+
+- [x] Förstärkt preflighten för `training_focus.source_evidence`: varje begränsat
+  utdrag måste nu återfinnas i samma, avklippta `source_material` som faktiskt
+  skickas till den oberoende granskaren. Saknade eller föråldrade utdrag stoppas
+  före provideranrop; NFKC-/whitespace-normalisering tillåts och delträff inuti
+  ett större ord räknas inte som belägg. Gransknings- och utfärdandetrösklarna
+  har inte sänkts.
+- [x] Regressioner täcker saknat/stale utdrag, exakt 500-teckensgräns,
+  NFKC/whitespace, ordgräns, feltypade/tomma utdrag och UTF-16-gränser med
+  emoji. Existerande fixtures korrigerades där de påstod källbelägg som inte
+  fanns i testmaterialet.
+- [x] Offlineverifiering denna session: verifier-output-contract, quality-gold,
+  exam-generation-pipeline-http **2/2**, exam-generation-pipeline **28/28**,
+  per-exam-review-handler **76/76**, per-page-targets **87/87**,
+  per-manifest **31/31**, mistake-training-source **17/17**,
+  mistake-training-context, per-context-pack och per-sales-data-minimization
+  **4/4** passerade. `git diff --check` passerade vid kontrollen.
+- [x] HTTP/PGlite-testet innehåller nu en syntetisk end-to-end-felträningsväg:
+  signerad ägarbunden provkälla + verifierat underkänt svar → serverresolver →
+  persistent pipelinejobb → riktig intern generator med syntetiska provider-
+  svar över återupptagna batchar → oberoende verifierarkontrakt → verifierad
+  checkpoint → exakt 12/12 utfärdade frågor och en kvotförbrukning. Testet
+  observerar minst ett mellanliggande `202` före slutförandet.
+- [x] Negativ kontrast i samma harness: den syntetiska oberoende granskaren
+  nekar fokusmatchningen tills jobbet når terminalt fel. Inget prov utfärdas,
+  inga kandidater når accepterad checkpoint, reservationen återbetalas och
+  elevens kvot återgår till baslinjen.
+- [!] Detta är test med syntetiska modeller/svar, inte en live-kontroll av
+  modellernas semantiska relevans, staging, pilotanvändning eller
+  produktionsupplevelse. Testets syntetiska granskare lämnar förutbestämda
+  positiva omdömen; testet bevisar käll-/kontextflöde och oförsvagade
+  godkännandekontrakt, inte att en verklig modell tränar rätt misstag.
+  Aktuell Preview-branchkoppling och budget har nu verifierats read-only,
+  men inga live-AI-anrop, pushar eller deployer gjordes.
+- [x] Färsk fjärrkontroll: GitHub `main` och Vercels READY Production pekar på
+  `ad60a683` (`dpl_5jhXXmoq94bp3gqyPwtJvLgEycd1`). Den befintliga
+  feature-branchen och dess READY Preview pekar på `590ac554`
+  (`dpl_4XzKHLY7Wb5k8JAkUWPt6Jwi3QSr`). De 15 lokalt ändrade filerna i denna
+  arbetsgren finns inte i någon av dessa deployer.
+- [x] Vercel Preview-miljövariabler kontrollerades utan att läsa hemliga
+  värden. De tio förväntade stagingvariablerna är branch-scope:ade till
+  `codex/exgen-generation-quality-2026-10-20`. Supabase staging
+  `yhcinqejsocpmmetazpz` rapporterade `ACTIVE_HEALTHY`.
+- [x] Stagingens read-only-budgetkontroll: tak `$3.379071`, spenderat
+  `$2.172902`, reserverat `$0.263628`, återstående `$0.942541`. Inga AI-anrop
+  gjordes; denna restbudget är inte tillräcklig grund för ett större liveprov.
+- [x] Ett oavsiktligt tomt Vercel-projekt, `provia-ai-live-ad60`, skapades under
+  CLI-inspektion. Det saknade deployment och miljövariabler och togs bort efter
+  användarens uttryckliga godkännande; därefter verifierades att projektet inte
+  längre fanns. Inga andra Vercel-projekt ändrades.
+
+**Nästa steg:** granska den lokala diffen och efter separat uttryckligt
+godkännande publicera en avgränsad feature-Preview. Gör inte liveprov förrän
+stagingbudgeten räcker och kan verifieras på nytt. Behåll produktion, `main`
+och produktionsdatabas orörda tills separat releasebeslut.
+
+### Uppföljning 2026-10-25
+
+- [x] Färsk riktad omkörning på arbetsgrenen: 115 Node-tester passerade, 0
+  misslyckades. Den omfattade provpipeline, HTTP/PGlite, P.E.R API, verifierar,
+  offline kvalitets-eval, frontend-kontext, sidmål och dataminimering.
+- [x] Oberoende provkvalitetsgranskning bekräftade täckning för 3/6/12,
+  reparation, retry, timeout, ofullständiga resultat och verifierad
+  felträning. Den betonade att verklig semantisk modellprecision inte bevisas
+  av mockade providers.
+- [x] Oberoende säkerhets-/P.E.R.-granskning fann ingen blockerande regression
+  i dataminimering, kvot-/leaseflöde, verifierad efterrättning eller spärr mot
+  facit under aktivt prov. Granskningen bekräftade att kvalitetsgrindarna inte
+  försvagats. Ingen livebeteendeverifiering gjordes.
+- [!] De fyra P.E.R.-sidkontexterna har tester i API-/frontend-sviterna, men
+  aktuell modellkvalitet och svarstid är ännu inte mätta mot verkliga
+  modellutdata. Detta kräver en avgränsad staging-Preview som innehåller de
+  lokala ändringarna och ett budgetgodkänt syntetiskt test.
+- [x] Aktuell Git-kontroll: lokal `HEAD` och GitHub `main` är `ad60a683`;
+  feature-branchen är `590ac554`. De 15 ändrade arbetsfilerna är lokala och
+  ocommittade. Vercel Production följer `main`; feature-Preview följer den
+  gamla feature-commiten. Ingen releaseåtgärd utfördes.
+- [x] Ytterligare aktuell validering: `npm run a11y-audit` rapporterade 0
+  tillgänglighetsöverträdelser och 0 konsolfel på granskade sidor, inklusive
+  app, startsida och förbättringssida. `npm run xeliov:context:test` passerade
+  4/4 tester, inklusive sekretessredigering och urval av verifierade lärdomar.
+- [x] Read-only releasekontroll upprepad: Vercel Production READY kör fortfarande
+  `ad60a683`; feature-Preview READY kör fortfarande `590ac554`. Stagingens
+  enda budgetrad är aktiverad: tak `$3.379071`, spenderat `$2.172902`,
+  reserverat `$0.263628`, kvar `$0.942541`. Inga modellanrop gjordes.
