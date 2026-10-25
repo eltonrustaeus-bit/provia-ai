@@ -4082,3 +4082,46 @@ garanteras för alla frågor; skolpilot behöver fortsatt observerad användning
 schema- och autentiseringskontroll utan AI-anrop. Liveanrop kräver bekräftad
 syntetisk kontosession och uttryckligt verifierad kostnadsram; Production kräver
 förkontroll av migrationsförutsättningarna och separat releasegodkännande.
+
+## Releasekorrigeringar: kvotåterstart och P.E.R-rättelse — 2026-10-25
+
+- [x] Reproducerat browserfel: ett definitivt HTTP 429-kvotsvar rensade den
+  sparade återupptagningsjobbet men lämnade materialet i
+  `exgen_pending_generation_input_v1`. Kvotgrenen rensar nu båda posterna;
+  `tests/frontend/exam-pending-resume.test.mjs` passerar och bekräftar att
+  omladdning inte erbjuder ett återstartbart jobb eller gör nytt AI-anrop.
+- [x] Om P.E.R:s interna granskning hittar en allvarlig rättelse men båda
+  rättelseskrivningarna misslyckas, skickar vanlig chatt nu en kort lokaliserad
+  säkerhetsnotis i samma bubbla. Servern försöker ersätta felaktig historik med
+  notisen; bakgrundsminnet uppdateras inte från den osäkra versionen.
+  Självgranskningsmetadata visas inte. Prov-/facitgrindarna ändrades inte.
+- [x] Offline-regressioner verifierade på aktuell lokal diff:
+  provpipeline 3/6/12 och recovery 59/59; P.E.R streaming 18/18;
+  P.E.R sidmål 82/82; P.E.R manifest/resultatsnitt 29/29;
+  P.E.R provkontext 96/96; P.E.R browser-/kontåterhämtning 1/1;
+  pending-generation-resume 1/1; misstagsträning 24/24;
+  migrering/lease/kvot/rollback 34/34; bred provflödesbrowserregression
+  192 godkända, 0 fel; ändrade JS-filer syntaxkontrollerade och diffkontroll
+  ren.
+- [x] Tre avgränsade read-only granskningar genomfördes. En påstådd lease-race
+  drogs tillbaka efter verifiering av att owner-scoped claim förnyar parent
+  lease till 300 sekunder medan child lease är högst 90 sekunder och HTTP-jobbet
+  högst 57 sekunder. Granskningarna bekräftar att migrerings-/Productionläge
+  ändå kräver hosted förkontroll.
+- [x] Kodfixarna är committade som
+  `84011d81fca2643b9805ba48d60f4a5b0b97ae7d` och pushade till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_3c4zRBWcQqw3rbL9N9c9y8Loo1N8` är READY från exakt den SHA; PR #124 pekar
+  på samma commit och Vercel-kontrollerna passerar. PR:en är fortsatt Draft.
+- [!] Denna statusnotering är en separat dokumentationsändring efter
+  kodcheckpointen. Om den pushas som egen commit måste Vercel även verifieras
+  för det nya exakta PR-huvudet; innehållet är i övrigt oförändrad kod.
+- [!] Ingen live-AI eller hosted-databasändring gjordes. Stagingidentitet och
+  aktuell budget verifierades inte. Production migrationsledger/raddata är
+  fortsatt okontrollerade; ingen migration, `main` eller Production ändrades.
+
+**PILOT NOT READY.** Nästa säkra steg är att verifiera ett syntetiskt,
+autentiserat stagingflöde först när identitet och kostnadsram kan bekräftas.
+Merge/deploy till exgen.se väntar dessutom på read-only förkontroll av
+Production-migrationsledger och befintliga pipeline-rader, sedan separat
+releasegodkännande.
