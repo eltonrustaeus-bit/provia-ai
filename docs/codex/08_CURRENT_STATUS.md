@@ -1,5 +1,43 @@
 # 08 Current Status
 
+# P.E.R avbryter inaktuella provledtrådar — 2026-10-25
+
+- [x] Oberoende granskning hittade att ett fördröjt P.E.R-svar kunde visas
+  efter att eleven bytt aktuell provfråga. Det kunde göra att en ledtråd om
+  fråga N uppfattades som hjälp för fråga N+1.
+- [x] P.E.R-begäran binds nu till aktuell sida, kurs/nivå och, under aktivt
+  prov, verifierad providentitet och frågeidentitet. Kontextbyte avbryter
+  begäran, rensar dess tillfälliga fråga och visar ett tydligt besked; manuellt
+  skickande krävs för att fråga igen. Svar som redan färdigställts påverkas
+  inte. Provets serverbaserade proof- och facitgrindar är oförändrade.
+- [x] Ny fördröjd webbläsarregression bekräftar att frågebyte avbryter ett
+  väntande svar, återaktiverar Skicka och aldrig renderar ett sent svar från
+  föregående fråga.
+- [x] Oberoende slutgranskning fann inga blockerare i ändringen och
+  bekräftade att elevens svarstext på samma fråga inte utlöser avbrott.
+- [x] Tester på patchen: `per-exam-context` **90/90**,
+  `per-page-targets` **64/64**, `per-manifest` **29/29**,
+  `pilot-session-recovery` **1/1**; full API-handler **71/71** på samma
+  API-kod; syntax- och diffkontroller passerade.
+- [x] Kodcheckpoint `b8e38aa0a16e8b8c0a33da10e90b361438d8747a` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Preview
+  `dpl_BUy5g6e27yV4rEXAaUZ1utfogdUC` är `READY` från exakt SHA. Den
+  inloggade branch-aliasen har ett befintligt ifyllt prov; det lämnades orört.
+- [!] Ingen ny live-AI-förfrågan gjordes. Den aktuella inloggade sessionen har
+  ett äldre aktivt prov och används därför inte för ny ledtrådstestning. Den
+  senaste äldre testvyn visade en separat provgenerering som misslyckats 0/3;
+  den är inte en liveverifiering av den här P.E.R-fixen. Stagingbudgeten
+  lästes endast: `$0.974381` återstod vid senaste budgetuppdatering.
+- [!] Previewns deploymentstatus och commit är verifierade, men appflödet efter
+  autentisering har inte visuellt verifierats på den nya unika deploy-URL:en.
+  Ingen `main`, Production, Supabase-data/schema, konto, kvot eller hemlighet
+  ändrades.
+
+**PILOT NOT READY.** Nästa säkra steg är att använda en inloggad stagingvy utan
+öppet prov för syntetisk kontroll av startsida, aktiv provledtråd och
+förbättringscoach. Lämna befintliga prov orörda och gör inga betalda anrop
+utöver den verifierade kvarvarande staginggränsen.
+
 # P.E.R sidhistorik och startsidesminne — 2026-10-25
 
 - [x] Live-stagingkontrollen på den godkända Previewn avslutades säkert med
