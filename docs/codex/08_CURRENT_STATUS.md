@@ -3164,5 +3164,18 @@ kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.
   `$2.090394` spenderat och `$0.263628` reserverat mot intern cap `$3.379071`
   (senaste uppdatering `2026-10-24 23:35 UTC`). Denna försöksrunda använde
   ingen modellförfrågan enligt API:ts busy-lease-kodväg.
-- [!] Ändringen är lokal tills nästa checkpoint pushas; ännu ingen ny Preview
-  för busy-meddelandet. Det befintliga ifyllda provet lämnades orört.
+- [x] Commit `2216d157c6dccd6d65732dfebc7fbeec05e71357` är pushad enbart till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_5LLwyrTr5QTKt7iw8uGZ2ceTekqV` är `READY` från exakt denna commit i det
+  befintliga `provia-ai`-projektet. Preview:
+  `https://provia-3mxrzct8q-eltons-projects-4adfb1a3.vercel.app/`.
+- [x] Den inloggade startsidesfliken laddades om efter att Previewn blev
+  `READY`; den återställde frågan och visade att man kan skicka den igen.
+  Ingen ny AI-förfrågan gjordes. Det befintliga ifyllda provet i en annan flik
+  lämnades orört.
+- [!] Oberoende granskning av underliggande P.E.R-proof-kedja hittade inga
+  blockerande säkerhetsfel. Den noterade att aktiva provledtrådar fortfarande
+  ofta är mallbaserade (P2), och att `exam-pipeline-offline.test.mjs` stoppade
+  vid en separat assertion om logisk avgränsning innan replay-testet kördes.
+  Aktiv ledtråd och replay behöver därför fortsatt verifiering; detta är inte
+  löst av busy-meddelandet.
