@@ -662,6 +662,7 @@
       var session = null;
       try { session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
       var nextAccountId = pilotSessionUserId(session) || null;
+      abortPerRequestForAccountId(nextAccountId);
       if (nextAccountId !== _perHistoryAccountId) {
         _perHistoryAccountId = nextAccountId;
         setExamHistoryMasked(true);
@@ -1404,7 +1405,7 @@ function finalizeMsg(div, text) {
 
     async function send(q, opts) {
       if (!q || _perActiveRequest) return;
-      var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
+      var requestAccountId = currentPilotAccountId();
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
         if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
@@ -1478,8 +1479,8 @@ function finalizeMsg(div, text) {
       };
       function requestStillOwned() {
         if (requestState.cancelled) return false;
-        if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
-        clearPilotPendingQuestionForAccount(requestAccountId);
+        if (currentPilotAccountId() === requestAccountId) return true;
+        if (EXGEN_RUNTIME.environment === 'pilot') clearPilotPendingQuestionForAccount(requestAccountId);
         abortPerRequestForAccountId(currentPilotAccountId());
         return false;
       }
@@ -1494,10 +1495,9 @@ function finalizeMsg(div, text) {
         if (!requestStillOwned()) return;
         if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
-        var pageTopic = (pageCtx && (pageCtx.course || pageCtx.topic))
+        var pageTopic = pageCtx && (pageCtx.course || pageCtx.topic)
           ? (pageCtx.course || pageCtx.topic)
-          : (pageCtx && pageCtx.page && !['app', 'prov', 'resultat', 'exam', 'exam-result'].includes(pageCtx.page)
-            ? pageCtx.page : '');
+          : '';
         var isLandingMode = !token; // Public guide only; study help requires an account.
 
         if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {

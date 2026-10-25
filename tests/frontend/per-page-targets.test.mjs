@@ -45,6 +45,155 @@ async function mk(path, { explainHandler, additionalMocks = [], waitUntil = "net
   });
 }
 
+async function assertPageTopic(path, expectedPage) {
+  let resolveRequest;
+  const requestSeen = new Promise(resolve => { resolveRequest = resolve; });
+  const { ctx, page } = await mk(path, {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion && body.topic !== "studiecoach") resolveRequest(body);
+      await route.fulfill({ json: { ok: true, answer: "Jag hjälper dig med det.", helpCap: 3 } });
+    },
+  });
+  await page.waitForSelector("#perBubble", { timeout: 8000 });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Vad betyder fotosyntes?");
+  await page.locator("#perSendBtn").click();
+  const body = await Promise.race([
+    requestSeen,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("P.E.R request did not start")), 5000)),
+  ]);
+  ok(`${expectedPage} remains page context`, body.pageContext?.page === expectedPage, body.pageContext?.page);
+  ok(`${expectedPage} is not sent as the study topic`, body.topic === "", JSON.stringify(body.topic));
+  await ctx.close();
+}
+
+await assertPageTopic("/index.html", "startsida");
+await assertPageTopic("/förbättring.html", "förbättring");
+
+// A regular-app answer started by account A must not render or enter shared
+// P.E.R history after another tab changes the same browser session to account B.
+{
+  let notifyStarted;
+  const started = new Promise(resolve => { notifyStarted = resolve; });
+  let releaseResponse;
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  let finishRoute;
+  const routeFinished = new Promise(resolve => { finishRoute = resolve; });
+  const { ctx, page } = await mk("/index.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion) {
+        notifyStarted(body);
+        await responseGate;
+        try { await route.fulfill({ json: { answer: "PRIVATE_OLD_ACCOUNT_PER_MARKER" } }); } catch (_) {}
+        finishRoute();
+      } else {
+        await route.fulfill({ json: { ok: true } });
+      }
+    },
+  });
+  let resolveRequestFailed;
+  const requestFailed = new Promise(resolve => { resolveRequestFailed = resolve; });
+  await page.evaluate(() => {
+    window.__perAuthStorageChanged = false;
+    window.addEventListener("storage", event => {
+      if (event.key === window.ExGenRuntime.authStorageKey) window.__perAuthStorageChanged = true;
+    });
+  });
+  page.on("requestfailed", request => {
+    if (request.url().includes("/api/explain") && request.method() === "POST") resolveRequestFailed(true);
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Kan du förklara fotosyntes?");
+  await page.locator("#perSendBtn").click();
+  const requestBody = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("ordinary P.E.R request did not start")), 5000)),
+  ]);
+  const accountA = await page.evaluate(() => JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || "null")?.user?.id);
+  ok("ordinary P.E.R request starts under account A", accountA === "u1"
+    && requestBody.userQuestion === "Kan du förklara fotosyntes?", String(accountA));
+
+  const authKey = await page.evaluate(() => window.ExGenRuntime.authStorageKey);
+  const pageB = await ctx.newPage();
+  // Use a same-origin inert 404 page so a second Supabase client cannot refresh
+  // and overwrite the deliberately switched session while the race is tested.
+  await pageB.goto(srv.url + "/__per-storage-test", { waitUntil: "domcontentloaded" });
+  const tokenPayload = Buffer.from(JSON.stringify({ sub: "u2", exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url");
+  const tokenB = "e30." + tokenPayload + ".sig";
+  await pageB.evaluate(({ key, token }) => {
+    const session = { access_token: token, refresh_token: "r", user: { id: "u2", email: "u2@t.se" } };
+    const newValue = JSON.stringify(session);
+    localStorage.setItem(key, newValue);
+  }, { key: authKey, token: tokenB });
+  await page.waitForFunction(() => window.__perAuthStorageChanged &&
+    JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || "null")?.user?.id === "u2", null, { timeout: 5000 });
+  ok("second tab delivers the real auth storage event to account A", true);
+  await Promise.race([
+    requestFailed,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("account switch did not cancel the P.E.R request")), 5000)),
+  ]);
+  ok("account switch cancels the in-flight P.E.R request", true);
+  releaseResponse();
+  await routeFinished;
+  const afterSwitch = await page.evaluate(() => ({
+    messages: document.querySelector("#perMessages")?.textContent || "",
+    history: localStorage.getItem("proviaai_per_history") || "",
+  }));
+  ok("ordinary chat A→B switch discards the delayed answer", !afterSwitch.messages.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
+  ok("ordinary chat A→B switch does not cache the delayed answer", !afterSwitch.history.includes("PRIVATE_OLD_ACCOUNT_PER_MARKER"));
+  await pageB.close();
+  await ctx.close();
+}
+
+// Cover the narrow race where the response has arrived but the auth storage
+// event has not yet run: requestStillOwned must still reject account A's answer.
+{
+  let notifyStarted;
+  const started = new Promise(resolve => { notifyStarted = resolve; });
+  let releaseResponse;
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  let finishRoute;
+  const routeFinished = new Promise(resolve => { finishRoute = resolve; });
+  const { ctx, page } = await mk("/index.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion) {
+        notifyStarted(body);
+        await responseGate;
+        await route.fulfill({ json: { answer: "PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER" } });
+        finishRoute();
+      } else {
+        await route.fulfill({ json: { ok: true } });
+      }
+    },
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Förklara fotosyntes kort.");
+  await page.locator("#perSendBtn").click();
+  const body = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("late-response P.E.R request did not start")), 5000)),
+  ]);
+  ok("late-response race begins with account A", body.userQuestion === "Förklara fotosyntes kort."
+    && await page.evaluate(() => JSON.parse(localStorage.getItem(window.ExGenRuntime.authStorageKey) || "null")?.user?.id) === "u1");
+  await page.evaluate(() => {
+    const key = window.ExGenRuntime.authStorageKey;
+    localStorage.setItem(key, JSON.stringify({ access_token: "e30.eyJzdWIiOiJ1MiJ9.sig", refresh_token: "r", user: { id: "u2" } }));
+  });
+  releaseResponse();
+  await routeFinished;
+  await page.waitForFunction(() => document.querySelector("#perSendBtn")?.disabled === false, null, { timeout: 5000 });
+  const afterLateResponse = await page.evaluate(() => ({
+    messages: document.querySelector("#perMessages")?.textContent || "",
+    history: localStorage.getItem("proviaai_per_history") || "",
+  }));
+  ok("late response after account switch is not shown", !afterLateResponse.messages.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));
+  ok("late response after account switch is not cached", !afterLateResponse.history.includes("PRIVATE_LATE_OLD_ACCOUNT_PER_MARKER"));
+  await ctx.close();
+}
+
 // ── T1: prissidan deklarerar tre mål ──────────────────────────────────────
 {
   const { ctx, page } = await mk("/pricing.html");

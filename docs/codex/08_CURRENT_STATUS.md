@@ -1,5 +1,34 @@
 # 08 Current Status
 
+## P.E.R sidkontext och vanliga kontobyten — 2026-10-25
+
+- [x] P.E.R skiljer sididentitet från skolämne: startsidan och
+  förbättringssidan skickas kvar som `pageContext.page`, men används inte längre
+  som ämne när kurs/ämne saknas. Det förebygger att modellen får `startsida`
+  eller `förbättring` som studieämne.
+- [x] Vanliga P.E.R-anrop knyts nu till det konto som startade dem även utanför
+  pilotmiljön. En auth-ändring mellan flikar avbryter begäran; sen kontroll av
+  ägarskap stoppar även ett redan fördröjt svar från att visas eller sparas i
+  den delade P.E.R-historiken.
+- [x] Ett Playwright-test öppnar två verkliga flikar i samma origin. Det byter
+  auth-session från A till B medan A:s P.E.R-svar hålls tillbaka och bekräftar
+  storage-händelse, avbruten begäran samt att A:s svar varken visas eller
+  cachelagras.
+- [x] Tvåflikstestet bekräftar även att ett svar som anländer efter ett
+  kontobyte nekas av den sena ägarskapskontrollen även när inget storage-event
+  levereras till samma flik.
+- [x] `tests/frontend/per-page-targets.test.mjs` passerade **41/41**;
+  `per-manifest` **28/28**; `per-exam-context` **87/87**; `per-context-pack`
+  och `per-landing` passerade. `node --check` och `git diff --check` passerade.
+- [!] En enda P.E.R-förfrågan gjordes i den redan öppna staging-Previewn med
+  syntetiskt material, enligt användarens godkännande. Servern svarade
+  ”Provet är inte öppet för svar ...” i stället för en ämnesspecifik ledtråd.
+  Det befintliga 12/12-provet lämnades öppet och oskickat; dess verifierade
+  serverstatus avlästes inte, och inget nytt försök gjordes. Därför är live-
+  beteendet för ett serververifierat aktivt prov fortfarande obekräftat.
+- [!] Den fullständiga API-testfilen för P.E.R avbröts före denna ändring och
+  räknas inte som godkänd. `main`, Production, Supabase och kvoter ändrades inte.
+
 ## P.E.R allmän hjälp, provläge och kontobyte — 2026-10-25
 
 - [x] Allmän P.E.R-chatt på app-/förbättringssidor skickar inte längre lokal
