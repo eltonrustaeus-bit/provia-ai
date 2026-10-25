@@ -1462,11 +1462,12 @@
     async function loadCoach(h,m){
       const box=$('coachText');
       if(!box)return;
+      const currentBox=()=>$('coachText')||box;
       const{data:sessionData}=db?await db.auth.getSession():{data:null};
       const ownerId=sessionData?.session?.user?.id||'';
       if(!ownerId){box.textContent='Logga in för att få en personlig analys.';return;}
       const cache=getCoachCache(ownerId);
-      if(coachPending?.ownerId===ownerId)return;
+      if(coachPending?.ownerId===ownerId){currentBox().textContent='P.E.R läser…';return;}
       box.textContent='P.E.R läser…';
       flow.busy('coach',true);
       const requestId=++coachRequestSequence;
@@ -1478,30 +1479,30 @@
           const{data:checked}=await db.auth.getSession();
           if(requestId!==coachRequestSequence||checked?.session?.user?.id!==ownerId)return;
           if(result?.coachDeferred){
-            box.textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+            currentBox().textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
             return;
           }
           if(result?.unchanged===true&&result.coachEvidenceFingerprint===cache.dataFingerprint){
-            box.textContent=cache.text;
+            currentBox().textContent=cache.text;
             return;
           }
         }
-        box.textContent='P.E.R läser…';
+        currentBox().textContent='P.E.R läser…';
         result=await fetchPERCoach(ownerId);
         const{data:current}=await db.auth.getSession();
         if(requestId!==coachRequestSequence||current?.session?.user?.id!==ownerId)return;
         if(result?.coachDeferred){
-          box.textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+          currentBox().textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
           return;
         }
         if(result?.answer){
-          box.textContent=result.answer;
+          currentBox().textContent=result.answer;
           if(/^[a-f0-9]{64}$/.test(result.coachEvidenceFingerprint||''))
             setCoachCache({ownerId,dataFingerprint:result.coachEvidenceFingerprint,ts:Date.now(),text:result.answer});
         }
-        else coachError(box);
+        else coachError(currentBox());
       }catch(_){
-        if(requestId===coachRequestSequence)coachError(box);
+        if(requestId===coachRequestSequence)coachError(currentBox());
       }
       finally{
         if(coachPending?.requestId===requestId)coachPending=null;

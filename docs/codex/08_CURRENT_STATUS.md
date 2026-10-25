@@ -3817,3 +3817,28 @@ Preview-version; ändringen som tar bort oombedd tidsplan och invalidierar dess
 cache behöver pushas och verifieras på en ny Preview. Aktiv provledtråd saknar
 fortfarande livebevis på exakt senaste kod med syntetiskt underlag. Ingen
 Production, `main`, Supabase-data/schema, roll, kvot eller hemlighet ändrades.
+
+## P.E.R coachkort under väntande svar — 2026-10-25
+
+- [x] En ny liveförfrågan efter coachprompt v3 lämnade förbättringsvyn tom medan
+  serveranropet väntade. Trolig och reproducerad rotorsak var en klientkapplöpning:
+  `renderAll()` ersätter coachkortets DOM-nod vid navigation/synk, medan det
+  väntande anropet tidigare behöll en referens till den borttagna noden.
+- [x] `förbättring.html` uppdaterar nu den aktuella `#coachText`-noden efter
+  varje asynkront steg. Om samma konto redan har en väntande förfrågan visas
+  laddningsstatus i det nya kortet utan att starta ett andra modellanrop.
+- [x] Regressionstestet i `tests/frontend/per-page-targets.test.mjs` fördröjer
+  coachsvaret, lämnar och öppnar vyn igen, och verifierar svar i aktuellt kort,
+  släckt laddningsindikator och exakt ett anrop.
+- [x] `per-page-targets` **71/71** och `per-exam-review-handler` **72/72**;
+  `explain-error-safety`, syntaxkontroll och `git diff --check` passerade.
+- [!] `forbattring-flow` gav **44/46**: två äldre assertions om coachens
+  hjälpttext/spärr utan data stämmer inte med nuvarande verifierade-underlag-
+  beteende. De ligger utanför denna render-race och ändrades inte.
+- [!] Den oberoende read-only granskaren fann inga blockerare i race-fixen.
+  Ändringen har ännu inte pushats eller live-verifierats i Preview; det tidigare
+  liveanropet stannade visuellt tomt på koden före fixen. Ingen ny AI-fråga,
+  öppen provändring, Production-, `main`- eller databashandling gjordes.
+
+**PILOT NOT READY.** Nästa steg är att skapa staging-Preview för race-fixen och
+kontrollera coachkortet utan att starta om eller avbryta något öppet prov.

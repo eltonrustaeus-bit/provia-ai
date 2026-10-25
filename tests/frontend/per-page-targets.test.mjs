@@ -107,6 +107,42 @@ async function assertPageTopic(path, expectedPage) {
 await assertPageTopic("/index.html", "startsida");
 await assertPageTopic("/förbättring.html", "förbättring");
 
+// Re-rendering the improvement flow while the recommendation is in flight
+// replaces its card. The response must target the live card, not a detached
+// element captured by the original request.
+{
+  let releaseResponse;
+  let requestStarted;
+  let coachCalls = 0;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.topic === "studiecoach") {
+        coachCalls++;
+        requestStarted();
+        await responseGate;
+        await route.fulfill({ json: { answer: "LIVE_CARD_AFTER_RERENDER" } });
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("coach request did not start")), 5000)),
+  ]);
+  await page.getByRole("button", { name: "← Tillbaka" }).click();
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  releaseResponse();
+  await page.getByText("LIVE_CARD_AFTER_RERENDER").waitFor({ timeout: 5000 });
+  await page.waitForFunction(() => !document.querySelector('[data-screen="coach"] .xf-orb')?.classList.contains("busy"));
+  ok("in-flight coach response renders into the current card after navigation rerender",
+    await page.locator("#coachText").textContent() === "LIVE_CARD_AFTER_RERENDER");
+  ok("navigation rerender does not start a duplicate model request", coachCalls === 1, String(coachCalls));
+  await ctx.close();
+}
+
 // The server retains one account transcript, while the visible chat stays
 // scoped to the current page and excludes exam-bound or untagged legacy turns.
 {
