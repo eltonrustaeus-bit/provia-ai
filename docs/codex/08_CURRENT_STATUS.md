@@ -3145,3 +3145,24 @@ att kontot inte äger det bevarade 9/12-provet innan något syntetiskt AI-test.
 **PILOT NOT READY.** Nästa steg: granska den READY Previewn med en aktiv
 staginginloggning. Liveverifiering kräver ny kontroll av stagingkoppling och
 kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.
+
+## P.E.R busy-lease felmeddelande — 2026-10-25
+
+- [x] En syntetisk allmän fråga på startsidan nådde den aktuella, inloggade
+  staging-Previewn. API:t svarade `409 PER_REQUEST_IN_PROGRESS`; den befintliga
+  P.E.R-leasen var upptagen och klienten visade råkoden i stället för ett
+  begripligt besked. Serverkoden returnerar detta före modellsteget. Frågan
+  låg kvar i inmatningsfältet.
+- [x] Klienten visar nu ett lokaliserat meddelande om att P.E.R redan hanterar
+  en förfrågan, behåller frågan och låter eleven själv försöka igen när den är
+  klar. Ingen automatisk retry infördes, så konkurrerande flikar inte skapar
+  dubbla AI-anrop.
+- [x] Regressionskontroll: `per-page-targets` **44/44**,
+  `per-exam-context` **88/88**, `per-manifest` **29/29**; `node --check
+  shared.js` och `git diff --check` passerade. P.E.R API-handlern ändrades inte.
+- [x] Stagingens budgetrad lästes före och efter; den var oförändrad vid
+  `$2.090394` spenderat och `$0.263628` reserverat mot intern cap `$3.379071`
+  (senaste uppdatering `2026-10-24 23:35 UTC`). Denna försöksrunda använde
+  ingen modellförfrågan enligt API:ts busy-lease-kodväg.
+- [!] Ändringen är lokal tills nästa checkpoint pushas; ännu ingen ny Preview
+  för busy-meddelandet. Det befintliga ifyllda provet lämnades orört.

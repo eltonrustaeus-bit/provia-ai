@@ -1712,6 +1712,14 @@ function finalizeMsg(div, text) {
                 typing.textContent = language === 'en'
                   ? 'I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.'
                   : 'Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.';
+              } else if (data.error === 'PER_REQUEST_IN_PROGRESS') {
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'P.E.R is already handling another request. Your question is still here; wait for it to finish, then press Send to retry.'
+                  : 'P.E.R hanterar redan en annan förfrågan. Din fråga finns kvar; vänta tills den är klar och tryck sedan på Skicka igen.';
               } else {
                 typing.textContent = data.error || 'Fel — försök igen.';
               }

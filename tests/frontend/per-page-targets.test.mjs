@@ -71,6 +71,31 @@ async function assertPageTopic(path, expectedPage) {
 await assertPageTopic("/index.html", "startsida");
 await assertPageTopic("/förbättring.html", "förbättring");
 
+// A per-user answer lease can be busy because a request is still running in
+// another tab. Preserve the question and explain a safe manual retry in plain
+// language instead of exposing the backend code.
+{
+  const question = "Vilken del av ExGen hjälper mig att öva på mina anteckningar?";
+  const { ctx, page } = await mk("/index.html", {
+    explainHandler: async route => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({ status: 409, json: { error: "PER_REQUEST_IN_PROGRESS" } });
+      } else {
+        await route.fulfill({ json: { ok: true } });
+      }
+    },
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill(question);
+  await page.locator("#perSendBtn").click();
+  await page.waitForFunction(() => document.querySelector("#perSendBtn")?.disabled === false, null, { timeout: 5000 });
+  const message = await page.locator("#perMessages").innerText();
+  ok("busy P.E.R request explains that another answer is in progress", message.includes("hanterar redan en annan förfrågan"), message);
+  ok("busy P.E.R request preserves the question for manual retry", await page.locator("#perInput").inputValue() === question, await page.locator("#perInput").inputValue());
+  ok("busy P.E.R request hides its backend error code", !message.includes("PER_REQUEST_IN_PROGRESS"), message);
+  await ctx.close();
+}
+
 // A regular-app answer started by account A must not render or enter shared
 // P.E.R history after another tab changes the same browser session to account B.
 {
