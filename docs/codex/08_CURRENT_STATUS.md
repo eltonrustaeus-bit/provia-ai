@@ -3179,9 +3179,16 @@ kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.
   prov, ingen ändring av öppet prov, Supabase, konto, kvot, `main` eller
   Production gjordes.
 
-**PILOT NOT READY.** Nästa steg: slutför oberoende granskning, skapa feature-
-checkpoint och kontrollera att dess Preview blir READY. Liveverifiera endast
-om rätt stagingkonto och kostnadsgräns kan bekräftas utan att röra öppna prov.
+**PILOT NOT READY.** Oberoende API-/säkerhetsgranskning efter korrigering
+fann inga blockerare; provhint-granskningen fann inga blockerare. Commit
+`357eee6f2ad957a891ae14dace110ee25aae39ac` är pushad enbart till
+`codex/exgen-generation-quality-2026-10-20`; Vercel deployment
+`dpl_3BfHriXqFBiFYk7kBjGreR63mUf9` är `READY` i projektet `provia-ai` för
+exakt denna commit. Preview:
+`https://provia-abhr93b6t-eltons-projects-4adfb1a3.vercel.app/`.
+Livemodell, RLS och coachens faktiska stagingbeteende är ännu inte verifierade.
+Före skolpilot behöver rätt stagingkonto och godkänd kvarvarande budget
+bekräftas utan att röra öppna prov.
 
 ## P.E.R busy-lease felmeddelande — 2026-10-25
 
