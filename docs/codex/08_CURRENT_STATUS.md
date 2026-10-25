@@ -4845,6 +4845,10 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   gasfrågan avvisas och att k-värde-synonymer godkänns; inga blockerare i
   patchen. Granskaren bekräftade samtidigt att semantisk entailment och legacy-
   jobb utan källutdrag fortfarande inte bevisas eller ändras.
+- [x] Kodcheckpoint `d94c34f056bf6ace9fffa6f6cf5e2ea36fc23b3e` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_BgZN2mbFq8PUqxPTeSaSxU3gV5SL` är `READY` från exakt SHA på
+  `https://provia-jyo00fls5-eltons-projects-4adfb1a3.vercel.app/app.html`.
 - [!] Ingen staging- eller live-AI-körning gjordes: Preview-kontot och sparad
   historik har inte verifierats som syntetiska. Ingen kostnad, databas-, konto-,
   kvot-, `main`- eller Production-ändring gjordes.
