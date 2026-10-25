@@ -4137,7 +4137,7 @@ releasegodkännande.
   (`mnmotdluigzeehdjbhbu`) som ACTIVE_HEALTHY. Stagingens migrationsledger har
   motsvarande fyra senare pipeline-migrationer; produktionens ledger slutar vid
   `20261023104523` och saknar lokalt tillagda migrationer
-  `20261024140557`, `20261024151433`, `20261024165536` och `20261024212500`.
+  `20261024140557`, `20261024151433`, `20261024225011` och `20261024225017`.
 - [x] Read-only aggregerad produktionspreflight för
   `mock_exam_generation_pipeline_jobs`: 1 rad totalt, 0 rader över begärda
   progress-/frågegränser och 0 aktiva jobb. Detta visar att de två nya
@@ -4158,3 +4158,8 @@ releasegodkännande.
 test. Därefter kan en separat releaseprövning väga in de fyra saknade
 produktionsmigrationerna; inga produktionsändringar är godkända av denna
 read-only preflight.
+
+- [x] Stagingmigrationernas faktiska versions-ID:n har nu verifierats mot
+  funktions- och constraint-definitioner. Lokala filnamn och testreferenser
+  använder `20261024225011` och `20261024225017`, samma versioner som stagingens
+  ledger. SQL-innehållet är oförändrat; ingen migration kördes.

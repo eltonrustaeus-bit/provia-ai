@@ -7,8 +7,8 @@ const guardedRollbacks = [
   "../../supabase/migrations/20261021115253_per_chat_quota_reservations_ROLLBACK.sql",
   "../../supabase/migrations/20261022075222_staging_ai_budget_guard_ROLLBACK.sql",
   "../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly_ROLLBACK.sql",
-  "../../supabase/migrations/20261024165536_release_abandoned_exam_pipeline_after_recovery_window_ROLLBACK.sql",
-  "../../supabase/migrations/20261024212500_tighten_pipeline_integrity_bounds_ROLLBACK.sql",
+  "../../supabase/migrations/20261024225011_release_abandoned_exam_pipeline_after_recovery_window_ROLLBACK.sql",
+  "../../supabase/migrations/20261024225017_tighten_pipeline_integrity_bounds_ROLLBACK.sql",
 ];
 
 for (const relativePath of guardedRollbacks) {
