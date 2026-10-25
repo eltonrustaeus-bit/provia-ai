@@ -21,6 +21,9 @@ function publicGuideAnswer(question) {
   if (/vad är exgen|vad gör exgen|vad kan exgen|hur fungerar exgen|vilka funktioner|vilken plan|vilket alternativ|vilken ska jag välja/.test(text)) {
     return "ExGen hjälper dig att plugga på ditt eget material: skapa övningsprov, få rättning med modellsvar och förklaringar och träna vidare på missade begrepp. P.E.R ger studiehjälp och leder dig vidare i appen. Jämför planerna eller börja gratis. [GOTO:app.html]";
   }
+  if (/skillnad|skiljer|jämför|jamfor|jämförelse|jamforelse|bäst|bast|bättre än|battre an/.test(text)) {
+    return "ExGen utgår från ditt eget studiematerial och gör det till övningsprov med rättning, modellsvar och förklaringar. P.E.R hjälper dig vidare, och under ett aktivt prov ger den ledtrådar i stället för facit. När du jämför studieappar kan du därför utgå från om du vill träna på egna kursunderlag och få återkoppling. Se aktuella planer eller börja gratis. [GOTO:app.html]";
+  }
   return "Jag kan svara på hur ExGen fungerar här. För personlig hjälp med ett skolämne behöver du logga in i appen, så att P.E.R kan kontrollera provläget och hjälpa dig på rätt sätt. [GOTO:app.html]";
 }
 

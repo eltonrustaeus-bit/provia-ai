@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createRequire } from "node:module";
 
@@ -7,6 +8,9 @@ const generation = require("../../api/generate-exam.js");
 const operations = require("../../api/_exam-generation-operations.cjs");
 const pipeline = require("../../api/_exam-generation-pipeline.cjs");
 const mistakeTraining = require("../../api/_mistake-training.cjs");
+const mistakeTrainingGold = JSON.parse(readFileSync(
+  new URL("../evals/exam-quality/mistake-training-gold.v1.json", import.meta.url), "utf8",
+));
 
 const original = {
   generateVerifiedBatch: generation.generateVerifiedBatch,
@@ -639,7 +643,7 @@ test("resumed mistake-training rejects a negated action despite the verifier's f
 test("mistake-training covers every selected focus before reaching assembly for 3, 6 and 12 questions", async (t) => {
   for (const requested of [3, 6, 12]) {
     await t.test(`${requested} questions`, async () => {
-      const focusIds = ["focus-1", "focus-2", "focus-3"];
+      const focusIds = mistakeTrainingGold.cases.map((fixture) => fixture.focus.focusId);
       const job = {
         id: `00000000-0000-4000-8000-${String(requested + 40).padStart(12, "0")}`,
         user_id: "11111111-1111-4111-8111-111111111111",
@@ -650,19 +654,21 @@ test("mistake-training covers every selected focus before reaching assembly for 
         stage: "generate", requested_count: requested,
         payload: {
           qType: "short", numQuestions: requested,
-          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`,
-            skill: `Träna färdighet ${focusId}`, sourceEvidence: [`Källbelägg ${focusId} styr dess färdighet.`] })),
+          trainingFocus: mistakeTrainingGold.cases.map((fixture) => fixture.focus),
           priorQuestions: [{ id: "old", question: "Lös ekvationen 2x + 4 = 10.", concept_tag: "Ekvationslösning" }],
         },
         accepted_questions: [], progress_current: 0,
       };
       const prior = {
         generateVerifiedBatch: generation.generateVerifiedBatch,
+        finalizeVerifiedExam: generation.finalizeVerifiedExam,
         renewPipelineLease: operations.renewPipelineLease,
         renewGenerationLease: operations.renewGenerationLease,
         checkpointPipelineJob: operations.checkpointPipelineJob,
+        completePipelineJob: operations.completePipelineJob,
       };
       let sequence = 0;
+      let finalizedQuestions = [];
       operations.renewPipelineLease = async () => true;
       operations.renewGenerationLease = async () => true;
       operations.checkpointPipelineJob = async (input) => {
@@ -675,16 +681,27 @@ test("mistake-training covers every selected focus before reaching assembly for 
         ok: true,
         questions: Array.from({ length: Math.min(2, payload.numQuestions) }, () => {
           sequence++;
-          const focusId = focusIds[(sequence - 1) % focusIds.length];
+          const focusIndex = (sequence - 1) % mistakeTrainingGold.cases.length;
+          const variantIndex = Math.floor((sequence - 1) / mistakeTrainingGold.cases.length);
+          const fixture = mistakeTrainingGold.cases[focusIndex];
+          const candidate = fixture.relevant[variantIndex];
           return {
             id: `training-${sequence}`, type: "short",
-            question: `Källbelägg ${focusId} styr färdighet ${focusId}: utred unik deluppgift ${sequence} med metod ${String.fromCharCode(96 + sequence)} och exempel ${sequence * 17}.`,
-            source_references: [`Källbelägg ${focusId} styr dess färdighet.`],
-            training_focus_matches: focusIds,
+            ...candidate,
+            source_references: fixture.focus.sourceEvidence,
+            training_focus_matches: [fixture.focus.focusId],
             validation_status: "verified",
           };
         }),
       } });
+      generation.finalizeVerifiedExam = async ({ questions }) => {
+        finalizedQuestions = questions;
+        return {
+          submissionId: "55555555-5555-4555-8555-555555555555",
+          response: { exam: { questions }, meta: { requested, partial: false } },
+        };
+      };
+      operations.completePipelineJob = async ({ response }) => ({ status: "completed", response });
       try {
         let advances = 0;
         while (job.stage !== "assemble") {
@@ -698,13 +715,96 @@ test("mistake-training covers every selected focus before reaching assembly for 
         assert.deepEqual(new Set(job.accepted_questions.flatMap((question) => question.training_focus_matches)), new Set(focusIds));
         assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.length === 1),
           "the pipeline persists only source-supported focus IDs, not the model's overclaimed set");
+        assert.ok(job.accepted_questions.every((question) =>
+          pipeline.supportedTrainingFocusMatches(question, question.training_focus_matches,
+            job.payload.trainingFocus).length === 1),
+        "every issued synthetic question must be grounded in one of the realistic verified mistakes");
+        const completed = await pipeline.advance(job);
+        assert.equal(completed.status, "completed");
+        assert.equal(finalizedQuestions.length, requested);
+        assert.equal(completed.response.exam.questions.length, requested);
+        assert.equal(completed.response.meta.partial, false);
+        assert.ok(finalizedQuestions.every((question) =>
+          pipeline.supportedTrainingFocusMatches(question, question.training_focus_matches,
+            job.payload.trainingFocus).length === 1),
+        "each question remains grounded through final assembly");
       } finally {
         generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+        generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
         operations.renewPipelineLease = prior.renewPipelineLease;
         operations.renewGenerationLease = prior.renewGenerationLease;
         operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+        operations.completePipelineJob = prior.completePipelineJob;
       }
     });
+  }
+});
+
+test("mistake-training never fills remaining slots with a question unrelated to all verified foci", async () => {
+  const focus1Evidence = "I y=kx+m anger k lutningen och m skärningen med y-axeln.";
+  const focus2Evidence = "Växten använder koldioxid och vatten i fotosyntesen. Fotosyntesen bildar druvsocker och syre.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000021",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Linjär funktion", skill: "Skilja lutningen från skärningen med y-axeln",
+          sourceQuestion: "Vad visar k och m i y=kx+m?", sourceEvidence: [focus1Evidence] },
+        { focusId: "focus-2", concept: "Fotosyntes", skill: "Skilja ämnen växten använder från ämnen som bildas",
+          sourceQuestion: "Vilka ämnen använder växten och vilka bildas vid fotosyntesen?", sourceEvidence: [focus2Evidence] },
+      ],
+    },
+    accepted_questions: [
+      { id: "math-supported", type: "short",
+        question: "Vilken parameter anger lutningen respektive skärningen med y-axeln i y=4x+2?",
+        model_answer: "k anger lutningen och m skärningen med y-axeln.", source_references: [focus1Evidence],
+        training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "biology-supported", type: "short",
+        question: "Sortera ämnena växten använder och de som bildas vid fotosyntesen.",
+        model_answer: "Koldioxid och vatten används; druvsocker och syre bildas.", source_references: [focus2Evidence],
+        training_focus_matches: ["focus-2"], validation_status: "verified" },
+    ],
+    progress_current: 2,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let checkpointInput;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => { checkpointInput = input; return { status: "retry_queued" }; };
+  generation.generateVerifiedBatch = async () => ({ status: 200, body: {
+    ok: true,
+    questions: [{
+      id: "unrelated-algebra", type: "short",
+      question: "Beräkna y när x=3 i y=4x+2.", model_answer: "14",
+      learning_objective: "Sätta in x-värde i en funktion", concept_tag: "Linjär funktion",
+      source_references: [focus1Evidence], training_focus_matches: ["focus-1"], validation_status: "verified",
+    }],
+  } });
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(checkpointInput.acceptedQuestions.length, 2,
+      "an unrelated question must not consume a requested question slot after all focus IDs are already covered");
+    assert.equal(checkpointInput.nextStage, "repair");
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
   }
 });
 
@@ -738,6 +838,58 @@ test("assembly rechecks stored focus matches against their source before issuing
     assert.equal(retryInput.errorCode, "TRAINING_FOCUS_INCOMPLETE");
     assert.equal(result.status, "retry_limit");
     assert.equal(result.error, "TRAINING_FOCUS_INCOMPLETE");
+  } finally {
+    generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
+    operations.retryPipelineStep = prior.retryPipelineStep;
+  }
+});
+
+test("assembly fails closed after bounded retries for a legacy question with no source-supported focus", async () => {
+  const mathEvidence = "I y=kx+m anger k lutningen och m skärningen med y-axeln.";
+  const biologyEvidence = "Växten använder koldioxid och vatten i fotosyntesen. Fotosyntesen bildar druvsocker och syre.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000022",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    stage: "assemble",
+    requested_count: 3,
+    payload: { trainingFocus: [
+      { focusId: "focus-1", concept: "Linjär funktion", skill: "Skilja lutningen från skärningen med y-axeln",
+        sourceQuestion: "Vad visar k och m i y=kx+m?", sourceEvidence: [mathEvidence] },
+      { focusId: "focus-2", concept: "Fotosyntes", skill: "Skilja ämnen växten använder från ämnen som bildas",
+        sourceQuestion: "Vilka ämnen använder växten och vilka bildas vid fotosyntesen?", sourceEvidence: [biologyEvidence] },
+    ] },
+    accepted_questions: [
+      { id: "supported-math", question: "Vilken parameter anger lutningen respektive skärningen med y-axeln i y=4x+2?",
+        source_references: [mathEvidence], training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "supported-biology", question: "Sortera ämnena växten använder och de som bildas vid fotosyntesen.",
+        source_references: [biologyEvidence], training_focus_matches: ["focus-2"], validation_status: "verified" },
+      { id: "stale-unrelated", question: "Beräkna y när x=3 i y=4x+2.", model_answer: "14",
+        source_references: [mathEvidence], training_focus_matches: ["focus-1"], validation_status: "verified" },
+    ],
+  };
+  const prior = {
+    finalizeVerifiedExam: generation.finalizeVerifiedExam,
+    retryPipelineStep: operations.retryPipelineStep,
+  };
+  let finalizeCalls = 0;
+  let retryInput;
+  let retryCalls = 0;
+  generation.finalizeVerifiedExam = async () => { finalizeCalls++; throw new Error("must not finalize"); };
+  operations.retryPipelineStep = async (input) => {
+    retryInput = input;
+    retryCalls++;
+    return retryCalls < 3 ? "retry_queued" : "retry_limit";
+  };
+  try {
+    const first = await pipeline.advance(job);
+    const second = await pipeline.advance(job);
+    const result = await pipeline.advance(job);
+    assert.equal(finalizeCalls, 0, "legacy unsupported question must never reach finalization");
+    assert.deepEqual([first.status, second.status, result.status], ["retry", "retry", "retry_limit"]);
+    assert.equal(retryCalls, 3, "the existing server retry limit bounds the fail-closed assembly path");
+    assert.equal(retryInput.errorCode, "TRAINING_QUESTION_UNGROUNDED");
+    assert.equal(result.error, "TRAINING_QUESTION_UNGROUNDED");
   } finally {
     generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
     operations.retryPipelineStep = prior.retryPipelineStep;

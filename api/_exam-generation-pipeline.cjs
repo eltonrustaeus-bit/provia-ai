@@ -10,7 +10,9 @@ const PIPELINE_REQUEST_ID_PATTERN = new RegExp(`^exam-pipeline:${REQUEST_ID_UUID
 const TRAINING_EVIDENCE_STOP_WORDS = new Set([
   "att", "den", "det", "du", "en", "ett", "för", "hur", "i", "och", "om", "som", "vad", "vid", "vilka", "vilket", "är",
   "a", "an", "and", "are", "as", "by", "for", "from", "graph", "graphs", "graf", "grafer", "how", "identify", "identifiera", "in", "is", "of", "on", "or", "plant", "plants", "the", "to", "use", "used", "uses", "using", "what", "when", "which", "with", "använda", "använder", "används", "tar", "upp", "växt", "växter", "växten",
+  "between", "choose", "form", "forms", "irregular", "participle", "past", "present", "regular", "simple", "skilja", "verb", "verbs", "välja",
 ]);
+const TRAINING_EVIDENCE_SHORT_ANCHORS = new Set(["go"]);
 
 function questionTargets(job) {
   if (!["mix", "mixed"].includes(job.payload.qType)) return null;
@@ -170,7 +172,13 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
     const candidateQuestion = typeof question?.question === "string" ? question.question : "";
     const candidateTaskText = candidateQuestion;
     if (specificTerms.length === 0 || !hasTrainingTermOverlap(candidateTaskText, specificTerms.join(" "))) return false;
-    if (contradictsTrainingActionDirection(specificContext, candidateTaskText)) return false;
+    const hasTenseFocus = trainingTenseFrames(specificContext).size > 0;
+    const focusDirections = trainingActionDirections(specificContext);
+    const candidateDirections = trainingActionDirections(candidateTaskText);
+    if (contradictsTrainingActionDirection(specificContext, candidateTaskText) ||
+        contradictsTrainingActionPairing(candidateTaskText) ||
+        (!hasTenseFocus && [...focusDirections].some((direction) => !candidateDirections.has(direction))) ||
+        contradictsTrainingTenseFrame(specificContext, candidateTaskText)) return false;
     return sourceEvidence.some((evidence) =>
       (hasStoredEvidence
         ? filterSourceReferences(evidence, references).length > 0
@@ -179,6 +187,32 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
       sharesTrainingEvidence(candidateText, evidence) &&
       sharesTrainingEvidence(candidateQuestion, evidence));
   });
+}
+
+function contradictsTrainingTenseFrame(focusText, candidateQuestion) {
+  const focusFrames = trainingTenseFrames(focusText);
+  const candidateFrames = trainingTenseFrames(candidateQuestion);
+  if (focusFrames.size === 0) return false;
+  if (candidateFrames.size === 0 || [...candidateFrames].some((frame) => !focusFrames.has(frame))) return true;
+  const clauses = String(candidateQuestion || "").normalize("NFKC").toLocaleLowerCase("en")
+    .split(/[.!?;]+/u).map((clause) => clause.trim()).filter(Boolean);
+  return clauses.some((clause) =>
+    /\b(?:yesterday|last\s+(?:night|week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:days?|weeks?|months?|years?)\s+ago|in\s+(?:19|20)\d{2})\b/u.test(clause) &&
+    /\b(?:i|you|we|they|he|she|it)\s+(?:have|has)\s+(?:[\p{L}]+|_{2,})\b/u.test(clause));
+}
+
+function trainingTenseFrames(value) {
+  const text = String(value || "").normalize("NFKC").toLocaleLowerCase("en");
+  const frames = new Set();
+  if (/\bpast\s+simple\b|\b(?:preteritum|imperfekt|dåtid)\b/u.test(text) ||
+      /\b(?:yesterday|last\s+(?:night|week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:days?|weeks?|months?|years?)\s+ago|in\s+(?:19|20)\d{2})\b/u.test(text)) frames.add("past_simple");
+  if (/\bpresent\s+perfect\b|\b(?:presens\s+)?perfekt\b/u.test(text) ||
+      /\b(?:i|you|we|they|he|she|it)\s+(?:have|has)\s+(?:[\p{L}]+|_{2,})\b/u.test(text)) frames.add("present_perfect");
+  if (/\bpast\s+participle\b/u.test(text)) frames.add("past_participle");
+  if (/\bpast\s+continuous\b/u.test(text) ||
+      /\b(?:was|were)\s+(?:[\p{L}]+ing|_{2,})\b/u.test(text)) frames.add("past_continuous");
+  if (/\bpresent\s+simple\b/u.test(text) || /\b(?:every\s+day|usually|often)\b/u.test(text)) frames.add("present_simple");
+  return frames;
 }
 
 function contradictsTrainingActionDirection(focusText, candidateQuestion) {
@@ -197,25 +231,45 @@ function contradictsTrainingActionDirection(focusText, candidateQuestion) {
 function trainingActionDirections(value) {
   const words = String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{N}]+/gu) || [];
   const directions = new Set();
-  if (words.some((word) => word.startsWith("använd") || word.startsWith("absorber") ||
+  if (words.some((word) => word.startsWith("använd") || word.startsWith("absorber") || word.startsWith("enter") ||
       word.startsWith("förbruk") || word.startsWith("behöv") || word.startsWith("kräv") ||
       word.startsWith("upptag") || word.startsWith("tillför") || word === "input" ||
-      word === "inputs" || word.startsWith("consume") || word.startsWith("take")) ||
+      word === "inputs" || word.startsWith("consume") || word.startsWith("take") ||
+      word.startsWith("reactant") || word.startsWith("råvara")) ||
       words.some((word, index) => ["ta", "tar", "tog"].includes(word) &&
         words.slice(index + 1, index + 5).some((next) => ["upp", "in"].includes(next))) ||
+      words.some((word, index) => ["gå", "går", "ga", "go", "goes", "went"].includes(word) &&
+        words.slice(index + 1, index + 4).some((next) => ["in", "into"].includes(next))) ||
       words.some((word, index) => word.startsWith("tas") &&
         words.slice(index + 1, index + 5).some((next) => ["upp", "in"].includes(next)))) {
     directions.add("input");
   }
-  if (words.some((word) => word.startsWith("bild") || word.startsWith("producer") ||
+  if (words.some((word) => word.startsWith("bild") || word.startsWith("produc") || word.startsWith("producer") ||
+      word.startsWith("exit") || word.startsWith("leav") || word === "product" || word === "products" ||
       word.startsWith("generer") || word.startsWith("avge") || word.startsWith("frigör") ||
       word.startsWith("frisätt") || word.startsWith("skap") || word.startsWith("utsöndr") ||
       word === "output" || word === "outputs" || word.startsWith("release") || word.startsWith("form")) ||
       words.some((word, index) => word.startsWith("släpp") &&
-        words.slice(index + 1, index + 3).includes("ut"))) {
+        words.slice(index + 1, index + 3).includes("ut")) ||
+      words.some((word, index) => ["kom", "kommer", "come", "comes", "came", "go", "goes"].includes(word) &&
+        words.slice(index + 1, index + 4).some((next) => ["ut", "out"].includes(next)))) {
     directions.add("output");
   }
+  if (words.some((word) => word.startsWith("produkt"))) directions.add("output");
   return directions;
+}
+
+function contradictsTrainingActionPairing(value) {
+  const clauses = String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
+    .split(/[,;.!?]|\b(?:and|och|while|whereas)\b/gu).map((clause) => clause.trim()).filter(Boolean);
+  return clauses.some((clause) => {
+    const words = clause.match(/[\p{L}\p{N}]+/gu) || [];
+    const directions = trainingActionDirections(clause);
+    const hasInputNoun = words.some((word) => word.startsWith("reactant") || word.startsWith("råvara"));
+    const hasOutputNoun = words.some((word) => word === "product" || word === "products" || word.startsWith("produkt"));
+    return (hasOutputNoun && directions.has("input") && !hasInputNoun) ||
+      (hasInputNoun && directions.has("output") && !hasOutputNoun);
+  });
 }
 
 function hasNegatedTrainingAction(value, direction) {
@@ -251,7 +305,8 @@ function sharesTrainingEvidence(candidateText, evidence) {
 function trainingTerms(value) {
   return new Set(String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
     .replace(/\bk[\s-]*(?:värde(?:t|n)?|value)\b/gu, " lutning ")
-    .match(/[\p{L}\p{N}]+/gu)?.filter((term) => !TRAINING_EVIDENCE_STOP_WORDS.has(term) && term.length >= 3)
+    .match(/[\p{L}\p{N}]+/gu)?.filter((term) => TRAINING_EVIDENCE_SHORT_ANCHORS.has(term) ||
+      (!TRAINING_EVIDENCE_STOP_WORDS.has(term) && term.length >= 3))
     .map((term) => /^(lutning|riktningskoefficient|slope)/u.test(term) ? "lutning" : term) || []);
 }
 
@@ -428,7 +483,9 @@ async function advance(job, { deadlineAt = null } = {}) {
     );
     const newlyCoveredFocusIds = uncoveredBefore.filter((id) =>
       !coveredTrainingFocusIds.has(id) && candidateFocusMatches.includes(id));
-    if (newlyCoveredFocusIds.length === 0 && uncoveredBefore.some((id) => !coveredTrainingFocusIds.has(id))) {
+    const hasRequiredTrainingFocus = Array.isArray(job.payload.trainingFocus) && job.payload.trainingFocus.length > 0;
+    if ((hasRequiredTrainingFocus && candidateFocusMatches.length === 0) ||
+        (newlyCoveredFocusIds.length === 0 && uncoveredBefore.some((id) => !coveredTrainingFocusIds.has(id)))) {
       focusMismatchCandidates++;
       continue;
     }
@@ -526,6 +583,15 @@ async function advance(job, { deadlineAt = null } = {}) {
 }
 
 async function assemble(job) {
+  const trainingFocus = Array.isArray(job.payload.trainingFocus) ? job.payload.trainingFocus : [];
+  const questions = trainingFocus.length
+    ? job.accepted_questions.map((question) => ({
+      ...question,
+      training_focus_matches: supportedTrainingFocusMatches(
+        question, question?.training_focus_matches, trainingFocus, job.payload.pastedText,
+      ),
+    }))
+    : job.accepted_questions;
   const uncoveredFocusIds = uncoveredTrainingFocusIds(job, job.accepted_questions);
   if (uncoveredFocusIds.length) {
     const retry = await operations.retryPipelineStep({
@@ -535,12 +601,20 @@ async function assemble(job) {
     });
     return retryOutcome(retry, job, "TRAINING_FOCUS_INCOMPLETE");
   }
+  if (trainingFocus.length && questions.some((question) => question.training_focus_matches.length === 0)) {
+    const retry = await operations.retryPipelineStep({
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      errorCode: "TRAINING_QUESTION_UNGROUNDED",
+    });
+    return retryOutcome(retry, job, "TRAINING_QUESTION_UNGROUNDED");
+  }
   let finalized;
   try {
     finalized = await generation.finalizeVerifiedExam({
       userId: job.user_id,
       payload: job.payload,
-      questions: job.accepted_questions,
+      questions,
     });
   } catch {
     const retry = await operations.retryPipelineStep({

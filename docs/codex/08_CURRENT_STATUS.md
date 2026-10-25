@@ -4986,3 +4986,33 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   inte verklig semantisk modelltolkning eller staging/livebeteende. Ingen AI-
   anropskostnad, staging-DB, `main` eller Production ändrades. Preview skapas
   först efter den godkända feature-pushen.
+
+### Relevans i prov från tidigare misstag — 2026-10-26
+
+- [x] Utökade regressionsmaterialet från generiska platshållare till 3 realistiska
+  syntetiska fokusfall: linjära funktioner, fotosyntesens in-/utflöden och
+  oregelbundna engelska verb. Relevanta kandidater och närliggande men fel
+  träningsmål prövas separat.
+- [x] Pipeline-grinden kräver nu att varje kandidat i ett misstagsprov har
+  källstött matchning mot minst ett valt fokus; en redan täckt lista av fokus
+  räcker inte för att fylla resterande platser med orelaterade frågor.
+- [x] Slutmonteringen räknar om fokusmatchningen innan utfärdning och failar
+  stängt om en äldre sparad fråga inte längre har stöd. Kvalitets- och
+  verifieringskraven har inte sänkts.
+- [x] Tempusgrinden kräver en igenkänd målform, hanterar vanliga svenska
+  tempusnamn och avvisar den tydliga motsägelsen "Yesterday, I have ...".
+  Fotosyntesgrinden känner igen reaktant-/produktformuleringar och avvisar
+  de testade felvända kopplingarna.
+- [x] 3/6/12-fixtureflödet går nu genom pipeline-assembly och completion-kontrakt
+  i offline-test. Separat befintligt 12-frågetest utövar riktig lokal
+  finalisering, manifest och frågebevis; fixturetestets slutsteg är mockat.
+- [x] Startsides-P.E.R. ger nu ett konkret svar på vanliga jämförelsefrågor om
+  ExGen utan obekräftade påståenden om konkurrenters funktioner.
+- [x] Offline: 74 riktade API-/pipeline-regressioner passerade; gold-eval och
+  P.E.R.-guide passerade 10/10; syntaxkontroll och `git diff --check` passerade.
+- [!] Oberoende granskning bekräftade att de tidigare specifika exemplen nu
+  täcks. Lexikal handling-parning är fortfarande en avgränsad heuristik och
+  assembly-avvikelse i äldre jobb kan återköas tills retrygränsen nås; detta
+  avslutar säkert utan att utfärda en felaktig fråga men återställer inte jobbet.
+  Ingen staging-/live-AI-verifiering gjordes. `main`, Production, Supabase,
+  hemligheter, konton och kvoter förblir orörda.
