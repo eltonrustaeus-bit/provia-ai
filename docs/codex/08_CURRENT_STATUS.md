@@ -21,11 +21,15 @@
 - [!] Browser/API tests use synthetic fixtures and mocked requests; no live
   model call or staging database write was made. The material mutation is
   simulated at the page-context source, not entered through the production UI.
-- [x] Syntax and `git diff --check` pass; final independent review is in progress.
-- [ ] Feature checkpoint/Preview remains pending. The latest Preview is logged
-  in, but its account shows existing study history; no live model request was
-  sent because a synthetic-only context and current budget could not be
-  independently established without using personal study data.
+- [x] Syntax and `git diff --check` pass; independent read-only review found no
+  blockers in the material guard, coaching prompt, or preserved exam gates.
+- [x] Feature checkpoint `6673020` is pushed to
+  `codex/exgen-generation-quality-2026-10-20`; Vercel Preview is READY at
+  `https://provia-f5z1p6ez0-eltons-projects-4adfb1a3.vercel.app/app.html`
+  (`dpl_D2eqXnEjpqFKwX9vtKnfn7FoBnQ5`).
+- [!] No live model request was sent: the available signed-in account shows
+  existing study history, so synthetic-only input could not be established
+  without sending personal study data. Production and database were untouched.
 
 # P.E.R begränsad livekontroll — 2026-10-25
 
