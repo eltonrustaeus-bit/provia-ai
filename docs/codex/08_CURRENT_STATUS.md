@@ -1,5 +1,29 @@
 # 08 Current Status
 
+# Production exam-pipeline migrations — 2026-10-25
+
+- [x] Applied exactly migrations `20261024140557`, `20261024151433`,
+  `20261024225011`, and `20261024225017` to Production project
+  `mnmotdluigzeehdjbhbu`, in order. The Supabase migration ledger now records
+  those exact repository versions and names.
+- [x] Production readback confirms `assembly_grace_used` defaults to false,
+  the claim function uses the bounded assembly grace, cleanup has the
+  20-minute recovery window, and quota reaping checks the live parent lease.
+- [x] Both question-count constraints are validated. Aggregate check:
+  1 pipeline row, 0 progress/candidate count violations, and 0 active jobs.
+  No application rows were modified or deleted by these migrations.
+- [x] The three changed `SECURITY DEFINER` RPCs use an empty search path and
+  are executable only by `service_role` among `anon`, `authenticated`, and
+  `service_role`.
+- [x] Focused offline pipeline/recovery and migration tests passed 37/37;
+  migration-file integrity check passed (53 migrations, 50 rollbacks).
+- [!] Supabase advisors still report existing unrelated RLS, mutable search
+  path, extension, function-grant, leaked-password-protection, and unindexed
+  foreign-key findings. They were not changed as part of this approved scope.
+- [!] These checks verify Production schema and aggregate invariants only.
+  No paid AI call, learner-flow test, merge to `main`, or Production Vercel
+  deployment was performed in this step.
+
 # P.E.R auth-state synchronization — 2026-10-25
 
 - [x] Root cause: the visitor quota row was calculated once when the widget
