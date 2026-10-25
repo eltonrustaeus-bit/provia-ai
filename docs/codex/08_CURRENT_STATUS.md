@@ -31,9 +31,14 @@
   `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
   `dpl_DQcx79XMu9rUhUmkwK4sDUaPdhM9` är `READY` från exakt denna SHA:
   `https://provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
-- [ ] Frontend-/kontoisoleringscheckpointen återstår. Därefter skapas och
-  verifieras en separat Preview från dess exakta SHA. Live-modellbeteende
-  kräver separat aktuell kontroll av stagingåtkomst och kostnadsgräns.
+- [x] Frontend-/kontoisoleringscheckpoint `d9dd0d59b7361fd09ed78a77ad09e225c7905fea`
+  är pushad separat. Preview `dpl_5qX493oiqfLF4M4bW3F4DgKonz9b` är `READY`
+  från exakt denna SHA; Vercels befintliga branch-alias är
+  `https://provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Offline-/mock-testerna och Preview-builden är verifierade. Inloggad
+  staging/live-modellbeteende testades inte; färsk kostnads- och
+  stagingåtkomstkontroll saknades. `main`, Production och Supabase ändrades
+  inte.
 
 ## Senaste livebevis och nästa kvalitetsfix — 2026-10-25
 
