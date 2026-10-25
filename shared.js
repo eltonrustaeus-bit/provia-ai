@@ -380,6 +380,36 @@
     });
   }
 
+  function perContextChangeMessage(contextKey) {
+    var before = {};
+    var after = {};
+    try {
+      before = JSON.parse(contextKey || '{}');
+      after = JSON.parse(perRequestContextKey());
+    } catch (_) {}
+    var english = !!(window.ExGenEngine && typeof window.ExGenEngine.language === 'function'
+      && window.ExGenEngine.language() === 'en');
+    if (before.page !== after.page) return english
+      ? 'The page changed while P.E.R was working. The reply was cancelled; send your question again on the current page.'
+      : 'Sidan ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen på den aktuella sidan.';
+    if (before.course !== after.course || before.level !== after.level) return english
+      ? 'The study subject or level changed while P.E.R was working. The reply was cancelled; send your question again for the current subject.'
+      : 'Ämne eller nivå ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen för det aktuella studieområdet.';
+    if (before.exam && after.exam) {
+      var oldQuestion = before.exam;
+      var newQuestion = after.exam;
+      if (oldQuestion.questionProof !== newQuestion.questionProof
+          || oldQuestion.id !== newQuestion.id
+          || oldQuestion.number !== newQuestion.number
+          || oldQuestion.text !== newQuestion.text) return english
+        ? 'The exam question changed while P.E.R was working. The reply was cancelled; ask again about the current question.'
+        : 'Provfrågan ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen om den aktuella frågan.';
+    }
+    return english
+      ? 'The study context changed while P.E.R was working. The reply was cancelled; send your question again in the current context.'
+      : 'Studiekontexten ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen i den aktuella kontexten.';
+  }
+
   function invalidatePerRequestForContextChange() {
     var active = _perActiveRequest;
     if (!active || active.answerCommitted || !active.contextKey || active.contextKey === perRequestContextKey()) return;
@@ -1564,13 +1594,11 @@ function finalizeMsg(div, text) {
       var hist = _examHistoryMasked ? [] : perGetHist();
       var requestTimedOut = false;
       var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var requestContext = getPageContext() || {};
       var requestState = {
         cancelled: false,
         controller: requestController,
         accountId: requestAccountId,
         contextKey: perRequestContextKey(),
-        examContext: requestContext.examState?.phase === 'exam',
         answerCommitted: false,
         cancel: null,
         cancelForContextChange: null
@@ -1604,9 +1632,7 @@ function finalizeMsg(div, text) {
         requestState.cancel();
         clearPendingQuestion();
         stopThinking();
-        var message = requestState.examContext
-          ? 'Provfrågan ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen om den aktuella frågan.'
-          : 'Sidan eller studieområdet ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen här.';
+        var message = perContextChangeMessage(requestState.contextKey);
         if (typing) {
           typing.className = 'per-msg teacher';
           typing.textContent = message;

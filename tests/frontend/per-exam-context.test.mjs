@@ -35,8 +35,13 @@ const EXAM = {
 let lastExplain = null;
 let holdNextExplainResponse = false;
 let releaseHeldExplainResponse = null;
-let explainResponseHeldResolve = null;
-const explainResponseHeld = new Promise(resolve => { explainResponseHeldResolve = resolve; });
+async function waitForHeldExplainResponse() {
+  const deadline = Date.now() + 5000;
+  while (!releaseHeldExplainResponse) {
+    if (Date.now() >= deadline) throw new Error("Timed out waiting for mocked P.E.R response");
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
 let examStateUnavailable = false;
 let activeExamCount = 0;
 let historyAllowed = true;
@@ -120,8 +125,6 @@ await mockApis(page, {
       if (holdNextExplainResponse) {
         holdNextExplainResponse = false;
         await new Promise(resolve => {
-          explainResponseHeldResolve?.();
-          explainResponseHeldResolve = null;
           releaseHeldExplainResponse = () => r.fulfill({ json: { ok: true, answer: "STALE_QUESTION_RESPONSE" } })
             .catch(() => {}).then(resolve);
         });
@@ -314,7 +317,7 @@ ok("T4h frågebeviset följer med till P.E.R API:t", lastExplain?.pageContext?.c
 holdNextExplainResponse = true;
 await page.fill("#perInput", "Hjälp mig med frågan");
 await page.click("#perSendBtn");
-await explainResponseHeld;
+await waitForHeldExplainResponse();
 await page.click(".xf-dot >> nth=3");
 await page.waitForFunction(() => document.getElementById("perMessages")?.innerText.includes("Provfrågan ändrades"));
 const staleQuestionState = await page.evaluate(() => ({
@@ -326,9 +329,64 @@ ok("question change aborts and labels an in-flight hint", staleQuestionState.que
   && staleQuestionState.answer.includes("Provfrågan ändrades") && staleQuestionState.sendDisabled === false,
   JSON.stringify(staleQuestionState));
 await releaseHeldExplainResponse?.();
+releaseHeldExplainResponse = null;
 await page.waitForTimeout(100);
 const staleQuestionAnswer = await page.locator("#perMessages").innerText();
 ok("a late hint for the previous exam question is never rendered", !staleQuestionAnswer.includes("STALE_QUESTION_RESPONSE"), staleQuestionAnswer);
+
+async function assertContextChangeCancelsHint(label, expectedMessage, changeContext, restoreContext) {
+  holdNextExplainResponse = true;
+  if (!(await page.locator("#perInput").isVisible())) await page.click(".xf-ask");
+  await page.fill("#perInput", "Hjälp mig med den aktuella frågan");
+  await page.click("#perSendBtn");
+  await waitForHeldExplainResponse();
+  await changeContext();
+  await page.waitForFunction(message => document.getElementById("perMessages")?.innerText.includes(message), expectedMessage);
+  const state = await page.evaluate(() => ({
+    text: document.getElementById("perMessages")?.innerText || "",
+    sendDisabled: document.getElementById("perSendBtn")?.disabled,
+  }));
+  ok(`${label} context change gets accurate cancellation copy and unlocks retry`,
+    state.text.includes(expectedMessage) && state.sendDisabled === false, JSON.stringify(state));
+  await releaseHeldExplainResponse?.();
+  releaseHeldExplainResponse = null;
+  await page.waitForTimeout(100);
+  const late = await page.locator("#perMessages").innerText();
+  ok(`${label} context change never renders the late answer`, !late.includes("STALE_QUESTION_RESPONSE"), late);
+  await restoreContext();
+}
+
+const contextBeforePageSwitch = await page.evaluate(() => window.__perTestCtx());
+await assertContextChangeCancelsHint("page", "Sidan ändrades", async () => {
+  await page.evaluate(context => window.PER.describe({
+    page: "förbättring", focus: context.currentQuestion,
+    targets: context.targets, state: context.examState,
+  }), contextBeforePageSwitch);
+}, async () => {
+  await page.evaluate(context => window.PER.describe({
+    page: "app", focus: context.currentQuestion,
+    targets: context.targets, state: context.examState,
+  }), contextBeforePageSwitch);
+});
+
+await assertContextChangeCancelsHint("course", "Ämne eller nivå ändrades", async () => {
+  await page.evaluate(() => {
+    const original = window.__getPerStudyContext;
+    window.__originalPerStudyContextForTest = original;
+    window.__getPerStudyContext = () => ({ ...original(), course: "Matematik 2b" });
+    const context = window.__perTestCtx();
+    window.PER.describe({ page: "app", focus: context.currentQuestion,
+      targets: context.targets, state: context.examState });
+  });
+}, async () => {
+  await page.evaluate(() => {
+    window.__getPerStudyContext = window.__originalPerStudyContextForTest;
+    delete window.__originalPerStudyContextForTest;
+    const context = window.__perTestCtx();
+    window.PER.describe({ page: "app", focus: context.currentQuestion,
+      targets: context.targets, state: context.examState });
+  });
+});
 
 // Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
 await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);

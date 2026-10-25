@@ -3,9 +3,12 @@
 # P.E.R begränsad livekontroll — 2026-10-25
 
 - [x] Den inloggade staging-Previewn för kodcheckpoint `b8e38aa` öppnades i
-  samma webbläsarsession. Startsidan laddade och en enda allmän, syntetisk
-  P.E.R-fråga fick ett faktiskt svar med relevant vägledning till Mockprov.
+  samma webbläsarsession. Startsidan laddade och den inskickade allmänna
+  frågetexten fick ett faktiskt svar med relevant vägledning till Mockprov.
   Inget prov skapades.
+- [!] Frågetexten var syntetisk, men sidans sparade P.E.R-historik verifierades
+  inte före anropet. Därför räknas detta inte som en fullt verifierad
+  syntetisk prompt/livekvalitetskontroll.
 - [x] Utvecklingssidan laddade i samma session och visade serverhämtad
   studiehistorik. En skrivskyddad stagingfråga visade noll aktiva, orättade
   prov och noll köade/körande genereringsjobb.
@@ -35,10 +38,14 @@
   föregående fråga.
 - [x] Oberoende slutgranskning fann inga blockerare i ändringen och
   bekräftade att elevens svarstext på samma fråga inte utlöser avbrott.
-- [x] Tester på patchen: `per-exam-context` **90/90**,
+- [x] Tester på patchen: `per-exam-context` **94/94**,
   `per-page-targets` **64/64**, `per-manifest` **29/29**,
   `pilot-session-recovery` **1/1**; full API-handler **71/71** på samma
   API-kod; syntax- och diffkontroller passerade.
+- [x] Den fördröjda webbläsarregressionen täcker nu även sid- och
+  kurskontextbyte och verifierar att ett sent svar inte visas. Bytena
+  simuleras via P.E.R-kontexten; riktig routenavigering och kursväljarens
+  interaktion är inte täckta av detta test.
 - [x] Kodcheckpoint `b8e38aa0a16e8b8c0a33da10e90b361438d8747a` är pushad till
   `codex/exgen-generation-quality-2026-10-20`. Preview
   `dpl_BUy5g6e27yV4rEXAaUZ1utfogdUC` är `READY` från exakt SHA. Den
