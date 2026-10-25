@@ -1,5 +1,35 @@
 # 08 Current Status
 
+# P.E.R sidhistorik och startsidesminne — 2026-10-25
+
+- [x] Live-stagingkontrollen på den godkända Previewn avslutades säkert med
+  **0/3 godkända frågor**; prov utfärdades inte och inga befintliga prov
+  ändrades. Telemetrin visar verifierarkasseringar för källstöd/linjering,
+  faktakvalitet, tydlighet och svårighetsgrad samt strukturella avslag på
+  `source_answer_not_extractable`. Reparationen kördes men gav inte tre
+  godkända frågor. Detta är en provgenererings-/underlagsdiagnos, inte bevis
+  för ett fel i P.E.R eller att material saknades.
+- [x] P.E.R konversationsfönstret begränsas nu till de senaste åtta meddelandena
+  **efter** filtrering till aktuell sida och borttagning av provbundna turer.
+  Nyare samtal på andra sidor kan inte längre skjuta undan relevant kontext på
+  startsidan.
+- [x] Startsideshjälp sparar fortsatt sidans vanliga chathistorik, men hoppar
+  över den fristående långminnesuppdateringen. Det undviker att en generell
+  ExGen-fråga oavsiktligt uppdaterar elevminne. Inläsning av elevprofil och
+  verifierat provunderlag förblir avstängd på startsidan.
+- [x] Oberoende granskning fann inga blockerare. Den noterade en testlucka kring
+  sparad sidchat; regressionstestet har kompletterats och verifierar nu både
+  sparandet och att ingen bakgrundsuppdatering av långminne startar.
+- [x] Fullständig `tests/api/per-exam-review-handler.test.mjs` passerade
+  **70/70** efter kodändringarna. Därefter lades granskningens extra
+  sidchattsparande-assertion till och det fokuserade startsidetestet passerade
+  **1/1** på exakt slutdiff. P.E.R frontendsviter passerade **5/5**;
+  `per-memory-epoch`, syntaxkontroller och `git diff --check` passerade.
+- [!] Live P.E.R-kvalitet på startsida, aktivt prov och förbättringssida är
+  fortsatt overifierad. Inga ytterligare live-AI-anrop är godkända i denna
+  verifieringsrunda. Ingen kvot, roll, hemlighet, Supabase, `main` eller
+  Production ändrades.
+
 # P.E.R three-page checkpoint — 2026-10-25
 
 - [x] Integrated code checkpoint `81319a8687e212795835846f3ea145e23de0320f`

@@ -1418,9 +1418,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           page,
           examBound: isExamBoundPage(page),
         };
-      })
+      });
+    const historyForPrompt = history
+      .filter(m => m.page === requestPage && !m.examBound)
       .slice(-8);
-    const historyForPrompt = history.filter(m => m.page === requestPage && !m.examBound);
 
     // Recent mistakes from frontend localStorage (optional — best-effort)
     const rawMistakes = studyCoachRequest ? [] : Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
@@ -1763,7 +1764,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: 'assistant', content: fullText, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
-      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
+      if (!isHomepageRequest) refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1833,7 +1834,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: "assistant", content: answer, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
-      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
+      if (!isHomepageRequest) refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:

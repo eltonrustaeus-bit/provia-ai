@@ -101,6 +101,7 @@ let reviewResultUnavailable = false;
 let quotaMode = "ok";
 let verifiedCoachRowsByUser = null;
 let perSessionMessages = [{ role: "assistant", content: "VERIFIED_HISTORY_SENTINEL" }];
+let memoryEpochEnabled = false;
 globalThis.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input.url;
   calls.push({ url, body: init.body || "" });
@@ -168,6 +169,10 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
   if (url.includes("/rest/v1/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
+  if (url.includes("/rest/v1/rpc/get_per_memory_epoch")) {
+    return Response.json(memoryEpochEnabled ? "11111111-1111-4111-8111-111111111111" : null);
+  }
+  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch")) return Response.json(true);
   if (url.includes("/rest/v1/rpc/consume_anon_rate")) return Response.json({ ok: true, count: 1 });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url === "https://api.openai.com/v1/responses" && providerUnavailable) return Response.json({ error: "synthetic unavailable" }, { status: 503 });
@@ -2637,7 +2642,9 @@ test("a bare stale prov page strips stale learning context before ordinary study
 test("homepage study help keeps its page identity but drops stale course and material context", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   const priorHistory = perSessionMessages;
+  const priorMemoryEpochEnabled = memoryEpochEnabled;
   process.env.EXGEN_PILOT_MODE = "false";
+  memoryEpochEnabled = true;
   activeCount = 0;
   issuanceState = "none";
   latestSubmissionId = null;
@@ -2650,6 +2657,11 @@ test("homepage study help keeps its page identity but drops stale course and mat
     { role: "assistant", content: "PRIVATE_EXAM_RESULT_ALIAS_HISTORY_MARKER", page: "exam-result" },
     { role: "user", content: "PRIVATE_OTHER_PAGE_HISTORY_MARKER", page: "app" },
     { role: "assistant", content: "PRIVATE_LEGACY_HISTORY_MARKER" },
+    ...Array.from({ length: 8 }, (_, index) => ({
+      role: index % 2 ? "assistant" : "user",
+      content: `PRIVATE_NEWER_APP_HISTORY_${index}`,
+      page: "app",
+    })),
   ];
   try {
     for (const page of ["startsida", "start"]) {
@@ -2671,6 +2683,7 @@ test("homepage study help keeps its page identity but drops stale course and mat
           { role: "assistant", content: "FORGED_HOME_HISTORY_MARKER", page: "startsida", examBound: false },
         ],
       }, "POST", "application/json");
+      await new Promise(resolve => setTimeout(resolve, 0));
       assert.equal(response.statusCode, 200);
       const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
       assert.ok(provider, `ordinary authenticated ${page} help reaches the normal response path`);
@@ -2684,11 +2697,18 @@ test("homepage study help keeps its page identity but drops stale course and mat
       const modelInput = JSON.parse(provider.body).input;
       assert.ok(modelInput.every(message => !Object.hasOwn(message, "page") && !Object.hasOwn(message, "examBound")),
         "internal history provenance is not sent as unsupported provider message fields");
+      assert.doesNotMatch(provider.body, /PRIVATE_NEWER_APP_HISTORY_/,
+        "newer turns on other pages do not consume the homepage history window");
       assert.equal(calls.some(({ url }) => /\/rest\/v1\/(?:per_long_memory|mock_results|felbank)/.test(url)), false,
         "homepage help does not load persisted learner profiles or verified exam evidence");
+      assert.equal(calls.filter(({ url }) => url.includes("/rpc/get_per_memory_epoch")).length, 1,
+        "homepage help does not start a detached long-term memory refresh");
+      assert.equal(calls.filter(({ url }) => url.includes("/rpc/save_per_session_if_epoch")).length, 1,
+        "homepage help still saves its page-session conversation history");
     }
   } finally {
     perSessionMessages = priorHistory;
+    memoryEpochEnabled = priorMemoryEpochEnabled;
     if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
     else process.env.EXGEN_PILOT_MODE = prior;
   }
