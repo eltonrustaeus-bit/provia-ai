@@ -17,17 +17,26 @@
   autentiserat konto och att aktivt prov fortsätter att kräva facitfria
   ledtrådar. Hjälp på hemsidan kan däremot inte utgå från studiematerial som
   användaren inte har lagt till i den kontexten.
-- [!] Detta är lokal/offline-verifiering, inte bevis på live-modellens
-  svarskvalitet. Ingen live-AI-förfrågan eller ändring av Supabase, kvot,
-  Vercel Production eller `main` gjordes. Den senast lästa stagingmarginalen
-  var cirka `$1.025049`; öppna prov och oskickad text i webbläsaren lämnades
-  orörda.
-- [x] HEAD och godkänd feature-branch pekar båda på `91e914b`. Senaste
-  verifierade Vercel Preview är `READY` från denna SHA:
-  `https://provia-7qgzxe4ho-eltons-projects-4adfb1a3.vercel.app/`.
-- [!] **PILOT NOT READY.** Kodens lokala P.E.R.-flöden har starkare regression-
-  täckning, men live-auth, aktuell stagingkoppling och modellbeteende måste
-  verifieras separat innan man påstår att den hostade upplevelsen fungerar.
+- [x] Inloggad P.E.R.-vy bekräftades skrivskyddat på den befintliga
+  branch-previewn. Den visar ett äldre syntetiskt 12/12-prov; P.E.R:s befintliga
+  meddelande säger att provet inte är öppet för svar. Ingen fråga skickades,
+  provet lämnades orört och en annan oskickad P.E.R.-fråga behölls.
+- [x] Vercel-previewvariablernas metadata verifierades för exakt
+  `codex/exgen-generation-quality-2026-10-20`: staging-URL, OpenAI-nyckel,
+  Supabase servernyckel, pilotläge och budgetvariabel är branch-scope:ade och
+  krypterade. Inga värden lästes.
+- [x] Färsk, skrivskyddad stagingbudget: cap `$3.379071`, spenderat
+  `$2.090394`, reserverat `$0.263628`, återstående `$1.025049`.
+- [!] Detta är fortfarande inte bevis på live-modellens svarskvalitet. Ingen
+  ny live-AI-förfrågan eller ändring av Supabase, kvot, Vercel Production eller
+  `main` gjordes. Den äldre provvyn saknar bekräftad aktiv serverstatus och
+  används inte som testunderlag.
+- [x] Senaste statuscheckpoint `317636e` är pushad och Vercel-preview är
+  `READY` från exakt SHA:
+  `https://provia-jitp12zs2-eltons-projects-4adfb1a3.vercel.app/`.
+- [!] **PILOT NOT READY.** Offlineflöden och rätt stagingkonfiguration är
+  verifierade, men ingen serververifierad aktiv provfråga har använts för ett
+  nytt live-test. Behåll det öppna provet och invänta ett säkert testläge.
 
 ## P.E.R sidkontext och vanliga kontobyten — 2026-10-25
 
