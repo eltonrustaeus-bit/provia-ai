@@ -4811,3 +4811,40 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Ingen inloggad syntetisk testkörning eller live-AI användes; Previewn
   innehåller inte verifierad syntetisk konto-/historikstatus. `main`,
   Production, Supabase, hemligheter, konton och kvoter är orörda.
+
+### Adversarial källkontroll för felträning — 2026-10-25
+
+- [x] Oberoende granskning reproducerade att en verifierare som felaktigt
+  markerar ett fokus kunde få en orelaterad fråga att passera när frågan bara
+  citerade rätt material. Pipelinen kräver nu både fokusets citerade utdrag
+  och ett begrepp från den specifika färdighets-/felkontexten, utöver ett
+  allmänt ämne. Vanliga böjningar och lutning/riktningskoefficient/k-värde
+  normaliseras. Befintliga strukturella, oberoende gransknings- och
+  provgrindar är oförändrade.
+- [x] Adversarial regression simulerar en fotosyntesmiss med en korrekt citerad
+  mitosfråga, en bred ämnesfråga och en felriktad användningsfråga trots
+  felaktigt positivt verifierarutlåtande. Dessa täcker inte fokus; relevanta
+  inputfrågor och böjnings-/synonymformer täcks av separata positiva fall.
+- [x] Efter ändringen passerade den kombinerade pipeline-/HTTP-/käll-/
+  quality-gold-sviten **50/50**, inklusive återupptagna 3/6/12-flöden,
+  HTTP-retry och tydlig partiell leverans.
+  `node --check api/_exam-generation-pipeline.cjs` och `git diff --check`
+  passerade. P.E.R-sid-/provkontext passerade tidigare i samma QA-session
+  (95/95 respektive 102/102); P.E.R-källfilerna ändrades inte.
+- [!] Textöverlappet är ett deterministiskt förfilter, inte semantisk entailment.
+  En verifierare kan fortfarande överdriva relevans när en felriktad fråga
+  delar ett specifikt färdighetsord med felbeviset; en relevant parafras utan
+  delade eller normaliserade termer kan avvisas. Modellsvarens semantik är
+  inte liveverifierad. En äldre kompatibilitetsgren för redan lagrade fokus
+  utan `sourceEvidence` finns kvar oförändrad och är svagare.
+- [!] Källavsnittens bredd är fortfarande en genereringsstyrning/rangordning,
+  inte ett krav för utfärdande. Ett adversarialt test av en generator som
+  ignorerar avsnittsmålet saknas; full avsnittstäckning är inte beslutad som
+  ett hårt produktkrav eftersom prov kan ha färre frågor än materialavsnitt.
+- [x] Oberoende slutgranskning bekräftade att den reproducerade felriktade
+  gasfrågan avvisas och att k-värde-synonymer godkänns; inga blockerare i
+  patchen. Granskaren bekräftade samtidigt att semantisk entailment och legacy-
+  jobb utan källutdrag fortfarande inte bevisas eller ändras.
+- [!] Ingen staging- eller live-AI-körning gjordes: Preview-kontot och sparad
+  historik har inte verifierats som syntetiska. Ingen kostnad, databas-, konto-,
+  kvot-, `main`- eller Production-ändring gjordes.

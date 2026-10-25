@@ -7,6 +7,10 @@ const MAX_COMPARISON_CONTEXT_BYTES = 8 * 1024;
 const REQUEST_ID_UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const REQUEST_ID_PATTERN = new RegExp(`^${REQUEST_ID_UUID}$`, "i");
 const PIPELINE_REQUEST_ID_PATTERN = new RegExp(`^exam-pipeline:${REQUEST_ID_UUID}$`, "i");
+const TRAINING_EVIDENCE_STOP_WORDS = new Set([
+  "att", "den", "det", "du", "en", "ett", "för", "hur", "i", "och", "om", "som", "vad", "vid", "vilka", "vilket", "är",
+  "a", "an", "and", "are", "as", "by", "for", "from", "graph", "graphs", "graf", "grafer", "how", "identify", "identifiera", "in", "is", "of", "on", "or", "plant", "plants", "the", "to", "use", "used", "uses", "using", "what", "when", "which", "with", "använda", "använder", "används", "tar", "upp", "växt", "växter", "växten",
+]);
 
 function questionTargets(job) {
   if (!["mix", "mixed"].includes(job.payload.qType)) return null;
@@ -151,8 +155,40 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus) {
     if (!focus) return false;
     if (!Object.hasOwn(focus, "sourceEvidence")) return true;
     if (!Array.isArray(focus.sourceEvidence) || focus.sourceEvidence.length === 0) return false;
-    return focus.sourceEvidence.some((evidence) => filterSourceReferences(evidence, references).length > 0);
+    const candidateText = [question?.question, question?.model_answer, question?.learning_objective,
+      question?.concept_tag, question?.topic].filter((value) => typeof value === "string").join(" ");
+    const conceptTerms = trainingTerms(focus.concept);
+    const specificContext = [focus.skill, focus.sourceQuestion, focus.gradingFeedback,
+      focus.expectedAnswer].filter((value) => typeof value === "string").join(" ");
+    const specificTerms = [...trainingTerms(specificContext)]
+      .filter((term) => ![...conceptTerms].some((conceptTerm) => sameTrainingTerm(term, conceptTerm)));
+    return focus.sourceEvidence.some((evidence) =>
+      filterSourceReferences(evidence, references).length > 0 && sharesTrainingEvidence(candidateText, evidence) &&
+      (!specificTerms.length || hasTrainingTermOverlap(candidateText, specificTerms.join(" "))));
   });
+}
+
+function sharesTrainingEvidence(candidateText, evidence) {
+  return hasTrainingTermOverlap(candidateText, evidence);
+}
+
+function trainingTerms(value) {
+  return new Set(String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE")
+    .replace(/\bk[\s-]*(?:värde(?:t|n)?|value)\b/gu, " lutning ")
+    .match(/[\p{L}\p{N}]+/gu)?.filter((term) => !TRAINING_EVIDENCE_STOP_WORDS.has(term) && term.length >= 3)
+    .map((term) => /^(lutning|riktningskoefficient|slope)/u.test(term) ? "lutning" : term) || []);
+}
+
+function sameTrainingTerm(left, right) {
+  if (left === right) return true;
+  if (!/^[\p{L}]+$/u.test(left) || !/^[\p{L}]+$/u.test(right) || left.length < 6 || right.length < 6) return false;
+  return left.slice(0, Math.min(left.length, right.length)) === right.slice(0, Math.min(left.length, right.length));
+}
+
+function hasTrainingTermOverlap(left, right) {
+  const leftTerms = trainingTerms(left);
+  const rightTerms = trainingTerms(right);
+  return [...leftTerms].some((leftTerm) => [...rightTerms].some((rightTerm) => sameTrainingTerm(leftTerm, rightTerm)));
 }
 
 function mergeRepairFeedback(previous, current) {

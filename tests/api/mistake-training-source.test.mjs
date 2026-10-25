@@ -157,12 +157,14 @@ test("mistake evidence stays focused despite short unrelated source citations", 
     "the verified mistake should anchor focus instead of three unrelated but source-valid citations");
   assert.ok(!resolved.trainingFocus[0].sourceEvidence.some((excerpt) => /fotosyntes|klorofyll|ljusenergi/iu.test(excerpt)),
     "unrelated source sections must not become mistake-training evidence");
-  assert.deepEqual(examPipeline.supportedTrainingFocusMatches({ source_references: unrelatedReferences },
+  const focusedQuestion = { question: "Vad beskriver lutningen i en graf?", model_answer: "Förändringen.",
+    source_references: ["Lutningen beskriver förändringen"] };
+  assert.deepEqual(examPipeline.supportedTrainingFocusMatches({ ...focusedQuestion, source_references: unrelatedReferences },
     ["focus-1"], resolved.trainingFocus), [],
   "unrelated but source-valid citations cannot satisfy the pipeline's focus-evidence guard");
-  assert.deepEqual(examPipeline.supportedTrainingFocusMatches({ source_references: ["Lutningen beskriver förändringen"] },
+  assert.deepEqual(examPipeline.supportedTrainingFocusMatches(focusedQuestion,
     ["focus-1"], resolved.trainingFocus), ["focus-1"],
-  "a task citing the focused evidence still covers the documented mistake");
+  "a question using the focused evidence still covers the documented mistake");
 });
 
 test("mistake training preserves inflected evidence and rejects unsupported focus", async () => {
