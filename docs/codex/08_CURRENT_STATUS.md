@@ -418,10 +418,22 @@ redo och budgeten lästs om. Ingen production/main-ändring.
 - [x] Färsk skrivskyddad stagingkontroll för testkontot fann cap `$3.379071`,
   spenderat `$2.090394`, reserverat `$0.263628` och **$1.025049 kvar**;
   inget aktivt orättat prov hittades för kontot. Inga stagingdata ändrades.
-- [!] Ändringen är ännu inte pushad och därför inte verifierad i en ny Preview.
-  Det enda godkända syntetiska 3-frågeprovet och en ledtråd ska köras först när
-  den exakta Previewn är `READY` och branch/stagingkopplingen är verifierad.
-  Det äldre visade provet och den oskickade P.E.R-frågan ska lämnas orörda.
+- [x] Commit `450bc449d3599ccc16b51532c0d818cd35ae08cd` är pushad enbart till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_8PacEuccFYE3uLZsVEgojg53i9ga` blev `READY` från exakt denna SHA och
+  Preview-aliasen är den befintliga branch-aliasen
+  `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+  Branch-scopade Previewvariabler verifierades via Vercel CLI utan att
+  dekryptera värden.
+- [!] Liveprovet kördes inte. I samma befintliga flik visade kontosidan
+  `exgenswedenab@gmail.com` och Premium, men appens `/app.html` visade
+  inloggningsgrinden när den öppnades från kontosidan och även vid återgång.
+  Ingen modellförfrågan eller budgetreservation gjordes. Stagingens senaste
+  lästa budget förblev `$1.025049` tillgänglig och kontot hade 0 aktiva
+  orättade prov vid förkontrollen.
+- [x] Den tidigare resultatvyn låg kvar som färdig, ej aktiv provpost enligt
+  den skrivskyddade förkontrollen. Ingen provrad avbröts, rättades eller
+  raderades. Ingen ytterligare flik eller staginginloggning skapades.
 
 ## Uppföljning utan extra liveförbrukning — 2026-10-24 21:04 UTC
 
