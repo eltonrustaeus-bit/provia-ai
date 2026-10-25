@@ -98,6 +98,19 @@ for (const lang of ["sv", "en"]) {
     text: { format: generateExam.buildMockExamSchema(3) },
   }, { lang, numQuestions: 3, candidateCount: 4, qType: "short", questionCountOffset: base.questionCountOffset });
   const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
+  const repairInstruction = repair.input.filter((item) => item.role === "user").at(-1).content;
+  assert.match(repairInstruction, lang === "sv"
+    ? /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet/
+    : /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material/,
+  `${lang} repair repeats the extractive-answer gate explicitly`);
+  assert.match(repairInstruction, lang === "sv"
+    ? /utan inledning, etikett, förklaring eller omskrivning före eller efter citatet/
+    : /with no introduction, label, explanation, or paraphrase before or after/,
+  `${lang} repair forbids non-source text around an extractive answer`);
+  assert.match(repairInstruction, lang === "sv"
+    ? /Matematik får ha en korrekt härledd lösning/
+    : /Mathematics may use a correctly derived solution/,
+  `${lang} repair preserves the mathematical derivation exception`);
   assert.match(repairedUserPrompt, new RegExp(`^${label}: 4\\.$`, "m"),
     `${lang} repair prompt count agrees with the four-question output schema`);
   assert.match(repairedUserPrompt, new RegExp(`^${courseLabel}: .*\\n${label}: 3\\.$`, "m"),
@@ -136,11 +149,47 @@ const batchWithNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
   comparisonQuestions: [{ id: "approved-1", concept_tag: "Kloroplaster", question: "Var sker fotosyntesen?" }],
+  comparisonAnswerTargets: [{ id: "approved-1", answer_target: "FACIT_SKALL_INTE_NA_GENERATORN" }],
 });
-assert.match(batchWithNoveltyContext.userPrompt, /redan godkända i samma prov/i,
-  "later generation batches are instructed to avoid repeating approved questions");
+assert.match(batchWithNoveltyContext.userPrompt, /tidigare prov eller har redan godkänts i detta prov/i,
+  "later generation batches are instructed to avoid repeating historical and approved questions");
 assert.match(batchWithNoveltyContext.userPrompt, /Var sker fotosyntesen\?/,
   "the generation prompt receives existing questions only as novelty context");
+assert.doesNotMatch(batchWithNoveltyContext.userPrompt, /FACIT_SKALL_INTE_NA_GENERATORN/,
+  "review-only answer targets never enter the question-generation prompt");
+const crowdedNoveltyContext = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 12,
+  pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
+  priorQuestions: Array.from({ length: 20 }, (_, index) => ({
+    concept_tag: `Historiskt begrepp ${index + 1}`, question: `Historisk fråga ${index + 1}`,
+  })),
+  comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({
+    concept_tag: `Aktuellt begrepp ${index + 1}`, question: `Aktuell godkänd fråga ${index + 1}`,
+  })),
+});
+assert.match(crowdedNoveltyContext.userPrompt, /Aktuell godkänd fråga 12/,
+  "all current approved questions remain visible to generation when historical context is full");
+assert.doesNotMatch(crowdedNoveltyContext.userPrompt, /Historisk fråga 9/,
+  "historical questions are trimmed to make room for the full current batch");
+const crowdedRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: "system" }, { role: "user", content: "material" }],
+  text: { format: { name: "mock_exam_schema" } },
+}, {
+  lang: "sv", numQuestions: 12, candidateCount: 2, qType: "short",
+  existingQuestions: [
+    { concept_tag: "Aktuellt begrepp A", question: "Rundans godkända fråga A" },
+    { concept_tag: "Aktuellt begrepp B", question: "Rundans godkända fråga B" },
+  ],
+  priorQuestions: Array.from({ length: 20 }, (_, index) => ({ question: `Historisk fråga ${index + 1}` })),
+  comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({ question: `Aktuell godkänd fråga ${index + 1}` })),
+});
+assert.match(crowdedRepair.input.at(-1).content, /Aktuell godkänd fråga 12/,
+  "repair generation receives earlier approved questions, not only draft stems");
+assert.match(crowdedRepair.input.at(-1).content, /Rundans godkända fråga B/,
+  "repair generation also receives questions approved in the current review round");
+assert.doesNotMatch(crowdedRepair.input.at(-1).content, /Historisk fråga 7/,
+  "repair comparison context reserves 14 of 20 slots for current approved questions");
 const internalPayloadWithEscapedSource = Buffer.from(JSON.stringify({
   pastedText: "\0".repeat(12000),
   comparisonQuestions: [{ question: "Approved question ".repeat(350) }],
@@ -169,14 +218,48 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
+assert.match(biologyPrompt.systemPrompt, /faktabaserade kortsvar måste model_answer dessutom bestå.*ordagranna meningar ur materialet/i,
+  "the generator keeps factual science answer keys extractive");
+assert.match(biologyPrompt.systemPrompt, /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet.*ingen inledning, etikett, förklaring eller omskrivning/i,
+  "the generator forbids prefixes and paraphrases that would fail exact source extraction");
+assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt härledd lösning/i,
+  "the extractive instruction preserves derived mathematical answers");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
+  examQuestionCount: 12,
+  comparisonQuestions: [{ concept_tag: "Nollställen", question: "Bestäm nollställena till f(x)=x^2-4x+3." }],
 });
+const mathTwelvePrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "mix", numQuestions: 12,
+  pastedText: "Syntetiskt material om funktioner, nollställen och exponentialmodeller.", isMath: true,
+});
+assert.match(mathTwelvePrompt.userPrompt, /9 räkne- eller problemlösningsuppgifter, 2 tillämpnings-\/resonemangsuppgifter och högst 1 begrepps-\/definitionsfråga/i,
+  "a 12-question mathematics request states concrete balance targets in the user prompt");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi", qType: "short", numQuestions: 12,
+  pastedText: "Syntetiskt biologimaterial.", isMath: false,
+}).userPrompt, /MATTEPROVETS BALANS/,
+"the mathematics mix instruction stays out of non-mathematics generation");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "graph", numQuestions: 12,
+  pastedText: "y=2x+1", isMath: true,
+}).userPrompt, /MATTEPROVETS BALANS/,
+"graph-only requests are not distorted by the mixed mathematics category target");
+assert.doesNotMatch(generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Matematik 2b", qType: "mix", numQuestions: 12,
+  pastedText: "Material om funktioner och nollställen.", isMath: true,
+  trainingFocus: [{ concept: "nollställen", skill: "lösning" }],
+}).userPrompt, /MATTEPROVETS BALANS/,
+"general mathematics balance does not compete with verified mistake-training focus");
 assert.match(mathPrompt.systemPrompt, /På A-nivå skapar du utmaning genom flera tydliga matematiska steg.*inte genom öppna uppmaningar/i,
   "A-level mathematics uses bounded multi-step work rather than open-ended wording");
 assert.match(mathPrompt.systemPrompt, /Ett kontrollerbart slutsvarsmål/i,
   "each mathematical short answer has one checkable answer target");
+assert.match(mathPrompt.userPrompt, /Hela provet omfattar 12 frågor.*batch på 3 frågor; balansmålen gäller hela provet, inte batchen/i,
+  "a resumed generation batch receives coherent targets for the whole exam rather than its local batch size");
+assert.match(mathPrompt.userPrompt, /Redan godkända frågor i jämförelseunderlaget ska inte räknas som ny bredd/i,
+  "approved question context guides skill coverage as well as wording novelty");
 assert.match(mathPrompt.systemPrompt, /frågan uttryckligen be eleven visa eller förklara lösningsmetoden om metodpoäng ska ges/i,
   "method points require the question to explicitly request working");
 assert.match(mathPrompt.systemPrompt, /Om frågan bara ber om ett slutsvar ska matrisen bara bedöma slutsvaret/i,
@@ -191,6 +274,10 @@ assert.match(englishPrompt.systemPrompt, /one self-contained task with a clear a
   "English short-answer generation follows the same bounded-task rule");
 assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested by the question/i,
   "English scoring criteria cannot silently require unrequested work");
+assert.match(englishPrompt.systemPrompt, /each task must be independently solvable from the material and question text/i,
+  "math tasks retain the independent solvability requirement without extractive-only answers");
+assert.match(englishPrompt.systemPrompt, /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material.*no introduction, label, explanation, or paraphrase/i,
+  "English factual short answers cannot add text around a source quotation");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,
@@ -447,6 +534,78 @@ assert.match(emptyNormalization.failure?.payload.message || "", /inga användbar
 assert.equal(emptyNormalization.failure?.payload.exam, undefined,
   "an empty model response also returns no raw exam object");
 
+const extractiveAnswer = {
+  id: "source-answer", type: "short", question: "Vad bildas vid cellandning?", points: 2,
+  cognitive_level: "förstå", model_answer: "Koldioxid och vatten bildas.",
+  rubric: "Nämn båda produkterna.", source_references: ["Koldioxid och vatten bildas."],
+  scoring_rubric: { parts: [{ description: "Nämner båda produkterna", points: 2 }] },
+};
+const extractiveGate = assessment.gateExam({ questions: [extractiveAnswer] }, {
+  profile: "generic", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.", secret: signingSecret,
+});
+assert.equal(extractiveGate.questions.length, 1, "an exact source sentence can be issued as an answer");
+const unsupportedAnswerGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer,
+  model_answer: "Koldioxid och vatten bildas och frigör elektroner.",
+}] }, {
+  profile: "generic", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Vid cellandning bryts glukos ned. Koldioxid och vatten bildas.", secret: signingSecret,
+});
+assert.equal(unsupportedAnswerGate.questions.length, 0,
+  "a source quote cannot license an unsupported addition to the full-score answer");
+assert.deepEqual(unsupportedAnswerGate.dropped[0].issues, ["source_answer_not_extractable"]);
+const contradictorySymbolGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "pH > 7 är surt.",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "pH < 7 är surt.", secret: signingSecret,
+});
+assert.equal(contradictorySymbolGate.questions.length, 0,
+  "extractive matching preserves meaning-bearing comparison symbols");
+const numericBoundaryGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "pH > 7",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "pH > 70 är basiskt.", secret: signingSecret,
+});
+assert.equal(numericBoundaryGate.questions.length, 0,
+  "extractive matching does not accept a number embedded in a longer number");
+for (const sourceMaterial of ["pH > 7,5 är basiskt.", "pH > 7.5 är basiskt."]) {
+  const decimalBoundaryGate = assessment.gateExam({ questions: [{
+    ...extractiveAnswer, model_answer: "pH > 7",
+  }] }, {
+    profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+    sourceMaterial, secret: signingSecret,
+  });
+  assert.equal(decimalBoundaryGate.questions.length, 0,
+    `extractive matching does not accept an integer prefix of ${sourceMaterial}`);
+  const decimalSuffixGate = assessment.gateExam({ questions: [{
+    ...extractiveAnswer, model_answer: "5 är basiskt.",
+  }] }, {
+    profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+    sourceMaterial, secret: signingSecret,
+  });
+  assert.equal(decimalSuffixGate.questions.length, 0,
+    `extractive matching does not accept the fractional suffix of ${sourceMaterial}`);
+}
+const chemicalCaseGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "CO bildas.",
+}] }, {
+  profile: "natural_sciences", requireSourceReferences: true, requireExtractiveAnswers: true,
+  sourceMaterial: "Co bildas.", secret: signingSecret,
+});
+assert.equal(chemicalCaseGate.questions.length, 0,
+  "extractive matching preserves capitalization that distinguishes chemical species");
+const mathDerivationGate = assessment.gateExam({ questions: [{
+  ...extractiveAnswer, model_answer: "x = 2", question: "Lös 2x = 4.",
+}] }, {
+  profile: "mathematics", requireSourceReferences: true, requireExtractiveAnswers: false,
+  sourceMaterial: "Lös ekvationen 2x = 4.", secret: signingSecret,
+});
+assert.equal(mathDerivationGate.questions.length, 1,
+  "math derivations use their existing independent verification path");
+
 const duplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "zero-first", question: "Vad får man som nollställ för funktionen y = 3x - 6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
   { ...questions[1], id: "zero-paraphrase", question: "Vad är nollstället för funktionen y=3x-6?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
@@ -461,6 +620,160 @@ assert.deepEqual(duplicateGate.dropped, [
   { id: "zero-paraphrase", issues: ["duplicate_question"] },
   { id: "zero-semantic-paraphrase", issues: ["duplicate_question"] },
 ]);
+
+const makeEquationQuestion = (id, question) => ({
+  ...questions[0], id, type: "short", options: [], correct_index: -1,
+  concept_tag: "Ekvationslösning", question, model_answer: "x = 3",
+  estimated_answer_length: "one_sentence",
+  scoring_rubric: { parts: [{ description: "Lösningen x = 3", points: 1 }], full_score_requirements: "x = 3", partial_credit_notes: "" },
+});
+const equationQuestion = makeEquationQuestion("equation-explicit", "Lös ekvationen 2x + 4 = 10.");
+const rewrittenEquationQuestion = makeEquationQuestion(
+  "equation-instruction-rewrite", "Bestäm värdet på x i 2x + 4 = 10.",
+);
+const calculatedEquationQuestion = makeEquationQuestion(
+  "equation-calculated-rewrite", "Beräkna x då 2x + 4 = 10.",
+);
+const verbalEquationQuestion = makeEquationQuestion(
+  "equation-verbal", "Vilket tal ger 10 när det multipliceras med två och sedan ökas med fyra?",
+);
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, rewrittenEquationQuestion), true,
+  "the same equation remains a duplicate when only the Swedish instruction is rephrased");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, calculatedEquationQuestion), true,
+  "the same equation remains a duplicate when phrased as 'Beräkna x då'");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, makeEquationQuestion(
+  "equation-different-expression", "Beräkna x då 3x + 4 = 10.",
+)), false, "different equations are not collapsed by the solve-equation intent");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, {
+  ...makeEquationQuestion("equation-different-skill", "Bestäm lutningen för linjen y = 2x + 4."),
+  concept_tag: "Lutning",
+}), false, "a different skill is not collapsed even when the same equation is involved");
+assert.equal(assessment.isDuplicateQuestion(equationQuestion, verbalEquationQuestion), true,
+  "an equivalent verbal equation is recognized even when it shares few surface tokens");
+const equivalentEquationGate = assessment.gateExam({ questions: [equationQuestion, verbalEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(equivalentEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(equivalentEquationGate.dropped, [{ id: "equation-verbal", issues: ["duplicate_question"] }],
+  "the deterministic gate withholds an equivalent verbal equation even if an independent reviewer approves it");
+const rewrittenEquationGate = assessment.gateExam({ questions: [equationQuestion, rewrittenEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(rewrittenEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(rewrittenEquationGate.dropped, [{ id: "equation-instruction-rewrite", issues: ["duplicate_question"] }],
+  "the gate drops an instruction-only equation rewrite without relying on model review");
+const calculatedEquationGate = assessment.gateExam({ questions: [equationQuestion, calculatedEquationQuestion] }, {
+  profile: "mathematics", secret: signingSecret,
+});
+assert.deepEqual(calculatedEquationGate.questions.map(({ id }) => id), ["equation-explicit"]);
+assert.deepEqual(calculatedEquationGate.dropped, [{ id: "equation-calculated-rewrite", issues: ["duplicate_question"] }],
+  "the deterministic gate drops the 'Beräkna x då' rewrite");
+
+const quadraticSolve = makeEquationQuestion(
+  "quadratic-solve", "Lös andragradsekvationen x² − 5x + 6 = 0.",
+);
+const quadraticZeros = makeEquationQuestion(
+  "quadratic-zeros", "Bestäm nollställena till f(x) = x² − 5x + 6.",
+);
+const quadraticRoots = makeEquationQuestion(
+  "quadratic-roots", "Bestäm rötterna till y = x² − 5x + 6.",
+);
+const quadraticPNotation = makeEquationQuestion(
+  "quadratic-p-notation", "Bestäm nollställena för funktionen p(x)=x^2-6x+5. Vad är nollställen?",
+);
+const quadraticPNotationChoice = makeEquationQuestion(
+  "quadratic-p-notation-choice", "Vilket av följande värden av x ger nollställe för funktionen p(x)=x^2-6x+5?",
+);
+const quadraticPositiveInterval = makeEquationQuestion(
+  "quadratic-positive-interval", "För vilka x gäller p(x)=x²−5x+6 > 0?",
+);
+const quadraticPositiveIntervalParaphrase = makeEquationQuestion(
+  "quadratic-positive-interval-paraphrase", "När är funktionen p(x)=x^2-5x+6 positiv?",
+);
+const quadraticNegativeInterval = makeEquationQuestion(
+  "quadratic-negative-interval", "För vilka x gäller p(x)=x^2-5x+6 < 0?",
+);
+const quadraticPositiveInclusive = makeEquationQuestion(
+  "quadratic-positive-inclusive", "För vilka x gäller p(x)=x^2-5x+6 >= 0?",
+);
+const quadraticNegativeInclusive = makeEquationQuestion(
+  "quadratic-negative-inclusive", "För vilka x gäller p(x)=x^2-5x+6 <= 0?",
+);
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticZeros), true,
+  "solving a quadratic and finding its zeros are duplicates when they target the same roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, quadraticRoots), true,
+  "root wording and plain y= function notation normalize to the same quadratic target");
+assert.equal(assessment.isDuplicateQuestion(quadraticPNotation, quadraticPNotationChoice), true,
+  "different question formats using p(x)= notation cannot repeat the same quadratic-root skill");
+assert.equal(assessment.isDuplicateQuestion(quadraticPNotation, makeEquationQuestion(
+  "quadratic-p-evaluation", "Beräkna p(4) för funktionen p(x)=x^2-6x+5.",
+)), false, "evaluating the same polynomial remains a distinct mathematical skill");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticPositiveIntervalParaphrase), true,
+  "the same positive-sign interval is deduplicated across an inequality and wording paraphrase");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticNegativeInterval), false,
+  "positive and negative intervals of the same quadratic remain distinct skills");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval, quadraticPositiveInclusive), false,
+  "strictly positive and non-negative intervals differ at the roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticNegativeInterval, quadraticNegativeInclusive), false,
+  "strictly negative and non-positive intervals differ at the roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInclusive, quadraticNegativeInclusive), false,
+  "non-negative and non-positive intervals remain distinct skills");
+assert.equal(assessment.isDuplicateQuestion(quadraticPositiveInterval,
+  makeEquationQuestion("quadratic-positive-inclusive-words", "När är p(x)=x²−5x+6 icke-negativ?")), false,
+"strictly positive and non-negative wordings differ at the roots");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, makeEquationQuestion(
+  "quadratic-different", "Lös andragradsekvationen x² − 4x + 3 = 0.",
+)), false, "a different quadratic equation remains a distinct question");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 med pq-formeln."),
+  makeEquationQuestion("quadratic-factor", "Förklara metoden för att lösa x² − 5x + 6 = 0 genom faktorisering."),
+), false, "questions that teach different explicit solution methods remain distinct");
+const quadraticWithoutPq = makeEquationQuestion(
+  "quadratic-without-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 utan pq-formeln.",
+);
+const quadraticWithPq = makeEquationQuestion(
+  "quadratic-with-pq", "Förklara metoden för att lösa x² − 5x + 6 = 0 med pq-formeln.",
+);
+for (const [id, wording] of [
+  ["quadratic-without-pq-phrase", "utan pq-formeln"],
+  ["quadratic-without-pq-verb", "utan att använda pq-formeln"],
+  ["quadratic-without-pq-english", "without using the pq formula"],
+  ["quadratic-without-pq-do-not", "do not use the pq formula"],
+]) {
+  assert.equal(assessment.isDuplicateQuestion(quadraticWithPq, makeEquationQuestion(
+    id, `Förklara metoden för att lösa x² − 5x + 6 = 0 ${wording}.`,
+  )), false, `negated method instruction remains distinct: ${wording}`);
+}
+const methodGate = assessment.gateExam({ questions: [
+  quadraticWithPq,
+  makeEquationQuestion("quadratic-with-factor", "Förklara metoden för att lösa x² − 5x + 6 = 0 genom faktorisering."),
+  quadraticWithoutPq,
+] }, { profile: "mathematics", secret: signingSecret });
+assert.equal(methodGate.questions.length, 3,
+  "the actual quality gate keeps explicit and negated method variants as separate questions");
+assert.equal(assessment.isDuplicateQuestion(quadraticRoots, makeEquationQuestion(
+  "quadratic-roots-and-slope", "Bestäm rötterna till y = x² − 5x + 6. Bestäm också lutningen.",
+)), false, "a combined roots-and-slope task is not collapsed into a roots-only task");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-apply-methods", "Lös med både pq-formeln och faktorisering: x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-methods", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+), false, "applying two methods and comparing them remain distinct task actions");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-efficiency", "Jämför dem och förklara vilken metod är mest effektiv för x² − 5x + 6 = 0."),
+), false, "a comparison with an added evaluation criterion remains a distinct task");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-steps", "Jämför vilken metod kräver minst antal beräkningssteg för x² − 5x + 6 = 0."),
+), false, "a comparison asking for fewest calculation steps remains distinct");
+assert.equal(assessment.isDuplicateQuestion(
+  makeEquationQuestion("quadratic-compare", "Jämför pq-formeln med faktorisering för x² − 5x + 6 = 0."),
+  makeEquationQuestion("quadratic-compare-reliable", "Jämför vilken metod som är mest tillförlitlig för x² − 5x + 6 = 0."),
+), false, "a comparison asking for reliability remains distinct");
+assert.equal(assessment.isDuplicateQuestion(quadraticSolve, {
+  ...makeEquationQuestion("quadratic-different-skill", "Bestäm lutningen för y = x² − 5x + 6."),
+  concept_tag: "Lutning",
+}), false, "a different mathematical skill is not collapsed just because it uses the same polynomial");
 
 const semanticDuplicateGate = assessment.gateExam({ questions: [
   { ...questions[0], id: "capacity-definition", question: "Vad är ekosystemets bärförmåga och hur påverkas den?", topic: "Ekologi", concept_tag: "Bärförmåga" },
@@ -482,6 +795,18 @@ assert.deepEqual(semanticDuplicateGate.questions.map((question) => question.id),
 assert.deepEqual(semanticDuplicateGate.dropped, [
   { id: "capacity-explanation-paraphrase", issues: ["duplicate_question"] },
   { id: "biodiversity-paraphrase", issues: ["duplicate_question"] },
+]);
+
+const linearZeroConceptGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "linear-zeros-represent", question: "Vad representerar nollställena i en linjär funktion?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[0], id: "linear-zeros-describe", question: "Vad beskriver nollställena i en linjär funktion?", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+  { ...questions[0], id: "linear-zero-calculate", question: "Beräkna nollstället till y = 2x + 4.", topic: "Linjära funktioner", concept_tag: "Nollställe" },
+] }, { profile: "mathematics", secret: signingSecret });
+assert.deepEqual(linearZeroConceptGate.questions.map((question) => question.id), [
+  "linear-zeros-represent", "linear-zero-calculate",
+], "represent/describe paraphrases are deduped while a calculation on a specified line remains distinct");
+assert.deepEqual(linearZeroConceptGate.dropped, [
+  { id: "linear-zeros-describe", issues: ["duplicate_question"] },
 ]);
 
 const respirationSiblingGate = assessment.gateExam({ questions: [
@@ -563,6 +888,13 @@ assert.deepEqual(logicalOperandGate.questions.map((question) => question.id), [
 assert.deepEqual(logicalOperandGate.dropped, [
   { id: "same-operands-paraphrase", issues: ["duplicate_question"] },
 ]);
+
+const symmetricVariableComparisonGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "compare-a-b", question: "Jämför A och B.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "compare-b-a", question: "Jämför B och A.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(symmetricVariableComparisonGate.questions.map((question) => question.id), ["compare-a-b"],
+  "reversing a symmetric comparison does not create a distinct question");
 
 for (const [language, original, redundant] of [
   ["sv", "Förklara om regelA och (regelB eller regelC) gäller.", "Förklara om regelA och ((regelB eller regelC)) gäller."],
@@ -856,6 +1188,14 @@ globalThis.fetch = async (input, init = {}) => {
         return {
         id: q.id, approved: !rejected, factual_accuracy: rejected ? 0.2 : 1, ambiguity_score: 0,
         difficulty_match: 1, source_alignment: 1, scoring_quality: 1,
+        source_support: { question: true, answer: true, rubric: true,
+          rubric_parts: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => true) : [],
+          accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => true) : [],
+          evidence_quotes: [reviewInput.source_material.match(/^\s*(?:\S+\s+){0,7}\S+/u)?.[0].trim() || ""],
+          question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+          rubric_part_evidence: Array.isArray(q.scoring_rubric?.parts) ? q.scoring_rubric.parts.map(() => [0]) : [],
+          accepted_answer_evidence: Array.isArray(q.accepted_answers) ? q.accepted_answers.map(() => [0]) : [] },
+        duplicate_of: "",
         language_quality: 1, language_match: q.id !== verifierLanguageMismatchId, option_quality: Array.isArray(q.options)
           ? q.options.map((_, index) => !(optionRejected && index === 2))
           : [],
@@ -1181,7 +1521,11 @@ try {
     topic: "Fotosyntes",
     subtopic: "Fotosyntesens reaktanter och produkter",
     concept_tag: "Fotosyntes",
-    learning_objective: "Beskriva fotosyntesens plats, reaktanter och produkter.",
+    learning_objective: [
+      "Beskriva fotosyntesens plats.",
+      "Beskriva fotosyntesens reaktanter.",
+      "Beskriva fotosyntesens produkter.",
+    ][index],
     source_references: [["kloroplasterna"], ["vatten och koldioxid"], ["glukos och syre"]][index],
   }));
   activeQuestions = biologyQuestions;
@@ -2316,8 +2660,8 @@ try {
   }
   assert.deepEqual(verifierInputs.at(-1).questions.map(({ id }) => id), duplicateAwareRepair.map(({ id }) => id),
     "the retry verifier receives the generated repair candidate");
-  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag }) => ({ id, type, question, concept_tag })),
-    "the retry verifier gets already approved question wording and concept tags only as comparison context");
+  assert.deepEqual(verifierInputs.at(-1).comparison_questions, questions.slice(1).map(({ id, type, question, concept_tag, learning_objective }) => ({ id, type, question, concept_tag, learning_objective })),
+    "the retry verifier gets approved question wording, concept tags and learning goals only as comparison context");
   assert.equal(calls.filter((call) => call.body?.stream && call.body?.text?.format?.name === "mock_exam_schema"
     && call.body?.input?.at(-1)?.content?.includes("KVALITETSREPARATION")).length, 1,
     "at most one bounded missing-slot repair is requested");
@@ -2430,7 +2774,7 @@ try {
   const solverOnlyRejectedFirstPass = biologyQuestions.map((question, index) => ({
     ...question,
     id: `solver-only-${index + 1}`,
-    question: `REJECTED_STEM_SENTINEL_${index + 1}`,
+    question: `REJECTED_STEM_SENTINEL_${index + 1}: ${question.question}`,
     options: ["Kloroplast", "Cellkärna", "Kesäkten"],
     correct_index: 0,
     model_answer: "REJECTED_ANSWER_KEY_SENTINEL",

@@ -47,8 +47,14 @@ function cleanMistakes(values) {
     .map(item => ({
       question: cleanText(item?.question || item?.text || "", 180),
       category: cleanText(item?.category || item?.course || "", 60),
+      concept: cleanText(item?.concept || item?.concept_tag || "", 80),
+      errorTags: Array.isArray(item?.errorTags || item?.error_tags)
+        ? (item.errorTags || item.error_tags).slice(0, 4).map(tag => cleanText(tag, 40)).filter(tag => /^[a-z0-9_-]+$/i.test(tag))
+        : [],
+      studentAnswer: cleanText(item?.studentAnswer || item?.user_answer || "", 160),
+      feedback: cleanText(item?.feedback || "", 160),
     }))
-    .filter(item => item.question || item.category);
+    .filter(item => item.question || item.category || item.concept || item.feedback);
 }
 
 /* Mål som sidan erbjuder P.E.R att skicka eleven till. Bara id, etikett och
@@ -80,14 +86,14 @@ function cleanTargets(values) {
   return out;
 }
 
-function describePage(page) {
+export function describePage(page) {
   const normalized = cleanText(page, 50).toLowerCase();
   if (normalized.includes("förbättring") || normalized.includes("forbattring")) return "förbättring";
   if (normalized.includes("pris")) return "prisplan";
   if (normalized.includes("konto")) return "konto";
   if (normalized.includes("prov")) return "prov";
   if (normalized.includes("start")) return "startsida";
-  return normalized || "";
+  return ["app", "resultat", "exam", "exam-result"].includes(normalized) ? normalized : "";
 }
 
 export function buildPERContextPack({
@@ -114,14 +120,20 @@ export function buildPERContextPack({
   if (level) pageContext.level = level;
   if (mode) pageContext.mode = mode;
 
+  const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });
+  const resultStudyContext = !currentQuestion && (
+    raw.examState?.phase === "result" || ["resultat", "exam-result"].includes(page)
+  );
   const examContextDeclared = Boolean(raw.currentQuestion || raw.examState)
     || ["prov", "resultat", "exam", "exam-result"].includes(page);
-  if (!examContextDeclared && typeof raw.studyMaterial === "string") {
+  // A completed-result view may keep the original study material in context
+  // for ordinary coaching. This is only prompt context: explain.js still
+  // requires server-verified grading before it can reveal exam answers.
+  if ((!examContextDeclared || resultStudyContext) && typeof raw.studyMaterial === "string") {
     const studyMaterial = raw.studyMaterial.replace(/\u0000/g, "").trim().slice(0, 6000);
     if (studyMaterial) pageContext.studyMaterial = studyMaterial;
   }
 
-  const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });
   if (currentQuestion) {
     if (currentQuestion.type === "graph") {
       const declaredGraphModes = [];
@@ -197,7 +209,11 @@ export function buildPERContextPack({
     }
   }
 
-  const mistakes = cleanMistakes(recentMistakes);
+  const normalizedCourse = course.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("sv-SE");
+  const mistakes = normalizedCourse
+    ? cleanMistakes(recentMistakes).filter(item => item.category
+      .normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("sv-SE") === normalizedCourse)
+    : [];
   if (mistakes.length) {
     summaryLines.push(`Senaste misstag: ${mistakes.slice(0, 3).map(m => m.category || m.question).join(", ")}`);
   }

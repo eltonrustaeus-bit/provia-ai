@@ -122,16 +122,68 @@
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
   var PER_MEMORY_CLEAR_EPOCH_KEY = 'proviaai_per_memory_clear_epoch';
+  var PER_PENDING_QUESTION_KEY = 'exgen_per_pending_question';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
   var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
-  var _pilotRestoredSend = null;
+  var _restoredPerSend = null;
+
+  function currentPerPageId() {
+    return getPageContext()?.page || 'app';
+  }
+
+  function savePerPendingQuestion(question, accountId, pageId, requestOptions) {
+    if (!accountId || typeof question !== 'string' || !question || question.length > 2000) return false;
+    try {
+      var pending = {
+        question: question,
+        savedAt: Date.now(),
+        accountId: accountId,
+        page: pageId || currentPerPageId(),
+      };
+      if (requestOptions && requestOptions.examProof) {
+        pending.requestOptions = {
+          helpLevel: requestOptions.helpLevel,
+          examProof: requestOptions.examProof,
+        };
+      }
+      sessionStorage.setItem(PER_PENDING_QUESTION_KEY, JSON.stringify(pending));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function clearPerPendingQuestion(accountId) {
+    try {
+      var raw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      if (!accountId || pending.accountId === accountId) sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
+
+  function clearPerPendingQuestionForAccountChange(session) {
+    if (EXGEN_RUNTIME.environment === 'pilot') return;
+    try {
+      var raw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      var nextAccountId = pilotSessionUserId(session);
+      if (pending.accountId !== nextAccountId) sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
 
   var _examHistoryMasked = true;
   var _serverVerifiedPerHistoryRelease = false;
+  var _perHistoryRequestGeneration = 0;
+  var _perHistoryInvalidationGeneration = 0;
+  var _perHistoryAppliedRequestGeneration = 0;
   try {
     if (localStorage.getItem(PER_EXAM_HISTORY_MASK_KEY) === '1') _examHistoryMasked = true;
   } catch (_) {}
@@ -142,6 +194,8 @@
       return pilotSessionUserId(session) || null;
     } catch (_) { return null; }
   }
+
+  var _perHistoryAccountId = currentPilotAccountId();
 
   function pilotSessionUserId(session) {
     if (session && session.user && session.user.id) return String(session.user.id);
@@ -240,7 +294,7 @@
      om på noll: annars bär fråga 2 med sig fråga 1:s "ge mig svaret" och eleven
      får facit på en fråga hen aldrig bett om hjälp med. */
   var PER_STEP_LABELS = [null, 'Förklara begreppet', 'Visa metoden', 'Ge mig svaret'];
-  var _perHelpLevel = 0;
+  var _perHelpLevel = 1;
   var _perHelpCap = null;
   var _perFocusKey = null;
   var _perAskInFlight = '';
@@ -274,7 +328,12 @@
   }
 
   function perDescribe(m) {
-    if (!m || typeof m !== 'object') { _perManifest = null; perPaintSees(); return; }
+    if (!m || typeof m !== 'object') {
+      _perManifest = null;
+      perPaintSees();
+      invalidatePerRequestForContextChange();
+      return;
+    }
     perWarnKeys(m, PER_MANIFEST_KEYS, '');
     perWarnKeys(m.state, PER_STATE_KEYS, 'state.');
     var st = null;
@@ -299,6 +358,63 @@
     perResetStepsIfNewFocus();
     if (window.PER && window.PER._resetNudge) window.PER._resetNudge();
     perPaintSees();
+    invalidatePerRequestForContextChange();
+  }
+
+  function perRequestContextKey() {
+    var context = getPageContext() || {};
+    var exam = context.examState || {};
+    var question = context.currentQuestion || {};
+    var activeExam = exam.phase === 'exam';
+    return JSON.stringify({
+      page: context.page || 'app',
+      course: context.course || '',
+      level: context.level || '',
+      studyMaterial: context.studyMaterial || '',
+      exam: activeExam ? {
+        submissionId: exam.submissionId || '',
+        questionProof: question.questionProof || '',
+        id: question.id || '',
+        number: question.number == null ? '' : question.number,
+        text: question.text || ''
+      } : null
+    });
+  }
+
+  function perContextChangeMessage(contextKey) {
+    var before = {};
+    var after = {};
+    try {
+      before = JSON.parse(contextKey || '{}');
+      after = JSON.parse(perRequestContextKey());
+    } catch (_) {}
+    var english = !!(window.ExGenEngine && typeof window.ExGenEngine.language === 'function'
+      && window.ExGenEngine.language() === 'en');
+    if (before.page !== after.page) return english
+      ? 'The page changed while P.E.R was working. The reply was cancelled; send your question again on the current page.'
+      : 'Sidan ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen på den aktuella sidan.';
+    if (before.course !== after.course || before.level !== after.level) return english
+      ? 'The study subject or level changed while P.E.R was working. The reply was cancelled; send your question again for the current subject.'
+      : 'Ämne eller nivå ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen för det aktuella studieområdet.';
+    if (before.exam && after.exam) {
+      var oldQuestion = before.exam;
+      var newQuestion = after.exam;
+      if (oldQuestion.questionProof !== newQuestion.questionProof
+          || oldQuestion.id !== newQuestion.id
+          || oldQuestion.number !== newQuestion.number
+          || oldQuestion.text !== newQuestion.text) return english
+        ? 'The exam question changed while P.E.R was working. The reply was cancelled; ask again about the current question.'
+        : 'Provfrågan ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen om den aktuella frågan.';
+    }
+    return english
+      ? 'The study context changed while P.E.R was working. The reply was cancelled; send your question again in the current context.'
+      : 'Studiekontexten ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen i den aktuella kontexten.';
+  }
+
+  function invalidatePerRequestForContextChange() {
+    var active = _perActiveRequest;
+    if (!active || active.answerCommitted || !active.contextKey || active.contextKey === perRequestContextKey()) return;
+    if (active.cancelForContextChange) active.cancelForContextChange();
   }
 
   /* Nyckeln är frågans identitet, inte hela fokusobjektet: publish() i
@@ -315,7 +431,8 @@
     var key = perFocusKey();
     if (key === _perFocusKey) return;
     _perFocusKey = key;
-    _perHelpLevel = 0;
+    var context = getPageContext();
+    _perHelpLevel = context.currentQuestion || context.examState && context.examState.phase === 'exam' ? 0 : 1;
     _perHelpCap = null;
     /* En redan ritad rad bär förra frågans tak. Att låta den ligga kvar är
        värre än att inte rita någon alls — den påstår något om en fråga som
@@ -380,6 +497,15 @@
       else if (path === '/' || path.includes('index')) page = 'startsida';
 
       var ctx = { page: page };
+      var flowContext = typeof window.__getPerStudyContext === 'function' ? window.__getPerStudyContext() : null;
+      var courseInput = document.getElementById('course');
+      var levelInput = document.getElementById('level');
+      /* Live wizard state reflects a course the student just changed; hidden
+         compatibility inputs can still contain the previous exam. */
+      var selectedCourse = String(flowContext?.course || '').trim() || courseInput && String(courseInput.value || '').trim() || '';
+      var selectedLevel = String(flowContext?.level || '').trim() || levelInput && String(levelInput.value || '').trim() || '';
+      if (selectedCourse) ctx.course = String(selectedCourse).trim().slice(0, 120);
+      if (selectedLevel) ctx.level = String(selectedLevel).trim().slice(0, 30);
 
       /* Äldre fält som ännu inte flyttat in i manifestet. setPerContext skriver
          fortfarande hit, så sidor som inte migrerats tappar ingenting.
@@ -396,8 +522,8 @@
         if (Array.isArray(pc.questions)) ctx.questions = pc.questions;
         if (typeof pc.userScore === 'number') ctx.userScore = pc.userScore;
         if (Array.isArray(pc.weakAreas)) ctx.weakAreas = pc.weakAreas;
-        if (pc.course) ctx.course = pc.course;
-        if (pc.level) ctx.level = pc.level;
+        if (pc.course && !selectedCourse) ctx.course = pc.course;
+        if (pc.level && !selectedLevel) ctx.level = pc.level;
         if (pc.mode) ctx.mode = pc.mode;
       }
 
@@ -407,10 +533,14 @@
         if (m.page) ctx.page = m.page;
         if (m.focus && (m.focus.text || typeof m.focus.number === 'number')) {
           ctx.currentQuestion = {
+            id: typeof m.focus.id === 'string' ? m.focus.id.slice(0, 100) : '',
             number: m.focus.number,
+            of: typeof m.focus.of === 'number' ? m.focus.of : undefined,
             text: m.focus.text,
             options: m.focus.options,
             type: m.focus.type,
+            questionProof: typeof m.focus.questionProof === 'string'
+              && /^[A-Za-z0-9_-]{43}$/.test(m.focus.questionProof) ? m.focus.questionProof : '',
             graphMode: m.focus.type === 'graph' && m.focus.graphMode === 'scatter' ? 'scatter'
               : m.focus.type === 'graph' && m.focus.graphMode === 'line' ? 'line' : undefined,
             category: m.focus.category,
@@ -428,9 +558,14 @@
 
       /* P.E.R. may use the material currently being prepared in ordinary
          study mode. Never attach it to an exam/result context. */
-      if (ctx.page === 'app' && !ctx.currentQuestion && !ctx.examState
+      var verifiedResultView = ctx.examState && ctx.examState.phase === 'result';
+      if ((ctx.page === 'app' || verifiedResultView) && !ctx.currentQuestion
+          && (!ctx.examState || verifiedResultView)
           && typeof window.__getPerStudyMaterial === 'function') {
-        var studyMaterial = String(window.__getPerStudyMaterial() || '').trim().slice(0, 6000);
+        var liveMaterial = typeof window.__getPerStudyContext === 'function'
+          ? flowContext?.studyMaterial
+          : window.__getPerStudyMaterial();
+        var studyMaterial = String(liveMaterial || '').trim().slice(0, 6000);
         if (studyMaterial) ctx.studyMaterial = studyMaterial;
       }
 
@@ -440,7 +575,7 @@
          localStorage är bara det som råkar ligga kvar i den här webbläsaren.
          Den mer korrekta källan ska vinna. Beslutat 2026-08-09, avviker
          medvetet från dagens beteende. */
-      if (typeof ctx.userScore !== 'number') {
+      if (ctx.page !== 'startsida' && ctx.page !== 'förbättring' && typeof ctx.userScore !== 'number') {
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
@@ -453,6 +588,13 @@
             }
           }
         } catch (_) {}
+      }
+
+      // The homepage offers general product/study help, not personalized
+      // coaching. Drop any stale study or exam context from another route.
+      if (ctx.page === 'startsida') {
+        ['course', 'level', 'studyMaterial', 'userScore', 'weakAreas', 'currentQuestion', 'questions', 'examState', 'mode']
+          .forEach(function (key) { delete ctx[key]; });
       }
 
       return ctx;
@@ -501,7 +643,7 @@
         return 'Vill du gå igenom dina misstag? Jag kan förklara vad som hände.';
       }
       if (path.includes('app')) {
-        return 'Fastnat på något i provet? Fråga på.';
+        return 'Vad vill du förstå? Fråga P.E.R.';
       }
     } catch (_) {}
     return 'Vad kan jag hjälpa dig med?';
@@ -515,11 +657,18 @@
     try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
   }
 
+  function perHistoryForCurrentPage(history) {
+    var page = getPageContext()?.page || 'app';
+    return (Array.isArray(history) ? history : []).filter(function (message) {
+      return message && message.page === page && message.examBound !== true;
+    });
+  }
+
   function renderPerHistory(history) {
     var msgs = document.getElementById('perMessages');
     if (!msgs) return;
     msgs.innerHTML = '';
-    (Array.isArray(history) ? history : []).forEach(function (msg) {
+    perHistoryForCurrentPage(history).forEach(function (msg) {
       if (!msg || typeof msg.content !== 'string' || (msg.role !== 'user' && msg.role !== 'assistant')) return;
       var div = document.createElement('div');
       div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
@@ -546,7 +695,10 @@
   function setExamHistoryMasked(masked, persist) {
     var next = Boolean(masked);
     if (!next && !_serverVerifiedPerHistoryRelease) return;
-    if (next) _serverVerifiedPerHistoryRelease = false;
+    if (next) {
+      _serverVerifiedPerHistoryRelease = false;
+      _perHistoryInvalidationGeneration++;
+    }
     var shouldPersist = arguments.length < 2 || Boolean(persist);
     if (next === _examHistoryMasked && !next) return;
     var msgs = document.getElementById('perMessages');
@@ -556,7 +708,7 @@
         if (node.classList.contains('per-history-mask-notice') || node.classList.contains('typing')) return;
         var text = node.textContent.trim();
         if (!text) return;
-        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text });
+        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text, page: getPageContext()?.page || 'app' });
       });
     }
     _examHistoryMasked = next;
@@ -594,6 +746,9 @@
     try {
       var session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null');
       var token = session && session.access_token;
+      var accountId = pilotSessionUserId(session) || null;
+      var requestGeneration = ++_perHistoryRequestGeneration;
+      var invalidationGeneration = _perHistoryInvalidationGeneration;
       if (session && session.expires_at
         && Number(session.expires_at) - 60 <= Date.now() / 1000) return null;
       if (!token) return null;
@@ -603,11 +758,15 @@
       if (!response.ok) return false;
       var data = await response.json();
       if (!data || !Array.isArray(data.history)) return false;
+      if (invalidationGeneration !== _perHistoryInvalidationGeneration
+        || requestGeneration < _perHistoryAppliedRequestGeneration
+        || accountId !== currentPilotAccountId()) return false;
       var history = data.history.filter(function (msg) {
         return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
       }).slice(-PER_MAX_HIST);
       _serverVerifiedPerHistoryRelease = true;
       _examHistoryMasked = false;
+      _perHistoryAppliedRequestGeneration = requestGeneration;
       try {
         localStorage.setItem(PER_HIST_KEY, JSON.stringify(history));
         localStorage.removeItem(PER_EXAM_HISTORY_MASK_KEY);
@@ -628,6 +787,17 @@
   }
 
   window.addEventListener('storage', function (event) {
+    if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) {
+      var session = null;
+      try { session = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+      var nextAccountId = pilotSessionUserId(session) || null;
+      abortPerRequestForAccountId(nextAccountId);
+      if (nextAccountId !== _perHistoryAccountId) {
+        _perHistoryAccountId = nextAccountId;
+        setExamHistoryMasked(true);
+        refreshPerHistoryIfVerified();
+      }
+    }
     if (event.key === PER_EXAM_HISTORY_MASK_KEY) {
       if (event.newValue === '1') setExamHistoryMasked(true);
       else if (event.newValue === null) refreshPerHistoryIfVerified();
@@ -970,14 +1140,51 @@
       setTimeout(hideNudge, 6000);
     }
 
-    function register(fn) { _getToken = fn; }
+    function register(fn) {
+      _getToken = fn;
+      syncLandingBar();
+    }
+
+    var _hasSession = false;
+    var _landingSyncGeneration = 0;
+    function syncLandingBar() {
+      var generation = ++_landingSyncGeneration;
+      _hasSession = false;
+      try {
+        var rawSession = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
+        if (rawSession) {
+          var storedSession = JSON.parse(rawSession);
+          var hasExpiry = storedSession && storedSession.expires_at !== undefined && storedSession.expires_at !== null;
+          var expiresAt = hasExpiry ? Number(storedSession.expires_at) : null;
+          // A near-expiry token still counts; expired tokens need auth refresh confirmation below.
+          _hasSession = !!(storedSession && storedSession.access_token && (
+            !hasExpiry || (Number.isFinite(expiresAt) && expiresAt > Date.now() / 1000)
+          ));
+        }
+      } catch (_) {}
+      var landingBar = document.getElementById('perLandingBar');
+      if (!landingBar) return;
+      if (_hasSession) landingBar.classList.remove('visible');
+      else {
+        updateLandingBar();
+        if (typeof _getToken === 'function') {
+          Promise.resolve().then(function () { return _getToken(); }).then(function (token) {
+            if (generation !== _landingSyncGeneration || !token) return;
+            _hasSession = true;
+            landingBar.classList.remove('visible');
+          }).catch(function () {});
+        }
+      }
+    }
 
     function clearAfterServerMemoryClear() {
+      _perHistoryInvalidationGeneration++;
       if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
       try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
+      clearPerPendingQuestion();
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-        _pilotRestoredSend = null;
+        _restoredPerSend = null;
       }
       var input = document.getElementById('perInput');
       if (input) input.value = '';
@@ -1092,12 +1299,8 @@
       } catch (_) {}
     }
 
-    /* Självgranskningens rättelse. Se api/_per-review.js.
-
-   Den visas som ett eget block UNDER svaret, inte som en omskrivning av det.
-   Att tyst byta ut texten hade dolt både felet och att systemet hittade det —
-   och en elev som ser att P.E.R. kontrollerar sig själv har mer skäl att lita
-   på honom, inte mindre. */
+    /* Used only for the separate correction UI on exam-bound pages.
+       Ordinary chat replaces its answer in place after serious review. */
 var _perRättelse = null;
 
 function visaRättelse(efterEl, text) {
@@ -1354,8 +1557,8 @@ function finalizeMsg(div, text) {
     }
 
     function takeRestoredRequestOptions(question) {
-      var restored = _pilotRestoredSend;
-      _pilotRestoredSend = null;
+      var restored = _restoredPerSend;
+      _restoredPerSend = null;
       return restored && restored.question === question && restored.accountId === (currentPilotAccountId() || null)
         ? restored.options
         : undefined;
@@ -1363,14 +1566,16 @@ function finalizeMsg(div, text) {
 
     async function send(q, opts) {
       if (!q || _perActiveRequest) return;
-      var requestAccountId = EXGEN_RUNTIME.environment === 'pilot' ? currentPilotAccountId() : null;
+      var requestAccountId = currentPilotAccountId();
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
         if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
+        else savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
         if (input) input.value = q;
         return true;
       }
       function clearPendingQuestion() {
+        clearPerPendingQuestion(requestAccountId);
         if (EXGEN_RUNTIME.environment !== 'pilot') return;
         try {
           var pending = JSON.parse(sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY) || 'null');
@@ -1390,6 +1595,10 @@ function finalizeMsg(div, text) {
         return;
       }
       if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
+      var pageAtRequest = currentPerPageId();
+      if (EXGEN_RUNTIME.environment !== 'pilot') {
+        savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
+      }
       var announcement = document.getElementById('perAnnouncement');
       if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
@@ -1424,7 +1633,15 @@ function finalizeMsg(div, text) {
       var hist = _examHistoryMasked ? [] : perGetHist();
       var requestTimedOut = false;
       var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var requestState = { cancelled: false, controller: requestController, accountId: requestAccountId, cancel: null };
+      var requestState = {
+        cancelled: false,
+        controller: requestController,
+        accountId: requestAccountId,
+        contextKey: perRequestContextKey(),
+        answerCommitted: false,
+        cancel: null,
+        cancelForContextChange: null
+      };
       _perActiveRequest = requestState;
       var rejectRequestDeadline;
       var requestDeadline = new Promise(function (_, reject) { rejectRequestDeadline = reject; });
@@ -1437,10 +1654,29 @@ function finalizeMsg(div, text) {
       };
       function requestStillOwned() {
         if (requestState.cancelled) return false;
-        if (EXGEN_RUNTIME.environment !== 'pilot' || currentPilotAccountId() === requestAccountId) return true;
-        clearPilotPendingQuestionForAccount(requestAccountId);
-        abortPerRequestForAccountId(currentPilotAccountId());
-        return false;
+        if (currentPilotAccountId() !== requestAccountId) {
+          if (EXGEN_RUNTIME.environment === 'pilot') clearPilotPendingQuestionForAccount(requestAccountId);
+          else clearPerPendingQuestion(requestAccountId);
+          abortPerRequestForAccountId(currentPilotAccountId());
+          return false;
+        }
+        if (!requestState.answerCommitted && requestState.contextKey !== perRequestContextKey()) {
+          requestState.cancelForContextChange?.();
+          return false;
+        }
+        return true;
+      }
+      requestState.cancelForContextChange = function () {
+        if (requestState.cancelled || requestState.answerCommitted) return;
+        requestState.cancel();
+        clearPendingQuestion();
+        stopThinking();
+        var message = perContextChangeMessage(requestState.contextKey);
+        if (typing) {
+          typing.className = 'per-msg teacher';
+          typing.textContent = message;
+        }
+        announceFailure(message);
       }
       var requestTimeout = setTimeout(function () {
         requestTimedOut = true;
@@ -1453,7 +1689,9 @@ function finalizeMsg(div, text) {
         if (!requestStillOwned()) return;
         if (requestTimedOut) throw new Error('P.E.R request timed out');
         var pageCtx = getPageContext();
-        var pageTopic = (pageCtx && pageCtx.page) ? pageCtx.page : 'ExGen';
+        var pageTopic = pageCtx && (pageCtx.course || pageCtx.topic)
+          ? (pageCtx.course || pageCtx.topic)
+          : '';
         var isLandingMode = !token; // Public guide only; study help requires an account.
 
         if (isLandingMode && EXGEN_RUNTIME.environment === 'pilot') {
@@ -1489,27 +1727,48 @@ function finalizeMsg(div, text) {
           updateLandingBar();
         }
 
-        var recentMistakes = [];
+        var recentMistakes = [], weakAreas = [];
         try {
-          var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
-          recentMistakes = lsMistakes.slice(-10).map(function(m) {
-            return { question: String(m.question || '').slice(0, 200), category: String(m.course || m.category || '').slice(0, 60) };
-          });
+          var mayUseMistakeContext = pageCtx.page !== 'startsida'
+            && pageCtx.page !== 'förbättring'
+            && pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
+            && pageCtx.examState?.phase !== 'exam';
+          if (mayUseMistakeContext) {
+            var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
+            var activeCourse = String(pageCtx.course || '').trim();
+            var normalizeCourse = function(value) {
+              return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('sv');
+            };
+            // Browser mistake history can contain several subjects. Never let
+            // another course's errors steer P.E.R; without a known course the
+            // safest useful context is no local mistake history at all.
+            var courseMistakes = activeCourse ? lsMistakes.filter(function(m) {
+              var mistakeCourse = m && (m.course || m.category);
+              return normalizeCourse(mistakeCourse) === normalizeCourse(activeCourse);
+            }) : [];
+            recentMistakes = courseMistakes.slice(-10).reverse().map(function(m) {
+              return {
+                question: String(m.question || '').slice(0, 200),
+                category: activeCourse.slice(0, 60),
+                concept: String(m.concept_tag || '').slice(0, 80),
+                errorTags: Array.isArray(m.error_tags) ? m.error_tags.slice(0, 4).map(function(tag) { return String(tag).slice(0, 40); }) : [],
+                studentAnswer: String(m.user_answer || '').slice(0, 160),
+                feedback: String(m.feedback || '').slice(0, 160)
+              };
+            });
+            var conceptFreq = {};
+            courseMistakes.forEach(function(m) {
+              var concept = String(m && m.concept_tag || '').trim();
+              if (concept && !/^(okänt|okant|unknown)$/i.test(concept)) conceptFreq[concept] = (conceptFreq[concept] || 0) + 1;
+            });
+            weakAreas = Object.keys(conceptFreq).sort(function(a,b) { return conceptFreq[b]-conceptFreq[a] || a.localeCompare(b); }).slice(0,5);
+          }
         } catch (_) {}
 
-        var weakAreas = [];
-        try {
-          var lsHist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
-          var courseFreq = {};
-          lsHist.forEach(function(e) { if (e.course) courseFreq[e.course] = (courseFreq[e.course] || 0) + 1; });
-          weakAreas = Object.keys(courseFreq).sort(function(a,b) { return courseFreq[b]-courseFreq[a]; }).slice(0,5);
-        } catch (_) {}
-
-        var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply };
+        var fetchBodyObj = { userQuestion: q, history: hist, topic: pageTopic, pageContext: pageCtx, recentMistakes: recentMistakes, weakAreas: weakAreas, helpLevel: askLevel, clarifyReply: clarifyReply, lang: perHistoryUsesEnglish() ? 'en' : 'sv' };
         if (opts && opts.examProof) {
           fetchBodyObj.examReview = true;
           fetchBodyObj.examProof = opts.examProof;
-          fetchBodyObj.lang = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language() === 'en' ? 'en' : 'sv';
         }
         var fetchHdrs = { 'Content-Type': 'application/json' };
         if (isLandingMode) {
@@ -1561,6 +1820,7 @@ function finalizeMsg(div, text) {
                   streamComplete = true;
                   if (!answerCommitted && answerText.trim()) {
                     answerCommitted = true;
+                    requestState.answerCommitted = true;
                     clearPendingQuestion();
                     clearTimeout(requestTimeout);
                     reviewTimeout = setTimeout(function () {
@@ -1573,11 +1833,21 @@ function finalizeMsg(div, text) {
                   }
                 }
                 if (ev.done && ev.history) perSaveHist(ev.history);
-                /* Rättelsen från självgranskningen. Kommer efter att svaret
-                   strömmat färdigt — eleven har redan läst texten, och en
-                   synlig rättelse under den är ärligare än att tyst skriva om
-                   svaret eller hålla tillbaka det i väntan på granskningen.
-                   Bara allvarliga fynd når hit; servern filtrerar resten. */
+                if (typeof ev.reviewedAnswer === 'string' && ev.reviewedAnswer.trim()) {
+                  answerText = ev.reviewedAnswer;
+                  if (answerCommitted && typing) finalizeMsg(typing, answerText);
+                  if (ev.history) perSaveHist(ev.history);
+                }
+                if (typeof ev.reviewUnavailable === 'string' && ev.reviewUnavailable.trim() && answerCommitted && typing) {
+                  answerText = ev.reviewUnavailable;
+                  typing.className = 'per-msg teacher';
+                  typing.textContent = answerText;
+                  if (ev.history) perSaveHist(ev.history);
+                  announceFailure(answerText);
+                }
+                /* Exam-bound pages retain their separate correction UI.
+                   Ordinary chat receives reviewedAnswer and replaces this
+                   same bubble without exposing review metadata. */
                 if (ev.granskning && ev.granskning.rättelse) {
                   _perRättelse = ev.granskning.rättelse;
                   if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }
@@ -1644,6 +1914,14 @@ function finalizeMsg(div, text) {
                 typing.textContent = language === 'en'
                   ? 'I can’t verify the exam status right now, so I can’t help with a specific exam question yet. Your question is still here; send it again to retry.'
                   : 'Jag kan inte kontrollera provstatusen just nu och kan därför inte hjälpa med en enskild provfråga ännu. Din fråga finns kvar; tryck Skicka igen för att försöka på nytt.';
+              } else if (data.error === 'PER_REQUEST_IN_PROGRESS') {
+                var language = window.ExGenEngine && window.ExGenEngine.language && window.ExGenEngine.language();
+                if (!language) {
+                  try { language = localStorage.getItem('proviaai_lang') || document.documentElement.lang; } catch (_) {}
+                }
+                typing.textContent = language === 'en'
+                  ? 'P.E.R is already handling another request. Your question is still here; wait for it to finish, then press Send to retry.'
+                  : 'P.E.R hanterar redan en annan förfrågan. Din fråga finns kvar; vänta tills den är klar och tryck sedan på Skicka igen.';
               } else {
                 typing.textContent = data.error || 'Fel — försök igen.';
               }
@@ -1662,6 +1940,7 @@ function finalizeMsg(div, text) {
                   : 'P.E.R fick inget användbart svar. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
                 announceFailure(typing.textContent);
               } else {
+                requestState.answerCommitted = true;
                 clearPendingQuestion();
                 if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
                 finalizeMsg(typing, data.answer);
@@ -2109,9 +2388,10 @@ function finalizeMsg(div, text) {
           : 'Rensa konversationen från den här enheten? Serverlagrad historik och P.E.R-minne finns kvar.')) return;
         if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
+        clearPerPendingQuestion();
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-          _pilotRestoredSend = null;
+          _restoredPerSend = null;
         }
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');
@@ -2271,7 +2551,7 @@ function finalizeMsg(div, text) {
               : !currentAccountId;
             if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
               if (pending.requestOptions && pending.requestOptions.examProof) {
-                _pilotRestoredSend = {
+                _restoredPerSend = {
                   question: pending.question,
                   accountId: currentAccountId || null,
                   options: pending.requestOptions
@@ -2285,6 +2565,40 @@ function finalizeMsg(div, text) {
         } catch (_) {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
         }
+      } else {
+        function restorePerPendingQuestion() {
+          try {
+            var perPendingRaw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+            if (!perPendingRaw) return;
+            var perPending = JSON.parse(perPendingRaw);
+            var perSession = null;
+            try { perSession = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+            var perAccountId = pilotSessionUserId(perSession);
+            if (!perAccountId) return; // Keep it hidden until the same account signs in again.
+            sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+            var perPendingAge = Date.now() - Number(perPending.savedAt);
+            var pageMatches = perPending.page === currentPerPageId();
+            if (perPending.accountId === perAccountId && pageMatches
+                && typeof perPending.question === 'string' && perPending.question
+                && perPending.question.length <= 2000 && perPendingAge >= 0
+                && perPendingAge <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              if (perPending.requestOptions && perPending.requestOptions.examProof) {
+                _restoredPerSend = {
+                  question: perPending.question,
+                  accountId: perAccountId,
+                  options: perPending.requestOptions,
+                };
+              }
+              perInpEl.value = perPending.question;
+              toggle();
+              addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
+            }
+          } catch (_) {
+            try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+          }
+        }
+        restorePerPendingQuestion();
+        window.addEventListener('exgen:per-session-saved', restorePerPendingQuestion);
       }
 
       /* Background Supabase sync — load cross-device history */
@@ -2296,31 +2610,16 @@ function finalizeMsg(div, text) {
           var currentHist = perGetHist();
           var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
           if (!_open && !hasNewUserMsg) {
-            var msgsEl = document.getElementById('perMessages');
-            if (msgsEl) {
-              msgsEl.innerHTML = '';
-              history.forEach(function(msg) {
-                var div = document.createElement('div');
-                div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
-                div.textContent = msg.content;
-                msgsEl.appendChild(div);
-              });
-              msgsEl.scrollTop = msgsEl.scrollHeight;
-            }
+            renderPerHistory(history);
           }
         }).catch(function() {});
 
-      /* Show quota bar for unauthenticated users on all pages */
-      var _hasSession = false;
-      try {
-        var _rawSess = localStorage.getItem(EXGEN_RUNTIME.authStorageKey);
-        // Samma giltighetsprövning som getToken(). En utgången session ska visa
-        // gratisraden, inte dölja den — annars ser besökaren inga frågor kvar
-        // samtidigt som de faktiskt har tre.
-        if (_rawSess) { _hasSession = sessionIsLive(JSON.parse(_rawSess)); }
-      } catch (_) {}
-      if (!_hasSession) updateLandingBar();
-      window.addEventListener('exgen:languagechange', function () { if (!_hasSession) updateLandingBar(); });
+      syncLandingBar();
+      window.addEventListener('storage', function (event) {
+        if (event.key === EXGEN_RUNTIME.authStorageKey || event.key === null) syncLandingBar();
+      });
+      window.addEventListener('exgen:per-session-saved', syncLandingBar);
+      window.addEventListener('exgen:languagechange', syncLandingBar);
 
       /* Landing pages: keep P.E.R available without taking over the first view.
          The old first-visit flow opened the full chat automatically after 3.5s.
@@ -2636,7 +2935,9 @@ function finalizeMsg(div, text) {
     function saveSession(d) {
       abortPerRequestForAccountId(pilotSessionUserId(d) || null);
       clearPilotQuestionForAccountChange(d);
+      clearPerPendingQuestionForAccountChange(d);
       try { localStorage.setItem(SUPA_LS, JSON.stringify(d)); } catch (_) {}
+      window.dispatchEvent(new CustomEvent('exgen:per-session-saved'));
       try { sessionStorage.removeItem(PILOT_REAUTH_REQUIRED_KEY); } catch (_) {}
       if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.syncSession();
       rememberAccount();

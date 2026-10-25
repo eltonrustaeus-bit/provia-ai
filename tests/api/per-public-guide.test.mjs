@@ -10,6 +10,10 @@ test("public guidance answers product questions without unverified price figures
   assert.doesNotMatch(publicGuideAnswer("Vad kostar Premium?"), /\d+\s*kr/);
   assert.match(publicGuideAnswer("Hur skapar jag ett prov?"), /eget studiematerial/);
   assert.match(publicGuideAnswer("Vad gör P.E.R?"), /ledtrådar i stället för facit/);
+  assert.match(publicGuideAnswer("Vad är ExGen?"), /övningsprov.*modellsvar.*förklaringar/s);
+  assert.match(publicGuideAnswer("Hur fungerar rättningen?"), /poäng, modellsvar och en förklaring/);
+  assert.match(publicGuideAnswer("Vad gör felbanken?"), /missade begrepp.*Premium/);
+  assert.match(publicGuideAnswer("Vilken plan ska jag välja?"), /Jämför planerna eller börja gratis/);
 });
 
 test("public guidance never reflects or solves a submitted exam question", () => {

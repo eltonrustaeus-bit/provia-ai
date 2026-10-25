@@ -26,7 +26,10 @@ const supabase = {
         verifiedFilter = true;
         return this;
       },
-      order() { return this; },
+      order(column, options) {
+        assert.deepEqual([column, options], ["created_at", { ascending: false }], "the server query returns newest results first");
+        return this;
+      },
       async limit() { return { data: rows.filter(row => verifiedFilter && row.verified_at), error: null }; },
     };
   },
@@ -34,7 +37,7 @@ const supabase = {
 
 const signals = await enrichMemoryFromExamData(supabase, owner);
 assert.equal(verifiedFilter, true);
-assert.deepEqual(signals.mockRecentScores, [80, 45]);
+assert.deepEqual(signals.mockRecentScores, [45, 80], "the five most recent scores are returned oldest-to-newest for trend consumers");
 assert.deepEqual(signals.mockWeakConcepts, ["Linjär funktion", "Enheter"]);
 assert.deepEqual(signals.felBankWeakConcepts, signals.mockWeakConcepts);
 assert.deepEqual(signals.felBankErrorTypes, ["Metod", "Enhet"]);
@@ -50,5 +53,17 @@ const unavailable = await enrichMemoryFromExamData({
   },
 }, owner);
 assert.deepEqual(unavailable.mockRecentScores, [], "missing verified schema fails closed");
+await assert.rejects(
+  enrichMemoryFromExamData({
+    from() {
+      return {
+        select() { return this; }, eq() { return this; }, not() { return this; },
+        order() { return this; }, async limit() { return { data: null, error: new Error("offline") }; },
+      };
+    },
+  }, owner, { throwOnError: true }),
+  /verified study evidence unavailable/,
+  "cache validation must not treat a failed evidence read as an empty but unchanged history",
+);
 
 console.log("P.E.R memory: only verified grading contributes durable exam signals");

@@ -86,7 +86,7 @@ let aiCalls = 0;
 const refresh = maybeRefreshLongMemory(
   db,
   USER_ID,
-  [{ role: "user", content: "I need help with linear equations" }],
+  [{ role: "user", content: "I need help with linear equations", page: "app" }],
   async () => {
     aiCalls += 1;
     signalStarted();
@@ -117,3 +117,33 @@ const ttlCall = db.state.calls.findLast((call) => call.name === "delete_stale_pe
 assert.equal(ttlCall.args.p_expected_updated_at, "2026-01-01T00:00:00.000Z");
 
 console.log("P.E.R memory epochs: stale session, summary, help-level and TTL operations cannot cross a confirmed clear");
+
+const provenanceDb = createDatabase();
+const memoryPrompts = [];
+await maybeRefreshLongMemory(
+  provenanceDb,
+  USER_ID,
+  [
+    { role: "user", content: "PRIVATE_HOME_MEMORY_MARKER", page: "startsida" },
+    { role: "user", content: "SAFE_APP_MEMORY_MARKER", page: "app" },
+    { role: "user", content: "PRIVATE_EXAM_MEMORY_MARKER", page: "prov", examBound: true },
+    { role: "assistant", content: "PRIVATE_LEGACY_MEMORY_MARKER" },
+  ],
+  async (messages) => {
+    memoryPrompts.push(messages[0].content);
+    return memoryPrompts.length === 1
+      ? "Possible learning preference summary"
+      : { weak_topics: [], strong_topics: [], avg_score: null, exam_count: 0, study_pattern: "unknown", last_module: "unknown", score_trajectory: [], sessions_total: 0 };
+  },
+  "",
+  EPOCH_1,
+);
+assert.equal(memoryPrompts.length, 2, "summary and structured extraction both run for safe tagged chat");
+for (const prompt of memoryPrompts) {
+  assert.match(prompt, /SAFE_APP_MEMORY_MARKER/);
+  assert.doesNotMatch(prompt, /PRIVATE_HOME_MEMORY_MARKER/,
+    "homepage product conversations never become learner long-term memory");
+  assert.doesNotMatch(prompt, /PRIVATE_(?:EXAM|LEGACY)_MEMORY_MARKER/,
+    "long-term memory excludes exam-bound and unproven legacy transcript turns");
+}
+console.log("P.E.R memory provenance: only tagged non-homepage, non-exam chat enters long-term memory prompts");

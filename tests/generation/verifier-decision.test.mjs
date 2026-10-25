@@ -20,7 +20,9 @@ function check(name, fn) { try { fn(); ok(name); } catch (e) { fail(name, e); } 
 const good = {
   id: "1", approved: true, factual_accuracy: 0.95, ambiguity_score: 0.05,
   difficulty_match: 0.9, source_alignment: 0.9, scoring_quality: 0.9, language_quality: 0.95, language_match: true,
-  option_quality: [], option_quality_contract_ok: true, issues: [], required_changes: [],
+  option_quality: [], option_quality_contract_ok: true, source_support_contract_ok: true,
+  duplicate_of: "", duplicate_of_contract_ok: true,
+  issues: [], required_changes: [],
 };
 
 check("approves a high-confidence, low-ambiguity result", () => {
@@ -93,6 +95,19 @@ check("rejects a question when any distractor is marked incoherent", () => {
 check("fails closed unless option-quality contract validation is explicitly true", () => {
   assert.equal(V.decideApproval({ ...good, option_quality_contract_ok: undefined }), false);
   assert.equal(V.decideApproval({ ...good, option_quality_contract_ok: false }), false);
+});
+
+check("fails closed unless source support was checked against literal evidence", () => {
+  assert.equal(V.decideApproval({ ...good, source_support_contract_ok: undefined }), false);
+  assert.equal(V.decideApproval({ ...good, source_support_contract_ok: false }), false);
+  assert.ok(V.buildVerifierSchema().schema.properties.results.items.required.includes("source_support"));
+});
+
+check("fails closed unless the duplicate verdict is explicit and valid", () => {
+  assert.equal(V.decideApproval({ ...good, duplicate_of: undefined }), false);
+  assert.equal(V.decideApproval({ ...good, duplicate_of: null }), false);
+  assert.equal(V.decideApproval({ ...good, duplicate_of: "earlier" }), false);
+  assert.equal(V.decideApproval({ ...good, duplicate_of_contract_ok: false }), false);
 });
 
 check("option-quality is required by the structured verifier schema", () => {

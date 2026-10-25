@@ -511,3 +511,40 @@ AI-reported until independently reviewed.
 - Limitation: Synthetic provider results and a fake clock verify application
   branches and deadline arithmetic only. They do not measure wall-clock
   latency, timeout behavior, hosted SQL/RLS, or model quality/yield.
+
+### 2026-10-23 — Refresh and re-verify auth during resumable client workflows
+- Status: VERIFIED
+- Evidence: staging Auth log showed an expired access token rejected with
+  `bad_jwt` after earlier successful user checks and token refresh; offline
+  tests in `tests/frontend/exam-generation-progress.test.mjs` and
+  `tests/frontend/exam-generation-auth-snapshot.test.mjs`; independent
+  read-only security and test reviews
+- Finding: A long client workflow must not keep reusing the access token
+  captured before work began. After 401, use the current refreshed session or
+  refresh it, server-verify the new token still belongs to the original user,
+  then retry only the same idempotent request once. Return persistent auth
+  errors directly instead of disguising them as a still-running job.
+- Limitation: Offline tests prove client branching and account/idempotency
+  checks only. The fix has not yet been deployed or verified in staging; no
+  live model call followed the observed auth failure.
+
+### 2026-10-23 — Repeat extractive answer constraints in repair prompts
+- Status: VERIFIED (one live staging run; broader yield unverified)
+- Evidence: independent read-only review found no blocker; the deployed feature
+  Preview `dpl_44avLTTqEWQqVRiWRb5EBE13EPZV` ran a synthetic Biology 1 request
+  for 12 short-answer questions and issued all 12 after the prompt change.
+  The prior prompt produced only 1/12 for a separate synthetic Biology 1 run.
+  Supabase recorded the new job as `succeeded`, progress 12/12. No answers were
+  submitted. Staging spend increased by `$0.120592` and remained within the
+  previously approved additional `$2` cap.
+- Finding: A rule present in the base generation prompt may not reliably carry
+  through a later repair call. Repeat the precise constraint in the repair
+  prompt: factual short-answer keys must contain only complete contiguous
+  sentences copied verbatim from the source, without prefixes, labels,
+  explanations, or paraphrases. Preserve the derived-answer exception for
+  mathematics and retain every existing structural and quality gate.
+- Limitation: This is one successful 12-question run, not a statistically
+  reliable yield estimate or proof of consistent performance across subjects.
+  Earlier repair batches still showed reviewer failures for source support,
+  clarity, answer alignment, and scoring quality. All existing gates remained
+  active. Repeated tests with different synthetic source material are needed.

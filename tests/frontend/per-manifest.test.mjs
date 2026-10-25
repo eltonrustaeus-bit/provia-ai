@@ -36,7 +36,7 @@ ok("T1 PER.describe finns", await page.evaluate(() => typeof window.PER?.describ
 const t2 = await page.evaluate(() => {
   window.PER.describe({
     page: "prov",
-    focus: { kind: "question", number: 7, of: 12, text: "Vad är derivatan?", options: ["A1", "B2"], answer: "B", answered: true },
+    focus: { kind: "question", id: "q7", number: 7, of: 12, text: "Vad är derivatan?", options: ["A1", "B2"], answer: "B", answered: true, questionProof: "A".repeat(43) },
     targets: [{ id: "q7", label: "Fråga 7", hint: "derivata", go: function () {} }],
     state: { answered: 5, remaining: 7, elapsed: "12:40" }
   });
@@ -45,6 +45,7 @@ const t2 = await page.evaluate(() => {
 ok("T2a nummer når fram", t2.currentQuestion?.number === 7, JSON.stringify(t2.currentQuestion));
 ok("T2b text når fram", t2.currentQuestion?.text === "Vad är derivatan?");
 ok("T2c elevens svar når fram", t2.currentQuestion?.answer === "B");
+ok("T2d verifieringsstämpeln når API-kontexten", t2.currentQuestion?.questionProof === "A".repeat(43));
 ok("T2d state blir examState", t2.examState?.answered === 5 && t2.examState?.remaining === 7);
 ok("T2e targets når fram utan go", t2.targets?.length === 1 && t2.targets[0].id === "q7" && t2.targets[0].go === undefined, JSON.stringify(t2.targets));
 
@@ -91,6 +92,17 @@ ok("T6a page följer med", t6.page === "förbättring", t6.page);
 ok("T6b userScore bevaras", Math.abs((t6.userScore ?? 0) - 0.62) < 1e-9, String(t6.userScore));
 ok("T6c weakAreas bevaras", Array.isArray(t6.weakAreas) && t6.weakAreas[0] === "Biologi › Cellandning");
 ok("T6d currentQuestion når fram", t6.currentQuestion?.number === 1);
+
+const currentCourseWins = await page.evaluate(() => {
+  window.__getPerStudyContext = () => ({ course: "Biologi 1", level: "B" });
+  window.setPerContext({ course: "Matematik 2b", level: "C" });
+  const context = window.__perTestCtx();
+  delete window.__getPerStudyContext;
+  return context;
+});
+ok("aktuell kurs och nivå går före äldre sidkontext",
+  currentCourseWins.course === "Biologi 1" && currentCourseWins.level === "B",
+  JSON.stringify({ course: currentCourseWins.course, level: currentCourseWins.level }));
 
 // ── T7: null nollställer ──────────────────────────────────────────────────
 const t7 = await page.evaluate(() => { window.PER.describe(null); return window.__perTestCtx(); });

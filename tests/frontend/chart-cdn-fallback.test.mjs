@@ -130,8 +130,8 @@ test("history chart exposes the same result values when Chart.js loads", async (
         const perContext = await page.evaluate(() => ({
           context: window.__perTestCtx(), history: JSON.parse(localStorage.getItem("proviaai_history") || "[]"),
         }));
-        assert.ok(Math.abs(perContext.context.userScore - 0.75) < 1e-9,
-          `P.E.R average excludes invalid synced attempts: ${JSON.stringify(perContext)}`);
+        assert.equal(perContext.context.userScore, undefined,
+          `the improvement page does not send browser-derived scores as verified context: ${JSON.stringify(perContext)}`);
         assert.equal(await page.locator(".chartData").getAttribute("open"), null);
         await page.locator(".chartData summary").focus();
         await page.keyboard.press("Enter");

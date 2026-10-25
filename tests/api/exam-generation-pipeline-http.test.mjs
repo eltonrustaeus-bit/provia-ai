@@ -26,6 +26,7 @@ let failNextBatches = 0;
 let failFinalizations = 0;
 let failNextPipelineClaim = false;
 let loseNextPipelineClaimResponse = false;
+let lastPipelineJobUpsert = null;
 let rejectAllBatches = false;
 let simulatedGenerationTimeoutMs = 0;
 let useActualGeneratorForNextBatch = false;
@@ -160,7 +161,15 @@ globalThis.fetch = async (input, init = {}) => {
           factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1,
           source_alignment: question.id === rejectedId ? 0.5 : 1,
           scoring_quality: 1, language_quality: 1,
+          source_support: { question: true, answer: true, rubric: true,
+            rubric_parts: Array.isArray(question.scoring_rubric?.parts) ? question.scoring_rubric.parts.map(() => true) : [],
+            accepted_answers: Array.isArray(question.accepted_answers) ? question.accepted_answers.map(() => true) : [],
+            evidence_quotes: [review.source_material.match(/^\s*(?:\S+\s+){0,7}\S+/u)?.[0].trim() || ""],
+            question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+            rubric_part_evidence: Array.isArray(question.scoring_rubric?.parts) ? question.scoring_rubric.parts.map(() => [0]) : [],
+            accepted_answer_evidence: Array.isArray(question.accepted_answers) ? question.accepted_answers.map(() => [0]) : [] },
           language_match: true, option_quality: question.options.map(() => true),
+          duplicate_of: "",
           issues: question.id === rejectedId ? [failureCode] : [],
           required_changes: question.id === rejectedId ? [failureNote] : [],
         })) });
@@ -203,20 +212,28 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.pathname === "/rest/v1/user_profiles") return ok([]);
   if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs" && init.method === "POST") {
     const row = body;
+    lastPipelineJobUpsert = row;
     await db.query(`insert into public.mock_exam_generation_pipeline_jobs
       (id,user_id,idempotency_key,request_hash,attempt_id,quota_request_id,state,stage,payload,
-       accepted_questions,requested_count,progress_current,stage_attempts,lease_token,lease_expires_at,deadline_at,error_code)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'[]'::jsonb,$10,0,0,null,null,$11,$12)
-      on conflict(user_id,idempotency_key) do nothing`, [
+       accepted_questions,requested_count,progress_current,stage_attempts,lease_token,lease_expires_at,deadline_at,error_code,assembly_grace_used)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'[]'::jsonb,$10,0,0,null,null,$11,$12,$13)
+      on conflict(user_id,idempotency_key) do update set
+        id=excluded.id,request_hash=excluded.request_hash,attempt_id=excluded.attempt_id,
+        quota_request_id=excluded.quota_request_id,state=excluded.state,stage=excluded.stage,
+        payload=excluded.payload,accepted_questions=excluded.accepted_questions,
+        requested_count=excluded.requested_count,progress_current=excluded.progress_current,
+        stage_attempts=excluded.stage_attempts,lease_token=excluded.lease_token,
+        lease_expires_at=excluded.lease_expires_at,deadline_at=excluded.deadline_at,
+        error_code=excluded.error_code,assembly_grace_used=excluded.assembly_grace_used`, [
         row.id,row.user_id,row.idempotency_key,row.request_hash,row.attempt_id,row.quota_request_id,
-        row.state,row.stage,JSON.stringify(row.payload),row.requested_count,row.deadline_at,row.error_code,
+      row.state,row.stage,JSON.stringify(row.payload),row.requested_count,row.deadline_at,row.error_code,row.assembly_grace_used,
       ]);
     return ok(null, 201);
   }
   if (url.pathname === "/rest/v1/mock_exam_generation_pipeline_jobs" && url.searchParams.has("idempotency_key")) {
     const idempotencyKey = url.searchParams.get("idempotency_key")?.replace(/^eq\./, "");
     const requestUserId = url.searchParams.get("user_id")?.replace(/^eq\./, "") || userId;
-    const row = (await db.query(`select id,state,stage,requested_count,progress_current,error_code,request_hash,deadline_at,accepted_questions
+    const row = (await db.query(`select id,state,stage,requested_count,progress_current,error_code,request_hash,deadline_at,accepted_questions,assembly_grace_used
       from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1 and user_id=$2`, [idempotencyKey,requestUserId])).rows[0];
     return ok(row ? [row] : []);
   }
@@ -285,11 +302,13 @@ test("advance reserves time after model work for durable checkpoint and response
   assert.equal(pipelineGenerationDeadlineAt(startedAt), startedAt + 45_000);
   assert.ok(startedAt + 57_000 - pipelineGenerationDeadlineAt(startedAt) >= 12_000,
     "a model batch cannot consume the entire advance invocation budget");
-  assert.ok(pipelineGenerationDeadlineAt(startedAt) - (startedAt + 6_000)
+  assert.ok(pipelineGenerationDeadlineAt(startedAt) - (startedAt + 7_000)
     >= generation.minimumExamPreflightBudgetMs("mc", true),
-  "the batch deadline still clears the internal generation-and-review preflight after bounded setup work");
-  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 20_000).toISOString()), startedAt + 20_000,
-    "a worker must not spend model time after the persisted operation deadline");
+  "the batch deadline still clears the internal generation-and-review preflight after seven seconds of setup");
+  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 20_000).toISOString()), startedAt + 8_000,
+    "near-deadline jobs reserve 12 seconds for usage settlement and durable checkpointing");
+  assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, new Date(startedAt + 10_000).toISOString()), startedAt - 2_000,
+    "a job with no safe finalization window must not start a new model batch");
   assert.equal(clampPipelineGenerationDeadline(startedAt + 45_000, "invalid"), startedAt + 45_000,
     "an invalid stored deadline cannot extend the handler's hard deadline");
 });
@@ -351,6 +370,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   const preflightReleaseMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022140400_release_preflight_budget_attempt.sql", import.meta.url), "utf8");
   const feedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022170148_checkpoint_exam_repair_feedback.sql", import.meta.url), "utf8");
   const repeatedObjectiveFeedbackMigration = fs.readFileSync(new URL("../../supabase/migrations/20261022220521_add_repeated_learning_objective_checkpoint_feedback.sql", import.meta.url), "utf8");
+  const queuedAssemblyFinalizationMigration = fs.readFileSync(new URL("../../supabase/migrations/20261024140557_finalize_queued_pipeline_assembly.sql", import.meta.url), "utf8");
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
     create schema auth; create table auth.users(id uuid primary key);
@@ -367,6 +387,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
   await db.exec(preflightReleaseMigration);
   await db.exec(feedbackMigration);
   await db.exec(repeatedObjectiveFeedbackMigration);
+  await db.exec(queuedAssemblyFinalizationMigration);
   const seedJob = async (ordinal, requested, stage = "generate", qType = "mc") => {
     const jobId = testUuid(100 + ordinal);
     const idempotencyKey = testUuid(200 + ordinal);
@@ -382,7 +403,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       values($1,$2,$3,$4,$5,$6,'queued',$7,$8::jsonb,$9,clock_timestamp()+interval '10 minutes')`,[
         jobId,userId,idempotencyKey,hash,attemptId,quotaId,stage,JSON.stringify({
           lang:"sv",level:"C",course:"Aritmetik",qType,numQuestions:requested,pastedText:source,
-          idempotencyKey,attemptId,quotaPeriod:"2026-W43",quota:{ok:true,count:1,limit:100,period:"2026-W43",enforced:true},entitlements:{},requestHash:hash,
+          idempotencyKey,attemptId,quotaPeriod:"2026-W43",quota:{ok:true,count:1,limit:100,period:"2026-W43",enforced:true},entitlements:{},generationRole:"gratis",requestHash:hash,
         }),requested,
       ]);
     return { jobId, idempotencyKey, quotaId };
@@ -395,13 +416,15 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     loadUserRole: generation.loadUserRole,
   };
   generated = 0;
+  let lastBatchTrainingContext = null;
   console.info = () => {};
-  generation.generateVerifiedBatch = async ({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback }) => {
+  generation.generateVerifiedBatch = async ({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback, roleSnapshot }) => {
     generationBatchInvocations += 1;
+    lastBatchTrainingContext = { trainingFocus: payload.trainingFocus, priorQuestions: payload.priorQuestions };
     if (useActualGeneratorForNextBatch || useActualGeneratorForPipeline) {
       useActualGeneratorForNextBatch = false;
       actualGenerationDeadlines.push(deadlineAt);
-      return prior.generate({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback });
+      return prior.generate({ userId: batchUserId, payload, deadlineAt, pipelineJobId, pipelineStage, repairFeedback, roleSnapshot });
     }
     if (setupDelays) {
       lastBatchRemainingMs = deadlineAt - Date.now();
@@ -445,6 +468,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     const startPayload = {
       lang: "sv", level: "C", course: "Aritmetik", qType: "mc", numQuestions: 12,
       pastedText: source, idempotencyKey: testUuid(9999),
+      trainingFocus: [{ concept: "Addition", skill: "Beräkna summor", errorTags: ["calculation_error", "bad tag!"], userAnswer: "private answer" }],
+      priorQuestions: [{ id: "client-controlled", question: "Vad är summan?", concept_tag: "Addition", model_answer: "private key" }],
     };
     const callStart = async (payload = startPayload) => {
       const res = responseRecorder();
@@ -457,14 +482,22 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     // Simulate a client that did not observe the first handler response.
     await callStart();
     const firstPersistedOperation = (await db.query(
-      "select id from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
+      "select id,payload->>'generationRole' as generation_role,payload->'trainingFocus' as training_focus,payload->'priorQuestions' as prior_questions from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1",
       [startPayload.idempotencyKey],
-    )).rows[0]?.id;
-    assert.ok(firstPersistedOperation, "the first request persisted its operation before its response was lost");
+    )).rows[0];
+    assert.ok(firstPersistedOperation?.id, "the first request persisted its operation before its response was lost");
+    assert.equal(firstPersistedOperation.generation_role, "gratis",
+      "the job stores only the start handler's normalized server role for internal reuse");
+    assert.deepEqual(firstPersistedOperation.training_focus, [], "unverified client focus is ignored outside verified mistake-training mode");
+    assert.deepEqual(firstPersistedOperation.prior_questions, [], "unverified comparison questions are ignored outside verified mistake-training mode");
+    assert.ok(!JSON.stringify(firstPersistedOperation).includes("private answer"));
+    assert.ok(!JSON.stringify(firstPersistedOperation).includes("private key"));
+    assert.equal(lastPipelineJobUpsert.assembly_grace_used, false,
+      "new pipeline attempts explicitly reset any previous one-time assembly grace marker");
     // After reload, the client retries with the same start key.
     const repeatedStart = await callStart();
     assert.equal(repeatedStart.statusCode, 202);
-    assert.equal(repeatedStart.body.operationId, firstPersistedOperation);
+    assert.equal(repeatedStart.body.operationId, firstPersistedOperation.id);
     assert.equal(repeatedStart.body.approved, 0);
     assert.equal(Object.hasOwn(repeatedStart.body, "payload"), false);
     assert.equal(Object.hasOwn(repeatedStart.body, "accepted_questions"), false);
@@ -483,6 +516,16 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     assert.equal((await db.query(
       "select mock_quota_count from public.profiles where id=$1", [userId],
     )).rows[0].mock_quota_count, 1, "replaying start does not increment the persisted quota twice");
+    const changedTrainingReplay = await callStart({
+      ...startPayload,
+      priorQuestions: [{ question: "A different historical question" }],
+    });
+    assert.equal(changedTrainingReplay.statusCode, 202,
+      "untrusted comparison context cannot change the ordinary exam request or start a second operation");
+    assert.equal((await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count, 1,
+    "a changed training replay cannot reserve another question or quota unit");
     assert.equal(generationBatchInvocations, 0, "starting/replaying does not invoke the model before advance");
 
     const callAdvance=async(operationId)=>{
@@ -522,6 +565,10 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         else assert.equal(advanced.statusCode, 202, JSON.stringify(advanced.body));
       }
       assert.ok(completed, `${requested}-question job created by start reaches issuance`);
+      assert.deepEqual(lastBatchTrainingContext, {
+        trainingFocus: [],
+        priorQuestions: [],
+      }, "ordinary exam jobs never carry unverified client mistake or comparison context");
       assert.equal(completed.body.exam.questions.length, requested);
       assert.equal(completed.body.meta.requested, requested);
       assert.equal(completed.body.meta.partial, false);
@@ -707,20 +754,20 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       fakeNow = originalClock();
       setupDelays = {
         "/auth/v1/user": 1_000,
-        "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user": 5_000,
+        "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user": 6_000,
       };
       lastBatchRemainingMs = null;
       const atBoundary = await callAdvance(boundaryJobId);
       assert.equal(atBoundary.statusCode, 202);
-      assert.equal(lastBatchRemainingMs, 39_000,
-        "six seconds of auth, ownership and lease setup are included in the fixed handler deadline");
+      assert.equal(lastBatchRemainingMs, 38_000,
+        "seven seconds of auth, ownership and lease setup are included in the fixed handler deadline");
       assert.deepEqual(setupTelemetry[0], {
         event: "exam_generation_pipeline_setup",
         requestId: `exam-pipeline:${boundaryJobId}`,
         authMs: 1_000,
-        claimMs: 5_000,
-        elapsedMs: 6_000,
-        remainingMs: 39_000,
+        claimMs: 6_000,
+        elapsedMs: 7_000,
+        remainingMs: 38_000,
         outcome: "claimed",
       }, "setup telemetry is numeric and contains no user, job or source material");
       assert.equal(atBoundary.body.approved, 2,
@@ -728,13 +775,13 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
 
       const { jobId: exceededJobId } = await seedJob(31, 3);
       fakeNow = originalClock();
-      setupDelays["/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user"] = 6_000;
+      setupDelays["/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user"] = 7_000;
       lastBatchRemainingMs = null;
       const overBudget = await callAdvance(exceededJobId);
       assert.equal(overBudget.statusCode, 202);
       assert.equal(overBudget.body.state, "retrying");
-      assert.equal(lastBatchRemainingMs, 38_000);
-      assert.equal(setupTelemetry[1].remainingMs, 38_000,
+      assert.equal(lastBatchRemainingMs, 37_000);
+      assert.equal(setupTelemetry[1].remainingMs, 37_000,
         "the combined owner claim and parent renewal are included in pre-model setup");
       assert.equal(overBudget.body.approved, 0,
         "setup that consumes the preflight reserve fails closed without checkpointing or issuing candidates");
@@ -1180,7 +1227,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
           `the actual ${requested}-question path marks each fully approved ${step} batch as passed`);
       }
       assert.ok(mockedUsageEvents.filter(event => event.pipeline_step === "generate")
-        .every(event => !Object.hasOwn(event, "verification_passed")),
+        .every(event => event.verification_passed === null),
       "generation usage events do not masquerade as quality-review outcomes");
       assert.doesNotMatch(JSON.stringify(mockedUsageEvents), /Beräkna|Addition|2\+3=5|3\+3=6|4\+3=7/,
         "usage telemetry excludes question text and study material");
@@ -1300,6 +1347,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       "/auth/v1/user": 1_500,
       "/rest/v1/rpc/claim_mock_exam_generation_pipeline_job_for_user": 1_500,
       "/rest/v1/rpc/renew_mock_exam_generation_lease": 1_000,
+      "/rest/v1/profiles": 5_000,
       "/v1/responses": 9_000,
       "/rest/v1/rpc/checkpoint_mock_exam_generation_pipeline_batch": 1_000,
     };
@@ -1596,6 +1644,35 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
     assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [userId])).rows[0].mock_quota_count,
       deadlinePartialBaseline + 1, "deadline partial consumes exactly one quota unit");
 
+    const queuedAssemblyBaseline = (await db.query(
+      "select mock_quota_count from public.profiles where id=$1", [userId],
+    )).rows[0].mock_quota_count;
+    const { jobId: queuedAssemblyJobId, quotaId: queuedAssemblyQuotaId } = await seedJob(94, 12, "assemble");
+    const queuedAssemblyQuestions = questions(8);
+    await db.query(`update public.mock_exam_generation_pipeline_jobs
+      set accepted_questions=$2::jsonb,progress_current=$3,deadline_at=clock_timestamp()-interval '1 second'
+      where id=$1`, [queuedAssemblyJobId, JSON.stringify(queuedAssemblyQuestions), queuedAssemblyQuestions.length]);
+    const queuedAssemblyBatchesBefore = generationBatchInvocations;
+    const queuedAssemblyFinalizationsBefore = finalizationInvocations;
+    const queuedAssembly = await callAdvance(queuedAssemblyJobId);
+    assert.equal(queuedAssembly.statusCode, 200, JSON.stringify(queuedAssembly.body));
+    assert.equal(queuedAssembly.body.exam.questions.length, 8,
+      "a verified checkpoint already queued for assembly survives a deadline crossing before the next request");
+    assert.equal(queuedAssembly.body.meta.requested, 12);
+    assert.equal(queuedAssembly.body.meta.partial, true);
+    assert.equal(generationBatchInvocations, queuedAssemblyBatchesBefore,
+      "expired queued assembly finalizes its verified checkpoint without regenerating questions");
+    assert.equal(finalizationInvocations, queuedAssemblyFinalizationsBefore + 1);
+    assert.equal((await db.query("select status from public.mock_exam_quota_reservations where request_id=$1", [queuedAssemblyQuotaId])).rows[0].status,
+      "consumed");
+    assert.equal((await db.query("select mock_quota_count from public.profiles where id=$1", [userId])).rows[0].mock_quota_count,
+      queuedAssemblyBaseline + 1, "queued-assembly recovery consumes exactly one quota unit");
+    const queuedAssemblyReplay = await callAdvance(queuedAssemblyJobId);
+    assert.deepEqual(queuedAssemblyReplay.body, queuedAssembly.body,
+      "queued-assembly recovery replays its exact final result");
+    assert.equal(finalizationInvocations, queuedAssemblyFinalizationsBefore + 1,
+      "queued-assembly replay never finalizes twice");
+
     const expiredBelowFloorBaseline = (await db.query(
       "select mock_quota_count from public.profiles where id=$1", [userId],
     )).rows[0].mock_quota_count;
@@ -1784,8 +1861,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,29,
-      "full 3/6/12 runs and repairs, mixed partials, retries, deadline salvages, and timeout recovery issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,30,
+      "full 3/6/12 runs and repairs, mixed partials, retries, deadline and queued-assembly salvages, and timeout recovery issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
@@ -2043,6 +2120,27 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
         "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
       )).rows[0].n, issuedBefore, "failed finalization never issues an exam");
     }
+
+    const restartPayload = { ...startPayload, idempotencyKey: testUuid(9998), numQuestions: 3,
+      trainingFocus: [], priorQuestions: [] };
+    const firstRestart = await callStart(restartPayload);
+    assert.equal(firstRestart.statusCode, 202);
+    const priorAttempt = (await db.query(`select id,request_hash,attempt_id,quota_request_id
+      from public.mock_exam_generation_pipeline_jobs where idempotency_key=$1`, [restartPayload.idempotencyKey])).rows[0];
+    assert.ok(priorAttempt?.id);
+    await db.query(`update public.mock_exam_generation_pipeline_jobs
+      set state='failed',stage='terminal',payload='{}'::jsonb,assembly_grace_used=true
+      where id=$1`, [priorAttempt.id]);
+    await db.query("select public.fail_mock_exam_generation($1,$2,$3,$4)",
+      [userId,restartPayload.idempotencyKey,priorAttempt.request_hash,priorAttempt.attempt_id]);
+    const retriedStart = await callStart(restartPayload);
+    assert.equal(retriedStart.statusCode, 202);
+    assert.notEqual(retriedStart.body.operationId, priorAttempt.id,
+      "a terminal retry receives a fresh pipeline operation");
+    const retriedJob = (await db.query(`select state,stage,assembly_grace_used
+      from public.mock_exam_generation_pipeline_jobs where id=$1`, [retriedStart.body.operationId])).rows[0];
+    assert.deepEqual(retriedJob,{state:"queued",stage:"generate",assembly_grace_used:false},
+      "a terminal retry cannot inherit the previous attempt's assembly grace");
   } finally {
     rejectAllBatches = false;
     failNextActualGenerationStreams = 0;

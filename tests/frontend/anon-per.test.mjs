@@ -96,6 +96,52 @@ try {
   R.ok("spärrtexten nämner rätt antal produktfrågor", msgs.includes(`${gräns} frågor om ExGen`), msgs.slice(-120));
   R.ok("spärren erbjuder ett konto som väg vidare", /gratis konto/i.test(msgs));
 
+  const authStorageKey = await page.evaluate(() => window.ExGenRuntime.authStorageKey);
+  await page.evaluate(key => {
+    localStorage.setItem(key, JSON.stringify({
+      access_token: "synthetic-session-token",
+      expires_at: Math.floor(Date.now() / 1000) + 30,
+      refresh_token: "synthetic-refresh-token",
+      user: { id: "synthetic-user" },
+    }));
+    window.dispatchEvent(new CustomEvent("exgen:per-session-saved"));
+  }, authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "hidden", timeout: 5_000 });
+  R.ok("same-tab sign-in hides the visitor quota", !(await page.locator("#perLandingBar").isVisible()));
+
+  const authWriter = await t.ctx.newPage();
+  await authWriter.goto(`${srv.url}/index.html`, { waitUntil: "networkidle" });
+  await authWriter.evaluate(key => localStorage.removeItem(key), authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "visible", timeout: 5_000 });
+  R.ok("cross-tab sign-out restores the visitor quota", await page.locator("#perLandingBar").isVisible());
+  await authWriter.evaluate(key => {
+    localStorage.setItem(key, JSON.stringify({
+      access_token: "synthetic-cross-tab-token",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      user: { id: "synthetic-cross-tab-user" },
+    }));
+  }, authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "hidden", timeout: 5_000 });
+  R.ok("cross-tab sign-in hides the visitor quota", !(await page.locator("#perLandingBar").isVisible()));
+  await authWriter.evaluate(key => localStorage.setItem(key, JSON.stringify({
+    access_token: "synthetic-near-expiry-token",
+    expires_at: Math.floor(Date.now() / 1000) - 10,
+    refresh_token: "synthetic-refresh-token",
+    user: { id: "synthetic-refreshable-user" },
+  })), authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "visible", timeout: 5_000 });
+  await page.evaluate(key => {
+    window.PER.register(async () => {
+      const session = JSON.parse(localStorage.getItem(key) || "null");
+      return session?.refresh_token ? "synthetic-refreshed-token" : "";
+    });
+  }, authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "hidden", timeout: 5_000 });
+  R.ok("refreshable sign-in hides the visitor quota after auth confirms it", !(await page.locator("#perLandingBar").isVisible()));
+  await authWriter.evaluate(key => localStorage.removeItem(key), authStorageKey);
+  await page.locator("#perLandingBar").waitFor({ state: "visible", timeout: 5_000 });
+  await authWriter.close();
+
   await t.close();
 
   const en = await öppna("en");

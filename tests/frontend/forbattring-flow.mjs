@@ -67,11 +67,14 @@ const ROWS = [
 
 // Rutten registreras SIST för att vinna över den generella **/rest/v1/** —
 // sist registrerad rutt vinner, tvärtemot hur listan läses.
-async function open(hash = "", { nExams = 3 } = {}) {
+async function open(hash = "", { nExams = 3, additionalMocks = [] } = {}) {
   const { ctx, page } = await openPage(browser, `${srv.url}/f%C3%B6rb%C3%A4ttring.html${hash}`, {
     width: 1280, height: 900, reducedMotion: "reduce",
     waitUntil: "domcontentloaded", settle: 1600,
-    mocks: { extra: [["**/rest/v1/user_exams**", r => r.fulfill({ json: ROWS.slice(0, nExams) })]] },
+    mocks: { extra: [
+      ["**/rest/v1/user_exams**", r => r.fulfill({ json: ROWS.slice(0, nExams) })],
+      ...additionalMocks,
+    ] },
   });
   return { ctx, page };
 }
@@ -117,7 +120,8 @@ const synliga = page => page.evaluate(() =>
     JSON.stringify(v.map(x => x.mål)) === '["felbank","prov","coach","rapport"]',
     JSON.stringify(v));
   ok("F3 coach och rapport utlovar bara det funktionerna visar",
-    v.some(x => x.mål === "coach" && /Fråga P\.E\.R vad du ska göra/i.test(x.label) && /analys/i.test(x.small)) &&
+    v.some(x => x.mål === "coach" && /Fråga P\.E\.R vad du ska göra/i.test(x.label) &&
+      /(?:personlig vägledning från verifierat underlag|öppna sparad rekommendation)/i.test(x.small)) &&
     v.some(x => x.mål === "rapport" && /Skapa övningsrapport/i.test(x.label) && /minst 3 verifierat rättade prov/i.test(x.small)) &&
     !JSON.stringify(v).match(/personlig studieplan|Rapport till läraren/i), JSON.stringify(v));
   await ctx.close();
@@ -167,8 +171,8 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
   await ctx.close();
 }
 
-// F7: utan data byter ingången roll. En väg som inte går att ta ska säga
-// varför — en spärrad knapp utan skäl är en återvändsgränd.
+// F7: empty local history must not hide server-backed coaching. Routes that
+// truly need local history explain why they are unavailable.
 {
   const { ctx, page } = await open("", { nExams: 0 });
   const v = await page.evaluate(() => ({
@@ -179,8 +183,11 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
     tillAppen: !!document.querySelector('[data-screen="hem"] a[href="app.html"]'),
   }));
   const spärrade = v.vägar.filter(x => x.av);
-  ok("F7 utan data är vägarna spärrade, säger varför, och pekar på appen",
-    spärrade.length >= 3 && spärrade.every(x => x.small.length > 0) && v.tillAppen,
+  const coach = v.vägar.find(x => x.mål === "coach");
+  ok("F7 tom lokal historik spärrar bara lokala träningsvägar och lämnar P.E.R tillgänglig",
+    spärrade.length === 2 && spärrade.every(x => x.small.length > 0) &&
+    spärrade.every(x => ["felbank", "prov"].includes(x.mål)) &&
+    coach?.av === false && /verifierat underlag/i.test(coach.small) && v.tillAppen,
     JSON.stringify(v));
   await ctx.close();
 }
@@ -332,7 +339,10 @@ for (const mål of ["felbank", "prov", "coach", "rapport"]) {
 // F17: nyckeltalen står som etikett och värde. De låg förut i samma zon som
 // coach-texten och resultatgrafen — tre sorters avläsning i en hög.
 {
-  const { ctx, page } = await open("#coach");
+  const { ctx, page } = await open("#coach", { additionalMocks: [["**/api/explain", r => r.fulfill({ json: {
+    answer: "Träna derivata i tre pass.",
+    coachEvidenceSummary: { latestPercent: 62, trendDeltaPp: 0, recentResultCount: 3, focusCourse: null },
+  } })]] });
   await page.waitForTimeout(800);
   const v = await page.evaluate(() =>
     [...document.querySelectorAll('[data-screen="coach"] .xf-row')].map(r => ({

@@ -14,9 +14,9 @@
 // VARFÖR DEN INTE STOPPAR STRÖMNINGEN
 // Eleven ser svaret medan det skrivs. Att hålla tillbaka det tills granskningen
 // är klar hade fördubblat väntetiden och tagit bort känslan av att någon svarar
-// direkt. Granskningen körs efter att svaret är färdigt, och bara ett ALLVARLIGT
-// fynd visas — som en rättelse under svaret, inte som en tyst omskrivning.
-// Att visa rättelsen är ärligare än att dölja att något var fel.
+// direkt. Granskningen körs efter att svaret är färdigt. Vid ett ALLVARLIGT
+// fynd ersätter vanlig chatt svaret med den korta rättelsen i samma bubbla;
+// provsidor behåller sin separata, pedagogiskt avgränsade rättelsevisning.
 
 /** Vad granskaren får säga om allvaret. Ordningen är stigande. */
 export const ALLVAR = Object.freeze(["ingen", "mindre", "allvarlig"]);

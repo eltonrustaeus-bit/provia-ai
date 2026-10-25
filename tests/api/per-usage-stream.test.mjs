@@ -24,6 +24,15 @@ let failStreamingAfterDelta = false;
 let cleanEofAfterDelta = false;
 let truncatedStream = false;
 let stopReasonWithoutDone = false;
+let failFirstQuotaCommit = false;
+let failCorrectionHistorySave = false;
+let quotaCommitCalls = 0;
+let quotaCommitApplied = false;
+let failQuotaCommit = false;
+let waitForClientAbort = false;
+let disconnectBeforeFirstDelta = false;
+let disconnectDuringQuotaCommit = false;
+let responseForDisconnect = null;
 let failResponses = false;
 let providerAnswer = "Börja med begreppet och pröva ett eget exempel.";
 let streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
@@ -34,13 +43,27 @@ globalThis.fetch = async (input, init = {}) => {
   requests.push({ url, body });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "synthetic@example.invalid" });
   if (url.includes("/rest/v1/rpc/get_per_memory_epoch")) return Response.json(memoryEpoch);
-  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch") ||
-      url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
+  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch")) {
+    if (failCorrectionHistorySave && body?.p_messages?.at(-1)?.content === "Kontrollera insättningen: rätt värde är x = 4.") {
+      return Response.json(false);
+    }
+    return Response.json(true);
+  }
+  if (url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
   if (url.includes("/rest/v1/rpc/reserve_per_chat_quota")) return Response.json({ ok: true, count: 1 });
-  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) return Response.json({ ok: true, committed: true });
+  if (url.includes("/rest/v1/rpc/commit_per_chat_quota")) {
+    quotaCommitCalls += 1;
+    if (disconnectDuringQuotaCommit) responseForDisconnect?.emit("close");
+    if (failQuotaCommit) return Response.json({ ok: false, committed: false });
+    if (failFirstQuotaCommit && quotaCommitCalls === 1) {
+      quotaCommitApplied = true;
+      return Response.json({ error: "synthetic lost commit response" }, { status: 503 });
+    }
+    return Response.json({ ok: true, committed: true, already_committed: quotaCommitApplied });
+  }
   if (url.includes("/rest/v1/rpc/refund_per_chat_quota")) return Response.json({ ok: true, refunded: true });
   if (url.includes("/rest/v1/ai_usage_events")) return new Response(null, { status: 201 });
   if (url.includes("/rest/v1/per_long_memory") && url.includes("updated_at")) {
@@ -53,6 +76,17 @@ globalThis.fetch = async (input, init = {}) => {
       : Response.json([]);
   }
   if (url === "https://api.openai.com/v1/chat/completions") {
+    if (waitForClientAbort) {
+      const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
+      const bodyStream = new ReadableStream({
+        start(controller) {
+          if (disconnectBeforeFirstDelta) responseForDisconnect?.emit("close");
+          controller.enqueue(new TextEncoder().encode(partial));
+          init.signal.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")), { once: true });
+        },
+      });
+      return new Response(bodyStream, { status: 200 });
+    }
     if (cleanEofAfterDelta) {
       const partial = `data: ${JSON.stringify({ choices: [{ delta: { content: "Börja med en ledtråd." } }] })}\n\n`;
       const bodyStream = new ReadableStream({
@@ -101,6 +135,7 @@ globalThis.fetch = async (input, init = {}) => {
 const { default: handler } = await import("../../api/explain.js?per-usage-stream-test");
 
 function response() {
+  const listeners = new Map();
   return {
     statusCode: 200,
     headers: {},
@@ -108,14 +143,20 @@ function response() {
     status(code) { this.statusCode = code; return this; },
     setHeader(name, value) { this.headers[name] = value; },
     flushHeaders() {},
-    write(value) { this.chunks.push(value); },
-    end(value) { if (value) this.chunks.push(value); this.ended = true; return this; },
+    once(name, callback) { listeners.set(name, callback); return this; },
+    emit(name) { listeners.get(name)?.(); },
+    write(value) {
+      this.chunks.push(value);
+      if (value.includes('"delta"') && this.closeAfterFirstDelta) this.emit("close");
+    },
+    end(value) { if (value) this.chunks.push(value); this.ended = true; this.writableEnded = true; return this; },
     json(value) { this.body = value; this.ended = true; return this; },
   };
 }
 
 async function invoke(accept, body = {}) {
   const res = response();
+  responseForDisconnect = res;
   await handler({
     method: "POST",
     headers: { authorization: "Bearer synthetic-user-token", accept },
@@ -158,6 +199,105 @@ test("streaming P.E.R records the terminal usage chunk without forwarding it to 
   assert.doesNotMatch(JSON.stringify(usageWrite.body), /Hur börjar jag|Börja med att hitta/);
 });
 
+test("quota commit retries the same reservation before streaming the first answer delta", async () => {
+  requests.length = 0;
+  failFirstQuotaCommit = true;
+  quotaCommitCalls = 0;
+  quotaCommitApplied = false;
+  let res;
+  try {
+    res = await invoke("text/event-stream");
+  } finally {
+    failFirstQuotaCommit = false;
+  }
+  assert.equal(res.ended, true);
+  assert.match(res.chunks.join(""), /Börja med att hitta ett begrepp/);
+  const commits = requests.filter((request) => request.url.endsWith("/rpc/commit_per_chat_quota"));
+  assert.equal(commits.length, 2);
+  assert.deepEqual(commits[1].body, commits[0].body,
+    "a lost/negative commit response retries the same idempotency key rather than creating another charge");
+});
+
+test("streaming P.E.R emits no model text when quota cannot be committed", async () => {
+  requests.length = 0;
+  failQuotaCommit = true;
+  quotaCommitCalls = 0;
+  let res;
+  try { res = await invoke("text/event-stream"); }
+  finally { failQuotaCommit = false; }
+  const payload = res.chunks.join("");
+  assert.equal(res.ended, true);
+  assert.doesNotMatch(payload, /Börja med att hitta ett begrepp/);
+  assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
+  assert.equal(quotaCommitCalls, 2, "the same commit is retried once before output");
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+});
+
+test("streaming P.E.R aborts model work after a client disconnect", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  const res = response();
+  res.closeAfterFirstDelta = true;
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally { waitForClientAbort = false; }
+  assert.equal(res.ended, undefined);
+  assert.match(res.chunks.join(""), /Börja med en ledtråd/);
+  assert.doesNotMatch(res.chunks.join(""), /P\.E\.R är tillfälligt otillgänglig/);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+});
+
+test("streaming P.E.R refunds quota and discards buffered text when disconnect precedes first delta", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  disconnectBeforeFirstDelta = true;
+  const res = response();
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally {
+    waitForClientAbort = false;
+    disconnectBeforeFirstDelta = false;
+  }
+  assert.equal(res.ended, undefined);
+  assert.equal(res.chunks.length, 0);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+});
+
+test("streaming P.E.R writes no delta if disconnect happens during the quota commit", async () => {
+  requests.length = 0;
+  waitForClientAbort = true;
+  disconnectDuringQuotaCommit = true;
+  const res = response();
+  responseForDisconnect = res;
+  try {
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer synthetic-user-token", accept: "text/event-stream" },
+      body: { userQuestion: "Hur börjar jag tänka?", pageContext: { page: "app" } },
+    }, res);
+  } finally {
+    waitForClientAbort = false;
+    disconnectDuringQuotaCommit = false;
+  }
+  assert.equal(res.ended, undefined);
+  assert.equal(res.chunks.length, 0);
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")),
+    "the committed reservation is terminal and must not be refunded as if still pending");
+});
+
 test("tips mode commits successful quota and refunds provider failures", async () => {
   const priorPilotMode = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";
@@ -188,7 +328,7 @@ test("tips mode commits successful quota and refunds provider failures", async (
   }
 });
 
-test("a serious P.E.R correction is persisted with the assistant answer and returned to the client", async () => {
+test("a serious ordinary-chat P.E.R correction replaces the answer without a self-review note", async () => {
   requests.length = 0;
   streamAnswer = "Ekvationen ger x = 5.";
   reviewAnswer = JSON.stringify({
@@ -201,17 +341,57 @@ test("a serious P.E.R correction is persisted with the assistant answer and retu
     const events = res.chunks
       .filter((chunk) => chunk.startsWith("data: "))
       .map((chunk) => JSON.parse(chunk.slice(6).trim()));
-    const correctionEvent = events.find((event) => event.granskning?.rättelse);
+    const correctionEvent = events.find((event) => event.reviewedAnswer);
     assert.ok(correctionEvent);
-    assert.match(correctionEvent.history.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+    assert.equal(correctionEvent.reviewedAnswer, "Kontrollera insättningen: rätt värde är x = 4.");
+    assert.equal(correctionEvent.history.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.equal(events.some((event) => event.granskning), false,
+      "ordinary chat does not expose review metadata or an after-answer note");
 
     const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
     assert.equal(historyWrites.length, 2);
-    assert.doesNotMatch(historyWrites[0].body.p_messages.at(-1).content, /P\.E\.R-kontroll/);
-    assert.match(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
+    assert.equal(historyWrites[1].body.p_messages.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.doesNotMatch(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
   } finally {
     streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
     reviewAnswer = null;
+  }
+});
+
+test("ordinary-chat correction is not shown if corrected history cannot be saved", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({
+    allvar: "allvarlig",
+    fynd: [{ typ: "räknefel", citat: "x = 5", varför: "Insättning visar att värdet inte stämmer." }],
+    rättelse: "Kontrollera insättningen: rätt värde är x = 4.",
+  });
+  failCorrectionHistorySave = true;
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    const events = res.chunks
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+    assert.equal(events.some((event) => event.reviewedAnswer), false,
+      "a correction is not shown unless matching server history was saved");
+    const unavailableEvent = events.find((event) => event.reviewUnavailable);
+    assert.ok(unavailableEvent,
+      "ordinary chat replaces the unpersisted answer with a safe retry notice");
+    assert.match(unavailableEvent.reviewUnavailable, /säkerställa svaret|verify this answer safely/i);
+    assert.equal(unavailableEvent.history?.at(-1)?.content, unavailableEvent.reviewUnavailable,
+      "the safe notice replaces the questionable answer in saved session history when storage recovers");
+    assert.equal(events.some((event) => event.granskning), false,
+      "ordinary chat does not fall back to a self-review note");
+    const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
+    assert.equal(historyWrites.length, 4, "the failed correction save retries once, then persists a safe notice");
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
+    assert.equal(historyWrites[1].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
+    assert.equal(historyWrites[2].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
+  } finally {
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+    reviewAnswer = null;
+    failCorrectionHistorySave = false;
   }
 });
 
@@ -231,9 +411,9 @@ test("streaming P.E.R ends safely when the provider stream fails after a partial
   assert.match(payload, /Börja med en ledtråd/);
   assert.match(payload, /P\.E\.R är tillfälligt otillgänglig/);
   assert.doesNotMatch(payload, /synthetic provider stream reset/);
-  assert.ok(requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")),
-    "a failed provider stream refunds its reservation");
-  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")));
+  assert.ok(requests.some((request) => request.url.endsWith("/rpc/commit_per_chat_quota")),
+    "a partial answer is charged before any text is sent");
+  assert.ok(!requests.some((request) => request.url.endsWith("/rpc/refund_per_chat_quota")));
 });
 
 test("streaming P.E.R does not commit a partial answer after clean EOF without a terminal event", async () => {

@@ -10,6 +10,8 @@ try {
   let generatedRequest = null;
   const browserErrors = [];
   const apiResponses = [];
+  let savedRow = null;
+  let savedExam = null;
   page.on("pageerror", (error) => browserErrors.push(error.message));
   page.on("console", (message) => { if (message.type() === "error" || message.type() === "warning") browserErrors.push(message.text()); });
   page.on("response", (response) => {
@@ -60,8 +62,12 @@ try {
         } });
       }],
       ["**/rest/v1/user_exams*", async (route) => {
-        if (route.request().method() === "POST") await route.fulfill({ json: [{ id: "synthetic-result" }] });
-        else await route.fulfill({ json: [] });
+        if (route.request().method() === "POST") {
+          savedRow = route.request().postDataJSON()?.[0] || null;
+          savedExam = savedRow?.exam || null;
+          await route.fulfill({ json: [{ id: "synthetic-result" }] });
+        }
+        else await route.fulfill({ json: savedRow ? [savedRow] : [] });
       }],
     ],
   });
@@ -113,6 +119,15 @@ try {
   assert.equal(await page.getByText("Your answer", { exact: true }).count(), 1);
   assert.equal(await page.getByText("Full-credit answer", { exact: true }).count(), 1);
   assert.equal(await page.getByRole("button", { name: "Try again — new questions, same level" }).count(), 1);
+  assert.match(await page.locator("#xf .xf-screen[data-screen='result'] .xf-question-quality-note").innerText(), /requested 3 questions.*1 question passed quality review and is included/i,
+    "the result view repeats the shortfall so grading cannot make the partial exam look complete");
+  assert.equal(savedExam?.requested_question_count, 3, "saved exam metadata retains the originally requested count");
+  assert.equal(savedExam?.partial_delivery, true, "saved exam metadata retains that only a partial exam was issued");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("#xf .xf-screen.on");
+  const restoredHistory = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_history") || "[]"));
+  assert.equal(restoredHistory.at(-1)?.numQuestions, 3, "account history restores the requested count after reload");
+  assert.equal(restoredHistory.at(-1)?.partialDelivery, true, "account history preserves partial status after reload");
 } finally {
   try { await browser.close(); }
   finally { await server.close(); }

@@ -267,6 +267,39 @@ function normalizeGenericOption(value) {
     .toLocaleLowerCase("sv-SE");
 }
 
+function normalizeSourceAnswer(value) {
+  return String(value || "")
+    .normalize("NFC")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function answerIsExtractive(question, sourceMaterial) {
+  const answer = normalizeSourceAnswer(question?.model_answer);
+  const source = normalizeSourceAnswer(sourceMaterial);
+  if (!answer || !source) return false;
+
+  const isWordCharacter = (value) => Boolean(value && /[\p{L}\p{N}_]/u.test(value));
+  const firstAnswerCharacter = Array.from(answer)[0];
+  const lastAnswerCharacter = Array.from(answer).at(-1);
+  let offset = source.indexOf(answer);
+  while (offset !== -1) {
+    const prefix = source.slice(0, offset);
+    const before = Array.from(prefix).at(-1);
+    const suffix = source.slice(offset + answer.length);
+    const after = Array.from(suffix)[0];
+    const decimalPrefix = /\p{N}[.,]$/u.test(prefix);
+    const leftBoundary = (!isWordCharacter(firstAnswerCharacter) || !isWordCharacter(before)) &&
+      !(isWordCharacter(firstAnswerCharacter) && decimalPrefix);
+    const decimalContinuation = /^[.,]\p{N}/u.test(suffix);
+    const rightBoundary = (!isWordCharacter(lastAnswerCharacter) || !isWordCharacter(after)) &&
+      !(isWordCharacter(lastAnswerCharacter) && decimalContinuation);
+    if (leftBoundary && rightBoundary) return true;
+    offset = source.indexOf(answer, offset + 1);
+  }
+  return false;
+}
+
 function generalQualityIssues(q, options) {
   const issues = [];
   if (!q || typeof q !== "object") return ["not_an_object"];
@@ -277,6 +310,10 @@ function generalQualityIssues(q, options) {
   if (!cogLevel) issues.push("cognitive_level_missing");
 
   const type = String(q.type || "");
+  if (type === "short" && options?.requireExtractiveAnswers === true &&
+      !answerIsExtractive(q, options.sourceMaterial)) {
+    issues.push("source_answer_not_extractable");
+  }
   if (type === "mc") {
     const opts = Array.isArray(q.options) ? q.options : [];
     if (opts.length < 2) issues.push("too_few_options");
@@ -570,6 +607,7 @@ const BLOCKING = new Set([
   "not_an_object", "empty_prompt", "nonpositive_points", "too_few_options",
   "empty_option", "duplicate_options", "answer_key_out_of_range",
   "source_reference_missing", "requested_type_mismatch",
+  "source_answer_not_extractable",
   "open_question_ungradeable", "leaked_instructions", "corrupted_option_text", "math_options_numerically_equal", "math_option_type_mismatch",
   "unsupported_single_word_option_outlier",
   "cognitive_level_missing", "scoring_rubric_missing_for_open", "scoring_rubric_points_mismatch", "law_deprecated_terminology",
@@ -591,7 +629,7 @@ const SEMANTIC_DUPLICATE_FILLER = new Set([
 ]);
 const SEMANTIC_SHORT_TOKENS = new Set(["or", "no", "if", "vs", "x", "y", "z", "n", "m", "b", "c", "i", "j"]);
 const QUESTION_INTENT_PATTERNS = [
-  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
+  ["explanation", /(?:^|[^\p{L}\p{N}_])(?:beskriv\p{L}*|redogör\p{L}*|förklara\p{L}*|resonera\p{L}*|represent\p{L}*|describe\p{L}*|explain\p{L}*|outline|discuss\p{L}*)(?=$|[^\p{L}\p{N}_])/u],
   ["definition", /\b(?:vad\s+(?:menas|avses|innebär|är)|definiera|what\s+is|define|meaning)\b/u],
   ["importance", /\b(?:varför|viktig|viktigt|betydelse|why|important|importance)\b/u],
   ["effect", /\b(?:påverka\w*|faktor\w*|orsak\w*|affect\w*|factor\w*|cause\w*)\b/u],
@@ -622,6 +660,9 @@ function semanticQuestionTokenSequence(question) {
     const token = sourceToken.toLowerCase();
     const isUppercaseVariable = /^[A-ZÅÄÖ]$/u.test(sourceToken);
     const verbStem = token.replace(/(?:ar|as)$/u, "a");
+    if (/^represent(?:erar|era|erade|erat|s|ed|ing)?$/u.test(token)) {
+      return { token: "beskriv", isUppercaseVariable };
+    }
     return {
       token: verbStem.length > 5
         ? verbStem.replace(/(?:ens|ets|erna|arna|orna|en|et|ar|er|or|s|t|r)$/u, "")
@@ -632,6 +673,10 @@ function semanticQuestionTokenSequence(question) {
     (isUppercaseVariable || token.length > 2 || SEMANTIC_SHORT_TOKENS.has(token)) &&
     (isUppercaseVariable || !SEMANTIC_DUPLICATE_FILLER.has(token)))
     .map(({ token }) => token);
+}
+
+function exactComparisonTokens(value) {
+  return String(value || "").normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
 }
 
 function commutativeComparisonSignature(question) {
@@ -653,6 +698,93 @@ function semanticConceptTag(question) {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
+}
+
+function answerTargetTopicSignature(question) {
+  return [...semanticQuestionTokens(question)]
+    .filter((token) => !/^(?:ansvar|ansvara|uppgif|syft|funktion|huvud|roll|function|purpose|responsib|role|biolog|biology|process)/u.test(token))
+    .sort()
+    .join(" ");
+}
+
+function repeatsHighConfidenceAnswerTarget(left, right) {
+  const leftAnswer = new Set(semanticQuestionTokenSequence({ question: left?.model_answer || "" }));
+  const rightAnswer = new Set(semanticQuestionTokenSequence({ question: right?.model_answer || "" }));
+  if (leftAnswer.size < 5 || rightAnswer.size < 5) return false;
+  let shared = 0;
+  for (const token of leftAnswer) if (rightAnswer.has(token)) shared++;
+  if (shared < 5 || shared / Math.min(leftAnswer.size, rightAnswer.size) < 0.9) return false;
+  const answerTargetIntents = [
+    ["function", /(?:funktion[\p{L}]*|uppgift[\p{L}]*|ansvar[\p{L}]*|syfte[\p{L}]*|function[\p{L}]*|purpose|responsib[\p{L}]*)/u],
+    ["process", /(?:process[\p{L}]*|steg[\p{L}]*|processes)/u],
+    ["process_inputs", /(?:använd(?:er|a|s)?|tar\s+upp|tar\s+in|upptar|uses?|takes?\s+in|absorbs?)/u],
+    ["process_outputs", /(?:bild(?:as|ar|ade|ades)|producer[\p{L}]*|frigör[\p{L}]*|avger[\p{L}]*|forms?|produces?|releases?|generates?)/u],
+  ];
+  const leftText = String(left?.question || "").normalize("NFKC").toLowerCase();
+  const rightText = String(right?.question || "").normalize("NFKC").toLowerCase();
+  const hasExtraTargetCue = (text) => /\b(?:vid|under|när|om|efter|före|innan|beroende\s+på|medan|samtidigt\s+som|if|when|after|before|depending\s+on|inklusive|including|påverkan|inverkan|aktiveringsenergi)\b/u.test(text);
+  // A shared answer is not enough to collapse a coordinated question into a
+  // simpler one: the second phrase may add an assessed learning target.
+  const hasCompoundTask = (text) => /\b(?:och|samt|and|as\s+well\s+as)\b/u.test(text);
+  if (hasExtraTargetCue(leftText) || hasExtraTargetCue(rightText) ||
+      hasCompoundTask(leftText) || hasCompoundTask(rightText)) return false;
+  const leftIntents = new Set(answerTargetIntents.filter(([, pattern]) => pattern.test(leftText)).map(([intent]) => intent));
+  const rightIntents = new Set(answerTargetIntents.filter(([, pattern]) => pattern.test(rightText)).map(([intent]) => intent));
+  const sharedIntent = [...leftIntents].some((intent) => rightIntents.has(intent));
+  if (!sharedIntent) return false;
+
+  // Similar answer vocabulary alone cannot establish a duplicate: reverse
+  // processes can use the same terms for different inputs and outputs.
+  // Require the same tagged concept and non-task topic. For explicitly
+  // process-focused paraphrases, the shared process intent and near-identical
+  // full-score answer are stronger than wording differences in the stem, but
+  // only when both questions agree on whether they ask about inputs or outputs.
+  const concept = semanticConceptTag(left);
+  const processDirections = (intents) => ["process_inputs", "process_outputs"]
+    .filter((intent) => intents.has(intent)).sort().join(",");
+  if (leftIntents.has("process") && rightIntents.has("process") &&
+      processDirections(leftIntents) !== processDirections(rightIntents)) return false;
+  const sharedProcessIntent = leftIntents.has("process") && rightIntents.has("process") &&
+    processDirections(leftIntents) === processDirections(rightIntents);
+  const leftTopic = answerTargetTopicSignature(left);
+  const rightTopic = answerTargetTopicSignature(right);
+  const leftQuestionText = String(left?.question || "").normalize("NFKC").toLowerCase();
+  const rightQuestionText = String(right?.question || "").normalize("NFKC").toLowerCase();
+  const chloroplastPhotosynthesisAlias = concept.includes("fotosyntes") && (
+    (/\bkloroplast[\p{L}]*\b/u.test(leftQuestionText) && /\bfotosyntes[\p{L}]*\b/u.test(rightQuestionText)) ||
+    (/\bfotosyntes[\p{L}]*\b/u.test(leftQuestionText) && /\bkloroplast[\p{L}]*\b/u.test(rightQuestionText))
+  );
+  const sameProcessTopic = leftTopic === rightTopic || (
+    chloroplastPhotosynthesisAlias
+  );
+  return Boolean(concept && concept === semanticConceptTag(right) &&
+    leftTopic && rightTopic && sameProcessTopic &&
+    (sharedProcessIntent || leftTopic === rightTopic));
+}
+
+function repeatsNearIdenticalQuestionStem(left, right) {
+  if (!left?.concept_tag || semanticConceptTag(left) !== semanticConceptTag(right) ||
+      String(left?.type || "") !== String(right?.type || "")) return false;
+  const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
+  if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftTokens = semanticQuestionTokens(left);
+  const rightTokens = semanticQuestionTokens(right);
+  if (leftTokens.size < 4 || rightTokens.size < 4) return false;
+  const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return union > 0 && shared / union >= 0.85;
+}
+
+function repeatsSameObjectiveAndAnswer(left, right) {
+  if (!left?.concept_tag || semanticConceptTag(left) !== semanticConceptTag(right) ||
+      String(left?.type || "") !== String(right?.type || "")) return false;
+  const leftObjective = exactComparisonTokens(left?.learning_objective).join(" ");
+  const rightObjective = exactComparisonTokens(right?.learning_objective).join(" ");
+  if (!leftObjective || leftObjective !== rightObjective) return false;
+  const leftAnswer = exactComparisonTokens(left?.model_answer).join(" ");
+  const rightAnswer = exactComparisonTokens(right?.model_answer).join(" ");
+  return leftAnswer.split(" ").filter(Boolean).length >= 4 && leftAnswer === rightAnswer;
 }
 
 function questionIntents(question) {
@@ -747,6 +879,15 @@ function questionLogicalStructureSequence(question) {
   return hasOperandOnBothSides ? canonicalLogicalStructure(structure, text) : null;
 }
 
+function questionLogicalVariableSequence(question) {
+  const text = String(question?.question || "").normalize("NFKC");
+  return [...text.matchAll(/[\p{L}][\p{L}\p{N}_]*/gu)]
+    .map(([token]) => token)
+    .filter((token) => /^[\p{Lu}]$/u.test(token) ||
+      (/\p{Lu}/u.test(token.slice(1)) && token.length > 2))
+    .map((token) => token.toLowerCase());
+}
+
 function semanticDuplicateQuestion(left, right) {
   const leftStructure = questionLogicalStructureSequence(left);
   const rightStructure = questionLogicalStructureSequence(right);
@@ -780,13 +921,61 @@ function semanticDuplicateQuestion(left, right) {
 
 function mathQuestionIntent(question) {
   const text = `${question?.concept_tag || ""} ${question?.question || ""}`
+    .replace(/²/g, "^2")
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
-  if (/nollst(?:ä|a)ll|nollpunkt|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
+  if (/\b(?:l(?:ö|o)s|l(?:ö|o)sa)\b.{0,100}(?:ekvation|andragrad|x\s*\^?\s*2)/u.test(text)) {
+    return "solve-equation";
+  }
+  if (/x\s*\^\s*2/u.test(text) &&
+      /(?:[<>]=?\s*0|[≥≤]\s*0|\b(?:positiv|negativ)\w*|icke[-\s]?(?:positiv|negativ)\w*|non[-\s]?(?:positive|negative)\w*)/u.test(text) &&
+      /(?:[a-z]\s*\(\s*x\s*\)\s*=|\by\s*=)/u.test(text)) {
+    return "zero";
+  }
+  if (/(?:j(?:ä|a)mför|compare)/u.test(text) &&
+      /x\s*\^?\s*2/u.test(text) && /(?:=|pq-formel|faktoriser|ber(?:ä|a)kningssteg|tillf(?:ö|o)rlitlig)/u.test(text)) {
+    return "zero";
+  }
+  if (/\b(?:lös\s+(?:ekvationen|andragradsekvationen|andragradsekvation|ut)|bestäm\s+(?:värdet\s+på\s+)?x\s+i|beräkna\s+(?:värdet\s+på\s+)?x\s+(?:i|då)|hitta\s+x\s+i|solve\s+(?:the\s+)?equation|solve\s+for\s+x|find\s+x\s+in|vilket\s+(?:tal|värde)\s+ger\s+\w+\s+när\s+(?:det|talet|x)\s+multipliceras\s+med|what\s+(?:number|value)\s+(?:gives|produces)\s+\w+\s+when\s+(?:it\s+is\s+)?multiplied\s+by)(?![\p{L}\p{N}_])/u.test(text)) return "solve-equation";
+  if (/nollst(?:ä|a)ll|nollpunkt|r(?:ö|o)tter|l(?:ö|o)sningarna|x-axeln|x-axel|sk(?:ä|a)r.{0,24}x-axel|y\s*=\s*0/u.test(text)) return "zero";
   if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) return "slope";
   if (/y-sk(?:ä|a)rning|y-axeln|y-axel|vertical intercept/u.test(text)) return "y-intercept";
   if (/derivata|derivative|tangentlutning/u.test(text)) return "derivative";
+  return "";
+}
+
+function verbalEquation(question) {
+  const text = String(question?.question || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const patterns = [
+    /\b(?:vilket|vad\s+för)\s+(?:tal|värde)\s+(?:ger|motsvarar|blir)\s+([\p{L}\d.]+)\s+när\s+(?:det|talet|x)\s+multipliceras\s+med\s+([\p{L}\d.]+)(?:\s+och\s+sedan\s+(?:ökar|ökas|adderas)\s+med\s+([\p{L}\d.]+))?/u,
+    /\bwhat\s+(?:number|value)\s+(?:gives|produces|equals)\s+([\p{L}\d.]+)\s+when\s+(?:it\s+is\s+)?multiplied\s+by\s+([\p{L}\d.]+)(?:\s+and\s+then\s+(?:increased|raised|augmented)\s+by\s+([\p{L}\d.]+))?/u,
+  ];
+  const numberWords = new Map([
+    ["noll", "0"], ["zero", "0"], ["ett", "1"], ["en", "1"], ["one", "1"],
+    ["två", "2"], ["tva", "2"], ["two", "2"], ["tre", "3"], ["three", "3"],
+    ["fyra", "4"], ["four", "4"], ["fem", "5"], ["five", "5"],
+    ["sex", "6"], ["six", "6"], ["sju", "7"], ["seven", "7"],
+    ["åtta", "8"], ["atta", "8"], ["eight", "8"], ["nio", "9"], ["nine", "9"],
+    ["tio", "10"], ["ten", "10"],
+  ]);
+  const number = (value) => {
+    if (/^\d+(?:\.\d+)?$/.test(value)) return String(Number(value));
+    return numberWords.get(value) || null;
+  };
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const [target, factor, offset = "0"] = match.slice(1);
+    const targetValue = number(target);
+    const factorValue = number(factor);
+    const offsetValue = number(offset);
+    if (targetValue === null || factorValue === null || offsetValue === null) return "";
+    return `${factorValue}*x${Number(offsetValue) < 0 ? offsetValue : `+${offsetValue}`}=${targetValue}`;
+  }
   return "";
 }
 
@@ -795,11 +984,150 @@ function mathQuestionExpression(question) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[−–—]/g, "-");
-  const equations = text.match(/[a-z]\s*=\s*[-+]?\d*\.?\d*\s*[a-z](?:\s*[-+]\s*\d*\.?\d+)?/gu) || [];
-  return equations.map((equation) => equation.replace(/\s+/g, "")).sort().join("|");
+  const verbal = verbalEquation(question);
+  if (verbal) return verbal;
+  const linearTerm = "(?:[-+]?\\s*\\d*\\.?\\d*\\s*[a-z](?:\\s*[-+]\\s*\\d*\\.?\\d+)?|[-+]?\\s*\\d+(?:\\.\\d+)?)";
+  const equations = text.match(new RegExp(`${linearTerm}\\s*=\\s*${linearTerm}`, "gu")) || [];
+  return equations.map((equation) => equation.replace(/\s+/g, "").replace(/(\d)([a-z])/g, "$1*$2")).sort().join("|");
+}
+
+function quadraticZeroSignature(question) {
+  const intent = mathQuestionIntent(question);
+  if (intent !== "solve-equation" && intent !== "zero") return "";
+  const text = String(question?.question || "")
+    .replace(/²/g, "^2")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-");
+  const functionMatch = text.match(/(?:[a-z]|y)\s*\(\s*x\s*\)\s*=\s*([^?.;]+)/u)
+    || text.match(/\by\s*=\s*([^?.;]+)/u);
+  const zeroEquation = text.match(/([0-9x+*/^().\s-]+)\s*=\s*0(?:\D|$)/u);
+  const expression = (zeroEquation?.[1] || functionMatch?.[1] || "")
+    .split(/(?:<=|>=|<|>|\b(?:icke[-\s]?(?:positiv|negativ)|non[-\s]?(?:positive|negative)|positiv|negativ)\w*)/u)[0];
+  if (!expression || !/x\s*\^\s*2/u.test(expression)) return "";
+
+  const compact = expression.replace(/\s+/g, "").replace(/\*/g, "");
+  const terms = compact.match(/[+-]?[^+-]+/gu);
+  if (!terms?.length || terms.join("") !== compact) return "";
+  const coefficients = [0, 0, 0];
+  for (const term of terms) {
+    const match = term.match(/^([+-]?)(?:(\d+(?:\.\d+)?)?)x(?:\^(2))?$|^([+-]?)(\d+(?:\.\d+)?)$/u);
+    if (!match) return "";
+    if (match[0].includes("x")) {
+      const degree = match[3] ? 2 : 1;
+      const magnitude = match[2] ? Number(match[2]) : 1;
+      coefficients[2 - degree] += (match[1] === "-" ? -1 : 1) * magnitude;
+    } else {
+      coefficients[2] += (match[4] === "-" ? -1 : 1) * Number(match[5]);
+    }
+  }
+  if (coefficients[0] === 0) return "";
+  return coefficients.map((coefficient) => String(coefficient / coefficients[0])).join(",");
+}
+
+function quadraticSolutionMethod(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const patterns = [
+    ["pq-formula", /pq-formel|pq\s+formula|abc-formula/gu],
+    ["factorization", /faktoriser|factori[sz]e/gu],
+    ["complete-square", /kvadratkompletter|complete the square/gu],
+    ["graph", /grafiskt|med graf|graphically/gu],
+  ];
+  const methods = [];
+  for (const [name, pattern] of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const preceding = text.slice(Math.max(0, match.index - 24), match.index);
+      const negated = /\b(?:inte|ej|utan|without|not)\b(?:\s+\b(?:att|anv(?:ä|a)nda|use|using|apply|applying|the)\b){0,3}\s*$/u.test(preceding);
+      methods.push(`${negated ? "not-" : ""}${name}`);
+    }
+  }
+  return [...new Set(methods)].sort().join(",");
+}
+
+function quadraticSkillSignature(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const skills = [];
+  if (/nollst(?:ä|a)ll|r(?:ö|o)tter|l(?:ö|o)sningarna|\bl(?:ö|o)s(?:a)?\b/u.test(text)) skills.push("roots");
+  if (/(?:>=\s*0|≥\s*0|större\s+än\s+(?:eller\s+)?lika\s+med\s+0|greater\s+than\s+or\s+equal\s+to\s+0|icke[-\s]?negativ\w*|non[-\s]?negative\w*|positiv\w*\s+eller\s+noll)/u.test(text)) {
+    skills.push("positive-region-inclusive");
+  } else if (/(?:>\s*0|större\s+än\s+0|greater\s+than\s+0|\bpositiv\w*)/u.test(text)) {
+    skills.push("positive-region-strict");
+  }
+  if (/(?:<=\s*0|≤\s*0|mindre\s+än\s+(?:eller\s+)?lika\s+med\s+0|less\s+than\s+or\s+equal\s+to\s+0|icke[-\s]?positiv\w*|non[-\s]?positive\w*|negativ\w*\s+eller\s+noll)/u.test(text)) {
+    skills.push("negative-region-inclusive");
+  } else if (/(?:<\s*0|mindre\s+än\s+0|less\s+than\s+0|\bnegativ\w*)/u.test(text)) {
+    skills.push("negative-region-strict");
+  }
+  if (/lutning|riktningskoefficient|stigning|slope/u.test(text)) skills.push("slope");
+  if (/derivata|derivative|tangentlutning/u.test(text)) skills.push("derivative");
+  if (/toppunkt|vertex|symmetrilinje|symmetry axis/u.test(text)) skills.push("vertex-or-axis");
+  return [...new Set(skills)].sort().join(",");
+}
+
+function quadraticTaskAction(question) {
+  const text = String(question?.question || "").normalize("NFKC").toLowerCase();
+  const actions = [];
+  if (/j(?:ä|a)mför|j(?:ä|a)mf(?:ö|o)ra|compare|comparing|comparison/u.test(text)) actions.push("compare");
+  if (/f(?:ö|o)rklara|beskriv|explain|describe/u.test(text)) actions.push("explain");
+  if (/effektiv|snabbast|efficient|most\s+efficient/u.test(text)) actions.push("efficiency");
+  if (/motivera|motivering|justify|justification/u.test(text)) actions.push("justify");
+  return actions.join(",") || "solve";
+}
+
+function normalizedQuadraticQuestionText(question) {
+  return String(question?.question || "")
+    .replace(/²/g, "^2")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[−–—]/g, "-")
+    .replace(/[?.;]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isDuplicateQuestion(left, right) {
+  const leftQuadratic = quadraticZeroSignature(left);
+  const rightQuadratic = quadraticZeroSignature(right);
+  if (leftQuadratic && rightQuadratic && leftQuadratic !== rightQuadratic) return false;
+  if (leftQuadratic && leftQuadratic === rightQuadratic) {
+    const leftAction = quadraticTaskAction(left);
+    const rightAction = quadraticTaskAction(right);
+    if (leftAction.includes("compare") || rightAction.includes("compare")) {
+      return leftAction === rightAction &&
+        normalizedQuadraticQuestionText(left) === normalizedQuadraticQuestionText(right);
+    }
+    return quadraticSolutionMethod(left) === quadraticSolutionMethod(right) &&
+      quadraticSkillSignature(left) === quadraticSkillSignature(right) &&
+      leftAction === rightAction;
+  }
+  if (leftQuadratic || rightQuadratic) return false;
+
+  // Structural answer-target differences must win over broad stem/objective
+  // overlap. Otherwise questions with the same terms and answer vocabulary,
+  // but a different logical scope (for example AND/OR order), are discarded.
+  const leftLogicalStructure = questionLogicalStructureSequence(left);
+  const rightLogicalStructure = questionLogicalStructureSequence(right);
+  if ((leftLogicalStructure === null && rightLogicalStructure?.length) ||
+      (rightLogicalStructure === null && leftLogicalStructure?.length)) return false;
+  const leftLogicalVariables = questionLogicalVariableSequence(left);
+  const rightLogicalVariables = questionLogicalVariableSequence(right);
+  if (leftLogicalVariables.length > 1 && rightLogicalVariables.length > 1 &&
+      leftLogicalVariables.length === rightLogicalVariables.length &&
+      leftLogicalVariables.every((token) => rightLogicalVariables.includes(token)) &&
+      leftLogicalVariables.some((token, index) => token !== rightLogicalVariables[index]) &&
+      !(commutativeComparisonSignature(left) &&
+        commutativeComparisonSignature(left) === commutativeComparisonSignature(right))) return false;
+  if (leftLogicalStructure?.length && rightLogicalStructure?.length &&
+      (leftLogicalStructure.length !== rightLogicalStructure.length ||
+        leftLogicalStructure.some((token, index) => token !== rightLogicalStructure[index]))) return false;
+
+  // Question-stem overlap misses paraphrased factual questions. Treat a very
+  // close repeated full-score answer as the same target, while requiring a
+  // substantial token floor so short shared answers (for example "ATP") do
+  // not collapse distinct questions.
+  if (repeatsNearIdenticalQuestionStem(left, right) || repeatsSameObjectiveAndAnswer(left, right)) return true;
+  if (repeatsHighConfidenceAnswerTarget(left, right)) return true;
+
   const signature = questionDedupeSignature(left);
   if (signature && signature === questionDedupeSignature(right)) {
     const leftStructure = questionLogicalStructureSequence(left);

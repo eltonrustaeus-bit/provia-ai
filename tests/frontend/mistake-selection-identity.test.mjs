@@ -7,14 +7,14 @@ const browser = await chromium.launch({ headless: true });
 const createdAt = "2026-10-15T10:00:00.000Z";
 const rows = [
   {
-    id: "exam-a", created_at: createdAt, course: "Biologi 1", level: "C", qtype: "mix",
-    exam: { training_batch_id: "batch-a", questions: [{ id: "q1", question: "Var sker cellandning?" }] },
+    id: "exam-a", submission_id: "a".repeat(32), created_at: createdAt, course: "Biologi 1", level: "C", qtype: "mix", material: "Cellandning sker i mitokondrierna och frigör energi.",
+    exam: { training_batch_id: "batch-a", submission_receipt: `v2.${"a".repeat(32)}.syntheticreceipt`, questions: [{ id: "q1", question: "Var sker cellandning?" }] },
     answers: [{ id: "q1", answer: "Cellkärnan" }],
     result: { per_question: [{ id: "q1", points: 0, max_points: 2, feedback: "Tänk på cellens organeller.", model_answer: "I mitokondrien." }] },
   },
   {
-    id: "exam-b", created_at: createdAt, course: "Biologi 1", level: "C", qtype: "mix",
-    exam: { training_batch_id: "batch-b", questions: [{ id: "q1", question: "Vad bildas vid fotosyntesen?" }] },
+    id: "exam-b", submission_id: "b".repeat(32), created_at: createdAt, course: "Biologi 1", level: "C", qtype: "mix", material: "Fotosyntesen omvandlar ljusenergi till kemisk energi.",
+    exam: { training_batch_id: "batch-b", submission_receipt: `v2.${"b".repeat(32)}.syntheticreceipt`, questions: [{ id: "q1", question: "Vad bildas vid fotosyntesen?" }] },
     answers: [{ id: "q1", answer: "Syre" }],
     result: { per_question: [{ id: "q1", points: 0, max_points: 2, feedback: "Ta med energilagring.", model_answer: "Glukos och syre." }] },
   },
@@ -43,11 +43,13 @@ try {
 
   await page.locator("#trainSelectedBtn").click();
   await page.waitForURL(/app\.html#train$/);
-  await page.waitForFunction(() => document.querySelector("#pastedText")?.value.includes("Var sker cellandning?"));
+  await page.waitForFunction(() => document.querySelector("#pastedText")?.value.includes("Cellandning sker i mitokondrierna"));
   const material = await page.locator("#pastedText").inputValue();
-  assert.match(material, /Var sker cellandning\?/);
-  assert.doesNotMatch(material, /Vad bildas vid fotosyntesen\?/,
-    "training material contains only the selected exam's mistake, not another q1");
+  assert.match(material, /Cellandning sker i mitokondrierna/);
+  assert.doesNotMatch(material, /Fotosyntesen omvandlar ljusenergi/,
+    "training source contains only the selected exam's saved original material");
+  assert.doesNotMatch(material, /Var sker cellandning\?|Cellkärnan|I mitokondrien/,
+    "old question, student answer and answer key remain separate from source evidence");
   await close();
   console.log("mistake-selection-identity: repeated question IDs remain isolated through selection and training");
 } finally {

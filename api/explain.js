@@ -1,11 +1,13 @@
-﻿import { randomUUID } from "node:crypto";
+﻿import { createHmac, randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "./_auth.js";
 import supabaseKeys from "./_supabase-server-key.cjs";
-import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
+import { callAIRaw, callAIStream, buildPERSystemPrompt, buildPERLandingPrompt, buildPERCoachSystemPrompt, buildExplainPrompt , modulesInPrompt, bumpModules } from "./_per-core.js";
 import aiUsage from "./_ai-usage.cjs";
 import aiBudget from "./_ai-usage.cjs";
 import publicGuide from "./_per-public-guide.cjs";
+import { resolveCourse } from "./_education.js";
+import { isKnownErrorCode } from "./_concept-tags.js";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
@@ -14,7 +16,7 @@ import { decidePerRole, buildRoleInstruction } from "./_per-role.js";
 import { buildCurriculumContext } from "./_math-curriculum.js";
 import { buildLearningSignals, getLongMemoryEpoch, loadLongMemory, maybeRefreshLongMemory, savePerSessionHistory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
 import { currentPeriodKey, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
-import { buildPERContextPack } from "./_per-context.js";
+import { buildPERContextPack, describePage } from "./_per-context.js";
 import { flagsEnabled } from "./_flags.js";
 /* buildProfileContext anropas inte härifrån längre — api/_learner-context.js är
    enda stället som sätter ihop elevblocken, och en andra väg in i prompten är
@@ -41,6 +43,9 @@ const FRUSTRATION_REGEX = /fattar inte|förstår inte|helt lost|ger upp|hopplös
 const FEYNMAN_REGEX     = /förklara för dig|jag förklarar|testa om jag|feynman|förklara det för mig som/i;
 const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fråga|välj.*fråga.*ställ/i;
 const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
+// Bump when the verified coaching prompt or its evidence contract changes so
+// browser-cached advice cannot outlive the instructions that produced it.
+const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v4";
 
 const supabase = createSupabaseServerClient(
   getSupabaseUrl(),
@@ -71,6 +76,10 @@ async function callMeasuredPerAI(messages, options, { userId, feature = "per_cha
 
 function sanitize(str, maxLen) {
   return typeof str === "string" ? str.slice(0, maxLen) : "";
+}
+
+function isExamBoundPage(page) {
+  return ["prov", "resultat", "exam", "exam-result"].includes(page);
 }
 
 async function consumePerChatQuota(user, roleHint) {
@@ -108,13 +117,18 @@ async function settlePerChatQuota(userId, quota, commit) {
   if (!quota?.requestId || !quota?.periodKey) return true;
   try {
     const rpc = commit ? "commit_per_chat_quota" : "refund_per_chat_quota";
-    const { data, error } = await supabase.rpc(rpc, {
+    const args = {
       p_user_id: userId,
       p_period_key: quota.periodKey,
       p_request_id: quota.requestId,
-    });
-    if (error || !data || typeof data.ok !== "boolean") return false;
-    return data.ok;
+    };
+    let result = await supabase.rpc(rpc, args);
+    if (commit && (result.error || !result.data || result.data.ok !== true)) {
+      // The RPC is idempotent by request ID, so a lost response can be retried safely.
+      result = await supabase.rpc(rpc, args);
+    }
+    if (result.error || !result.data || typeof result.data.ok !== "boolean") return false;
+    return result.data.ok;
   } catch {
     return false;
   }
@@ -506,7 +520,74 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId 
   } catch { return null; }
 }
 
-function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
+function verifiedActiveQuestion(body, user, submissionId) {
+  const context = body.pageContext;
+  const question = context?.currentQuestion;
+  if (!question || typeof question !== "object" || Array.isArray(question) ||
+      typeof context?.course !== "string" ||
+      !examCompletion.verifyActiveQuestionProof(
+        question.questionProof, user.id, context.course, submissionId,
+        question, question.number, question.of,
+      )) return null;
+  return {
+    type: question.type,
+    text: String(question.question ?? question.text ?? "").slice(0, 4000),
+    graphMode: question.type === "graph" ? question.graphMode : undefined,
+  };
+}
+
+function buildVerifiedCoachEvidence(examData = {}) {
+  const lines = [];
+  const scores = Array.isArray(examData.mockRecentScores)
+    ? examData.mockRecentScores.filter(value => Number.isInteger(value) && value >= 0 && value <= 100)
+    : [];
+  // Course names are free text in legacy rows. Resolve to the official catalog
+  // before placing one in a model prompt; generated tags are omitted entirely.
+  const courses = [...new Set((Array.isArray(examData.felBankCourses) ? examData.felBankCourses : [])
+    .map(course => resolveCourse(course)?.name)
+    .filter(Boolean))].slice(0, 5);
+  const errorLabels = {
+    mc_wrong: "Felaktigt flervalsalternativ",
+    concept_confusion: "Begreppsförväxling",
+    definition_missing: "Definition saknas",
+    structure_weak: "Svarsstruktur behöver stärkas",
+    calculation_error: "Beräkningsfel",
+    insufficient_material: "Otillräckligt underlag",
+    answer_key_unverified: "Facit kunde inte verifieras",
+  };
+  const errorTypes = [...new Set((Array.isArray(examData.felBankErrorTypes) ? examData.felBankErrorTypes : [])
+    .filter(isKnownErrorCode)
+    .map(code => errorLabels[code]))].slice(0, 6);
+  if (scores.length) lines.push(`Senaste verifierade provresultat (äldst först, senaste sist): ${scores.join("%, ")}%`);
+  if (courses.length) lines.push(`Kurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: ${JSON.stringify(courses)}`);
+  if (errorTypes.length) lines.push(`Verifierade felmönster från ExGens fasta felkodlista: ${JSON.stringify(errorTypes)}`);
+  return lines.length ? lines.join("\n") : "Inga verifierade provresultat finns ännu.";
+}
+
+function buildVerifiedCoachSnapshot(examData = {}, userId = "") {
+  const evidence = buildVerifiedCoachEvidence(examData);
+  const fingerprintKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const scores = Array.isArray(examData.mockRecentScores)
+    ? examData.mockRecentScores.filter(value => Number.isInteger(value) && value >= 0 && value <= 100)
+    : [];
+  const focusCourse = [...new Set((Array.isArray(examData.felBankCourses) ? examData.felBankCourses : [])
+    .map(course => resolveCourse(course)?.name)
+    .filter(Boolean))][0] || null;
+  return {
+    evidence,
+    fingerprint: fingerprintKey && userId
+      ? createHmac("sha256", fingerprintKey).update(`${userId}\0${PER_COACH_PROMPT_REVISION}\0${evidence}`).digest("hex")
+      : null,
+    summary: {
+      latestPercent: scores.at(-1) ?? null,
+      trendDeltaPp: scores.length > 1 ? scores.at(-1) - scores[0] : null,
+      recentResultCount: scores.length,
+      focusCourse,
+    },
+  };
+}
+
+function sendActiveExamGuidance(req, res, body, issuanceState = "active", trustedQuestion = undefined) {
   const safeHelpStates = ["unverified", "abandoned", "expired", "missing", "completed"];
   if (issuanceState !== "active" && !safeHelpStates.includes(issuanceState)) {
     const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
@@ -536,10 +617,15 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       reviewDeferred: true,
     });
   }
-  const currentQuestion = body.pageContext?.currentQuestion;
+  const currentQuestion = trustedQuestion === undefined
+    ? body.pageContext?.currentQuestion : trustedQuestion;
   const type = currentQuestion?.type;
-  const hasDraft = currentQuestion?.answered === true;
-  const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 500);
+  const requestIsEnglish = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+  const helpRequest = String(body.userQuestion || "").trim().slice(0, 300).toLocaleLowerCase(requestIsEnglish ? "en-US" : "sv-SE");
+  const answerRequest = /\b(give me (the )?answer|what is the answer|correct answer|correct option|answer key|solution please|facit|rätt svar|rätta svaret|ge mig svaret|vad är svaret|vilket alternativ är rätt)\b/i.test(helpRequest);
+  const asksToCheckDraft = !answerRequest && /\b(my answer|my work|my solution|is my answer right|is this right|check my|mitt svar|min lösning|min uträkning|är mitt svar rätt|är min lösning rätt|är det rätt|kolla mitt svar|rätta mitt svar)\b/i.test(helpRequest);
+  const hasDraft = asksToCheckDraft;
+  const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 4000);
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
   if (currentQuestion?.graph_ui && Object.hasOwn(currentQuestion.graph_ui, "mode")) declaredGraphModes.push(currentQuestion.graph_ui.mode);
@@ -556,13 +642,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ],
       line: [
         "First identify what each axis represents. What relationship is the question asking you to show?",
-        "Choose two convenient x-values in the grid and work out their y-values. Keep your calculations separate from the drawing.",
-        "Check that both points fit the relationship and that the line's direction matches your reasoning. What could you verify before submitting?",
+        "Test the points you select against the relationship before drawing. Which part of your material shows how to check them?",
+        "Check that your plotted work fits the relationship and that the direction matches your reasoning. What could you verify before submitting?",
       ],
       scatter: [
         "Check what each axis represents and which column belongs on each axis. What does one row become on the graph?",
-        "Place one row at a time: the first value is horizontal (x), and the second is vertical (y). Check labels and units as you go.",
-        "Compare the first and last observations, then describe the pattern you see. Do not assume every point lies on a line.",
+        "Compare the table headings with the axis labels. For one row, which value belongs on each axis? Check labels and units before plotting it.",
+        "Check all observations before describing the pattern. Does your description fit every point you placed?",
       ],
       genericGraph: [
         "Check what the axes and symbols show. Which part of your material could help you interpret them?",
@@ -583,13 +669,13 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ],
       line: [
         "Börja med att se vad axlarna visar. Vilket samband ber frågan dig att visa?",
-        "Välj två enkla x-värden i rutnätet och räkna fram deras y-värden. Håll beräkningarna åtskilda från själva ritandet.",
-        "Kontrollera att båda punkterna passar sambandet och att linjens riktning stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
+        "Pröva punkterna du väljer mot sambandet innan du ritar. Vilken del av materialet visar hur du kan kontrollera dem?",
+        "Kontrollera att det du ritat passar sambandet och att riktningen stämmer med ditt resonemang. Vad kan du kontrollera före inlämning?",
       ],
       scatter: [
         "Se vad axlarna visar och vilken kolumn som hör till respektive axel. Vad blir en rad i tabellen på grafen?",
-        "Placera en rad i taget: första värdet är vågrätt (x) och det andra lodrätt (y). Kontrollera rubriker och enheter under tiden.",
-        "Jämför den första och sista raden och beskriv mönstret. Utgå inte från att alla punkter ligger på en linje.",
+        "Jämför tabellens rubriker med axlarnas namn. Vilket värde från en rad hör till respektive axel? Kontrollera rubriker och enheter innan du placerar punkten.",
+        "Kontrollera alla observationer innan du beskriver mönstret. Stämmer din beskrivning med varje punkt du placerat?",
       ],
       genericGraph: [
         "Se vad axlar och markeringar visar. Vilken del av ditt material kan hjälpa dig att tolka dem?",
@@ -617,7 +703,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       scatter: [
         "If you have placed points, compare each one with the x and y values from the same table row.",
         "Check one point's labels and units against its row. What changes if its coordinates are reversed?",
-        "Compare the first and last observations, then describe the trend without assuming every point lies on a line.",
+        "Compare the observations you plotted. What pattern, if any, do they support? Check your claim against the source.",
       ],
       genericGraph: [
         "If you have made a mark on the graph, explain what that mark represents using the axes.",
@@ -644,7 +730,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       scatter: [
         "Om du har placerat ut punkter, jämför varje punkt med x- och y-värdet från samma tabellrad.",
         "Kontrollera en punkts rubriker och enheter mot tabellraden. Vad ändras om koordinaterna byter plats?",
-        "Jämför första och sista observationen och beskriv trenden utan att anta att alla punkter ligger på en linje.",
+        "Jämför observationerna du placerat. Vilket mönster, om något, stöder de? Kontrollera ditt påstående mot materialet.",
       ],
       genericGraph: [
         "Om du har markerat något i grafen, förklara vad markeringen visar med hjälp av axlarna.",
@@ -662,32 +748,140 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
     : 0;
   res.setHeader("Cache-Control", "no-store");
   const ladder = hasDraft ? draftChecks : hints;
-  const sequence = type === "graph"
+  const normalizedQuestion = questionText.toLocaleLowerCase(en ? "en-US" : "sv-SE");
+  let contextualSequence = null;
+  const comparisonQuestion = /\b(compare|compared|comparison|contrast|difference|differences|jämför|jämföra|jämförelse|skillnad|skillnader)\b/i.test(normalizedQuestion);
+  const causeEffectQuestion = /\b(why|cause|causes|caused|reason|reasons|because|varför|orsak|orsaker|orsaken|beror|leder till)\b/i.test(normalizedQuestion);
+  if (/fotosyntes|photosynthesis/.test(normalizedQuestion)) {
+    contextualSequence = hasDraft
+      ? (en ? [
+        "If you have a draft, sort the substances into what the process takes in and what it forms or releases. Which claim in your material can you check first?",
+        "If you have started an answer, check that it distinguishes inputs from products. Which sentence in your material supports each group?",
+        "If you have an answer, compare each part with the process description and revise anything the material does not support.",
+      ] : [
+        "Om du har ett utkast, dela upp ämnena i sådant processen tar in och sådant den bildar eller avger. Vilket påstående i materialet kan du kontrollera först?",
+        "Om du har börjat svara, kontrollera att svaret skiljer mellan sådant som används och sådant som bildas. Vilken mening i materialet stöder respektive grupp?",
+        "Om du har ett svar, jämför varje del med processbeskrivningen och ompröva sådant som saknar stöd i materialet.",
+      ])
+      : (en ? [
+        "Sort what the plant takes in separately from what the process forms or releases. Where in your material can you find evidence for each part?",
+        "Follow the process description from beginning to end. Which substances belong at each stage, and what role does the material give them?",
+        "Make a simple in-through-out list and check every item against your material. Then explain how you distinguish what is used from what is formed.",
+      ] : [
+        "Sortera det växten tar in från det processen bildar eller avger. Var i materialet hittar du belägg för varje del?",
+        "Följ processbeskrivningen från början till slut. Vilka ämnen hör till respektive del, och vilken roll får de i materialet?",
+        "Gör en enkel in-genom-ut-lista och kontrollera varje punkt mot materialet. Förklara sedan skillnaden mellan det som används och det som bildas.",
+      ]);
+  } else if (/\bmitos\b/.test(normalizedQuestion) && /\bmeios\b/.test(normalizedQuestion)) {
+    contextualSequence = hasDraft
+      ? (en ? [
+        "Compare your draft using the same headings for both processes: purpose and outcome. Which part needs evidence from your material?",
+        "Check that each comparison point describes both processes on the same basis. What does your material support for each one?",
+        "Review each row of your comparison against the source and revise any claim that is not supported.",
+      ] : [
+        "Jämför ditt utkast med samma rubriker för båda processerna: syfte och resultat. Vilken del behöver stöd från materialet?",
+        "Kontrollera att varje jämförelsepunkt beskriver båda processerna på samma grund. Vad får stöd i materialet för respektive process?",
+        "Granska varje rad i jämförelsen mot källan och ompröva påståenden som saknar stöd.",
+      ])
+      : (en ? [
+        "Choose one comparison point, such as purpose or outcome. What can you find about each process in your material?",
+        "Find a description of both processes under the same heading. What difference does the source support without relying on memory alone?",
+        "Make a two-column table with purpose and outcome as headings. Fill each cell from your material, then explain the contrast in your own words.",
+      ] : [
+        "Välj en jämförelsepunkt, till exempel syfte eller resultat. Vad hittar du om båda processerna i materialet?",
+        "Leta upp en beskrivning av båda processerna under samma rubrik. Vilken skillnad stöds av materialet, inte bara minnet?",
+        "Gör en tabell med syfte och resultat som rubriker. Fyll rutorna från materialet och formulera sedan skillnaden med egna ord.",
+      ]);
+  } else if (comparisonQuestion && !causeEffectQuestion) {
+    contextualSequence = en ? [
+        "Choose one shared comparison point. What does your material say about each item under that same point?",
+        "Find evidence about both items under the same heading. What contrast does that evidence support?",
+        "Make a two-column note using the shared comparison point, fill it from your material, then explain the contrast in your own words.",
+      ] : [
+        "Välj en gemensam jämförelsepunkt. Vad säger materialet om vart och ett utifrån just den punkten?",
+        "Hitta belägg om båda i samma del av materialet. Vilken skillnad stöder de beläggen?",
+        "Gör två kolumner med samma jämförelsepunkt, fyll dem från materialet och förklara sedan skillnaden med egna ord.",
+      ];
+  } else if (/\b(?:växt(?:en|er|erna|ens)?|plants?)\b/i.test(normalizedQuestion) &&
+      /\b(tar upp|upptag|absorberar|take up|uptake|absorb)\b/i.test(normalizedQuestion) &&
+      /\b(vatten|water)\b/i.test(normalizedQuestion) &&
+      /\b(koldioxid|carbon dioxide|co2)\b|\bco₂(?=\W|$)/i.test(normalizedQuestion)) {
+    contextualSequence = en ? [
+      "Split the question into the two substances. Which words in your material show where each one enters the plant?",
+      "Trace each substance separately through the description. What route into the plant does the source give for each?",
+      "Build two short source-backed steps, one for each substance, then check that you have not mixed up their routes. Which sentence supports each step?",
+    ] : [
+      "Dela upp frågan i de två ämnena. Vilka ord i materialet visar var vart och ett kommer in i växten?",
+      "Följ ämnena var för sig genom beskrivningen. Vilken väg in i växten anger källan för respektive ämne?",
+      "Bygg två korta steg med stöd i materialet, ett för varje ämne. Kontrollera sedan att du inte blandat ihop vägarna. Vilken mening stöder varje steg?",
+    ];
+  } else if (causeEffectQuestion && !comparisonQuestion) {
+    contextualSequence = en ? [
+        "Identify what the question says changes. Where in your material is a possible cause or mechanism described?",
+        "Trace the process in order: what happens first, and what follows? Which source detail connects the steps?",
+        "Build a short cause-and-effect chain from your material and check that each link is supported, not just assumed.",
+      ] : [
+        "Identifiera vad frågan säger förändras. Var i materialet beskrivs en möjlig orsak eller mekanism?",
+        "Följ processen i ordning: vad händer först och vad följer? Vilken detalj i materialet binder ihop stegen?",
+        "Bygg en kort orsakskedja från materialet och kontrollera att varje led har stöd, inte bara antas.",
+      ];
+  }
+  const sequence = contextualSequence || (type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
-    : ladder[type];
+    : ladder[type]);
+  const requestGuidance = answerRequest ? null : asksToCheckDraft ? null
+    : /\b(why|varför|orsak|cause)\b/i.test(helpRequest) ? (en ? [
+      "Identify what changes in the question. Which possible cause can you find in your material?",
+      "Follow the description in your material in order. Which detail links a cause to the change?",
+      "Build a short cause-and-effect chain from the source and check that each link has evidence.",
+    ] : [
+      "Se vad som förändras i frågan. Vilken möjlig orsak hittar du i materialet?",
+      "Följ beskrivningen i materialet i ordning. Vilken detalj kopplar en orsak till förändringen?",
+      "Bygg en kort orsakskedja från källan och kontrollera att varje led har belägg.",
+    ])
+    : /\b(how do i|how can i|how should i|how to|hur börjar jag|hur ska jag börja|hur gör jag|hur ska jag|hur kan jag|how do i start|what should i do|vad ska jag göra|vilket steg först)\b/i.test(helpRequest) ? (en ? [
+      "Start with the action word in the question. What does it ask you to do: compare, describe or explain?",
+      "Break the task into two small steps. Which one can you support with your material first?",
+      "Make a short plan from the question's requirements, then check each step against your material.",
+    ] : [
+      "Börja med frågans verb. Ska du jämföra, beskriva eller förklara?",
+      "Dela upp uppgiften i två små steg. Vilket kan du först stödja med materialet?",
+      "Gör en kort plan utifrån frågans krav och kontrollera varje steg mot materialet.",
+    ])
+    : /\b(what does .+ mean|what is meant by|vad betyder|vad menas med|vad menas)\b/i.test(helpRequest) ? (en ? [
+      "Find the key word from the question in your material. What description is given there?",
+      "Compare the key word with a nearby concept in your material. What distinction does the source make?",
+      "Explain the concept in your own words and connect it to one specific detail in your material.",
+    ] : [
+      "Hitta nyckelordet från frågan i materialet. Hur beskrivs det där?",
+      "Jämför nyckelordet med ett närliggande begrepp i materialet. Vilken skillnad gör källan?",
+      "Förklara begreppet med egna ord och koppla det till en konkret detalj i materialet.",
+    ]) : null;
   const slopeQuestion = /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
+  const questionHasSpecificGuidance = Boolean(contextualSequence || type === "graph" || slopeQuestion);
+  const effectiveRequestGuidance = questionHasSpecificGuidance ? null : requestGuidance;
   const slopeGuidance = en
     ? hasDraft
       ? [
-        "You have started answering a slope question. Which two points or changes are you using? Check that your method compares vertical change with horizontal change.",
-        "Write down the change in y and the change in x separately. Does your answer compare them in the same order?",
-        "Use the relationship between the change in y and the change in x, then check your signs and units. Keep your calculation in your own work.",
+        "You have started answering a slope question. Check that the quantities you chose, and their order, match the definition in your course material.",
+        "Write down the changes you chose separately. Does your answer use them in the order shown in your material?",
+        "Use your chosen method, then check signs and units. Keep the calculation in your own work.",
       ]
       : [
-        "Slope describes how much y changes when x changes. What two quantities would you compare to describe that change?",
-        "Find the change in y and the change in x between two points. Which change belongs in the numerator, and which in the denominator?",
-        "The method is change in y divided by change in x. Keep the subtraction order consistent; what does that tell you about the direction of the line?",
+        "Look at points on the line. What changes as you move from one to another?",
+        "Write down what changes between the points. Where in your course material is the rule that connects those changes?",
+        "Compare the two changes in the order shown in your material. Check signs and units, then explain what your result says about the line.",
       ]
     : hasDraft
       ? [
-        "Du har börjat svara på en lutningsfråga. Vilka två punkter eller förändringar utgår du från? Kontrollera att metoden jämför förändringen lodrätt med förändringen vågrätt.",
-        "Skriv förändringen i y och förändringen i x var för sig. Jämför du dem i samma ordning i ditt svar?",
-        "Använd sambandet mellan förändringen i y och förändringen i x och kontrollera tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
+        "Du har börjat svara på en lutningsfråga. Kontrollera att storheterna du valt, och deras ordning, stämmer med definitionen i ditt kursmaterial.",
+        "Skriv upp förändringarna du valt var för sig. Använder ditt svar dem i samma ordning som i materialet?",
+        "Använd din valda metod och kontrollera sedan tecken och enheter. Behåll själva beräkningen i ditt eget arbete.",
       ]
       : [
-        "Lutning beskriver hur mycket y förändras när x förändras. Vilka två storheter behöver du jämföra för att beskriva den förändringen?",
-        "Ta reda på förändringen i y och förändringen i x mellan två punkter. Vilken förändring ska stå i täljaren och vilken i nämnaren?",
-        "Metoden är förändring i y delat med förändring i x. Håll subtraktionsordningen konsekvent. Vad säger det om linjens riktning?",
+        "Titta på punkter på linjen. Vad förändras när du går från en punkt till en annan?",
+        "Skriv upp vad som förändras mellan punkterna. Var i ditt kursmaterial finns regeln som binder ihop förändringarna?",
+        "Jämför förändringarna i den ordning som visas i ditt material. Kontrollera tecken och enheter och förklara sedan vad resultatet säger om linjen.",
       ];
   // This is a fixed answer-free ladder, separate from the pilot cap for free-form model help.
   const statusNote = issuanceState === "active" ? "" : issuanceState === "unverified"
@@ -698,39 +892,64 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ? "This exam is not open for answering. I can help with the method, but a full answer requires verified grading. "
       : "Provet är inte öppet för svar. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ");
   res.json({
-    answer: statusNote + (slopeQuestion ? slopeGuidance[requestedLevel] : sequence?.[requestedLevel] || ladder.short[requestedLevel]),
+    answer: statusNote + (asksToCheckDraft && slopeQuestion ? slopeGuidance[requestedLevel]
+      : effectiveRequestGuidance?.[requestedLevel] || (slopeQuestion ? slopeGuidance[requestedLevel]
+        : sequence?.[requestedLevel] || ladder.short[requestedLevel])),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: issuanceState === "active",
+    ...(body.topic === "studiecoach" ? { coachDeferred: true } : {}),
     ...(issuanceState !== "active" ? { examState: issuanceState } : {}),
   });
 }
 
-async function gateActiveExam(req, res, body, user) {
-  delete body._perExamStudyOnly;
-  delete body._perPendingExamStudy;
+async function gateActiveExam(req, res, body, user, perAnswerLease) {
   const context = body.pageContext && typeof body.pageContext === "object" && !Array.isArray(body.pageContext)
     ? body.pageContext
     : null;
   const page = String(context?.page || "").trim().toLowerCase();
-  const examPage = ["prov", "resultat", "exam", "exam-result"].includes(page);
-  const hasOtherPage = Boolean(page && !examPage);
+  const hasOtherPage = Boolean(page && !["prov", "resultat", "exam", "exam-result"].includes(page));
+  const isHomepage = describePage(context?.page) === "startsida";
   const hasCurrentQuestion = context?.currentQuestion && typeof context.currentQuestion === "object";
   const hasExamPhase = typeof context?.examState?.phase === "string" && context.examState.phase.trim().length > 0;
   const hasSubmissionIdentity = typeof context?.examState?.submissionId === "string"
     && /^[a-f0-9]{32}$/.test(context.examState.submissionId);
   const hasExamQuestions = Array.isArray(context?.questions) && context.questions.length > 0;
-  const examContextDeclared = examPage || (!hasOtherPage &&
-    (hasCurrentQuestion || hasExamPhase || hasSubmissionIdentity || hasExamQuestions));
+  const hasStaleExamPayload = Boolean(hasCurrentQuestion || hasExamQuestions || context?.examState);
+  const chatSubmissionIdentity = hasSubmissionIdentity && body.examReview !== true && !Array.isArray(body.scores);
+  // A stale question list can remain in shared client context after leaving
+  // the exam. Treat exam fields as declared context only on exam/result pages;
+  // submission identity remains exam-bound on every route.
+  const examContextDeclared = chatSubmissionIdentity || (!hasOtherPage &&
+    (hasExamQuestions || hasCurrentQuestion || hasExamPhase || page === "prov"));
   const ordinaryStudyChat = typeof body.userQuestion === "string" && body.userQuestion.trim().length > 0
     && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && body.landingMode !== true && !Array.isArray(body.scores)
     && body.question == null && body.correct == null;
 
-  function referencesExamQuestion() {
+  function applyHomepageContextBoundary() {
+    if (!isHomepage) return;
+    body.pageContext = { page: "startsida" };
+    body.topic = "";
+    body.recentMistakes = [];
+    body.weakAreas = [];
+    delete body.context;
+  }
+
+  function referencesExamQuestion({ allowTopicOverlap = false, ignoreQuestionMatch = false, minimumSharedWords = 4 } = {}) {
     const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
-    if (/\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)) return true;
+    const explicitAnswerIntent = /\b(facit|rätt svar|lös hela|ge mig (?:facit|svaret|lösningen)|(?:vad|what) (?:är|is) (?:facit|svaret|the answer|lösningen)(?: på (?:uppgiften|frågan|provet))?|(?:svaret|the answer) på (?:uppgiften|frågan|provet)|give me (?:the )?(?:answer|solution)|exakt svar|exact answer|provfråga|fråga\s*\d+|this question|the answer|correct answer|solve this|question\s*\d+|reveal|visa (?:facit|svaret|lösningen)|mitt svar|my answer|is this correct)\b/i.test(query)
+      || /\b(?:förklara|visa|ge|beskriv|explain|show|give)\s+(?:mig\s+)?(?:hela\s+)?(?:lösningen|svaret|facit|the solution|the answer)\b/i.test(query)
+      || /\b(?:lösningen|svaret|facit|the solution|the answer)\s+(?:på|till|för|to|for)\s+(?:uppgift(?:en)?|fråga(?:n)?|provet|problem|question|task)(?:\s*#?\d+)?\b/i.test(query);
+    const answerEvaluationIntent = /\bvarför\s+(?:(?:är|var|blev)\s+)?(?:svaret|mitt svar|det svaret)\b.{0,80}\b(?:rätt|korrekt)\b|\b(?:svaret|mitt svar|jag fick)\s+\d+(?:[,.]\d+)?\s+(?:är|var)\s+(?:rätt|korrekt)\b|\b(?:jag|vi)\s+(?:skrev|svarade|valde|angav|fick)\b.{0,80}\b(?:rätt|korrekt)\b|\bvarför\s+\d+(?:[,.]\d+)?\s+(?:är|var)\s+(?:rätt|korrekt)\b/i.test(query)
+      || /\bwhy\s+(?:(?:is|was)\s+)?(?:my|the|this)\s+answer\b.{0,80}\b(?:right|correct)\b|\b(?:my|the)\s+answer\s+\d+(?:[,.]\d+)?\s+(?:is|was)\s+(?:right|correct)\b|\b(?:i|we)\s+(?:wrote|answered|put|chose|selected|got)\b.{0,80}\b(?:right|correct)\b|\bwhy\s+\d+(?:[,.]\d+)?\s+(?:is|was)\s+(?:right|correct)\b/i.test(query)
+      || /\b(?:why|varför)\b.{0,80}\b(?:\d+(?:[,.]\d+)?|(?:the\s+)?(?:answer|result)|svaret|resultatet)\b.{0,80}\b(?:stämmer|fungerar|funkar|makes\s+sense|checks?\s+out|works?\s+out|(?:is|was|är|var)\s+(?:right|correct|valid|rätt|korrekt))\b/i.test(query);
+    const concreteTaskReference = /\b(?:uppgift|fråga|provfråga|exercise|question|task|problem)\b/i.test(query)
+      || /\b(?:this|that|the) (?:question|task|exercise|problem)\b/i.test(query);
+    const requestsTaskSolution = /\b(?:lös(?:a|er|ning|ningen)?|solve|work out|answer|besvara|svara på|räkn(?:a|ar|ade|at)?|räkna ut|beräkn(?:a|ar|ade|at)?|calculate|compute|facit|svaret|the answer|the solution|förklara|explain|visa|show|walk me through)\b/i.test(query);
+    if (explicitAnswerIntent || answerEvaluationIntent || (concreteTaskReference && (requestsTaskSolution || isClearlyGeneralQuestion()))) return true;
     if (examContextDeclared && /\b(den här|det här|denna fråga|den frågan|detta|dessa|här|this|that|it|those)\b/i.test(query)) return true;
+    if (ignoreQuestionMatch) return false;
     const targets = [
       context?.currentQuestion?.text,
       context?.currentQuestion?.question,
@@ -743,11 +962,41 @@ async function gateActiveExam(req, res, body, user) {
       ]) : []),
     ]
       .filter((value) => typeof value === "string");
+    const normalizeQuestion = (value) => value.toLocaleLowerCase("sv-SE").normalize("NFKC")
+      .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalizedQuery = normalizeQuestion(query);
+    if (targets.some((target) => normalizeQuestion(target) === normalizedQuery)) return true;
     if (!targets.length) return false;
-    const ignored = new Set("vad betyder beskriv förklara varför hur kan jag mitt din med från till detta den det som och eller är var was what does explain how why with from that this question about which tell me please help solve find use give answer the a an is of in on for it".split(" "));
+    const ignored = new Set("vad betyder beskriv förklara varför hur kan jag mitt din med från till mellan detta den det som och eller är var was what does explain how why with from that this question about which tell me please help solve find use give answer the a an is of in on for it".split(" "));
     const stem = (word) => word.replace(/(?:arna|erna|ande|en|et|ar|er|or|s)$/u, (suffix) =>
       word.length - suffix.length >= 4 ? "" : suffix);
     const queryWords = new Set((query.normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || []).map(stem));
+    // After verified completion, allow broad concept questions that naturally
+    // share a couple of terms with the old question. Explicit task references
+    // were handled above; reserve this heuristic for strong textual overlap.
+    if (allowTopicOverlap) {
+      const normalizeEquation = (value) => value.toLowerCase()
+        .replace(/²/g, "^2").replace(/³/g, "^3")
+        .replace(/[·⋅∙×]/g, "*").replace(/−/g, "-").replace(/\s+/g, "")
+        .replace(/(\d+(?:[.,]\d+)?)\*([a-z])/g, "$1$2")
+        .replace(/([a-z])\*([a-z])/g, "$1$2")
+        .replace(/[.,;:!?]+$/g, "");
+      const equationAtom = String.raw`(?:\d+(?:[.,]\d+)?\s*[a-z](?:[a-z])?(?:\s*\^\s*[+-]?\d+)?|[a-z](?:[a-z])?(?:\s*\^\s*[+-]?\d+)?|\d+(?:[.,]\d+)?|\([^()]{1,60}\))`;
+      const equationSide = String.raw`(?:[+-]\s*)?${equationAtom}(?:\s*[+*/-]\s*${equationAtom})*`;
+      const equationPattern = new RegExp(String.raw`(?<![\p{L}\p{N}_])(${equationSide})\s*=\s*(${equationSide})(?![\p{L}\p{N}_])`, "giu");
+      const findEquations = (value) => String(value).replace(/²/g, "^2").replace(/³/g, "^3")
+        .replace(/[·⋅∙×]/g, "*").replace(/−/g, "-").match(equationPattern) || [];
+      const queryEquations = new Set(findEquations(query)
+        .map(normalizeEquation));
+      for (const target of targets) {
+        const targetWords = target.toLocaleLowerCase("sv-SE").normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || [];
+        const sharedWords = new Set(targetWords.filter((word) => !ignored.has(word) && queryWords.has(stem(word))).map(stem));
+        const targetEquations = findEquations(target)
+          .map(normalizeEquation);
+        if (sharedWords.size >= minimumSharedWords || targetEquations.some((equation) => queryEquations.has(equation))) return true;
+      }
+      return false;
+    }
     for (const target of targets) {
       const targetWords = target.toLocaleLowerCase("sv-SE").normalize("NFKC").match(/[\p{L}\p{N}]{4,}/gu) || [];
       if (targetWords.some((word) => !ignored.has(word) && queryWords.has(stem(word)))) return true;
@@ -757,29 +1006,58 @@ async function gateActiveExam(req, res, body, user) {
 
   function isClearlyGeneralQuestion() {
     const query = String(body.userQuestion || "").trim();
-    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)\b/i
+    const direct = /\b(vad är|vad betyder|förklara|skillnaden mellan|hur fungerar|vad ska jag (?:göra nu|öva(?: mer)? på|fokusera på)|vad borde jag (?:öva(?: mer)? på|träna(?: mer)? på|fokusera på)|vad behöver jag (?:öva(?: mer)? på|träna(?: mer)? på)|ge (?:mig )?ett exempel|visa (?:mig )?ett exempel|define|what is|what does|explain|difference between|how does|how do i|where can i|navigate|what should i (?:study|practice|work on) next|what should I focus on|var finns|hur hittar jag|var hittar jag|gå till|öppna inställningar)(?=$|[^\p{L}\p{N}_])/iu
       .test(query);
     // Natural standalone help requests need not use a textbook-style opening.
     // Require an explicit subject after the request so vague prompts such as
     // "hjälp mig att tänka" remain on the answer-free exam-help path.
     const namedTopic = /^(?:kan du )?(?:hjälpa mig (?:att )?(?:förstå|med)|hjälp mig (?:att )?(?:förstå|med)|kan du (?:förklara|berätta om|gå igenom)|berätta om|gå igenom)\s+[\p{L}\p{N}]/iu
       .test(query);
-    return direct || (hasSubmissionIdentity && namedTopic);
+    const contextualHelp = /\b(?:hjälp mig\s+(?:att\s+)?(?:förstå|med)|kan du\s+(?:förklara|berätta om|gå igenom)|förklara)\s+(?!den här|det här|denna|fråga|uppgift|provet)[\p{L}\p{N}]/iu
+      .test(query);
+    return direct || namedTopic || contextualHelp;
   }
 
-  function allowRestrictedStudyChat({ pendingExam = true } = {}) {
-    if (!ordinaryStudyChat || referencesExamQuestion()) return false;
-    if (examContextDeclared && !isClearlyGeneralQuestion()) return false;
-    // This server-owned marker only limits ordinary study chat. Exam-related
-    // questions and specialized answer routes remain behind their own gates.
-    body._perExamStudyOnly = true;
-    if (pendingExam) body._perPendingExamStudy = true;
-    if (context) {
-      body.pageContext = { ...context };
-      delete body.pageContext.currentQuestion;
-      delete body.pageContext.questions;
-      delete body.pageContext.examState;
-      if (examPage) delete body.pageContext.page;
+  function allowSafeStudyChat(serverState) {
+    const clearlyGeneral = isClearlyGeneralQuestion();
+    const staleProvView = String(context?.page || "").trim().toLowerCase() === "prov";
+    const hasStaleExamPayload = Boolean(context?.currentQuestion || context?.questions || context?.examState);
+    const staleViewWithoutIssuance = serverState === "none" && staleProvView;
+    const inactiveIssuance = ["none", "completed", "abandoned", "expired", "missing"].includes(serverState);
+    const ignoreStaleQuestionMatch = Boolean(clearlyGeneral && hasOtherPage && hasStaleExamPayload && inactiveIssuance);
+    if (!ordinaryStudyChat || referencesExamQuestion({
+      allowTopicOverlap: clearlyGeneral && !staleViewWithoutIssuance,
+      ignoreQuestionMatch: (clearlyGeneral && staleViewWithoutIssuance) || ignoreStaleQuestionMatch,
+      minimumSharedWords: serverState === "completed" ? 4 : 3,
+    })) return false;
+    // Inactive or unverified exam context must not strand unrelated study help.
+    // Exam-specific requests were rejected above; all exam payload fields are
+    // stripped before this request can reach the model.
+    if (examContextDeclared && (!clearlyGeneral || (serverState === "none" && !staleProvView))) return false;
+    if (["active", "grading"].includes(serverState)) return false;
+    if (perAnswerLease && ["abandoned", "expired", "missing"].includes(serverState)) {
+      perAnswerLease.allowIncompleteGeneralChat = true;
+    }
+    const safeContext = { page: isHomepage ? "startsida" : "app" };
+    const stripStaleExamSource = isHomepage || staleProvView || hasStaleExamPayload;
+    for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
+      if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;
+      if (stripStaleExamSource && ["course", "level"].includes(key)) continue;
+      if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];
+    }
+    body.pageContext = safeContext;
+    applyHomepageContextBoundary();
+    const selectedTopic = String(safeContext.course || (stripStaleExamSource ? "" : context?.topic || body.topic) || "").trim();
+    body.topic = ["app", "prov", "resultat", "exam", "exam-result"].includes(selectedTopic.toLowerCase()) ? "" : selectedTopic;
+    delete body.context;
+    if (stripStaleExamSource || ["abandoned", "expired", "missing"].includes(serverState)) {
+      // Old client chat can contain the unfinished exam question or its answer;
+      // continue from the student's current prompt instead of replaying it.
+      body.history = [];
+      body.recentMistakes = [];
+      body.weakAreas = [];
+      body.clarifyReply = "";
+      body.topic = safeContext.course || "";
     }
     return true;
   }
@@ -800,10 +1078,11 @@ async function gateActiveExam(req, res, body, user) {
         return true;
       }
       if (latestState === "none" || latestState === "completed") return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
       return true;
     }
-    sendActiveExamGuidance(req, res, body);
+    sendActiveExamGuidance(req, res, body, "active", null);
     return true;
   }
 
@@ -817,8 +1096,9 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (state === "active" || state === "grading") {
-      if (allowRestrictedStudyChat()) return false;
-      sendActiveExamGuidance(req, res, body, state);
+      const trustedQuestion = state === "active"
+        ? verifiedActiveQuestion(body, user, submissionId) : null;
+      sendActiveExamGuidance(req, res, body, state, trustedQuestion);
       return true;
     }
     const activeCount = await examIssuance.activeExamCount(user.id);
@@ -827,8 +1107,7 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (activeCount > 0) {
-      if (allowRestrictedStudyChat()) return false;
-      sendActiveExamGuidance(req, res, body);
+      sendActiveExamGuidance(req, res, body, "active", null);
       return true;
     }
     const latestState = await examIssuance.latestExamState(user.id);
@@ -837,18 +1116,21 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      if (allowSafeStudyChat(latestState)) return false;
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
       return true;
     }
     if (state !== "completed") {
       // A known issuance without a server-verified grade remains answer-gated,
       // even if the client moved away from the exam page or dropped its context.
+      // Clearly unrelated study help is still allowed through the sanitized path.
+      if (allowSafeStudyChat(state)) return false;
       sendActiveExamGuidance(req, res, body, state);
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat({ pendingExam: false })) return false;
+      if (allowSafeStudyChat(state)) return false;
       // A verified result can be reviewed through the signed completion flow;
       // a plain chat request on the exam view still does not get the answer.
       sendActiveExamGuidance(req, res, body, state);
@@ -858,7 +1140,9 @@ async function gateActiveExam(req, res, body, user) {
       body.pageContext = { ...context };
       delete body.pageContext.examState;
       delete body.pageContext.currentQuestion;
+      delete body.pageContext.questions;
     }
+    applyHomepageContextBoundary();
     return false;
   }
   // Client phase is a hint, not an issuance identity. A stale exam view must
@@ -877,12 +1161,18 @@ async function gateActiveExam(req, res, body, user) {
       return true;
     }
     if (latestState !== "none" && latestState !== "completed") {
-      if (allowRestrictedStudyChat()) return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      if (allowSafeStudyChat(latestState)) return false;
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
+      return true;
+    }
+    if (hasOtherPage && hasStaleExamPayload && ordinaryStudyChat) {
+      if (allowSafeStudyChat(latestState)) return false;
+      sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
     if (examContextDeclared) {
-      if (allowRestrictedStudyChat()) return false;
+      if ((latestState === "completed" || latestState === "none") && allowSafeStudyChat(latestState)) return false;
       sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
@@ -891,13 +1181,14 @@ async function gateActiveExam(req, res, body, user) {
       // display context, not trusted inputs to the general study-help prompt.
       body.pageContext = { ...context };
       delete body.pageContext.currentQuestion;
+      delete body.pageContext.questions;
       delete body.pageContext.examState;
       if (["prov", "resultat"].includes(body.pageContext.page)) delete body.pageContext.page;
     }
+    applyHomepageContextBoundary();
     return false;
   }
-  if (allowRestrictedStudyChat()) return false;
-  sendActiveExamGuidance(req, res, body);
+  sendActiveExamGuidance(req, res, body, "active", null);
   return true;
 }
 
@@ -918,20 +1209,22 @@ async function acquirePerAnswerLease(user, lease) {
   // status check and lease acquisition.
   const latestState = await examIssuance.latestExamState(user.id);
   if (latestState === "none" || latestState === "completed") return "acquired";
+  if (lease.allowIncompleteGeneralChat && ["abandoned", "expired", "missing"].includes(latestState)) return "acquired";
+  lease.blockedState = latestState;
   await examIssuance.releasePerAnswerLease(user.id, lease.leaseId);
   lease.userId = null;
   lease.leaseId = null;
   return latestState === null ? null : "ungraded_exam";
 }
 
-function rejectLeaseOutcome(req, res, body, outcome, { history = false } = {}) {
+function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = null } = {}) {
   if (outcome === "exam_active") {
     if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
-    sendActiveExamGuidance(req, res, body);
+    sendActiveExamGuidance(req, res, body, "active", null);
     return true;
   }
   if (outcome === "ungraded_exam") {
-    sendActiveExamGuidance(req, res, body, "abandoned");
+    sendActiveExamGuidance(req, res, body, lease?.blockedState || "abandoned");
     return true;
   }
   if (outcome === "busy") return res.status(409).json({ error: "PER_REQUEST_IN_PROGRESS" });
@@ -952,7 +1245,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       return res.status(409).json({ error: "PER_HISTORY_LOCKED" });
     }
     const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true });
+    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, {}, leaseOutcome, { history: true, lease: perAnswerLease });
     const messages = await loadPerHistory(user.id);
     return res.json({ ok: true, history: messages });
   }
@@ -985,9 +1278,9 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     let landingUser = null;
     if (req.headers?.authorization) {
       landingUser = await requireAuth(req, res);
-      if (!landingUser || await gateActiveExam(req, res, body, landingUser)) return;
+      if (!landingUser || await gateActiveExam(req, res, body, landingUser, perAnswerLease)) return;
       const leaseOutcome = await acquirePerAnswerLease(landingUser, perAnswerLease);
-      if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+      if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome, { lease: perAnswerLease });
     }
     const question = sanitize(String(body.userQuestion || body.topic || ''), 300).trim();
     if (!question) return res.status(400).json({ error: 'No question' });
@@ -1069,14 +1362,34 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
   const user = await requireAuth(req, res);
   if (!user) return;
-  const persistentTeachTurn = body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
+  const studyCoachRequest = body.topic === "studiecoach";
+  const persistentTeachTurn = !studyCoachRequest && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && !Array.isArray(body.scores)
-    && (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0));
+    && (body.topic || body.userQuestion);
   const perMemoryEpoch = persistentTeachTurn ? await getLongMemoryEpoch(supabase, user.id) : null;
-  if (await gateActiveExam(req, res, body, user)) return;
-  if (body._perExamStudyOnly !== true) {
-    const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
-    if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome);
+  if (await gateActiveExam(req, res, body, user, perAnswerLease)) return;
+  const leaseOutcome = await acquirePerAnswerLease(user, perAnswerLease);
+  if (leaseOutcome !== "acquired") return rejectLeaseOutcome(req, res, body, leaseOutcome, { lease: perAnswerLease });
+
+  // A saved coach recommendation may only be reused after comparing its
+  // fingerprint with the same server-verified evidence the coach consumes.
+  // This check is authenticated, owner-scoped, answer-gated, and does not use
+  // AI quota or model tokens.
+  if (studyCoachRequest && body.coachCacheCheck === true) {
+    try {
+      const liveExamData = await enrichMemoryFromExamData(supabase, user.id, { throwOnError: true });
+      const snapshot = buildVerifiedCoachSnapshot(liveExamData, user.id);
+      const known = typeof body.knownCoachEvidenceFingerprint === "string"
+        ? body.knownCoachEvidenceFingerprint : "";
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json({
+        unchanged: /^[a-f0-9]{64}$/.test(known) && known === snapshot.fingerprint,
+        coachEvidenceFingerprint: snapshot.fingerprint,
+        coachEvidenceSummary: snapshot.summary,
+      });
+    } catch {
+      return res.status(503).json({ error: "Kunde inte kontrollera din verifierade provhistorik just nu." });
+    }
   }
 
   // ── TIPS MODE — felbank tips (merged from former /api/smart-tips) ──
@@ -1127,7 +1440,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
   }
 
   // ── TEACH MODE: P.E.R multi-turn chat ──
-  if (body.topic || body.userQuestion || (Array.isArray(body.history) && body.history.length > 0)) {
+  if (body.topic || body.userQuestion) {
     const { data: prof, error: profErr } = await supabase
       .from("profiles")
       .select("role, per_quota_count, per_quota_period")
@@ -1144,10 +1457,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     if (quotaDenied) return quotaDenied;
     quotaRemaining = quota.remaining;
 
-    const topic        = sanitize(body.topic, 150);
+    const topic        = studyCoachRequest ? "" : sanitize(body.topic, 150);
     const userQuestion = sanitize(body.userQuestion, isPilotMode() ? 2000 : 500);
-    const context      = sanitize(body.context, 400);
-    const rawAreas     = Array.isArray(body.weakAreas) ? body.weakAreas : [];
+    const context      = studyCoachRequest ? "" : sanitize(body.context, 400);
+    const rawAreas     = studyCoachRequest ? [] : Array.isArray(body.weakAreas) ? body.weakAreas : [];
     const weakAreas    = rawAreas.slice(0, 10).map(a => sanitize(String(a), 80));
     /* Elevens val på en klargörande fråga. Saneras en gång till i
        buildPERSystemPrompt innan den når prompten — det här är bara längd. */
@@ -1157,21 +1470,39 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        defaultHelpLevel() för varför det inte alltid är 0. */
     const badOmNivå = (typeof body.helpLevel === 'number' && Number.isFinite(body.helpLevel))
       ? Math.min(3, Math.max(0, Math.floor(body.helpLevel))) : null;
-    const rawHist = Array.isArray(body.history) ? body.history : [];
+    const requestPage = studyCoachRequest ? "förbättring" : describePage(body.pageContext?.page) || "app";
+    const isHomepageRequest = requestPage === "startsida";
+    const rawHist = studyCoachRequest ? [] : await loadPerHistory(user.id);
     const history = rawHist
       .filter(m => m && (m.role === "user" || m.role === "assistant"))
-      .map(m => ({ role: m.role, content: sanitize(String(m.content), 500) }))
+      .map(m => {
+        const page = describePage(m.page) || "legacy";
+        return {
+          role: m.role,
+          content: sanitize(String(m.content), 500),
+          page,
+          examBound: isExamBoundPage(page),
+        };
+      });
+    const historyForPrompt = history
+      .filter(m => m.page === requestPage && !m.examBound)
       .slice(-8);
 
     // Recent mistakes from frontend localStorage (optional — best-effort)
-    const rawMistakes = Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
+    const rawMistakes = studyCoachRequest ? [] : Array.isArray(body.recentMistakes) ? body.recentMistakes : [];
     const recentMistakes = rawMistakes.slice(0, 10).map(m => ({
       question: sanitize(String(m.question || ''), 200),
       category: sanitize(String(m.category || m.course || ''), 60),
+      concept: sanitize(String(m.concept || m.concept_tag || ''), 80),
+      errorTags: Array.isArray(m.errorTags || m.error_tags)
+        ? (m.errorTags || m.error_tags).slice(0, 4).map(tag => sanitize(String(tag || ''), 40))
+        : [],
+      studentAnswer: sanitize(String(m.studentAnswer || m.user_answer || ''), 160),
+      feedback: sanitize(String(m.feedback || ''), 160),
     }));
 
     const contextPack = buildPERContextPack({
-      rawPageContext: body.pageContext,
+      rawPageContext: studyCoachRequest ? { page: "förbättring" } : body.pageContext,
       topic,
       context,
       weakAreas,
@@ -1188,7 +1519,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     const sales = decideSalesMode({ loggedIn: true, pageContext, userQuestion });
     const salesGuardrail = buildSalesGuardrail(sales.mode, { role });
 
-    const intent      = (isPilotMode() || body._perExamStudyOnly === true) ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
+    const intent      = isPilotMode() ? 'study' : SUPPORT_TRIGGER_REGEX.test(userQuestion)
       ? 'support'
       : sales.mode === SALES_MODE.ASKED
         ? 'sales'
@@ -1215,9 +1546,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        profileEnabled avgörs server-side. En klient ska inte kunna be om
        personalisering som inte är utrullad. */
     const [{ summary: longMemory, structured: structuredMemory }, liveExamData, profileEnabled] = await Promise.all([
-      loadLongMemory(supabase, user.id, perMemoryEpoch),
-      enrichMemoryFromExamData(supabase, user.id),
-      flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
+      studyCoachRequest || isHomepageRequest ? Promise.resolve({ summary: "", structured: {} }) : loadLongMemory(supabase, user.id, perMemoryEpoch),
+      isHomepageRequest
+        ? Promise.resolve({ mockWeakConcepts: [], mockRecentScores: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] })
+        : enrichMemoryFromExamData(supabase, user.id, { throwOnError: studyCoachRequest }),
+      studyCoachRequest || isHomepageRequest ? Promise.resolve(false) : flagsEnabled(supabase, ["per_learner_profile_enabled"], user.id),
     ]);
 
     // Live DB-fakta vinner alltid över den dagsgamla cachen för skolflödets
@@ -1239,7 +1572,12 @@ async function handleExplainRequest(req, res, perAnswerLease) {
     let learnerContext = '';
     let roleInstruction = '';
     let curriculumContext = '';
-    try {
+    const coachSnapshot = studyCoachRequest ? buildVerifiedCoachSnapshot(liveExamData, user.id) : null;
+    if (studyCoachRequest) {
+      learnerContext = coachSnapshot.evidence;
+    } else if (isHomepageRequest) {
+      learnerContext = "";
+    } else try {
       const [profile, upRes] = await Promise.all([
         profileEnabled ? loadProfile(supabase, user.id) : Promise.resolve(null),
         supabase.from("user_profiles").select("mastery").eq("id", user.id).maybeSingle(),
@@ -1277,7 +1615,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        Aldrig blockerande — loadCollectiveSignals sväljer varje fel och ger [], så ett
        saknat migrationssteg eller en läsrättighet som inte satts gör P.E.R långsammare
        att förbättra, aldrig trasig. */
-    const collectiveBlock = buildCollectiveBlock(
+    const collectiveBlock = studyCoachRequest ? "" : buildCollectiveBlock(
       await loadCollectiveSignals(supabase, {
         course: pageContext?.course || null,
         topics: mergedWeakAreas,
@@ -1307,40 +1645,38 @@ async function handleExplainRequest(req, res, perAnswerLease) {
        så signalen bygger på det senaste samtalet och inte på hela elevens
        livstid. Det är en medveten begränsning: en stil som ändrats ska hinna
        märkas, och en enstaka udda session ska inte fastna för alltid. */
-    const style = deriveStyleSignals(history);
+    const style = deriveStyleSignals(historyForPrompt);
 
-    const helpCap = helpCapFor(pageContext, {
-      pilotMode: isPilotMode(),
-      pendingExam: body._perPendingExamStudy === true,
-    });
+    const helpCap = helpCapFor(pageContext, { pilotMode: isPilotMode() });
     const requestedLevel = badOmNivå !== null ? badOmNivå : defaultHelpLevel(pageContext);
     const helpLevel = Math.min(requestedLevel, helpCap);
 
-    const systemContent = buildPERSystemPrompt({
-      userQuestion,
-      collectiveBlock,
-      context: ctxParts.join('\n'),
-      learnerProfile: [learnerContext, curriculumContext, roleInstruction, salesGuardrail].filter(Boolean).join('\n\n'),
-      weakAreas: mergedWeakAreas,
-      role,
-      helpLevel,
-      requestedLevel,
-      helpCap,
-      quietHelpCap: body._perPendingExamStudy === true,
-      clarifyReply,
-      style,
-      pageContext,
-      intent,
-      mood,
-      feynman,
-      quiz,
-      celebrating,
-      quotaRemaining,
-      recentMistakes: contextPack.recentMistakes,
-      longMemory,
-      studentName,
-
-    });
+    const systemContent = studyCoachRequest
+      ? buildPERCoachSystemPrompt({ verifiedEvidence: learnerContext })
+      : buildPERSystemPrompt({
+        userQuestion,
+        collectiveBlock,
+        context: ctxParts.join('\n'),
+        learnerProfile: [learnerContext, curriculumContext, roleInstruction, salesGuardrail].filter(Boolean).join('\n\n'),
+        weakAreas: mergedWeakAreas,
+        role,
+        language: body.lang === 'en' ? 'en' : 'sv',
+        helpLevel,
+        requestedLevel,
+        helpCap,
+        clarifyReply,
+        style,
+        pageContext,
+        intent,
+        mood,
+        feynman,
+        quiz,
+        celebrating,
+        quotaRemaining,
+        recentMistakes: contextPack.recentMistakes,
+        longMemory,
+        studentName,
+      });
 
     /* Vilka delar av P.E.R. som faktiskt användes i det här svaret.
        Underlaget till hjärnan på per.html. Aggregat: modulnamn, timme, antal —
@@ -1356,7 +1692,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 
     const msgs = [
       { role: "system", content: systemContent },
-      ...history,
+      ...historyForPrompt.map(({ role, content }) => ({ role, content })),
       { role: "user", content: userMsg },
     ];
 
@@ -1374,6 +1710,16 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       let streamFinished = false;
       let streamTruncated = false;
       let streamBudgetReservation = null;
+      let quotaCommitted = false;
+      let quotaCommitFailed = false;
+      let clientDisconnected = false;
+      const clientAbort = new AbortController();
+      res.once?.("close", () => {
+        if (!res.writableEnded) {
+          clientDisconnected = true;
+          clientAbort.abort();
+        }
+      });
       const streamStartedAt = Date.now();
       try {
         const stream = await callAIStream(msgs, {
@@ -1381,6 +1727,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           timeout: 55_000,
           includeUsage: true,
           userId: user.id,
+          signal: clientAbort.signal,
         });
         streamBudgetReservation = stream?.aiSpendReservation || null;
         const reader = stream.getReader();
@@ -1388,6 +1735,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         let buf = '';
         while (true) {
           const { done, value } = await reader.read();
+          if (clientDisconnected) {
+            if (!done) await reader.cancel().catch(() => {});
+            break;
+          }
           if (done) break;
           buf += decoder.decode(value, { stream: true });
           const lines = buf.split('\n');
@@ -1399,28 +1750,55 @@ async function handleExplainRequest(req, res, perAnswerLease) {
               streamFinished = true;
               continue;
             }
-            try {
-              const ev = JSON.parse(raw);
-              if (ev.usage) {
-                streamUsage = ev.usage;
-                streamModel = ev.model || null;
+            let ev;
+            try { ev = JSON.parse(raw); } catch (_) { continue; }
+            if (ev.usage) {
+              streamUsage = ev.usage;
+              streamModel = ev.model || null;
+            }
+            const finishReason = ev.choices?.[0]?.finish_reason;
+            if (finishReason === 'stop') streamFinished = true;
+            else if (finishReason) streamTruncated = true;
+            const delta = ev.choices?.[0]?.delta?.content;
+            if (delta) {
+              if (!quotaCommitted) {
+                quotaCommitted = await settlePerChatQuota(user.id, quota, true);
+                if (!quotaCommitted) {
+                  quotaCommitFailed = true;
+                  break;
+                }
               }
-              const finishReason = ev.choices?.[0]?.finish_reason;
-              if (finishReason === 'stop') streamFinished = true;
-              else if (finishReason) streamTruncated = true;
-              const delta = ev.choices?.[0]?.delta?.content;
-              if (delta) { fullText += delta; res.write(`data: ${JSON.stringify({ delta })}\n\n`); }
-            } catch (_) {}
+              if (clientDisconnected) break;
+              fullText += delta;
+              res.write(`data: ${JSON.stringify({ delta })}\n\n`);
+            }
+          }
+          if (quotaCommitFailed) {
+            await reader.cancel().catch(() => {});
+            throw new Error("P.E.R quota could not be committed before streaming output");
+          }
+          if (clientDisconnected) {
+            await reader.cancel().catch(() => {});
+            break;
           }
         }
       } catch {
-        await settlePerChatQuota(user.id, quota, false);
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
+        if (clientDisconnected) return;
         res.write(`data: ${JSON.stringify({ error: 'P.E.R är tillfälligt otillgänglig. Försök igen senare.' })}\n\n`);
         return res.end();
       }
 
+      if (clientDisconnected) {
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
+        return;
+      }
+
       if (!streamFinished || streamTruncated) {
-        await settlePerChatQuota(user.id, quota, false);
+        await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
         res.write(`data: ${JSON.stringify({ error: 'Svaret avbröts innan det blev klart. Frågan finns kvar; försök igen.' })}\n\n`);
         return res.end();
       }
@@ -1430,27 +1808,29 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         model: streamModel || process.env.OPENAI_MODEL_PER || process.env.OPENAI_MODEL || "gpt-4o-mini",
         usage: streamUsage, latencyMs: Date.now() - streamStartedAt,
       }, { timeoutMs: 750 });
-      await settleAiSpend(streamBudgetReservation, streamUsage);
+      await settleAiSpend(streamBudgetReservation, streamUsage, { conservativeFallback: true });
       if (!fullText) {
         await usageWrite;
-        await settlePerChatQuota(user.id, quota, false);
+        if (!quotaCommitted) await settlePerChatQuota(user.id, quota, false);
         res.write(`data: ${JSON.stringify({ error: 'No response' })}\n\n`);
         return res.end();
       }
 
-      if (!(await settlePerChatQuota(user.id, quota, true))) {
+      if (!quotaCommitted && !(await settlePerChatQuota(user.id, quota, true))) {
         await usageWrite;
         res.write(`data: ${JSON.stringify({ error: 'P.E.R-kvoten kunde inte sparas. Försök igen.' })}\n\n`);
         return res.end();
       }
+      quotaCommitted = true;
 
       const newHistory = [
         ...history,
-        { role: 'user', content: userMsg },
-        { role: 'assistant', content: fullText },
+        { role: 'user', content: userMsg, page: requestPage, examBound: isExamBoundPage(requestPage) },
+        { role: 'assistant', content: fullText, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
-      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
+      let historyForMemory = newHistory;
+      let refreshMemory = !isHomepageRequest && historySaved;
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1461,15 +1841,14 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
 
       // Confirm the saved primary answer before optional self-review. The client
       // can then distinguish a completed answer from a delayed correction pass.
       res.write(`data: ${JSON.stringify({ done: true, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel })}\n\n`);
 
-      /* Granskningen körs EFTER att svaret strömmat färdigt. Eleven har redan
-         läst texten; en rättelse under den är ärligare än att hålla tillbaka
-         hela svaret i väntan på ett andra modellanrop. */
+      /* Ordinary chat replaces a seriously flawed answer in place. Active-exam
+         guidance keeps its existing review UI and answer restrictions. */
       const granskning = await granskaSvar({
         fråga: userQuestion, svar: fullText, helpLevel, userId: user.id,
         /* curriculumContext byggs BARA av _math-curriculum.js, och bara när
@@ -1487,19 +1866,53 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           correctedHistory = newHistory.slice();
           const lastAssistant = correctedHistory.findLastIndex((message) => message.role === "assistant");
           if (lastAssistant >= 0) {
-            correctedHistory[lastAssistant] = {
-              ...correctedHistory[lastAssistant],
-              content: `${correctedHistory[lastAssistant].content}\n\nP.E.R-kontroll: ${granskning.rättelse}`,
-            };
-            correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+            const replacementAnswer = granskning.rättelse;
+            if (!isExamBoundPage(requestPage)) {
+              correctedHistory[lastAssistant] = { ...correctedHistory[lastAssistant], content: replacementAnswer };
+              correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              if (!correctedHistorySaved) {
+                correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              }
+              if (correctedHistorySaved) {
+                historyForMemory = correctedHistory;
+                res.write(`data: ${JSON.stringify({
+                  reviewedAnswer: replacementAnswer,
+                  history: correctedHistory,
+                })}\n\n`);
+              } else {
+                refreshMemory = false;
+                const safeNotice = body.lang === "en"
+                  ? "I could not verify this answer safely. Please ask again."
+                  : "Jag kunde inte säkerställa svaret. Skicka frågan igen.";
+                correctedHistory[lastAssistant] = { ...correctedHistory[lastAssistant], content: safeNotice };
+                let noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+                if (!noticeSaved) noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+                res.write(`data: ${JSON.stringify({
+                  reviewUnavailable: safeNotice,
+                  ...(noticeSaved ? { history: correctedHistory } : {}),
+                })}\n\n`);
+              }
+            } else {
+              correctedHistory[lastAssistant] = {
+                ...correctedHistory[lastAssistant],
+                content: `${newHistory[lastAssistant]?.content || fullText}\n\nP.E.R-kontroll: ${replacementAnswer}`,
+              };
+              correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              res.write(`data: ${JSON.stringify({
+                granskning,
+                ...(correctedHistorySaved ? { history: correctedHistory } : {}),
+              })}\n\n`);
+              if (correctedHistorySaved) historyForMemory = correctedHistory;
+            }
+          } else {
+            res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
           }
+        } else if (isExamBoundPage(requestPage)) {
+          res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
         }
-        res.write(`data: ${JSON.stringify({
-          granskning,
-          ...(correctedHistorySaved ? { history: correctedHistory } : {}),
-        })}\n\n`);
       }
 
+      if (refreshMemory) refreshPerMemory(user.id, historyForMemory, learningSignals, perMemoryEpoch).catch(() => {});
       await usageWrite;
       return res.end();
     }
@@ -1516,11 +1929,11 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       }
       const newHistory = [
         ...history,
-        { role: "user", content: userMsg },
-        { role: "assistant", content: answer },
+        { role: "user", content: userMsg, page: requestPage, examBound: isExamBoundPage(requestPage) },
+        { role: "assistant", content: answer, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
-      refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
+      if (!isHomepageRequest) refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1531,8 +1944,12 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
-      return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel });
+      if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel,
+        ...(coachSnapshot ? {
+          coachEvidenceFingerprint: coachSnapshot.fingerprint,
+          coachEvidenceSummary: coachSnapshot.summary,
+        } : {}) });
     } catch {
       await settlePerChatQuota(user.id, quota, false);
       return res.status(500).json({ error: "P.E.R är tillfälligt otillgänglig. Försök igen senare." });
@@ -1602,7 +2019,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
 }
 
 export default async function handler(req, res) {
-  const perAnswerLease = { userId: null, leaseId: null };
+  const perAnswerLease = { userId: null, leaseId: null, allowIncompleteGeneralChat: false };
   try {
     return await handleExplainRequest(req, res, perAnswerLease);
   } finally {

@@ -147,7 +147,7 @@ export function buildLearningSignals({ weakAreas = [], recentMistakes = [], page
 
 // Exam-derived signals come only from server-verified grading; chat/session
 // signals below remain the student's unverified account of their learning.
-export async function enrichMemoryFromExamData(supabase, userId) {
+export async function enrichMemoryFromExamData(supabase, userId, { throwOnError = false } = {}) {
   try {
     const { data, error } = await supabase
       .from("mock_results")
@@ -159,7 +159,8 @@ export async function enrichMemoryFromExamData(supabase, userId) {
     if (error) throw error;
 
     const mockRows = (data || []).filter(r => Number.isInteger(r.percent) && r.percent >= 0 && r.percent <= 100);
-    const mockRecentScores = mockRows.slice(0, 5).map(r => r.percent);
+    // The query is newest-first; consumers calculate trends from oldest to newest.
+    const mockRecentScores = mockRows.slice(0, 5).reverse().map(r => r.percent);
     const mockWeakConcepts = [...new Set(
       mockRows
         .flatMap(r => Array.isArray(r.weak_concept_tags) ? r.weak_concept_tags : [])
@@ -179,6 +180,7 @@ export async function enrichMemoryFromExamData(supabase, userId) {
 
     return { mockRecentScores, mockWeakConcepts, felBankWeakConcepts, felBankErrorTypes, felBankCourses };
   } catch {
+    if (throwOnError) throw new Error("verified study evidence unavailable");
     return { mockRecentScores: [], mockWeakConcepts: [], felBankWeakConcepts: [], felBankErrorTypes: [], felBankCourses: [] };
   }
 }
@@ -242,7 +244,12 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const examData    = await enrichMemoryFromExamData(supabase, userId);
     const hasExamData = examData.mockRecentScores.length > 0 || examData.mockWeakConcepts.length > 0
       || examData.felBankWeakConcepts.length > 0;
-    const hasMessages = Array.isArray(recentMessages) && recentMessages.length > 0;
+    const memoryMessages = (Array.isArray(recentMessages) ? recentMessages : []).filter(message => {
+      const page = typeof message?.page === "string" ? message.page : "";
+      return !message?.examBound && !["startsida", "prov", "resultat", "exam", "exam-result"].includes(page)
+        && ["app", "förbättring", "prisplan", "konto"].includes(page);
+    });
+    const hasMessages = memoryMessages.length > 0;
     if (!hasMessages && !hasExamData) return;
 
     const { data } = await supabase
@@ -255,7 +262,7 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
     const daysSince  = lastUpdate ? (Date.now() - lastUpdate.getTime()) / 86_400_000 : 999;
     if (daysSince < REFRESH_DAYS) return;
 
-    const histText   = (Array.isArray(recentMessages) ? recentMessages : [])
+    const histText   = memoryMessages
       .slice(-30)
       .map(m => `${m.role === "user" ? "Elev" : "P.E.R"}: ${cleanMemoryText(m.content, 160)}`)
       .join("\n")

@@ -43,15 +43,15 @@ const verifiedA = { data: { user: { id: "account-a" } }, error: null };
   assert.equal(result, null, "an unverified session cannot start generation");
 }
 
-const runStart = html.indexOf("  async function runGenerate(onProgress)");
+const runStart = html.indexOf("  async function runGenerate(");
 const runEnd = html.indexOf("\n  async function runGrade", runStart);
 const runGenerate = html.slice(runStart, runEnd);
 assert.ok(runStart >= 0 && runEnd > runStart, "the app generation entrypoint exists");
 assert.match(runGenerate, /getGenerationAuthSnapshot\(\)/);
 assert.match(runGenerate, /getIdempotencyKey\(authSnapshot\.userId,payload\)/,
   "the request fingerprint is bound to the verified owner");
-assert.match(runGenerate, /runResumableGeneration\(payload,onProgress,authSnapshot\.token\)/,
-  "the resumable operation receives the same auth snapshot token");
+assert.match(runGenerate, /runResumableGeneration\(payload,onProgress,authSnapshot\.token,authSnapshot\.userId,async operationId=>/,
+  "the resumable operation receives the auth snapshot token and owner for safe refresh");
 assert.match(runGenerate, /postJson\("\/api\/generate-exam",payload,\{timeoutMs:62000,token:authSnapshot\.token\}\)/,
   "the single-request graph flow receives the same auth snapshot token");
 assert.doesNotMatch(runGenerate, /await getUserId\(\)/,

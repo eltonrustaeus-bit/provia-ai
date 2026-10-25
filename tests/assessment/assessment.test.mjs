@@ -154,6 +154,212 @@ check("COGNITIVE_VERBS exports E/C/A with non-empty verb lists", (() => {
   return v && Array.isArray(v.E) && v.E.length > 0 && Array.isArray(v.C) && v.C.length > 0 && Array.isArray(v.A) && v.A.length > 0;
 })());
 
+// A staging exam exposed paraphrased stems that passed the question-token
+// duplicate gate even though their full-score answers tested the same fact.
+const biologyQuestion = (id, question, model_answer, concept_tag) => ({
+  id, type: "short", question, model_answer, concept_tag, options: [], correct_index: -1,
+  points: 1, cognitive_level: "förstå", rubric: "Ett sakligt korrekt svar.",
+  scoring_rubric: {
+    parts: [{ description: "Sakligt korrekt svar", points: 1 }],
+    full_score_requirements: "Svara korrekt.", partial_credit_notes: "",
+  },
+});
+const observedBiologyPairs = [
+  [
+    biologyQuestion("mitochondria-1", "Vad ansvarar mitokondrierna för i cellerna?",
+      "Mitokondrierna sköter huvuddelen av cellandningen och bildar ATP, som cellen använder som energikälla.", "Mitokondrier"),
+    biologyQuestion("mitochondria-2", "Vad är mitokondriernas huvudsakliga uppgift i celler?",
+      "Mitokondrierna sköter huvuddelen av cellandningen och bildar ATP.", "Mitokondrier"),
+  ],
+  [
+    biologyQuestion("membrane-1", "Vad är cellmembranets funktion i cellen?",
+      "Cellmembranet avgränsar cellen och reglerar vilka ämnen som passerar in och ut.", "Cellmembran"),
+    biologyQuestion("membrane-2", "Vad är cellmembranets huvudfunktion i cellen?",
+      "Cellmembranet avgränsar cellen och reglerar vilka ämnen som passerar in och ut.", "Cellmembran"),
+  ],
+  [
+    biologyQuestion("enzyme-1", "Vad är en funktion av enzymer i biologin?",
+      "Enzymer är proteiner som ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+    biologyQuestion("enzyme-2", "Vad är syftet med enzymer i biologiska processer?",
+      "Enzymer är proteiner som ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+  ],
+];
+for (const [first, duplicate] of observedBiologyPairs) {
+  const gate = A.gateExam({ questions: [first, duplicate] }, { profile: "natural_sciences" });
+  check(`withholds ${duplicate.id} when paraphrased stem repeats the same answer target`,
+    gate.questions.map((question) => question.id).join() === first.id &&
+      gate.dropped.some((item) => item.id === duplicate.id && item.issues.includes("duplicate_question")));
+}
+const liveRibosomePair = [
+  { ...biologyQuestion("ribosome-function", "Vilken funktion har ribosomer i cellen?",
+    "Ribosomer bygger proteiner med information från RNA.", "Ribosomer"),
+    learning_objective: "Beskriv ribosomernas funktion." },
+  { ...biologyQuestion("ribosome-rna", "Vad gör ribosomerna med RNA?",
+    "Ribosomer bygger proteiner med information från RNA.", "Ribosomer"),
+    learning_objective: "Beskriv ribosomernas funktion." },
+];
+const liveRibosomeGate = A.gateExam({ questions: liveRibosomePair }, { profile: "natural_sciences" });
+check("drops live ribosome paraphrase with the same concept, objective, and answer",
+  liveRibosomeGate.questions.length === 1 && liveRibosomeGate.questions[0].id === "ribosome-function");
+const livePhotosynthesisGate = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-under", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-in", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Fotosyntesen använder ljusenergi för att bygga druvsocker av koldioxid och vatten; syre bildas samtidigt.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("drops live photosynthesis paraphrase with the same concept and learning objective",
+  livePhotosynthesisGate.questions.length === 1 && livePhotosynthesisGate.questions[0].id === "photosynthesis-under");
+const distinctStemObjectives = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-location", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Kloroplasterna är platsen där fotosyntesen sker.", "Fotosyntes"),
+    learning_objective: "Beskriv var fotosyntesen sker." },
+  { ...biologyQuestion("photosynthesis-light", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll fångar ljusenergi.", "Fotosyntes"),
+    learning_objective: "Förklara hur ljusenergi fångas." },
+] }, { profile: "natural_sciences" });
+check("keeps near-identical stems when their learning objectives differ",
+  distinctStemObjectives.questions.length === 2);
+const distinctObjectiveVerbs = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-describe", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-explain", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+    learning_objective: "Förklara fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps near-identical stems when the learning-action verbs differ",
+  distinctObjectiveVerbs.questions.length === 2);
+const reversedProcessAnswers = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-reactants", "Vilka ämnen används som ingångsämnen i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten för att bilda glukos och syre.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-products", "Vilka ämnen bildas som produkter i fotosyntesen?",
+    "Fotosyntesen använder glukos och syre för att bilda koldioxid och vatten.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps reactant and product questions when the answer terms reverse roles",
+  reversedProcessAnswers.questions.length === 2);
+const addedAnswerConcept = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-answer-short", "Vad sker i fotosyntesen?",
+    "Växter använder ljusenergi för att bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-answer-expanded", "Hur sker fotosyntesen i växter?",
+    "Växter använder ljusenergi för att bilda druvsocker och syre.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps same-objective answers when one adds a distinct answer concept",
+  addedAnswerConcept.questions.length === 2);
+const answerNegationDiffers = A.gateExam({ questions: [
+  { ...biologyQuestion("photosynthesis-positive", "Vad sker i fotosyntesen?",
+    "Växter använder ljusenergi för att bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+  { ...biologyQuestion("photosynthesis-negative", "Hur sker fotosyntesen i växter?",
+    "Växter använder ljusenergi för att ej bilda druvsocker.", "Fotosyntes"),
+    learning_objective: "Beskriv fotosyntesens process." },
+] }, { profile: "natural_sciences" });
+check("keeps same-objective answers when they differ by a negation",
+  answerNegationDiffers.questions.length === 2);
+const missingObjectivePhotosynthesisGate = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-under-unused", "Vad sker under fotosyntesen i kloroplasterna?",
+    "Klorofyll i kloroplasterna fångar ljus.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-in-unused", "Vad sker i kloroplasterna under fotosyntesen?",
+    "Fotosyntesen använder ljusenergi för att bygga druvsocker av koldioxid och vatten; syre bildas samtidigt.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("does not collapse similar stems when the learning objective is missing",
+  missingObjectivePhotosynthesisGate.questions.length === 2);
+const distinctMitochondriaTargets = A.gateExam({ questions: [
+  biologyQuestion("mitochondria-general-function", "Vad är mitokondriernas huvudsakliga uppgift i celler?",
+    "Mitokondrierna sköter huvuddelen av cellandningen och bildar ATP.", "Mitokondrier"),
+  biologyQuestion("mitochondria-nadh-production", "Vad är mitokondriernas funktion för NADH-produktion?",
+    "Mitokondrierna sköter huvuddelen av cellandningen och bildar ATP. NADH-produktion är en separat del av processen.", "Mitokondrier"),
+] }, { profile: "natural_sciences" });
+check("keeps a mitochondria question with a distinct NADH production target", distinctMitochondriaTargets.questions.length === 2);
+const distinctEnzymeSkills = A.gateExam({ questions: [
+  biologyQuestion("enzyme-function", "Vad gör ett enzym i en kemisk reaktion?",
+    "Enzymet ökar reaktionens hastighet utan att själv förbrukas.", "Enzymer"),
+  biologyQuestion("enzyme-temperature", "Vad kan hög temperatur göra med enzymets form?",
+    "Hög temperatur kan denaturera enzymet så dess aktiva säte ändras.", "Enzymer"),
+] }, { profile: "natural_sciences" });
+check("keeps distinct skills on the same broad biology concept", distinctEnzymeSkills.questions.length === 2);
+const compoundEnzymeTarget = A.gateExam({ questions: [
+  biologyQuestion("enzyme-function-simple", "Vad är enzymets funktion?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+  biologyQuestion("enzyme-function-and-temperature", "Vad är enzymets funktion och vad gör hög temperatur med enzymet?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas. Hög temperatur kan denaturera enzymet.", "Enzymer"),
+] }, { profile: "natural_sciences" });
+check("keeps a compound question that adds a separately assessed enzyme-temperature task", compoundEnzymeTarget.questions.length === 2);
+const coordinatedEnzymeTarget = A.gateExam({ questions: [
+  biologyQuestion("enzyme-function-basic", "Vad är enzymets funktion?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+  biologyQuestion("enzyme-function-effect", "Vad är enzymets funktion och påverkan av hög temperatur?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas. Hög temperatur kan denaturera enzymet.", "Enzymer"),
+] }, { profile: "natural_sciences" });
+check("keeps a coordinated question that adds an extra assessed concept", coordinatedEnzymeTarget.questions.length === 2);
+const inclusiveEnzymeTarget = A.gateExam({ questions: [
+  biologyQuestion("enzyme-function-basic-inclusive", "Vad är enzymets funktion?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+  biologyQuestion("enzyme-function-including-energy", "Vad är enzymets funktion, inklusive dess effekt på aktiveringsenergin?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas. De sänker reaktionens aktiveringsenergi.", "Enzymer"),
+] }, { profile: "natural_sciences" });
+check("keeps a question whose inclusive clause adds a separate target", inclusiveEnzymeTarget.questions.length === 2);
+const qualifiedEnzymeTarget = A.gateExam({ questions: [
+  biologyQuestion("enzyme-function-unqualified", "Vad är enzymets funktion?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas.", "Enzymer"),
+  biologyQuestion("enzyme-function-at-temperature", "Vad är enzymets funktion vid hög temperatur?",
+    "Enzymer ökar hastigheten på kemiska reaktioner utan att själva förbrukas. Vid hög temperatur kan enzymet denaturera.", "Enzymer"),
+] }, { profile: "natural_sciences" });
+check("keeps a qualified question when it adds a condition and distinct answer concept", qualifiedEnzymeTarget.questions.length === 2);
+const distinctPhotosynthesisTargets = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-inputs", "Vilka ämnen använder växten vid fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-products", "Vilka ämnen bildas vid fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("keeps input and product questions distinct despite a shared source-backed answer", distinctPhotosynthesisTargets.questions.length === 2);
+const repeatedPhotosynthesisProcess = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-location-process", "Vilken process sker i kloroplaster enligt materialet?",
+    "Fotosyntesen sker i kloroplasterna och omvandlar koldioxid och vatten till glukos och syre med hjälp av ljusenergi.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-process", "Vad är fotosyntesens process enligt materialet?",
+    "Fotosyntesen sker i kloroplasterna och omvandlar koldioxid och vatten till glukos och syre med hjälp av ljusenergi.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("drops paraphrased questions that assess the same photosynthesis process",
+  repeatedPhotosynthesisProcess.questions.length === 1 &&
+    repeatedPhotosynthesisProcess.dropped.some((item) => item.id === "photosynthesis-process" &&
+      item.issues.includes("duplicate_question")));
+const directionalPhotosynthesisQuestions = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-process-input", "Vilken process använder växten koldioxid?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+  biologyQuestion("photosynthesis-process-output", "Vilken process avger syre?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes"),
+] }, { profile: "natural_sciences" });
+check("keeps input and output questions distinct when both mention a process",
+  directionalPhotosynthesisQuestions.questions.length === 2);
+const distinctProcessesUnderBroadTag = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-carbon-input", "Vilken process använder koldioxid i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Cellens energiprocesser"),
+  biologyQuestion("respiration-glucose-input", "Vilken process använder glukos i cellandningen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Cellens energiprocesser"),
+] }, { profile: "natural_sciences" });
+check("keeps distinct same-direction processes under a broad shared concept tag",
+  distinctProcessesUnderBroadTag.questions.length === 2);
+const distinctProcessesUnderMixedTag = A.gateExam({ questions: [
+  biologyQuestion("mixed-tag-photosynthesis", "Vilken process använder koldioxid i fotosyntesen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes och cellandning"),
+  biologyQuestion("mixed-tag-respiration", "Vilken process använder glukos i cellandningen?",
+    "Fotosyntesen använder koldioxid och vatten och bildar glukos och syre.", "Fotosyntes och cellandning"),
+] }, { profile: "natural_sciences" });
+check("keeps different same-direction processes under a mixed photosynthesis tag",
+  distinctProcessesUnderMixedTag.questions.length === 2);
+const reversedBioProcesses = A.gateExam({ questions: [
+  biologyQuestion("photosynthesis-products", "Vilka produkter bildas i fotosyntesen?",
+    "Glukos och syre bildas av koldioxid och vatten.", "Fotosyntes"),
+  biologyQuestion("respiration-products", "Vilka produkter bildas i cellandningen?",
+    "Koldioxid och vatten bildas av glukos och syre.", "Cellandning"),
+] }, { profile: "natural_sciences" });
+check("keeps distinct reverse-process questions with the same answer vocabulary", reversedBioProcesses.questions.length === 2);
+
 // ── Regression: the 3 reported bad questions ──────────────────────────────
 // Q1 ("Vilket brott klassas som personbrott?") and Q2 (nödvärn, vague scoring)
 // are NOT structurally invalid — they need the AI verifier (api/_verifier.js,

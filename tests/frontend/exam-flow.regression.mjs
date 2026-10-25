@@ -319,6 +319,68 @@ async function toMaterial(page) {
   await page.waitForSelector("#xf .xf-screen[data-screen='material'].on", { timeout: 5000 });
 }
 
+// The standard material-based exam must not claim to personalize from saved
+// mistakes when it sends no mistake-training source to the generation API.
+{
+  const { ctx, page, errs } = await mk();
+  try {
+    await signIn(page, "ordinary-exam-saved-mistake", "sv", {
+      proviaai_mistakes: [{ course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" }],
+    });
+    await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#xf .xf-screen[data-screen='start'].on", { timeout: 8000 });
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Matematik 1b");
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='aim'].on", { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='aim'] .xf-sub")
+      ?.textContent.includes("Träna sparade misstag"), null, { timeout: 5000 });
+    const aimCopy = await page.locator("#xf .xf-screen[data-screen='aim'] .xf-sub").textContent();
+    ok("vanlig provguidning säger inte att sparade misstag viktas in automatiskt",
+      /Träna sparade misstag/.test(aimCopy) && !/viktar jag upp|extra weight/i.test(aimCopy), aimCopy);
+    await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary");
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "y = 2x + 1");
+    await page.evaluate(() => localStorage.setItem("proviaai_mistakes", JSON.stringify([
+      { course: "Matematik 1b", mistake_key: "synthetic-mistake", question: "synthetic" },
+    ])));
+    await page.evaluate(() => localStorage.setItem("proviaai_history", JSON.stringify([
+      { ts: 1, course: "Matematik 1b", level: "C", qType: "mix", numQuestions: 3, percent: 70 },
+    ])));
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const savedMistakesCopy = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-row")
+      .filter({ hasText: "Sparade misstag" }).textContent();
+    ok("provkontraktet förklarar att misstag tränas separat och materialet styr detta prov",
+      /Träna dem separat/.test(savedMistakesCopy) && /materialet ovan/.test(savedMistakesCopy), savedMistakesCopy);
+    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    ok("vanlig provbegäran skickar inte klientens felbank till generatorn",
+      lastGeneratePayload?.trainingFocus?.length === 0
+        && lastGeneratePayload?.priorQuestions?.length === 0
+        && lastGeneratePayload?.sourceReferences?.length === 0,
+      JSON.stringify({ trainingFocus: lastGeneratePayload?.trainingFocus?.length,
+        priorQuestions: lastGeneratePayload?.priorQuestions?.length,
+        sourceReferences: lastGeneratePayload?.sourceReferences?.length }));
+    ok("vanligt provflöde med sparade fel saknar sidfel", errs.length === 0, errs.join(" | "));
+  } catch (e) {
+    ok("vanligt provflöde med sparade fel är tydligt och isolerat", false, e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 // A click handler receives the PointerEvent as its first argument. The material
 // step accepts an optional user-facing message, so passing the handler directly
 // used to render "[object PointerEvent]" in the alert region.
@@ -440,6 +502,27 @@ async function toMaterial(page) {
 
 // The learner can decide which source-supported terms the generator should prioritize.
 {
+  const { ctx, page } = await mk();
+  try {
+    await signIn(page, "default-focus-user");
+    await toMaterial(page);
+    await page.fill("#xf .xf-screen[data-screen='material'] .xf-area",
+      "Fotosyntes sker i kloroplaster där klorofyll fångar ljus. Växten använder koldioxid och vatten för att bilda glukos och syrgas. Cellandning frigör energi ur glukos med hjälp av syre.");
+    await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
+    await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
+    const boxes = page.locator(".xf-focus-option input[type='checkbox']");
+    const noneSelected = await boxes.evaluateAll(nodes => nodes.length > 0 && nodes.every(node => !node.checked));
+    await page.getByRole("button", { name: "Skapa provet" }).click();
+    await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
+    ok("T14 fokusord är avvalda från början så avsnittsbredd kan styras",
+      noneSelected && Array.isArray(lastGeneratePayload?.focusTerms)
+      && lastGeneratePayload.focusTerms.length === 0);
+  } finally {
+    await ctx.close();
+  }
+}
+
+{
   const { ctx, page, errs } = await mk();
   try {
     await signIn(page, "focus-scope-user");
@@ -450,15 +533,15 @@ async function toMaterial(page) {
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
     const boxes = page.locator(".xf-focus-option input[type='checkbox']");
     const count = await boxes.count();
-    const initialSelection = await boxes.evaluateAll(nodes => nodes.every(node => node.checked));
+    const initiallyUnselected = await boxes.evaluateAll(nodes => nodes.every(node => !node.checked));
     const focusValues = await boxes.evaluateAll(nodes => nodes.map(node => node.value));
-    const sourceTerm = count ? await boxes.first().inputValue() : "";
-    if (count) await boxes.first().uncheck();
-    const remainingTerms = count > 1 ? await boxes.evaluateAll(nodes => nodes.filter(node => node.checked).map(node => node.value)) : [];
+    const selectedTerm = count ? await boxes.first().inputValue() : "";
+    const unselectedTerm = count > 1 ? await boxes.nth(1).inputValue() : "";
+    if (count) await boxes.first().check();
     await page.getByRole("button", { name: "Skapa provet" }).click();
     await page.waitForSelector(".xf-exam.on", { timeout: 10000 });
     ok("T14a fokusval visas som tillgängliga val med tydlig täckningsbegränsning",
-      count > 0 && initialSelection
+      count > 1 && initiallyUnselected
       && focusValues.every(term => term.length <= 48 && /^[a-zåäö][a-zåäö-]{3,}[a-zåäö]$/.test(term))
       && !focusValues.includes("alltså")
       && !focusValues.includes("övningsmaterial")
@@ -468,12 +551,12 @@ async function toMaterial(page) {
       && await page.locator(".xf-focus legend").textContent() === "Prioritera ord"
       && await page.locator(".xf-focus").getAttribute("aria-describedby") === "xf-focus-help"
       && /ingen fullständig kurskarta/.test(await page.locator(".xf-focus-help").textContent() || ""));
-    ok("T14b elevens avval och kvarvarande fokusbegrepp följer med till generatorn",
+    ok("T14b bara elevens aktiva fokusval följer med till generatorn",
       lastGeneratePayload?.pastedText === material
       && Array.isArray(lastGeneratePayload?.focusTerms)
-      && lastGeneratePayload.focusTerms.length === remainingTerms.length
-      && lastGeneratePayload.focusTerms.includes(remainingTerms[0])
-      && !lastGeneratePayload.focusTerms.includes(sourceTerm), JSON.stringify(lastGeneratePayload?.focusTerms));
+      && lastGeneratePayload.focusTerms.length === 1
+      && lastGeneratePayload.focusTerms.includes(selectedTerm)
+      && !lastGeneratePayload.focusTerms.includes(unselectedTerm), JSON.stringify(lastGeneratePayload?.focusTerms));
     ok("T14c fokusvalet lämnar inga klientfel", errs.length === 0, errs.join(" | "));
   } finally {
     await ctx.close();
@@ -743,32 +826,22 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       "Linjär funktion y = 2x + 1 beskriver sambandet mellan x och y. Lutningen är 2 och skärningen med y-axeln är 1.");
     await page.click("#xf .xf-screen[data-screen='material'] .xf-btn.primary");
     await page.waitForSelector("#xf .xf-screen[data-screen='contract'].on", { timeout: 5000 });
-    const requestId = "12345678-1234-4234-8234-123456789abc";
-    const technicalFailureMessage = "Ett tekniskt fel stoppade provskapandet. Inget prov lämnades ut. Försök igen om en stund.";
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 500, json: { ok: false, error: "exam_generation_failed", requestId, stage: "exam_issuance", message: technicalFailureMessage },
-    }));
-    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Steg: provstart/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    await page.waitForFunction(() => /Referens: 12345678-1234-4234-8234-123456789abc/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    const errorA11y = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err")
-      .evaluate(node => ({ role: node.getAttribute("role"), atomic: node.getAttribute("aria-atomic") }));
-    ok("genereringsfel visar en säker korrelationsreferens i ett sammanhållet larm",
-      errorA11y.role === "alert" && errorA11y.atomic === "true",
-      JSON.stringify(errorA11y));
-    ok("genereringsfel visar bara en tillåten, begriplig serverfas",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes("Steg: provstart") && !text.includes("exam_issuance")));
-    ok("genereringsfel visar en användbar förklaring i stället för ett generiskt återförsök",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(technicalFailureMessage) && !text.includes("Error (HTTP 500)")));
     const qualityMessage = "För få frågor klarade kvalitetskontrollen för att bilda ett användbart prov. Inget prov lämnades ut. Lägg till mer relevant material eller avgränsa området och försök igen.";
-    let qualityReceived = 0;
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 502, json: { ok: false, error: "incomplete_exam", message: qualityMessage, received: qualityReceived, requested: 3 },
-    }));
+    const operationId = "12345678-1234-4234-8234-123456789abc";
+    await page.route("**/api/generate-exam*", route => {
+      const url = new URL(route.request().url());
+      const pipeline = url.searchParams.get("pipeline");
+      if (pipeline === "start") return route.fulfill({ status: 202, json: {
+        ok: true, operationId, requested: 3, approved: 0, state: "queued",
+      } });
+      if (pipeline === "advance") return route.fulfill({ status: 502, json: {
+        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+      } });
+      if (pipeline === "status") return route.fulfill({ status: 502, json: {
+        ok: false, error: "incomplete_exam", message: qualityMessage, received: 0, requested: 3,
+      } });
+      return route.fulfill({ status: 400, json: { ok: false, error: "unexpected_pipeline_request" } });
+    });
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
     await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
       ?.textContent?.includes("0 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
@@ -785,13 +858,6 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("noll-frågefallet visar ett begripligt kvalitetsfel och inte en HTTP-kod",
       await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
         text.includes(qualityMessage) && text.includes("0 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
-    qualityReceived = 1;
-    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes("1 av 3 frågor klarade kontrollen"), null, { timeout: 5000 });
-    ok("delvis godkända men otillräckliga frågor visar korrekt 1 av 3-count",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes(qualityMessage) && text.includes("1 av 3 frågor klarade kontrollen") && !text.includes("Error (HTTP 502)")));
     await page.route("**/api/generate-exam*", route => route.fulfill({
       status: 429, json: { ok: false, error: "Quota exceeded", count: 3, limit: 3, period: "2026-W43", periodUnit: "week" },
     }));
@@ -805,26 +871,22 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
       JSON.stringify({ quotaNotice, quotaError }));
     await page.route("**/api/generate-exam*", route => route.abort("failed"));
     await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(() => /Anslutningen bröts/.test(
-      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 5000 });
-    ok("nätverksfel skiljs från serverfel och eleven kan försöka igen",
-      await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent().then(text =>
-        text.includes("Anslutningen bröts") && text.includes("Ditt material finns kvar")));
-    const authMessage = "Din inloggning kunde inte verifieras av provtjänsten. Materialet finns kvar. Logga ut och in igen; kontakta pilotansvarig om felet fortsätter.";
-    await page.route("**/api/generate-exam*", route => route.fulfill({
-      status: 401, json: { ok: false, error: "Unauthorized" },
-    }));
-    await page.click("#xf .xf-screen[data-screen='contract'] .xf-btn.primary");
-    await page.waitForFunction(message => document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")
-      ?.textContent?.includes(message), authMessage, { timeout: 5000 });
-    const authError = await page.locator("#xf .xf-screen[data-screen='contract'] .xf-err").textContent();
-    ok("authfel blir begripligt och döljer rå Unauthorized-text",
-      authError.includes(authMessage) && !authError.includes("Unauthorized"));
-    ok("authfel behåller elevens material för återhämtning",
+    await page.waitForFunction(() => /Provet är inte färdigt ännu/.test(
+      document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || ""), null, { timeout: 7000 });
+    const resumableNotice = page.locator("#xf .xf-screen[data-screen='contract'] .xf-err");
+    ok("nätverksfel visas som samma återupptagbara provjobb",
+      await resumableNotice.textContent().then(text => text.includes("utan ett nytt kvotdrag"))
+      && await resumableNotice.getAttribute("role") === "status");
+    ok("återupptagbart genereringsfel bevarar elevens material",
       await page.locator("#xf .xf-screen[data-screen='material'] .xf-area").inputValue()
         .then(value => value.includes("Linjär funktion y = 2x + 1")));
   } catch (e) {
-    ok("genereringsfel annonseras för hjälpmedel", false, e.message);
+    const visibleState = await page.evaluate(() => ({
+      error: document.querySelector("#xf .xf-screen[data-screen='contract'] .xf-err")?.textContent || "",
+      status: document.getElementById("status")?.textContent || "",
+      authGateVisible: !!document.querySelector("#authGate") && getComputedStyle(document.querySelector("#authGate")).display !== "none",
+    }));
+    ok("nätverksfel annonseras för hjälpmedel", false, `${e.stack || e.message}; ${JSON.stringify(visibleState)}`);
   } finally {
     await ctx.close();
   }
@@ -1333,24 +1395,36 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
 {
   const { ctx, page, errs } = await mk();
   await signIn(page, "u1");
+  const sourceSubmission = "a".repeat(32);
+  await page.route("**/rest/v1/user_exams**", route => route.fulfill({ json: [{
+    id: "saved-training-exam",
+    submission_id: sourceSubmission,
+    created_at: "2026-10-20T10:00:00.000Z",
+    course: "Biologi 1",
+    level: "C",
+    qtype: "mix",
+    material: "Cellandning sker i mitokondriernas matrix. Jäsning bildar två ATP.",
+    exam: {
+      training_batch_id: "verified-training-batch",
+      submission_receipt: `v2.${sourceSubmission}.syntheticTrainingProof`,
+      questions: [
+        { id: "m1", type: "short_answer", question: "Vad sker i matrix?", points: 3, topic: "Cellandning" },
+        { id: "m2", type: "short_answer", question: "Hur många ATP ger jäsning?", points: 2, topic: "Jäsning" }
+      ]
+    },
+    answers: [{ id: "m1", answer: "vet ej" }, { id: "m2", answer: "30" }],
+    result: { total_points: 0, max_points: 5, per_question: [
+      { id: "m1", points: 0, max_points: 3, feedback: "saknar citronsyracykeln", model_answer: "Citronsyracykeln" },
+      { id: "m2", points: 0, max_points: 2, feedback: "fel", model_answer: "2" }
+    ] }
+  }] }));
   await page.addInitScript(() => {
-    localStorage.setItem("proviaai_mistakes", JSON.stringify([
-      { ts: Date.now(), course: "Biologi 1", level: "C", qType: "short", id: "m1", question: "Vad sker i matrix?", user_answer: "vet ej", feedback: "saknar citronsyracykeln", model_answer: "Citronsyracykeln", points: 0, max_points: 3 },
-      { ts: Date.now(), course: "Biologi 1", level: "C", qType: "mc", id: "m2", question: "Hur många ATP ger jäsning?", user_answer: "30", feedback: "fel", model_answer: "2", points: 0, max_points: 2 }
-    ]));
     localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
   });
-  // loadExamsFromAccountToLocal() skriver över felbanken från servern vid varje
-  // laddning, så den måste sättas efter att den körts — annars testar vi tomt.
+  // Träningsunderlag måste komma från ett sparat, rättat konto-prov.
   await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => {
-    localStorage.setItem("proviaai_mistakes", JSON.stringify([
-      { ts: Date.now(), course: "Biologi 1", level: "C", qType: "short", id: "m1", question: "Vad sker i matrix?", user_answer: "vet ej", feedback: "saknar citronsyracykeln", model_answer: "Citronsyracykeln", points: 0, max_points: 3 },
-      { ts: Date.now(), course: "Biologi 1", level: "C", qType: "mc", id: "m2", question: "Hur många ATP ger jäsning?", user_answer: "30", feedback: "fel", model_answer: "2", points: 0, max_points: 2 }
-    ]));
-    localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" }));
-  });
+  await page.evaluate(() => localStorage.setItem("proviaai_train_pick", JSON.stringify({ mode: "all", keys: [], course: "Biologi 1" })));
   await page.goto(`${srv.url}/app.html#train`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3000);
   const st = await page.evaluate(() => {
@@ -1361,8 +1435,8 @@ if (process.env.EXAM_FLOW_ONLY_RESULT_RECOVERY) {
       engineMaterial: (document.getElementById("pastedText")?.value || "").length
     };
   });
-  ok("T6a #train landar på provkontraktet", st.screen === "contract", "hamnade på " + st.screen);
-  ok("T6b motorns materialfält är fyllt", st.engineMaterial > 50, st.engineMaterial + " tecken");
+  ok("T6a verifierad rättad träningskälla landar på provkontraktet", st.screen === "contract", "hamnade på " + st.screen);
+  ok("T6b träningsmaterialet kommer från kontots ursprungsprov", st.engineMaterial > 50, st.engineMaterial + " tecken");
   ok("T6c inga konsolfel", errs.length === 0, errs.join(" | "));
   await page.screenshot({ path: SHOT + "/t6-train.png" });
   await ctx.close();

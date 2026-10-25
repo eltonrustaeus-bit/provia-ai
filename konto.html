@@ -839,7 +839,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
 
   function clearDeletedAccountLocalData(userId){
     let cleared=true;
-    try{window.ExGenLocalDataBoundary?.clearForSignOut();}catch{cleared=false;}
+    try{if(window.ExGenLocalDataBoundary?.clearForSignOut()===false)cleared=false;}catch{cleared=false;}
     if(window.ExGenLocalDataBoundary?.clearLocalExamData(userId)===false)cleared=false;
     try{localStorage.removeItem(window.ExGenRuntime.authStorageKey);}catch{cleared=false;}
     try{sessionStorage.clear();}catch{cleared=false;}
@@ -915,7 +915,7 @@ document.getElementById("yr").textContent=new Date().getFullYear();
     const{data}=await sb.auth.getSession().catch(()=>({data:null}));
     const userId=data?.session?.user?.id;
     if(userId&&window.ExGenLocalDataBoundary?.hasLocalExamData(userId)){
-      const keepData=window.confirm("Ett provutkast eller osynkat provresultat finns kvar i webbläsaren. Vill du behålla det lokalt för samma konto och logga ut? Lokal lagring är inte krypterad.");
+      const keepData=window.confirm("Ett provutkast, osynkat resultat eller påbörjat provskapande finns kvar i webbläsaren. Vill du behålla färdiga utkast och resultat lokalt för samma konto och logga ut? Påbörjat provskapande kan inte återupptas efter utloggning. Lokal lagring är inte krypterad.");
       if(keepData)window.ExGenExamDrafts?.flush();
       else if(window.confirm("Ta bort det här kontots lokala provutkast, svar och osynkade resultat och logga ut? Andra kontons lokala data påverkas inte.")){
         window.ExGenExamDrafts?.discardForUser(userId);
@@ -936,7 +936,9 @@ document.getElementById("yr").textContent=new Date().getFullYear();
       showMsg("Utloggningen kunde inte bekräftas. Lokal data lämnades orörd.","err");
       return;
     }
-    window.ExGenLocalDataBoundary?.clearForSignOut();
+    if(window.ExGenLocalDataBoundary?.clearForSignOut()===false){
+      window.alert("Du är utloggad, men lokalt sparat provmaterial kunde inte bekräftas rensat på den här enheten. Rensa webbplatsens lagring innan du delar enheten.");
+    }
     window.location.href="index.html";
   });
   });

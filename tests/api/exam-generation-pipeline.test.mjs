@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const generation = require("../../api/generate-exam.js");
 const operations = require("../../api/_exam-generation-operations.cjs");
 const pipeline = require("../../api/_exam-generation-pipeline.cjs");
+const mistakeTraining = require("../../api/_mistake-training.cjs");
 
 const original = {
   generateVerifiedBatch: generation.generateVerifiedBatch,
@@ -16,6 +17,32 @@ const original = {
   retryPipelineStep: operations.retryPipelineStep,
   completePipelineJob: operations.completePipelineJob,
 };
+
+test("a prior-mistake match must cite evidence from that focus source when available", () => {
+  const trainingFocus = [
+    { focusId: "focus-1", sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+    { focusId: "focus-2", sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
+  ];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], trainingFocus), ["focus-1"]);
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-1", "focus-2"], trainingFocus), ["focus-2"],
+  "a source citation from another same-course section cannot cover a focus with its own evidence");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1", "focus-2"],
+  "legacy accepted foci without sourceEvidence preserve their prior coverage behavior");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    source_references: ["Grafens lutning beskriver förändringen."],
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2", sourceEvidence: [] }]), ["focus-1"],
+  "a newly resolved focus with unavailable evidence fails closed rather than using the legacy bypass");
+  assert.deepEqual(pipeline.uncoveredTrainingFocusIds({ payload: { trainingFocus } }, [{
+    source_references: ["Grafens lutning beskriver förändringen."],
+    training_focus_matches: ["focus-1", "focus-2"],
+  }]), ["focus-2"], "persisted model claims cannot cover a different source focus");
+});
 
 test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounded batches", async (t) => {
   for (const requested of [3, 6, 12]) {
@@ -30,14 +57,16 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
         stage: "generate",
         requested_count: requested,
-        payload: { qType: "mc", numQuestions: requested },
+        payload: { qType: "mc", numQuestions: requested, generationRole: "premium" },
         accepted_questions: [],
         progress_current: 0,
       };
       let sequence = 0;
       const batchSizes = [];
+      const examQuestionCounts = [];
       const comparisonIdsByBatch = [];
       const pipelineJobIds = [];
+      const roleSnapshots = [];
       const sharedDeadlineAt = Date.now() + 50_000;
       const forwardedDeadlines = [];
       operations.renewGenerationLease = async () => true;
@@ -48,11 +77,15 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
         job.stage = input.nextStage;
         return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
       };
-      generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId }) => {
+      generation.generateVerifiedBatch = async ({ payload, deadlineAt, pipelineJobId, roleSnapshot }) => {
         forwardedDeadlines.push(deadlineAt);
         batchSizes.push(payload.numQuestions);
+        examQuestionCounts.push(payload.examQuestionCount);
         comparisonIdsByBatch.push(payload.comparisonQuestions.map((question) => question.id));
         pipelineJobIds.push(pipelineJobId);
+        roleSnapshots.push(roleSnapshot);
+        assert.equal(Object.hasOwn(payload, "generationRole"), false,
+          "the server role snapshot is not forwarded in the model request payload");
         const questions = Array.from({ length: Math.min(payload.numQuestions, 2) }, () => {
           sequence += 1;
           return {
@@ -76,11 +109,15 @@ test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounde
       assert.equal(job.progress_current, requested);
       assert.equal(job.accepted_questions.length, requested);
       assert.ok(batchSizes.every((size) => size <= 3));
+      assert.ok(examQuestionCounts.length > 1 && examQuestionCounts.every((count) => count === requested),
+        "each generation batch knows the requested whole-exam count, not only its local batch size");
       assert.ok(batchSizes.length > 1, "under-delivered batches must resume until the requested count is reached");
       assert.ok(forwardedDeadlines.length > 1 && forwardedDeadlines.every((value) => value === sharedDeadlineAt),
         "all generated batches share the outer request deadline instead of each starting a fresh budget");
       assert.ok(pipelineJobIds.length > 1 && pipelineJobIds.every((value) => value === job.id),
         "every generated batch carries the parent pipeline job ID for private usage correlation");
+      assert.ok(roleSnapshots.length > 1 && roleSnapshots.every((value) => value === "premium"),
+        "every resumed batch receives the role snapshot through private internal context");
       assert.deepEqual(comparisonIdsByBatch[0], [], "the initial batch has no prior approved questions to exclude");
       assert.deepEqual(comparisonIdsByBatch[1], ["approved-1", "approved-2"],
         "later batches receive only already-approved question references for novelty checks");
@@ -101,7 +138,10 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
     stage: "generate",
     requested_count: 3,
-    payload: { qType: "short", numQuestions: 3 },
+    payload: {
+      qType: "short", numQuestions: 3,
+      priorQuestions: [{ id: "client-id-ignored", question: "Vad är ett ekosystem?", concept_tag: "Ekologi" }],
+    },
     accepted_questions: [{
       id: "approved-source", type: "short", question: "Beräkna x när x + 2 = 5.",
       concept_tag: "Ekvationer", model_answer: "x = 3", options: ["answer key"], validation_status: "verified",
@@ -120,6 +160,8 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   operations.renewPipelineLease = async () => true;
   operations.renewGenerationLease = async () => true;
   let noveltyContext;
+  let answerTargetContext;
+  let priorContext;
   operations.checkpointPipelineJob = async (input) => {
     job.accepted_questions = input.acceptedQuestions;
     job.progress_current = input.progressCurrent;
@@ -128,8 +170,11 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
   };
   generation.generateVerifiedBatch = async ({ payload }) => {
     noveltyContext = payload.comparisonQuestions;
+    answerTargetContext = payload.comparisonAnswerTargets;
+    priorContext = payload.priorQuestions;
     return { status: 200, body: { ok: true, questions: [
       { id: "duplicate", type: "short", question: "Beräkna x när x + 2 = 5.", validation_status: "verified" },
+      { id: "historical-duplicate", type: "short", question: "Vad är ett ekosystem?", validation_status: "verified" },
       { id: "distinct", type: "short", question: "Bestäm nollställena till f(x)=x²-4.", validation_status: "verified" },
     ] } };
   };
@@ -139,11 +184,16 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     assert.equal(job.progress_current, 2, "the duplicate does not fill a requested slot");
     assert.deepEqual(job.accepted_questions.map((question) => question.id), ["approved-source", pipeline.batchQuestionId(job, { id: "distinct" })]);
     assert.deepEqual(noveltyContext, [{ id: "approved-1", concept_tag: "Ekvationer", question: "Beräkna x när x + 2 = 5." }]);
+    assert.deepEqual(answerTargetContext, [{ id: "approved-1", answer_target: "x = 3" }],
+      "the accepted answer is passed separately for reviewer deduplication");
+    assert.deepEqual(priorContext, [{ id: "client-id-ignored", question: "Vad är ett ekosystem?", concept_tag: "Ekologi" }],
+      "historical question context is forwarded separately from current approved questions");
     assert.ok(!JSON.stringify(noveltyContext).includes("x = 3"), "answer keys are not sent as novelty context");
+    assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer keys are not sent as novelty context");
     assert.ok(!JSON.stringify(noveltyContext).includes("answer key"), "answer options are not sent as novelty context");
     assert.equal(diagnosticLogs.length, 1);
-    assert.equal(diagnosticLogs[0].duplicateCandidates, 1);
-    assert.equal(diagnosticLogs[0].semanticDuplicateCandidates, 1);
+    assert.equal(diagnosticLogs[0].duplicateCandidates, 2);
+    assert.equal(diagnosticLogs[0].semanticDuplicateCandidates, 2);
     assert.equal(diagnosticLogs[0].batchIdCollisions, 0);
     assert.equal(diagnosticLogs[0].acceptedAfter, 2);
     assert.ok(!JSON.stringify(diagnosticLogs).includes("Beräkna x när x + 2 = 5."),
@@ -157,6 +207,312 @@ test("later batch uses approved stems for novelty while duplicate filtering rema
     operations.renewPipelineLease = prior.renewPipelineLease;
     operations.renewGenerationLease = prior.renewGenerationLease;
     operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("candidate selection prefers a new learning objective without blocking approved practice", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000021",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "generate",
+    requested_count: 2,
+    payload: { qType: "short", numQuestions: 2 },
+    accepted_questions: [{ id: "approved", type: "short", question: "Beräkna x när x + 2 = 5.",
+      learning_objective: "Lös linjära ekvationer", validation_status: "verified" }],
+    progress_current: 1,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    job.accepted_questions = input.acceptedQuestions;
+    job.progress_current = input.progressCurrent;
+    return { status: "checkpointed" };
+  };
+  try {
+    generation.generateVerifiedBatch = async () => ({ status: 200, body: { ok: true, questions: [
+      { id: "same-skill", type: "short", question: "Beräkna x när 2x + 3 = 11.",
+        learning_objective: "Lös linjära ekvationer", validation_status: "verified" },
+      { id: "new-skill", type: "short", question: "Bestäm nollställena till f(x)=x²-4.",
+        learning_objective: "Bestäm nollställen till en andragradsfunktion", validation_status: "verified" },
+    ] } });
+    await pipeline.advance(job);
+    assert.deepEqual(job.accepted_questions.map(({ id }) => id), [
+      "approved", pipeline.batchQuestionId(job, { id: "new-skill" }),
+    ], "a new learning objective wins the final slot");
+
+    job.requested_count = 3;
+    job.payload.numQuestions = 3;
+    job.accepted_questions = [{ ...job.accepted_questions[0], id: "approved", learning_objective: "Lös linjära ekvationer" }];
+    job.progress_current = 1;
+    generation.generateVerifiedBatch = async () => ({ status: 200, body: { ok: true, questions: [
+      { id: "practice-one", type: "short", question: "Beräkna x när 3x + 1 = 10.",
+        learning_objective: "Lös linjära ekvationer", validation_status: "verified" },
+      { id: "practice-two", type: "short", question: "Bestäm x när 4x - 2 = 14.",
+        learning_objective: "Lös linjära ekvationer", validation_status: "verified" },
+    ] } });
+    await pipeline.advance(job);
+    assert.equal(job.progress_current, 3,
+      "all verified questions remain usable when no broader alternative exists");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("mistake-training cannot replace an approved question at the same count when a focus is uncovered", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000018",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Isolera variabeln" },
+        { focusId: "focus-2", concept: "Grafer", skill: "Tolka lutning",
+          sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+      ],
+    },
+    accepted_questions: [1, 2, 3].map((n) => ({
+      id: `old-${n}`, type: "short", question: `Öva ekvation ${n}`,
+      training_focus_matches: ["focus-1"], validation_status: "verified",
+    })),
+    progress_current: 3,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let requiredFocusIds;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    if (input.progressCurrent === job.progress_current) {
+      assert.deepEqual(input.acceptedQuestions, job.accepted_questions,
+        "the persisted checkpoint contract requires same-count retries to keep the accepted set unchanged");
+      assert.equal(input.nextStage, "repair");
+      return { status: "retry_queued" };
+    }
+    job.accepted_questions = input.acceptedQuestions;
+    job.progress_current = input.progressCurrent;
+    job.stage = input.nextStage;
+    return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    requiredFocusIds = payload.trainingFocusRequiredIds;
+    return { status: 200, body: { ok: true, questions: [{
+      id: "new-graph-skill", type: "short", question: "Tolka lutningen från två punkter.",
+      source_references: ["Fotosyntesen sker i kloroplasterna."],
+      training_focus_matches: ["focus-2"], validation_status: "verified",
+    }] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.deepEqual(requiredFocusIds, ["focus-2"]);
+    assert.equal(job.accepted_questions.length, 3);
+    assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.includes("focus-1")));
+    assert.equal(job.stage, "repair");
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("resumed mistake-training does not let an unsupported stored focus claim consume the last slot", async () => {
+  const focus1 = "Ekvationens båda led ska balanseras.";
+  const focus2 = "Grafens lutning beskriver förändringen.";
+  const job = {
+    id: "00000000-0000-4000-8000-000000000020",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    idempotency_key: "22222222-2222-4222-8222-222222222222",
+    request_hash: "a".repeat(64),
+    attempt_id: "33333333-3333-4333-8333-333333333333",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+    stage: "repair",
+    stage_attempts: 1,
+    requested_count: 3,
+    payload: {
+      qType: "short", numQuestions: 3,
+      trainingFocus: [
+        { focusId: "focus-1", concept: "Ekvationer", sourceEvidence: [focus1] },
+        { focusId: "focus-2", concept: "Grafer", sourceEvidence: [focus2] },
+      ],
+    },
+    accepted_questions: [
+      { id: "old-supported", type: "short", question: "Förklara ekvationsbalans.",
+        source_references: [focus1], training_focus_matches: ["focus-1"], validation_status: "verified" },
+      { id: "old-overclaim", type: "short", question: "Beskriv ekvationsmetoden.",
+        source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified" },
+    ],
+    progress_current: 2,
+  };
+  const prior = {
+    generateVerifiedBatch: generation.generateVerifiedBatch,
+    renewPipelineLease: operations.renewPipelineLease,
+    renewGenerationLease: operations.renewGenerationLease,
+    checkpointPipelineJob: operations.checkpointPipelineJob,
+  };
+  let requiredFocusIds;
+  operations.renewPipelineLease = async () => true;
+  operations.renewGenerationLease = async () => true;
+  operations.checkpointPipelineJob = async (input) => {
+    assert.deepEqual(input.acceptedQuestions, job.accepted_questions,
+      "a candidate without support for the missing focus must not consume the final slot");
+    assert.equal(input.progressCurrent, 2);
+    assert.equal(input.nextStage, "repair");
+    return { status: "retry_queued" };
+  };
+  generation.generateVerifiedBatch = async ({ payload }) => {
+    requiredFocusIds = payload.trainingFocusRequiredIds;
+    return { status: 200, body: { ok: true, questions: [{
+      id: "new-unsupported", type: "short", question: "Tolka en fristående modell utan grafdata.",
+      source_references: [focus1], training_focus_matches: ["focus-2"], validation_status: "verified",
+    }] } };
+  };
+  try {
+    const result = await pipeline.advance(job);
+    assert.deepEqual(requiredFocusIds, ["focus-2"]);
+    assert.equal(job.accepted_questions.length, 2);
+    assert.equal(result.status, "retry");
+    assert.equal(result.error, "NO_NEW_APPROVED_QUESTIONS");
+  } finally {
+    generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+    operations.renewPipelineLease = prior.renewPipelineLease;
+    operations.renewGenerationLease = prior.renewGenerationLease;
+    operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+  }
+});
+
+test("mistake-training covers every selected focus before reaching assembly for 3, 6 and 12 questions", async (t) => {
+  for (const requested of [3, 6, 12]) {
+    await t.test(`${requested} questions`, async () => {
+      const focusIds = ["focus-1", "focus-2", "focus-3"];
+      const job = {
+        id: `00000000-0000-4000-8000-${String(requested + 40).padStart(12, "0")}`,
+        user_id: "11111111-1111-4111-8111-111111111111",
+        idempotency_key: "22222222-2222-4222-8222-222222222222",
+        request_hash: "a".repeat(64), attempt_id: "33333333-3333-4333-8333-333333333333",
+        lease_token: "44444444-4444-4444-8444-444444444444",
+        deadline_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        stage: "generate", requested_count: requested,
+        payload: {
+          qType: "short", numQuestions: requested,
+          trainingFocus: focusIds.map((focusId) => ({ focusId, concept: `Begrepp ${focusId}`,
+            skill: `Färdighet ${focusId}`, sourceEvidence: [`Källbelägg ${focusId} styr dess färdighet.`] })),
+          priorQuestions: [{ id: "old", question: "Lös ekvationen 2x + 4 = 10.", concept_tag: "Ekvationslösning" }],
+        },
+        accepted_questions: [], progress_current: 0,
+      };
+      const prior = {
+        generateVerifiedBatch: generation.generateVerifiedBatch,
+        renewPipelineLease: operations.renewPipelineLease,
+        renewGenerationLease: operations.renewGenerationLease,
+        checkpointPipelineJob: operations.checkpointPipelineJob,
+      };
+      let sequence = 0;
+      operations.renewPipelineLease = async () => true;
+      operations.renewGenerationLease = async () => true;
+      operations.checkpointPipelineJob = async (input) => {
+        job.accepted_questions = input.acceptedQuestions;
+        job.progress_current = input.progressCurrent;
+        job.stage = input.nextStage;
+        return { status: "checkpointed", stage: job.stage, progress_current: job.progress_current };
+      };
+      generation.generateVerifiedBatch = async ({ payload }) => ({ status: 200, body: {
+        ok: true,
+        questions: Array.from({ length: Math.min(2, payload.numQuestions) }, () => {
+          sequence++;
+          const focusId = focusIds[(sequence - 1) % focusIds.length];
+          return {
+            id: `training-${sequence}`, type: "short",
+            question: `Utred unik deluppgift ${sequence} med metod ${String.fromCharCode(96 + sequence)} och exempel ${sequence * 17}.`,
+            source_references: [`Källbelägg ${focusId} styr dess färdighet.`],
+            training_focus_matches: focusIds,
+            validation_status: "verified",
+          };
+        }),
+      } });
+      try {
+        let advances = 0;
+        while (job.stage !== "assemble") {
+          assert.ok(advances < 12, "bounded repair batches must reach assembly");
+          await pipeline.advance(job);
+          advances++;
+        }
+        assert.equal(job.accepted_questions.length, requested);
+        assert.equal(job.progress_current, requested);
+        assert.deepEqual(pipeline.uncoveredTrainingFocusIds(job, job.accepted_questions), []);
+        assert.deepEqual(new Set(job.accepted_questions.flatMap((question) => question.training_focus_matches)), new Set(focusIds));
+        assert.ok(job.accepted_questions.every((question) => question.training_focus_matches.length === 1),
+          "the pipeline persists only source-supported focus IDs, not the model's overclaimed set");
+      } finally {
+        generation.generateVerifiedBatch = prior.generateVerifiedBatch;
+        operations.renewPipelineLease = prior.renewPipelineLease;
+        operations.renewGenerationLease = prior.renewGenerationLease;
+        operations.checkpointPipelineJob = prior.checkpointPipelineJob;
+      }
+    });
+  }
+});
+
+test("assembly rechecks stored focus matches against their source before issuing", async () => {
+  const job = {
+    id: "00000000-0000-4000-8000-000000000019",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    lease_token: "44444444-4444-4444-8444-444444444444",
+    stage: "assemble",
+    requested_count: 3,
+    payload: { trainingFocus: [
+      { focusId: "focus-1", concept: "Ekvationer", sourceEvidence: ["Ekvationens båda led ska balanseras."] },
+      { focusId: "focus-2", concept: "Grafer", sourceEvidence: ["Lutningen visar förändring per x-enhet."] },
+    ] },
+    accepted_questions: [1, 2, 3].map((n) => ({
+      id: `old-${n}`, source_references: ["Ekvationens båda led ska balanseras."],
+      training_focus_matches: ["focus-1", "focus-2"], validation_status: "verified",
+    })),
+  };
+  const prior = {
+    finalizeVerifiedExam: generation.finalizeVerifiedExam,
+    retryPipelineStep: operations.retryPipelineStep,
+  };
+  let finalizeCalls = 0;
+  let retryInput;
+  generation.finalizeVerifiedExam = async () => { finalizeCalls++; throw new Error("must not finalize"); };
+  operations.retryPipelineStep = async (input) => { retryInput = input; return "retry_limit"; };
+  try {
+    const result = await pipeline.advance(job);
+    assert.equal(finalizeCalls, 0);
+    assert.equal(retryInput.errorCode, "TRAINING_FOCUS_INCOMPLETE");
+    assert.equal(result.status, "retry_limit");
+    assert.equal(result.error, "TRAINING_FOCUS_INCOMPLETE");
+  } finally {
+    generation.finalizeVerifiedExam = prior.finalizeVerifiedExam;
+    operations.retryPipelineStep = prior.retryPipelineStep;
   }
 });
 
@@ -418,19 +774,59 @@ test("comparison context and maximum escaped material fit the bounded internal r
     model_answer: "must not be copied",
   }));
   const context = pipeline.comparisonQuestionsFor(largeAcceptedSet, 20);
+  const answerTargets = pipeline.comparisonAnswerTargetsFor(largeAcceptedSet, 20);
   assert.ok(Buffer.byteLength(JSON.stringify(context), "utf8") <= pipeline.MAX_COMPARISON_CONTEXT_BYTES);
+  assert.ok(Buffer.byteLength(JSON.stringify(answerTargets), "utf8") <= pipeline.MAX_COMPARISON_CONTEXT_BYTES);
   assert.ok(context.length > 1, "the bounded context retains multiple approved questions");
   assert.ok(context.every((question) => !Object.hasOwn(question, "model_answer")));
+  assert.ok(answerTargets.length > 1 && answerTargets.every((target) => target.answer_target === "must not be copied"));
+  assert.ok(answerTargets.every((target) => /^approved-[1-9][0-9]{0,1}$/.test(target.id)));
   const requestBody = Buffer.from(JSON.stringify({
     lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
     pastedText: "\0".repeat(12000),
     focusTerms: ["begrepp".repeat(20), "funktion".repeat(20)],
     comparisonQuestions: context,
+    comparisonAnswerTargets: answerTargets,
     idempotencyKey: "12345678-1234-4123-8123-123456789012",
   }), "utf8");
   assert.ok(requestBody.byteLength < 128 * 1024, "the full worst-case internal payload remains below 128 KiB");
   const requestStream = async function* () { yield requestBody; };
   assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).pastedText.length, 12000);
+  await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
+});
+
+test("review answer targets stay aligned with comparison questions after the 20-item cap", () => {
+  const comparisons = Array.from({ length: 20 }, (_, index) => ({ id: `round-${index + 1}` }));
+  const targets = [
+    { id: "approved-1", answer_target: "Older accepted answer" },
+    { id: "round-1", answer_target: "Current accepted answer" },
+  ];
+  assert.deepEqual(generation.comparisonAnswerTargetsForReview(comparisons, targets), [targets[1]],
+    "answer targets for comparison questions dropped by the limit are filtered before review");
+});
+
+test("long verified mistake evidence fits the internal request envelope without widening public requests", async () => {
+  const trainingFocus = mistakeTraining.normalizeTrainingFocus(Array.from({ length: 12 }, (_, index) => ({
+    focusId: `focus-${index + 1}`,
+    sourceQuestionId: `question-${index + 1}`,
+    sourceSubmissionId: "a".repeat(32),
+    concept: "Begrepp",
+    skill: "Färdighet",
+    sourceQuestion: "Q".repeat(1200),
+    studentAnswer: "A".repeat(1200),
+    gradingFeedback: "F".repeat(1000),
+    expectedAnswer: "M".repeat(1000),
+    errorTags: ["method_missing"],
+  })));
+  assert.equal(trainingFocus.length, 12, "all selected mistake focuses retain enough bounded evidence");
+  const body = Buffer.from(JSON.stringify({
+    pastedText: "\0".repeat(12000),
+    trainingFocus,
+    comparisonQuestions: Array.from({ length: 12 }, (_, index) => ({ question: `Earlier question ${index}` })),
+  }), "utf8");
+  assert.ok(body.byteLength > 64 * 1024 && body.byteLength < 128 * 1024);
+  const requestStream = async function* () { yield body; };
+  assert.equal((await generation.readJsonBody(requestStream(), 128 * 1024)).trainingFocus.length, 12);
   await assert.rejects(() => generation.readJsonBody(requestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" });
 });
 
@@ -659,6 +1055,7 @@ test("12 verified questions run through worker assembly, real sealing and manife
     assert.equal(result.response.meta.requested, 12);
     assert.equal(result.response.meta.partial, false);
     assert.ok(result.response.exam.questions.every((question) => question.grade_task));
+    assert.ok(result.response.exam.questions.every((question) => /^[A-Za-z0-9_-]{43}$/.test(question.active_question_proof || "")));
     assert.ok(result.response.exam.questions.every((question) => !Object.hasOwn(question, "model_answer")));
     assert.match(result.response.exam.exam_manifest, /^v2\./);
     assert.equal(sequence, 12);
@@ -671,6 +1068,8 @@ test("12 verified questions run through worker assembly, real sealing and manife
     assert.equal(partial.response.meta.requested, 12);
     assert.equal(partial.response.meta.partial, true,
       "an eligible eight-of-twelve result remains explicitly partial through real finalization");
+    assert.ok(partial.response.exam.questions.every((question) => question.active_question_proof),
+      "partial exam questions also carry the same active-help proof contract");
   } finally {
     if (originalSigningSecret === undefined) delete process.env.EXAM_SIGNING_SECRET;
     else process.env.EXAM_SIGNING_SECRET = originalSigningSecret;

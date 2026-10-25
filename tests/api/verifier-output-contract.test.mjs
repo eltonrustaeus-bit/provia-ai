@@ -6,8 +6,15 @@ const { verifyQuestions, buildVerifierSchema, buildVerifierPrompt, decideApprova
 
 const question = (id) => ({ id, type: "short_answer", question: `Question ${id}` });
 const result = (id, approved) => ({ id, approved, language_match: true, option_quality: [] });
+const sourceSupport = (quote, parts = 0, answers = 0) => ({
+  question: true, answer: true, rubric: true,
+  rubric_parts: Array(parts).fill(true), accepted_answers: Array(answers).fill(true),
+  evidence_quotes: [quote], question_evidence: [0], answer_evidence: [0], rubric_evidence: [0],
+  rubric_part_evidence: Array.from({ length: parts }, () => [0]),
+  accepted_answer_evidence: Array.from({ length: answers }, () => [0]),
+});
 
-async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById) {
+async function runWithResults(results, questions = [question("q1"), question("q2")], material = "", timeoutMs, targetLevel, comparisonQuestions, lang = "en", reviewHintsById, trainingFocus, comparisonAnswerTargets) {
   const originalFetch = globalThis.fetch;
   const originalAbortTimeout = AbortSignal.timeout;
   const boundAbortTimeout = originalAbortTimeout.bind(AbortSignal);
@@ -21,11 +28,11 @@ async function runWithResults(results, questions = [question("q1"), question("q2
     return Response.json({
       model: "measured-review-model",
       usage: { input_tokens: 31, output_tokens: 7 },
-      output: [{ content: [{ type: "output_text", text: JSON.stringify({ results }) }] }],
+      output: [{ content: [{ type: "output_text", text: JSON.stringify({ results: results.map((entry) => ({ duplicate_of: "", ...entry })) }) }] }],
     });
   };
   try {
-    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, reviewHintsById }), fetchCalls, requestBody, requestTimeoutMs };
+    return { outcome: await verifyQuestions(questions, { apiKey: "synthetic", model: "synthetic", lang, material, timeoutMs, targetLevel, comparisonQuestions, comparisonAnswerTargets, reviewHintsById, trainingFocus }), fetchCalls, requestBody, requestTimeoutMs };
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalAbortTimeout;
@@ -57,28 +64,62 @@ const submittedReviewSchema = valid.requestBody.text.format.schema.properties.re
 assert.equal(submittedReviewSchema.minItems, 2, "review schema requires one result per supplied question");
 assert.equal(submittedReviewSchema.maxItems, 2, "review schema prevents extra results");
 assert.ok(submittedReviewSchema.items.required.includes("language_match"), "review schema requires an explicit selected-language verdict");
+assert.ok(submittedReviewSchema.items.required.includes("duplicate_of"),
+  "review schema requires an explicit same-learning-objective verdict");
 assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined,
   "schema inspection without a question count remains backward compatible");
+assert.ok(!submittedReviewSchema.items.required.includes("training_focus_alignment"),
+  "ordinary exams retain their existing review contract");
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
 assert.match(buildVerifierPrompt("sv"), /grammatiskt korrekt fält på fel språk är ändå en språkavvikelse/i);
+assert.match(buildVerifierPrompt("sv"), /översättningspräglade, onaturliga formuleringar.*tautologiska frågor/i,
+  "the reviewer rejects awkward translated wording and question-answer tautologies");
+assert.match(buildVerifierPrompt("sv"), /samma lärandemål på ett redundant sätt.*brett ämne.*skilda färdigheter/i,
+  "the reviewer rejects redundant objectives without rejecting distinct skills in the same broad subject");
+assert.match(buildVerifierPrompt("en"), /redundantly assesses the same learning objective.*broad subject.*distinct skills/i,
+  "the English reviewer keeps the same controlled duplicate rule");
 assert.match(buildVerifierPrompt("sv"), /frågestammen för idiomatisk, grammatiskt korrekt svenska.*'linjens ekvation', inte 'linjären'/i,
   "the independent reviewer explicitly checks Swedish inflection in question stems");
 assert.match(buildVerifierPrompt("sv"), /avvisa tydliga grammatikfel.*'den viktigt'.*ge inte högt language_quality/i,
   "the independent reviewer must reject obvious Swedish agreement errors rather than merely score them");
 assert.match(buildVerifierPrompt("sv"), /review_hints kan innehålla en intern formatvarning/i);
 assert.match(buildVerifierPrompt("sv"), /inga enordsalternativ matchar källtexten.*avvisa inte enbart/i);
+assert.match(buildVerifierPrompt("sv"), /ett enda obestyrkt tillägg gör hela answer=false/i,
+  "the reviewer must reject an otherwise correct exemplar with one unsupported clause");
+assert.match(buildVerifierPrompt("en"), /one unsupported addition makes the entire answer=false/i);
+assert.match(buildVerifierPrompt("sv"), /duplicate_of till id för en tidigare kandidat eller redan godkänd fråga/i);
 const outlierHintReview = await runWithResults(
-  [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], issues: [], required_changes: [] }],
+  [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
-  "", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"] },
+  "Stockholm är Sveriges huvudstad.", undefined, undefined, undefined, "sv", { q1: ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"] },
 );
 const outlierHintPayload = JSON.parse(outlierHintReview.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(outlierHintPayload.questions[0].review_hints, ["single_word_option_outlier_review", "all_single_word_options_unmatched_source_review"],
   "internal style warnings reach the independent reviewer without becoming a verdict");
 assert.equal(decideApproval(outlierHintReview.outcome.perQuestion.get("q1")), true,
   "the heuristic warning alone does not reject a valid single-word answer");
+const duplicateReview = await runWithResults([{
+  ...outlierHintReview.outcome.perQuestion.get("q1"), duplicate_of: "earlier-q",
+}], [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
+"Stockholm är Sveriges huvudstad.", undefined, undefined,
+[{ id: "earlier-q", type: "mc", question: "Vad heter Sveriges huvudstad?" }], "sv");
+assert.equal(decideApproval(duplicateReview.outcome.perQuestion.get("q1")), false,
+  "an otherwise approved near-duplicate cannot be issued");
+assert.ok(duplicateReview.outcome.perQuestion.get("q1").failure_categories.includes("repeated_learning_objective"));
+for (const invalidDuplicate of [null, 7, "q1", "foreign-q"]) {
+  const invalid = await runWithResults([{
+    ...outlierHintReview.outcome.perQuestion.get("q1"), duplicate_of: invalidDuplicate,
+  }], [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],
+  "Stockholm är Sveriges huvudstad.", undefined, undefined,
+  [{ id: "earlier-q", type: "mc", question: "Vad heter Sveriges huvudstad?" }], "sv");
+  const verdict = invalid.outcome.perQuestion.get("q1");
+  assert.equal(verdict.duplicate_of_contract_ok, false);
+  assert.equal(decideApproval(verdict), false);
+  assert.ok(!verdict.failure_categories.includes("repeated_learning_objective"),
+    "malformed references must not be reported as confirmed duplicate questions");
+}
 const wrongLanguageReview = await runWithResults([{
   ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
@@ -103,21 +144,37 @@ assert.match(buildVerifierPrompt("sv", undefined, 1, "C"), /cognitive_level är 
 assert.doesNotMatch(buildVerifierPrompt("sv"), /svårighetsgrad som inte matchar cognitive_level/i,
   "verifier no longer compares exam difficulty to the unrelated cognitive action label");
 assert.match(buildVerifierPrompt("sv"), /comparison_questions.*(?:context only|jämförelseunderlag)/i);
+assert.match(buildVerifierPrompt("sv"), /comparison_answer_targets innehåller facit enbart för jämförelse.*aldrig som källa/i);
 const comparisonContext = await runWithResults(
   [result("retry-1", true)],
   [question("retry-1")],
   "",
   undefined,
   undefined,
-  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", correct_index: 2, model_answer: "Facit ska inte delas." }],
+  [{ id: "approved-1", type: "mc", question: "Vilken process frigör energi?", concept_tag: "Cellandning", learning_objective: "Skilj cellandning från fotosyntes", correct_index: 2, model_answer: "Facit ska inte delas." }],
+  "en", undefined, undefined,
+  [{ id: "approved-1", answer_target: "Cellandningen frigör energi." }],
 );
 const comparisonPayload = JSON.parse(comparisonContext.requestBody.input.find((item) => item.role === "user").content);
 assert.deepEqual(comparisonPayload.comparison_questions, [{
   id: "approved-1", type: "mc", question: "Vilken process frigör energi?",
-  concept_tag: "Cellandning",
+  concept_tag: "Cellandning", learning_objective: "Skilj cellandning från fotosyntes",
 }], "repair review receives only approved question identity and wording, not answer keys or rubric");
 assert.deepEqual(comparisonPayload.questions.map(({ id }) => id), ["retry-1"],
   "comparison-only questions do not change the required review result IDs");
+assert.deepEqual(comparisonPayload.comparison_answer_targets, [
+  { id: "approved-1", answer_target: "Cellandningen frigör energi." },
+], "the verifier receives a separate, id-linked answer-target comparison channel");
+assert.equal(comparisonPayload.comparison_questions.some((item) => Object.hasOwn(item, "model_answer")), false,
+  "answer targets never leak into the question novelty context");
+const unrelatedComparisonTarget = await runWithResults(
+  [result("retry-1", true)], [question("retry-1")], "", undefined, undefined,
+  [{ id: "approved-1", question: "Approved stem" }], "en", undefined, undefined,
+  [{ id: "approved-2", answer_target: "not linked to a reviewed question" }],
+);
+assert.equal(unrelatedComparisonTarget.outcome.callOk, false,
+  "an answer target without a matching comparison question fails closed");
+assert.equal(unrelatedComparisonTarget.fetchCalls, 0);
 const oversizedComparison = await runWithResults(
   [result("retry-1", true)],
   [question("retry-1")],
@@ -207,13 +264,70 @@ const validOpenQuestion = { ...openQuestion, model_answer: "x = 2", rubric: "En 
 const validOpenResponse = await runWithResults([{
   id: validOpenQuestion.id, approved: true, factual_accuracy: 1, ambiguity_score: 0,
   difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
-  language_match: true, option_quality: [], issues: [], required_changes: [],
+  language_match: true, option_quality: [], source_support: sourceSupport("Ekvationer: 2x = 4", 1), issues: [], required_changes: [],
 }], [validOpenQuestion], "Ekvationer: 2x = 4.");
 const validOpenReview = validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id);
 assert.equal(validOpenReview.option_quality_contract_ok, true,
   "an empty option list is a complete quality review for a short-answer item");
 assert.equal(decideApproval(validOpenReview), true,
   "a valid reviewed short-answer question still passes the deterministic gate");
+assert.equal(validOpenReview.source_support_contract_ok, true,
+  "literal source evidence is checked before a positive source verdict is trusted");
+for (const field of ["question", "answer", "rubric"]) {
+  const unsupported = await runWithResults([{
+    ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+    source_support: { ...sourceSupport("Ekvationer: 2x = 4", 1), [field]: false },
+  }], [validOpenQuestion], "Ekvationer: 2x = 4.");
+  const verdict = unsupported.outcome.perQuestion.get(validOpenQuestion.id);
+  assert.equal(decideApproval(verdict), false, `${field} without source support cannot pass`);
+  assert.ok(verdict.failure_categories.includes("source_support"), "repair gets a bounded source-support signal");
+}
+for (const evidence_quotes of [[], ["fabricated source evidence"], ["Ekvationer: 2x = 4", "fabricated source evidence"]]) {
+  const unverified = await runWithResults([{
+    ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+    source_support: { ...sourceSupport("Ekvationer: 2x = 4", 1), evidence_quotes },
+  }], [validOpenQuestion], "Ekvationer: 2x = 4.");
+  assert.equal(decideApproval(unverified.outcome.perQuestion.get(validOpenQuestion.id)), false,
+    "missing or invented evidence cannot certify an otherwise high-scoring review");
+}
+const acceptedAnswerReview = await runWithResults([{
+  ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+  source_support: sourceSupport("Ekvationer: 2x = 4", 1, 1),
+}], [{ ...validOpenQuestion, accepted_answers: ["x = 2"] }], "Ekvationer: 2x = 4.");
+assert.deepEqual(JSON.parse(acceptedAnswerReview.requestBody.input[1].content).questions[0].accepted_answers, ["x = 2"],
+  "the reviewer sees accepted answers before judging source support");
+assert.equal(decideApproval(acceptedAnswerReview.outcome.perQuestion.get(validOpenQuestion.id)), true);
+const shortMathSource = await runWithResults([{
+  ...validOpenResponse.outcome.perQuestion.get(validOpenQuestion.id),
+  source_support: sourceSupport("y=2x+1"),
+}], [{ id: validOpenQuestion.id, type: "short_answer", question: "Ange lutningen i y=2x+1." }], "y=2x+1");
+assert.equal(decideApproval(shortMathSource.outcome.perQuestion.get(validOpenQuestion.id)), true,
+  "a complete short formula can serve as literal evidence without an arbitrary character minimum");
+const unsupportedBiology = await runWithResults([{
+  ...validOpenReview,
+  source_support: { ...sourceSupport("Alleler är olika varianter av en gen"),
+    question: false, answer: false, rubric: false },
+}], [{ id: validOpenQuestion.id, type: "short_answer",
+  question: "Vad är skillnaden mellan en dominant och en recessiv allel?",
+  model_answer: "En dominant allel uttrycks alltid; en recessiv bara i dubbel uppsättning.",
+  rubric: "Förklara dominant och recessiv nedärvning." }],
+"Alleler är olika varianter av en gen.");
+assert.equal(decideApproval(unsupportedBiology.outcome.perQuestion.get(validOpenQuestion.id)), false,
+  "a topical allele quote cannot override an explicit unsupported-claim verdict");
+for (const source_support of [
+  { ...validOpenReview.source_support, rubric_parts: [] },
+  { ...validOpenReview.source_support, rubric_parts: [false] },
+  { ...validOpenReview.source_support, accepted_answers: [false] },
+  { ...validOpenReview.source_support, question_evidence: [1] },
+  { ...validOpenReview.source_support, answer_evidence: [] },
+  { ...validOpenReview.source_support, rubric_part_evidence: [] },
+]) {
+  const check = await runWithResults([{ ...validOpenReview, source_support }],
+    [{ ...validOpenQuestion, accepted_answers: source_support.accepted_answers.length ? ["x = 2"] : [] }],
+    "Ekvationer: 2x = 4.");
+  assert.equal(decideApproval(check.outcome.perQuestion.get(validOpenQuestion.id)), false,
+    "missing or unsupported rubric parts and alternatives fail closed");
+}
 assert.equal(decideApproval({ ...validOpenReview, language_match: false }), false,
   "a fluent question in the wrong selected language fails closed despite high language-quality scores");
 const { language_match: _omittedLanguage, ...missingLanguageMatch } = validOpenReview;
@@ -229,22 +343,117 @@ const needsRevision = {
   issues: ["Exempelsvaret löser inte ekvationen."], required_changes: ["Byt exempelsvaret till x = 2."],
 };
 const openResponse = await runWithResults([needsRevision], [openQuestion], "Ekvationer: 2x = 4.");
-assert.deepEqual(openResponse.outcome.perQuestion.get("open-1").failure_categories, ["answer_alignment"],
-  "the review outcome exposes only bounded diagnostic categories for rejected content");
+assert.deepEqual(openResponse.outcome.perQuestion.get("open-1").failure_categories, ["answer_alignment", "source_support"],
+  "an absent source verdict is included as a bounded repair signal");
 const transmitted = JSON.parse(openResponse.requestBody.input.find((item) => item.role === "user").content);
 assert.equal(transmitted.source_material, "Ekvationer: 2x = 4.");
 assert.equal(transmitted.questions[0].model_answer, "x = 3", "the reviewer receives the generated exemplar it must independently check");
 assert.equal(transmitted.questions[0].rubric, "En poäng för x = 2.");
 assert.deepEqual(transmitted.questions[0].scoring_rubric, openQuestion.scoring_rubric);
 assert.match(buildVerifierPrompt("sv"), /lös uppgiften själv från grunden/i);
+assert.match(buildVerifierPrompt("sv"), /Sätt approved=false.*exempelsvaret är felaktigt, motsägelsefullt, otillräckligt för utlovade poäng/i,
+  "the Swedish verifier must retain the explicit incorrect/insufficient exemplar rejection rule");
 assert.match(buildVerifierPrompt("sv"), /source_material som begränsat faktaunderlag/i);
 assert.match(buildVerifierPrompt("sv"), /ordagrant förekommande källhänvisning räcker inte/i);
+assert.match(buildVerifierPrompt("sv"), /ett giltigt kortsvar som bedömningsmatrisen inte accepterar/i);
+assert.match(buildVerifierPrompt("en"), /a valid short answer excluded by its grading rubric/i);
+assert.match(buildVerifierPrompt("sv"), /Flera giltiga kortsvar är tillåtna/i);
+assert.match(buildVerifierPrompt("en"), /Multiple valid short answers are acceptable/i);
+assert.match(buildVerifierPrompt("sv"), /flervalsfråga med fler än ett rimligt svar eller flera försvarbara tolkningar/i);
+assert.match(buildVerifierPrompt("en"), /multiple-choice question with more than one reasonable answer or defensible interpretation/i);
+assert.match(buildVerifierPrompt("sv", "languages"), /i kortsvar kan flera giltiga formuleringar godtas/i);
+assert.match(buildVerifierPrompt("en", "languages"), /a short-answer item may allow several valid phrasings/i);
+assert.doesNotMatch(buildVerifierPrompt("sv"), /faktafel, mer än ett rimligt svar/i,
+  "multiple valid short answers are allowed when the rubric accepts them");
 assert.match(buildVerifierPrompt("sv"), /Jämför kandidaterna sinsemellan/i);
 assert.match(buildVerifierPrompt("en"), /exact source quote is not enough/i);
 assert.match(buildVerifierPrompt("en"), /Compare candidate questions with each other/i);
 assert.match(buildVerifierPrompt("sv", undefined, 3), /exakt 3 frågor och returnera exakt ett resultat/i);
 assert.equal(decideApproval(openResponse.outcome.perQuestion.get("open-1")), false,
   "a contradictory short-answer exemplar rejected by review cannot pass the deterministic gate");
+
+const focus = [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: ["calculation_error"],
+  sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
+  gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }];
+const focusedResult = {
+  ...result("q-focus", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  language_match: true, option_quality: [], issues: [], required_changes: [],
+  duplicate_of: "", source_support: sourceSupport("Linjär funktion: y = 2x + 3."),
+  training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: ["focus-1"],
+};
+const focusedReview = await runWithResults([focusedResult], [question("q-focus")], "Linjär funktion: y = 2x + 3.", undefined, "C", undefined, "sv", undefined, focus);
+const focusSchema = focusedReview.requestBody.text.format.schema.properties.results.items;
+const focusPayload = JSON.parse(focusedReview.requestBody.input.find((item) => item.role === "user").content);
+assert.ok(focusSchema.required.includes("training_focus_alignment"), "mistake-training requires an explicit alignment verdict");
+assert.ok(focusSchema.required.includes("training_focus_matches"), "mistake-training requires explicit focus IDs");
+assert.ok(focusSchema.required.includes("training_focus_skill_matches"), "mistake-training requires a separate verdict for specific failed skills");
+assert.ok(focusSchema.required.includes("training_focus_error_matches"), "mistake-training requires a separate verdict for the specific error evidence");
+assert.equal(focusSchema.properties.training_focus_matches.minItems, 0,
+  "an explicit no-match review is representable so the server can reject only that candidate");
+assert.deepEqual(focusPayload.training_focus, [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: ["calculation_error"],
+  source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
+  grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
+  "reviewer receives the bounded source question, verified answer, and grading evidence without source identities");
+assert.match(focusedReview.requestBody.input[0].content, /skill.*training_focus_skill_matches.*brett concept.*aldrig ersätta skill/i);
+assert.match(focusedReview.requestBody.input[0].content, /Generiska error_tags.*får aldrig ensamma räcka/i);
+assert.match(focusedReview.requestBody.input[0].content, /source_question, student_answer och grading_feedback.*training_focus_error_matches/i);
+assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: false }), false,
+  "a source-grounded question that misses the documented mistake cannot pass training review");
+assert.equal(decideApproval({ ...focusedReview.outcome.perQuestion.get("q-focus"), training_focus_alignment: true }), true,
+  "a focused question can pass only when the existing quality checks also pass");
+const genericOnlyReview = await runWithResults([{
+  ...focusedResult, training_focus_alignment: true, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(genericOnlyReview.outcome.callOk, true);
+assert.equal(decideApproval(genericOnlyReview.outcome.perQuestion.get("q-focus")), false,
+  "a generic error label without a specific concept/skill match cannot pass training review");
+const broadConceptOnlyReview = await runWithResults([{
+  ...focusedResult, training_focus_alignment: true, training_focus_matches: ["focus-1"], training_focus_skill_matches: [], training_focus_error_matches: ["focus-1"],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(broadConceptOnlyReview.outcome.callOk, true);
+assert.deepEqual(broadConceptOnlyReview.outcome.perQuestion.get("q-focus").training_focus_matches, [],
+  "a broad concept match cannot claim coverage of a focus with a more specific documented failed skill");
+assert.equal(decideApproval(broadConceptOnlyReview.outcome.perQuestion.get("q-focus")), false,
+  "a question that only overlaps the broad topic is withheld from mistake training");
+const skillWithoutErrorMatch = await runWithResults([{
+  ...focusedResult, training_focus_matches: ["focus-1"], training_focus_skill_matches: ["focus-1"], training_focus_error_matches: [],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.deepEqual(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus").training_focus_matches, [],
+  "a broad skill match without explicit alignment to the verified missed component cannot pass");
+assert.equal(decideApproval(skillWithoutErrorMatch.outcome.perQuestion.get("q-focus")), false);
+const explicitNoMatch = await runWithResults([{
+  ...focusedResult, approved: false, training_focus_alignment: false, training_focus_matches: [], training_focus_skill_matches: [], training_focus_error_matches: [],
+  required_changes: ["Öva en dokumenterad färdighet."],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(explicitNoMatch.outcome.callOk, true,
+  "the structured reviewer can return a valid explicit no-match decision");
+assert.equal(decideApproval(explicitNoMatch.outcome.perQuestion.get("q-focus")), false,
+  "an explicit no-match remains rejected by deterministic approval");
+const inventedFocusReview = await runWithResults([{
+  ...focusedResult, training_focus_matches: ["focus-999"],
+}], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(inventedFocusReview.outcome.callOk, false, "an invented focus ID invalidates the independent review response");
+assert.equal(inventedFocusReview.outcome.failureReason, "invalid_training_focus_matches");
+const missingFocusVerdict = await runWithResults([(({ training_focus_alignment: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingFocusVerdict.outcome.callOk, false, "missing focus verdict fails the complete review closed");
+assert.equal(missingFocusVerdict.outcome.failureReason, "missing_training_focus_alignment");
+const missingSkillVerdict = await runWithResults([(({ training_focus_skill_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingSkillVerdict.outcome.callOk, false, "missing specific-skill verdict fails the complete review closed");
+assert.equal(missingSkillVerdict.outcome.failureReason, "missing_training_focus_skill_matches");
+const missingErrorVerdict = await runWithResults([(({ training_focus_error_matches: _omitted, ...rest }) => rest)(focusedResult)], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined, focus);
+assert.equal(missingErrorVerdict.outcome.callOk, false, "missing specific-error verdict fails the complete review closed");
+assert.equal(missingErrorVerdict.outcome.failureReason, "missing_training_focus_error_matches");
+const sanitizedFocus = await runWithResults([focusedResult], [question("q-focus")], "material", undefined, undefined, undefined, "sv", undefined,
+  [{ concept: "Linjär funktion", skill: "Tolka lutning", errorTags: [], sourceSubmissionId: "private-id",
+    sourceQuestion: "Vad beskriver k?", studentAnswer: "Skärningen med y-axeln",
+    gradingFeedback: "k anger lutningen, inte skärningen.", expectedAnswer: "Lutningen" }]);
+assert.equal(sanitizedFocus.outcome.callOk, true, "server focus records can be safely reduced for review");
+assert.deepEqual(JSON.parse(sanitizedFocus.requestBody.input.find((item) => item.role === "user").content).training_focus,
+  [{ id: "focus-1", concept: "Linjär funktion", skill: "Tolka lutning", error_tags: [],
+    source_question: "Vad beskriver k?", student_answer: "Skärningen med y-axeln",
+    grading_feedback: "k anger lutningen, inte skärningen.", expected_answer: "Lutningen" }],
+  "source identities are excluded from the provider review payload");
 assert.equal(decideApproval({ ...validOpenReview, source_alignment: 0.59 }), false,
   "an exact source quote cannot override a below-threshold source-alignment decision");
 assert.equal(openResponse.outcome.callOk, true, "a structured rejection remains a valid completed review, not a transport failure");
