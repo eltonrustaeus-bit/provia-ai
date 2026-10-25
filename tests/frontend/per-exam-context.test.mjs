@@ -33,6 +33,10 @@ const EXAM = {
 };
 
 let lastExplain = null;
+let holdNextExplainResponse = false;
+let releaseHeldExplainResponse = null;
+let explainResponseHeldResolve = null;
+const explainResponseHeld = new Promise(resolve => { explainResponseHeldResolve = resolve; });
 let examStateUnavailable = false;
 let activeExamCount = 0;
 let historyAllowed = true;
@@ -113,6 +117,16 @@ await mockApis(page, {
         return;
       }
       try { lastExplain = JSON.parse(r.request().postData() || "{}"); } catch (_) {}
+      if (holdNextExplainResponse) {
+        holdNextExplainResponse = false;
+        await new Promise(resolve => {
+          explainResponseHeldResolve?.();
+          explainResponseHeldResolve = null;
+          releaseHeldExplainResponse = () => r.fulfill({ json: { ok: true, answer: "STALE_QUESTION_RESPONSE" } })
+            .catch(() => {}).then(resolve);
+        });
+        return;
+      }
       if (examStateUnavailable) r.fulfill({ status: 503, json: { error: "EXAM_STATE_UNAVAILABLE" } });
       else r.fulfill({ json: { ok: true, answer: "Svar från P.E.R." } });
     }],
@@ -295,6 +309,26 @@ ok("T4g provets servergenererade submission-id följer med till API:t", lastExpl
    JSON.stringify(lastExplain?.pageContext?.examState));
 ok("T4h frågebeviset följer med till P.E.R API:t", lastExplain?.pageContext?.currentQuestion?.questionProof === "A".repeat(43),
    JSON.stringify(lastExplain?.pageContext?.currentQuestion));
+
+// A delayed hint must be discarded if the student moves to another question.
+holdNextExplainResponse = true;
+await page.fill("#perInput", "Hjälp mig med frågan");
+await page.click("#perSendBtn");
+await explainResponseHeld;
+await page.click(".xf-dot >> nth=3");
+await page.waitForFunction(() => document.getElementById("perMessages")?.innerText.includes("Provfrågan ändrades"));
+const staleQuestionState = await page.evaluate(() => ({
+  answer: document.getElementById("perMessages")?.innerText || "",
+  question: window.__perTestCtx()?.currentQuestion?.number,
+  sendDisabled: document.getElementById("perSendBtn")?.disabled,
+}));
+ok("question change aborts and labels an in-flight hint", staleQuestionState.question === 4
+  && staleQuestionState.answer.includes("Provfrågan ändrades") && staleQuestionState.sendDisabled === false,
+  JSON.stringify(staleQuestionState));
+await releaseHeldExplainResponse?.();
+await page.waitForTimeout(100);
+const staleQuestionAnswer = await page.locator("#perMessages").innerText();
+ok("a late hint for the previous exam question is never rendered", !staleQuestionAnswer.includes("STALE_QUESTION_RESPONSE"), staleQuestionAnswer);
 
 // Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
 await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);

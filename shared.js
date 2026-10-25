@@ -328,7 +328,12 @@
   }
 
   function perDescribe(m) {
-    if (!m || typeof m !== 'object') { _perManifest = null; perPaintSees(); return; }
+    if (!m || typeof m !== 'object') {
+      _perManifest = null;
+      perPaintSees();
+      invalidatePerRequestForContextChange();
+      return;
+    }
     perWarnKeys(m, PER_MANIFEST_KEYS, '');
     perWarnKeys(m.state, PER_STATE_KEYS, 'state.');
     var st = null;
@@ -353,6 +358,32 @@
     perResetStepsIfNewFocus();
     if (window.PER && window.PER._resetNudge) window.PER._resetNudge();
     perPaintSees();
+    invalidatePerRequestForContextChange();
+  }
+
+  function perRequestContextKey() {
+    var context = getPageContext() || {};
+    var exam = context.examState || {};
+    var question = context.currentQuestion || {};
+    var activeExam = exam.phase === 'exam';
+    return JSON.stringify({
+      page: context.page || 'app',
+      course: context.course || '',
+      level: context.level || '',
+      exam: activeExam ? {
+        submissionId: exam.submissionId || '',
+        questionProof: question.questionProof || '',
+        id: question.id || '',
+        number: question.number == null ? '' : question.number,
+        text: question.text || ''
+      } : null
+    });
+  }
+
+  function invalidatePerRequestForContextChange() {
+    var active = _perActiveRequest;
+    if (!active || active.answerCommitted || !active.contextKey || active.contextKey === perRequestContextKey()) return;
+    if (active.cancelForContextChange) active.cancelForContextChange();
   }
 
   /* Nyckeln är frågans identitet, inte hela fokusobjektet: publish() i
@@ -1533,7 +1564,17 @@ function finalizeMsg(div, text) {
       var hist = _examHistoryMasked ? [] : perGetHist();
       var requestTimedOut = false;
       var requestController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var requestState = { cancelled: false, controller: requestController, accountId: requestAccountId, cancel: null };
+      var requestContext = getPageContext() || {};
+      var requestState = {
+        cancelled: false,
+        controller: requestController,
+        accountId: requestAccountId,
+        contextKey: perRequestContextKey(),
+        examContext: requestContext.examState?.phase === 'exam',
+        answerCommitted: false,
+        cancel: null,
+        cancelForContextChange: null
+      };
       _perActiveRequest = requestState;
       var rejectRequestDeadline;
       var requestDeadline = new Promise(function (_, reject) { rejectRequestDeadline = reject; });
@@ -1546,11 +1587,31 @@ function finalizeMsg(div, text) {
       };
       function requestStillOwned() {
         if (requestState.cancelled) return false;
-        if (currentPilotAccountId() === requestAccountId) return true;
-        if (EXGEN_RUNTIME.environment === 'pilot') clearPilotPendingQuestionForAccount(requestAccountId);
-        else clearPerPendingQuestion(requestAccountId);
-        abortPerRequestForAccountId(currentPilotAccountId());
-        return false;
+        if (currentPilotAccountId() !== requestAccountId) {
+          if (EXGEN_RUNTIME.environment === 'pilot') clearPilotPendingQuestionForAccount(requestAccountId);
+          else clearPerPendingQuestion(requestAccountId);
+          abortPerRequestForAccountId(currentPilotAccountId());
+          return false;
+        }
+        if (!requestState.answerCommitted && requestState.contextKey !== perRequestContextKey()) {
+          requestState.cancelForContextChange?.();
+          return false;
+        }
+        return true;
+      }
+      requestState.cancelForContextChange = function () {
+        if (requestState.cancelled || requestState.answerCommitted) return;
+        requestState.cancel();
+        clearPendingQuestion();
+        stopThinking();
+        var message = requestState.examContext
+          ? 'Provfrågan ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen om den aktuella frågan.'
+          : 'Sidan eller studieområdet ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen här.';
+        if (typing) {
+          typing.className = 'per-msg teacher';
+          typing.textContent = message;
+        }
+        announceFailure(message);
       }
       var requestTimeout = setTimeout(function () {
         requestTimedOut = true;
@@ -1693,6 +1754,7 @@ function finalizeMsg(div, text) {
                   streamComplete = true;
                   if (!answerCommitted && answerText.trim()) {
                     answerCommitted = true;
+                    requestState.answerCommitted = true;
                     clearPendingQuestion();
                     clearTimeout(requestTimeout);
                     reviewTimeout = setTimeout(function () {
@@ -1802,6 +1864,7 @@ function finalizeMsg(div, text) {
                   : 'P.E.R fick inget användbart svar. Frågan finns kvar i rutan; tryck Skicka igen när du vill försöka på nytt.';
                 announceFailure(typing.textContent);
               } else {
+                requestState.answerCommitted = true;
                 clearPendingQuestion();
                 if (typeof data.helpCap === 'number') _perHelpCap = data.helpCap;
                 finalizeMsg(typing, data.answer);
