@@ -3298,3 +3298,50 @@ bekräftas utan att röra öppna prov.
   vid en separat assertion om logisk avgränsning innan replay-testet kördes.
   Aktiv ledtråd och replay behöver därför fortsatt verifiering; detta är inte
   löst av busy-meddelandet.
+
+## P.E.R-frågespecifik upptagsledning — 2026-10-25
+
+- [x] Ett uttryckligen godkänt syntetiskt Biologi 1-prov skapades på befintlig
+  staging-Preview med inskickat fotosyntesmaterial: 3/3 frågor godkändes,
+  samtliga matchade materialet, och verifierad rättning gav 6/6. Ingen fråga
+  kom från felbanken. Inget tidigare öppet prov lämnades in, avbröts eller
+  ändrades.
+- [x] Den enda godkända P.E.R-frågan gällde fråga 1 under provet. Facitspärren
+  fungerade, men svaret var en generell första ledtråd som inte nämnde
+  vatten-/koldioxidupptag. Källkod visar att frågan föll igenom alla kända
+  deterministiska ämnesmönster till standardtrappan; detta var brist på
+  relevant specialisering, inte verifierat tapp av frågekontext.
+- [x] Ny aktiv, facitfri trappa för frågor om hur växter tar upp vatten och
+  koldioxid ber eleven dela upp ämnena och hitta deras väg i underlaget utan
+  att ge rötter eller klyvöppningar som facit. Den gäller både svenska och
+  engelska former, inklusive växten/växterna och CO₂.
+- [x] Oberoende granskning upptäckte och blockerade en proof/text-kant:
+  verifieraren och hintvalet kunde tidigare läsa olika textfält. Ledtrådsvalet
+  använder nu samma kanoniska `question ?? text` som proof-signeringen.
+  Regressionen bevarar en giltig proof med ett annat klientfält och bekräftar
+  att det nya specialfallet inte väljs. Oberoende eftergranskning fann sedan
+  inga kvarvarande blockerare eller facitläckage.
+- [x] Fokuserade handler-regressioner passerade **4/4**: signerad upptagsfråga,
+  CO₂/variation i frågeform, konflikt mellan signerad text och klienttext,
+  manipulerad proof samt befintliga fotosyntes-, jämförelse- och
+  proof-fallbackfall. JS-syntax och `git diff --check` passerade.
+- [x] Stagingens budget före test: cap `$3.379071`, spenderat `$2.090394`,
+  reserverat `$0.263628`, kvar `$1.025049`, 0 aktiva orättade prov. Efter
+  generering, en P.E.R-fråga och rättning: spenderat `$2.102296`, reserverat
+  oförändrat `$0.263628`, kvar `$1.013147`, 0 aktiva orättade prov.
+- [x] Kodcheckpoint `785da1d23bcfcbe50f1dbe5f67169e0a3a2ae5ff` pushades endast
+  till `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_AbT3T8Y3ThLM5BGrjvWPSHytqLtT` är `READY` från exakt commit i befintliga
+  `provia-ai`-projektet; `/app.html` svarade HTTP 200. Preview:
+  `https://provia-61fginw9o-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] P.E.R-ledtråden observerades före den nya koden. Ingen andra liveledtråd
+  gjordes efter deployen eftersom den uttryckligen godkända enda livefrågan
+  redan användes. Den nya hinttrappan är därför offline-testad och deployad,
+  men inte separat liveverifierad.
+- [x] Inga ändringar i `main`, Vercel Production, Supabase-schema/data,
+  konton, roller, kvoter eller hemligheter.
+
+**PILOT NOT READY.** Nästa steg är separat uttrycklig tillåtelse för högst en
+liveledtråd mot redan rättat syntetprov, om sådan verifikation fortfarande
+behövs. Startsida och förbättringssida måste också fortsatt kontrolleras i
+aktuell Preview; den här checkpointen avsåg aktiv provhjälp.
