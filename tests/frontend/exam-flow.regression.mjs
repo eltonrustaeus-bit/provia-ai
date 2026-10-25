@@ -204,7 +204,7 @@ const signIn = async (page, uid, lang = "sv", storage = {}, role = "premium") =>
   }
 }
 
-async function toExam(page, reuseStart = false) {
+async function toExam(page, reuseStart = false, requestedCount = 3) {
   // The language scenario is already at the start screen. Reloading there can
   // abort its pending mocked Auth request and manufacture an unrelated error.
   if (!reuseStart) await page.goto(`${srv.url}/app.html`, { waitUntil: "domcontentloaded" });
@@ -212,6 +212,10 @@ async function toExam(page, reuseStart = false) {
   await page.click("#xf .xf-screen[data-screen='start'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='subject'] .xf-input", "Biologi 1");
   await page.click("#xf .xf-screen[data-screen='subject'] .xf-btn.primary"); await waitForScreenEntrance(page);
+  if (requestedCount !== 3) {
+    await page.locator("#xf .xf-screen[data-screen='aim'] .xf-act .xf-btn.quiet").first().click();
+    await page.getByRole("group", { name: "Antal" }).getByRole("button", { name: String(requestedCount), exact: true }).click();
+  }
   await page.click("#xf .xf-screen[data-screen='aim'] .xf-btn.primary"); await waitForScreenEntrance(page);
   await page.fill("#xf .xf-screen[data-screen='material'] .xf-area", "Cellandning sker i mitokondrien. Glykolysen ger 2 ATP. Citronsyracykeln sker i matrix. Elektrontransportkedjan kräver syre. Jäsning ger bara 2 ATP per glukos vid syrebrist i muskeln.");
   await page.waitForTimeout(150);
@@ -1190,6 +1194,73 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
   ok("T1d inga konsolfel", errs.length === 0, errs.join(" | "));
   await page.screenshot({ path: SHOT + "/t1-result.png" });
   await ctx.close();
+}
+
+// A type-skewed partial remains labelled 8/12 after grading and in history.
+{
+  const { ctx, page } = await mk();
+  const partialQuestions = Array.from({ length: 8 }, (_, index) => {
+    const short = index === 7;
+    const source = short ? EXAM.questions[1] : EXAM.questions[0];
+    return {
+      ...source,
+      id: `partial-${index + 1}`,
+      question: `Syntetisk delprov fråga ${index + 1}`,
+      ...(short ? { type: "short", options: [], correct_index: -1 } : {}),
+    };
+  });
+  try {
+    const persistedExamRows = [];
+    await page.route("**/rest/v1/user_exams**", route => {
+      if (route.request().method() === "POST") {
+        try {
+          const body = JSON.parse(route.request().postData() || "[]");
+          persistedExamRows.push(...(Array.isArray(body) ? body : [body]));
+        } catch {}
+      }
+      return route.fallback();
+    });
+    await page.route("**/api/generate-exam*", route => route.fulfill({ json: {
+      ok: true,
+      exam: { ...EXAM, questions: partialQuestions },
+      meta: { requested: 12, partial: true },
+    } }));
+    await signIn(page, "partial-history-user");
+    await toExam(page, false, 12);
+    ok("8 godkända frågor visas som delprov av 12",
+      (await page.locator("#status").innerText()).includes("8 av 12")
+        && (await page.locator("#xf .xf-exam").count()) === 1);
+    for (let index = 0; index < partialQuestions.length; index++) {
+      if (index === 7) await page.fill(".xf-answer", "syntetiskt kortsvar");
+      else await page.locator(".xf-mc-opt").first().click();
+      await page.locator(".xf-exam-nav .xf-btn.primary").click();
+      if (index < partialQuestions.length - 1) await page.waitForTimeout(150);
+    }
+    await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
+    const partialState = await page.evaluate(() => ({
+      history: JSON.parse(localStorage.getItem("proviaai_history") || "[]").at(-1),
+      saved: JSON.parse(localStorage.getItem("proviaai_last_result") || "null"),
+    }));
+    const partialQualityNotes = await page.locator("#xf .xf-question-quality-note").allInnerTexts();
+    ok("rättad delprovsskärm visar fortfarande 8 av 12",
+      partialQualityNotes.some(note => note.includes("12 frågor") && note.includes("8 frågor klarade")),
+      partialQualityNotes.join(" | "));
+    ok("lokal provhistorik bevarar begärt antal och delprovsflagga",
+      partialState.history?.numQuestions === 12 && partialState.history?.partialDelivery === true,
+      JSON.stringify(partialState.history));
+    ok("sparat resultat bevarar delprovets ursprungliga omfattning",
+      partialState.saved?.exam?.requested_question_count === 12
+        && partialState.saved?.exam?.partial_delivery === true,
+      JSON.stringify({ requested: partialState.saved?.exam?.requested_question_count,
+        partial: partialState.saved?.exam?.partial_delivery }));
+    const savedExam = persistedExamRows.at(-1)?.exam;
+    ok("kontots sparbegäran bevarar begärt antal och delprovsflagga",
+      savedExam?.requested_question_count === 12 && savedExam?.partial_delivery === true,
+      JSON.stringify({ requested: savedExam?.requested_question_count,
+        partial: savedExam?.partial_delivery }));
+  } finally {
+    await ctx.close();
+  }
 }
 
 // A successful grade survives a reload and is recovered only through the

@@ -3077,8 +3077,18 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
     }
     distinct.push(question);
   }
-  const balanced = ["mix", "mixed"].includes(qType)
-    ? selectMixedQuestions(distinct, mixedTypeTargets(numQuestions))
+  const mixed = ["mix", "mixed"].includes(qType);
+  const isPartial = distinct.length < numQuestions;
+  // Eligible partials may be type-skewed; keep every approved item while still
+  // requiring both formats. Full exams continue to use the requested balance.
+  const partialTypeCounts = isPartial
+    ? {
+      mc: distinct.filter((question) => question.type === "mc").length,
+      short: distinct.filter((question) => question.type === "short").length,
+    }
+    : null;
+  const balanced = mixed
+    ? selectMixedQuestions(distinct, partialTypeCounts || mixedTypeTargets(numQuestions))
     : { questions: distinct.slice(0, numQuestions) };
   if (balanced.questions.length !== distinct.length || balanced.questions.length < minimumDeliverableQuestionCount(numQuestions)) {
     throw new Error("Question mix does not meet delivery requirements");

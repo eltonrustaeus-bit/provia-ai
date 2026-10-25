@@ -4898,3 +4898,24 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   API-svar; det bevisar inte serverns kryptografiska kontroll eller live-/modellbeteende.
 - [!] Ingen staging- eller live-AI-körning gjordes. `main`, Production,
   Supabase, hemligheter, konton och kvoter är orörda.
+
+### Blandad partiell leverans vid slutmontering — 2026-10-25
+
+- [x] Reproducerat med syntetiskt HTTP/PGlite-flöde: 8/12 godkända frågor
+  (7 flervalsfrågor + 1 kortsvarsfråga) passerade pipeline-miniminivån men
+  avvisades av slutmonteringens fullständiga 6/6-mixmål.
+- [x] Slutmontering behåller nu alla frågor i ett kvalificerat delprov med
+  faktisk skev fördelning, men fortsätter att kräva minst 60% av begärd mängd,
+  båda formaten och varje befintlig strukturell/verifieringsgrind. Fullständiga
+  blandade prov använder fortsatt den begärda balansen.
+- [x] Ny HTTP-regression omfattar 7+1 av 12 och verifierar utfärdat antal,
+  `partial=true`, engångskvot, engångsutfärdande och exakt replay. Den nya
+  regressionsgrenen passerade `tests/api/exam-generation-pipeline-http.test.mjs`
+  (2/2). Den fokuserade genererings-/kvalitetssviten passerade också 113/113.
+- [x] Browserflödet bevarar nu ursprungligt begärt antal och delprovsflagga i
+  rättningsmodellen. Ny 8/12-regression verifierar resultattext, lokal historik,
+  lokalt sparat resultat och POST-payloaden till kontosparningen.
+- [x] `tests/frontend/exam-flow.regression.mjs` passerade 202/202.
+- [!] Detta är lokal offline/PGlite-evidens, inte bevis för hosted SQL eller
+  live-modellkvalitet. Ingen migration, AI-anrop, staging- eller produktions-
+  databasändring gjordes.

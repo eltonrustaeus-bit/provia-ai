@@ -1949,6 +1949,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       { ordinal: 101, requested: 12, mc: 4, short: 4, shouldIssue: true },
       { ordinal: 102, requested: 12, mc: 8, short: 0, shouldIssue: false },
       { ordinal: 103, requested: 12, mc: 3, short: 4, shouldIssue: false },
+      { ordinal: 104, requested: 12, mc: 7, short: 1, shouldIssue: true },
     ]) {
       const quotaBaseline = (await db.query(
         "select mock_quota_count from public.profiles where id=$1", [userId],
@@ -2095,8 +2096,8 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       }
     }
 
-    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,31,
-      "full 3/6/12 runs, verified mistake training, repairs, mixed partials, retries, deadline and queued-assembly salvages issue exactly once");
+    assert.equal((await db.query("select count(*)::int as n from public.exam_issuances where user_id=$1",[userId])).rows[0].n,32,
+      "full 3/6/12 runs, verified mistake training, repairs, balanced and skewed mixed partials, retries, deadline and queued-assembly salvages issue exactly once");
 
     const issuedBeforeRejected = (await db.query(
       "select count(*)::int as n from public.exam_issuances where user_id=$1", [userId],
