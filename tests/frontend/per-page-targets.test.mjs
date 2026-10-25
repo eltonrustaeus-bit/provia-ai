@@ -143,6 +143,37 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await ctx.close();
 }
 
+// Coach errors should explain common recoverable states without exposing
+// arbitrary provider or backend messages.
+{
+  let calls = 0;
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.topic === "studiecoach") {
+        calls++;
+        if (calls === 1) return route.fulfill({
+          status: 503, contentType: "application/json", body: JSON.stringify({ error: "EXAM_STATE_UNAVAILABLE" }),
+        });
+        return route.fulfill({
+          status: 500, contentType: "application/json", body: JSON.stringify({ error: "OPENAI_API_KEY=must-not-render" }),
+        });
+      }
+      return route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("P.E.R kunde inte kontrollera provstatus just nu.").waitFor({ timeout: 5000 });
+  ok("coach explains a known verification outage in student-friendly language",
+    (await page.locator("#coachText").textContent()).includes("Försök igen senare."));
+  await page.click("#perCoachRetry");
+  await page.getByText("Kunde inte hämta analysen just nu.").waitFor({ timeout: 5000 });
+  const finalMessage = await page.locator("#coachText").textContent();
+  ok("unknown provider details are hidden behind generic coach guidance",
+    !finalMessage.includes("OPENAI_API_KEY") && calls === 2, finalMessage);
+  await ctx.close();
+}
+
 // The server retains one account transcript, while the visible chat stays
 // scoped to the current page and excludes exam-bound or untagged legacy turns.
 {

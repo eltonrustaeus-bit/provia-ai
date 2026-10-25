@@ -3842,3 +3842,29 @@ Production, `main`, Supabase-data/schema, roll, kvot eller hemlighet ändrades.
 
 **PILOT NOT READY.** Nästa steg är att skapa staging-Preview för race-fixen och
 kontrollera coachkortet utan att starta om eller avbryta något öppet prov.
+
+## P.E.R coach: livekontroll och säkra felmeddelanden — 2026-10-25
+
+- [x] Race-fixen från `876286d` är pushad till feature-branchen och dess Vercel
+  Preview `dpl_ECX3V5mkbDq1riiGRNddexuKNjiz` blev `READY` för exakt commit
+  `876286db13a0633af52772699b89197f1cc5e118`.
+- [x] En enda livekontroll i den uppdaterade coachvyn avslutades med ett tydligt
+  fel och återförsöksknapp i stället för en tom laddningsruta. AI-budgetens
+  senaste stagingrad var oförändrad (`$2.144983` spenderat, `$0.263628`
+  reserverat av `$3.379071` cap; `$0.970460` kvar), vilket innebär att inget
+  nytt modellbelopp registrerades. Inga fler liveförsök gjordes.
+- [!] Exakt HTTP-fel kunde inte fastställas från den gamla klienten eftersom
+  den visade samma generiska text för alla fel. Vercels runtime-loggar för
+  deploymenten hade inga poster; Supabase-vyn visade ingen aktiv
+  P.E.R-lease vid efterkontrollen. Detta lämnar serverorsaken till just det
+  misslyckade anropet obekräftad.
+- [x] Ny klientändring mappar endast kända HTTP-statusar/felkoder till korta,
+  elevsäkra meddelanden. Okända fel, inklusive råa providersträngar, fortsätter
+  att visas generiskt. Offlinetestet täcker både statusmeddelande och att
+  godtycklig känslig feltext döljs.
+- [x] Oberoende read-only granskning fann inga blockerande fel i
+  felmappningen. Ändringen är ännu inte pushad eller live-verifierad.
+
+**PILOT NOT READY.** Nästa steg är att pushdeploya felmappningen och vid behov
+använda det nu säkra statusmeddelandet för att välja rätt åtgärd. Gör inget nytt
+liveförsök förrän statusen och återstående stagingbudget har kontrollerats.

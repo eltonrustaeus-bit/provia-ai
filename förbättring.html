@@ -686,7 +686,11 @@
         })
       });
       const data=await r.json();
-      if(!r.ok)throw new Error(data?.error||'failed');
+      if(!r.ok){
+        const error=new Error(typeof data?.error==='string'?data.error:'');
+        error.status=r.status;
+        throw error;
+      }
       const{data:after}=await db.auth.getSession();
       if(after?.session?.user?.id!==ownerId) return null;
       return data;
@@ -1502,7 +1506,7 @@
         }
         else coachError(currentBox());
       }catch(_){
-        if(requestId===coachRequestSequence)coachError(currentBox());
+        if(requestId===coachRequestSequence)coachError(currentBox(),_);
       }
       finally{
         if(coachPending?.requestId===requestId)coachPending=null;
@@ -1512,8 +1516,23 @@
 
     /* Ett misslyckat anrop säger det och går att göra om, i stället för att
        lämna ett streck som inte går att skilja från "inte hämtat än". */
-    function coachError(box){
-      box.textContent='Kunde inte hämta analysen just nu.';
+    function coachError(box,error){
+      const message=String(error?.message||'');
+      const status=Number(error?.status)||0;
+      const safeMessage=message==='EXAM_STATE_UNAVAILABLE'
+        ?'P.E.R kunde inte kontrollera provstatus just nu. Försök igen senare.'
+        :message==='PER_REQUEST_IN_PROGRESS'||status===409
+          ?'En annan P.E.R-förfrågan pågår. Vänta en stund och försök igen.'
+          :message==='P.E.R-kvoten är slut.'||status===429
+            ?'P.E.R-kvoten för perioden är slut. Försök igen när den återställs.'
+            :status===401||status===403
+              ?'Din session kunde inte verifieras. Logga in igen och försök.'
+              :status===502
+                ?'P.E.R fick inget färdigt svar. Försök igen.'
+                :status===503
+                  ?'P.E.R kunde inte nå sin tjänst just nu. Försök igen om en stund.'
+                  :'Kunde inte hämta analysen just nu.';
+      box.textContent=safeMessage;
       if($('perCoachRetry'))return;
       const b=document.createElement('button');
       b.type='button'; b.id='perCoachRetry'; b.className='xf-btn ghost'; b.textContent='Försök igen';
