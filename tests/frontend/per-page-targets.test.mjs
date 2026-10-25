@@ -56,6 +56,32 @@ async function assertPageTopic(path, expectedPage) {
     },
   });
   await page.waitForSelector("#perBubble", { timeout: 8000 });
+  if (expectedPage === "startsida") {
+    await page.evaluate(() => {
+      window._perPageContext = {
+        course: "PRIVATE_STALE_COURSE",
+        level: "PRIVATE_STALE_LEVEL",
+        userScore: 0.92,
+        weakAreas: ["PRIVATE_STALE_WEAK_AREA"],
+        studyMaterial: "PRIVATE_STALE_MATERIAL",
+        currentQuestion: { text: "PRIVATE_STALE_QUESTION" },
+        questions: [{ question: "PRIVATE_STALE_QUESTIONS" }],
+        examState: { phase: "result" },
+        mode: "exam",
+      };
+      window.PER.describe({ page: "startsida" });
+      localStorage.setItem("proviaai_mistakes", JSON.stringify([
+        { course: "PRIVATE_STALE_COURSE", concept_tag: "PRIVATE_STALE_MISTAKE" },
+      ]));
+      localStorage.setItem("proviaai_history", JSON.stringify([{ percent: 92 }]));
+      window.__homepageReadLocalStudyData = false;
+      const originalGetItem = Storage.prototype.getItem;
+      Storage.prototype.getItem = function (key) {
+        if (key === "proviaai_mistakes" || key === "proviaai_history") window.__homepageReadLocalStudyData = true;
+        return originalGetItem.call(this, key);
+      };
+    });
+  }
   await page.click("#perBubble");
   await page.locator("#perInput").fill("Vad betyder fotosyntes?");
   await page.locator("#perSendBtn").click();
@@ -65,6 +91,16 @@ async function assertPageTopic(path, expectedPage) {
   ]);
   ok(`${expectedPage} remains page context`, body.pageContext?.page === expectedPage, body.pageContext?.page);
   ok(`${expectedPage} is not sent as the study topic`, body.topic === "", JSON.stringify(body.topic));
+  if (expectedPage === "startsida") {
+    ok("homepage P.E.R request omits browser-derived scores", body.pageContext?.userScore === undefined,
+      JSON.stringify(body.pageContext?.userScore));
+    ok("homepage P.E.R request omits browser-derived mistakes", body.recentMistakes?.length === 0
+      && body.weakAreas?.length === 0, JSON.stringify({ recentMistakes: body.recentMistakes, weakAreas: body.weakAreas }));
+    ok("homepage P.E.R request drops stale study/exam context", !/PRIVATE_STALE/.test(JSON.stringify(body.pageContext)),
+      JSON.stringify(body.pageContext));
+    ok("homepage P.E.R never reads local scores or the mistake bank",
+      await page.evaluate(() => window.__homepageReadLocalStudyData === false));
+  }
   await ctx.close();
 }
 

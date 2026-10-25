@@ -575,7 +575,7 @@
          localStorage är bara det som råkar ligga kvar i den här webbläsaren.
          Den mer korrekta källan ska vinna. Beslutat 2026-08-09, avviker
          medvetet från dagens beteende. */
-      if (ctx.page !== 'förbättring' && typeof ctx.userScore !== 'number') {
+      if (ctx.page !== 'startsida' && ctx.page !== 'förbättring' && typeof ctx.userScore !== 'number') {
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
@@ -588,6 +588,13 @@
             }
           }
         } catch (_) {}
+      }
+
+      // The homepage offers general product/study help, not personalized
+      // coaching. Drop any stale study or exam context from another route.
+      if (ctx.page === 'startsida') {
+        ['course', 'level', 'studyMaterial', 'userScore', 'weakAreas', 'currentQuestion', 'questions', 'examState', 'mode']
+          .forEach(function (key) { delete ctx[key]; });
       }
 
       return ctx;
@@ -1726,11 +1733,12 @@ function finalizeMsg(div, text) {
 
         var recentMistakes = [], weakAreas = [];
         try {
-          var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
-          var mayUseMistakeContext = pageCtx.page !== 'förbättring'
+          var mayUseMistakeContext = pageCtx.page !== 'startsida'
+            && pageCtx.page !== 'förbättring'
             && pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
             && pageCtx.examState?.phase !== 'exam';
           if (mayUseMistakeContext) {
+            var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
             var activeCourse = String(pageCtx.course || '').trim();
             var normalizeCourse = function(value) {
               return String(value || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase('sv');
