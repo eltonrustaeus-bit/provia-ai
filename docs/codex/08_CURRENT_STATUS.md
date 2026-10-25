@@ -4804,6 +4804,10 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Inget staging-/live-AI-test gjordes: den befintliga inloggade Previewn
   visar verklig studiehistorik, så syntetisk identitet kan inte säkerställas.
   Offline-stubbarna bevisar inte modellens semantiska precision.
-- [!] Ändringen är ännu inte pushad/deployad. Användarens godkännande gäller
-  befintlig feature-branch och Preview. `main`, Production, Supabase,
-  hemligheter, konton och kvoter är orörda.
+- [x] Kodcheckpoint `284fbc2d8270650696068c33836872df01ab11fe` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_4uqTnXZbXmCZ7sQs5hYEV4Vyja9o` är `READY` från exakt SHA på
+  `https://provia-k560gb8cp-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] Ingen inloggad syntetisk testkörning eller live-AI användes; Previewn
+  innehåller inte verifierad syntetisk konto-/historikstatus. `main`,
+  Production, Supabase, hemligheter, konton och kvoter är orörda.
