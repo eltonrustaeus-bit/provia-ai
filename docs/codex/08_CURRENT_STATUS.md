@@ -3944,13 +3944,27 @@ med ett bekräftat syntetiskt stagingprov. Ingen öppen provstatus ändrades.
   rubrik-, list-, citat- och länkmarkörer. Normaliseringen och regressionerna
   täcker nu färska och cacheade svar; granskaren rapporterade inga återstående
   konkreta fel i de granskade fallen.
-- [!] Fixen är ännu inte pushad/deployerad. Den senaste READY Previewn är
-  fortfarande `dpl_6ykCt3A4bkqRvyzbTeXW3r6Dwunc` för föregående kodrevision.
-  Aktiv provledtråd är fortfarande inte live-testad; ett separat öppet prov
-  lämnades orört.
+- [!] Vid slutet av den lokala verifieringen men före nästa avsnitt var fixen
+  ännu inte pushad. Aktiv provledtråd var inte live-testad; ett separat öppet
+  prov lämnades orört.
 
-**PILOT NOT READY.** Fixen är ännu inte pushad/deployerad. Nästa steg är
-checkpoint-push och verifiering av exakt Preview-deployment. Därefter kan högst
-ett coachtest bekräfta att senastepoängen nu stämmer med sidans resultat, efter
-färsk kontroll av stagingbudget. Aktiv provledtråd är fortsatt overifierad live;
-inget öppet eller produktionsprov får ändras för testet.
+## Coachfix verifierad i staging Preview — 2026-10-25
+
+- [x] Checkpoint `7af89996177c3cba1370de0d23ec1da93c4d1bdf` pushad till den
+  befintliga feature-branchen `codex/exgen-generation-quality-2026-10-20`.
+- [x] Vercel Preview `dpl_HKuN5V8XTXonaKYPL9TZp3FBRb9E` nådde READY för exakt
+  commit och den stabila branch-aliasen pekade på deploymenten. Ingen
+  `main`/Production-deploy eller databasskrivning gjordes.
+- [x] Ett syntetiskt coachsvar i den autentiserade staging-Previewn live-
+  verifierade att P.E.R nu säger att resultaten stigit från `0 %` till `100 %`
+  och listar de tre senaste som `92 %, 92 %, 100 %`. Det matchade sidans
+  senaste `100 %` och trend `+67 p.p.`. Svaret visade ingen rå Markdown.
+- [x] Skrivskyddad stagingbudget efter testet: cap `$3.379071`, spent
+  `$2.147958`, reserved `$0.263628`, kvar `$0.967485`. En enda coachförfrågan
+  kördes efter checkpointen; inga prov/resultat eller användarkvoter ändrades.
+
+**PILOT NOT READY.** Resultatordning och ren text är nu verifierade live för
+coachflödet på staging. Aktiv provledtråd är fortsatt inte live-verifierad;
+inget öppet prov eller produktionsprov ändrades. Håll kvar ändringen på
+feature-branch och gör ingen merge till `main`/Production utan separat uttryckligt
+beslut.
