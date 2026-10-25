@@ -4402,3 +4402,42 @@ och produktionsdatabas orörda tills separat releasebeslut.
   `ad60a683`; feature-Preview READY kör fortfarande `590ac554`. Stagingens
   enda budgetrad är aktiverad: tak `$3.379071`, spenderat `$2.172902`,
   reserverat `$0.263628`, kvar `$0.942541`. Inga modellanrop gjordes.
+
+## Stagingfel för 12 naturvetenskapliga kortsvar och källankare — 2026-10-25
+
+- [x] En livekontroll på staging använde syntetiskt Biologi 1-material och
+  begärde 12 kortsvarsfrågor på A-nivå. Inget prov utfärdades: resultatet var
+  uttryckligen `0 av 12`, och appen bad om mer relevant material eller snävare
+  ämne. Kvalitetsgrinden fungerade fail-closed.
+- [x] Sanerad Preview-telemetri för körningen visar att första 7 kandidaterna
+  föll strukturellt på `source_answer_not_extractable`. En senare reparations-
+  batch producerade 8 kandidater; 5 passerade strukturen men samtliga 5
+  avvisades av den oberoende granskaren, främst för `source_support`, samt
+  vissa utfall för nivå, fakta och bedömningskvalitet. Jobbet avslutades med
+  `STAGE_RETRY_LIMIT`. Råfrågor, material, konton och elevinnehåll lästes inte.
+- [x] Kodfixen lägger nu till ett begränsat urval av ordagranna svarankare från
+  naturvetenskapligt material för kortsvar och blandade prov. Urvalet täcker
+  hela materialet, bevarar källans radbrytningar och hanterar decimaler,
+  förkortningar samt ofullständiga punktlistor. Reparation får samma
+  ämnesspecifika instruktioner. A-nivå får inte etiketteras som analys om
+  källan bara stöder återgivning.
+- [x] Ingen strukturell kontroll, oberoende verifiering, godkännandetröskel,
+  minsta leveransgräns eller kvotregel ändrades. Saknas tillräckligt källstöd
+  ska provet fortsatt avvisas i stället för att fyllas med irrelevanta frågor.
+- [x] Slutlig offlinekontroll efter ändringen: riktad prov/offline-quality
+  **2/2**, relevant API-/HTTP-/P.E.R-/frontendsvit **115/115**,
+  `node --check` för ändrade JavaScript-filer och `git diff --check` passerade.
+  Oberoende read-only-granskning fann inga blockerare efter korrigering av
+  meningssegmenteringen.
+- [!] Ändringen är ännu inte liveverifierad. Den senaste lästa stagingbudgeten
+  efter föregående test var `$0.941435` kvar under den branch-scope:ade gränsen;
+  ingen ytterligare modellförfrågan gjordes. Den nya koden ska först nå en
+  READY feature-Preview. Ingen `main`, Production eller databas ändrades.
+- [x] Separat P.E.R-kontroll på startsidan fick ett relevant svar från
+  `gpt-6-luna` på cirka 2,8 sekunder. Detta verifierar bara den generella
+  startsidesfrågan, inte alla P.E.R-lägen.
+
+**PILOT NOT READY.** Den nya prompt-/ankarförbättringen behöver en staging-
+Preview och därefter en enda ny syntetisk körning inom en färskt verifierad
+budget. Den tidigare körningen ska fortsatt redovisas som misslyckad 0/12;
+offlinepass bevisar inte modellens framtida 12/12-resultat.

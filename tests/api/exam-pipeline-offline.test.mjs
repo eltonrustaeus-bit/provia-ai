@@ -145,6 +145,11 @@ const biologyPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "mc", numQuestions: 3,
   pastedText: "Fotosyntes sker i kloroplasterna. Växten använder koldioxid och vatten.", isMath: false,
 });
+const biologyShortPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "A", course: "Biologi 1", qType: "short", numQuestions: 3,
+  pastedText: "Fotosyntesen sker i kloroplasterna. Växten använder ljus, vatten och koldioxid för att bilda glukos och syre. Cellandning frigör energi ur glukos.",
+  isMath: false, requireExtractiveAnswers: true,
+});
 const batchWithNoveltyContext = generateExam.buildExamPrompts({
   lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 2,
   pastedText: "Fotosyntes sker i kloroplasterna.", isMath: false,
@@ -224,6 +229,58 @@ assert.match(biologyPrompt.systemPrompt, /model_answer innehålla ENDAST hela, s
   "the generator forbids prefixes and paraphrases that would fail exact source extraction");
 assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt härledd lösning/i,
   "the extractive instruction preserves derived mathematical answers");
+assert.match(biologyShortPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
+  "natural-science short answers receive exact source sentences as candidate answer anchors");
+assert.match(biologyShortPrompt.userPrompt, /\["Fotosyntesen sker i kloroplasterna\.","Växten använder ljus, vatten och koldioxid för att bilda glukos och syre\.","Cellandning frigör energi ur glukos\."\]/,
+  "answer anchors are literal complete sentences copied from the supplied synthetic material");
+assert.match(biologyShortPrompt.systemPrompt, /Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källmeningarna inte själva uttrycker/i,
+  "natural-science short-answer questions cannot demand unsupported inference beyond their exact answer source");
+assert.match(biologyShortPrompt.systemPrompt, /På A-nivå får du bara skapa en fråga om materialet både stöder svaret ordagrant och ger tillräckligt underlag för det självständiga resonemang/i,
+  "A-level science items require both an extractive answer and source-supported independent reasoning");
+assert.doesNotMatch(biologyPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
+  "anchor payloads are omitted when the chosen format has no short-answer items");
+const distributedSource = Array.from({ length: 18 }, (_, index) =>
+  `Källfaktum ${index + 1} beskriver en separat biologisk process i materialet.`).join(" ");
+const distributedBiologyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 3, examQuestionCount: 12,
+  pastedText: distributedSource, isMath: false, requireExtractiveAnswers: true,
+});
+const serializedAnchors = distributedBiologyPrompt.userPrompt.match(/Exakta källmeningar som möjliga svarankare[^:]*: (\[[^\n]*\])\./)?.[1];
+assert.ok(serializedAnchors, "distributed science material is represented by a bounded anchor list");
+const distributedAnchors = JSON.parse(serializedAnchors);
+assert.equal(distributedAnchors.length, 12, "anchor count follows the full exam target rather than a small internal batch");
+assert.equal(distributedAnchors[0], "Källfaktum 1 beskriver en separat biologisk process i materialet.");
+assert.equal(distributedAnchors.at(-1), "Källfaktum 18 beskriver en separat biologisk process i materialet.",
+  "bounded anchors retain source coverage through the end of longer material");
+const sentenceBoundaryPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Biologi 1", qType: "short", numQuestions: 3,
+  pastedText: "Vattnets pH 7.0 är neutralt. Ett pH under 7.0 är surt. Se t.ex. ett tydligt exempel här.\n• En punktanteckning utan avslutande mening\nFotosyntesen sker i kloroplasterna.\nVattnets pH-värde används för att\nbeskriva surhetsgraden.",
+  isMath: false, requireExtractiveAnswers: true,
+});
+const boundaryAnchorsText = sentenceBoundaryPrompt.userPrompt.match(/Exakta källmeningar som möjliga svarankare[^:]*: (\[[^\n]*\])\./)?.[1];
+assert.ok(boundaryAnchorsText, "sentence-aware source anchors are produced for punctuation edge cases");
+const boundaryAnchors = JSON.parse(boundaryAnchorsText);
+assert.deepEqual(boundaryAnchors, [
+  "Vattnets pH 7.0 är neutralt.",
+  "Ett pH under 7.0 är surt.",
+  "Se t.ex. ett tydligt exempel här.",
+  "Fotosyntesen sker i kloroplasterna.",
+  "Vattnets pH-värde används för att\nbeskriva surhetsgraden.",
+], "sentence segmentation preserves decimals and abbreviations while excluding an incomplete bullet note");
+assert.ok(boundaryAnchors.every((anchor) => sentenceBoundaryPrompt.userPrompt.includes(anchor)),
+  "each emitted anchor remains an exact contiguous substring of the original source text");
+const biologyRepair = generateExam.buildRepairPayload({
+  model: "synthetic-model",
+  input: [{ role: "system", content: biologyShortPrompt.systemPrompt }, { role: "user", content: biologyShortPrompt.userPrompt }],
+  text: { format: generateExam.buildMockExamSchema(3) },
+}, {
+  lang: "sv", numQuestions: 3, candidateCount: 4, qType: "short", requireExtractiveAnswers: true,
+  questionCountOffset: biologyShortPrompt.questionCountOffset,
+});
+assert.match(biologyRepair.input.at(-1).content, /NATURVETENSKAPLIGA KORTSVAR:.*På A-nivå/i,
+  "science-specific source-answer requirements persist through repair attempts");
+assert.match(biologyRepair.input.at(-1).content, /Kopiera dem exakt.*Poängkraven/i,
+  "repair instructions continue to direct candidates toward exact, fully supported source answers");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
