@@ -4429,15 +4429,20 @@ och produktionsdatabas orörda tills separat releasebeslut.
   `node --check` för ändrade JavaScript-filer och `git diff --check` passerade.
   Oberoende read-only-granskning fann inga blockerare efter korrigering av
   meningssegmenteringen.
-- [!] Ändringen är ännu inte liveverifierad. Den senaste lästa stagingbudgeten
-  efter föregående test var `$0.941435` kvar under den branch-scope:ade gränsen;
-  ingen ytterligare modellförfrågan gjordes. Den nya koden ska först nå en
-  READY feature-Preview. Ingen `main`, Production eller databas ändrades.
+- [x] Commit `acdb5ae576355aaf2b3689c2e9c87107cc853be8` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_C34aTHApQtKQ9brFvrY2YSaDD1oy` blev READY från exakt den SHA:n och
+  branch-aliasen pekar på den. Ingen `main`, Production eller databas ändrades.
+- [!] Den nya koden är ännu inte live-modellverifierad. Senaste lästa
+  stagingbudget efter föregående test var `$0.941435` kvar under den
+  branch-scope:ade gränsen; ingen ytterligare modellförfrågan gjordes.
+  GitHub `main` står kvar på `ad60a683`, och Vercel Production READY kör
+  fortsatt exakt den SHA:n.
 - [x] Separat P.E.R-kontroll på startsidan fick ett relevant svar från
   `gpt-6-luna` på cirka 2,8 sekunder. Detta verifierar bara den generella
   startsidesfrågan, inte alla P.E.R-lägen.
 
-**PILOT NOT READY.** Den nya prompt-/ankarförbättringen behöver en staging-
-Preview och därefter en enda ny syntetisk körning inom en färskt verifierad
-budget. Den tidigare körningen ska fortsatt redovisas som misslyckad 0/12;
+**PILOT NOT READY.** Den nya prompt-/ankarförbättringen finns i feature-Preview,
+men behöver en enda ny syntetisk körning när en färskt verifierad stagingbudget
+räcker. Den tidigare körningen ska fortsatt redovisas som misslyckad 0/12;
 offlinepass bevisar inte modellens framtida 12/12-resultat.
