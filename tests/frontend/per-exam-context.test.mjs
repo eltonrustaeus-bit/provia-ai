@@ -150,7 +150,7 @@ const proofFreshness = await page.evaluate(() => {
   return {
     current: window.__perTestRestoredProofIsFresh(now),
     stale: window.__perTestRestoredProofIsFresh(now - 15 * 60 * 1000 - 1),
-    future: window.__perTestRestoredProofIsFresh(now + 1),
+    future: window.__perTestRestoredProofIsFresh(now + 60_000),
     invalid: window.__perTestRestoredProofIsFresh("not-a-time"),
   };
 });

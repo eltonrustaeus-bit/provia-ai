@@ -1197,7 +1197,12 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
 {
   const { ctx, page } = await mk();
   const originalGradeTasks = EXAM.questions.map(q => q.grade_task);
+  let recoveredReviewPayload = null;
   try {
+    await page.route("**/api/explain", async route => {
+      recoveredReviewPayload = JSON.parse(route.request().postData() || "{}");
+      return route.fulfill({ json: { ok: true, answer: "Svar efter verifierad rättning." } });
+    });
     EXAM.questions.forEach((q, index) => { q.grade_task = { task_id: `recovery-${index}`, rubric: "synthetic" }; });
     await signIn(page, "result-recovery-user");
     await toExam(page);
@@ -1230,6 +1235,23 @@ if (!process.env.EXAM_FLOW_LANGUAGE_ONLY) {
     ok("T1r återhämtning använder exakt en idempotent rättningsåterspelning",
       gradeCallCount === callsAfterFirstGrade + 1, `replay calls=${gradeCallCount - callsAfterFirstGrade}`);
     ok("T1r P.E.R:s facitgranskning finns efter återhämtning", await page.locator(".xf-review-action").count() > 0);
+    await page.locator(".xf-review-action").first().click();
+    await page.waitForFunction(() => Array.from(document.querySelectorAll("#perMessages .per-msg.teacher"))
+      .some(message => message.textContent.includes("Svar efter verifierad rättning.")), null, { timeout: 8000 });
+    ok("T1r återställt resultat öppnar P.E.R-förklaring", !!recoveredReviewPayload);
+    ok("T1r P.E.R-anropet använder återhämtat signerat provbevis",
+      recoveredReviewPayload?.examProof?.receipt === `v2.${"f".repeat(32)}.syntheticRegressionProof`
+      && recoveredReviewPayload?.examProof?.selectedQuestionId === lastGradePayload?.questions?.[0]?.id,
+      JSON.stringify({ hasProof: !!recoveredReviewPayload?.examProof,
+        selectedQuestionId: recoveredReviewPayload?.examProof?.selectedQuestionId }));
+    ok("T1r efterrättningsanropet skickar rättade frågor i samma ordning",
+      JSON.stringify(recoveredReviewPayload?.examProof?.questions?.map(q => q.id))
+        === JSON.stringify(lastGradePayload?.questions?.map(q => q.id)));
+    ok("T1r efterrättningsanropet skickar exakt de rättade elevsvaren",
+      JSON.stringify(recoveredReviewPayload?.examProof?.answers)
+        === JSON.stringify(lastGradePayload?.answers));
+    ok("T1r efterrättningsanropet är uttryckligen markerat som provgranskning",
+      recoveredReviewPayload?.examReview === true);
   } finally {
     EXAM.questions.forEach((q, index) => { q.grade_task = originalGradeTasks[index]; });
     examIssuanceStateResponse = "active";

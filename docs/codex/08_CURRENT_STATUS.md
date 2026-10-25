@@ -4881,3 +4881,20 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Ingen syntetisk inloggning kunde bekräftas för det aktuella stagingkontot;
   därför gjordes ingen betald AI-körning. `main`, Production, Supabase, hemligheter,
   konton och kvoter är orörda.
+
+### P.E.R efter resultatrecovery — 2026-10-25
+
+- [x] Prov-/P.E.R-browserregressionen följer nu lyckad rättning, omladdning,
+  återställning via verifierat resultat, klick på P.E.R och det efterföljande
+  `/api/explain`-anropet. Testet jämför återhämtade frågor i ordning och elevsvar
+  exakt mot rättningsåterspelningen och kontrollerar `examReview` samt provkvittot.
+- [x] Gränstestet för framtida signerade P.E.R-bevis använder nu 60 sekunders
+  marginal i stället för 1 millisekund för att undvika en tidsrace.
+- [x] Offline: `EXAM_FLOW_ONLY_RESULT_RECOVERY=1 node
+  tests/frontend/exam-flow.regression.mjs` passerade **133/133** och
+  `node tests/frontend/per-exam-context.test.mjs` passerade **102/102** efter
+  ändringarna. `node --check` för båda testerna och `git diff --check` passerade.
+- [!] Oberoende granskning fann inga blockerare. Browserflödet använder mockade
+  API-svar; det bevisar inte serverns kryptografiska kontroll eller live-/modellbeteende.
+- [!] Ingen staging- eller live-AI-körning gjordes. `main`, Production,
+  Supabase, hemligheter, konton och kvoter är orörda.
