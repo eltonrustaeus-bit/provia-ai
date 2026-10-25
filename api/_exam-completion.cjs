@@ -44,6 +44,60 @@ function issueExamManifest(userId, course, material, questions) {
   return `v2.${id}.${signature}`;
 }
 
+function activeQuestionProjection(question) {
+  const declaredGraphMode = question?.graph_ui?.mode || question?.graphMode;
+  const graphMode = question?.type === "graph" &&
+    (declaredGraphMode === "line" || declaredGraphMode === "scatter") ? declaredGraphMode : undefined;
+  return {
+    id: String(question?.id ?? ""),
+    type: String(question?.type || ""),
+    text: String(question?.question ?? question?.text ?? ""),
+    options: Array.isArray(question?.options) ? question.options : [],
+    ...(graphMode ? { graphMode } : {}),
+  };
+}
+
+function activeQuestionMessage(userId, course, id, projection, number, total) {
+  return `exgen-active-question:v1:${userId}:${course || ""}:${id}:${number}:${total}:${JSON.stringify(projection)}`;
+}
+
+function issueActiveQuestionProofs(userId, course, questions) {
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) return null;
+  const secret = getExamSigningSecret();
+  const id = submissionId(userId, course, questions);
+  if (!secret || !id) return null;
+  const signed = [];
+  for (let index = 0; index < questions.length; index += 1) {
+    const question = questions[index];
+    const projection = activeQuestionProjection(question);
+    if (!projection.id || !projection.text.trim()) return null;
+    const signature = crypto.createHmac("sha256", secret)
+      .update(activeQuestionMessage(userId, course, id, projection, index + 1, questions.length))
+      .digest("base64url");
+    signed.push({ ...question, active_question_proof: signature });
+  }
+  return signed;
+}
+
+function verifyActiveQuestionProof(proof, userId, course, id, question, number, total) {
+  if (!userId || !/^[a-f0-9]{32}$/.test(String(id || "")) ||
+      typeof course !== "string" || course.length > 200 ||
+      typeof proof !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(proof) ||
+      !Number.isInteger(number) || number < 1 || !Number.isInteger(total) || total < number || total > 20) return false;
+  const secret = getExamSigningSecret();
+  const projection = activeQuestionProjection(question);
+  if (!secret || !projection.id || !projection.text.trim() || projection.text.length > 4000 ||
+      projection.id.length > 100 || !["mc", "short", "graph"].includes(projection.type) ||
+      projection.options.length > 8 ||
+      projection.options.some((option) => typeof option !== "string" || option.length > 1000)) return false;
+  const expected = crypto.createHmac("sha256", secret)
+    .update(activeQuestionMessage(userId, course, id, projection, number, total))
+    .digest("base64url");
+  const givenBytes = Buffer.from(proof);
+  const expectedBytes = Buffer.from(expected);
+  return givenBytes.length === expectedBytes.length && crypto.timingSafeEqual(givenBytes, expectedBytes);
+}
+
 function verifyExamManifest(manifest, userId, course, material, questions) {
   if (typeof manifest !== "string" || manifest.length > 80 || !supportedMaterial(material)) return false;
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) return false;
@@ -127,4 +181,7 @@ function verifyCompletion(proof, userId) {
     : null;
 }
 
-module.exports = { submissionId, answerFingerprint, issueExamManifest, verifyExamManifest, issueCompletion, verifyCompletion };
+module.exports = {
+  submissionId, answerFingerprint, issueExamManifest, verifyExamManifest,
+  issueActiveQuestionProofs, verifyActiveQuestionProof, issueCompletion, verifyCompletion,
+};

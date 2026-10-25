@@ -54,6 +54,39 @@ test("the exam manifest binds the complete delivered set to its account and mate
     "changing the exposed issuance ID invalidates the signature");
 });
 
+test("active-question proof binds an exact focus to owner, exam, course, and position", () => {
+  const questions = examFor();
+  const id = completion.submissionId(userId, course, questions);
+  const signed = completion.issueActiveQuestionProofs(userId, course, questions);
+  assert.equal(signed.length, questions.length);
+  const first = signed[0];
+  const focus = {
+    id: first.id, type: first.type, text: first.question, options: first.options,
+    number: 1, of: questions.length,
+  };
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, course, id, focus, 1, questions.length,
+  ), true);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, "student-b", course, id, focus, 1, questions.length,
+  ), false);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, "Biologi 1", id, focus, 1, questions.length,
+  ), false);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, course, "0".repeat(32), focus, 1, questions.length,
+  ), false);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, course, id, { ...focus, text: "Manipulerad fråga" }, 1, questions.length,
+  ), false);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, course, id, focus, 2, questions.length,
+  ), false);
+  assert.equal(completion.verifyActiveQuestionProof(
+    first.active_question_proof, userId, course, id, focus, 1, 1,
+  ), false);
+});
+
 test("legacy v1 exam manifests remain valid for already issued exams", () => {
   const questions = examFor();
   const id = completion.submissionId(userId, course, questions);

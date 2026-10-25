@@ -511,7 +511,24 @@ async function granskaSvar({ fråga, svar, helpLevel, isMath, läroplan, userId 
   } catch { return null; }
 }
 
-function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
+function verifiedActiveQuestion(body, user, submissionId) {
+  const context = body.pageContext;
+  const question = context?.currentQuestion;
+  if (!question || typeof question !== "object" || Array.isArray(question) ||
+      typeof context?.course !== "string" ||
+      !examCompletion.verifyActiveQuestionProof(
+        question.questionProof, user.id, context.course, submissionId,
+        question, question.number, question.of,
+      )) return null;
+  return {
+    type: question.type,
+    text: String(question.text || "").slice(0, 4000),
+    answered: question.answered === true,
+    graphMode: question.type === "graph" ? question.graphMode : undefined,
+  };
+}
+
+function sendActiveExamGuidance(req, res, body, issuanceState = "active", trustedQuestion = undefined) {
   const safeHelpStates = ["unverified", "abandoned", "expired", "missing", "completed"];
   if (issuanceState !== "active" && !safeHelpStates.includes(issuanceState)) {
     const en = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
@@ -541,10 +558,11 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       reviewDeferred: true,
     });
   }
-  const currentQuestion = body.pageContext?.currentQuestion;
+  const currentQuestion = trustedQuestion === undefined
+    ? body.pageContext?.currentQuestion : trustedQuestion;
   const type = currentQuestion?.type;
   const hasDraft = currentQuestion?.answered === true;
-  const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 500);
+  const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 4000);
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
   if (currentQuestion?.graph_ui && Object.hasOwn(currentQuestion.graph_ui, "mode")) declaredGraphModes.push(currentQuestion.graph_ui.mode);
@@ -876,10 +894,11 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
         return true;
       }
       if (latestState === "none" || latestState === "completed") return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
       return true;
     }
-    sendActiveExamGuidance(req, res, body);
+    sendActiveExamGuidance(req, res, body, "active", null);
     return true;
   }
 
@@ -893,7 +912,9 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
       return true;
     }
     if (state === "active" || state === "grading") {
-      sendActiveExamGuidance(req, res, body, state);
+      const trustedQuestion = state === "active"
+        ? verifiedActiveQuestion(body, user, submissionId) : null;
+      sendActiveExamGuidance(req, res, body, state, trustedQuestion);
       return true;
     }
     const activeCount = await examIssuance.activeExamCount(user.id);
@@ -902,7 +923,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
       return true;
     }
     if (activeCount > 0) {
-      sendActiveExamGuidance(req, res, body);
+      sendActiveExamGuidance(req, res, body, "active", null);
       return true;
     }
     const latestState = await examIssuance.latestExamState(user.id);
@@ -912,7 +933,8 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     }
     if (latestState !== "none" && latestState !== "completed") {
       if (allowSafeStudyChat(latestState)) return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
       return true;
     }
     if (state !== "completed") {
@@ -955,7 +977,8 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     }
     if (latestState !== "none" && latestState !== "completed") {
       if (allowSafeStudyChat(latestState)) return false;
-      sendActiveExamGuidance(req, res, body, latestState);
+      sendActiveExamGuidance(req, res, body, latestState,
+        latestState === "active" || latestState === "grading" ? null : undefined);
       return true;
     }
     if (hasOtherPage && hasStaleExamPayload && ordinaryStudyChat) {
@@ -979,7 +1002,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     }
     return false;
   }
-  sendActiveExamGuidance(req, res, body);
+  sendActiveExamGuidance(req, res, body, "active", null);
   return true;
 }
 
@@ -1011,7 +1034,7 @@ async function acquirePerAnswerLease(user, lease) {
 function rejectLeaseOutcome(req, res, body, outcome, { history = false, lease = null } = {}) {
   if (outcome === "exam_active") {
     if (history) return res.status(409).json({ error: "EXAM_ACTIVE" });
-    sendActiveExamGuidance(req, res, body);
+    sendActiveExamGuidance(req, res, body, "active", null);
     return true;
   }
   if (outcome === "ungraded_exam") {

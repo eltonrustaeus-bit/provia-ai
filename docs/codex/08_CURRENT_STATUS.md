@@ -3099,3 +3099,41 @@ budget.
 **PILOT NOT READY.** Invanta att användaren loggar in i den öppna Previewn med
 ett separat stagingkonto. Kontrollera därefter budgeten färskt och säkerställ
 att kontot inte äger det bevarade 9/12-provet innan något syntetiskt AI-test.
+
+## P.E.R aktiv-fråga verifiering — 2026-10-25
+
+- [x] ExGen binder nu P.E.R:s aktiva provledtråd till en serverutfärdad,
+  användar- och provbunden HMAC-profil av den aktuella frågan. Identitet,
+  kurs, prov, position, frågetext, frågetyp, alternativ och graf-läge ingår.
+- [x] Saknat eller ogiltigt bevis ger en neutral facitfri ledtråd; aktivt
+  provläge faller inte tillbaka till osignerad klienttext. Replay av ett
+  genererat prov får färska bevis. Långa frågor skickas intakta upp till den
+  verifierade gränsen, i stället för att UI:t klipper signerat innehåll.
+- [x] Oberoende granskning fann två blockerande luckor i första versionen:
+  osignerad klientfallback i aktivt provläge och mismatch när långa frågor
+  klipptes i klienten. Båda är åtgärdade och täcks av regressionstester.
+- [x] Den oberoende slutgranskningen fann inga blockerare för facitläckage,
+  ägar-/prov-/positionsbindning, replay eller neutral fallback. En icke-
+  blockerande långfrågekant åtgärdades: lutningsdetekteringen använder nu hela
+  den proof-verifierade frågan (upp till 4 000 tecken).
+- [x] Riktade offline-kontroller efter korrigering: bevis- och manifesttester
+  **41/41**; aktiv P.E.R-handler med ändrade proof/guard-fall **10/10**;
+  provpipeline och klientkontext passerade; provsidans kontext **88/88**;
+  startsidesmål **41/41**; P.E.R-landningskontroller gröna. Syntaxkontroller
+  för ändrade JS-filer passerade.
+- [x] Hela aktiva P.E.R-handler-sviten passerade **62/62** efter samtliga
+  korrigeringar. Testfallen för ledtrådstrappan använder signerad kontext;
+  saknad proof ger neutral hjälp; ett lutningsord efter tecken 620 väljer
+  fortfarande rätt, facitfri vägledning.
+- [!] Den godkända enstaka syntetiska ledtråden i den tidigare Previewn föll
+  tillbaka på ett generiskt meddelande om att provet inte var öppet. Ingen
+  nytt betalt AI-anrop gjordes: aktuell kvarvarande budget verifierades inte,
+  och det synliga provet lämnades orört. Preview/deployment för den här
+  ändringen har ännu inte skapats.
+- [!] Ändringarna är lokala och ocommittade. Inget ändrades i `main`, Vercel
+  Production, Supabase, konton, kvoter eller hemligheter.
+
+**PILOT NOT READY.** Nästa steg: checkpoint-commit/push enbart till den
+godkända feature-branchen och verifiering av en exakt READY Vercel Preview.
+Liveverifiering kräver ny kontroll av stagingkoppling, användarsession och
+kvarvarande kostnadsbudget; det tidigare öppna provet ska inte ändras.

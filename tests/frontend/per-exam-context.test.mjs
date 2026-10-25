@@ -23,6 +23,7 @@ const QUESTIONS = Array.from({ length: 4 }, (_, n) => ({
     : n === 3 ? { graph_ui: { mode: "future", point_count: 3, x_label: "Tid", y_label: "Halt" } } : {}),
   topic: "Cellandning", cognitive_level: "förstå", source_references: ["s.1"],
   model_answer: "Beta", grade_task: "synthetic-signed-question-" + (n + 1),
+  active_question_proof: "A".repeat(43),
   scoring_rubric: { parts: [], full_score_requirements: "", partial_credit_notes: "" }
 }));
 const EXAM_SUBMISSION_ID = examCompletion.submissionId("u1", "Biologi 1", QUESTIONS);
@@ -292,6 +293,8 @@ ok("T4f phase följer med ut på nätverket", lastExplain?.pageContext?.examStat
    JSON.stringify(lastExplain?.pageContext?.examState));
 ok("T4g provets servergenererade submission-id följer med till API:t", lastExplain?.pageContext?.examState?.submissionId === EXAM_SUBMISSION_ID,
    JSON.stringify(lastExplain?.pageContext?.examState));
+ok("T4h frågebeviset följer med till P.E.R API:t", lastExplain?.pageContext?.currentQuestion?.questionProof === "A".repeat(43),
+   JSON.stringify(lastExplain?.pageContext?.currentQuestion));
 
 // Saknat/okänt visningsmetadata får inte förvandlas till ett linjediagramstips.
 await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(300);

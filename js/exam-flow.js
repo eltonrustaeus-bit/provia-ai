@@ -2060,10 +2060,12 @@
       page: "prov",
       focus: {
         kind: "question",
+        id: String(q.id || ""),
         number: i + 1,
         of: qs.length,
-        text: String(q.question || "").slice(0, 400),
+        text: String(q.question || "").slice(0, 4000),
         type: q.type || "short",
+        questionProof: String(q.active_question_proof || ""),
         graphMode: q.type === "graph" && q.graph_ui
           && (q.graph_ui.mode === "line" || q.graph_ui.mode === "scatter") ? q.graph_ui.mode : undefined,
         options: Array.isArray(q.options) ? q.options : [],

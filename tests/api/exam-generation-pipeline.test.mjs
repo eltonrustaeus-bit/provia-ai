@@ -1055,6 +1055,7 @@ test("12 verified questions run through worker assembly, real sealing and manife
     assert.equal(result.response.meta.requested, 12);
     assert.equal(result.response.meta.partial, false);
     assert.ok(result.response.exam.questions.every((question) => question.grade_task));
+    assert.ok(result.response.exam.questions.every((question) => /^[A-Za-z0-9_-]{43}$/.test(question.active_question_proof || "")));
     assert.ok(result.response.exam.questions.every((question) => !Object.hasOwn(question, "model_answer")));
     assert.match(result.response.exam.exam_manifest, /^v2\./);
     assert.equal(sequence, 12);
@@ -1067,6 +1068,8 @@ test("12 verified questions run through worker assembly, real sealing and manife
     assert.equal(partial.response.meta.requested, 12);
     assert.equal(partial.response.meta.partial, true,
       "an eligible eight-of-twelve result remains explicitly partial through real finalization");
+    assert.ok(partial.response.exam.questions.every((question) => question.active_question_proof),
+      "partial exam questions also carry the same active-help proof contract");
   } finally {
     if (originalSigningSecret === undefined) delete process.env.EXAM_SIGNING_SECRET;
     else process.env.EXAM_SIGNING_SECRET = originalSigningSecret;

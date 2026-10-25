@@ -422,10 +422,14 @@
         if (m.page) ctx.page = m.page;
         if (m.focus && (m.focus.text || typeof m.focus.number === 'number')) {
           ctx.currentQuestion = {
+            id: typeof m.focus.id === 'string' ? m.focus.id.slice(0, 100) : '',
             number: m.focus.number,
+            of: typeof m.focus.of === 'number' ? m.focus.of : undefined,
             text: m.focus.text,
             options: m.focus.options,
             type: m.focus.type,
+            questionProof: typeof m.focus.questionProof === 'string'
+              && /^[A-Za-z0-9_-]{43}$/.test(m.focus.questionProof) ? m.focus.questionProof : '',
             graphMode: m.focus.type === 'graph' && m.focus.graphMode === 'scatter' ? 'scatter'
               : m.focus.type === 'graph' && m.focus.graphMode === 'line' ? 'line' : undefined,
             category: m.focus.category,

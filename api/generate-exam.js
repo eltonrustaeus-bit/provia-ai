@@ -60,7 +60,9 @@ function refreshReplayManifest(response, userId, course, pastedText) {
   if (!response?.ok || !response.exam || !Array.isArray(response.exam.questions)) return null;
   const examManifest = examCompletion.issueExamManifest(userId, course, pastedText, response.exam.questions);
   if (!examManifest) return null;
-  return { ...response, exam: { ...response.exam, exam_manifest: examManifest } };
+  const questions = examCompletion.issueActiveQuestionProofs(userId, course, response.exam.questions);
+  if (!questions) return null;
+  return { ...response, exam: { ...response.exam, exam_manifest: examManifest, questions } };
 }
 
 function safeString(x, maxLen = 200000) {
@@ -2850,6 +2852,8 @@ module.exports = async function handler(req, res, internalContext = null) {
     failureStage = "exam_manifest";
     clientExam.exam_manifest = examCompletion.issueExamManifest(user.id, course, pastedText, clientExam.questions);
     if (!clientExam.exam_manifest) throw new Error("Exam manifest unavailable");
+    clientExam.questions = examCompletion.issueActiveQuestionProofs(user.id, course, clientExam.questions);
+    if (!clientExam.questions) throw new Error("Active question proof unavailable");
     const submissionId = examCompletion.submissionId(user.id, course, clientExam.questions);
     if (!submissionId) throw new Error("Exam submission identity unavailable");
     const responsePayload = {
@@ -2999,6 +3003,8 @@ module.exports.finalizeVerifiedExam = async function finalizeVerifiedExam({ user
   const exam = { questions: clientQuestions };
   exam.exam_manifest = examCompletion.issueExamManifest(userId, course, pastedText, clientQuestions);
   if (!exam.exam_manifest) throw new Error("Exam manifest unavailable");
+  exam.questions = examCompletion.issueActiveQuestionProofs(userId, course, clientQuestions);
+  if (!exam.questions) throw new Error("Active question proof unavailable");
   const submissionId = examCompletion.submissionId(userId, course, clientQuestions);
   if (!submissionId) throw new Error("Exam submission identity unavailable");
   const quota = payload.quota || {};
