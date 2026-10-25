@@ -82,6 +82,25 @@ test("a prior-mistake match must cite evidence from that focus source when avail
   ["focus-3"], photosynthesisFocus), ["focus-3"],
   "specific questions that practise the missed objective retain coverage");
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen bildas vid fotosyntesen?",
+    model_answer: "Syre och druvsocker.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "a question about photosynthesis products cannot cover a documented mistake about its inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen släpps ut vid fotosyntesen?",
+    model_answer: "Syre och druvsocker.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "an alternative product phrasing cannot cover a documented mistake about inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-4"], [{ ...photosynthesisFocus[0], focusId: "focus-4",
+    skill: "Identifiera ämnen som bildas", sourceQuestion: "Vilka ämnen bildas vid fotosyntesen?" }]), [],
+  "a question about photosynthesis inputs cannot cover a documented mistake about its products");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
     question: "Varför stänger växten klyvöppningarna vid torka?",
     model_answer: "För att minska vattenförlusten.",
     learning_objective: "Identifiera ämnen växten använder i fotosyntesen.",
@@ -369,7 +388,7 @@ test("candidate selection prefers a new learning objective without blocking appr
   }
 });
 
-test("mistake-training rejects a verifier-overclaimed question despite an exact but irrelevant citation", async () => {
+test("mistake-training rejects an overclaimed product question despite a matching source citation", async () => {
   const job = {
     id: "00000000-0000-4000-8000-000000000018",
     user_id: "11111111-1111-4111-8111-111111111111",
@@ -388,6 +407,7 @@ test("mistake-training rejects a verifier-overclaimed question despite an exact 
           sourceQuestion: "Varför måste ekvationens båda led balanseras?",
           expectedAnswer: "Samma operation på båda sidor bevarar likheten." },
         { focusId: "focus-2", concept: "Fotosyntes", skill: "Identifiera ämnen som växten använder",
+          sourceQuestion: "Vilka ämnen använder växten vid fotosyntesen?",
           sourceEvidence: ["Växten använder koldioxid och vatten i fotosyntesen."] },
       ],
     },
@@ -423,8 +443,8 @@ test("mistake-training rejects a verifier-overclaimed question despite an exact 
   generation.generateVerifiedBatch = async ({ payload }) => {
     requiredFocusIds = payload.trainingFocusRequiredIds;
     return { status: 200, body: { ok: true, questions: [{
-      id: "unrelated-mitosis", type: "short", question: "Vad bildas vid mitos?",
-      model_answer: "Två dotterceller.",
+      id: "opposite-photosynthesis-action", type: "short", question: "Vilka ämnen bildas vid fotosyntesen?",
+      model_answer: "Syre och druvsocker.",
       source_references: ["Växten använder koldioxid och vatten i fotosyntesen."],
       training_focus_matches: ["focus-2"], validation_status: "verified",
     }] } };

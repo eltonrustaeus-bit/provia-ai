@@ -4919,3 +4919,17 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Detta är lokal offline/PGlite-evidens, inte bevis för hosted SQL eller
   live-modellkvalitet. Ingen migration, AI-anrop, staging- eller produktions-
   databasändring gjordes.
+
+### Riktningsfel i misstagsträning — 2026-10-25
+
+- [x] Reproducerat ett falskt positivt där en fråga om vilka ämnen som bildas
+  vid fotosyntesen kunde täcka ett dokumenterat fokus på vilka ämnen växten
+  använder. Delat ämne och källcitat räckte trots motsatt träningsriktning.
+- [x] Matchningen avvisar nu endast tydliga input/output-riktningsmotsägelser
+  mellan fokuset och frågeformuleringen. Befintliga käll-, färdighets- och
+  verifieringsgrindar är oförändrade; motsägelser testas åt båda håll.
+- [x] Offline: pipeline, pipeline-HTTP, felträningskällor och quality-gold
+  passerade tillsammans; syntaxkontroll och `git diff --check` passerade.
+- [!] Riktningskontrollen är ett deterministiskt lexikalt skydd, inte semantisk
+  entailment. Sammansatta/indirekta formuleringar kan fortfarande kräva
+  oberoende modellgranskning. Ingen staging-/live-AI-körning gjordes.

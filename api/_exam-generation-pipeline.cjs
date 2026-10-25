@@ -170,6 +170,7 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
     const candidateQuestion = typeof question?.question === "string" ? question.question : "";
     const candidateTaskText = candidateQuestion;
     if (specificTerms.length === 0 || !hasTrainingTermOverlap(candidateTaskText, specificTerms.join(" "))) return false;
+    if (contradictsTrainingActionDirection(specificContext, candidateTaskText)) return false;
     return sourceEvidence.some((evidence) =>
       (hasStoredEvidence
         ? filterSourceReferences(evidence, references).length > 0
@@ -178,6 +179,39 @@ function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceM
       sharesTrainingEvidence(candidateText, evidence) &&
       sharesTrainingEvidence(candidateQuestion, evidence));
   });
+}
+
+function contradictsTrainingActionDirection(focusText, candidateQuestion) {
+  const focusDirections = trainingActionDirections(focusText);
+  const candidateDirections = trainingActionDirections(candidateQuestion);
+  return (focusDirections.has("input") && !focusDirections.has("output") &&
+      candidateDirections.has("output") && !candidateDirections.has("input")) ||
+    (focusDirections.has("output") && !focusDirections.has("input") &&
+      candidateDirections.has("input") && !candidateDirections.has("output"));
+}
+
+function trainingActionDirections(value) {
+  const words = String(value || "").normalize("NFKC").toLocaleLowerCase("sv-SE").match(/[\p{L}\p{N}]+/gu) || [];
+  const directions = new Set();
+  if (words.some((word) => word.startsWith("använd") || word.startsWith("absorber") ||
+      word.startsWith("förbruk") || word.startsWith("behöv") || word.startsWith("kräv") ||
+      word.startsWith("upptag") || word.startsWith("tillför") || word === "input" ||
+      word === "inputs" || word.startsWith("consume") || word.startsWith("take")) ||
+      words.some((word, index) => ["ta", "tar", "tog"].includes(word) &&
+        words.slice(index + 1, index + 3).some((next) => ["upp", "in"].includes(next))) ||
+      words.some((word, index) => word.startsWith("tas") &&
+        words.slice(index + 1, index + 3).some((next) => ["upp", "in"].includes(next)))) {
+    directions.add("input");
+  }
+  if (words.some((word) => word.startsWith("bild") || word.startsWith("producer") ||
+      word.startsWith("generer") || word.startsWith("avge") || word.startsWith("frigör") ||
+      word.startsWith("frisätt") || word.startsWith("skap") || word.startsWith("utsöndr") ||
+      word === "output" || word === "outputs" || word.startsWith("release") || word.startsWith("form")) ||
+      words.some((word, index) => word.startsWith("släpp") &&
+        words.slice(index + 1, index + 3).includes("ut"))) {
+    directions.add("output");
+  }
+  return directions;
 }
 
 function sharesTrainingEvidence(candidateText, evidence) {
