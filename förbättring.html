@@ -1478,6 +1478,10 @@
           result=await fetchPERCoach(ownerId,cache.dataFingerprint);
           const{data:checked}=await db.auth.getSession();
           if(requestId!==coachRequestSequence||checked?.session?.user?.id!==ownerId)return;
+          if(result?.coachDeferred){
+            box.textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+            return;
+          }
           if(result?.unchanged===true&&result.coachEvidenceFingerprint===cache.dataFingerprint){
             box.textContent=cache.text;
             return;
@@ -1487,6 +1491,10 @@
         result=await fetchPERCoach(ownerId);
         const{data:current}=await db.auth.getSession();
         if(requestId!==coachRequestSequence||current?.session?.user?.id!==ownerId)return;
+        if(result?.coachDeferred){
+          box.textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+          return;
+        }
         if(result?.answer){
           box.textContent=result.answer;
           if(/^[a-f0-9]{64}$/.test(result.coachEvidenceFingerprint||''))

@@ -1,4 +1,4 @@
-import { ROOT, serve, openPage, report } from "./_harness.mjs";
+import { AUTH_KEY, ROOT, serve, openPage, report } from "./_harness.mjs";
 // Bevisar att målregistret har mer än en konsument: P.E.R kan skicka en
 // besökare till rätt PLANKORT på prissidan, inte bara till prissidan — och
 // öppna rätt sektion på förbättringssidan.
@@ -70,6 +70,102 @@ async function assertPageTopic(path, expectedPage) {
 
 await assertPageTopic("/index.html", "startsida");
 await assertPageTopic("/förbättring.html", "förbättring");
+
+// The server retains one account transcript, while the visible chat stays
+// scoped to the current page and excludes exam-bound or untagged legacy turns.
+{
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { ok: true, history: [
+          { role: "user", content: "PRIVATE_HOME_TRANSCRIPT_MARKER", page: "startsida" },
+          { role: "assistant", content: "PRIVATE_APP_TRANSCRIPT_MARKER", page: "app" },
+          { role: "assistant", content: "VISIBLE_IMPROVEMENT_TRANSCRIPT_MARKER", page: "förbättring" },
+          { role: "assistant", content: "PRIVATE_EXAM_TRANSCRIPT_MARKER", page: "prov", examBound: true },
+          { role: "assistant", content: "PRIVATE_LEGACY_TRANSCRIPT_MARKER" },
+        ] } });
+      } else await route.fulfill({ json: { ok: true, answer: "coach response" } });
+    },
+  });
+  await page.locator("#perMessages").getByText("VISIBLE_IMPROVEMENT_TRANSCRIPT_MARKER").waitFor({ state: "attached", timeout: 5000 });
+  const visible = await page.locator("#perMessages").innerText();
+  ok("P.E.R transcript shows the current page's saved conversation", visible.includes("VISIBLE_IMPROVEMENT_TRANSCRIPT_MARKER"), visible);
+  ok("P.E.R transcript does not display other-page, exam-bound, or legacy turns",
+    !/PRIVATE_(?:HOME|APP|EXAM|LEGACY)_TRANSCRIPT_MARKER/.test(visible), visible);
+  await ctx.close();
+}
+
+// An ordinary authenticated P.E.R question survives an interrupted response
+// in this tab, but is never replayed automatically or restored on another page.
+{
+  const QUESTION = "Kan du förklara fotosyntes?";
+  let postCount = 0;
+  let resolveFirstPost;
+  const firstPost = new Promise(resolve => { resolveFirstPost = resolve; });
+  const { ctx, page } = await mk("/index.html", {
+    explainHandler: async route => {
+      if (route.request().method() === "GET") return route.fulfill({ json: { ok: true, history: [] } });
+      postCount++;
+      if (postCount === 1) {
+        resolveFirstPost();
+        await new Promise(() => {});
+      }
+      return route.fulfill({ json: { ok: true, answer: "Svar efter manuell återförsök.", helpCap: 3 } });
+    },
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill(QUESTION);
+  await page.locator("#perSendBtn").click();
+  await Promise.race([firstPost, new Promise((_, reject) => setTimeout(() => reject(new Error("P.E.R request did not start")), 5000))]);
+  const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem("exgen_per_pending_question") || "null"));
+  ok("ordinary P.E.R saves a short-lived account-bound draft while waiting", saved?.question === QUESTION && saved?.accountId === "u1" && saved?.page === "startsida");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#perMessages").getByText("Din fråga är återställd. Tryck Skicka när du vill fortsätta.").waitFor({ state: "attached", timeout: 5000 });
+  ok("reload restores the interrupted question to the input without replaying it", await page.locator("#perInput").inputValue() === QUESTION && postCount === 1);
+  ok("restoration consumes the draft after binding it to the current page and account",
+    await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+
+  await page.locator("#perSendBtn").click();
+  await page.locator("#perMessages").getByText("Svar efter manuell återförsök.").waitFor({ timeout: 5000 });
+  ok("the student can explicitly retry the restored question", postCount === 2);
+
+  await page.evaluate(() => sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({
+    question: "Draft for another page", savedAt: Date.now(), accountId: "u1", page: "startsida",
+  })));
+  await page.goto(srv.url + "/förbättring.html", { waitUntil: "networkidle" });
+  ok("a pending question from another page is not restored", await page.locator("#perInput").inputValue() === "");
+  ok("a page-mismatched draft is discarded", await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+
+  await page.evaluate(() => sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({
+    question: "Draft for another account", savedAt: Date.now(), accountId: "u-other", page: "förbättring",
+  })));
+  await page.reload({ waitUntil: "networkidle" });
+  ok("a pending question from another account is not restored", await page.locator("#perInput").inputValue() === "");
+  ok("an account-mismatched draft is discarded", await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
+  await ctx.close();
+}
+
+// A blocked personal-coach call must not present a generic exam hint as a
+// personalized recommendation.
+{
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      if (route.request().method() === "GET") await route.fulfill({ json: { ok: true, history: [] } });
+      else await route.fulfill({ json: {
+        answer: "GENERIC_ACTIVE_EXAM_HINT_MARKER",
+        examActive: true,
+        coachDeferred: true,
+      } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.locator("#coachText").getByText("Slutför ditt pågående prov").waitFor({ timeout: 5000 });
+  const coach = await page.locator("#coachText").innerText();
+  ok("active exam clearly defers personal improvement coaching", coach.includes("Slutför ditt pågående prov"), coach);
+  ok("generic active-exam guidance is not presented as a personal recommendation", !coach.includes("GENERIC_ACTIVE_EXAM_HINT_MARKER"), coach);
+  await ctx.close();
+}
 
 // A coach answer is reusable only while its verified account history is the
 // same. A successful account sync that changes the result must trigger a new
@@ -521,6 +617,31 @@ await assertPageTopic("/förbättring.html", "förbättring");
     afterOldResponse.text.includes("PRIVATE_ACCOUNT_B_COACH_MARKER")
       && String(afterOldResponse.cache || "").includes("PRIVATE_ACCOUNT_B_COACH_MARKER")
       && afterOldResponse.owner === "u2");
+  await ctx.close();
+}
+
+// An expired login leaves the draft hidden and available only to the same
+// account after authentication returns.
+{
+  const { ctx, page } = await mk("/index.html");
+  const session = await page.evaluate(key => localStorage.getItem(key), AUTH_KEY);
+  await page.evaluate(() => sessionStorage.setItem("exgen_per_pending_question", JSON.stringify({
+    question: "Draft after expired login", savedAt: Date.now(), accountId: "u1", page: "startsida",
+  })));
+  await page.addInitScript(key => localStorage.removeItem(key), AUTH_KEY);
+  await page.reload({ waitUntil: "networkidle" });
+  const hidden = await page.evaluate(() => ({
+    value: document.getElementById("perInput")?.value || "",
+    pending: Boolean(sessionStorage.getItem("exgen_per_pending_question")),
+  }));
+  ok("an expired session keeps the draft hidden instead of discarding it", !hidden.value && hidden.pending, JSON.stringify(hidden));
+  await page.evaluate(({ key, value }) => {
+    localStorage.setItem(key, value);
+    window.dispatchEvent(new CustomEvent("exgen:per-session-saved"));
+  }, { key: AUTH_KEY, value: session });
+  await page.waitForFunction(question => document.getElementById("perInput")?.value === question, "Draft after expired login");
+  ok("the same account can recover its draft after signing back in",
+    await page.evaluate(() => sessionStorage.getItem("exgen_per_pending_question")) === null);
   await ctx.close();
 }
 

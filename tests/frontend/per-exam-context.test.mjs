@@ -47,11 +47,11 @@ const historyRaceFailure = new Promise(resolve => { historyRaceFailureResolve = 
 const activeExamCountCalls = [];
 const legacyStatusCalls = [];
 const SAVED_PER_HISTORY = [
-  { role: "user", content: "Explain my old practice result." },
-  { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42." },
+  { role: "user", content: "Explain my old practice result.", page: "app" },
+  { role: "assistant", content: "PRIVATE_OLD_FULL_SOLUTION_MARKER: the answer was 42.", page: "app" },
 ];
-const STALE_PER_HISTORY = [{ role: "assistant", content: "STALE_HISTORY_RESPONSE" }];
-const NEWEST_PER_HISTORY = [{ role: "assistant", content: "NEWEST_HISTORY_RESPONSE" }];
+const STALE_PER_HISTORY = [{ role: "assistant", content: "STALE_HISTORY_RESPONSE", page: "app" }];
+const NEWEST_PER_HISTORY = [{ role: "assistant", content: "NEWEST_HISTORY_RESPONSE", page: "app" }];
 const R = report("per-exam-context");
 const ok = (n, c, d = "") => R.ok(n, c, d);
 
@@ -473,15 +473,14 @@ await page.click(".xf-dot >> nth=3"); await page.waitForTimeout(200);
 await page.click(".xf-exam-nav .xf-btn.primary"); // "Lämna in" på sista frågan, 2 obesvarade → confirm()
 await page.waitForSelector("#xf .xf-screen[data-screen='result'].on", { timeout: 15000 });
 await page.waitForTimeout(200);
-await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null
-  && (document.getElementById("perMessages")?.innerText || "").includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"), null, { timeout: 5000 }).catch(() => null);
+await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null, null, { timeout: 5000 });
 const historyAfterGrade = await page.evaluate(() => ({
   visible: document.getElementById("perMessages")?.innerText || "",
   mask: localStorage.getItem("proviaai_per_exam_history_masked"),
   stored: JSON.parse(localStorage.getItem("proviaai_per_history") || "[]"),
 }));
-ok("P.E.R restores the server-approved transcript after the verified result",
-  historyAfterGrade.mask === null && historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
+ok("verified result unlocks P.E.R without showing a transcript from another page",
+  historyAfterGrade.mask === null && !historyAfterGrade.visible.includes("PRIVATE_OLD_FULL_SOLUTION_MARKER"),
   JSON.stringify({ mask: historyAfterGrade.mask, visible: historyAfterGrade.visible, calls: activeExamCountCalls }));
 const afterSubmit = await page.evaluate(() => window.__perTestCtx());
 ok("T9b currentQuestion är borta på resultatskärmen", !afterSubmit.currentQuestion, JSON.stringify(afterSubmit.currentQuestion));

@@ -245,8 +245,8 @@ export async function maybeRefreshLongMemory(supabase, userId, recentMessages, c
       || examData.felBankWeakConcepts.length > 0;
     const memoryMessages = (Array.isArray(recentMessages) ? recentMessages : []).filter(message => {
       const page = typeof message?.page === "string" ? message.page : "";
-      return !message?.examBound && !["prov", "resultat", "exam", "exam-result"].includes(page)
-        && ["startsida", "app", "förbättring", "prisplan", "konto"].includes(page);
+      return !message?.examBound && !["startsida", "prov", "resultat", "exam", "exam-result"].includes(page)
+        && ["app", "förbättring", "prisplan", "konto"].includes(page);
     });
     const hasMessages = memoryMessages.length > 0;
     if (!hasMessages && !hasExamData) return;

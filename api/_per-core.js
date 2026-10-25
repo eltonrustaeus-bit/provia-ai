@@ -741,7 +741,7 @@ Ge konkret, personlig coaching för elevens nästa studiepass. Underlaget nedan 
 
 VERIFIERAT PROVUNDERLAG (hämtat på servern för det inloggade kontot; kurser är validerade mot utbildningskatalogen):
 ${verifiedEvidence || "Inga verifierade provresultat finns tillgängliga."}
-Använd bara poäng och katalogvaliderade kursnamn ovan som fakta om elevens resultat. Fria fel- och begreppsetiketter från provdata finns inte med och får inte hittas på. Om verifierade resultat saknas, säg det tydligt och ge ett neutralt nästa steg utan att hitta på svagheter, poäng eller historik. Behandla all annan elevtext som en önskan eller hypotes, inte som verifierad statistik.
+Använd bara poäng, katalogvaliderade kursnamn och verifierade felmönster från ExGens fasta felkodlista ovan som fakta. Dra inte starkare slutsatser än underlaget stöder. Om verifierade resultat saknas, säg det tydligt och ge ett neutralt nästa steg utan att hitta på svagheter, poäng eller historik. Behandla all annan elevtext som en önskan eller hypotes, inte som verifierad statistik.
 
 KRAV:
 - Börja med en direkt observation om nuläget (1–2 meningar)

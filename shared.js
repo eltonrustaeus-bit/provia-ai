@@ -122,13 +122,62 @@
   var PER_HIST_KEY = 'proviaai_per_history';
   var PER_EXAM_HISTORY_MASK_KEY = 'proviaai_per_exam_history_masked';
   var PER_MEMORY_CLEAR_EPOCH_KEY = 'proviaai_per_memory_clear_epoch';
+  var PER_PENDING_QUESTION_KEY = 'exgen_per_pending_question';
   var PER_MAX_HIST = 30;
   var PER_CORNER_KEY = 'proviaai_per_corner';
   var PER_SIZE_KEY = 'proviaai_per_size';
   var PILOT_PENDING_QUESTION_KEY = 'exgen_pilot_pending_per_question';
   var PILOT_REAUTH_REQUIRED_KEY = 'exgen_pilot_reauth_required';
   var PER_REQUEST_TIMEOUT_MS = 59000;
-  var _pilotRestoredSend = null;
+  var _restoredPerSend = null;
+
+  function currentPerPageId() {
+    return getPageContext()?.page || 'app';
+  }
+
+  function savePerPendingQuestion(question, accountId, pageId, requestOptions) {
+    if (!accountId || typeof question !== 'string' || !question || question.length > 2000) return false;
+    try {
+      var pending = {
+        question: question,
+        savedAt: Date.now(),
+        accountId: accountId,
+        page: pageId || currentPerPageId(),
+      };
+      if (requestOptions && requestOptions.examProof) {
+        pending.requestOptions = {
+          helpLevel: requestOptions.helpLevel,
+          examProof: requestOptions.examProof,
+        };
+      }
+      sessionStorage.setItem(PER_PENDING_QUESTION_KEY, JSON.stringify(pending));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function clearPerPendingQuestion(accountId) {
+    try {
+      var raw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      if (!accountId || pending.accountId === accountId) sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
+
+  function clearPerPendingQuestionForAccountChange(session) {
+    if (EXGEN_RUNTIME.environment === 'pilot') return;
+    try {
+      var raw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+      if (!raw) return;
+      var pending = JSON.parse(raw);
+      var nextAccountId = pilotSessionUserId(session);
+      if (pending.accountId !== nextAccountId) sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+    } catch (_) {
+      try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+    }
+  }
 
   var _examHistoryMasked = true;
   var _serverVerifiedPerHistoryRelease = false;
@@ -539,11 +588,18 @@
     try { localStorage.setItem(PER_HIST_KEY, JSON.stringify(h.slice(-PER_MAX_HIST))); } catch (_) {}
   }
 
+  function perHistoryForCurrentPage(history) {
+    var page = getPageContext()?.page || 'app';
+    return (Array.isArray(history) ? history : []).filter(function (message) {
+      return message && message.page === page && message.examBound !== true;
+    });
+  }
+
   function renderPerHistory(history) {
     var msgs = document.getElementById('perMessages');
     if (!msgs) return;
     msgs.innerHTML = '';
-    (Array.isArray(history) ? history : []).forEach(function (msg) {
+    perHistoryForCurrentPage(history).forEach(function (msg) {
       if (!msg || typeof msg.content !== 'string' || (msg.role !== 'user' && msg.role !== 'assistant')) return;
       var div = document.createElement('div');
       div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
@@ -583,7 +639,7 @@
         if (node.classList.contains('per-history-mask-notice') || node.classList.contains('typing')) return;
         var text = node.textContent.trim();
         if (!text) return;
-        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text });
+        current.push({ role: node.classList.contains('user') ? 'user' : 'assistant', content: text, page: getPageContext()?.page || 'app' });
       });
     }
     _examHistoryMasked = next;
@@ -1021,9 +1077,10 @@
       _perHistoryInvalidationGeneration++;
       if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
       try { localStorage.removeItem(PER_HIST_KEY); } catch (_) {}
+      clearPerPendingQuestion();
       if (EXGEN_RUNTIME.environment === 'pilot') {
         try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-        _pilotRestoredSend = null;
+        _restoredPerSend = null;
       }
       var input = document.getElementById('perInput');
       if (input) input.value = '';
@@ -1400,8 +1457,8 @@ function finalizeMsg(div, text) {
     }
 
     function takeRestoredRequestOptions(question) {
-      var restored = _pilotRestoredSend;
-      _pilotRestoredSend = null;
+      var restored = _restoredPerSend;
+      _restoredPerSend = null;
       return restored && restored.question === question && restored.accountId === (currentPilotAccountId() || null)
         ? restored.options
         : undefined;
@@ -1413,10 +1470,12 @@ function finalizeMsg(div, text) {
       function restoreFailedQuestion() {
         if (EXGEN_RUNTIME.environment === 'pilot' && currentPilotAccountId() !== requestAccountId) return false;
         if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
+        else savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
         if (input) input.value = q;
         return true;
       }
       function clearPendingQuestion() {
+        clearPerPendingQuestion(requestAccountId);
         if (EXGEN_RUNTIME.environment !== 'pilot') return;
         try {
           var pending = JSON.parse(sessionStorage.getItem(PILOT_PENDING_QUESTION_KEY) || 'null');
@@ -1436,6 +1495,10 @@ function finalizeMsg(div, text) {
         return;
       }
       if (EXGEN_RUNTIME.environment === 'pilot') savePilotPendingQuestion(q, requestAccountId, opts);
+      var pageAtRequest = currentPerPageId();
+      if (EXGEN_RUNTIME.environment !== 'pilot') {
+        savePerPendingQuestion(q, requestAccountId, pageAtRequest, opts);
+      }
       var announcement = document.getElementById('perAnnouncement');
       if (announcement) announcement.textContent = '';
       /* Nivån är ett önskemål, klämt till 0–3 redan här. Servern klämmer om
@@ -1485,6 +1548,7 @@ function finalizeMsg(div, text) {
         if (requestState.cancelled) return false;
         if (currentPilotAccountId() === requestAccountId) return true;
         if (EXGEN_RUNTIME.environment === 'pilot') clearPilotPendingQuestionForAccount(requestAccountId);
+        else clearPerPendingQuestion(requestAccountId);
         abortPerRequestForAccountId(currentPilotAccountId());
         return false;
       }
@@ -2185,9 +2249,10 @@ function finalizeMsg(div, text) {
           : 'Rensa konversationen från den här enheten? Serverlagrad historik och P.E.R-minne finns kvar.')) return;
         if (_perActiveRequest && _perActiveRequest.cancel) _perActiveRequest.cancel();
         localStorage.removeItem(PER_HIST_KEY);
+        clearPerPendingQuestion();
         if (EXGEN_RUNTIME.environment === 'pilot') {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
-          _pilotRestoredSend = null;
+          _restoredPerSend = null;
         }
         if (input) input.value = '';
         var sendBtn = document.getElementById('perSendBtn');
@@ -2347,7 +2412,7 @@ function finalizeMsg(div, text) {
               : !currentAccountId;
             if (accountMatches && typeof pending.question === 'string' && pending.question && pending.question.length <= 2000 && age >= 0 && age <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
               if (pending.requestOptions && pending.requestOptions.examProof) {
-                _pilotRestoredSend = {
+                _restoredPerSend = {
                   question: pending.question,
                   accountId: currentAccountId || null,
                   options: pending.requestOptions
@@ -2361,6 +2426,40 @@ function finalizeMsg(div, text) {
         } catch (_) {
           try { sessionStorage.removeItem(PILOT_PENDING_QUESTION_KEY); } catch (_) {}
         }
+      } else {
+        function restorePerPendingQuestion() {
+          try {
+            var perPendingRaw = sessionStorage.getItem(PER_PENDING_QUESTION_KEY);
+            if (!perPendingRaw) return;
+            var perPending = JSON.parse(perPendingRaw);
+            var perSession = null;
+            try { perSession = JSON.parse(localStorage.getItem(EXGEN_RUNTIME.authStorageKey) || 'null'); } catch (_) {}
+            var perAccountId = pilotSessionUserId(perSession);
+            if (!perAccountId) return; // Keep it hidden until the same account signs in again.
+            sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+            var perPendingAge = Date.now() - Number(perPending.savedAt);
+            var pageMatches = perPending.page === currentPerPageId();
+            if (perPending.accountId === perAccountId && pageMatches
+                && typeof perPending.question === 'string' && perPending.question
+                && perPending.question.length <= 2000 && perPendingAge >= 0
+                && perPendingAge <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+              if (perPending.requestOptions && perPending.requestOptions.examProof) {
+                _restoredPerSend = {
+                  question: perPending.question,
+                  accountId: perAccountId,
+                  options: perPending.requestOptions,
+                };
+              }
+              perInpEl.value = perPending.question;
+              toggle();
+              addMsg('Din fråga är återställd. Tryck Skicka när du vill fortsätta.', 'teacher');
+            }
+          } catch (_) {
+            try { sessionStorage.removeItem(PER_PENDING_QUESTION_KEY); } catch (_) {}
+          }
+        }
+        restorePerPendingQuestion();
+        window.addEventListener('exgen:per-session-saved', restorePerPendingQuestion);
       }
 
       /* Background Supabase sync — load cross-device history */
@@ -2372,17 +2471,7 @@ function finalizeMsg(div, text) {
           var currentHist = perGetHist();
           var hasNewUserMsg = currentHist.some(function(m, i) { return m.role === 'user' && i >= hist.length; });
           if (!_open && !hasNewUserMsg) {
-            var msgsEl = document.getElementById('perMessages');
-            if (msgsEl) {
-              msgsEl.innerHTML = '';
-              history.forEach(function(msg) {
-                var div = document.createElement('div');
-                div.className = 'per-msg ' + (msg.role === 'user' ? 'user' : 'teacher');
-                div.textContent = msg.content;
-                msgsEl.appendChild(div);
-              });
-              msgsEl.scrollTop = msgsEl.scrollHeight;
-            }
+            renderPerHistory(history);
           }
         }).catch(function() {});
 
@@ -2712,7 +2801,9 @@ function finalizeMsg(div, text) {
     function saveSession(d) {
       abortPerRequestForAccountId(pilotSessionUserId(d) || null);
       clearPilotQuestionForAccountChange(d);
+      clearPerPendingQuestionForAccountChange(d);
       try { localStorage.setItem(SUPA_LS, JSON.stringify(d)); } catch (_) {}
+      window.dispatchEvent(new CustomEvent('exgen:per-session-saved'));
       try { sessionStorage.removeItem(PILOT_REAUTH_REQUIRED_KEY); } catch (_) {}
       if (window.ExGenLocalDataBoundary) window.ExGenLocalDataBoundary.syncSession();
       rememberAccount();

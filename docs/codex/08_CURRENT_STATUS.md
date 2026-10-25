@@ -3490,3 +3490,42 @@ aktuell Preview; den här checkpointen avsåg aktiv provhjälp.
 pilotnavigatorns regression till befintliga feature-branchen, kontrollera
 Previewns byggda commit och därefter fortsätta med säker, syntetisk
 P.E.R-verifiering endast inom kvarvarande uttryckligt godkänd budget.
+
+## P.E.R sidkontext och återhämtning — 2026-10-25
+
+- [x] P.E.R:s sparade konversation visas nu bara på den sida vars verifierade
+  meddelanden hör till. Provbundna och äldre osidbundna turer visas inte i
+  widgeten; riktiga API-svar bär redan sidmetadata.
+- [x] Vanliga inloggade frågor överlever avbruten begäran och omladdning som ett
+  kortlivat `sessionStorage`-utkast. Utkastet är bundet till konto och sida,
+  går ut efter 15 minuter, visas aldrig för fel konto/sida och skickas aldrig
+  automatiskt. Vid utgången session ligger det dolt tills samma konto loggar
+  in igen. Aktivt provs signerade proof återställs bara ihop med frågan och
+  kräver fortsatt manuellt klick samt serververifiering.
+- [x] Startsidesfrågor om produkten skriver inte längre hjälpnivå till elevens
+  långsiktiga preferensminne. Startsidan är även borttagen ur senare
+  långtidsminnesextraktion.
+- [x] Förbättringscoachen använder fortfarande serververifierade resultat och
+  katalogvaliderade kurser. Fria koncept-/feltexter från provmaterial skickas
+  inte till modellen; endast felkoder från den fasta listan mappas till fasta
+  svenska etiketter. Under aktivt prov skjuts personlig analys upp och UI:t
+  säger varför i stället för att visa en allmän ledtråd som coachråd.
+- [x] Oberoende säkerhetsgranskning efter ändringarna fann inga kvarvarande
+  blockerare för etikettinjektion, sid-/kontogräns eller proof-återställning.
+- [x] Aktuella riktade tester: `per-page-targets` **64/64**; riktade
+  `per-exam-review-handler` **3/3**; `per-memory-epoch` passerade;
+  `per-context-pack`, `per-scope-identity` och `per-exam-memory-provenance`
+  passerade. Den kompletta handler-sviten passerade **71/71** före de sista
+  små coachfilterändringarna; relevanta tre tester passerade igen efter dem.
+  Aktiv provkontext passerade **88/88**, och pilotens återställning efter
+  inloggning passerade **1/1**. JavaScript-syntax och `git diff --check`
+  passerade.
+- [!] Ingen ny live-AI-förfrågan gjordes. Den tidigare uttryckligt godkända
+  stagingförbrukningen är redan använd; ändringarna är offlineverifierade.
+  Push skapar nästa Preview-checkpoint, vars exakta SHA/READY-status ska
+  verifieras efter publicering. Ingen `main`, Vercel Production,
+  produktionsdatabas, konto, kvot eller hemlighet ändras.
+
+**PILOT NOT READY.** Nästa steg: pushad feature-Preview verifieras mot exakt
+commit. Ingen betald livekontroll görs utan verifierad kvarvarande budget och
+nytt uttryckligt godkännande.

@@ -124,7 +124,8 @@ await maybeRefreshLongMemory(
   provenanceDb,
   USER_ID,
   [
-    { role: "user", content: "SAFE_HOME_MEMORY_MARKER", page: "startsida" },
+    { role: "user", content: "PRIVATE_HOME_MEMORY_MARKER", page: "startsida" },
+    { role: "user", content: "SAFE_APP_MEMORY_MARKER", page: "app" },
     { role: "user", content: "PRIVATE_EXAM_MEMORY_MARKER", page: "prov", examBound: true },
     { role: "assistant", content: "PRIVATE_LEGACY_MEMORY_MARKER" },
   ],
@@ -139,8 +140,10 @@ await maybeRefreshLongMemory(
 );
 assert.equal(memoryPrompts.length, 2, "summary and structured extraction both run for safe tagged chat");
 for (const prompt of memoryPrompts) {
-  assert.match(prompt, /SAFE_HOME_MEMORY_MARKER/);
+  assert.match(prompt, /SAFE_APP_MEMORY_MARKER/);
+  assert.doesNotMatch(prompt, /PRIVATE_HOME_MEMORY_MARKER/,
+    "homepage product conversations never become learner long-term memory");
   assert.doesNotMatch(prompt, /PRIVATE_(?:EXAM|LEGACY)_MEMORY_MARKER/,
     "long-term memory excludes exam-bound and unproven legacy transcript turns");
 }
-console.log("P.E.R memory provenance: only tagged non-exam chat enters long-term memory prompts");
+console.log("P.E.R memory provenance: only tagged non-homepage, non-exam chat enters long-term memory prompts");

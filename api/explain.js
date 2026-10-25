@@ -7,6 +7,7 @@ import aiUsage from "./_ai-usage.cjs";
 import aiBudget from "./_ai-usage.cjs";
 import publicGuide from "./_per-public-guide.cjs";
 import { resolveCourse } from "./_education.js";
+import { isKnownErrorCode } from "./_concept-tags.js";
 import { needsReview, buildReviewPrompt, parseReview, REVIEW_SCHEMA } from "./_per-review.js";
 import { loadCollectiveSignals, buildCollectiveBlock } from "./_per-collective.js";
 import { SALES_TRIGGER_REGEX, SUPPORT_TRIGGER_REGEX } from "./_provia-kb.js";
@@ -543,8 +544,21 @@ function buildVerifiedCoachEvidence(examData = {}) {
   const courses = [...new Set((Array.isArray(examData.felBankCourses) ? examData.felBankCourses : [])
     .map(course => resolveCourse(course)?.name)
     .filter(Boolean))].slice(0, 5);
+  const errorLabels = {
+    mc_wrong: "Felaktigt flervalsalternativ",
+    concept_confusion: "Begreppsförväxling",
+    definition_missing: "Definition saknas",
+    structure_weak: "Svarsstruktur behöver stärkas",
+    calculation_error: "Beräkningsfel",
+    insufficient_material: "Otillräckligt underlag",
+    answer_key_unverified: "Facit kunde inte verifieras",
+  };
+  const errorTypes = [...new Set((Array.isArray(examData.felBankErrorTypes) ? examData.felBankErrorTypes : [])
+    .filter(isKnownErrorCode)
+    .map(code => errorLabels[code]))].slice(0, 6);
   if (scores.length) lines.push(`Senaste verifierade provresultat i tidsordning: ${scores.join("%, ")}%`);
   if (courses.length) lines.push(`Kurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: ${JSON.stringify(courses)}`);
+  if (errorTypes.length) lines.push(`Verifierade felmönster från ExGens fasta felkodlista: ${JSON.stringify(errorTypes)}`);
   return lines.length ? lines.join("\n") : "Inga verifierade provresultat finns ännu.";
 }
 
@@ -835,6 +849,7 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: issuanceState === "active",
+    ...(body.topic === "studiecoach" ? { coachDeferred: true } : {}),
     ...(issuanceState !== "active" ? { examState: issuanceState } : {}),
   });
 }
@@ -1775,7 +1790,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null && !studyCoachRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
 
       // Confirm the saved primary answer before optional self-review. The client
       // can then distinguish a completed answer from a delayed correction pass.
@@ -1845,7 +1860,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                      länge klienten inte skickar någon nivå finns det ingen
                      preferens att mäta, och då ska ingenting sparas.
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
-      if (badOmNivå !== null && !studyCoachRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
+      if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
       return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel,
         ...(coachSnapshot ? { coachEvidenceFingerprint: coachSnapshot.fingerprint } : {}) });
     } catch {
