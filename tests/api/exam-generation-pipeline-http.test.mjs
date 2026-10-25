@@ -1044,7 +1044,7 @@ test("separate authenticated advance requests persist full 3/6/12 runs, retry sa
       ({ focusId, sourceQuestionId, skill, errorTags, sourceEvidence })), [{
       focusId: "focus-1", sourceQuestionId: trainingSourceQuestion.id,
       skill: "Beräkna summor", errorTags: ["calculation_error"],
-      sourceEvidence: ["Addition: Beräkna summan av två tal."],
+      sourceEvidence: ["Exempel: 2+3=5", "Addition: Beräkna summan av två tal."],
     }], "the persisted job derives its training target, error and source evidence from the verified grade");
 
     const mistakeTrainingIssuancesBefore = (await db.query(

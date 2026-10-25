@@ -4779,3 +4779,31 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Preview-autentisering krävs fortfarande för användarflöde eller
   live-modellverifiering. `main`, Production, databasen, hemligheter, konton
   och kvoter har inte ändrats i detta steg.
+
+### Fokuserad källgrundning vid felträning — 2026-10-25
+
+- [x] Felträningens fokusutdrag härleds nu företrädesvis från den signerade
+  gamla frågan, verifierat facit och rättningsfeedback. Korta, källverifierade
+  citat behålls bara när de också överlappar det verifierade misstaget; hela
+  eller orelaterade citat kan inte ensamma täcka ett fokus.
+- [x] Om inget fokuserat källbevis kan beläggas stoppas begäran före
+  jobbstart med `MISTAKE_TRAINING_FOCUS_UNAVAILABLE`. Ingen fråga eller
+  kvalitetsgrind har släppts igenom lättare.
+- [x] Regressioner täcker tre korta men orelaterade citat, svag källa utan
+  härledbar koppling, giltig böjningsvariant, saknat bevis och den befintliga
+  HTTP-12-frågors felträningskedjan.
+- [x] Offline: käll-/pipeline-/quality-gold-sviten passerade **48/48**;
+  HTTP 3/6/12 och felträning passerade **2/2**; fristående
+  `mistake-training-source` passerade **19/19**. P.E.R-sidkontext passerade
+  **95/95** och prov/resultatkontext **102/102**. Ämnesroutning, first-pass,
+  syntax och `git diff --check` passerade.
+- [!] Oberoende granskaren fann först att korta orelaterade citat kunde
+  tränga undan fokus; därefter att reservvägen kunde acceptera sådana citat.
+  Båda fynden och ett efterföljande ordningsfall åtgärdades med regressioner.
+  Slutlig read-only-granskning fann inga kodblockerare.
+- [!] Inget staging-/live-AI-test gjordes: den befintliga inloggade Previewn
+  visar verklig studiehistorik, så syntetisk identitet kan inte säkerställas.
+  Offline-stubbarna bevisar inte modellens semantiska precision.
+- [!] Ändringen är ännu inte pushad/deployad. Användarens godkännande gäller
+  befintlig feature-branch och Preview. `main`, Production, Supabase,
+  hemligheter, konton och kvoter är orörda.

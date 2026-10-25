@@ -11,6 +11,7 @@ const { normalizedRequest } = await import("../../api/_exam-generation-start.mjs
 const gradeTasks = require("../../api/_grade-task.js");
 const completion = require("../../api/_exam-completion.cjs");
 const mistakeTraining = require("../../api/_mistake-training.cjs");
+const examPipeline = require("../../api/_exam-generation-pipeline.cjs");
 
 const userId = "student-source-owner";
 const course = "Matematik 2b";
@@ -112,6 +113,120 @@ test("mistake training derives source material and prior questions from a signed
   const normalizedSpelling = await resolve({ requestedCourse: "  matemATIK  2b " });
   assert.equal(normalizedSpelling.course, course,
     "the verified source's saved course label remains canonical when the request differs only by case and spacing");
+});
+
+test("mistake evidence stays focused despite short unrelated source citations", async () => {
+  const unrelatedReferences = [
+    "Fotosyntesen sker i kloroplasterna.",
+    "Bladen fångar ljusenergi.",
+    "Klorofyll absorberar ljus.",
+  ];
+  const contaminatedMaterial = `${material} ${unrelatedReferences.join(" ")}`;
+  const contextHash = gradeTasks.hashContext(contaminatedMaterial, course, userId);
+  const contaminatedQuestions = questions.map((question) => {
+    const { grade_task: _gradeTask, ...base } = question;
+    return {
+      ...base,
+      source_references: question.id === "q1" ? unrelatedReferences : [],
+      grade_task: gradeTasks.sealQuestion(base, undefined, contextHash),
+    };
+  });
+  const contaminatedSubmissionId = completion.submissionId(userId, course, contaminatedQuestions);
+  const receipt = completion.issueCompletion(userId, course, contaminatedQuestions);
+  const proof = completion.verifyCompletion({
+    receipt, course, material: contaminatedMaterial, questions: contaminatedQuestions,
+    answers: row.answers, selectedQuestionId: "q1",
+  }, userId);
+  assert.ok(proof, "the modified fixture still has a valid signed completion proof");
+
+  const resolved = await resolve({
+    sourceReferences: [{ submissionId: contaminatedSubmissionId, questionIds: ["q1"] }],
+    trainingFocus: [{ sourceSubmissionId: contaminatedSubmissionId, sourceQuestionId: "q1" }],
+    loadOwnedExam: async () => ({
+      ...row, submission_id: contaminatedSubmissionId, material: contaminatedMaterial,
+      exam: { questions: contaminatedQuestions, submission_receipt: receipt },
+    }),
+    hasVerifiedGrade: async () => ({
+      submission_id: contaminatedSubmissionId, verified_at: new Date().toISOString(), num_questions: contaminatedQuestions.length,
+      answer_fingerprint: proof.answerFingerprint, result_payload: resultPayload,
+      result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+    }),
+  });
+
+  assert.deepEqual(resolved.trainingFocus[0].sourceEvidence, ["Lutningen beskriver förändringen"],
+    "the verified mistake should anchor focus instead of three unrelated but source-valid citations");
+  assert.ok(!resolved.trainingFocus[0].sourceEvidence.some((excerpt) => /fotosyntes|klorofyll|ljusenergi/iu.test(excerpt)),
+    "unrelated source sections must not become mistake-training evidence");
+  assert.deepEqual(examPipeline.supportedTrainingFocusMatches({ source_references: unrelatedReferences },
+    ["focus-1"], resolved.trainingFocus), [],
+  "unrelated but source-valid citations cannot satisfy the pipeline's focus-evidence guard");
+  assert.deepEqual(examPipeline.supportedTrainingFocusMatches({ source_references: ["Lutningen beskriver förändringen"] },
+    ["focus-1"], resolved.trainingFocus), ["focus-1"],
+  "a task citing the focused evidence still covers the documented mistake");
+});
+
+test("mistake training preserves inflected evidence and rejects unsupported focus", async () => {
+  async function resolveMinimal(sourceReferences, sourceMaterial = "Lutning betecknas med k.") {
+    const sourceContext = gradeTasks.hashContext(sourceMaterial, course, userId);
+    const base = {
+      id: "q-synonym", type: "short", points: 1,
+      question: "Vad representerar k?", options: [], model_answer: "Lutningen",
+      concept_tag: "Linjär funktion", learning_objective: "Tolka lutning",
+      source_references: sourceReferences,
+    };
+    const sourceQuestion = { ...base, grade_task: gradeTasks.sealQuestion(base, undefined, sourceContext) };
+    const sourceQuestions = [sourceQuestion];
+    const sourceSubmissionId = completion.submissionId(userId, course, sourceQuestions);
+    const answers = [{ id: sourceQuestion.id, answer: "m" }];
+    const receipt = completion.issueCompletion(userId, course, sourceQuestions);
+    const proof = completion.verifyCompletion({
+      receipt, course, material: sourceMaterial, questions: sourceQuestions, answers,
+      selectedQuestionId: sourceQuestion.id,
+    }, userId);
+    assert.ok(proof);
+    return resolveMistakeTrainingSource({
+      userId, requestedCourse: course,
+      sourceReferences: [{ submissionId: sourceSubmissionId, questionIds: [sourceQuestion.id] }],
+      trainingFocus: [{ sourceSubmissionId, sourceQuestionId: sourceQuestion.id }],
+      loadOwnedExam: async () => ({
+        user_id: userId, submission_id: sourceSubmissionId, course, material: sourceMaterial,
+        exam: { questions: sourceQuestions, submission_receipt: receipt }, answers,
+      }),
+      hasVerifiedGrade: async () => ({
+        submission_id: sourceSubmissionId, verified_at: new Date().toISOString(), num_questions: 1,
+        answer_fingerprint: proof.answerFingerprint,
+        result_payload: { per_question: [{
+          id: sourceQuestion.id, points: 0, max_points: 1, feedback: "Du blandade ihop beteckningarna.",
+          model_answer: "Lutningen",
+        }] },
+        result_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    });
+  }
+
+  const cited = "Lutning betecknas med k.";
+  const resolved = await resolveMinimal([cited]);
+  assert.deepEqual(resolved.trainingFocus[0].sourceEvidence, [cited],
+    "a concise source citation remains available when its Swedish word forms match the verified focus");
+  const unrelatedCitations = [
+    "Fotosyntesen sker i kloroplasterna.",
+    "Bladen fångar ljusenergi.",
+    "Klorofyll absorberar ljus.",
+  ];
+  const lateRelevantCitation = "Lutningen.";
+  const resolvedLateCitation = await resolveMinimal(
+    [...unrelatedCitations, lateRelevantCitation],
+    [...unrelatedCitations, lateRelevantCitation].join(" "),
+  );
+  assert.deepEqual(resolvedLateCitation.trainingFocus[0].sourceEvidence, [lateRelevantCitation],
+    "a relevant citation after three unrelated candidates is examined before the evidence limit is applied");
+  await assert.rejects(resolveMinimal([]),
+    (error) => error.message === "MISTAKE_TRAINING_FOCUS_UNAVAILABLE",
+  "missing focus evidence is rejected before a generation job can start");
+  await assert.rejects(resolveMinimal(unrelatedCitations,
+    unrelatedCitations.join(" ")),
+  (error) => error.message === "MISTAKE_TRAINING_FOCUS_UNAVAILABLE",
+  "short but unrelated citations cannot become fallback mistake evidence when focus derivation has no match");
 });
 
 test("expected mistake answer comes from the verified grade when issued exam omitted the model answer", async () => {
@@ -230,8 +345,10 @@ test("same-course mistake foci retain citations from their own source material",
     loadOwnedExam: async ({ submissionId: id }) => rows.get(id)?.row,
     hasVerifiedGrade: async ({ submissionId: id }) => rows.get(id)?.grade,
   });
-  assert.deepEqual(resolved.trainingFocus.map((focus) => focus.sourceEvidence),
-    sourceSpecs.map((spec) => [spec.quote]));
+  assert.ok(resolved.trainingFocus[0].sourceEvidence[0].startsWith("Fotosyntesen använder ljus, vatten och koldioxid"),
+    "the biology focus keeps its own specific source excerpt even when the derived wording is shorter");
+  assert.ok(resolved.trainingFocus[1].sourceEvidence.some((quote) => quote.includes("Lutningen beskriver förändringen")),
+    "the maths focus keeps the evidence for its own missed skill");
   assert.ok(!resolved.trainingFocus[0].sourceEvidence.some((quote) => quote.includes("Lutningen")));
   assert.ok(!resolved.trainingFocus[1].sourceEvidence.some((quote) => quote.includes("Fotosyntesen")));
 });
@@ -293,7 +410,7 @@ test("server-reconstructed source evidence is bounded before it enters the pipel
   const longBase = {
     id: "q-long", type: "short", points: 2, question: `Fråga ${"x".repeat(1180)}`,
     options: [], model_answer: "a".repeat(1000), concept_tag: "Linjär funktion",
-    learning_objective: "Tolka lutning",
+    learning_objective: "Tolka lutning", source_references: ["Lutningen beskriver förändringen"],
   };
   const longQuestion = { ...longBase, grade_task: gradeTasks.sealQuestion(longBase, undefined, contextHash) };
   const longQuestions = [longQuestion];
@@ -318,7 +435,7 @@ test("server-reconstructed source evidence is bounded before it enters the pipel
       answer_fingerprint: proof.answerFingerprint,
       result_payload: { per_question: [{
         id: longQuestion.id, points: 0, max_points: 2,
-        feedback: "f".repeat(900), error_tags: ["method_missing"],
+        feedback: `Lutningen beskriver förändringen. ${"f".repeat(866)}`, error_tags: ["method_missing"],
       }] },
       result_expires_at: new Date(Date.now() + 60_000).toISOString(),
     }),
@@ -414,6 +531,8 @@ test("selected signed mistake questions stay first in duplicate context when sou
 });
 
 test("source history keeps questions that differ by a mathematical operator", async () => {
+  const operatorMaterial = "Lös ekvationen x + 1 = 2 genom att isolera x genom subtraktion.";
+  const operatorContext = gradeTasks.hashContext(operatorMaterial, course, userId);
   const historyQuestions = [
     "Lös ekvationen x + 1 = 2",
     "Lös ekvationen x - 1 = 2",
@@ -428,17 +547,18 @@ test("source history keeps questions that differ by a mathematical operator", as
       id: `operator-${index + 1}`, type: "short", points: 2, question, options: [],
       model_answer: index === 0 ? "x = 1" : "Svar enligt villkoret",
       concept_tag: "Ekvationer", learning_objective: "Lösa linjära ekvationer",
+      ...(index === 0 ? { source_references: ["Lös ekvationen x + 1 = 2 genom att isolera x"] } : {}),
     };
-    return { ...base, grade_task: gradeTasks.sealQuestion(base, undefined, contextHash) };
+    return { ...base, grade_task: gradeTasks.sealQuestion(base, undefined, operatorContext) };
   });
   const operatorSubmissionId = completion.submissionId(userId, course, historyQuestions);
   const answers = historyQuestions.map((question) => ({ id: question.id, answer: "osäker" }));
   const receipt = completion.issueCompletion(userId, course, historyQuestions);
   const proof = completion.verifyCompletion({
-    receipt, course, material, questions: historyQuestions, answers, selectedQuestionId: "operator-1",
+    receipt, course, material: operatorMaterial, questions: historyQuestions, answers, selectedQuestionId: "operator-1",
   }, userId);
   const sourceRow = {
-    user_id: userId, submission_id: operatorSubmissionId, course, material,
+    user_id: userId, submission_id: operatorSubmissionId, course, material: operatorMaterial,
     exam: { questions: historyQuestions, submission_receipt: receipt }, answers,
   };
   const grade = {
