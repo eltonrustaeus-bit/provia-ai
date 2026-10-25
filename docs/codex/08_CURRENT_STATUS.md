@@ -4551,5 +4551,9 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   skripten i förbättringssidan passerade syntaxkontroll; `git diff --check`
   passerade.
 - [!] Ingen live-AI-fråga eller användardata användes. Stagingfunktionalitet
-  är inte liveverifierad; commit och Vercel Preview inväntar publicering till
-  den godkända feature-branchen.
+  är inte liveverifierad.
+- [x] Kodcheckpoint `66bc7c2716f98e3941fd1069f5d1cc24a66a271a` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_6e4jdBBNjyFS9M8KS8Qbrm6XVsHj` är READY från exakt den committen;
+  `app.html` och `förbättring.html` svarar HTTP 200.
+- [x] Ingen ändring av `main`, Production eller databas gjordes.
