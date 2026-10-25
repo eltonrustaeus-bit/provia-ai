@@ -1,5 +1,34 @@
 # 08 Current Status
 
+# Senaste P.E.R-verifiering — 2026-10-25
+
+- [x] På `91e914bb360610fc4fc16f3cea2620e884db1812` passerade den fullständiga
+  `tests/api/per-exam-review-handler.test.mjs`-sviten **66/66**. Den tog cirka
+  323 sekunder; tidigare korta testkörningar avbröts av en tillfällig
+  55-sekundersgräns och ska inte tolkas som kodfel.
+- [x] `tests/api/per-usage-stream.test.mjs` passerade **17/17**. De tre
+  frontend-sviterna `per-page-targets`, `per-exam-context` och `per-manifest`
+  passerade också. De omfattar sidrouting, aktivt prov, kontobyte och dold
+  provhistorik.
+- [x] Tre oberoende, skrivskyddade granskningar fann ingen blockerande
+  kontext-, säkerhets- eller kvalitetsgrind-bugg i den granskade ändringen.
+  De bekräftade att hemsidans generella hjälp inte får klientpåhittade
+  studieområden, att förbättringscoachen använder verifierade resultat för
+  autentiserat konto och att aktivt prov fortsätter att kräva facitfria
+  ledtrådar. Hjälp på hemsidan kan däremot inte utgå från studiematerial som
+  användaren inte har lagt till i den kontexten.
+- [!] Detta är lokal/offline-verifiering, inte bevis på live-modellens
+  svarskvalitet. Ingen live-AI-förfrågan eller ändring av Supabase, kvot,
+  Vercel Production eller `main` gjordes. Den senast lästa stagingmarginalen
+  var cirka `$1.025049`; öppna prov och oskickad text i webbläsaren lämnades
+  orörda.
+- [x] HEAD och godkänd feature-branch pekar båda på `91e914b`. Senaste
+  verifierade Vercel Preview är `READY` från denna SHA:
+  `https://provia-7qgzxe4ho-eltons-projects-4adfb1a3.vercel.app/`.
+- [!] **PILOT NOT READY.** Kodens lokala P.E.R.-flöden har starkare regression-
+  täckning, men live-auth, aktuell stagingkoppling och modellbeteende måste
+  verifieras separat innan man påstår att den hostade upplevelsen fungerar.
+
 ## P.E.R sidkontext och vanliga kontobyten — 2026-10-25
 
 - [x] P.E.R skiljer sididentitet från skolämne: startsidan och
