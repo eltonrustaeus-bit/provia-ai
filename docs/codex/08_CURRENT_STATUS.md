@@ -4557,3 +4557,39 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   `dpl_6e4jdBBNjyFS9M8KS8Qbrm6XVsHj` är READY från exakt den committen;
   `app.html` och `förbättring.html` svarar HTTP 200.
 - [x] Ingen ändring av `main`, Production eller databas gjordes.
+
+### P.E.R och kvalitetskontroll: uppföljning — 2026-10-25
+
+- [x] På aktuell Preview för branch `codex/exgen-generation-quality-2026-10-20`
+  (`4697a95`, dokumentationscheckpoint; applikationskod `66bc7c2`) skickades
+  exakt en syntetisk allmän fråga via P.E.R på startsidan. Svaret förklarade
+  konkret hur eleven tränar på egna biologianteckningar och hänvisade till
+  Mockprov med kurs, nivå, frågetyp, rättning och modellsvar. Inget prov skapades.
+- [!] Detta verifierar ett enda startsideanrop, inte modellens stabilitet eller
+  P.E.R:s aktiva-prov-, efterrättnings- eller förbättringsläge. Frågetexten var
+  syntetisk; ingen verifiering gjordes av en inloggad elevidentitet.
+- [x] Read-only budget före/efter: cap `$3.379071`; spent `$2.223469` →
+  `$2.225114`; reserved `$0.263628`; remaining `$0.891974` → `$0.890329`.
+  Skillnaden är `$0.001645`, men kan inte säkert attribueras enbart till detta
+  anrop. Inga kvoter eller budgetinställningar ändrades.
+- [x] Offline: provpipeline-/recovery-/quality-gold-sviten avslutades med kod
+  0. Fem P.E.R frontend-/kontextsviter avslutades med kod 0; de rapporterade
+  bland annat 96 aktiva-provkontextfall, 90 sidmålsfall och 32
+  förbättringsbeteendefall. Riktad P.E.R API-regression för fyra kontexter
+  passerade 4/4 med `--test-timeout=90000`.
+- [x] En första API-körning med en påtvingad 30-sekundersgräns avbröt ett
+  långsamt test som tar cirka 42 sekunder. Resultatsidans test fick därefter
+  en tillfällig falsk assertion när den avbrutna körningen fortfarande städade.
+  Isolerat och i den slutliga sekventiella körningen passerade det. Ingen
+  produktionsdefekt bekräftades. Oberoende granskare körde dessutom valda mock-
+  tester (API 12/12, kvot/strömning 19/19 och kontextpaket 1/1); dessa är inte
+  livebevis.
+- [!] Granskningen fann inga blockerande facit-, ägarskaps- eller
+  sidavgränsningsfel. Kvarstående risker: felbankstext är fortfarande
+  modellinput trots avgränsning som obetrodd data, och en ny klientbegäran
+  efter ett förlorat P.E.R-svar får ett nytt request-ID och kan ge ett nytt
+  modell-anrop.
+- [!] Ingen liveprovsgenerering kördes. Staging har `$0.890329` kvar enligt
+  senaste read-only-kontroll, men aktuell syntetisk inloggad testidentitet är
+  inte fastställd. Inga användardata, prov, konton, kvoter, hemligheter,
+  produktionsresurser eller databasscheman ändrades.
