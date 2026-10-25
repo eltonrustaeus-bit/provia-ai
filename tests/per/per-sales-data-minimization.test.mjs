@@ -46,3 +46,20 @@ test("plan answers exclude learner performance and memory signals", () => {
   assert.match(prompt, /Lugn, saklig ton — hjälp eleven att fatta ett eget beslut/);
   assert.doesNotMatch(prompt, /80%-nivån snabbare|Förlust-aversion|Direkt utmaning med data/);
 });
+
+test("specialized product prompts retain only a whitelisted page identity", () => {
+  const home = buildPERSystemPrompt({
+    userQuestion: "Vad är ExGen och hur börjar jag?",
+    intent: "sales",
+    pageContext: { page: "startsida", course: "PRIVATE_COURSE_MARKER", studyMaterial: "PRIVATE_MATERIAL_MARKER" },
+  });
+  const forged = buildPERSystemPrompt({
+    userQuestion: "Vad kostar Premium?",
+    intent: "sales",
+    pageContext: { page: "PRIVATE_PAGE_MARKER" },
+  });
+
+  assert.match(home, /Sida: startsida/);
+  assert.doesNotMatch(home, /PRIVATE_(?:COURSE|MATERIAL)_MARKER/);
+  assert.doesNotMatch(forged, /PRIVATE_PAGE_MARKER/);
+});

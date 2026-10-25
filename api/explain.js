@@ -15,7 +15,7 @@ import { decidePerRole, buildRoleInstruction } from "./_per-role.js";
 import { buildCurriculumContext } from "./_math-curriculum.js";
 import { buildLearningSignals, getLongMemoryEpoch, loadLongMemory, maybeRefreshLongMemory, savePerSessionHistory, updateHelpLevelSignal, enrichMemoryFromExamData, deriveStyleSignals } from "./_per-memory.js";
 import { currentPeriodKey, getFeatureLimit, normalizeRole } from "./_provia-rules.js";
-import { buildPERContextPack } from "./_per-context.js";
+import { buildPERContextPack, describePage } from "./_per-context.js";
 import { flagsEnabled } from "./_flags.js";
 /* buildProfileContext anropas inte härifrån längre — api/_learner-context.js är
    enda stället som sätter ihop elevblocken, och en andra väg in i prompten är
@@ -841,6 +841,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     : null;
   const page = String(context?.page || "").trim().toLowerCase();
   const hasOtherPage = Boolean(page && !["prov", "resultat", "exam", "exam-result"].includes(page));
+  const isHomepage = describePage(context?.page) === "startsida";
   const hasCurrentQuestion = context?.currentQuestion && typeof context.currentQuestion === "object";
   const hasExamPhase = typeof context?.examState?.phase === "string" && context.examState.phase.trim().length > 0;
   const hasSubmissionIdentity = typeof context?.examState?.submissionId === "string"
@@ -857,6 +858,15 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && body.landingMode !== true && !Array.isArray(body.scores)
     && body.question == null && body.correct == null;
+
+  function applyHomepageContextBoundary() {
+    if (!isHomepage) return;
+    body.pageContext = { page: "startsida" };
+    body.topic = "";
+    body.recentMistakes = [];
+    body.weakAreas = [];
+    delete body.context;
+  }
 
   function referencesExamQuestion({ allowTopicOverlap = false, ignoreQuestionMatch = false, minimumSharedWords = 4 } = {}) {
     const query = String(body.userQuestion || "").toLocaleLowerCase("sv-SE");
@@ -960,14 +970,15 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     if (perAnswerLease && ["abandoned", "expired", "missing"].includes(serverState)) {
       perAnswerLease.allowIncompleteGeneralChat = true;
     }
-    const safeContext = { page: "app" };
-    const stripStaleExamSource = staleProvView || hasStaleExamPayload;
+    const safeContext = { page: isHomepage ? "startsida" : "app" };
+    const stripStaleExamSource = isHomepage || staleProvView || hasStaleExamPayload;
     for (const key of ["course", "level", "studyMaterial", "weakAreas", "targets"]) {
       if (stripStaleExamSource && ["studyMaterial", "weakAreas", "targets"].includes(key)) continue;
       if (stripStaleExamSource && ["course", "level"].includes(key)) continue;
       if (context && Object.hasOwn(context, key)) safeContext[key] = context[key];
     }
     body.pageContext = safeContext;
+    applyHomepageContextBoundary();
     const selectedTopic = String(safeContext.course || (stripStaleExamSource ? "" : context?.topic || body.topic) || "").trim();
     body.topic = ["app", "prov", "resultat", "exam", "exam-result"].includes(selectedTopic.toLowerCase()) ? "" : selectedTopic;
     delete body.context;
@@ -1063,6 +1074,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
       delete body.pageContext.currentQuestion;
       delete body.pageContext.questions;
     }
+    applyHomepageContextBoundary();
     return false;
   }
   // Client phase is a hint, not an issuance identity. A stale exam view must
@@ -1105,6 +1117,7 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
       delete body.pageContext.examState;
       if (["prov", "resultat"].includes(body.pageContext.page)) delete body.pageContext.page;
     }
+    applyHomepageContextBoundary();
     return false;
   }
   sendActiveExamGuidance(req, res, body, "active", null);

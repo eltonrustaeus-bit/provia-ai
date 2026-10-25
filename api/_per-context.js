@@ -86,7 +86,7 @@ function cleanTargets(values) {
   return out;
 }
 
-function describePage(page) {
+export function describePage(page) {
   const normalized = cleanText(page, 50).toLowerCase();
   if (normalized.includes("förbättring") || normalized.includes("forbattring")) return "förbättring";
   if (normalized.includes("pris")) return "prisplan";

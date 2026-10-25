@@ -2635,6 +2635,43 @@ test("a bare stale prov page strips stale learning context before ordinary study
   }
 });
 
+test("homepage study help keeps its page identity but drops stale course and material context", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  issuanceState = "none";
+  latestSubmissionId = null;
+  calls.length = 0;
+  try {
+    for (const page of ["startsida", "start"]) {
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Vad är ExGen och hur börjar jag?",
+        pageContext: {
+          page,
+          course: "PRIVATE_STALE_COURSE_MARKER",
+          level: "PRIVATE_STALE_LEVEL_MARKER",
+          studyMaterial: "PRIVATE_STALE_MATERIAL_MARKER",
+          weakAreas: ["PRIVATE_STALE_WEAK_AREA_MARKER"],
+          targets: ["PRIVATE_STALE_TARGET_MARKER"],
+        },
+        topic: "PRIVATE_STALE_TOPIC_MARKER",
+        recentMistakes: [{ question: "PRIVATE_STALE_MISTAKE_MARKER" }],
+        weakAreas: ["PRIVATE_STALE_BODY_WEAK_AREA_MARKER"],
+      }, "POST", "application/json");
+      assert.equal(response.statusCode, 200);
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.ok(provider, `ordinary authenticated ${page} help reaches the normal response path`);
+      assert.match(provider.body, /Sida: startsida/);
+      assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:COURSE|LEVEL|MATERIAL|WEAK_AREA|TARGET|TOPIC|MISTAKE|BODY_WEAK_AREA)_MARKER/,
+        `${page} questions cannot inherit client-supplied learning context without exam markers`);
+    }
+  } finally {
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
 test("overlapping stale question lists do not block general help or expose exam context", async () => {
   const prior = process.env.EXGEN_PILOT_MODE;
   process.env.EXGEN_PILOT_MODE = "false";

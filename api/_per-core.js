@@ -637,7 +637,9 @@ export function buildPERSalesPrompt({
   role = 'gratis',
   userQuestion = '',
   language = 'sv',
+  pageContext = null,
 } = {}) {
+  const page = safePERPage(pageContext?.page);
   const roleAdvice =
     role === 'premium'
       ? 'Aktuell plan: Premium. Föreslå ingen uppgradering.'
@@ -651,6 +653,8 @@ ${PROVIA_KB}
 ${identityBlocks(userQuestion)}
 
 ${PROVIA_OPERATING_MAP}
+
+${page ? `## AKTUELL SIDA\nSida: ${page}\n` : ''}
 
 ## ELEVENS PLAN
 ${roleAdvice}
@@ -691,6 +695,7 @@ FORMAT:
 
 export function buildPERSupportPrompt({ role = 'gratis', quotaRemaining = null, pageContext = null, longMemory = null, userQuestion = '', language = 'sv' } = {}) {
   const planLabel = getPlan(role).label;
+  const page = safePERPage(pageContext?.page);
 
   return `Du är ${perRole("support- och studieassistent")}.
 
@@ -699,7 +704,7 @@ ${identityBlocks(userQuestion)}
 
 ## AKTUELLT
 Plan: ${planLabel}${quotaRemaining !== null ? ` | P.E.R-frågor kvar denna period: ${quotaRemaining}` : ''}
-${pageContext?.page ? `Sida: ${pageContext.page}` : ''}
+${page ? `Sida: ${page}` : ''}
 ${longMemory ? `Elevprofil: ${longMemory}` : ''}
 
 ## SUPPORTREGLER
@@ -721,6 +726,12 @@ FORMAT:
 - Max 110 ord
 - ${language === 'en' ? 'Answer in English unless the student explicitly asks for another language.' : 'Svara på svenska om eleven inte uttryckligen ber om ett annat språk.'}
 - Inga säljfraser i supportläge`;
+}
+
+function safePERPage(value) {
+  const page = typeof value === 'string' ? value.trim().toLocaleLowerCase('sv-SE') : '';
+  return ['startsida', 'app', 'prov', 'resultat', 'förbättring', 'prisplan', 'konto'].includes(page)
+    ? page : '';
 }
 
 export function buildPERCoachSystemPrompt({ verifiedEvidence = "" } = {}) {
