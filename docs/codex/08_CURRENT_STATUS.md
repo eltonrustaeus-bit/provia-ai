@@ -2,6 +2,28 @@
 
 # P.E.R three-page checkpoint — 2026-10-25
 
+- [x] Integrated code checkpoint `81319a8687e212795835846f3ea145e23de0320f`
+  is pushed to `codex/exgen-generation-quality-2026-10-20`. Vercel deployment
+  `dpl_7ywsLDodB44PsxZpsmintbEhnVrd` is `READY` from that exact SHA at
+  `https://provia-rcu0n0b0s-eltons-projects-4adfb1a3.vercel.app/`.
+- [x] Authenticated `vc curl` returned **200** for `/`, `/app.html`, and
+  `/f%C3%B6rb%C3%A4ttring.html` on that deployment. Browser inspection of the
+  same Preview shows its pilot login gate; it is currently logged out.
+- [x] Integrated offline regression: the full P.E.R handler suite passed
+  **70/70** before the final route-classification cleanup; afterward the
+  focused homepage/ordinary-chat tests passed **3/3**. The 5-file frontend
+  suite passed **5/5** (including page targets 50/50 and account-switch
+  coverage); `per-usage-stream` passed **17/17**; `per-memory-epoch` passed
+  with the new provenance assertions. Syntax and diff checks passed.
+- [x] Read-only staging budget check at `2026-10-25 03:26 UTC`: cap
+  `$3.379071`, spent `$2.102296`, reserved `$0.263628`, remaining `$1.013147`.
+  No budget or quota was changed.
+- [!] No paid live request has been made. The fresh Preview is at the login
+  gate and no authenticated session is available in this tab. One approved
+  synthetic end-to-end test remains pending login and confirmation that the
+  chosen existing staging account has no open exam to disturb. `main`,
+  Production, Supabase schema/data, roles and secrets remain unchanged.
+
 - [x] Checkpoint `21bf94d7e4af7c29ee655db7336b0588e3034c63` is pushed to
   `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
   `dpl_7WkebewvQt7F26d3JkHK7R1x2mvA` is `READY` from that exact SHA:
@@ -35,10 +57,10 @@
   route-classification cleanup. After that cleanup, the focused homepage and
   ordinary-chat handler cases passed **3/3**, and `per-memory-epoch` passed,
   including provenance assertions. Syntax checks and `git diff --check` passed.
-- [!] These follow-up changes are not yet in a Preview. The earlier Preview
-  listed above contains only checkpoint `21bf94d`; no live model request was
-  made and live response quality remains unverified. `main`, Production,
-  Supabase, accounts, roles and quotas were not changed.
+- [x] The follow-up changes are included in integrated checkpoint `81319a8`
+  above; the earlier Preview remains recorded here only as its historical
+  checkpoint. Live model response quality remains unverified pending the
+  authenticated, budget-bounded staging run.
 
 # Senaste P.E.R-verifiering — 2026-10-25
 
