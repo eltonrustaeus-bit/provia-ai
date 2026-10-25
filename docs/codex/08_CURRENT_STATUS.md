@@ -4125,3 +4125,36 @@ autentiserat stagingflöde först när identitet och kostnadsram kan bekräftas.
 Merge/deploy till exgen.se väntar dessutom på read-only förkontroll av
 Production-migrationsledger och befintliga pipeline-rader, sedan separat
 releasegodkännande.
+
+## Read-only releasegrindar — 2026-10-25
+
+- [x] Feature-branchens aktuella huvud är `7afb441fb2e2516bf5a629f1a9f31d4c850329b1`.
+  PR #124 är öppen som Draft; Vercel deployment
+  `dpl_HpfK8xpbBaoPX9kVGsDXAxtKLEqK` är READY från exakt SHA, branch-aliasen
+  pekar på deploymenten och GitHub/Vercel-kontrollerna passerar.
+- [x] Read-only Supabase metadata bekräftade stagingprojektet
+  `exgen-pilot-staging` (`yhcinqejsocpmmetazpz`) och produktionsprojektet
+  (`mnmotdluigzeehdjbhbu`) som ACTIVE_HEALTHY. Stagingens migrationsledger har
+  motsvarande fyra senare pipeline-migrationer; produktionens ledger slutar vid
+  `20261023104523` och saknar lokalt tillagda migrationer
+  `20261024140557`, `20261024151433`, `20261024165536` och `20261024212500`.
+- [x] Read-only aggregerad produktionspreflight för
+  `mock_exam_generation_pipeline_jobs`: 1 rad totalt, 0 rader över begärda
+  progress-/frågegränser och 0 aktiva jobb. Detta visar att de två nya
+  count-constraints inte skulle avvisas av nuvarande rad, men ersätter inte
+  full migrationsgranskning eller godkännande att tillämpa migrationer.
+- [x] Färsk aggregerad stagingbudget: cap `$3.379071`, spent `$2.172902`,
+  reserved `$0.263628`, kvar `$0.942541`, enabled. Ingen modellfråga skickades.
+- [!] Den exakta Previewn i Codex-sidpanelen visar login gate. En befintlig
+  Chrome-session på branch-aliasen visar en inloggad vy med ett öppet,
+  obesvarat prov; vyn lämnades helt orörd. Därför gjordes inget live-AI-test
+  och stagingkontots syntetiska identitet är inte verifierad.
+- [!] Ingen produktionsmigration, `main`-merge, Production-deploy, konto-,
+  kvot- eller hemlighetsändring gjordes. Denna notering är dokumentation och
+  behöver en separat docs-checkpoint med exakt Preview-verifiering.
+
+**PILOT NOT READY.** Nästa releasearbete kräver en ren staging-session utan
+öppet prov samt en kostnadsram som räcker för ett enda avgränsat syntetiskt
+test. Därefter kan en separat releaseprövning väga in de fyra saknade
+produktionsmigrationerna; inga produktionsändringar är godkända av denna
+read-only preflight.
