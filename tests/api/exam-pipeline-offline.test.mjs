@@ -100,12 +100,12 @@ for (const lang of ["sv", "en"]) {
   const repairedUserPrompt = repair.input.find((item) => item.role === "user").content;
   const repairInstruction = repair.input.filter((item) => item.role === "user").at(-1).content;
   assert.match(repairInstruction, lang === "sv"
-    ? /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet/
-    : /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material/,
+    ? /en eller flera hela, sammanhängande källmeningar kopierade exakt/
+    : /one or more complete contiguous source sentences copied exactly/,
   `${lang} repair repeats the extractive-answer gate explicitly`);
   assert.match(repairInstruction, lang === "sv"
-    ? /utan inledning, etikett, förklaring eller omskrivning före eller efter citatet/
-    : /with no introduction, label, explanation, or paraphrase before or after/,
+    ? /parafrasera inte och lägg inte till fakta/
+    : /do not paraphrase or add facts/,
   `${lang} repair forbids non-source text around an extractive answer`);
   assert.match(repairInstruction, lang === "sv"
     ? /Matematik får ha en korrekt härledd lösning/
@@ -205,7 +205,7 @@ assert.equal((await generateExam.readJsonBody(internalRequestStream(), 128 * 102
   "bounded internal batches can transport valid maximum-length material plus comparison context");
 await assert.rejects(() => generateExam.readJsonBody(internalRequestStream(), 64 * 1024), { code: "BODY_TOO_LARGE" },
   "the ordinary 64 KiB request envelope still rejects oversized public-style bodies");
-assert.match(biologyPrompt.systemPrompt, /ORDAGRANT utdrag kopierat direkt från materialet, inte en parafras/i,
+assert.match(biologyPrompt.systemPrompt, /source_references ska vara ordagrant kopierad direkt från materialet, inte en parafras/i,
   "the generator must use exact source excerpts that survive the server's literal-reference check");
 assert.match(biologyPrompt.systemPrompt, /Varje distraktor måste vara ett begripligt och ämnesrelevant begrepp/i,
   "multiple-choice distractors must stay plausible and in the same subject category");
@@ -223,23 +223,32 @@ assert.match(biologyPrompt.systemPrompt, /självständig, tydligt avgränsad upp
   "first-pass short answers have one clear and bounded answer target");
 assert.match(biologyPrompt.systemPrompt, /Bedöm bara arbetssteg som frågan uttryckligen efterfrågar/i,
   "the short-answer rubric cannot silently score unrequested work");
-assert.match(biologyPrompt.systemPrompt, /faktabaserade kortsvar måste model_answer dessutom bestå.*ordagranna meningar ur materialet/i,
-  "the generator keeps factual science answer keys extractive");
-assert.match(biologyPrompt.systemPrompt, /model_answer innehålla ENDAST hela, sammanhängande meningar kopierade exakt ur materialet.*ingen inledning, etikett, förklaring eller omskrivning/i,
-  "the generator forbids prefixes and paraphrases that would fail exact source extraction");
+assert.match(biologyShortPrompt.systemPrompt, /det kortaste sammanhängande, ordagranna utdraget som fullt besvarar frågan och behåller alla nödvändiga villkor, negationer, enheter och orsakssamband/i,
+  "the science-specific answer span retains every necessary qualifier");
+assert.match(biologyShortPrompt.systemPrompt, /source_references ska visa hela den relevanta källmeningen eller de källmeningar.*går före önskemålet om korta utdrag/i,
+  "science source references retain full context despite the general short-reference preference");
+const historyPrompt = generateExam.buildExamPrompts({
+  lang: "sv", level: "C", course: "Historia 1b", qType: "short", numQuestions: 3,
+  pastedText: "Industrialiseringen förändrade samhället.", isMath: false,
+  requireExtractiveAnswers: false,
+});
+assert.match(historyPrompt.systemPrompt, /För faktabaserade kortsvar ska model_answer bestå av en eller flera hela, sammanhängande meningar kopierade exakt ur materialet/i,
+  "concise extractive answers remain scoped to the natural-science profile");
+assert.match(historyPrompt.systemPrompt, /source_references ska innehålla ett kort ordagrant utdrag på helst 5–12 ord/i,
+  "non-science source-reference guidance retains its existing concise form");
 assert.match(biologyPrompt.systemPrompt, /Matematik får fortsatt ha en korrekt härledd lösning/i,
   "the extractive instruction preserves derived mathematical answers");
 assert.match(biologyShortPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
   "natural-science short answers receive exact source sentences as candidate answer anchors");
-assert.match(biologyShortPrompt.userPrompt, /Ett ankare får användas igen endast när frågan prövar en annan tydligt avgränsad uppgift eller aspekt/i,
-  "the same source sentence can support distinct questions without weakening source-grounding rules");
+assert.match(biologyShortPrompt.userPrompt, /En mening får stödja olika, tydligt avgränsade svarsmål bara om varje fråga har sitt eget ordagranna svarutdrag/i,
+  "the same source sentence can support distinct answer targets only with separate exact answer spans");
 assert.doesNotMatch(biologyShortPrompt.userPrompt, /ännu oanvänt ankare/i,
   "the prompt no longer imposes a one-question-per-source-sentence ceiling");
 assert.match(biologyShortPrompt.userPrompt, /\["Fotosyntesen sker i kloroplasterna\.","Växten använder ljus, vatten och koldioxid för att bilda glukos och syre\.","Cellandning frigör energi ur glukos\."\]/,
   "answer anchors are literal complete sentences copied from the supplied synthetic material");
-assert.match(biologyShortPrompt.systemPrompt, /Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källmeningarna inte själva uttrycker/i,
+assert.match(biologyShortPrompt.systemPrompt, /Fråga inte efter en orsak, slutsats, jämförelse eller förklaring som källan inte stöder/i,
   "natural-science short-answer questions cannot demand unsupported inference beyond their exact answer source");
-assert.match(biologyShortPrompt.systemPrompt, /På A-nivå får du bara skapa en fråga om materialet både stöder svaret ordagrant och ger tillräckligt underlag för det självständiga resonemang/i,
+assert.match(biologyShortPrompt.systemPrompt, /På A-nivå får du bara skapa en fråga om materialet både stöder det exakta svaret och det självständiga resonemang som nivån kräver/i,
   "A-level science items require both an extractive answer and source-supported independent reasoning");
 assert.doesNotMatch(biologyPrompt.userPrompt, /Exakta källmeningar som möjliga svarankare/i,
   "anchor payloads are omitted when the chosen format has no short-answer items");
@@ -283,10 +292,23 @@ const biologyRepair = generateExam.buildRepairPayload({
 });
 assert.match(biologyRepair.input.at(-1).content, /NATURVETENSKAPLIGA KORTSVAR:.*På A-nivå/i,
   "science-specific source-answer requirements persist through repair attempts");
-assert.match(biologyRepair.input.at(-1).content, /Kopiera dem exakt.*Poängkraven/i,
+assert.match(biologyRepair.input.at(-1).content, /kortaste sammanhängande utdraget.*Lägg inte till eller parafrasera text/i,
   "repair instructions continue to direct candidates toward exact, fully supported source answers");
-assert.match(biologyRepair.input.at(-1).content, /En källmening får stödja mer än en reparationsfråga bara när varje uppgift prövar ett annat/i,
-  "repair batches may reuse a source sentence only for a distinct supported task");
+assert.match(biologyRepair.input.at(-1).content, /utan att tappa nödvändiga villkor, negationer, enheter eller orsakssamband/i,
+  "science repair preserves qualifiers and conditions in short answer spans");
+assert.match(biologyRepair.input.at(-1).content, /source_references ska visa hela relevanta källmeningar/i,
+  "science repair keeps full source context in references");
+const historyRepair = generateExam.buildRepairPayload({
+  input: [{ role: "user", content: "Antal frågor: 3. Material: Exempel." }],
+  text: { format: generateExam.buildMockExamSchema(3) },
+}, {
+  lang: "sv", numQuestions: 3, existingQuestions: [], candidateCount: 3,
+  requireExtractiveAnswers: false, qType: "short",
+});
+assert.match(historyRepair.input.at(-1).content, /en eller flera hela, sammanhängande källmeningar kopierade exakt/i,
+  "non-science repair retains complete-sentence extraction");
+assert.match(biologyRepair.input.at(-1).content, /En källmening får stödja flera reparationsfrågor bara om varje uppgift har ett eget, tydligt avgränsat svarsmål med ett eget exakt svarutdrag/i,
+  "repair batches may reuse a source sentence only for distinct exact answer targets");
 const mathPrompt = generateExam.buildExamPrompts({
   lang: "sv", level: "A", course: "Matematik 2b", qType: "short", numQuestions: 3,
   pastedText: "En andragradsfunktion skrivs f(x)=ax²+bx+c. Exempel: x²-4x+3 har nollställena 1 och 3.", isMath: true,
@@ -339,8 +361,8 @@ assert.match(englishPrompt.systemPrompt, /Score only work explicitly requested b
   "English scoring criteria cannot silently require unrequested work");
 assert.match(englishPrompt.systemPrompt, /each task must be independently solvable from the material and question text/i,
   "math tasks retain the independent solvability requirement without extractive-only answers");
-assert.match(englishPrompt.systemPrompt, /model_answer must contain ONLY complete, contiguous sentences copied exactly from the material.*no introduction, label, explanation, or paraphrase/i,
-  "English factual short answers cannot add text around a source quotation");
+assert.match(englishPrompt.systemPrompt, /model_answer must consist of one or more complete, contiguous sentences copied exactly from the material/i,
+  "English non-science factual short answers retain complete-sentence grounding");
 assert.match(englishPrompt.systemPrompt, /the question must explicitly ask students to show or explain their method if method points are awarded/i,
   "English math prompts align method points with requested student work");
 assert.match(englishPrompt.systemPrompt, /the rubric scores only that answer/i,

@@ -4493,3 +4493,26 @@ den befintliga felbanken eller skapa upprepade ofullständiga prov.
 **Nästa steg:** verifiera en ren, enbart syntetisk stagingidentitet innan ett
 enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 12/12-prestanda.
+
+### Uppföljning: svarutdrag och källbetydelse — 2026-10-25
+
+- [x] Naturvetenskapliga faktakortsvar kan nu använda sitt eget korta,
+  sammanhängande ordagranna svarutdrag när en källmening stöder flera skilda
+  mål. Svaret instrueras att behålla nödvändiga villkor, negationer, enheter
+  och orsakssamband; om kortningen tappar betydelse ska mer av meningen vara
+  kvar. Källhänvisningen ska visa hela relevanta meningssammanhanget.
+- [x] Den korta svarutdragsregeln är begränsad till naturvetenskap. Övriga
+  ämnen behåller instruktionen om hela ordagranna källmeningar och korta
+  källhänvisningar.
+- [x] Oberoende granskaren instrueras uttryckligen att avvisa en ordagrann
+  delsträng om borttagen negation, begränsning, villkor, enhet eller
+  orsakssamband ändrar innebörden. En syntetisk regression visar att en sådan
+  kandidat kan passera den rent strukturella substringkontrollen men avvisas
+  av oberoende verifiering; godkännandegrindarna är oförändrade.
+- [x] Offlinekontroller: syntax för fyra ändrade JavaScript-filer;
+  exam-pipeline offline, quality-gold, verifier-beslut,
+  verifier-output-contract och resumable-pipeline-testfiler passerade;
+  `git diff --check` passerade.
+- [!] Mockade verifierarutdata testar kodens avvisningsflöde, inte att en live
+  modell alltid upptäcker varje semantisk qualifierförlust. Ingen live-AI,
+  Supabase, databas, konto, kvot, `main` eller Production användes.

@@ -70,7 +70,7 @@ const reusedAnchorQuestions = [
     ...shortQuestion,
     id: "bio-reuse-inputs",
     question: "Vilka ämnen använder växten för att bilda glukos och syre?",
-    model_answer: reusableAnchorMaterial,
+    model_answer: "ljus, vatten och koldioxid",
     rubric: "Poäng för att ange ljus, vatten och koldioxid som utgångsämnen.",
     scoring_rubric: {
       parts: [{ description: "Ljus, vatten och koldioxid anges", points: 2 }],
@@ -83,7 +83,7 @@ const reusedAnchorQuestions = [
     ...shortQuestion,
     id: "bio-reuse-products",
     question: "Vilka ämnen bildas när växten använder ljus, vatten och koldioxid?",
-    model_answer: reusableAnchorMaterial,
+    model_answer: "glukos och syre",
     rubric: "Poäng för att ange glukos och syre som produkter.",
     scoring_rubric: {
       parts: [{ description: "Glukos och syre anges", points: 2 }],
@@ -98,8 +98,18 @@ const reusedAnchorQuestions = [
 }).gate.questions[0]);
 assert.equal(reusedAnchorQuestions.length, 2,
   "one exact source sentence may structurally support distinct input and output targets");
-assert.ok(reusedAnchorQuestions.every((question) => question.model_answer === reusableAnchorMaterial),
-  "both tasks retain the exact source answer instead of paraphrasing it");
+assert.deepEqual(reusedAnchorQuestions.map((question) => question.model_answer), [
+  "ljus, vatten och koldioxid",
+  "glukos och syre",
+], "distinct targets keep distinct exact answer excerpts from the shared source sentence");
+assert.equal(new Set(reusedAnchorQuestions.map((question) => question.model_answer)).size, 2,
+  "source reuse does not require identical full-sentence answer keys");
+const paraphrasedAnchorAnswer = normalizeAndGate({
+  ...reusedAnchorQuestions[0],
+  model_answer: "solsken, regn och koldioxid",
+}, { material: reusableAnchorMaterial, requireExtractiveAnswers: true });
+assert.deepEqual(paraphrasedAnchorAnswer.gate.dropped[0].issues, ["source_answer_not_extractable"],
+  "shorter answers still fail the extractive gate when paraphrased rather than copied exactly");
 const reuseReviews = new Map(reusedAnchorQuestions.map((question) => [question.id, { ...approvedReview, duplicate_of: "" }]));
 assert.ok(reusedAnchorQuestions.every((question) => verifier.decideApproval(reuseReviews.get(question.id))),
   "each distinct, extractive task can pass its own positive independent-review verdict");
@@ -136,6 +146,12 @@ assert.match(verifier.buildVerifierPrompt("sv", "natural_sciences", 1, null, tru
 assert.match(verifier.buildVerifierPrompt("sv", "natural_sciences", 1, null, true),
   /samma concept, kurs eller övergripande lärandemål räcker inte/i,
   "mistake-training review must check the specific missed component rather than broad topic overlap");
+assert.match(verifier.buildVerifierPrompt("sv", "natural_sciences", 1, null, false),
+  /utelämnad negation, begränsning.*villkor, enhet eller orsakssamband/i,
+  "the independent reviewer is explicitly warned that a verbatim substring can reverse meaning");
+assert.match(verifier.buildVerifierPrompt("en", "natural_sciences", 1, null, false),
+  /omitting negation, limitation.*condition, unit, or causal relation can reverse/i,
+  "the English reviewer applies the same qualifier-preservation rule");
 
 // Exercise the full local issuance boundary: a topic-overlapping candidate may
 // pass structural checks, but the independent review result must keep it out of
@@ -198,6 +214,70 @@ try {
     },
     questions: issuable,
   }), /Verified exam does not meet delivery requirements/);
+} finally {
+  globalThis.fetch = originalFetch;
+}
+
+const qualifierMaterial = "Ämnet är inte lösligt i vatten under 20 °C.";
+const qualifierTruncation = normalizeAndGate({
+  ...shortQuestion,
+  id: "bio-omitted-negation-and-condition",
+  question: "Vad säger källan om ämnets löslighet i vatten under 20 °C?",
+  model_answer: "lösligt i vatten",
+  rubric: "Ange lösligheten under 20 °C.",
+  scoring_rubric: {
+    parts: [{ description: "Lösligheten anges", points: 2 }],
+    full_score_requirements: "Ämnets löslighet anges.",
+    partial_credit_notes: "Delpoäng för ett ofullständigt svar.",
+  },
+  source_references: [qualifierMaterial],
+}, { material: qualifierMaterial, requireExtractiveAnswers: true });
+assert.equal(qualifierTruncation.gate.questions.length, 1,
+  "the structural exact-substring check alone cannot detect lost source meaning");
+globalThis.fetch = async () => Response.json({
+  model: "synthetic-reviewer",
+  usage: { input_tokens: 1, output_tokens: 1 },
+  output: [{ content: [{ type: "output_text", text: JSON.stringify({ results: [{
+    id: qualifierTruncation.gate.questions[0].id,
+    approved: false,
+    factual_accuracy: 0.2,
+    ambiguity_score: 0,
+    difficulty_match: 1,
+    source_alignment: 0.2,
+    scoring_quality: 0.2,
+    language_quality: 1,
+    language_match: true,
+    option_quality: [],
+    source_support: {
+      question: true,
+      answer: false,
+      rubric: false,
+      rubric_parts: [false],
+      accepted_answers: [],
+      evidence_quotes: [qualifierMaterial],
+      question_evidence: [0],
+      answer_evidence: [],
+      rubric_evidence: [0],
+      rubric_part_evidence: [[]],
+      accepted_answer_evidence: [],
+    },
+    duplicate_of: "",
+    issues: ["source_support"],
+    required_changes: ["Behåll negationen och temperaturvillkoret i svaret."],
+  }] }) }] }],
+});
+try {
+  const reviewedQualifier = await verifier.verifyQuestions(qualifierTruncation.gate.questions, {
+    apiKey: "synthetic-only",
+    model: "synthetic-reviewer",
+    subjectProfile: "natural_sciences",
+    lang: "sv",
+    material: qualifierMaterial,
+    timeoutMs: 5_000,
+  });
+  const candidate = qualifierTruncation.gate.questions[0];
+  assert.equal(verifier.decideApproval(reviewedQualifier.perQuestion.get(candidate.id)), false,
+    "a verifier rejection prevents a source-extractive but semantically incomplete answer from approval");
 } finally {
   globalThis.fetch = originalFetch;
 }
