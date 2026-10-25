@@ -1,5 +1,27 @@
 # 08 Current Status
 
+# P.E.R request-aware active-exam hints — 2026-10-25
+
+- [x] Active-exam guidance now recognizes explicit student requests for a
+  why-explanation, a starting method, a term clarification, or a self-check.
+  The help text remains fixed, pedagogical and answer-free; direct requests
+  for the answer still receive only the existing hint ladder.
+- [x] When a signed question has specialized source/graph guidance, that
+  question-specific guidance takes priority over generic intent text. English
+  and Swedish self-check requests are covered.
+- [x] The signed-question projection no longer trusts the client's unsigned
+  `answered` flag. Self-check wording is selected from the student's explicit
+  request, not from that mutable field.
+- [x] Offline verification: full `per-exam-review-handler` 72/72; focused
+  active-hint overlap tests 5/5; changed-file syntax checks and
+  `git diff --check` pass.
+- [x] Independent read-only review found no blocker in answer gating, proof
+  binding, intent classification, or model/quota avoidance.
+- [!] No live model call or hosted database operation was made. The signed-in
+  browser's available Preview still shows the login gate; the open exam was
+  preserved untouched.
+- [!] Feature checkpoint, GitHub push and Vercel Preview creation are pending.
+
 # P.E.R coach cache and verified-history access — 2026-10-25
 
 - [x] Independent review found two improvement-coach gaps: old cached advice

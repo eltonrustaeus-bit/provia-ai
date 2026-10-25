@@ -532,7 +532,6 @@ function verifiedActiveQuestion(body, user, submissionId) {
   return {
     type: question.type,
     text: String(question.question ?? question.text ?? "").slice(0, 4000),
-    answered: question.answered === true,
     graphMode: question.type === "graph" ? question.graphMode : undefined,
   };
 }
@@ -609,7 +608,11 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
   const currentQuestion = trustedQuestion === undefined
     ? body.pageContext?.currentQuestion : trustedQuestion;
   const type = currentQuestion?.type;
-  const hasDraft = currentQuestion?.answered === true;
+  const requestIsEnglish = body.lang === "en" || /^en\b/i.test(String(req.headers?.["accept-language"] || ""));
+  const helpRequest = String(body.userQuestion || "").trim().slice(0, 300).toLocaleLowerCase(requestIsEnglish ? "en-US" : "sv-SE");
+  const answerRequest = /\b(give me (the )?answer|what is the answer|correct answer|correct option|answer key|solution please|facit|rätt svar|rätta svaret|ge mig svaret|vad är svaret|vilket alternativ är rätt)\b/i.test(helpRequest);
+  const asksToCheckDraft = !answerRequest && /\b(my answer|my work|my solution|is my answer right|is this right|check my|mitt svar|min lösning|min uträkning|är mitt svar rätt|är min lösning rätt|är det rätt|kolla mitt svar|rätta mitt svar)\b/i.test(helpRequest);
+  const hasDraft = asksToCheckDraft;
   const questionText = String(currentQuestion?.text || currentQuestion?.question || "").slice(0, 4000);
   const declaredGraphModes = [];
   if (currentQuestion && Object.hasOwn(currentQuestion, "graphMode")) declaredGraphModes.push(currentQuestion.graphMode);
@@ -814,7 +817,37 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
   const sequence = contextualSequence || (type === "graph"
     ? (graphMode === "line" || graphMode === "scatter" ? ladder[graphMode] : ladder.genericGraph)
     : ladder[type]);
+  const requestGuidance = answerRequest ? null : asksToCheckDraft ? null
+    : /\b(why|varför|orsak|cause)\b/i.test(helpRequest) ? (en ? [
+      "Identify what changes in the question. Which possible cause can you find in your material?",
+      "Follow the description in your material in order. Which detail links a cause to the change?",
+      "Build a short cause-and-effect chain from the source and check that each link has evidence.",
+    ] : [
+      "Se vad som förändras i frågan. Vilken möjlig orsak hittar du i materialet?",
+      "Följ beskrivningen i materialet i ordning. Vilken detalj kopplar en orsak till förändringen?",
+      "Bygg en kort orsakskedja från källan och kontrollera att varje led har belägg.",
+    ])
+    : /\b(how do i|how can i|how should i|how to|hur börjar jag|hur ska jag börja|hur gör jag|hur ska jag|hur kan jag|how do i start|what should i do|vad ska jag göra|vilket steg först)\b/i.test(helpRequest) ? (en ? [
+      "Start with the action word in the question. What does it ask you to do: compare, describe or explain?",
+      "Break the task into two small steps. Which one can you support with your material first?",
+      "Make a short plan from the question's requirements, then check each step against your material.",
+    ] : [
+      "Börja med frågans verb. Ska du jämföra, beskriva eller förklara?",
+      "Dela upp uppgiften i två små steg. Vilket kan du först stödja med materialet?",
+      "Gör en kort plan utifrån frågans krav och kontrollera varje steg mot materialet.",
+    ])
+    : /\b(what does .+ mean|what is meant by|vad betyder|vad menas med|vad menas)\b/i.test(helpRequest) ? (en ? [
+      "Find the key word from the question in your material. What description is given there?",
+      "Compare the key word with a nearby concept in your material. What distinction does the source make?",
+      "Explain the concept in your own words and connect it to one specific detail in your material.",
+    ] : [
+      "Hitta nyckelordet från frågan i materialet. Hur beskrivs det där?",
+      "Jämför nyckelordet med ett närliggande begrepp i materialet. Vilken skillnad gör källan?",
+      "Förklara begreppet med egna ord och koppla det till en konkret detalj i materialet.",
+    ]) : null;
   const slopeQuestion = /\b(lutning|lutningen|riktningskoefficient|slope|gradient)\b/i.test(questionText);
+  const questionHasSpecificGuidance = Boolean(contextualSequence || type === "graph" || slopeQuestion);
+  const effectiveRequestGuidance = questionHasSpecificGuidance ? null : requestGuidance;
   const slopeGuidance = en
     ? hasDraft
       ? [
@@ -847,8 +880,9 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active", truste
       ? "This exam is not open for answering. I can help with the method, but a full answer requires verified grading. "
       : "Provet är inte öppet för svar. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ");
   res.json({
-    answer: statusNote + (slopeQuestion ? slopeGuidance[requestedLevel]
-      : sequence?.[requestedLevel] || ladder.short[requestedLevel]),
+    answer: statusNote + (asksToCheckDraft && slopeQuestion ? slopeGuidance[requestedLevel]
+      : effectiveRequestGuidance?.[requestedLevel] || (slopeQuestion ? slopeGuidance[requestedLevel]
+        : sequence?.[requestedLevel] || ladder.short[requestedLevel])),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: issuanceState === "active",
