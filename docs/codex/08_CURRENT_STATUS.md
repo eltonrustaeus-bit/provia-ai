@@ -4679,6 +4679,12 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   `$0.839398` var avläst före den föregående liveförfrågan och lästes inte om
   efteråt. Inga ytterligare betalda anrop, databasskrivningar eller
   produktionsändringar gjordes.
-- [!] Nästa steg: push av denna checkpoint till den befintliga feature-branchen,
-  verifiera Vercel Preview från exakt commit och fortsätta med syntetiska
-  3/6/12-provtester endast efter en ny skrivskyddad budgetkontroll.
+- [x] Kodcheckpoint `bd558b7b0d54ddcafc88aa3701a6751f697bb2c0` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_6jWACaLwi4T9vzyvifi9Ta3iNqSm` är `READY` från exakt SHA och har aliaset
+  `provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Preview-hostnamnet returnerar Vercel SSO-omdirigering för anonyma
+  förfrågningar. Deployment och commit är verifierade, men ingen ny
+  autentiserad app- eller modellkontroll har gjorts.
+- [!] Nästa steg: testa syntetiska 3/6/12-frågeprov på Preview endast efter en
+  ny skrivskyddad budgetkontroll och bekräftad syntetisk testidentitet.
