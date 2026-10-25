@@ -26,7 +26,13 @@
   validation follows the authenticated active-exam gate.
 - [!] The frontend test mocks the coach response; authenticated server evidence
   is covered separately by API tests rather than one hosted end-to-end test.
-- [!] Feature checkpoint push and Preview creation are still pending.
+- [x] Code checkpoint `4f226f103fe165efee2286ceb6a6d5af05b96985` is pushed to
+  `codex/exgen-generation-quality-2026-10-20`; Vercel Preview
+  `dpl_F1MZFtPs92zJD1wxZJWTcMr72KfF` is `READY` at
+  `https://provia-39pnnj8rl-eltons-projects-4adfb1a3.vercel.app/app.html`.
+- [!] The Preview currently shows its login gate in the available browser
+  session. A login on another unique Preview hostname is not shared, so no
+  authenticated live behavior was claimed or exercised.
 
 # P.E.R material change guard — 2026-10-25
 
