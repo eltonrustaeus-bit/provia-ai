@@ -460,7 +460,7 @@
          localStorage är bara det som råkar ligga kvar i den här webbläsaren.
          Den mer korrekta källan ska vinna. Beslutat 2026-08-09, avviker
          medvetet från dagens beteende. */
-      if (typeof ctx.userScore !== 'number') {
+      if (ctx.page !== 'förbättring' && typeof ctx.userScore !== 'number') {
         try {
           var hist = JSON.parse(localStorage.getItem('proviaai_history') || '[]');
           if (Array.isArray(hist) && hist.length) {
@@ -1536,7 +1536,8 @@ function finalizeMsg(div, text) {
         var recentMistakes = [], weakAreas = [];
         try {
           var lsMistakes = JSON.parse(localStorage.getItem('proviaai_mistakes') || '[]');
-          var mayUseMistakeContext = pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
+          var mayUseMistakeContext = pageCtx.page !== 'förbättring'
+            && pageCtx.page !== 'prov' && pageCtx.page !== 'exam'
             && pageCtx.examState?.phase !== 'exam';
           if (mayUseMistakeContext) {
             var activeCourse = String(pageCtx.course || '').trim();

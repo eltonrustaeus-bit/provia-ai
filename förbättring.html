@@ -438,7 +438,7 @@
       const uid=await getUserId();if(!uid)return{ok:false,error:'Not logged in'};
       const{data,error}=await db.from('user_exams').select('id,created_at,course,level,qtype,material,exam,answers,result').eq('user_id',uid).order('created_at',{ascending:true}).limit(500);
       if(error)return{ok:false,error:error.message||String(error)};
-      return{ok:true,rows:data||[]};
+      return{ok:true,rows:data||[],userId:uid};
     }
     async function deleteAllUserExamsFromAccount(session){
       if(!db) return{ok:false,error:'Supabase not configured'};
@@ -644,49 +644,34 @@
 
     /* ── PER COACH ── */
     const PER_COACH_TTL = 24 * 60 * 60 * 1000;
-    function getCoachCache(){const o=lsObj(LS_PER_COACH_CACHE);return(o&&typeof o==='object')?o:null;}
+    function getCoachCache(ownerId=localStorage.getItem('exgen_local_data_owner')){
+      const o=lsObj(LS_PER_COACH_CACHE);
+      return o&&typeof o==='object'&&ownerId&&o.ownerId===ownerId?o:null;
+    }
     function setCoachCache(data){lsSet(LS_PER_COACH_CACHE,data);}
     function isCoachCacheFresh(c){return c&&c.text&&(Date.now()-(c.ts||0))<PER_COACH_TTL;}
 
-    async function fetchPERCoach(h,m){
+    let coachRequestSequence=0;
+    let coachPending=null;
+    async function fetchPERCoach(ownerId){
       if(!db) return null;
       const{data:sd}=await db.auth.getSession();
       const token=sd?.session?.access_token||'';
-      if(!token) return null;
-
-      const avg5=avgPct(scoredHistory(h).slice(-5));
-      const courseFreq={},conceptFreq={};
-      m.slice(-30).forEach(x=>{
-        const c=String(x.course||'').trim(),concept=conceptOf(x);
-        if(c)courseFreq[c]=(courseFreq[c]||0)+1;
-        if(concept)conceptFreq[concept]=(conceptFreq[concept]||0)+1;
-      });
-      const topCourses=Object.entries(courseFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([c,n])=>`${c}(${n})`).join(', ');
-      const weakAreas=Object.keys(conceptFreq).sort((a,b)=>conceptFreq[b]-conceptFreq[a]||a.localeCompare(b)).slice(0,5);
-      const recentQ=m.slice(-5).map(x=>{
-        const concept=conceptOf(x),errors=errorTagsOf(x).slice(0,2).join(', '),feedback=String(x.feedback||'').slice(0,80);
-        return [concept,errors,feedback].filter(Boolean).join(' — ');
-      }).filter(Boolean).join(' | ');
-
-      const context=[
-        `${h.length} prov gjorda.`,
-        avg5===null?'Resultatsnitt saknas eftersom prov saknar poängunderlag.':`Snitt av prov med poängunderlag, senaste 5: ${avg5}%.`,
-        topCourses?`Kurser med flest registrerade misstag (inte betygssnitt): ${topCourses}.`:'',
-        recentQ?`Senaste dokumenterade begrepp och fel: ${recentQ}.`:''
-      ].filter(Boolean).join(' ');
+      if(!token||sd?.session?.user?.id!==ownerId) return null;
 
       const r=await fetch('/api/explain',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
         body:JSON.stringify({
           topic:'studiecoach',
-          context,
-          weakAreas,
+          pageContext:{page:'förbättring'},
           userQuestion:'Analysera min provhistorik och ge mig en personlig rekommendation för att förbättra mina resultat.'
         })
       });
       const data=await r.json();
       if(!r.ok)throw new Error(data?.error||'failed');
+      const{data:after}=await db.auth.getSession();
+      if(after?.session?.user?.id!==ownerId) return null;
       return data?.answer||null;
     }
 
@@ -1120,6 +1105,11 @@
       const r=await fetchUserExams();
       if(!r.ok){if(st){st.textContent=String(r.error||'Sync error');st.className='statusText bad';}if(syncBtn)syncBtn.removeAttribute('disabled');return;}
       const rows=r.rows||[];
+      if(!r.userId||r.userId!==await getUserId()){
+        if(st){st.textContent='Kontot ändrades under synkroniseringen. Uppdatera sidan för att läsa rätt data.';st.className='statusText warn';}
+        if(syncBtn)syncBtn.removeAttribute('disabled');
+        return;
+      }
       const h=rows.map(row=>{
         const totalRaw=row.result?.total_points,maxRaw=row.result?.max_points;
         const total=Number(totalRaw),maximum=Number(maxRaw);
@@ -1441,16 +1431,29 @@
       const box=$('coachText');
       if(!box)return;
       if(!h.length){box.textContent='Ingen provdata än. Gör ett prov i appen och tryck Rätta prov.';return;}
-      const cache=getCoachCache();
+      const{data:sessionData}=db?await db.auth.getSession():{data:null};
+      const ownerId=sessionData?.session?.user?.id||'';
+      if(!ownerId){box.textContent='Logga in för att få en personlig analys.';return;}
+      const cache=getCoachCache(ownerId);
       if(isCoachCacheFresh(cache)){box.textContent=cache.text;return;}
+      if(coachPending?.ownerId===ownerId)return;
       box.textContent='P.E.R läser…';
       flow.busy('coach',true);
+      const requestId=++coachRequestSequence;
+      coachPending={ownerId,requestId};
       try{
-        const text=await fetchPERCoach(h,m);
-        if(text){box.textContent=text;setCoachCache({ts:Date.now(),text});}
+        const text=await fetchPERCoach(ownerId);
+        const{data:current}=await db.auth.getSession();
+        if(requestId!==coachRequestSequence||current?.session?.user?.id!==ownerId)return;
+        if(text){box.textContent=text;setCoachCache({ownerId,ts:Date.now(),text});}
         else coachError(box);
-      }catch(_){coachError(box);}
-      finally{flow.busy('coach',false);}
+      }catch(_){
+        if(requestId===coachRequestSequence)coachError(box);
+      }
+      finally{
+        if(coachPending?.requestId===requestId)coachPending=null;
+        if(requestId===coachRequestSequence)flow.busy('coach',false);
+      }
     }
 
     /* Ett misslyckat anrop säger det och går att göra om, i stället för att
@@ -1511,20 +1514,8 @@
 
     function pushPerContext(){
       if(!window.setPerContext)return;
-      const {h,m}=data();
-      const areaCounts=m.slice(-30).reduce((acc,x)=>{
-        const c=String(x.course||'').trim(), cn=conceptOf(x);
-        const key=[c,cn].filter(Boolean).join(' › ');
-        if(key)acc[key]=(acc[key]||0)+1;
-        return acc;
-      },{});
-      const weakAreas=Object.keys(areaCounts).sort((a,b)=>areaCounts[b]-areaCounts[a]).slice(0,5);
-      const recentAverage=avgPct(scoredHistory(h).slice(-5));
       window.setPerContext({
         page:'förbättring',
-        userScore:recentAverage===null?undefined:recentAverage/100,
-        weakAreas,
-        examState:{answered:h.length,remaining:0},
         targets:PER_TARGETS
       });
       /* Exponeras bara för riggen. setPerContext sväljer manifestet och det
@@ -1547,8 +1538,25 @@
     /* Skärmen som just öppnades ska visa aktuell data — annars står coachen
        kvar på siffror från innan senaste synk. */
     flow.on(()=>renderAll());
+    let pageOwnerId=localStorage.getItem('exgen_local_data_owner')||null;
     db?.auth?.onAuthStateChange?.((_event,session)=>{
-      if(reportOwner&&session?.user?.id!==reportOwner)renderReportState();
+      const nextOwner=session?.user?.id||null;
+      if(nextOwner===pageOwnerId)return;
+      pageOwnerId=nextOwner;
+      if(window.ExGenLocalDataBoundary?.syncSession)window.ExGenLocalDataBoundary.syncSession();
+      else{
+        [LS_HISTORY,LS_MISTAKES,LS_LAST,LS_MATERIAL,LS_TRAIN_PICK,LS_PER_COACH_CACHE,
+          LS_SMART_TIPS_CACHE,LS_TEACHER_REPORT_CACHE,LS_USER_NAME_A,LS_USER_NAME_B]
+          .forEach(key=>localStorage.removeItem(key));
+        if(nextOwner)localStorage.setItem('exgen_local_data_owner',nextOwner);
+        else localStorage.removeItem('exgen_local_data_owner');
+      }
+      coachRequestSequence++;
+      coachPending=null;
+      flow.busy('coach',false);
+      reportOwner=null;
+      renderAll();
+      if(nextOwner)setTimeout(()=>syncFromAccount(),0);
     });
 
     /* ── RENSA ALL DATA ──

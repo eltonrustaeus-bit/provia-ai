@@ -1,5 +1,40 @@
 # 08 Current Status
 
+## P.E.R allmän hjälp, provläge och kontobyte — 2026-10-25
+
+- [x] Allmän P.E.R-chatt på app-/förbättringssidor skickar inte längre lokal
+  poäng, svaghetsområden eller historik som om de vore verifierade serverdata.
+  Förbättringssidans coach använder serverns autentiserade historik.
+- [x] Inaktuella provfrågor som ligger kvar i klientkontext blockerar inte
+  tydliga allmänna frågor när servern säger `none`, `completed`, `abandoned`,
+  `expired` eller `missing`. En riktig fråga om facit eller lösning fortsätter
+  att stoppas; provfält och gamla svar tas inte med till den vanliga prompten.
+- [x] Kontobyte rensar kontobunden lokal data genom den befintliga
+  `ExGenLocalDataBoundary`, uppdaterar ägarmarkören och ogiltigförklarar
+  fördröjda coachsvar. A→B-testet bekräftar att B:s historik/svar finns kvar,
+  medan A:s sena svar varken visas eller cachas.
+- [x] Nya, provverb-anpassade ledtrådar som byggde på overifierad frågetext
+  togs bort. Befintliga korta, facitfria ledtrådar behålls. Granskaren noterade
+  att äldre fasta graf-/lutningsledtrådar ännu kan väljas av klientmetadata;
+  de avslöjar inte facit men kan ibland bli irrelevanta.
+- [x] Lokal verifiering: full `tests/api/per-exam-review-handler.test.mjs`
+  passerade före senaste utökningen; efter utökningen passerade fokuserade
+  API-tester **2/2** för fem inaktiva statusar, treordsöverlapp och fortsatt
+  facitspärr. `tests/frontend/per-page-targets.test.mjs` passerade **29/29**.
+  Även `per-manifest` **28/28**, `per-exam-context` **87/87**,
+  `per-landing` och `per-context-pack` passerade. Syntax- och diffkontroller
+  passerade.
+- [!] Endast offline/mock-verifiering gjordes i detta checkpoint. Ingen staging-
+  Preview, live-modellförfrågan, `main` eller Production ändrades. Dessa tester
+  bevisar inte kvaliteten på svar från en live modell.
+- [x] API-checkpoint `e6a673906e17b26ccf1ba88987eb7c5cbef4f847` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_DQcx79XMu9rUhUmkwK4sDUaPdhM9` är `READY` från exakt denna SHA:
+  `https://provia-ai-git-codex-exgen-gener-b3c147-eltons-projects-4adfb1a3.vercel.app`.
+- [ ] Frontend-/kontoisoleringscheckpointen återstår. Därefter skapas och
+  verifieras en separat Preview från dess exakta SHA. Live-modellbeteende
+  kräver separat aktuell kontroll av stagingåtkomst och kostnadsgräns.
+
 ## Senaste livebevis och nästa kvalitetsfix — 2026-10-25
 
 Den här posten är nyaste kontrollen och ersätter äldre påståenden nedan om att
