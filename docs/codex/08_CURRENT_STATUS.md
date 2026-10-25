@@ -15,8 +15,10 @@
 - [x] Independent review rechecked the refresh-token edge case and cross-tab
   sign-in/sign-out; no blocker remains.
 - [!] A read-only staging budget check showed 0.972991 USD remaining under the
-  existing lower cap. No AI request was made: another authenticated Preview
-  tab showed an active exam, which was left untouched.
+  existing lower cap. No AI request was made: the side-panel account page
+  showed a profile, but `app.html` then displayed the login gate, so P.E.R
+  authentication in the target route was not confirmed. A separate Chrome
+  Preview tab showed an active 12-question exam; it was left untouched.
 - [x] Commit `6c090c8` is pushed to
   `codex/exgen-generation-quality-2026-10-20`; Vercel Preview
   `dpl_K5pn5TmPtG7Q7acUX8TEjQYrFxXq` is READY from the exact commit.
