@@ -34,19 +34,21 @@ const now = Date.now();
 let crash = null;
 try {
 
-// mergeMistakes() plockar ut varje per_question där max_points > 0 och
+// mergeMistakes() plockar ut besvarade per_question där max_points > 0 och
 // points < max_points. Frågans id blir misstagets id.
 const Q = {
   m1: { q: "Vad sker i mitokondrien?", svar: "Fotosyntes", fb: "Blandar ihop organellerna.", model: "Cellandning." },
   m2: { q: "Beskriv glykolysen.", svar: "Delvis", fb: "Saknar ATP-utbytet.", model: "2 ATP netto." },
   m3: { q: "Derivatan av x^2 sin x?", svar: "2x cos x", fb: "Produktregeln saknas.", model: "2x sin x + x^2 cos x." },
+  u1: { q: "Obesvarad uppgift ska inte tränas", svar: "", fb: "Ej besvarad", model: "Rätt svar." },
 };
 
-function examRow(i, course, wrong, right) {
-  const all = [...wrong, ...right];
+function examRow(i, course, wrong, right, unanswered = []) {
+  const all = [...wrong, ...right, ...unanswered];
   const per = [
     ...wrong.map(id => ({ id, points: 0, max_points: 2, feedback: Q[id].fb, model_answer: Q[id].model, concept_tag: "", error_tags: [] })),
     ...right.map(id => ({ id, points: 2, max_points: 2, feedback: "", model_answer: "", concept_tag: "", error_tags: [] })),
+    ...unanswered.map(id => ({ id, points: 0, max_points: 2, unanswered: true, feedback: Q[id].fb, model_answer: Q[id].model, concept_tag: "", error_tags: [] })),
   ];
   return {
     id: i,
@@ -62,7 +64,7 @@ function examRow(i, course, wrong, right) {
 // faktiskt filtrera bort, och rapportgrinden vid tre prov går att stå på båda
 // sidor om.
 const ROWS = [
-  examRow(1, "Biologi 1", ["m1"], ["r1"]),
+  examRow(1, "Biologi 1", ["m1"], ["r1"], ["u1"]),
   examRow(2, "Biologi 1", ["m2"], ["r2"]),
   examRow(3, "Matematik 2b", ["m3"], ["r3"]),
 ];
@@ -199,6 +201,39 @@ async function mark(page, id) {
   await ctx.close();
 }
 
+// ── 1d: obesvarade frågor är inte valbara felbanksträningar ─────────────
+{
+  const { ctx, page } = await mk(1, "felbank");
+  const visibleMistakes = await page.locator(".xfMissQ").allTextContents();
+  ok("1d obesvarad fråga saknas i träningsbar felbank",
+    !visibleMistakes.some(text => text.includes("Obesvarad uppgift ska inte tränas")), JSON.stringify(visibleMistakes));
+  ok("1e besvarat fel finns kvar i felbanken", visibleMistakes.some(text => text.includes(Q.m1.q)), JSON.stringify(visibleMistakes));
+  await ctx.close();
+}
+
+// ── 1f: synligt kursfel prioriteras före tretaket ────────────────────────
+{
+  const { ctx, page } = await mk(1, "felbank");
+  await page.evaluate(() => {
+    const mistakes = JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]");
+    const biologyKey = mistakes.find(item => item.id === "m1")?.mistake_key;
+    const hidden = [1, 2, 3].map(n => ({
+      mistake_key: `hidden-math-${n}`, course: "Matematik 2b", question: `Dolt mattefel ${n}`,
+      user_answer: "fel", feedback: "Öva vidare", model_answer: "Rätt svar", points: 0, max_points: 2,
+    }));
+    localStorage.setItem("proviaai_mistakes", JSON.stringify([...mistakes, ...hidden]));
+    localStorage.setItem("proviaai_train_pick", JSON.stringify({
+      keys: [biologyKey, ...hidden.map(item => item.mistake_key)], mode: "selected", course: "Matematik 2b",
+    }));
+  });
+  await page.locator("#courseFilter").selectOption({ label: "Biologi 1" });
+  await page.waitForTimeout(100);
+  const visibleContext = await page.evaluate(() => window.__perManifestForTest?.selectedMistakes || []);
+  ok("1f synligt markerat fel överlever när dolda kursval överstiger tretaket",
+    visibleContext.length === 1 && visibleContext[0].question === Q.m1.q, JSON.stringify(visibleContext));
+  await ctx.close();
+}
+
 // ── 2: markering uppdaterar räknare och lagring ──────────────────────────
 {
   const { ctx, page } = await mk(3, "felbank");
@@ -218,6 +253,15 @@ async function mark(page, id) {
   const expectedKeys = await page.evaluate(() => JSON.parse(localStorage.getItem("proviaai_mistakes") || "[]").filter(item => ["m1", "m3"].includes(item.id)).map(item => item.mistake_key));
   ok("2d två markerade", p2.keys.length === 2 && expectedKeys.every(key => p2.keys.includes(key)), JSON.stringify({ picked: p2.keys, expectedKeys }));
   ok("2e räknaren följer med", /\b2\b/.test((await page.textContent("#selCountPill")) || ""));
+  const selectedContext = await page.evaluate(() => window.__perManifestForTest?.selectedMistakes || []);
+  ok("2f P.E.R får samma markerade poster i urvalsordning", selectedContext.length === 2
+    && selectedContext[0].question === Q.m1.q && selectedContext[1].question === Q.m3.q,
+    JSON.stringify(selectedContext));
+  await page.locator("#courseFilter").selectOption({ label: "Biologi 1" });
+  await page.waitForTimeout(100);
+  const filteredContext = await page.evaluate(() => window.__perManifestForTest?.selectedMistakes || []);
+  ok("2g kursfilter tar bort dolda fel ur P.E.R-kontexten",
+    filteredContext.length === 1 && filteredContext[0].course === "Biologi 1", JSON.stringify(filteredContext));
   await ctx.close();
 }
 

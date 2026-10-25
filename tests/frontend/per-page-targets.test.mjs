@@ -884,6 +884,63 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await ctx.close();
 }
 
+// A prompt-relevant change in a marked mistake must invalidate an in-flight
+// reply even when the question, concept, and learner answer stay unchanged.
+{
+  let releaseResponse;
+  let requestStarted;
+  const started = new Promise(resolve => { requestStarted = resolve; });
+  const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.userQuestion === "Förklara mitt markerade misstag") {
+        requestStarted(body);
+        await responseGate;
+        await route.fulfill({ json: { answer: "STALE_MISTAKE_REPLY_MARKER", helpCap: 3 } });
+      } else await route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.evaluate(() => window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [{ question: "Fotosyntesfråga", concept: "Fotosyntes", studentAnswer: "Syre", feedback: "Gammal feedback", expectedAnswer: "Koldioxid och vatten" }],
+  }));
+  await page.evaluate(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.__perMistakeRequestAborted = false;
+    window.fetch = (input, init = {}) => {
+      if (String(input).includes("/api/explain") && init.signal) {
+        init.signal.addEventListener("abort", () => { window.__perMistakeRequestAborted = true; }, { once: true });
+      }
+      return nativeFetch(input, init);
+    };
+  });
+  await page.click("#perBubble");
+  await page.locator("#perInput").fill("Förklara mitt markerade misstag");
+  await page.locator("#perSendBtn").click();
+  const requestBody = await Promise.race([
+    started,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("mistake-context P.E.R request did not start")), 5000)),
+  ]);
+  ok("P.E.R request bär markerad feedback som elevdata",
+    requestBody.pageContext?.selectedMistakes?.[0]?.feedback === "Gammal feedback", JSON.stringify(requestBody.pageContext));
+  await page.evaluate(() => window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [{ question: "Fotosyntesfråga", concept: "Fotosyntes", studentAnswer: "Syre", feedback: "Uppdaterad feedback", expectedAnswer: "Koldioxid och vatten" }],
+  }));
+  await page.locator("#perMessages .per-msg.teacher")
+    .filter({ hasText: "Det markerade misstaget ändrades medan P.E.R arbetade." }).waitFor({ timeout: 5000 });
+  ok("ändrad feedback avbryter in-flight svar trots oförändrad fråga/svar",
+    await page.evaluate(() => window.__perMistakeRequestAborted));
+  releaseResponse();
+  await page.waitForTimeout(250);
+  ok("sent svar med gammal felbankstext kastas bort",
+    !(await page.locator("#perMessages").textContent()).includes("STALE_MISTAKE_REPLY_MARKER"));
+  await ctx.close();
+}
+
 await browser.close();
 await srv.close();
 process.exit(R.finish());

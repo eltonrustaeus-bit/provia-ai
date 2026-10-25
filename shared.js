@@ -278,9 +278,9 @@
      skickade { focus: … }; listan nedan hette currentQuestion. Objektet
      försvann utan felmeddelande och P.E.R svarade om fel fråga mitt i ett prov.
 
-     Fem tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
+     Tillåtna toppnycklar, och en okänd nyckel VARNAR i stället för att
      försvinna. Instansen var focus; klassen är tyst nyckelkassering. */
-  var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state', 'activeSection'];
+  var PER_MANIFEST_KEYS = ['page', 'focus', 'targets', 'state', 'activeSection', 'selectedMistakes'];
   var PER_IMPROVEMENT_SECTIONS = ['hem', 'felbank', 'prov', 'coach', 'rapport'];
   var PER_STATE_KEYS = ['answered', 'remaining', 'elapsed', 'phase', 'submissionId'];
   var _perManifest = null;
@@ -328,6 +328,27 @@
     return out;
   }
 
+  function perCleanSelectedMistakes(list) {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 3).filter(function (item) {
+      return item && typeof item === 'object' && !Array.isArray(item);
+    }).map(function (item) {
+      var clean = {
+        question: String(item.question || '').slice(0, 240),
+        concept: String(item.concept || '').slice(0, 100),
+        studentAnswer: String(item.studentAnswer || '').slice(0, 240),
+        feedback: String(item.feedback || '').slice(0, 240),
+        expectedAnswer: String(item.expectedAnswer || '').slice(0, 240),
+        course: String(item.course || '').slice(0, 100)
+      };
+      if (typeof item.points === 'number' && Number.isFinite(item.points)) clean.points = item.points;
+      if (typeof item.maxPoints === 'number' && Number.isFinite(item.maxPoints)) clean.maxPoints = item.maxPoints;
+      return clean;
+    }).filter(function (item) {
+      return item.question || item.concept || item.studentAnswer || item.feedback || item.expectedAnswer;
+    });
+  }
+
   function perDescribe(m) {
     if (!m || typeof m !== 'object') {
       _perManifest = null;
@@ -356,7 +377,9 @@
       targets: perCleanTargets(m.targets),
       state: st,
       activeSection: m.page === 'förbättring' && PER_IMPROVEMENT_SECTIONS.indexOf(m.activeSection) !== -1
-        ? m.activeSection : ''
+        ? m.activeSection : '',
+      selectedMistakes: m.page === 'förbättring' && m.activeSection === 'felbank'
+        ? perCleanSelectedMistakes(m.selectedMistakes) : []
     };
     perResetStepsIfNewFocus();
     if (window.PER && window.PER._resetNudge) window.PER._resetNudge();
@@ -372,6 +395,12 @@
     return JSON.stringify({
       page: context.page || 'app',
       activeSection: context.activeSection || '',
+      selectedMistakes: (context.activeSection === 'felbank' && Array.isArray(context.selectedMistakes)
+        ? context.selectedMistakes : [])
+        .map(function (item) {
+          return [item.question, item.concept, item.studentAnswer, item.feedback,
+            item.expectedAnswer, item.course, item.points, item.maxPoints];
+        }),
       course: context.course || '',
       level: context.level || '',
       studyMaterial: context.studyMaterial || '',
@@ -400,6 +429,9 @@
     if (before.activeSection !== after.activeSection) return english
       ? 'The section changed while P.E.R was working. The reply was cancelled; ask again in the current section.'
       : 'Sektionen ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen i den aktuella sektionen.';
+    if (JSON.stringify(before.selectedMistakes || []) !== JSON.stringify(after.selectedMistakes || [])) return english
+      ? 'The selected mistake changed while P.E.R was working. The reply was cancelled; ask again about the selected item.'
+      : 'Det markerade misstaget ändrades medan P.E.R arbetade. Svaret avbröts; fråga igen om det valda misstaget.';
     if (before.course !== after.course || before.level !== after.level) return english
       ? 'The study subject or level changed while P.E.R was working. The reply was cancelled; send your question again for the current subject.'
       : 'Ämne eller nivå ändrades medan P.E.R arbetade. Svaret avbröts; skicka frågan igen för det aktuella studieområdet.';
@@ -558,6 +590,9 @@
         }
         if (m.state) ctx.examState = m.state;
         if (ctx.page === 'förbättring' && m.activeSection) ctx.activeSection = m.activeSection;
+        if (ctx.page === 'förbättring' && m.activeSection === 'felbank' && m.selectedMistakes.length) {
+          ctx.selectedMistakes = m.selectedMistakes;
+        }
         if (m.targets.length) {
           ctx.targets = m.targets.map(function (t) {
             return { id: t.id, label: t.label, hint: t.hint };
@@ -602,7 +637,7 @@
       // The homepage offers general product/study help, not personalized
       // coaching. Drop any stale study or exam context from another route.
       if (ctx.page === 'startsida') {
-        ['course', 'level', 'studyMaterial', 'userScore', 'weakAreas', 'currentQuestion', 'questions', 'examState', 'mode']
+        ['course', 'level', 'studyMaterial', 'userScore', 'weakAreas', 'currentQuestion', 'questions', 'examState', 'mode', 'selectedMistakes']
           .forEach(function (key) { delete ctx[key]; });
       }
 
@@ -630,7 +665,8 @@
       focus: ctx.currentQuestion || ctx.focus || null,
       targets: ctx.targets || [],
       state: ctx.examState || null,
-      activeSection: ctx.activeSection || ''
+      activeSection: ctx.activeSection || '',
+      selectedMistakes: ctx.selectedMistakes || []
     });
   };
   window.clearPerContext = function() { window._perPageContext = null; perDescribe(null); };

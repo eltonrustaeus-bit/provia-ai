@@ -95,6 +95,28 @@ ok("T6b userScore bevaras", Math.abs((t6.userScore ?? 0) - 0.62) < 1e-9, String(
 ok("T6c weakAreas bevaras", Array.isArray(t6.weakAreas) && t6.weakAreas[0] === "Biologi › Cellandning");
 ok("T6d currentQuestion når fram", t6.currentQuestion?.number === 1);
 
+const selectedMistakes = await page.evaluate(() => {
+  window.setPerContext({
+    page: "förbättring",
+    activeSection: "felbank",
+    selectedMistakes: [
+      { question: "Vad är fotosyntes?", concept: "Fotosyntes", studentAnswer: "Vatten", feedback: "Saknar koldioxid", expectedAnswer: "Koldioxid och vatten", course: "Biologi 1", points: 0, maxPoints: 2, id: "must-not-leak" },
+      { question: "Andra markerade felet" },
+      { question: "Tredje markerade felet" },
+      { question: "Fjärde ska kapas" },
+    ],
+  });
+  return window.__perTestCtx();
+});
+ok("T6e felbankens markerade poster når P.E.R", selectedMistakes.selectedMistakes?.[0]?.question === "Vad är fotosyntes?"
+  && selectedMistakes.selectedMistakes?.length === 3);
+ok("T6f felkontext saknar lokala identifierare", !JSON.stringify(selectedMistakes.selectedMistakes).includes("must-not-leak"));
+const selectedMistakesOutsideBank = await page.evaluate(() => {
+  window.setPerContext({ page: "förbättring", activeSection: "coach", selectedMistakes: [{ question: "Ska inte skickas" }] });
+  return window.__perTestCtx();
+});
+ok("T6g markerade fel skickas inte från annan sektion", selectedMistakesOutsideBank.selectedMistakes === undefined);
+
 const currentCourseWins = await page.evaluate(() => {
   window.__getPerStudyContext = () => ({ course: "Biologi 1", level: "B" });
   window.setPerContext({ course: "Matematik 2b", level: "C" });

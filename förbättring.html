@@ -951,6 +951,7 @@
           const valt=getPick().keys.includes(key);
           d.classList.toggle('sel',valt);
           rad.setAttribute('aria-pressed',valt?'true':'false');
+          pushPerContext();
         });
         // Detaljen: egen kontroll, egen rad under. Ingen stopPropagation
         // behövs eftersom knapparna ligger utanför .xf-opt, inte inuti den —
@@ -1124,7 +1125,8 @@
         const per=(result&&Array.isArray(result.per_question))?result.per_question:[];
         per.forEach((item,questionIndex)=>{
           const got=Number(item.points||0),mx=Number(item.max_points||0);
-          if(mx>0&&got<mx){const qid=String(item.id),q=qById.get(qid)||{};
+          const qid=String(item.id),q=qById.get(qid)||{},answer=String(aById.get(qid)||'');
+          if(item.unanswered!==true&&mx>0&&got<mx&&q.question?.trim()&&answer.trim()){
             out.push({mistake_key:`exam:${batchId}:${questionIndex}`,ts:cTs||Date.now(),course:r.course||'',level:r.level||'C',qType:q.type||(r.qtype||'mix'),id:qid,question:String(q.question||''),user_answer:String(aById.get(qid)||''),feedback:String(item.feedback||''),model_answer:String(item.model_answer||''),points:got,max_points:mx,concept_tag:String(item.concept_tag||''),error_tags:Array.isArray(item.error_tags)?item.error_tags:[]});}
         });
       });
@@ -1388,7 +1390,7 @@
       /* Ritar bara om sin EGEN lista. renderAll() hade ritat om fem skärmar
          och flyttat fokus för att en rad markerades. */
       const om=()=>{ renderMistakes(lsArr(LS_MISTAKES),kurs()); updateSelPill(); };
-      $('courseFilter').addEventListener('change',()=>{CONCEPT_FILTER='';om();});
+      $('courseFilter').addEventListener('change',()=>{CONCEPT_FILTER='';om();pushPerContext();});
       $('clearSelectionBtn').addEventListener('click',()=>{clearPick();om();});
       $('trainSelectedBtn').addEventListener('click',()=>{
         const p=getPick();
@@ -1632,14 +1634,33 @@
 
     function pushPerContext(){
       if(!window.setPerContext)return;
+      const activeSection=flow.current();
+      const pick=getPick();
+      const visibleCourse=String($('courseFilter')?.value||'').trim();
+      const mistakesByKey=new Map(lsArr(LS_MISTAKES)
+        .filter(m=>!visibleCourse||String(m.course||'').trim()===visibleCourse)
+        .map(m=>[mKey(m),m]));
+      const selectedMistakes=activeSection==='felbank'&&pick.mode==='selected'
+        ? pick.keys.map(key=>mistakesByKey.get(key)).filter(Boolean).slice(-3).map(m=>({
+          question:m.question,
+          concept:conceptOf(m),
+          studentAnswer:m.user_answer,
+          feedback:m.feedback,
+          expectedAnswer:m.model_answer,
+          course:m.course,
+          points:m.points,
+          maxPoints:m.max_points
+        }))
+        : [];
       window.setPerContext({
         page:'förbättring',
-        activeSection:flow.current(),
+        activeSection,
+        selectedMistakes,
         targets:PER_TARGETS
       });
       /* Exponeras bara för riggen. setPerContext sväljer manifestet och det
          finns ingen väg tillbaka ut. */
-      window.__perManifestForTest={activeSection:flow.current(),targets:PER_TARGETS};
+      window.__perManifestForTest={activeSection,selectedMistakes,targets:PER_TARGETS};
     }
     document.addEventListener('DOMContentLoaded',pushPerContext,{once:true});
 

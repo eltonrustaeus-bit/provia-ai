@@ -68,6 +68,25 @@ function cleanMistakes(values) {
     .filter(item => item.question || item.category || item.concept || item.feedback);
 }
 
+function cleanSelectedMistakes(values) {
+  if (!Array.isArray(values)) return [];
+  return values.slice(0, 3).map(item => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+    const mistake = {
+      question: cleanText(item.question, 240),
+      concept: cleanText(item.concept, 100),
+      studentAnswer: cleanText(item.studentAnswer, 240),
+      feedback: cleanText(item.feedback, 240),
+      expectedAnswer: cleanText(item.expectedAnswer, 240),
+      course: cleanText(item.course, 100),
+      points: cleanNumber(item.points, 0, 999),
+      maxPoints: cleanNumber(item.maxPoints, 0, 999),
+    };
+    return mistake.question || mistake.concept || mistake.studentAnswer || mistake.feedback || mistake.expectedAnswer
+      ? mistake : null;
+  }).filter(Boolean);
+}
+
 /* Mål som sidan erbjuder P.E.R att skicka eleven till. Bara id, etikett och
    ledtråd — go-funktionen stannar hos klienten och når aldrig hit.
    id:t begränsas hårt eftersom det går ut i prompten och kommer tillbaka som
@@ -140,6 +159,13 @@ export function buildPERContextPack({
       pageContext.activeSection = activeSection;
       summaryLines.push(`Aktiv del av förbättringssidan: ${activeSection}`);
     }
+  }
+
+  // Markerade fel är lokal klientkontext, inte verifierad serverhistorik.
+  // Skicka dem bara från felbanken och låt prompten behandla dem som osäkra data.
+  if (page === "förbättring" && raw.activeSection === "felbank") {
+    const selectedMistakes = cleanSelectedMistakes(raw.selectedMistakes);
+    if (selectedMistakes.length) pageContext.selectedMistakes = selectedMistakes;
   }
 
   const currentQuestion = cleanQuestion(raw.currentQuestion, { maxText: 360, includeType: true });

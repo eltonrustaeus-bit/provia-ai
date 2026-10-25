@@ -4529,3 +4529,27 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   villkor, negationer, enheter och orsakssamband. Inga kvalitetsgrindar ändrades.
 - [x] Oberoende slutgranskning: inga kvarvarande promptkonflikter eller
   försvagade kvalitetsgrindar hittades.
+
+### Uppföljning: P.E.R felbankskontext — 2026-10-25
+
+- [x] P.E.R får nu upp till tre markerade fel med fråga, elevsvar, feedback,
+  modellsvar, ämne och poäng när eleven befinner sig i felbanken. Kontexten
+  följer urvalsordningen och aktuellt kursfilter. Startsidan, andra
+  förbättringssektioner och aktivt prov får inte denna lokala felkontext.
+- [x] Servern begränsar och sanerar fälten, tar bort identifierare och märker
+  dem uttryckligen som obetrodd, potentiellt gammal klientdata i både vanlig
+  studie- och supportprompt. Promptens svarsspärrar och provgrindar ändras inte.
+- [x] P.E.R avbryter nu ett pågående svar om någon promptrelevant del av det
+  markerade felet ändras. Felbanken filtrerar också bort obesvarade eller
+  tomma svar som annars hade presenterats som träningsbara fel.
+- [x] Oberoende read-only-granskning fann först kurs-/urvalskantfall; de
+  korrigerades och ett regressionstest bekräftar att synligt kursval inte
+  trängs undan av dolda markeringar. Slutgranskning fann inga blockerare.
+- [x] Offlineverifiering: `per-manifest` 34/34,
+  `forbattring-behaviour` 32/32, `per-page-targets` 90/90 och
+  `per-context-pack` passerade. Ändrade JavaScript-filer och de tre inline-
+  skripten i förbättringssidan passerade syntaxkontroll; `git diff --check`
+  passerade.
+- [!] Ingen live-AI-fråga eller användardata användes. Stagingfunktionalitet
+  är inte liveverifierad; commit och Vercel Preview inväntar publicering till
+  den godkända feature-branchen.
