@@ -3777,3 +3777,37 @@ förbättringscoach. Startsidan behöver inget ytterligare betalt test nu.
 **PILOT NOT READY.** Nästa blockerare för bredare liveverifiering är en
 staging-session där den relevanta prov-/coachhistoriken är bekräftat syntetisk
 och den aktuella provfrågan faktiskt är aktiv.
+
+## P.E.R målavstämning — 2026-10-25
+
+- [x] Aktuell feature-Preview `dpl_4gs6Cksht7pb6576K4kkNrTooN4R` är
+  `READY` från exakt `5405222bd809ada6e6bd42a233d4ac367b638d50`;
+  branch-aliasen pekar på denna deployment. Den separata URL:en
+  `provia-mmqi4rbt6...` pekar däremot på äldre SHA `b71e630` och gav
+  inloggningsgrind på app-routen; den används inte som bevis för nyaste koden.
+- [x] Riktade tester på HEAD: `per-page-targets` **69/69**,
+  `per-exam-context` **96/96**, `anon-per` **21/21**,
+  `per-manifest` **29/29**, `per-memory-epoch` passerade och full
+  `per-exam-review-handler` **72/72**. Node syntax- och diffkontroller
+  passerade; ESM-varning i testharnessen är ofarlig.
+- [x] Oberoende read-only review fann inga blockerande kodbrister i
+  startsidans gräns, konto-/resultatbunden coachcache eller provkontextens
+  avbrott. Reviewern bekräftade också att mocktester inte ersätter livebevis.
+- [x] Den inloggade staging-branch-aliasen visade förbättringssidan och
+  serverhämtad sammanfattning av testhistorik/felbank med ämnesspecifik nästa
+  rekommendation. Detta verifierar sidans läsning/rendering, inte ett nytt
+  personligt AI-coachsvar. Coachknappen gick inte att aktivera via den
+  tillgängliga browserstyrningen; ingen modellförfrågan skickades.
+- [!] Aktiv provhjälp på den exakta senaste koden är fortsatt inte live-testad.
+  En flik på branch-aliasen visade tidigare ett ifyllt 12-frågeprov; inget svar
+  ändrades och provet lämnades inte in eller avbröts. Efter vanlig navigation
+  visades appens startsida; provets serverstatus kontrollerades inte på nytt.
+- [!] Skrivskyddad budgetläsning 2026-10-25 10:59 UTC visade cap `$3.379071`,
+  spenderat `$2.143292`, reserverat `$0.263628` och `$0.972151` kvar. Inget
+  nytt AI-anrop gjordes efter den läsningen i denna fortsättning.
+
+**PILOT NOT READY.** Kod, offlinegrindar, feature-push och Preview är
+verifierade. Kvar är en lyckad livekontroll av coachsvaret samt aktiv
+provledtråd på aktuell Preview med bekräftat syntetiskt underlag och utan att
+förändra ett befintligt prov. Ingen Production, `main`, Supabase-data/schema,
+roll, kvot eller hemlighet ändrades.
