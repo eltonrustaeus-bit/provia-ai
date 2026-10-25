@@ -8,7 +8,7 @@
 const { MAX_MC_OPTIONS } = require("./_assessment.js");
 const { filterSourceReferences } = require("./_source-references.cjs");
 
-function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false) {
+function buildVerifierSchema(questionCount, requireTrainingFocus = false, requireMistakeEvidence = false, targetLevel = null) {
   const required = [
     "id", "approved", "factual_accuracy", "ambiguity_score",
     "difficulty_match", "source_alignment", "scoring_quality",
@@ -45,6 +45,23 @@ function buildVerifierSchema(questionCount, requireTrainingFocus = false, requir
     issues: { type: "array", items: { type: "string" }, maxItems: 10 },
     required_changes: { type: "array", items: { type: "string" }, maxItems: 10 },
   };
+  if (targetLevel === "A") {
+    required.push("difficulty_evidence");
+    properties.difficulty_evidence = {
+      type: "object",
+      additionalProperties: false,
+      required: ["task_evidence", "scoring_evidence", "source_fact_evidence", "reasoning_operation", "distinct_source_facts", "rubric_rewards_reasoning", "justified_conclusion_required"],
+      properties: {
+        task_evidence: { type: "string", minLength: 8, maxLength: 300 },
+        scoring_evidence: { type: "string", minLength: 8, maxLength: 300 },
+        source_fact_evidence: { type: "array", minItems: 2, maxItems: 5, uniqueItems: true, items: { type: "integer", minimum: 0, maximum: 4 } },
+        reasoning_operation: { type: "string", enum: ["recall", "explain", "apply", "analyze", "compare", "infer", "evaluate", "synthesize"] },
+        distinct_source_facts: { type: "integer", minimum: 0, maximum: 20 },
+        rubric_rewards_reasoning: { type: "boolean" },
+        justified_conclusion_required: { type: "boolean" },
+      },
+    };
+  }
   if (requireTrainingFocus) {
     required.push("training_focus_alignment");
     properties.training_focus_alignment = { type: "boolean" };
@@ -229,6 +246,7 @@ function decideApproval(r, thresholds) {
   if (r.duplicate_of !== "" || r.duplicate_of_contract_ok !== true) return false;
   if (!Array.isArray(r.required_changes) || r.required_changes.length > 0) return false;
   if (r.training_focus_required === true && r.training_focus_alignment !== true) return false;
+  if (r.difficulty_evidence_required === true && r.difficulty_evidence_contract_ok !== true) return false;
   if (r.option_quality_contract_ok !== true ||
       (Array.isArray(r.option_quality) && r.option_quality.some((quality) => quality !== true))) return false;
   if (r.source_support_contract_ok !== true) return false;
@@ -306,9 +324,14 @@ function requestedLevelHint(lang, level) {
         A: "A involves independent analysis or well-grounded evaluation with justified conclusions and, when supported by the source, multi-step reasoning.",
       };
   if (!levels[level]) return "";
-  return lang === "sv"
+  const levelEvidence = level === "A"
+    ? (lang === "sv"
+      ? " För varje A-fråga ska difficulty_evidence innehålla exakta delsträngar från frågan och bedömningsrubriken, index till minst två olika ordagranna källutdrag i source_support.evidence_quotes, faktisk resonemangsoperation, antal skilda källfakta samt om rubriken belönar resonemang och kräver en motiverad slutsats. Kräv jämförelse, slutsatsdragning, värdering eller syntes när källan medger det. En etikett eller ett verb som 'analysera' räcker inte. Om uppgiften kan lösas genom att återge en enda källmening, eller om rubriken bara belönar återgivning, ska approved=false och required_changes ange den konkreta bristen."
+      : " For every A-level item, difficulty_evidence must contain exact substrings from the task and scoring rubric, indexes to at least two distinct verbatim source quotes in source_support.evidence_quotes, the actual reasoning operation, the number of distinct source facts, and whether the rubric rewards reasoning and requires a justified conclusion. Require comparison, inference, evaluation, or synthesis when the source supports it. A label or verb such as 'analyze' is not evidence. If the task can be solved by repeating one source sentence, or the rubric rewards recall only, set approved=false and state the concrete gap in required_changes.")
+    : "";
+  return (lang === "sv"
     ? ` Användarens valda provnivå är ${level}. Bedöm frågans faktiska krav mot E/C/A-nivån. cognitive_level beskriver typen av tänkande, inte E/C/A-skalan; likställ inte exempelvis 'analysera' med A. ${levels[level]} Frågan får inte smyga in krav som inte efterfrågas eller poängsätts.`
-    : ` The user's selected exam level is ${level}. Judge the task's actual demand against this E/C/A target. cognitive_level describes the kind of thinking, not the E/C/A scale; do not treat a label such as 'analyze' as proof of A-level difficulty. ${levels[level]} Do not add hidden requirements or unsupported facts.`;
+    : ` The user's selected exam level is ${level}. Judge the task's actual demand against this E/C/A target. cognitive_level describes the kind of thinking, not the E/C/A scale; do not treat a label such as 'analyze' as proof of A-level difficulty. ${levels[level]} Do not add hidden requirements or unsupported facts.`) + levelEvidence;
 }
 
 function buildVerifierPrompt(lang, subjectProfile, questionCount, targetLevel, requireTrainingFocus = false) {
@@ -478,7 +501,7 @@ async function verifyQuestions(questions, opts) {
           { role: "system", content: buildVerifierPrompt(lang, subjectProfile, items.length, targetLevel, requiresTrainingFocus) },
           { role: "user", content: reviewPayload }
         ],
-        text: { format: buildVerifierSchema(items.length, requiresTrainingFocus, requiresMistakeEvidence) }
+        text: { format: buildVerifierSchema(items.length, requiresTrainingFocus, requiresMistakeEvidence, targetLevel) }
       }),
       signal: AbortSignal.timeout(requestTimeoutMs)
     }, { userId });
@@ -570,6 +593,54 @@ async function verifyQuestions(questions, opts) {
       const expectedRubricParts = Array.isArray(expectedQuestion?.scoring_rubric?.parts)
         ? expectedQuestion.scoring_rubric.parts.length : 0;
       const expectedAcceptedAnswers = expectedQuestion.accepted_answers.length;
+      const difficultyEvidence = res.difficulty_evidence;
+      const sourceFactEvidence = difficultyEvidence?.source_fact_evidence;
+      // Bind the reviewer's A-level rationale to submitted text and source
+      // evidence; whether paraphrased quotes are genuinely distinct facts is
+      // still a semantic decision for the independent reviewer.
+      const citedSourceFacts = Array.isArray(sourceFactEvidence)
+        ? sourceFactEvidence.map((index) => quotes?.[index]).filter((quote) => typeof quote === "string")
+        : [];
+      const flattenText = (value, output = []) => {
+        if (typeof value === "string") output.push(value);
+        else if (Array.isArray(value)) value.forEach((item) => flattenText(item, output));
+        else if (value && typeof value === "object") Object.values(value).forEach((item) => flattenText(item, output));
+        return output;
+      };
+      const rubricText = flattenText([expectedQuestion.rubric, expectedQuestion.scoring_rubric]).join("\n");
+      const higherOrderOperations = new Set(["analyze", "compare", "infer", "evaluate", "synthesize"]);
+      const normalizeEvidenceText = (value) => String(value || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+      const taskText = normalizeEvidenceText(expectedQuestion.question);
+      const scoringEvidenceText = normalizeEvidenceText(difficultyEvidence?.scoring_evidence);
+      const operationSignals = {
+        analyze: ["analysera", "analys", "samband", "paverkar", "orsak", "foljd", "analyze", "analysis", "relationship", "cause", "effect"],
+        compare: ["jamfor", "jamforelse", "skillnad", "likhet", "compare", "comparison", "difference", "similarity"],
+        infer: ["dra slutsats", "slutsats", "harled", "tolka", "infer", "conclusion", "derive", "interpret"],
+        evaluate: ["bedom", "vardera", "motivera stallning", "utvardera", "evaluate", "assess", "justify", "weigh"],
+        synthesize: ["foresla", "kombinera", "utforma", "skapa", "syntetisera", "synthesize", "design", "combine", "propose"],
+      };
+      const containsSignal = (text, signals) => signals.some((signal) => text.includes(signal));
+      const conclusionSignals = ["motivera", "slutsats", "resonera", "justify", "conclusion", "reasoned conclusion"];
+      const rubricReasoningSignals = ["resonemang", "motivera", "slutsats", "jamfor", "analys", "underbygg", "reasoning", "justify", "conclusion", "compare", "analysis", "evidence"];
+      const difficultyEvidenceContractOk = targetLevel !== "A" || (
+        difficultyEvidence && typeof difficultyEvidence === "object" &&
+        typeof difficultyEvidence.task_evidence === "string" && difficultyEvidence.task_evidence.length >= 8 &&
+        typeof expectedQuestion.question === "string" && expectedQuestion.question.includes(difficultyEvidence.task_evidence) &&
+        typeof difficultyEvidence.scoring_evidence === "string" && difficultyEvidence.scoring_evidence.length >= 8 &&
+        rubricText.includes(difficultyEvidence.scoring_evidence) &&
+        Array.isArray(sourceFactEvidence) && sourceFactEvidence.length >= 2 && sourceFactEvidence.length <= 5 &&
+        sourceFactEvidence.every((index) => Number.isInteger(index) && index >= 0 && index < quotes?.length) &&
+        new Set(sourceFactEvidence).size === sourceFactEvidence.length &&
+        new Set(citedSourceFacts.map((quote) => quote.trim())).size >= 2 &&
+        sourceFactEvidence.every((index) => Array.isArray(support?.question_evidence) && support.question_evidence.includes(index) &&
+          Array.isArray(support?.answer_evidence) && support.answer_evidence.includes(index)) &&
+        higherOrderOperations.has(difficultyEvidence.reasoning_operation) &&
+        Number.isInteger(difficultyEvidence.distinct_source_facts) && difficultyEvidence.distinct_source_facts === new Set(citedSourceFacts.map((quote) => quote.trim())).size &&
+        containsSignal(taskText, operationSignals[difficultyEvidence.reasoning_operation] || []) &&
+        difficultyEvidence.rubric_rewards_reasoning === true && containsSignal(scoringEvidenceText, rubricReasoningSignals) &&
+        difficultyEvidence.justified_conclusion_required === true && containsSignal(taskText, conclusionSignals) &&
+        containsSignal(scoringEvidenceText, conclusionSignals)
+      );
       const validEvidenceIndices = (indices) => Array.isArray(indices) && indices.length >= 1 &&
         indices.length <= 5 && indices.every((index) => Number.isInteger(index) && index >= 0 && index < quotes?.length);
       const sourceSupportContractOk = support?.question === true && support?.answer === true &&
@@ -598,6 +669,7 @@ async function verifyQuestions(questions, opts) {
         failureCategories.push("repeated_learning_objective");
       }
       if (!sourceSupportContractOk && !failureCategories.includes("source_support")) failureCategories.push("source_support");
+      if (!difficultyEvidenceContractOk && !failureCategories.includes("difficulty_match")) failureCategories.push("difficulty_match");
       perQuestion.set(res.id, {
         ...res,
         training_focus_alignment: requiresTrainingFocus
@@ -610,6 +682,8 @@ async function verifyQuestions(questions, opts) {
         option_quality_contract_ok: optionQualityContractOk,
         duplicate_of_contract_ok: duplicateOfContractOk,
         source_support_contract_ok: sourceSupportContractOk,
+        difficulty_evidence_required: targetLevel === "A",
+        difficulty_evidence_contract_ok: difficultyEvidenceContractOk,
         failure_categories: failureCategories,
       });
     }

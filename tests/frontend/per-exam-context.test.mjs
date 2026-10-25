@@ -145,6 +145,17 @@ await seed(page);
 
 await page.goto(`${srv.url}/app.html`, { waitUntil: "networkidle" });
 await page.waitForSelector("#xf .xf-screen.on", { timeout: 8000 });
+const proofFreshness = await page.evaluate(() => {
+  const now = Date.now();
+  return {
+    current: window.__perTestRestoredProofIsFresh(now),
+    stale: window.__perTestRestoredProofIsFresh(now - 15 * 60 * 1000 - 1),
+    future: window.__perTestRestoredProofIsFresh(now + 1),
+    invalid: window.__perTestRestoredProofIsFresh("not-a-time"),
+  };
+});
+ok("P.E.R signerade återförsöksbevis upphör efter 15 minuter", proofFreshness.current
+  && !proofFreshness.stale && !proofFreshness.future && !proofFreshness.invalid, JSON.stringify(proofFreshness));
 await page.waitForFunction(() => localStorage.getItem("proviaai_per_exam_history_masked") === null, null, { timeout: 5000 });
 await page.evaluate(() => window.PER.setExamHistoryMasked(true));
 historyRaceBehaviors.push("defer", "fail");
@@ -659,6 +670,35 @@ ok("T9f alla exakta elevsvar följer med i den verifierade provenheten",
 ok("T9g retry behåller samma signerade efter-rättningsbevis", lastExplain?.examProof?.receipt === `v2.${"d".repeat(32)}.syntheticCompletionProof`
   && lastExplain?.examProof?.selectedQuestionId === "q1" && lastExplain?.examReview === true,
   JSON.stringify(lastExplain?.examProof && { selectedQuestionId: lastExplain.examProof.selectedQuestionId, examReview: lastExplain.examReview }));
+
+failNextExplainWithUnavailable = true;
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+await page.evaluate(() => window.setPerContext({ page: "förbättring", activeSection: "coach" }));
+lastExplain = null;
+const changedContextRetry = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
+await page.click("#perSendBtn");
+await changedContextRetry;
+ok("sidbyte mellan fel och återförsök rensar det signerade provbeviset",
+  !lastExplain?.examProof && lastExplain?.examReview !== true,
+  JSON.stringify({ page: lastExplain?.pageContext?.page, hasExamProof: !!lastExplain?.examProof }));
+
+await page.evaluate(() => window.setPerContext({ page: "app", examState: { phase: "result" } }));
+failNextExplainWithUnavailable = true;
+await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
+await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();
+await page.evaluate(() => window.PER.clearAfterServerMemoryClear());
+await page.locator("#perInput").fill("Please explain my grading on question 1 step by step");
+lastExplain = null;
+const memoryClearRetry = page.waitForResponse(response => response.url().includes("/api/explain")
+  && response.request().method() === "POST");
+await page.click("#perSendBtn");
+await memoryClearRetry;
+ok("serverminnesrensning i vanliga appen rensar även efterrättningsbeviset",
+  !lastExplain?.examProof && lastExplain?.examReview !== true,
+  JSON.stringify({ hasExamProof: !!lastExplain?.examProof, examReview: lastExplain?.examReview }));
+
 failNextExplainWithUnavailable = true;
 await page.click("#xf .xf-screen[data-screen='result'] .xf-review-action >> nth=0");
 await page.locator("#perMessages .per-msg.teacher").filter({ hasText: "can’t verify the exam status" }).last().waitFor();

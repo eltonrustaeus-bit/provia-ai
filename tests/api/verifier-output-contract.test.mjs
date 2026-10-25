@@ -70,6 +70,8 @@ assert.equal(buildVerifierSchema().schema.properties.results.minItems, undefined
   "schema inspection without a question count remains backward compatible");
 assert.ok(!submittedReviewSchema.items.required.includes("training_focus_alignment"),
   "ordinary exams retain their existing review contract");
+assert.match(buildVerifierPrompt("sv", undefined, undefined, "A"), /ska difficulty_evidence innehålla exakta delsträngar/i);
+assert.match(buildVerifierPrompt("en", undefined, undefined, "A"), /a label or verb such as 'analyze' is not evidence/i);
 assert.match(valid.requestBody.input[0].content, /exactly 2 questions and return exactly one result/i);
 assert.match(valid.requestBody.input[0].content, /language_match=true only when every learner-facing field is in the selected output language/i);
 assert.match(buildVerifierPrompt("sv"), /language_match=true endast om alla elevriktade fält är på det valda provspråket/i);
@@ -90,6 +92,86 @@ assert.match(buildVerifierPrompt("sv"), /ett enda obestyrkt tillägg gör hela a
   "the reviewer must reject an otherwise correct exemplar with one unsupported clause");
 assert.match(buildVerifierPrompt("en"), /one unsupported addition makes the entire answer=false/i);
 assert.match(buildVerifierPrompt("sv"), /duplicate_of till id för en tidigare kandidat eller redan godkänd fråga/i);
+
+const aLevelMaterial = "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos. Vid cellandningen bryts glukos ned och kolet återgår till koldioxid.";
+const aLevelQuestion = {
+  id: "a-compare", type: "short_answer",
+  question: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos och motivera en slutsats om sambandet.",
+  rubric: { criteria: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen med båda källfakta." },
+  scoring_rubric: { summary: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen med båda källfakta." },
+};
+const validALevelEvidence = {
+  task_evidence: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos",
+  scoring_evidence: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen",
+  source_fact_evidence: [0, 1],
+  reasoning_operation: "compare", distinct_source_facts: 2,
+  rubric_rewards_reasoning: true, justified_conclusion_required: true,
+};
+const aLevelReviewResult = (difficulty_evidence, evidenceQuotes = [
+  "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+  "Vid cellandningen bryts glukos ned och kolet återgår till koldioxid.",
+]) => ({
+  ...result("a-compare", true), factual_accuracy: 1, ambiguity_score: 0,
+  difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1,
+  option_quality: [], source_support: {
+    ...sourceSupport("Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos"),
+    evidence_quotes: evidenceQuotes,
+    question_evidence: [0, 1], answer_evidence: [0, 1], rubric_evidence: [0, 1],
+  },
+  duplicate_of: "", issues: [], required_changes: [], difficulty_evidence,
+});
+const supportedALevel = await runWithResults(
+  [aLevelReviewResult(validALevelEvidence)], [aLevelQuestion], aLevelMaterial,
+  undefined, "A", undefined, "sv");
+assert.equal(supportedALevel.outcome.callOk, true);
+assert.equal(decideApproval(supportedALevel.outcome.perQuestion.get("a-compare")), true,
+  "an A-level comparison with literal task/rubric evidence meets the added contract");
+assert.equal(supportedALevel.outcome.perQuestion.get("a-compare").difficulty_evidence_contract_ok, true);
+assert.ok(supportedALevel.requestBody.text.format.schema.properties.results.items.required.includes("difficulty_evidence"));
+
+const weakALevel = await runWithResults(
+  [aLevelReviewResult({
+    task_evidence: "Jämför hur fotosyntes och cellandning flyttar kol mellan luft och glukos",
+    scoring_evidence: "Jämför att fotosyntesen binder kol i glukos medan cellandningen frigör koldioxid; motivera slutsatsen",
+    source_fact_evidence: [0, 1],
+    reasoning_operation: "recall", distinct_source_facts: 1,
+    rubric_rewards_reasoning: false, justified_conclusion_required: false,
+  })], [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(weakALevel.outcome.perQuestion.get("a-compare")), false,
+  "a recall-only claim cannot pass A-level even with a high difficulty score");
+assert.ok(weakALevel.outcome.perQuestion.get("a-compare").failure_categories.includes("difficulty_match"));
+
+const recallQuestion = {
+  ...aLevelQuestion,
+  question: "Beskriv vad fotosyntes binder och vad cellandning frigör.",
+  rubric: { criteria: "Beskriv två fakta och motivera slutsatsen." },
+  scoring_rubric: { summary: "Beskriv två fakta och motivera slutsatsen." },
+};
+const mislabelledA = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    task_evidence: "Beskriv vad fotosyntes binder och vad cellandning frigör",
+    scoring_evidence: "Beskriv två fakta och motivera slutsatsen",
+  })], [recallQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(mislabelledA.outcome.perQuestion.get("a-compare")), false,
+  "a recall task cannot be relabeled as comparison when its wording has no comparison operation");
+
+const sameFactQuotes = await runWithResults(
+  [aLevelReviewResult(validALevelEvidence, [
+    "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+    "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
+  ])],
+  [aLevelQuestion], aLevelMaterial,
+  undefined, "A", undefined, "sv");
+assert.equal(decideApproval(sameFactQuotes.outcome.perQuestion.get("a-compare")), false,
+  "two indexes to the same quoted source fact do not satisfy the A-level evidence contract");
+
+const unsupportedALevel = await runWithResults(
+  [aLevelReviewResult({ ...validALevelEvidence, task_evidence: "analyze the whole ecosystem" })],
+  [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(unsupportedALevel.outcome.perQuestion.get("a-compare")), false,
+  "A-level evidence that is not an exact task substring fails closed");
+
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],
   [{ id: "q1", type: "mc", question: "Vilken stad är huvudstad?", options: ["Stockholm", "En stad i norr", "En ort vid kusten"] }],

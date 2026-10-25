@@ -4652,3 +4652,33 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   visar en lyckad 3-frågekörning, inte tillförlitlig 6/12-generering eller att
   P.E.R:s efterrättningsretry nu lyckas efter att status-/leasefelet återhämtat
   sig. Budgeten ska läsas om innan eventuella fler AI-anrop.
+
+### A-nivågrind och P.E.R återförsök — 2026-10-25
+
+- [x] A-nivåns oberoende frågegranskning kräver nu strukturerad evidens:
+  ordagranna utdrag ur frågan och bedömningsrubriken, minst två olika
+  källcitat kopplade till både fråge- och svarsstöd, samt en stödd högre
+  resonemangsoperation och rubrik-/slutsatssignaler. Befintliga kvalitetsmått
+  och trösklar är oförändrade; övriga nivåer får inte det extra fältet.
+- [!] Citatindex och textsignaler kan inte avgöra om parafraserade citat
+  verkligen uttrycker olika fakta eller om en fråga semantiskt kräver A-nivå.
+  Den oberoende granskarens ämnesbedömning är fortfarande nödvändig. Testerna
+  använder mockade granskarutdata och är inte livebevis på modellens precision.
+- [x] P.E.R:s signerade efterrättningsbevis binds nu till samma konto, fråga,
+  sida och relevanta P.E.R-kontext samt högst 15 minuters återställningstid.
+  Minnesrensning tar bort bevis även i vanliga appen. Pilotens förväntade
+  övergång `startsida` → `app` efter återinloggning tillåts, men konto- och
+  kontextkontroller behålls. Vid kontextbyte förklarar UI:t att frågan skickas
+  som vanlig hjälp eller att resultatet behöver öppnas igen.
+- [x] Riktade offlinekontroller passerade: verifierarens output-kontrakt,
+  verifierarbeslut, provpipeline 28/28, P.E.R-kontext 102/102, pilotens
+  återinloggning 1/1, quality-gold, syntaxkontroller och `git diff --check`.
+- [!] En lyckad efterrättningsförklaring observerades tidigare på Preview
+  `e6afb73`, före dessa ändringar. Ingen live-AI-kontroll av ny A-nivågrind eller
+  denna uppdaterade återförsökskod har gjorts; det senast kända stagingvärdet
+  `$0.839398` var avläst före den föregående liveförfrågan och lästes inte om
+  efteråt. Inga ytterligare betalda anrop, databasskrivningar eller
+  produktionsändringar gjordes.
+- [!] Nästa steg: push av denna checkpoint till den befintliga feature-branchen,
+  verifiera Vercel Preview från exakt commit och fortsätta med syntetiska
+  3/6/12-provtester endast efter en ny skrivskyddad budgetkontroll.
