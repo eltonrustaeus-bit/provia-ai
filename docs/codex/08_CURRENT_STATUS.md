@@ -4852,3 +4852,32 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
 - [!] Ingen staging- eller live-AI-körning gjordes: Preview-kontot och sparad
   historik har inte verifierats som syntetiska. Ingen kostnad, databas-, konto-,
   kvot-, `main`- eller Production-ändring gjordes.
+
+### Återupptagning av legacy-felträning med källbevis — 2026-10-25
+
+- [x] Äldre sparade jobb utan `sourceEvidence` kan nu återvinna ett litet antal
+  ordagranna utdrag från sitt redan sparade material, separat härledda från
+  ursprungsfråga, facit, färdighet och rättningsfeedback. Elevens felaktiga svar
+  används inte som positivt källbevis. Saknat material eller otillräcklig
+  kontext lämnar fokuset otäckt; explicit tomt `sourceEvidence` faller fortsatt
+  stängt.
+- [x] Ett legacy-fokus räknas bara som täckt när kandidatfrågan själv visar både
+  källanknytning och en specifik färdighetssignal. Modellsvar, lärandemål,
+  konceptetiketter eller enbart verifierarens match-ID kan inte fylla dessa
+  beviskrav. Källhänvisningen måste vara ordagrant belagd i det sparade
+  materialet och överlappa det härledda fokusutdraget.
+- [x] Regressioner täcker återupptagna legacyjobb, separata textpassager för
+  fråga/facit, saknat stöd, felaktigt svar, fel ämne med rätt citat, intilliggande
+  men annorlunda färdighet, missvisande lärandemål och facitsvar som ensamt
+  upprepar rätt källfakta.
+- [x] Offline pipeline-/HTTP-/käll-/quality-gold-svit passerade **50/50**,
+  inklusive 3/6/12 och återupptagning. Ändrade JavaScript-filer passerade
+  syntaxkontroll; `git diff --check` passerade. Oberoende granskning av de
+  reproducerade falska positiva fallen fann inga blockerare i slutdiffen.
+- [!] Matchningen är fortsatt ett lexikalt deterministiskt förfilter, inte
+  semantisk entailment. En giltig parafras utan delade termer kan lämnas otäckt;
+  modellkvalitet och verkligt staging/livebeteende verifieras inte av dessa
+  offlineprov.
+- [!] Ingen syntetisk inloggning kunde bekräftas för det aktuella stagingkontot;
+  därför gjordes ingen betald AI-körning. `main`, Production, Supabase, hemligheter,
+  konton och kvoter är orörda.

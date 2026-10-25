@@ -20,8 +20,10 @@ const original = {
 
 test("a prior-mistake match must cite evidence from that focus source when available", () => {
   const trainingFocus = [
-    { focusId: "focus-1", sourceEvidence: ["Grafens lutning beskriver förändringen."] },
-    { focusId: "focus-2", sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
+    { focusId: "focus-1", skill: "Tolka grafens lutning", sourceQuestion: "Vad beskriver grafens lutning?",
+      sourceEvidence: ["Grafens lutning beskriver förändringen."] },
+    { focusId: "focus-2", skill: "Lokalisera kloroplasterna", sourceQuestion: "Var sker fotosyntesen i växtcellen?",
+      sourceEvidence: ["Fotosyntesen sker i kloroplasterna."] },
   ];
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
     question: "Hur beskriver grafens lutning förändringen?",
@@ -35,8 +37,8 @@ test("a prior-mistake match must cite evidence from that focus source when avail
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
     question: "Beskriv grafens lutning.",
     source_references: ["Grafens lutning beskriver förändringen."],
-  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1", "focus-2"],
-  "legacy accepted foci without sourceEvidence preserve their prior coverage behavior");
+  }, ["focus-1", "focus-2"], [trainingFocus[0], { focusId: "focus-2" }]), ["focus-1"],
+  "a legacy focus without source material cannot be credited based only on the verifier claim");
   assert.deepEqual(pipeline.supportedTrainingFocusMatches({
     question: "Beskriv grafens lutning.",
     source_references: ["Grafens lutning beskriver förändringen."],
@@ -79,6 +81,19 @@ test("a prior-mistake match must cite evidence from that focus source when avail
     model_answer: "Koldioxid och vatten.", source_references: ["Fotosyntesen sker i kloroplasterna."] },
   ["focus-3"], photosynthesisFocus), ["focus-3"],
   "specific questions that practise the missed objective retain coverage");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Varför stänger växten klyvöppningarna vid torka?",
+    model_answer: "För att minska vattenförlusten.",
+    learning_objective: "Identifiera ämnen växten använder i fotosyntesen.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "a misleading model-supplied objective cannot make an adjacent plant/water question cover photosynthesis inputs");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen använder växten vid torka?",
+    model_answer: "Koldioxid och vatten används däremot i fotosyntesen.",
+    source_references: ["Fotosyntesen sker i kloroplasterna."],
+  }, ["focus-3"], photosynthesisFocus), [],
+  "the answer cannot provide source overlap for a question that is not grounded in the focus evidence");
   const slopeFocus = [{ focusId: "focus-4", concept: "Linjär funktion", skill: "Tolka grafens lutning",
     sourceQuestion: "Vad anger lutningen i en linjär graf?", studentAnswer: "k är skärningen med y-axeln",
     gradingFeedback: "k anger riktningskoefficienten; m är skärningen.", expectedAnswer: "k anger lutningen.",
@@ -93,6 +108,37 @@ test("a prior-mistake match must cite evidence from that focus source when avail
     source_references: ["Lutningen i en graf visar förändring per x-enhet."],
   }, ["focus-4"], slopeFocus), ["focus-4"],
   "k-value terminology maps to the verified slope skill");
+
+  const legacyMaterial = "Fotosyntesen använder ljus, vatten och koldioxid för att bilda druvsocker och syre. Gröna växter tar upp koldioxid genom klyvöppningarna.";
+  const legacyFocus = [{ focusId: "focus-5", concept: "Fotosyntes",
+    skill: "Identifiera ämnen växten använder", sourceQuestion: "Vilka ämnen använder växten i fotosyntesen?",
+    studentAnswer: "Syre", gradingFeedback: "Växten tar upp koldioxid och vatten.",
+    expectedAnswer: "Koldioxid och vatten" }];
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+  }, ["focus-5"], legacyFocus, legacyMaterial), ["focus-5"],
+  "legacy jobs can recover exact focus evidence from their persisted course material and verified answer context");
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilken gas bildas vid fotosyntesen?", model_answer: "Syre.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+  }, ["focus-5"], legacyFocus, legacyMaterial), [],
+  "recovered legacy evidence does not let the student's incorrect answer cover the missed skill");
+  const separatedLegacyMaterial = "Fotosyntesen använder ljus, vatten och koldioxid för att bilda druvsocker och syre. Gröna växter tar upp koldioxid genom klyvöppningarna.";
+  assert.deepEqual(pipeline.supportedTrainingFocusMatches({
+    question: "Vilka ämnen tar gröna växter upp genom klyvöppningarna?",
+    model_answer: "Koldioxid.",
+    source_references: ["Gröna växter tar upp koldioxid genom klyvöppningarna."],
+  }, ["focus-5"], legacyFocus, separatedLegacyMaterial), ["focus-5"],
+  "legacy source-question and answer contexts can recover different literal passages from the saved material");
+  assert.deepEqual(pipeline.uncoveredTrainingFocusIds({ payload: {
+    pastedText: legacyMaterial, trainingFocus: legacyFocus,
+  } }, [{ question: "Vilka ämnen tar växten upp vid fotosyntesen?",
+    model_answer: "Koldioxid och vatten.",
+    source_references: ["Fotosyntesen använder ljus, vatten och koldioxid för att"],
+    training_focus_matches: ["focus-5"],
+  }]), [], "resumed legacy pipeline jobs use their stored course material to verify focus coverage");
 });
 
 test("step pipeline accumulates exactly 3, 6 and 12 verified questions in bounded batches", async (t) => {
@@ -336,14 +382,19 @@ test("mistake-training rejects a verifier-overclaimed question despite an exact 
     requested_count: 3,
     payload: {
       qType: "short", numQuestions: 3,
+      pastedText: "Ekvationens båda led ska balanseras med samma operation så att likheten bevaras.",
       trainingFocus: [
-        { focusId: "focus-1", concept: "Ekvationer", skill: "Isolera variabeln" },
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera båda leden",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?",
+          expectedAnswer: "Samma operation på båda sidor bevarar likheten." },
         { focusId: "focus-2", concept: "Fotosyntes", skill: "Identifiera ämnen som växten använder",
           sourceEvidence: ["Växten använder koldioxid och vatten i fotosyntesen."] },
       ],
     },
     accepted_questions: [1, 2, 3].map((n) => ({
-      id: `old-${n}`, type: "short", question: `Öva ekvation ${n}`,
+      id: `old-${n}`, type: "short", question: `Varför måste ekvationens båda led balanseras? Övning ${n}`,
+      model_answer: "Samma operation på båda sidor bevarar likheten.",
+      source_references: ["Ekvationens båda led ska balanseras med samma operation så att likheten"],
       training_focus_matches: ["focus-1"], validation_status: "verified",
     })),
     progress_current: 3,
@@ -411,8 +462,10 @@ test("resumed mistake-training does not let an unsupported stored focus claim co
     payload: {
       qType: "short", numQuestions: 3,
       trainingFocus: [
-        { focusId: "focus-1", concept: "Ekvationer", sourceEvidence: [focus1] },
-        { focusId: "focus-2", concept: "Grafer", sourceEvidence: [focus2] },
+        { focusId: "focus-1", concept: "Ekvationer", skill: "Balansera ekvationens båda led",
+          sourceQuestion: "Varför måste ekvationens båda led balanseras?", sourceEvidence: [focus1] },
+        { focusId: "focus-2", concept: "Grafer", skill: "Tolka grafens lutning",
+          sourceQuestion: "Vad visar grafens lutning?", sourceEvidence: [focus2] },
       ],
     },
     accepted_questions: [

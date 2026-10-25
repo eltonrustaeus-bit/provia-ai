@@ -2,7 +2,7 @@ const crypto = require("node:crypto");
 const generation = require("./generate-exam.js");
 const operations = require("./_exam-generation-operations.cjs");
 const assessment = require("./_assessment");
-const { filterSourceReferences } = require("./_source-references.cjs");
+const { deriveSourceExcerpt, filterSourceReferences } = require("./_source-references.cjs");
 const MAX_COMPARISON_CONTEXT_BYTES = 8 * 1024;
 const REQUEST_ID_UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const REQUEST_ID_PATTERN = new RegExp(`^${REQUEST_ID_UUID}$`, "i");
@@ -141,30 +141,42 @@ function uncoveredTrainingFocusIds(job, questions) {
   const focuses = Array.isArray(job?.payload?.trainingFocus) ? job.payload.trainingFocus : [];
   const covered = new Set((Array.isArray(questions) ? questions : [])
     .flatMap((question) => supportedTrainingFocusMatches(
-      question, question?.training_focus_matches, focuses,
+      question, question?.training_focus_matches, focuses, job?.payload?.pastedText,
     )));
   return required.filter((id) => !covered.has(id));
 }
 
-function supportedTrainingFocusMatches(question, matches, trainingFocus) {
+function supportedTrainingFocusMatches(question, matches, trainingFocus, sourceMaterial = "") {
   const references = Array.isArray(question?.source_references) ? question.source_references : [];
   const focuses = Array.isArray(trainingFocus) ? trainingFocus : [];
   return (Array.isArray(matches) ? matches : []).filter((focusId) => {
     const focus = focuses.find((item, index) =>
       (item?.focusId || `focus-${index + 1}`) === focusId);
     if (!focus) return false;
-    if (!Object.hasOwn(focus, "sourceEvidence")) return true;
-    if (!Array.isArray(focus.sourceEvidence) || focus.sourceEvidence.length === 0) return false;
+    const hasStoredEvidence = Object.hasOwn(focus, "sourceEvidence");
+    const sourceEvidence = hasStoredEvidence
+      ? Array.isArray(focus.sourceEvidence) ? focus.sourceEvidence : []
+      : [...new Set([focus.sourceQuestion, focus.expectedAnswer, focus.skill, focus.gradingFeedback]
+        .filter((context) => typeof context === "string" && context.trim())
+        .flatMap((context) => deriveSourceExcerpt(sourceMaterial, [context])))];
+    if (sourceEvidence.length === 0) return false;
     const candidateText = [question?.question, question?.model_answer, question?.learning_objective,
       question?.concept_tag, question?.topic].filter((value) => typeof value === "string").join(" ");
     const conceptTerms = trainingTerms(focus.concept);
-    const specificContext = [focus.skill, focus.sourceQuestion, focus.gradingFeedback,
-      focus.expectedAnswer].filter((value) => typeof value === "string").join(" ");
+    const specificContext = [focus.skill, focus.sourceQuestion]
+      .filter((value) => typeof value === "string").join(" ");
     const specificTerms = [...trainingTerms(specificContext)]
       .filter((term) => ![...conceptTerms].some((conceptTerm) => sameTrainingTerm(term, conceptTerm)));
-    return focus.sourceEvidence.some((evidence) =>
-      filterSourceReferences(evidence, references).length > 0 && sharesTrainingEvidence(candidateText, evidence) &&
-      (!specificTerms.length || hasTrainingTermOverlap(candidateText, specificTerms.join(" "))));
+    const candidateQuestion = typeof question?.question === "string" ? question.question : "";
+    const candidateTaskText = candidateQuestion;
+    if (specificTerms.length === 0 || !hasTrainingTermOverlap(candidateTaskText, specificTerms.join(" "))) return false;
+    return sourceEvidence.some((evidence) =>
+      (hasStoredEvidence
+        ? filterSourceReferences(evidence, references).length > 0
+        : filterSourceReferences(sourceMaterial, references).some((reference) =>
+          countTrainingEvidenceOverlap(reference, evidence) >= 2)) &&
+      sharesTrainingEvidence(candidateText, evidence) &&
+      sharesTrainingEvidence(candidateQuestion, evidence));
   });
 }
 
@@ -189,6 +201,13 @@ function hasTrainingTermOverlap(left, right) {
   const leftTerms = trainingTerms(left);
   const rightTerms = trainingTerms(right);
   return [...leftTerms].some((leftTerm) => [...rightTerms].some((rightTerm) => sameTrainingTerm(leftTerm, rightTerm)));
+}
+
+function countTrainingEvidenceOverlap(left, right) {
+  const leftTerms = trainingTerms(left);
+  const rightTerms = trainingTerms(right);
+  return [...leftTerms].filter((leftTerm) =>
+    [...rightTerms].some((rightTerm) => sameTrainingTerm(leftTerm, rightTerm))).length;
 }
 
 function mergeRepairFeedback(previous, current) {
@@ -312,7 +331,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   let focusMismatchCandidates = 0;
   const coveredTrainingFocusIds = new Set(acceptedBefore.flatMap((question) =>
     supportedTrainingFocusMatches(
-      question, question?.training_focus_matches, job.payload.trainingFocus,
+      question, question?.training_focus_matches, job.payload.trainingFocus, job.payload.pastedText,
     )));
   const sourceCounts = sourceTarget?.counts || [];
   const rankedQuestions = generated.body.questions.map((question, index) => ({ question, index,
@@ -341,7 +360,7 @@ async function advance(job, { deadlineAt = null } = {}) {
   for (const { question } of rankedQuestions) {
     if (question.validation_status !== "verified") { unverifiedCandidates++; continue; }
     const candidateFocusMatches = supportedTrainingFocusMatches(
-      question, question.training_focus_matches, job.payload.trainingFocus,
+      question, question.training_focus_matches, job.payload.trainingFocus, job.payload.pastedText,
     );
     const newlyCoveredFocusIds = uncoveredBefore.filter((id) =>
       !coveredTrainingFocusIds.has(id) && candidateFocusMatches.includes(id));
