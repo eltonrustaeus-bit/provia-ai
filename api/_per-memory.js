@@ -159,7 +159,8 @@ export async function enrichMemoryFromExamData(supabase, userId, { throwOnError 
     if (error) throw error;
 
     const mockRows = (data || []).filter(r => Number.isInteger(r.percent) && r.percent >= 0 && r.percent <= 100);
-    const mockRecentScores = mockRows.slice(0, 5).map(r => r.percent);
+    // The query is newest-first; consumers calculate trends from oldest to newest.
+    const mockRecentScores = mockRows.slice(0, 5).reverse().map(r => r.percent);
     const mockWeakConcepts = [...new Set(
       mockRows
         .flatMap(r => Array.isArray(r.weak_concept_tags) ? r.weak_concept_tags : [])

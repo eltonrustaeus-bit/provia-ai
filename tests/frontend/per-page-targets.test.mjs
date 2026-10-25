@@ -283,7 +283,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
         const body = route.request().postDataJSON();
         if (body?.topic === "studiecoach") coachRequest = true;
         await route.fulfill({ json: {
-          answer: "SERVER_VERIFIED_COACH_WITH_EMPTY_LOCAL_HISTORY",
+          answer: "**SERVER_VERIFIED_COACH_WITH_EMPTY_LOCAL_HISTORY**",
           coachEvidenceFingerprint: "e".repeat(64),
         } });
       }
@@ -291,8 +291,9 @@ await assertPageTopic("/förbättring.html", "förbättring");
   });
   await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
   await page.getByText("SERVER_VERIFIED_COACH_WITH_EMPTY_LOCAL_HISTORY").waitFor({ timeout: 5000 });
-  ok("server coach is reachable even when local exam history is empty", coachRequest,
-    await page.locator("#coachText").innerText());
+  const coachText = await page.locator("#coachText").innerText();
+  ok("server coach is reachable even when local exam history is empty", coachRequest, coachText);
+  ok("coach card removes markdown markers from plain-text answers", !coachText.includes("**"), coachText);
   await ctx.close();
 }
 
@@ -318,7 +319,7 @@ await assertPageTopic("/förbättring.html", "förbättring");
         } else if (body?.topic === "studiecoach") {
           coachCalls++;
           await route.fulfill({ json: {
-            answer: `COACH_DATA_VERSION_${coachCalls}`,
+            answer: `**COACH_DATA_VERSION_${coachCalls}**\n# Nästa steg\n- Repetera\n1. Testa igen\n\`metod\`\n> [Öppna felbanken](/förbättring.html#felbank)`,
             coachEvidenceFingerprint: evidenceFingerprint,
           } });
         } else await route.fulfill({ json: { ok: true, answer: "P.E.R svar" } });
@@ -331,11 +332,15 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.getByRole("button", { name: "← Tillbaka" }).click();
   await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
   await page.getByText("COACH_DATA_VERSION_1").waitFor({ timeout: 5000 });
+  ok("fresh coach answer is rendered without markdown markers",
+    !/[#*`]|^\s*(?:[-+>]|\d+[.)] )|\]\(/m.test(await page.locator("#coachText").innerText()));
   ok("coach recommendation stores its server evidence fingerprint", coachCalls === 1, String(coachCalls));
 
   await page.getByRole("button", { name: "← Tillbaka" }).click();
   await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
   await page.getByText("COACH_DATA_VERSION_1").waitFor({ timeout: 5000 });
+  ok("cached coach answer remains plain text",
+    !/[#*`]|^\s*(?:[-+>]|\d+[.)] )|\]\(/m.test(await page.locator("#coachText").innerText()));
   ok("unchanged server-verified evidence reuses the recommendation without another model call",
     coachCalls === 1 && evidenceChecks === 1, `${coachCalls} generation, ${evidenceChecks} evidence check`);
 

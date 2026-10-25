@@ -663,6 +663,18 @@
       return o&&typeof o==='object'&&ownerId&&o.ownerId===ownerId?o:null;
     }
     function setCoachCache(data){lsSet(LS_PER_COACH_CACHE,data);}
+    function coachDisplayText(value){
+      return String(value||'')
+        .replace(/^\s{0,3}>\s?/gm,'')
+        .replace(/^\s{0,3}#{1,6}\s+/gm,'')
+        .replace(/^\s*[-+*]\s+/gm,'')
+        .replace(/^\s*\d+[.)]\s+/gm,'')
+        .replace(/\[([^\]]+)\]\(([^)\n]+)\)/g,'$1')
+        .replace(/\*\*([^*]+)\*\*/g,'$1')
+        .replace(/\*([^*]+)\*/g,'$1')
+        .replace(/`([^`]+)`/g,'$1')
+        .trim();
+    }
     function isCoachCacheFresh(c){
       return Boolean(c&&c.text&&/^[a-f0-9]{64}$/.test(c.dataFingerprint||'')&&(Date.now()-(c.ts||0))<PER_COACH_TTL);
     }
@@ -1487,7 +1499,9 @@
             return;
           }
           if(result?.unchanged===true&&result.coachEvidenceFingerprint===cache.dataFingerprint){
-            currentBox().textContent=cache.text;
+            const answer=coachDisplayText(cache.text);
+            currentBox().textContent=answer;
+            if(answer!==cache.text)setCoachCache({...cache,text:answer});
             return;
           }
         }
@@ -1500,9 +1514,10 @@
           return;
         }
         if(result?.answer){
-          currentBox().textContent=result.answer;
+          const answer=coachDisplayText(result.answer);
+          currentBox().textContent=answer;
           if(/^[a-f0-9]{64}$/.test(result.coachEvidenceFingerprint||''))
-            setCoachCache({ownerId,dataFingerprint:result.coachEvidenceFingerprint,ts:Date.now(),text:result.answer});
+            setCoachCache({ownerId,dataFingerprint:result.coachEvidenceFingerprint,ts:Date.now(),text:answer});
         }
         else coachError(currentBox());
       }catch(_){

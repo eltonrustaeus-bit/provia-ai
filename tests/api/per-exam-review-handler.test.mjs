@@ -1206,6 +1206,8 @@ test("improvement coach uses only the authenticated account's verified server re
     const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
     assert.ok(provider, "coach answer reaches the model");
     assert.match(provider.body, /45%/);
+    assert.match(provider.body, /äldst först, senaste sist\): 2%, 45%/,
+      "verified result series must be chronological so the final score is the latest");
     assert.match(provider.body, /Biologi 1/);
     assert.match(provider.body, /skapa ett riktat mockprov/i);
     assert.match(provider.body, /enda verifierade statistiken/i);

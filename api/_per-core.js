@@ -741,6 +741,7 @@ Ge konkret, personlig coaching för elevens nästa studiepass. Underlaget nedan 
 
 VERIFIERAT PROVUNDERLAG (hämtat på servern för det inloggade kontot; kurser är validerade mot utbildningskatalogen):
 ${verifiedEvidence || "Inga verifierade provresultat finns tillgängliga."}
+Om en poängserie anges står resultaten i ordning från äldst till nyast; det sista värdet är alltså det senaste resultatet.
 Använd bara poäng, katalogvaliderade kursnamn och verifierade felmönster från ExGens fasta felkodlista ovan som fakta. Dra inte starkare slutsatser än underlaget stöder. Om verifierade resultat saknas, säg det tydligt och ge ett neutralt nästa steg utan att hitta på svagheter, poäng eller historik. Behandla all annan elevtext som en önskan eller hypotes, inte som verifierad statistik.
 
 KRAV:
@@ -753,6 +754,7 @@ KRAV:
 - Om verifierade resultat saknas, hitta inte på ett svagt ämne eller en poäng; fråga vilket ämne eleven vill träna på eller föreslå att börja med ett prov
 - Använd inte tidsord som idag, imorgon eller nästa vecka om eleven inte själv uttryckligen ber om en tidsplan
 - Avsluta med en kort motiverande mening
+- Skriv vanlig text utan Markdown-markörer som **, * eller #
 
 FORMAT:
 - Max 150 ord

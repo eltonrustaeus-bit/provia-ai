@@ -58,6 +58,9 @@ check("coachråd avser nästa studiepass utan påhittad kalenderdag",
   /nästa studiepass/i.test(coachPrompt)
     && /hitta inte på en kalenderdag eller tidsplan/i.test(coachPrompt)
     && /inte tidsord som idag, imorgon eller nästa vecka om eleven inte själv uttryckligen ber om en tidsplan/i.test(coachPrompt));
+check("coachprompten tolkar verifierade poäng kronologiskt och skriver vanlig text",
+  /från äldst till nyast; det sista värdet är alltså det senaste resultatet/i.test(coachPrompt)
+    && /vanlig text utan Markdown-markörer/i.test(coachPrompt));
 check("coachprompten ber inte rutinmässigt eleven agera imorgon", !/åtgärder eleven kan ta imorgon/i.test(coachPrompt));
 
 console.log("\n— GRUNDARE OCH UF —");

@@ -45,7 +45,7 @@ const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fr
 const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
 // Bump when the verified coaching prompt or its evidence contract changes so
 // browser-cached advice cannot outlive the instructions that produced it.
-const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v3";
+const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v4";
 
 const supabase = createSupabaseServerClient(
   getSupabaseUrl(),
@@ -558,7 +558,7 @@ function buildVerifiedCoachEvidence(examData = {}) {
   const errorTypes = [...new Set((Array.isArray(examData.felBankErrorTypes) ? examData.felBankErrorTypes : [])
     .filter(isKnownErrorCode)
     .map(code => errorLabels[code]))].slice(0, 6);
-  if (scores.length) lines.push(`Senaste verifierade provresultat i tidsordning: ${scores.join("%, ")}%`);
+  if (scores.length) lines.push(`Senaste verifierade provresultat (äldst först, senaste sist): ${scores.join("%, ")}%`);
   if (courses.length) lines.push(`Kurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: ${JSON.stringify(courses)}`);
   if (errorTypes.length) lines.push(`Verifierade felmönster från ExGens fasta felkodlista: ${JSON.stringify(errorTypes)}`);
   return lines.length ? lines.join("\n") : "Inga verifierade provresultat finns ännu.";

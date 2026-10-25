@@ -3916,3 +3916,41 @@ modellgenerering, felstatusens liveorsak och aktiv provhjälp återstår.
 **PILOT NOT READY.** Lokala P.E.R-kontext- och aktivprovstester är nu gröna;
 färsk modellgenerering och aktiv provhjälp behöver fortfarande verifieras live
 med ett bekräftat syntetiskt stagingprov. Ingen öppen provstatus ändrades.
+
+## P.E.R verifierad coach: kronologi och ren text — 2026-10-25
+
+- [x] En enda generell P.E.R-fråga på branch-aliasens autentiserade Preview
+  besvarades live med tydlig hjälp om att göra prov från egna anteckningar,
+  rättning, modellsvar och felbank. Skrivskyddad budget efter svaret visade
+  cap `$3.379071`, spent `$2.146696`, reserved `$0.263628`, kvar `$0.968747`.
+- [!] Livecoachkortet visade en saklig tidsordningsmiss: appens senaste resultat
+  var `100 %`, medan coachen kallade `0 %` senaste. Samma fem resultat fanns i
+  båda vyerna i omvänd ordning. Rotorsak: serverfrågan hämtar verifierade rader
+  nyast-först, men poängkonsumenterna räknar `sista minus första` som om listan
+  vore äldst-först.
+- [x] Stagingraden efter den enda coachförfrågan visade spent `$2.147307`,
+  reserved `$0.263628`, kvar `$0.968136`. Inga fler livefrågor skickades efter
+  upptäckten; inget prov eller resultat ändrades.
+- [x] Kodfix: behåll de nyast-först hämtade raderna och vänd endast den
+  verifierade poängserien till äldst-först. Gör ordningen explicit i coachens
+  faktaunderlag och instruktion, bumpa coachrevisionen så gammal cache
+  ogiltigförklaras, och normalisera Markdown i coachkortets vanliga textvisning.
+- [x] Riktade offlinekontroller efter fix: `per-exam-memory-provenance`,
+  `learner-context`, coachens verifierade evidens/cache-tester **2/2**,
+  `per-scope-identity`, `forbattring-flow` **46/46** och
+  `per-page-targets` **76/76** passerade. Syntaxkontroll och `git diff --check`
+  passerade.
+- [x] Oberoende read-only-granskning fann och hjälpte till att fånga Markdown-
+  rubrik-, list-, citat- och länkmarkörer. Normaliseringen och regressionerna
+  täcker nu färska och cacheade svar; granskaren rapporterade inga återstående
+  konkreta fel i de granskade fallen.
+- [!] Fixen är ännu inte pushad/deployerad. Den senaste READY Previewn är
+  fortfarande `dpl_6ykCt3A4bkqRvyzbTeXW3r6Dwunc` för föregående kodrevision.
+  Aktiv provledtråd är fortfarande inte live-testad; ett separat öppet prov
+  lämnades orört.
+
+**PILOT NOT READY.** Fixen är ännu inte pushad/deployerad. Nästa steg är
+checkpoint-push och verifiering av exakt Preview-deployment. Därefter kan högst
+ett coachtest bekräfta att senastepoängen nu stämmer med sidans resultat, efter
+färsk kontroll av stagingbudget. Aktiv provledtråd är fortsatt overifierad live;
+inget öppet eller produktionsprov får ändras för testet.
