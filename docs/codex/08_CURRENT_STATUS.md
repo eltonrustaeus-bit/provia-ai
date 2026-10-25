@@ -17,8 +17,10 @@
 - [!] A read-only staging budget check showed 0.972991 USD remaining under the
   existing lower cap. No AI request was made: another authenticated Preview
   tab showed an active exam, which was left untouched.
-- [!] This code checkpoint is local pending commit/push and a fresh Vercel
-  Preview. No `main`, Production, or database write was made.
+- [x] Commit `6c090c8` is pushed to
+  `codex/exgen-generation-quality-2026-10-20`; Vercel Preview
+  `dpl_K5pn5TmPtG7Q7acUX8TEjQYrFxXq` is READY from the exact commit.
+- [x] No `main`, Production, or database write was made.
 
 # P.E.R request-aware active-exam hints — 2026-10-25
 
