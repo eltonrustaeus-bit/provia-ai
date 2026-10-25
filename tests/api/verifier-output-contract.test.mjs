@@ -120,6 +120,24 @@ const aLevelReviewResult = (difficulty_evidence, evidenceQuotes = [
   },
   duplicate_of: "", issues: [], required_changes: [], difficulty_evidence,
 });
+async function assertARejected(questionText, scoringText, lang = "sv", reasoningOperation = "analyze") {
+  const candidate = {
+    ...aLevelQuestion,
+    question: questionText,
+    rubric: { criteria: scoringText },
+    scoring_rubric: { summary: scoringText },
+  };
+  const review = await runWithResults(
+    [aLevelReviewResult({
+      ...validALevelEvidence,
+      reasoning_operation: reasoningOperation,
+      task_evidence: questionText,
+      scoring_evidence: scoringText,
+    })], [candidate], aLevelMaterial, undefined, "A", undefined, lang);
+  const decision = review.outcome.perQuestion.get("a-compare");
+  assert.equal(decideApproval(decision), false, `recall-only wording must not pass A-level: ${questionText}`);
+  return decision;
+}
 const supportedALevel = await runWithResults(
   [aLevelReviewResult(validALevelEvidence)], [aLevelQuestion], aLevelMaterial,
   undefined, "A", undefined, "sv");
@@ -156,6 +174,37 @@ const mislabelledA = await runWithResults(
 assert.equal(decideApproval(mislabelledA.outcome.perQuestion.get("a-compare")), false,
   "a recall task cannot be relabeled as comparison when its wording has no comparison operation");
 
+const contrastiveA = {
+  ...aLevelQuestion,
+  question: "Beskriv inte bara vad fotosyntesen binder, utan analysera också hur cellandningen flyttar kolet och motivera en slutsats.",
+  rubric: { criteria: "Poäng ges inte bara för återgivning, utan även för analys och en motiverad slutsats med båda källfakta." },
+  scoring_rubric: { summary: "Poäng ges inte bara för återgivning, utan även för analys och en motiverad slutsats med båda källfakta." },
+};
+const contrastiveReview = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    reasoning_operation: "analyze",
+    task_evidence: "analysera också hur cellandningen flyttar kolet och motivera en slutsats",
+    scoring_evidence: contrastiveA.rubric.criteria,
+  })], [contrastiveA], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(contrastiveReview.outcome.perQuestion.get("a-compare")), true,
+  "a reasoning operation after 'inte bara ..., utan ... också' remains affirmative");
+
+for (const [questionText, scoringText, lang] of [
+  ["Beskriv vad fotosyntes binder och vad cellandning frigör. Jämför inte processerna eller motivera någon slutsats; återge bara faktan.", "Poäng ges för korrekt återgivning, inte för resonemang, jämförelse eller motiverad slutsats."],
+  ["Beskriv vad fotosyntes binder och vad cellandning frigör. Analys och motiverad slutsats krävs inte; återge bara faktan.", "Resonemang ger inga poäng. Det krävs inte att eleven motiverar eller drar en slutsats."],
+  ["Analys av sambandet mellan processerna krävs inte; återge bara faktan.", "Resonemang om sambandet belönas inte."],
+  ["Beskriv inte bara fakta, utan analysera inte sambandet. Motivera inte slutsatsen.", "Poäng ges inte för analys eller motiverad slutsats; återgivning räcker."],
+  ["Not only list two facts, but do not analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but tell students to refrain from trying to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but disallow students to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students needn't analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students aren't supposed to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+  ["Not only list two facts, but students are exempt from having to analyze or justify a conclusion; simply repeat the source.", "Points are not awarded for analysis or a justified conclusion; recall is enough.", "en"],
+]) {
+  await assertARejected(questionText, scoringText, lang);
+}
+
 const sameFactQuotes = await runWithResults(
   [aLevelReviewResult(validALevelEvidence, [
     "Vid fotosyntesen tar växten upp koldioxid från luften och binder kolet i glukos.",
@@ -171,6 +220,21 @@ const unsupportedALevel = await runWithResults(
   [aLevelQuestion], aLevelMaterial, undefined, "A", undefined, "sv");
 assert.equal(decideApproval(unsupportedALevel.outcome.perQuestion.get("a-compare")), false,
   "A-level evidence that is not an exact task substring fails closed");
+
+const nounOnlyA = {
+  ...aLevelQuestion,
+  question: "Beskriv fotosyntesens och cellandningens samband och orsaker.",
+  rubric: { criteria: "Poäng för samband och en slutsats." },
+  scoring_rubric: { summary: "Poäng för samband och en slutsats." },
+};
+const overclaimedNounOnlyA = await runWithResults(
+  [aLevelReviewResult({
+    ...validALevelEvidence,
+    task_evidence: nounOnlyA.question,
+    scoring_evidence: nounOnlyA.rubric.criteria,
+  })], [nounOnlyA], aLevelMaterial, undefined, "A", undefined, "sv");
+assert.equal(decideApproval(overclaimedNounOnlyA.outcome.perQuestion.get("a-compare")), false,
+  "topic nouns such as 'relationship' and 'cause' are not proof that the task requires analysis");
 
 const outlierHintReview = await runWithResults(
   [{ ...result("q1", true), factual_accuracy: 1, ambiguity_score: 0, difficulty_match: 1, source_alignment: 1, scoring_quality: 1, language_quality: 1, language_match: true, option_quality: [true, true, true], source_support: sourceSupport("Stockholm är Sveriges huvudstad"), issues: [], required_changes: [] }],

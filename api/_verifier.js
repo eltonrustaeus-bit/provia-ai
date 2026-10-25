@@ -613,15 +613,35 @@ async function verifyQuestions(questions, opts) {
       const taskText = normalizeEvidenceText(expectedQuestion.question);
       const scoringEvidenceText = normalizeEvidenceText(difficultyEvidence?.scoring_evidence);
       const operationSignals = {
-        analyze: ["analysera", "analys", "samband", "paverkar", "orsak", "foljd", "analyze", "analysis", "relationship", "cause", "effect"],
-        compare: ["jamfor", "jamforelse", "skillnad", "likhet", "compare", "comparison", "difference", "similarity"],
-        infer: ["dra slutsats", "slutsats", "harled", "tolka", "infer", "conclusion", "derive", "interpret"],
-        evaluate: ["bedom", "vardera", "motivera stallning", "utvardera", "evaluate", "assess", "justify", "weigh"],
+        analyze: ["analysera", "undersok", "forklara hur", "forklara varfor", "analyze", "examine", "investigate", "explain how", "explain why"],
+        compare: ["jamfor", "compare"],
+        infer: ["dra slutsats", "harled", "tolka", "infer", "derive", "interpret"],
+        evaluate: ["bedom", "vardera", "ta stallning", "utvardera", "evaluate", "assess", "justify", "weigh"],
         synthesize: ["foresla", "kombinera", "utforma", "skapa", "syntetisera", "synthesize", "design", "combine", "propose"],
       };
-      const containsSignal = (text, signals) => signals.some((signal) => text.includes(signal));
-      const conclusionSignals = ["motivera", "slutsats", "resonera", "justify", "conclusion", "reasoned conclusion"];
-      const rubricReasoningSignals = ["resonemang", "motivera", "slutsats", "jamfor", "analys", "underbygg", "reasoning", "justify", "conclusion", "compare", "analysis", "evidence"];
+      const containsAffirmedSignal = (text, signals) => signals.some((signal) => {
+        let at = text.indexOf(signal);
+        while (at >= 0) {
+          const before = text.slice(Math.max(0, at - 64), at);
+          const after = text.slice(at + signal.length, at + signal.length + 64);
+          const contrastiveBefore = /\b(?:inte\s+bara|not\s+only)\b(?:\s+\w+){0,2}\s*$/u.test(before);
+          const contrastiveAfter = /^\s*(?:inte\s+bara|not\s+only)\b/u.test(after);
+          const contrastivePair = /\b(?:inte\s+bara|not\s+only)\b[\s\S]{0,96}\b(?:utan|but)\b[\s\S]{0,48}$/u.test(before);
+          const lastConjunction = [...before.matchAll(/\b(?:utan|but)\b/gu)].at(-1);
+          const continuationText = lastConjunction
+            ? before.slice(lastConjunction.index + lastConjunction[0].length)
+            : "";
+          const continuationHasNegation = /\b(?:inte|ej|aldrig|not|never|no|without|needn['’]?t|don['’]?t|doesn['’]?t|didn['’]?t|cannot|can['’]?t|mustn['’]?t|shouldn['’]?t|won['’]?t|(?:am|is|are|was|were)n['’]?t|exempt(?:s|ed|ing)?|refus(?:e|es|ed|ing)|refrain(?:s|ed|ing)?|declin(?:e|es|ed|ing)|avoid(?:s|ed|ing)?|prohibit(?:s|ed|ing)?|disallow(?:s|ed|ing)?|forbid(?:s|den)?|ban(?:s|ned)?|bar(?:s|red|ring)?|preclude(?:s|d|ing)?|exclude(?:s|d|ing)?|prevent(?:s|ed|ing)?|not\s+allowed|not\s+permitted|not\s+supposed)\b/u.test(continuationText);
+          const contrastiveContinuation = contrastivePair && !continuationHasNegation && !/\butan\s+att\b/u.test(before);
+          const negatedBefore = !contrastiveBefore && !contrastiveContinuation && /\b(?:inte|ej|aldrig|utan(?:\s+att)?|without|needn['’]?t|never|not|don['’]?t|doesn['’]?t|didn['’]?t|cannot|can['’]?t|mustn['’]?t|shouldn['’]?t|won['’]?t|(?:am|is|are|was|were)n['’]?t|exempt(?:s|ed|ing)?|refus(?:e|es|ed|ing)|refrain(?:s|ed|ing)?|declin(?:e|es|ed|ing)|avoid(?:s|ed|ing)?|prohibit(?:s|ed|ing)?|disallow(?:s|ed|ing)?|forbid(?:s|den)?|ban(?:s|ned)?|bar(?:s|red|ring)?|preclude(?:s|d|ing)?|exclude(?:s|d|ing)?|prevent(?:s|ed|ing)?|not\s+allowed|not\s+permitted|not\s+supposed)\b(?:\s+\w+){0,4}\s*$/u.test(before);
+          const negatedAfter = !contrastiveAfter && /^\s*(?:\w+\s+){0,5}(?:inte|ej|aldrig|not|never|no|inga|ingen|inget)\b/u.test(after);
+          if (!negatedBefore && !negatedAfter) return true;
+          at = text.indexOf(signal, at + 1);
+        }
+        return false;
+      });
+      const conclusionSignals = ["motivera", "dra slutsats", "resonera", "justify", "draw a conclusion", "reasoned conclusion"];
+      const rubricReasoningSignals = ["resonemang", "motiver", "jamfor", "analys", "underbygg", "reasoning", "justify", "compare", "analysis", "evidence-based"];
       const difficultyEvidenceContractOk = targetLevel !== "A" || (
         difficultyEvidence && typeof difficultyEvidence === "object" &&
         typeof difficultyEvidence.task_evidence === "string" && difficultyEvidence.task_evidence.length >= 8 &&
@@ -636,10 +656,10 @@ async function verifyQuestions(questions, opts) {
           Array.isArray(support?.answer_evidence) && support.answer_evidence.includes(index)) &&
         higherOrderOperations.has(difficultyEvidence.reasoning_operation) &&
         Number.isInteger(difficultyEvidence.distinct_source_facts) && difficultyEvidence.distinct_source_facts === new Set(citedSourceFacts.map((quote) => quote.trim())).size &&
-        containsSignal(taskText, operationSignals[difficultyEvidence.reasoning_operation] || []) &&
-        difficultyEvidence.rubric_rewards_reasoning === true && containsSignal(scoringEvidenceText, rubricReasoningSignals) &&
-        difficultyEvidence.justified_conclusion_required === true && containsSignal(taskText, conclusionSignals) &&
-        containsSignal(scoringEvidenceText, conclusionSignals)
+        containsAffirmedSignal(taskText, operationSignals[difficultyEvidence.reasoning_operation] || []) &&
+        difficultyEvidence.rubric_rewards_reasoning === true && containsAffirmedSignal(scoringEvidenceText, rubricReasoningSignals) &&
+        difficultyEvidence.justified_conclusion_required === true && containsAffirmedSignal(taskText, conclusionSignals) &&
+        containsAffirmedSignal(scoringEvidenceText, conclusionSignals)
       );
       const validEvidenceIndices = (indices) => Array.isArray(indices) && indices.length >= 1 &&
         indices.length <= 5 && indices.every((index) => Number.isInteger(index) && index >= 0 && index < quotes?.length);

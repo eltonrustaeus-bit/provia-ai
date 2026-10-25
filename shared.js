@@ -2733,10 +2733,17 @@ function finalizeMsg(div, text) {
             if (!perAccountId) return; // Keep it hidden until the same account signs in again.
             var perPendingAge = Date.now() - Number(perPending.savedAt);
             var pageMatches = samePerProofPage(perPending.page, currentPerPageId());
-            if (perPending.accountId === perAccountId && pageMatches
-                && typeof perPending.question === 'string' && perPending.question
-                && perPending.question.length <= 2000 && perPendingAge >= 0
-                && perPendingAge <= 15 * 60 * 1000 && perInpEl && !perInpEl.value) {
+            if (perPending.accountId !== perAccountId || !pageMatches) {
+              sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+              return;
+            }
+            if (typeof perPending.question !== 'string' || !perPending.question
+                || perPending.question.length > 2000 || perPendingAge < 0
+                || perPendingAge > 15 * 60 * 1000) {
+              sessionStorage.removeItem(PER_PENDING_QUESTION_KEY);
+              return;
+            }
+            if (perInpEl && !perInpEl.value) {
               var hasPendingProof = !!(perPending.requestOptions && perPending.requestOptions.examProof);
               var pendingProofMatches = hasPendingProof && typeof perPending.contextFingerprint === 'string' &&
                 perPending.contextFingerprint.length > 0 &&

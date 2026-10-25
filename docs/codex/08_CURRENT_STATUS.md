@@ -4688,3 +4688,32 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   autentiserad app- eller modellkontroll har gjorts.
 - [!] Nästa steg: testa syntetiska 3/6/12-frågeprov på Preview endast efter en
   ny skrivskyddad budgetkontroll och bekräftad syntetisk testidentitet.
+
+### A-nivågrind och P.E.R-utkast — fortsatt kvalitetssäkring 2026-10-25
+
+- [x] Oberoende review av `f5e3c0f` reproducerade att A-grinden kunde godkänna
+  en återgivningsfråga när granskaren felaktigt hävdade att negaterat resonemang
+  var ett krav. `api/_verifier.js` kräver nu konkreta uppgiftsverb i stället för
+  ämnesord som "samband" eller "orsak", och kontrollerar att resonemang och
+  slutsats efterfrågas och belönas. Negationer, förbud och kontrastformer är
+  adversarialt regressionstestade; slutlig avgränsad verifierargranskning fann
+  inga blockerare. Heuristiken kan inte bevisa semantisk A-nivå på egen hand.
+- [x] `shared.js` rensar ett avbrutet P.E.R-utkast när inloggad användare eller
+  aktuell sida inte matchar utkastet, och rensar ogiltiga eller äldre än
+  15 minuter utkast. Om ingen användarsession är tillgänglig ligger utkastet
+  kvar dolt så samma elev kan återhämta det efter inloggning.
+- [x] Riktade offlinekontroller: provpipeline 28/28, HTTP-återupptagbar
+  3/6/12-pipeline 2/2, P.E.R-sidtester 90/90, P.E.R-provsammanhang 102/102,
+  verifierarbeslut, A-nivåns outputkontrakt, quality-gold, syntax och
+  `git diff --check` passerade.
+- [!] A-nivåns verifierutdata är syntetiskt mockade i dessa regressioner. De
+  visar att deterministiska grindar stoppar konkreta motsägelser, inte att
+  produktionsmodellen alltid tolkar uppgiftens semantik korrekt.
+- [!] Utan extern livekontroll kvarstår tidigare noterad lucka: provmekanik och
+  felbankens provenance är testade, men semantisk relevans hos verkligt
+  genererade frågor är inte bevisad av offline-testerna.
+- [x] `shared.js`-ändringen är oberoende granskad utan blockerande fynd. En
+  liten testlucka kvarstår för exakt gränsfall kring 15-minutersutgång.
+- [!] A-nivå- och P.E.R-utkastfixarna är ännu lokala. Nästa checkpoint pushar
+  dem endast till den godkända feature-branchen och skapar en Vercel Preview.
+  Inga Production-, `main`- eller databasändringar är godkända.
