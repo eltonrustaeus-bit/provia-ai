@@ -567,11 +567,23 @@ function buildVerifiedCoachEvidence(examData = {}) {
 function buildVerifiedCoachSnapshot(examData = {}, userId = "") {
   const evidence = buildVerifiedCoachEvidence(examData);
   const fingerprintKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const scores = Array.isArray(examData.mockRecentScores)
+    ? examData.mockRecentScores.filter(value => Number.isInteger(value) && value >= 0 && value <= 100)
+    : [];
+  const focusCourse = [...new Set((Array.isArray(examData.felBankCourses) ? examData.felBankCourses : [])
+    .map(course => resolveCourse(course)?.name)
+    .filter(Boolean))][0] || null;
   return {
     evidence,
     fingerprint: fingerprintKey && userId
       ? createHmac("sha256", fingerprintKey).update(`${userId}\0${PER_COACH_PROMPT_REVISION}\0${evidence}`).digest("hex")
       : null,
+    summary: {
+      latestPercent: scores.at(-1) ?? null,
+      trendDeltaPp: scores.length > 1 ? scores.at(-1) - scores[0] : null,
+      recentResultCount: scores.length,
+      focusCourse,
+    },
   };
 }
 
@@ -1373,6 +1385,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       return res.json({
         unchanged: /^[a-f0-9]{64}$/.test(known) && known === snapshot.fingerprint,
         coachEvidenceFingerprint: snapshot.fingerprint,
+        coachEvidenceSummary: snapshot.summary,
       });
     } catch {
       return res.status(503).json({ error: "Kunde inte kontrollera din verifierade provhistorik just nu." });
@@ -1899,7 +1912,10 @@ async function handleExplainRequest(req, res, perAnswerLease) {
          badOmNivå är null tills eleven faktiskt tryckt på ett steg. */
       if (badOmNivå !== null && !studyCoachRequest && !isHomepageRequest) recordHelpPreference(supabase, user.id, badOmNivå, perMemoryEpoch);
       return res.json({ answer, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel,
-        ...(coachSnapshot ? { coachEvidenceFingerprint: coachSnapshot.fingerprint } : {}) });
+        ...(coachSnapshot ? {
+          coachEvidenceFingerprint: coachSnapshot.fingerprint,
+          coachEvidenceSummary: coachSnapshot.summary,
+        } : {}) });
     } catch {
       await settlePerChatQuota(user.id, quota, false);
       return res.status(500).json({ error: "P.E.R är tillfälligt otillgänglig. Försök igen senare." });

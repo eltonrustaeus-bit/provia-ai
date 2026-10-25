@@ -1196,6 +1196,12 @@ test("improvement coach uses only the authenticated account's verified server re
     }, "POST", "application/json");
 
     assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    assert.deepEqual(response.body.coachEvidenceSummary, {
+      latestPercent: 45,
+      trendDeltaPp: 43,
+      recentResultCount: 2,
+      focusCourse: "Biologi 1",
+    }, "the visible coach summary uses the same authenticated verified rows as the recommendation");
     const resultsQuery = calls.find(({ url }) => url.includes("/rest/v1/mock_results") &&
       new URL(url).searchParams.get("select")?.includes("weak_concept_tags"));
     assert.ok(resultsQuery, "coach reads the verified-result source");
@@ -1298,6 +1304,12 @@ test("coach cache validation fingerprints only fresh verified evidence without q
     assert.equal(first.statusCode, 200, JSON.stringify(first.body));
     assert.equal(first.body.unchanged, false);
     assert.match(first.body.coachEvidenceFingerprint, /^[a-f0-9]{64}$/);
+    assert.deepEqual(first.body.coachEvidenceSummary, {
+      latestPercent: 45,
+      trendDeltaPp: null,
+      recentResultCount: 1,
+      focusCourse: "Biologi 1",
+    });
     const priorPromptFingerprint = createHmac("sha256", process.env.SUPABASE_SECRET_KEY)
       .update(`${userId}\0Senaste verifierade provresultat i tidsordning: 45%\nKurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: [\"Biologi 1\"]`)
       .digest("hex");
@@ -1333,6 +1345,8 @@ test("coach cache validation fingerprints only fresh verified evidence without q
     assert.equal(same.statusCode, 200, JSON.stringify(same.body));
     assert.equal(same.body.unchanged, true, "only the same account's current verified prompt evidence validates a cached answer");
     assert.equal(same.body.coachEvidenceFingerprint, first.body.coachEvidenceFingerprint);
+    assert.deepEqual(same.body.coachEvidenceSummary, first.body.coachEvidenceSummary,
+      "even a no-AI cache check returns fresh server-verified display metrics");
     assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")
       && !url.includes("commit_per_chat_quota")));
   } finally {

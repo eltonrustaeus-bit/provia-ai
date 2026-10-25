@@ -123,7 +123,10 @@ await assertPageTopic("/förbättring.html", "förbättring");
         coachCalls++;
         requestStarted();
         await responseGate;
-        await route.fulfill({ json: { answer: "LIVE_CARD_AFTER_RERENDER" } });
+        await route.fulfill({ json: {
+          answer: "LIVE_CARD_AFTER_RERENDER",
+          coachEvidenceSummary: { latestPercent: 45, trendDeltaPp: -17, recentResultCount: 3, focusCourse: "Biologi 1" },
+        } });
       } else await route.fulfill({ json: { ok: true } });
     },
   });
@@ -139,7 +142,57 @@ await assertPageTopic("/förbättring.html", "förbättring");
   await page.waitForFunction(() => !document.querySelector('[data-screen="coach"] .xf-orb')?.classList.contains("busy"));
   ok("in-flight coach response renders into the current card after navigation rerender",
     await page.locator("#coachText").textContent() === "LIVE_CARD_AFTER_RERENDER");
+  ok("coach score summary comes from the verified server evidence, not local 62% history",
+    await page.locator("#lastText").textContent() === "45 % · verifierat resultat",
+    await page.locator("#lastText").textContent());
+  ok("coach trend explicitly describes the server-verified sample",
+    await page.locator("#trendText").textContent() === "-17 p.p. · senaste 3 verifierade",
+    await page.locator("#trendText").textContent());
+  ok("coach focus is sourced from the server-verified course list",
+    await page.locator("#focusText").textContent() === "Biologi 1 · verifierade resultat under 70 %",
+    await page.locator("#focusText").textContent());
   ok("navigation rerender does not start a duplicate model request", coachCalls === 1, String(coachCalls));
+  await ctx.close();
+}
+
+// A successful-but-old or malformed response must not be interpreted as
+// verified evidence that the student has no results or fractional scores.
+{
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.topic === "studiecoach") return route.fulfill({ json: { answer: "COACH_WITHOUT_SUMMARY" } });
+      return route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_WITHOUT_SUMMARY").waitFor({ timeout: 5000 });
+  ok("missing verified summary is not presented as an empty verified history",
+    await page.locator("#lastText").textContent() === "Verifierad historik kunde inte hämtas",
+    await page.locator("#lastText").textContent());
+  ok("missing summary leaves trend and focus unclaimed",
+    await page.locator("#trendText").textContent() === "—" &&
+      await page.locator("#focusText").textContent() === "");
+  await ctx.close();
+}
+
+{
+  const { ctx, page } = await mk("/förbättring.html", {
+    explainHandler: async route => {
+      const body = route.request().method() === "POST" ? route.request().postDataJSON() : null;
+      if (body?.topic === "studiecoach") return route.fulfill({ json: {
+        answer: "COACH_WITH_FRACTIONAL_SUMMARY",
+        coachEvidenceSummary: { latestPercent: 45, trendDeltaPp: -17.6, recentResultCount: 3, focusCourse: "Biologi 1" },
+      } });
+      return route.fulfill({ json: { ok: true } });
+    },
+  });
+  await page.getByRole("button", { name: "Fråga P.E.R vad du ska göra" }).click();
+  await page.getByText("COACH_WITH_FRACTIONAL_SUMMARY").waitFor({ timeout: 5000 });
+  ok("fractional verified trend is rejected instead of silently rounded",
+    await page.locator("#lastText").textContent() === "Verifierad historik kunde inte hämtas" &&
+      await page.locator("#trendText").textContent() === "—" &&
+      await page.locator("#focusText").textContent() === "");
   await ctx.close();
 }
 

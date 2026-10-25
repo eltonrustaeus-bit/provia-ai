@@ -3968,3 +3968,37 @@ coachflödet på staging. Aktiv provledtråd är fortsatt inte live-verifierad;
 inget öppet prov eller produktionsprov ändrades. Håll kvar ändringen på
 feature-branch och gör ingen merge till `main`/Production utan separat uttryckligt
 beslut.
+
+## Coachkortets verifierade nyckeltal och aktivt P.E.R-test — 2026-10-25
+
+- [x] På den redan inloggade staging-Previewn skapades ett syntetiskt
+  Biologi 1-prov med tre frågor om fotosyntes från motsvarande underlag. Alla
+  tre genererades; den granskade Calvin-cykelfrågan låg inom materialets ämne.
+  P.E.R gav en ledtråd som bad eleven hitta belägg i materialet utan att ange
+  svaret. UI:t höll facitsvaret låst under provet.
+- [x] Användaren bekräftade att just testprovet fick avbrytas. Appen återgick
+  till startsidan; inga andra prov lämnades in, avbröts eller ändrades.
+- [x] Coachkortets Senaste/Trend/Fokus hämtas nu från samma autentiserade,
+  verifierade resultatunderlag som serverns P.E.R-rekommendation, inte från
+  obekräftad lokal `user_exams`-historik. Cachekontrollen returnerar även det
+  färska serverunderlaget utan modell- eller kvotanrop.
+- [x] UI:t visar laddning, avvaktande provstatus och otillgänglig historik
+  separat. Saknat eller felaktigt underlag visas inte som nollresultat; en
+  decimal trend avvisas i stället för att tyst rundas.
+- [x] Offlinekontroller på slutdiff: `per-page-targets` **82/82**,
+  `forbattring-flow` **46/46**, full `per-exam-review-handler` **72/72**;
+  `node --check api/explain.js` och `git diff --check` passerade.
+- [x] Oberoende read-only-review hittade en fractional-trend-valideringslucka;
+  den är åtgärdad med heltalskontroll och ett regressionsfall. Övriga
+  ägarskaps- och proveniensflöden bedömdes utan blockerare.
+- [!] Ett prov och en P.E.R-ledtråd live-verifierades syntetiskt före
+  avbrytandet. Ingen inlämning/rättning, coachmodellgenerering eller ny
+  AI-förfrågan gjordes efteråt. Senaste lästa stagingbudget före testet var
+  `$0.942541` kvar; den siffran är en tidigare ögonblicksbild och kan ha ändrats.
+- [!] Coachkortets nya nyckeltal är ännu inte live-verifierade på den aktuella
+  Previewn. De här ändringarna är lokala och ocommittade vid noteringstillfället;
+  `main`, Production, databas, konto, kvot och hemligheter har inte ändrats.
+
+**PILOT NOT READY.** Nästa steg är slutlig diffgranskning, checkpoint på den
+befintliga feature-branchen och kontroll av READY Previewn. Inga fler live-AI-
+anrop behövs för denna coachkortskorrigering.

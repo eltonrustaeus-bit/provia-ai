@@ -1437,7 +1437,7 @@
        med texten "Hämta P.E.R-analys" — på en skärm eleven öppnat just för att
        få den. Dygnscachen behålls: det är samma historik. */
     function renderCoach(){
-      const {h,m,last}=data();
+      const {h,m}=data();
       flow.say('coach','P.E.R läser din historik.',
         'Rekommendationen bygger på dina senaste prov och din felbank.');
 
@@ -1458,19 +1458,7 @@
         '<div class="xf-row"><dt>Fokus</dt><dd id="focusText">—</dd></div>';
       body.appendChild(stats);
 
-      const lastA=(last&&last.attempt)?last.attempt:h[h.length-1];
-      if(lastA){
-        const lastPercent=chartPercent(lastA.percent);
-        $('lastText').textContent=`${lastPercent===null?'Resultat saknas':`${lastPercent} %`} · ${lastA.level||'—'} · `+
-          ((lastA.course||'').trim()||'Ingen kurs');
-      }
-      const tr=computeTrend(h);
-      $('trendText').textContent=tr?`${tr.delta>=0?'+':''}${Math.round(tr.delta)} p.p.`:'—';
-      const mc=mostMistakeCourse(m);
-      if(mc.course){
-        const topC=conceptCounts(m.filter(x=>String(x.course||'').trim()===mc.course))[0];
-        $('focusText').textContent=topC?`${mc.course} › ${topC[0]} (${topC[1]})`:`${mc.course} (${mc.n})`;
-      }else $('focusText').textContent='Markera 5 misstag';
+      setVerifiedCoachSummary(null,'loading');
 
       if(flow.current()==='coach')loadCoach(h,m);
     }
@@ -1481,7 +1469,7 @@
       const currentBox=()=>$('coachText')||box;
       const{data:sessionData}=db?await db.auth.getSession():{data:null};
       const ownerId=sessionData?.session?.user?.id||'';
-      if(!ownerId){box.textContent='Logga in för att få en personlig analys.';return;}
+      if(!ownerId){box.textContent='Logga in för att få en personlig analys.';setVerifiedCoachSummary(null,'unavailable');return;}
       const cache=getCoachCache(ownerId);
       if(coachPending?.ownerId===ownerId){currentBox().textContent='P.E.R läser…';return;}
       box.textContent='P.E.R läser…';
@@ -1496,9 +1484,11 @@
           if(requestId!==coachRequestSequence||checked?.session?.user?.id!==ownerId)return;
           if(result?.coachDeferred){
             currentBox().textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+            setVerifiedCoachSummary(null,'deferred');
             return;
           }
           if(result?.unchanged===true&&result.coachEvidenceFingerprint===cache.dataFingerprint){
+            setVerifiedCoachSummary(result.coachEvidenceSummary);
             const answer=coachDisplayText(cache.text);
             currentBox().textContent=answer;
             if(answer!==cache.text)setCoachCache({...cache,text:answer});
@@ -1511,8 +1501,10 @@
         if(requestId!==coachRequestSequence||current?.session?.user?.id!==ownerId)return;
         if(result?.coachDeferred){
           currentBox().textContent='Slutför ditt pågående prov för att få en personlig analys. Under provet kan P.E.R ge ledtrådar till den aktuella frågan.';
+          setVerifiedCoachSummary(null,'deferred');
           return;
         }
+        setVerifiedCoachSummary(result?.coachEvidenceSummary);
         if(result?.answer){
           const answer=coachDisplayText(result.answer);
           currentBox().textContent=answer;
@@ -1521,12 +1513,50 @@
         }
         else coachError(currentBox());
       }catch(_){
-        if(requestId===coachRequestSequence)coachError(currentBox(),_);
+        if(requestId===coachRequestSequence){setVerifiedCoachSummary(null,'unavailable');coachError(currentBox(),_);}
       }
       finally{
         if(coachPending?.requestId===requestId)coachPending=null;
         if(requestId===coachRequestSequence)flow.busy('coach',false);
       }
+    }
+
+    function setVerifiedCoachSummary(summary,state='ready'){
+      const last=$('lastText'),trend=$('trendText'),focus=$('focusText');
+      if(!last||!trend||!focus)return;
+      if(state==='loading'){
+        last.textContent='Kontrollerar verifierad historik…';
+        trend.textContent='—';
+        focus.textContent='P.E.R hämtar sitt underlag';
+        return;
+      }
+      if(state==='unavailable'||state==='deferred'){
+        last.textContent=state==='deferred'?'Personlig coachning väntar tills provet är klart':'Verifierad historik kunde inte hämtas';
+        trend.textContent='—';
+        focus.textContent='';
+        return;
+      }
+      const count=summary&&summary.recentResultCount;
+      const latest=summary&&summary.latestPercent;
+      const delta=summary&&summary.trendDeltaPp;
+      const validSummary=Number.isInteger(count)&&count>=0&&count<=5&&
+        (count===0?latest===null:Number.isInteger(latest)&&latest>=0&&latest<=100)&&
+        (count<2?delta===null:Number.isInteger(delta)&&delta>=-100&&delta<=100)&&
+        (summary.focusCourse===null||typeof summary.focusCourse==='string');
+      if(!validSummary){
+        last.textContent='Verifierad historik kunde inte hämtas';
+        trend.textContent='—';
+        focus.textContent='';
+        return;
+      }
+      const course=typeof summary?.focusCourse==='string'?summary.focusCourse.trim():'';
+      last.textContent=count===0?'Inga verifierade resultat ännu':`${latest} % · verifierat resultat`;
+      trend.textContent=delta===null
+        ?(count>1?'Trend saknas':'Behöver minst två verifierade prov')
+        :`${delta>=0?'+':''}${Math.round(delta)} p.p. · senaste ${count} verifierade`;
+      focus.textContent=course
+        ?`${course} · verifierade resultat under 70 %`
+        :'Inget verifierat fokusområde ännu';
     }
 
     /* Ett misslyckat anrop säger det och går att göra om, i stället för att
