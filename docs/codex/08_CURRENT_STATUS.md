@@ -4259,6 +4259,32 @@ reparationsspår i ett syntetiskt, versionsstyrt gold-set. Utöka aggregerad
 diagnostik endast med integritetssäkra utfallskoder; gör ny liveverifiering
 först efter färsk budget- och Previewkontroll.
 
+## Feature-Preview verifierad efter kvalitetsfixar — 2026-10-25
+
+- [x] GitHub-feature-branchen
+  `codex/exgen-generation-quality-2026-10-20` pekar på commit
+  `794ad2260c5ecd43910b21c179db231acb7d2716`
+  (`Improve ExGen exam quality and PER context`). `main` står kvar på
+  `ad60a68316a1dfaedb54a508e5b063bd1cc24bf4`.
+- [x] Vercel Preview `dpl_G5S6AVuC7EwYKcsLpjY9PuhSENjg` är READY från exakt
+  feature-branchens commit. Branch-aliasen pekar på deploymenten. En ny
+  direkt-URL visar den avsedda skolpilotens inloggningsgrind; en befintlig
+  inloggad branch-aliasflik har session, men inget AI-flöde kördes och inget
+  befintligt prov ändrades.
+- [x] Färsk, skrivskyddad stagingbudget kl. 12:24 UTC: cap `$3.379071`, spent
+  `$2.172902`, reserved `$0.263628`, kvar `$0.942541`, enabled. Ingen
+  modellförfrågan skickades; kvarvarande belopp räcker inte som verifierad
+  kostnadsram för ett meningsfullt prov-/P.E.R.-test.
+- [x] Bekräftat lokalt efter push: arbetskatalogen ren, feature-ref på
+  `794ad2260c5ecd43910b21c179db231acb7d2716`, `main` oförändrad. Inga
+  databasskrivningar, produktionsåtgärder, kontoförändringar eller
+  kvotändringar gjordes.
+
+**PILOT NOT READY.** Koden är publicerad i feature-Preview och offlinekontroller
+är godkända, men ny modellbaserad semantisk kvalitet är inte liveverifierad.
+Nästa steg är först en ny kostnadsram eller återställd budget, därefter ett
+enda avgränsat syntetiskt stagingflöde med bekräftad autentiserad session.
+
 ## Verifierarens källbelägg vid felträning — 2026-10-25
 
 - [x] Bekräftad kodrotorsak: servern återskapar `sourceEvidence` från elevens
