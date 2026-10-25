@@ -45,7 +45,7 @@ const QUIZ_REGEX        = /quizza mig|quiz mig|ställ.*fråga.*mig|testa mig.*fr
 const SUCCESS_REGEX     = /klarade|godkänt|100 ?%|alla rätt|noll fel|klarat provet|lyckades|fick rätt på alla/i;
 // Bump when the verified coaching prompt or its evidence contract changes so
 // browser-cached advice cannot outlive the instructions that produced it.
-const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v2";
+const PER_COACH_PROMPT_REVISION = "2026-10-25-verified-coach-v3";
 
 const supabase = createSupabaseServerClient(
   getSupabaseUrl(),

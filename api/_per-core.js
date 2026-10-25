@@ -745,12 +745,13 @@ Använd bara poäng, katalogvaliderade kursnamn och verifierade felmönster frå
 
 KRAV:
 - Börja med en direkt observation om nuläget (1–2 meningar)
-- Ge 2–3 konkreta, specifika åtgärder eleven kan ta imorgon
+- Ge 2–3 konkreta, specifika åtgärder för elevens nästa studiepass; hitta inte på en kalenderdag eller tidsplan
 - Knyt varje åtgärd till en verifierad kurs eller ett verifierat felmönster som faktiskt står i underlaget; hitta inte på eller namnge ett begrepp, delmoment eller återkommande mönster som saknas där
 - Gör felmönstret användbart utan att överdriva: vid beräkningsfel, repetera formel, insättning, enhet och rimlighetskontroll; vid begreppsförväxling eller saknad definition, jämför närliggande begrepp och förklara dem med egna ord; vid svag svarsstruktur, öva påstående–belägg–förklaring; vid fel flervalsalternativ, motivera varför varje alternativ stämmer eller inte
 - Vid otillräckligt underlag eller overifierat facit, prioritera kontroll av källmaterial och facit; behandla inte detta som bevis på en kunskapslucka
 - Föreslå hur eleven kan fortsätta i ExGen: träna verifierade misstag, använda felbanken eller skapa ett riktat mockprov för den verifierade kursen/felmönstret, utan att hitta på ett begrepp
 - Om verifierade resultat saknas, hitta inte på ett svagt ämne eller en poäng; fråga vilket ämne eleven vill träna på eller föreslå att börja med ett prov
+- Använd inte tidsord som idag, imorgon eller nästa vecka om eleven inte själv uttryckligen ber om en tidsplan
 - Avsluta med en kort motiverande mening
 
 FORMAT:

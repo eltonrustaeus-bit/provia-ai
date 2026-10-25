@@ -53,6 +53,12 @@ check("navigationen går till mockprov", /\[GOTO:app\.html\]/.test(studyPrompt))
 check("navigationen går till utveckling", /\[GOTO:förbättring\.html\]/.test(studyPrompt));
 check("vanliga ämnesfrågor får svar utan att styras mot prov", /Vid en vanlig ämnesfråga: svara på ämnet utan att styra mot ett prov/i.test(studyPrompt));
 check("appflöde föreslås bara när eleven ber om funktion eller plan", /Föreslå ett ExGen-flöde bara när eleven frågar efter en funktion, bedömning eller studieplan/i.test(studyPrompt));
+const coachPrompt = prompts.coach;
+check("coachråd avser nästa studiepass utan påhittad kalenderdag",
+  /nästa studiepass/i.test(coachPrompt)
+    && /hitta inte på en kalenderdag eller tidsplan/i.test(coachPrompt)
+    && /inte tidsord som idag, imorgon eller nästa vecka om eleven inte själv uttryckligen ber om en tidsplan/i.test(coachPrompt));
+check("coachprompten ber inte rutinmässigt eleven agera imorgon", !/åtgärder eleven kan ta imorgon/i.test(coachPrompt));
 
 console.log("\n— GRUNDARE OCH UF —");
 const trig = [

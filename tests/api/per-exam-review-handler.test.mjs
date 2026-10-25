@@ -1305,6 +1305,16 @@ test("coach cache validation fingerprints only fresh verified evidence without q
       knownCoachEvidenceFingerprint: priorPromptFingerprint,
     }, "POST", "application/json");
     assert.equal(stalePrompt.body.unchanged, false, "a fingerprint from the earlier coach prompt cannot reuse cached advice");
+    const oldRevisionEvidence = "Senaste verifierade provresultat i tidsordning: 45%\nKurser med verifierade resultat under 70% i Skolverkets utbildningskatalog: [\"Biologi 1\"]";
+    const oldRevisionFingerprint = createHmac("sha256", process.env.SUPABASE_SECRET_KEY)
+      .update([userId, "2026-10-25-verified-coach-v2", oldRevisionEvidence].join("\0"))
+      .digest("hex");
+    const oldRevision = await invoke({
+      topic: "studiecoach",
+      coachCacheCheck: true,
+      knownCoachEvidenceFingerprint: oldRevisionFingerprint,
+    }, "POST", "application/json");
+    assert.equal(oldRevision.body.unchanged, false, "the former calendar-timed coach prompt cannot reuse cached advice");
     const resultsQuery = calls.find(({ url }) => url.includes("/rest/v1/mock_results"));
     assert.ok(resultsQuery);
     assert.equal(new URL(resultsQuery.url).searchParams.get("user_id"), `eq.${userId}`);

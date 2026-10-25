@@ -3793,21 +3793,27 @@ och den aktuella provfrågan faktiskt är aktiv.
 - [x] Oberoende read-only review fann inga blockerande kodbrister i
   startsidans gräns, konto-/resultatbunden coachcache eller provkontextens
   avbrott. Reviewern bekräftade också att mocktester inte ersätter livebevis.
-- [x] Den inloggade staging-branch-aliasen visade förbättringssidan och
-  serverhämtad sammanfattning av testhistorik/felbank med ämnesspecifik nästa
-  rekommendation. Detta verifierar sidans läsning/rendering, inte ett nytt
-  personligt AI-coachsvar. Coachknappen gick inte att aktivera via den
-  tillgängliga browserstyrningen; ingen modellförfrågan skickades.
+- [x] På branch-aliasens förbättringssida gav ett syntetiskt stagingkonto ett
+  live coachsvar från serververifierad historik. Rådet kopplade nästa steg till
+  verifierat kurs-/felmönster och bad kontrollera ett avvikande resultat innan
+  slutsats drogs. Svaret följde dock den gamla promptens instruktion att ange
+  "imorgon"; därför uppdateras coachprompten till "nästa studiepass" utan
+  påhittad kalenderdag.
+- [x] Coachpromptrevision bumpas från `verified-coach-v2` till `v3`, så en
+  sparad rekommendation skapad med den gamla tidsinstruktionen inte återanvänds.
+  Regressionstesterna verifierar både promptregeln och att gammalt
+  v2-fingeravtryck invalidieras. Ändringen är ännu inte deployad i denna status.
 - [!] Aktiv provhjälp på den exakta senaste koden är fortsatt inte live-testad.
   En flik på branch-aliasen visade tidigare ett ifyllt 12-frågeprov; inget svar
   ändrades och provet lämnades inte in eller avbröts. Efter vanlig navigation
   visades appens startsida; provets serverstatus kontrollerades inte på nytt.
-- [!] Skrivskyddad budgetläsning 2026-10-25 10:59 UTC visade cap `$3.379071`,
-  spenderat `$2.143292`, reserverat `$0.263628` och `$0.972151` kvar. Inget
-  nytt AI-anrop gjordes efter den läsningen i denna fortsättning.
+- [x] Skrivskyddad budgetläsning efter coachanropet, 2026-10-25 11:27 UTC:
+  cap `$3.379071`, spenderat `$2.143987`, reserverat `$0.263628`, kvar
+  `$0.971456`. Delta för live coachsvaret var cirka `$0.000695` i appens
+  budgetbokföring.
 
-**PILOT NOT READY.** Kod, offlinegrindar, feature-push och Preview är
-verifierade. Kvar är en lyckad livekontroll av coachsvaret samt aktiv
-provledtråd på aktuell Preview med bekräftat syntetiskt underlag och utan att
-förändra ett befintligt prov. Ingen Production, `main`, Supabase-data/schema,
-roll, kvot eller hemlighet ändrades.
+**PILOT NOT READY.** Live coachsvar har nu verifierats på föregående
+Preview-version; ändringen som tar bort oombedd tidsplan och invalidierar dess
+cache behöver pushas och verifieras på en ny Preview. Aktiv provledtråd saknar
+fortfarande livebevis på exakt senaste kod med syntetiskt underlag. Ingen
+Production, `main`, Supabase-data/schema, roll, kvot eller hemlighet ändrades.
