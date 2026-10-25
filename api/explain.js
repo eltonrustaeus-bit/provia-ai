@@ -703,7 +703,8 @@ function sendActiveExamGuidance(req, res, body, issuanceState = "active") {
       ? "This exam is not open for answering. I can help with the method, but a full answer requires verified grading. "
       : "Provet är inte öppet för svar. Jag kan hjälpa med metoden, men ett fullständigt svar kräver verifierad rättning. ");
   res.json({
-    answer: statusNote + (slopeQuestion ? slopeGuidance[requestedLevel] : sequence?.[requestedLevel] || ladder.short[requestedLevel]),
+    answer: statusNote + (slopeQuestion ? slopeGuidance[requestedLevel]
+      : sequence?.[requestedLevel] || ladder.short[requestedLevel]),
     helpCap: 2,
     helpLevelUsed: requestedLevel,
     examActive: issuanceState === "active",
@@ -722,9 +723,13 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
   const hasSubmissionIdentity = typeof context?.examState?.submissionId === "string"
     && /^[a-f0-9]{32}$/.test(context.examState.submissionId);
   const hasExamQuestions = Array.isArray(context?.questions) && context.questions.length > 0;
+  const hasStaleExamPayload = Boolean(hasCurrentQuestion || hasExamQuestions || context?.examState);
   const chatSubmissionIdentity = hasSubmissionIdentity && body.examReview !== true && !Array.isArray(body.scores);
-  const examContextDeclared = hasExamQuestions || chatSubmissionIdentity || (!hasOtherPage &&
-    (hasCurrentQuestion || hasExamPhase || page === "prov"));
+  // A stale question list can remain in shared client context after leaving
+  // the exam. Treat exam fields as declared context only on exam/result pages;
+  // submission identity remains exam-bound on every route.
+  const examContextDeclared = chatSubmissionIdentity || (!hasOtherPage &&
+    (hasExamQuestions || hasCurrentQuestion || hasExamPhase || page === "prov"));
   const ordinaryStudyChat = typeof body.userQuestion === "string" && body.userQuestion.trim().length > 0
     && body.examReview !== true && body.tipsMode !== true && body.legalMode !== true
     && body.landingMode !== true && !Array.isArray(body.scores)
@@ -817,9 +822,11 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     const staleProvView = String(context?.page || "").trim().toLowerCase() === "prov";
     const hasStaleExamPayload = Boolean(context?.currentQuestion || context?.questions || context?.examState);
     const staleViewWithoutIssuance = serverState === "none" && staleProvView;
+    const inactiveIssuance = ["none", "completed", "abandoned", "expired", "missing"].includes(serverState);
+    const ignoreStaleQuestionMatch = Boolean(clearlyGeneral && hasOtherPage && hasStaleExamPayload && inactiveIssuance);
     if (!ordinaryStudyChat || referencesExamQuestion({
       allowTopicOverlap: clearlyGeneral && !staleViewWithoutIssuance,
-      ignoreQuestionMatch: clearlyGeneral && staleViewWithoutIssuance,
+      ignoreQuestionMatch: (clearlyGeneral && staleViewWithoutIssuance) || ignoreStaleQuestionMatch,
       minimumSharedWords: serverState === "completed" ? 4 : 3,
     })) return false;
     // Inactive or unverified exam context must not strand unrelated study help.
@@ -949,6 +956,11 @@ async function gateActiveExam(req, res, body, user, perAnswerLease) {
     if (latestState !== "none" && latestState !== "completed") {
       if (allowSafeStudyChat(latestState)) return false;
       sendActiveExamGuidance(req, res, body, latestState);
+      return true;
+    }
+    if (hasOtherPage && hasStaleExamPayload && ordinaryStudyChat) {
+      if (allowSafeStudyChat(latestState)) return false;
+      sendActiveExamGuidance(req, res, body, "unverified");
       return true;
     }
     if (examContextDeclared) {

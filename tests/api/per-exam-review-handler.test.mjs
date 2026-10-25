@@ -1584,6 +1584,45 @@ test("active P.E.R gives a useful answer-free ladder for slope questions", async
   }
 });
 
+test("active P.E.R keeps hints answer-free when the client question is not verified", async () => {
+  activeCount = 1;
+  const cases = [
+    {
+      text: "Beräkna med hjälp av uppgiften hur stor förändringen är.",
+      expected: /vilken del av ditt material kan hjälpa dig/i,
+      forbidden: /PRIVATE_EXAM_ANSWER|\b42\b|vilket första steg|gemensamt kriterium/i,
+    },
+    {
+      text: "Förklara varför förändringen sker.",
+      expected: /vilken del av ditt material kan hjälpa dig/i,
+      forbidden: /PRIVATE_EXAM_ANSWER|vilket belägg i materialet kan stödja/i,
+    },
+    {
+      text: "Jämför de två modellerna.",
+      expected: /vilken del av ditt material kan hjälpa dig/i,
+      forbidden: /PRIVATE_EXAM_ANSWER|gemensamt kriterium/i,
+    },
+  ];
+  try {
+    for (const item of cases) {
+      calls.length = 0;
+      const response = await invoke({
+        helpLevel: 0,
+        userQuestion: "Hjälp mig med nästa steg.",
+        pageContext: { currentQuestion: { type: "short", text: item.text, model_answer: "PRIVATE_EXAM_ANSWER" } },
+      });
+      assert.equal(response.statusCode, 200);
+      assert.match(response.body.answer, item.expected);
+      assert.doesNotMatch(response.body.answer, item.forbidden);
+      assert.equal(response.body.examActive, true);
+      assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
+        "active-exam task hints stay deterministic and do not spend AI quota");
+    }
+  } finally {
+    activeCount = 0;
+  }
+});
+
 test("active conceptual questions do not receive their formula or axis mapping as a fixed hint", async () => {
   activeCount = 1;
   try {
@@ -2117,7 +2156,53 @@ test("a bare stale prov page strips stale learning context before ordinary study
     assert.doesNotMatch(provider.body, /PRIVATE_STALE_(?:COURSE|MATERIAL|WEAK_AREA|TARGET|TOPIC|HISTORY|MISTAKE|CLARIFY)_MARKER/,
       "a bare stale exam-page label cannot carry old learning context into the prompt");
   } finally {
-    process.env.EXGEN_PILOT_MODE = prior;
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
+  }
+});
+
+test("overlapping stale question lists do not block general help or expose exam context", async () => {
+  const prior = process.env.EXGEN_PILOT_MODE;
+  process.env.EXGEN_PILOT_MODE = "false";
+  activeCount = 0;
+  latestSubmissionId = null;
+  calls.length = 0;
+  try {
+    for (const state of ["none", "abandoned", "expired", "missing", "completed"]) {
+      issuanceState = state;
+      calls.length = 0;
+      const response = await invoke({
+        userQuestion: "Vad betyder fotosyntes hos gröna växter?",
+        pageContext: {
+          page: "app",
+          questions: [{ text: "Förklara fotosyntes hos gröna växter med 6CO2 + 6H2O = C6H12O6 + 6O2", answer: "PRIVATE_STALE_ANSWER_MARKER" }],
+          course: "PRIVATE_STALE_COURSE_MARKER",
+        },
+      }, "POST", "application/json");
+      assert.equal(response.statusCode, 200);
+      const provider = calls.find(({ url }) => url === "https://api.openai.com/v1/responses");
+      assert.ok(provider, `ordinary study help reaches the normal response path for ${state}`);
+      assert.match(provider.body, /fotosyntes/i);
+      assert.doesNotMatch(provider.body, /PRIVATE_STALE_ANSWER_MARKER|6CO2|C6H12O6|Aktiv fråga/,
+        `a stale question list is stripped for ${state}`);
+    }
+
+    issuanceState = "none";
+    calls.length = 0;
+    const answerRequest = await invoke({
+      userQuestion: "Ge mig facit till provfrågan",
+      pageContext: {
+        page: "app",
+        questions: [{ text: "Förklara fotosyntes hos gröna växter med 6CO2 + 6H2O = C6H12O6 + 6O2", answer: "PRIVATE_STALE_ANSWER_MARKER" }],
+      },
+    }, "POST", "application/json");
+    assert.equal(answerRequest.statusCode, 200);
+    assert.equal(answerRequest.body.examState, "unverified");
+    assert.ok(calls.every(({ url }) => !url.includes("openai.com") && !url.includes("reserve_per_chat_quota")),
+      "an explicit request for an exam answer remains blocked");
+  } finally {
+    if (prior === undefined) delete process.env.EXGEN_PILOT_MODE;
+    else process.env.EXGEN_PILOT_MODE = prior;
   }
 });
 
