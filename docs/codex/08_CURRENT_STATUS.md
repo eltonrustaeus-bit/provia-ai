@@ -4714,6 +4714,9 @@ enda 12-frågetest. Offline- och mocktester bevisar inte live-modellens
   genererade frågor är inte bevisad av offline-testerna.
 - [x] `shared.js`-ändringen är oberoende granskad utan blockerande fynd. En
   liten testlucka kvarstår för exakt gränsfall kring 15-minutersutgång.
-- [!] A-nivå- och P.E.R-utkastfixarna är ännu lokala. Nästa checkpoint pushar
-  dem endast till den godkända feature-branchen och skapar en Vercel Preview.
-  Inga Production-, `main`- eller databasändringar är godkända.
+- [x] Kodcheckpoint `e1a64fabd4f403dda7578a1fded0ca025ba3a440` är pushad till
+  `codex/exgen-generation-quality-2026-10-20`. Vercel Preview
+  `dpl_DwH5xFHup1XPP6yMfuWaAe68gDzr` blev `READY` från exakt SHA med URL
+  `https://provia-mno8zy0ep-eltons-projects-4adfb1a3.vercel.app`.
+- [!] Deployment is verified, but no authenticated app/session or live-model
+  check was performed. No Production, `main`, or database change was made.
