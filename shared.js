@@ -1838,6 +1838,13 @@ function finalizeMsg(div, text) {
                   if (answerCommitted && typing) finalizeMsg(typing, answerText);
                   if (ev.history) perSaveHist(ev.history);
                 }
+                if (typeof ev.reviewUnavailable === 'string' && ev.reviewUnavailable.trim() && answerCommitted && typing) {
+                  answerText = ev.reviewUnavailable;
+                  typing.className = 'per-msg teacher';
+                  typing.textContent = answerText;
+                  if (ev.history) perSaveHist(ev.history);
+                  announceFailure(answerText);
+                }
                 /* Exam-bound pages retain their separate correction UI.
                    Ordinary chat receives reviewedAnswer and replaces this
                    same bubble without exposing review metadata. */

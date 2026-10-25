@@ -1829,7 +1829,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         { role: 'assistant', content: fullText, page: requestPage, examBound: isExamBoundPage(requestPage) },
       ].slice(-20);
       const historySaved = await savePerSessionHistory(supabase, user.id, newHistory, perMemoryEpoch);
-      if (!isHomepageRequest) refreshPerMemory(user.id, newHistory, learningSignals, perMemoryEpoch).catch(() => {});
+      let historyForMemory = newHistory;
+      let refreshMemory = !isHomepageRequest && historySaved;
       /* badOmNivå, inte helpLevel och inte requestedLevel.
          Signalen lär sig vilket förklaringsdjup eleven FÖREDRAR. Två saker får
          därför inte hamna här:
@@ -1873,9 +1874,22 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                 correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
               }
               if (correctedHistorySaved) {
+                historyForMemory = correctedHistory;
                 res.write(`data: ${JSON.stringify({
                   reviewedAnswer: replacementAnswer,
                   history: correctedHistory,
+                })}\n\n`);
+              } else {
+                refreshMemory = false;
+                const safeNotice = body.lang === "en"
+                  ? "I could not verify this answer safely. Please ask again."
+                  : "Jag kunde inte säkerställa svaret. Skicka frågan igen.";
+                correctedHistory[lastAssistant] = { ...correctedHistory[lastAssistant], content: safeNotice };
+                let noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+                if (!noticeSaved) noticeSaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+                res.write(`data: ${JSON.stringify({
+                  reviewUnavailable: safeNotice,
+                  ...(noticeSaved ? { history: correctedHistory } : {}),
                 })}\n\n`);
               }
             } else {
@@ -1888,6 +1902,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
                 granskning,
                 ...(correctedHistorySaved ? { history: correctedHistory } : {}),
               })}\n\n`);
+              if (correctedHistorySaved) historyForMemory = correctedHistory;
             }
           } else {
             res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
@@ -1897,6 +1912,7 @@ async function handleExplainRequest(req, res, perAnswerLease) {
         }
       }
 
+      if (refreshMemory) refreshPerMemory(user.id, historyForMemory, learningSignals, perMemoryEpoch).catch(() => {});
       await usageWrite;
       return res.end();
     }

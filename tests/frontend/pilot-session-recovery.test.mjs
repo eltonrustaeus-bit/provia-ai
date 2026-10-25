@@ -36,6 +36,22 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       let body = {};
       try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch {}
       res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" });
+      if (body.userQuestion === "Fråga vars svar inte gick att verifiera") {
+        const notice = "Jag kunde inte säkerställa svaret. Skicka frågan igen.";
+        const history = [
+          { role: "user", content: body.userQuestion },
+          { role: "assistant", content: notice }
+        ];
+        const initialHistory = [
+          { role: "user", content: body.userQuestion },
+          { role: "assistant", content: "Ett osäkert svar." }
+        ];
+        res.write('data: {"delta":"Ett osäkert svar."}\n\n');
+        res.write(`data: ${JSON.stringify({ done: true, history: initialHistory, helpCap: 3 })}\n\n`);
+        res.write(`data: ${JSON.stringify({ reviewUnavailable: notice, history })}\n\n`);
+        res.end();
+        return;
+      }
       if (body.userQuestion === "Fråga som ska rensas") {
         res.write('data: {"delta":"Del av svar"}\n\n');
         const timer = setTimeout(() => { if (!res.destroyed) res.end(); }, 1200);
@@ -452,6 +468,18 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     assert.doesNotMatch(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
     assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /En kort precisering\./,
       "the local conversation cache follows the persisted replacement");
+
+    const reviewFailurePage = await openPilotPage(makeSession("account-a"), "account-a", null,
+      route => route.continue({ url: `${reviewServerUrl}/api/explain` }));
+    await reviewFailurePage.locator("#perBubble").click();
+    await reviewFailurePage.locator("#perInput").fill("Fråga vars svar inte gick att verifiera");
+    await reviewFailurePage.locator("#perSendBtn").click();
+    await reviewFailurePage.locator("#perMessages").getByText("Jag kunde inte säkerställa svaret. Skicka frågan igen.", { exact: true }).waitFor();
+    assert.equal(await reviewFailurePage.locator("#perMessages").getByText("Ett osäkert svar.", { exact: true }).count(), 0,
+      "a failed correction never remains as the visible final answer");
+    assert.match(await reviewFailurePage.evaluate(() => localStorage.getItem("proviaai_per_history")),
+      /Jag kunde inte säkerställa svaret/,
+      "the local P.E.R history follows the safe persisted notice");
 
     const tokenSwitchPage = await openPilotPage(makeSession("account-a"));
     await tokenSwitchPage.locator("#perBubble").click();

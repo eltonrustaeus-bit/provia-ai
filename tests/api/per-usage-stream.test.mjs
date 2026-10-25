@@ -375,10 +375,16 @@ test("ordinary-chat correction is not shown if corrected history cannot be saved
       .map((chunk) => JSON.parse(chunk.slice(6).trim()));
     assert.equal(events.some((event) => event.reviewedAnswer), false,
       "a correction is not shown unless matching server history was saved");
+    const unavailableEvent = events.find((event) => event.reviewUnavailable);
+    assert.ok(unavailableEvent,
+      "ordinary chat replaces the unpersisted answer with a safe retry notice");
+    assert.match(unavailableEvent.reviewUnavailable, /säkerställa svaret|verify this answer safely/i);
+    assert.equal(unavailableEvent.history?.at(-1)?.content, unavailableEvent.reviewUnavailable,
+      "the safe notice replaces the questionable answer in saved session history when storage recovers");
     assert.equal(events.some((event) => event.granskning), false,
       "ordinary chat does not fall back to a self-review note");
     const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
-    assert.equal(historyWrites.length, 3, "the failed correction save receives one retry");
+    assert.equal(historyWrites.length, 4, "the failed correction save retries once, then persists a safe notice");
     assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
     assert.equal(historyWrites[1].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
     assert.equal(historyWrites[2].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");

@@ -2534,6 +2534,7 @@ try{
     }
     if(res.status===429&&res.data?.error==="Quota exceeded"){
       try{window.ExGenGenerationRequest?.clearPendingGeneration?.(idempotencyKey);}catch{}
+      try{window.ExGenGenerationRequest?.clearPendingInput?.(idempotencyKey);}catch{}
       if(typeof res.data.count==="number")localStorage.setItem(quotaStorageKey(generationRole, authSnapshot.userId), String(res.data.count));
       const msg = quotaLimitMessage(res.data.periodUnit || ROLE_LIMITS[currentRole]?.period);
       setBusy(false);clearGenerationPlaceholder();setStatus(msg,"bad");await refreshQuotaUi();
