@@ -25,6 +25,7 @@ let cleanEofAfterDelta = false;
 let truncatedStream = false;
 let stopReasonWithoutDone = false;
 let failFirstQuotaCommit = false;
+let failCorrectionHistorySave = false;
 let quotaCommitCalls = 0;
 let quotaCommitApplied = false;
 let failQuotaCommit = false;
@@ -42,8 +43,13 @@ globalThis.fetch = async (input, init = {}) => {
   requests.push({ url, body });
   if (url === `${origin}/auth/v1/user`) return Response.json({ id: userId, email: "synthetic@example.invalid" });
   if (url.includes("/rest/v1/rpc/get_per_memory_epoch")) return Response.json(memoryEpoch);
-  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch") ||
-      url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
+  if (url.includes("/rest/v1/rpc/save_per_session_if_epoch")) {
+    if (failCorrectionHistorySave && body?.p_messages?.at(-1)?.content === "Kontrollera insättningen: rätt värde är x = 4.") {
+      return Response.json(false);
+    }
+    return Response.json(true);
+  }
+  if (url.includes("/rest/v1/rpc/save_per_long_memory_if_epoch")) return Response.json(true);
   if (url.includes("/rest/v1/rpc/active_exam_count")) return Response.json(activeCount);
   if (url.includes("/rest/v1/rpc/acquire_per_answer_lease")) return Response.json("acquired");
   if (url.includes("/rest/v1/rpc/release_per_answer_lease")) return Response.json("released");
@@ -322,7 +328,7 @@ test("tips mode commits successful quota and refunds provider failures", async (
   }
 });
 
-test("a serious P.E.R correction is persisted with the assistant answer and returned to the client", async () => {
+test("a serious ordinary-chat P.E.R correction replaces the answer without a self-review note", async () => {
   requests.length = 0;
   streamAnswer = "Ekvationen ger x = 5.";
   reviewAnswer = JSON.stringify({
@@ -335,17 +341,51 @@ test("a serious P.E.R correction is persisted with the assistant answer and retu
     const events = res.chunks
       .filter((chunk) => chunk.startsWith("data: "))
       .map((chunk) => JSON.parse(chunk.slice(6).trim()));
-    const correctionEvent = events.find((event) => event.granskning?.rättelse);
+    const correctionEvent = events.find((event) => event.reviewedAnswer);
     assert.ok(correctionEvent);
-    assert.match(correctionEvent.history.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+    assert.equal(correctionEvent.reviewedAnswer, "Kontrollera insättningen: rätt värde är x = 4.");
+    assert.equal(correctionEvent.history.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.equal(events.some((event) => event.granskning), false,
+      "ordinary chat does not expose review metadata or an after-answer note");
 
     const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
     assert.equal(historyWrites.length, 2);
-    assert.doesNotMatch(historyWrites[0].body.p_messages.at(-1).content, /P\.E\.R-kontroll/);
-    assert.match(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll: Kontrollera insättningen/);
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
+    assert.equal(historyWrites[1].body.p_messages.at(-1).content, correctionEvent.reviewedAnswer);
+    assert.doesNotMatch(historyWrites[1].body.p_messages.at(-1).content, /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
   } finally {
     streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
     reviewAnswer = null;
+  }
+});
+
+test("ordinary-chat correction is not shown if corrected history cannot be saved", async () => {
+  requests.length = 0;
+  streamAnswer = "Ekvationen ger x = 5.";
+  reviewAnswer = JSON.stringify({
+    allvar: "allvarlig",
+    fynd: [{ typ: "räknefel", citat: "x = 5", varför: "Insättning visar att värdet inte stämmer." }],
+    rättelse: "Kontrollera insättningen: rätt värde är x = 4.",
+  });
+  failCorrectionHistorySave = true;
+  try {
+    const res = await invoke("text/event-stream", { userQuestion: "Hur löser jag ekvationen?" });
+    const events = res.chunks
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6).trim()));
+    assert.equal(events.some((event) => event.reviewedAnswer), false,
+      "a correction is not shown unless matching server history was saved");
+    assert.equal(events.some((event) => event.granskning), false,
+      "ordinary chat does not fall back to a self-review note");
+    const historyWrites = requests.filter((request) => request.url.endsWith("/rest/v1/rpc/save_per_session_if_epoch"));
+    assert.equal(historyWrites.length, 3, "the failed correction save receives one retry");
+    assert.equal(historyWrites[0].body.p_messages.at(-1).content, "Ekvationen ger x = 5.");
+    assert.equal(historyWrites[1].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
+    assert.equal(historyWrites[2].body.p_messages.at(-1).content, "Kontrollera insättningen: rätt värde är x = 4.");
+  } finally {
+    streamAnswer = "Börja med att hitta ett begrepp i ditt material.";
+    reviewAnswer = null;
+    failCorrectionHistorySave = false;
   }
 });
 

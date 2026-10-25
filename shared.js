@@ -1299,12 +1299,8 @@
       } catch (_) {}
     }
 
-    /* Självgranskningens rättelse. Se api/_per-review.js.
-
-   Den visas som ett eget block UNDER svaret, inte som en omskrivning av det.
-   Att tyst byta ut texten hade dolt både felet och att systemet hittade det —
-   och en elev som ser att P.E.R. kontrollerar sig själv har mer skäl att lita
-   på honom, inte mindre. */
+    /* Used only for the separate correction UI on exam-bound pages.
+       Ordinary chat replaces its answer in place after serious review. */
 var _perRättelse = null;
 
 function visaRättelse(efterEl, text) {
@@ -1837,11 +1833,14 @@ function finalizeMsg(div, text) {
                   }
                 }
                 if (ev.done && ev.history) perSaveHist(ev.history);
-                /* Rättelsen från självgranskningen. Kommer efter att svaret
-                   strömmat färdigt — eleven har redan läst texten, och en
-                   synlig rättelse under den är ärligare än att tyst skriva om
-                   svaret eller hålla tillbaka det i väntan på granskningen.
-                   Bara allvarliga fynd når hit; servern filtrerar resten. */
+                if (typeof ev.reviewedAnswer === 'string' && ev.reviewedAnswer.trim()) {
+                  answerText = ev.reviewedAnswer;
+                  if (answerCommitted && typing) finalizeMsg(typing, answerText);
+                  if (ev.history) perSaveHist(ev.history);
+                }
+                /* Exam-bound pages retain their separate correction UI.
+                   Ordinary chat receives reviewedAnswer and replaces this
+                   same bubble without exposing review metadata. */
                 if (ev.granskning && ev.granskning.rättelse) {
                   _perRättelse = ev.granskning.rättelse;
                   if (answerCommitted && typing) { visaRättelse(typing, _perRättelse); _perRättelse = null; }

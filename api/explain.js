@@ -1846,9 +1846,8 @@ async function handleExplainRequest(req, res, perAnswerLease) {
       // can then distinguish a completed answer from a delayed correction pass.
       res.write(`data: ${JSON.stringify({ done: true, ...(historySaved ? { history: newHistory } : {}), helpCap, helpLevelUsed: helpLevel })}\n\n`);
 
-      /* Granskningen körs EFTER att svaret strömmat färdigt. Eleven har redan
-         läst texten; en rättelse under den är ärligare än att hålla tillbaka
-         hela svaret i väntan på ett andra modellanrop. */
+      /* Ordinary chat replaces a seriously flawed answer in place. Active-exam
+         guidance keeps its existing review UI and answer restrictions. */
       const granskning = await granskaSvar({
         fråga: userQuestion, svar: fullText, helpLevel, userId: user.id,
         /* curriculumContext byggs BARA av _math-curriculum.js, och bara när
@@ -1866,17 +1865,36 @@ async function handleExplainRequest(req, res, perAnswerLease) {
           correctedHistory = newHistory.slice();
           const lastAssistant = correctedHistory.findLastIndex((message) => message.role === "assistant");
           if (lastAssistant >= 0) {
-            correctedHistory[lastAssistant] = {
-              ...correctedHistory[lastAssistant],
-              content: `${correctedHistory[lastAssistant].content}\n\nP.E.R-kontroll: ${granskning.rättelse}`,
-            };
-            correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+            const replacementAnswer = granskning.rättelse;
+            if (!isExamBoundPage(requestPage)) {
+              correctedHistory[lastAssistant] = { ...correctedHistory[lastAssistant], content: replacementAnswer };
+              correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              if (!correctedHistorySaved) {
+                correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              }
+              if (correctedHistorySaved) {
+                res.write(`data: ${JSON.stringify({
+                  reviewedAnswer: replacementAnswer,
+                  history: correctedHistory,
+                })}\n\n`);
+              }
+            } else {
+              correctedHistory[lastAssistant] = {
+                ...correctedHistory[lastAssistant],
+                content: `${newHistory[lastAssistant]?.content || fullText}\n\nP.E.R-kontroll: ${replacementAnswer}`,
+              };
+              correctedHistorySaved = await savePerSessionHistory(supabase, user.id, correctedHistory, perMemoryEpoch);
+              res.write(`data: ${JSON.stringify({
+                granskning,
+                ...(correctedHistorySaved ? { history: correctedHistory } : {}),
+              })}\n\n`);
+            }
+          } else {
+            res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
           }
+        } else if (isExamBoundPage(requestPage)) {
+          res.write(`data: ${JSON.stringify({ granskning })}\n\n`);
         }
-        res.write(`data: ${JSON.stringify({
-          granskning,
-          ...(correctedHistorySaved ? { history: correctedHistory } : {}),
-        })}\n\n`);
       }
 
       await usageWrite;

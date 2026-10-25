@@ -889,6 +889,13 @@ assert.deepEqual(logicalOperandGate.dropped, [
   { id: "same-operands-paraphrase", issues: ["duplicate_question"] },
 ]);
 
+const symmetricVariableComparisonGate = assessment.gateExam({ questions: [
+  { ...questions[0], id: "compare-a-b", question: "Jämför A och B.", topic: "Logik", concept_tag: "Logik" },
+  { ...questions[0], id: "compare-b-a", question: "Jämför B och A.", topic: "Logik", concept_tag: "Logik" },
+] }, { profile: "generic", secret: signingSecret });
+assert.deepEqual(symmetricVariableComparisonGate.questions.map((question) => question.id), ["compare-a-b"],
+  "reversing a symmetric comparison does not create a distinct question");
+
 for (const [language, original, redundant] of [
   ["sv", "Förklara om regelA och (regelB eller regelC) gäller.", "Förklara om regelA och ((regelB eller regelC)) gäller."],
   ["en", "Explain whether ruleA and (ruleB or ruleC) applies.", "Explain whether ruleA and ((ruleB or ruleC)) applies."],
@@ -1514,7 +1521,11 @@ try {
     topic: "Fotosyntes",
     subtopic: "Fotosyntesens reaktanter och produkter",
     concept_tag: "Fotosyntes",
-    learning_objective: "Beskriva fotosyntesens plats, reaktanter och produkter.",
+    learning_objective: [
+      "Beskriva fotosyntesens plats.",
+      "Beskriva fotosyntesens reaktanter.",
+      "Beskriva fotosyntesens produkter.",
+    ][index],
     source_references: [["kloroplasterna"], ["vatten och koldioxid"], ["glukos och syre"]][index],
   }));
   activeQuestions = biologyQuestions;
@@ -2763,7 +2774,7 @@ try {
   const solverOnlyRejectedFirstPass = biologyQuestions.map((question, index) => ({
     ...question,
     id: `solver-only-${index + 1}`,
-    question: `REJECTED_STEM_SENTINEL_${index + 1}`,
+    question: `REJECTED_STEM_SENTINEL_${index + 1}: ${question.question}`,
     options: ["Kloroplast", "Cellkärna", "Kesäkten"],
     correct_index: 0,
     model_answer: "REJECTED_ANSWER_KEY_SENTINEL",

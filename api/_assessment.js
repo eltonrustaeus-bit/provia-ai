@@ -879,6 +879,15 @@ function questionLogicalStructureSequence(question) {
   return hasOperandOnBothSides ? canonicalLogicalStructure(structure, text) : null;
 }
 
+function questionLogicalVariableSequence(question) {
+  const text = String(question?.question || "").normalize("NFKC");
+  return [...text.matchAll(/[\p{L}][\p{L}\p{N}_]*/gu)]
+    .map(([token]) => token)
+    .filter((token) => /^[\p{Lu}]$/u.test(token) ||
+      (/\p{Lu}/u.test(token.slice(1)) && token.length > 2))
+    .map((token) => token.toLowerCase());
+}
+
 function semanticDuplicateQuestion(left, right) {
   const leftStructure = questionLogicalStructureSequence(left);
   const rightStructure = questionLogicalStructureSequence(right);
@@ -1092,6 +1101,25 @@ function isDuplicateQuestion(left, right) {
       leftAction === rightAction;
   }
   if (leftQuadratic || rightQuadratic) return false;
+
+  // Structural answer-target differences must win over broad stem/objective
+  // overlap. Otherwise questions with the same terms and answer vocabulary,
+  // but a different logical scope (for example AND/OR order), are discarded.
+  const leftLogicalStructure = questionLogicalStructureSequence(left);
+  const rightLogicalStructure = questionLogicalStructureSequence(right);
+  if ((leftLogicalStructure === null && rightLogicalStructure?.length) ||
+      (rightLogicalStructure === null && leftLogicalStructure?.length)) return false;
+  const leftLogicalVariables = questionLogicalVariableSequence(left);
+  const rightLogicalVariables = questionLogicalVariableSequence(right);
+  if (leftLogicalVariables.length > 1 && rightLogicalVariables.length > 1 &&
+      leftLogicalVariables.length === rightLogicalVariables.length &&
+      leftLogicalVariables.every((token) => rightLogicalVariables.includes(token)) &&
+      leftLogicalVariables.some((token, index) => token !== rightLogicalVariables[index]) &&
+      !(commutativeComparisonSignature(left) &&
+        commutativeComparisonSignature(left) === commutativeComparisonSignature(right))) return false;
+  if (leftLogicalStructure?.length && rightLogicalStructure?.length &&
+      (leftLogicalStructure.length !== rightLogicalStructure.length ||
+        leftLogicalStructure.some((token, index) => token !== rightLogicalStructure[index]))) return false;
 
   // Question-stem overlap misses paraphrased factual questions. Treat a very
   // close repeated full-score answer as the same target, while requiring a

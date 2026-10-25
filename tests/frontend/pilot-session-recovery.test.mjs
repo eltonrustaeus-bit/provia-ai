@@ -46,7 +46,7 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
       res.write('data: {"done":true,"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat."}],"helpCap":2}\n\n');
       const timer = setTimeout(() => {
         if (res.destroyed) return;
-        res.write('data: {"granskning":{"rättelse":"En kort precisering."},"history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"Svar sparat.\\n\\nP.E.R-kontroll: En kort precisering."}]}\n\n');
+        res.write('data: {"reviewedAnswer":"En kort precisering.","history":[{"role":"user","content":"' + body.userQuestion + '"},{"role":"assistant","content":"En kort precisering."}]}\n\n');
         res.end();
       }, 800);
       res.on("close", () => clearTimeout(timer));
@@ -444,11 +444,14 @@ test("pilot P.E.R preserves study data and restores its unsent question through 
     await reviewPage.locator("#perInput").fill(QUESTION);
     await reviewPage.locator("#perSendBtn").click();
     await reviewPage.locator("#perMessages").getByText("Svar sparat.").waitFor();
+    await reviewPage.locator("#perMessages").getByText("En kort precisering.").waitFor();
     assert.equal(await reviewPage.locator(".per-rattelse").count(), 0,
-      "the saved primary answer renders before the optional review correction arrives");
-    await reviewPage.locator(".per-rattelse").waitFor();
-    assert.equal(await reviewPage.locator(".per-rattelse").innerText(), "JAG KONTROLLERADE MITT SVAR\nEn kort precisering.");
-    assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll: En kort precisering/);
+      "the reviewed answer replaces the original in the same chat bubble");
+    assert.equal(await reviewPage.locator("#perMessages").getByText("Svar sparat.", { exact: true }).count(), 0);
+    assert.equal(await reviewPage.locator("#perMessages").getByText("En kort precisering.", { exact: true }).count(), 1);
+    assert.doesNotMatch(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /P\.E\.R-kontroll|jag kontrollerade mitt svar/i);
+    assert.match(await reviewPage.evaluate(() => localStorage.getItem("proviaai_per_history")), /En kort precisering\./,
+      "the local conversation cache follows the persisted replacement");
 
     const tokenSwitchPage = await openPilotPage(makeSession("account-a"));
     await tokenSwitchPage.locator("#perBubble").click();
